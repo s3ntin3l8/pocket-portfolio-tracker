@@ -156,4 +156,37 @@ describe("auth + portfolios + transactions", () => {
     });
     expect(cross.statusCode).toBe(404);
   });
+
+  it("computes XIRR performance from external cash flows", async () => {
+    const t = await token("perf-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Perf", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const post = (payload: object) =>
+      app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload,
+      });
+    await post({ type: "deposit", price: "1000000", currency: "IDR", executedAt: "2025-01-01T00:00:00.000Z" });
+    await post({ type: "withdrawal", price: "100000", currency: "IDR", executedAt: "2025-07-01T00:00:00.000Z" });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/performance`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const perf = res.json();
+    expect(perf.netWorth).toBe("900000"); // 1,000,000 deposited - 100,000 withdrawn
+    expect(typeof perf.xirr).toBe("number");
+    expect(Number.isFinite(perf.xirr)).toBe(true);
+  });
 });
