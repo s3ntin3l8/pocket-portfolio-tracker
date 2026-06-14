@@ -11,6 +11,7 @@ export default defineConfig({
       "@portfolio/db": pkg("db"),
       "@portfolio/core": pkg("core"),
       "@portfolio/schema": pkg("schema"),
+      "@portfolio/market-data": pkg("market-data"),
     },
   },
   test: {

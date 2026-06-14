@@ -7,6 +7,7 @@ import {
   cashFlow,
   xirr,
   netWorth,
+  summarizePortfolio,
   type CoreTransaction,
   type CorporateAction,
 } from "../src/index.js";
@@ -151,6 +152,57 @@ describe("xirr (extreme / fallback)", () => {
   });
   it("returns NaN for fewer than two points", () => {
     expect(Number.isNaN(xirr([{ amount: -1, date: new Date() }]))).toBe(true);
+  });
+});
+
+describe("summarizePortfolio", () => {
+  const I1 = "inst-1";
+  const I2 = "inst-2";
+
+  function mk(p: Partial<CoreTransaction>): CoreTransaction {
+    return {
+      instrumentId: I1,
+      type: "buy",
+      quantity: "0",
+      price: "0",
+      fees: "0",
+      currency: "IDR",
+      executedAt: new Date("2026-01-01"),
+      ...p,
+    };
+  }
+
+  it("values holdings, cash, P&L and net worth", () => {
+    const txs: CoreTransaction[] = [
+      mk({ type: "deposit", instrumentId: null, price: "5000000" }),
+      mk({ type: "buy", quantity: "100", price: "9500", executedAt: new Date("2026-01-02") }),
+      mk({ type: "buy", quantity: "100", price: "10500", executedAt: new Date("2026-01-03") }),
+      mk({ type: "sell", quantity: "50", price: "11000", executedAt: new Date("2026-01-04") }),
+      // unpriced holding — returned but excluded from market-value totals
+      mk({ type: "buy", instrumentId: I2, quantity: "10", price: "100", executedAt: new Date("2026-01-05") }),
+    ];
+
+    const summary = summarizePortfolio({
+      transactions: txs,
+      prices: { [I1]: { price: "11000", currency: "IDR" } },
+      displayCurrency: "IDR",
+    });
+
+    const h1 = summary.holdings.find((h) => h.instrumentId === I1)!;
+    expect(h1.marketValue).toBe("1650000"); // 150 * 11000
+    expect(h1.unrealizedPnL).toBe("150000"); // 1,650,000 - 1,500,000
+    expect(h1.realizedPnL).toBe("50000");
+
+    const h2 = summary.holdings.find((h) => h.instrumentId === I2)!;
+    expect(h2.marketValue).toBeNull(); // no price
+
+    // 5,000,000 - 950,000 - 1,050,000 + 550,000 - 1,000 (the I2 buy)
+    expect(summary.cash.IDR).toBe("3549000");
+    expect(summary.totalCost).toBe("1500000"); // priced holdings only
+    expect(summary.totalMarketValue).toBe("1650000");
+    expect(summary.totalUnrealizedPnL).toBe("150000");
+    expect(summary.totalRealizedPnL).toBe("50000");
+    expect(summary.netWorth).toBe("5199000"); // 1,650,000 + 3,549,000
   });
 });
 

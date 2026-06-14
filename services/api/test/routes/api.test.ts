@@ -119,6 +119,26 @@ describe("auth + portfolios + transactions", () => {
     ]);
   });
 
+  it("values the portfolio via /summary (priced by market data)", async () => {
+    const t = await token("user-a");
+    const portfolioId = (await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) })).json()[0].id;
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/summary`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const summary = res.json();
+    // BBCA priced at 9500 by the fixture provider → 100 * 9500 market value.
+    expect(summary.totalMarketValue).toBe("950000");
+    expect(summary.holdings[0].marketValue).toBe("950000");
+    expect(summary.totalUnrealizedPnL).toBe("0");
+    // Bought without a prior cash deposit, so cash is negative and net worth nets to 0.
+    expect(summary.cash.IDR).toBe("-950000");
+    expect(summary.netWorth).toBe("0");
+  });
+
   it("isolates portfolios between users", async () => {
     const tA = await token("user-a");
     const tB = await token("user-b");

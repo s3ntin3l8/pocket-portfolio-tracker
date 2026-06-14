@@ -1,8 +1,14 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq } from "drizzle-orm";
-import { portfolios, transactions } from "@portfolio/db";
+import { and, eq, inArray } from "drizzle-orm";
+import { instruments, portfolios, transactions } from "@portfolio/db";
 import { transactionInputSchema } from "@portfolio/schema";
-import { computeHoldings, type CoreTransaction } from "@portfolio/core";
+import {
+  computeHoldings,
+  summarizePortfolio,
+  type CoreTransaction,
+} from "@portfolio/core";
+import type { InstrumentRef } from "@portfolio/market-data";
+import { getMarketData } from "../services/market-data.js";
 import { requireUser } from "../plugins/auth.js";
 
 interface PortfolioParams {
@@ -94,6 +100,68 @@ export async function transactionsRoute(app: FastifyInstance) {
         executedAt: r.executedAt,
       }));
       return computeHoldings(coreTxns);
+    },
+  );
+
+  // Full valuation summary: holdings priced via market data + cash + net worth.
+  app.get<{ Params: PortfolioParams }>(
+    "/portfolios/:portfolioId/summary",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = requireUser(request);
+      const { portfolioId } = request.params;
+      const portfolio = await ownedPortfolio(id, portfolioId);
+      if (!portfolio) {
+        return reply.code(404).send({ error: "portfolio_not_found" });
+      }
+
+      const rows = await app.db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.portfolioId, portfolioId));
+
+      const instrumentIds = [
+        ...new Set(
+          rows.map((r) => r.instrumentId).filter((x): x is string => x !== null),
+        ),
+      ];
+      const instrumentRows = instrumentIds.length
+        ? await app.db
+            .select()
+            .from(instruments)
+            .where(inArray(instruments.id, instrumentIds))
+        : [];
+
+      const refs = instrumentRows.map((i) => ({
+        id: i.id,
+        ref: {
+          symbol: i.symbol,
+          market: i.market,
+          assetClass: i.assetClass,
+          currency: i.currency,
+        } satisfies InstrumentRef,
+      }));
+      const quotes = await getMarketData().getQuotes(refs);
+      const prices: Record<string, { price: string; currency: string }> = {};
+      for (const [instrumentId, q] of Object.entries(quotes)) {
+        prices[instrumentId] = { price: q.price, currency: q.currency };
+      }
+
+      const coreTxns: CoreTransaction[] = rows.map((r) => ({
+        instrumentId: r.instrumentId,
+        type: r.type,
+        quantity: r.quantity,
+        price: r.price,
+        fees: r.fees,
+        currency: r.currency,
+        executedAt: r.executedAt,
+      }));
+
+      return summarizePortfolio({
+        transactions: coreTxns,
+        prices,
+        displayCurrency: portfolio.baseCurrency,
+      });
     },
   );
 }
