@@ -9,3 +9,9 @@ export {
   type PriceQuote,
   type NetWorthInput,
 } from "./networth.js";
+export {
+  summarizePortfolio,
+  type PortfolioSummary,
+  type HoldingValuation,
+  type SummarizeInput,
+} from "./valuation.js";
