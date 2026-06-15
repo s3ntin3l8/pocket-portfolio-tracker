@@ -3,7 +3,13 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "next-intl";
 import { formatMoney } from "@/lib/utils";
-import type { AllocationSlice } from "@/lib/mock-data";
+
+/** A single donut slice — any keyed category (asset class, currency, …). */
+export interface DonutSlice {
+  key: string;
+  label: string;
+  value: number;
+}
 
 const COLORS = [
   "var(--color-chart-1)",
@@ -13,7 +19,13 @@ const COLORS = [
   "var(--color-chart-5)",
 ];
 
-export function AllocationDonut({ data }: { data: AllocationSlice[] }) {
+export function AllocationDonut({
+  data,
+  currency = "IDR",
+}: {
+  data: DonutSlice[];
+  currency?: string;
+}) {
   const locale = useLocale();
   const total = data.reduce((s, d) => s + d.value, 0);
 
@@ -36,7 +48,7 @@ export function AllocationDonut({ data }: { data: AllocationSlice[] }) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => formatMoney(value, "IDR", locale)}
+              formatter={(value: number) => formatMoney(value, currency, locale)}
               contentStyle={{
                 background: "var(--color-popover)",
                 border: "1px solid var(--color-border)",
