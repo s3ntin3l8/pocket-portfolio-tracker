@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -14,6 +14,20 @@ export const metadata: Metadata = {
   description:
     "Indonesian-first personal portfolio tracker with screenshot import.",
   manifest: "/manifest.webmanifest",
+  // iOS: enable standalone "Add to Home Screen" with the right name + status bar.
+  appleWebApp: {
+    capable: true,
+    title: "Portfolio",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
 };
 
 export function generateStaticParams() {
