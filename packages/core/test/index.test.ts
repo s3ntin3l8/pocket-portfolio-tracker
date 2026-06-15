@@ -247,6 +247,28 @@ describe("summarizePortfolio", () => {
     // Total in IDR: 50,000 + 100 × 16,000.
     expect(summary.totalDayChange).toBe("1650000");
   });
+
+  it("breaks exposure down by currency (holdings + cash) in display currency", () => {
+    const summary = summarizePortfolio({
+      transactions: [
+        mk({ type: "deposit", instrumentId: null, currency: "IDR", price: "1000000" }),
+        mk({ type: "deposit", instrumentId: null, currency: "USD", price: "200" }),
+        mk({ type: "buy", quantity: "100", price: "9000", currency: "IDR" }), // I1, IDR
+        mk({ type: "buy", instrumentId: I2, quantity: "10", price: "100", currency: "USD" }), // I2, USD
+      ],
+      prices: {
+        [I1]: { price: "9500", currency: "IDR" },
+        [I2]: { price: "110", currency: "USD" },
+      },
+      displayCurrency: "IDR",
+      fx: (from, to) => (from === "USD" && to === "IDR" ? "16000" : "1"),
+    });
+
+    // IDR: holding 100×9500=950,000 + cash (1,000,000 − 900,000)=100,000 → 1,050,000.
+    expect(summary.exposureByCurrency.IDR).toBe("1050000");
+    // USD: holding 10×110=1,100 + cash (200 − 1,000)=−800 → ×16,000 = 4,800,000.
+    expect(summary.exposureByCurrency.USD).toBe("4800000");
+  });
 });
 
 describe("netWorth", () => {
@@ -291,6 +313,7 @@ describe("aggregatePortfolios", () => {
     totalRealizedPnL: "0",
     totalIncome: "0",
     totalDayChange: "0",
+    exposureByCurrency: {},
     ...over,
   });
 
@@ -313,6 +336,7 @@ describe("aggregatePortfolios", () => {
         },
       ],
       cash: { IDR: "1000000" },
+      exposureByCurrency: { IDR: "1950000" },
       netWorth: "1950000",
       totalCost: "900000",
       totalMarketValue: "950000",
@@ -352,6 +376,7 @@ describe("aggregatePortfolios", () => {
         },
       ],
       cash: { IDR: "500000", USD: "100" },
+      exposureByCurrency: { IDR: "7100000", USD: "100000" },
       netWorth: "7200000",
       totalCost: "5950000",
       totalMarketValue: "6700000",
@@ -373,6 +398,7 @@ describe("aggregatePortfolios", () => {
     expect(out.holdings).toHaveLength(2); // i1 merged, i2 distinct
 
     expect(out.cash).toEqual({ IDR: "1500000", USD: "100" });
+    expect(out.exposureByCurrency).toEqual({ IDR: "9050000", USD: "100000" });
     expect(out.netWorth).toBe("9150000"); // 1,950,000 + 7,200,000
     expect(out.totalCost).toBe("6850000");
     expect(out.totalUnrealizedPnL).toBe("800000"); // totalMV − totalCost

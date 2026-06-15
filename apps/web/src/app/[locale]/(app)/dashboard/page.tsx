@@ -137,6 +137,13 @@ export default async function DashboardPage({
     .sort((a, b) => holdingValue(b) - holdingValue(a))
     .slice(0, 4);
 
+  // Currency exposure (display-currency magnitudes). Only meaningful with a mix.
+  const exposure = Object.entries(summary.exposureByCurrency)
+    .map(([key, value]) => ({ key, label: key, value: Number(value) }))
+    .filter((s) => s.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const showExposure = exposure.length > 1;
+
   return (
     <div className="space-y-6">
       {Heading}
@@ -199,10 +206,23 @@ export default async function DashboardPage({
             <CardTitle>{t("allocation")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <AllocationDonut data={allocation} />
+            <AllocationDonut data={allocation} currency={currency} />
           </CardContent>
         </Card>
       </div>
+
+      {showExposure && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("currencyExposure")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AllocationDonut data={exposure} currency={currency} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

@@ -30,6 +30,12 @@ export interface PortfolioSummary {
   totalIncome: string;
   /** Sum of per-holding day change, in the display currency. */
   totalDayChange: string;
+  /**
+   * Wealth denominated in each currency — keyed by the asset's own currency
+   * (instrument currency for holdings, balance currency for cash), with each
+   * value converted to the display currency for comparable magnitudes.
+   */
+  exposureByCurrency: Record<string, string>;
 }
 
 export interface SummarizeInput {
@@ -57,6 +63,10 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
   let totalMarketValue = new Decimal(0);
   let totalRealized = new Decimal(0);
   let totalDayChange = new Decimal(0);
+  const exposure: Record<string, Decimal> = {};
+  const addExposure = (ccy: string, amountDisplay: string) => {
+    exposure[ccy] = (exposure[ccy] ?? new Decimal(0)).add(amountDisplay);
+  };
 
   const valuations: HoldingValuation[] = holdings.map((h) => {
     const quote = input.prices[h.instrumentId];
@@ -87,6 +97,7 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     totalMarketValue = totalMarketValue.add(
       new Decimal(convert(mv, currency, input.displayCurrency, fx)),
     );
+    addExposure(currency, convert(mv, currency, input.displayCurrency, fx));
 
     // Day change needs a non-zero prior close; otherwise it's simply unknown.
     const prev =
@@ -117,6 +128,9 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
   });
 
   const cash = cashBalances(input.transactions);
+  for (const [ccy, amount] of Object.entries(cash)) {
+    addExposure(ccy, convert(amount, ccy, input.displayCurrency, fx));
+  }
   const nw = netWorth({
     holdings,
     prices: input.prices,
@@ -150,6 +164,9 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     totalRealizedPnL: totalRealized.toString(),
     totalIncome: totalIncome.toString(),
     totalDayChange: totalDayChange.toString(),
+    exposureByCurrency: Object.fromEntries(
+      Object.entries(exposure).map(([k, v]) => [k, v.toString()]),
+    ),
   };
 }
 
@@ -164,6 +181,7 @@ export function aggregatePortfolios(
 ): PortfolioSummary {
   const holdings = new Map<string, HoldingValuation>();
   const cash: Record<string, string> = {};
+  const exposure: Record<string, string> = {};
   let totalCost = new Decimal(0);
   let totalMarketValue = new Decimal(0);
   let totalRealized = new Decimal(0);
@@ -187,6 +205,12 @@ export function aggregatePortfolios(
 
     for (const [currency, amount] of Object.entries(s.cash)) {
       cash[currency] = new Decimal(cash[currency] ?? "0").add(amount).toString();
+    }
+
+    for (const [currency, amount] of Object.entries(s.exposureByCurrency)) {
+      exposure[currency] = new Decimal(exposure[currency] ?? "0")
+        .add(amount)
+        .toString();
     }
 
     for (const h of s.holdings) {
@@ -227,5 +251,6 @@ export function aggregatePortfolios(
     totalRealizedPnL: totalRealized.toString(),
     totalIncome: totalIncome.toString(),
     totalDayChange: totalDayChange.toString(),
+    exposureByCurrency: exposure,
   };
 }

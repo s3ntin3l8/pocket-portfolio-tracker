@@ -128,6 +128,7 @@
     "return": "Return (p.a.)",
     "valueOverTime": "Value over time",
     "allocation": "Allocation",
+    "currencyExposure": "Currency exposure",
     "topHoldings": "Top holdings",
     "topMovers": "Top movers"
   },

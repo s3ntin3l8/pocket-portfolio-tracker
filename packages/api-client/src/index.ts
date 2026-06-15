@@ -124,6 +124,8 @@ export interface PortfolioSummary {
   totalRealizedPnL: string;
   totalIncome: string;
   totalDayChange: string;
+  /** Wealth denominated in each currency (display-currency magnitudes). */
+  exposureByCurrency: Record<string, string>;
 }
 
 export interface PortfolioPerformance {
@@ -145,6 +147,8 @@ export interface NetWorth {
   totalRealizedPnL: string;
   totalIncome: string;
   totalDayChange: string;
+  /** Wealth denominated in each currency (display-currency magnitudes). */
+  exposureByCurrency: Record<string, string>;
   xirr: number | null;
   portfolioCount: number;
   asOf: string;
