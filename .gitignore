@@ -21,5 +21,6 @@ apps/web/public/swe-worker-*.js
 .env.*
 !.env.example
 
-# Claude Code local plans (keep settings.json + hooks tracked)
+# Claude Code local plans + scratch (keep settings.json + hooks tracked)
 .claude/plans/
+.claude/tmp/
