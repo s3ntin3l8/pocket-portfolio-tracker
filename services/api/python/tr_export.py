@@ -18,7 +18,8 @@ Each emitted line is the NORMALIZED event the Node mapper consumes:
 Extraction of isin/shares/fees from the timeline detail is best-effort and the part most
 sensitive to pytr/TR changes; the raw detail is scanned defensively.
 
-NOTE: validated live against pytr==0.4.10; TR's private protocol can change.
+NOTE: targets pytr==0.4.9 (the latest published release); not yet validated against a
+live account. TR's private protocol can change.
 """
 
 import argparse

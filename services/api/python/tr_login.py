@@ -16,8 +16,8 @@ Contract (the Node runner in services/pytr/runner.ts depends on this exactly):
     4. exit 0 on success; exit 3 on a bad code; exit 1 on any other failure
        (a human-readable reason is written to stderr)
 
-NOTE: validated live against pytr==0.4.10 during pairing; pytr's private TR protocol
-can change between versions.
+NOTE: targets pytr==0.4.9 (the latest published release); not yet validated against a
+live account. pytr's private TR protocol can change between versions.
 """
 
 import argparse
