@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { generateKeyPair, SignJWT, type KeyLike } from "jose";
+import { generateKeyPair, SignJWT } from "jose";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import type { ParsedTransaction } from "@portfolio/schema";
@@ -35,7 +35,7 @@ const AUDIENCE = "portfolio-tracker";
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 let app: App;
-let privateKey: KeyLike;
+let privateKey: CryptoKey;
 
 async function token(sub: string) {
   return new SignJWT({ email: `${sub}@example.com` })
@@ -385,7 +385,7 @@ describe("CSV import → confirm flow", () => {
 
 describe("screenshot import → confirm flow", () => {
   let ssApp: App;
-  let ssKey: KeyLike;
+  let ssKey: CryptoKey;
 
   async function ssToken(sub: string) {
     return new SignJWT({})

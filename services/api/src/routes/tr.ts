@@ -9,7 +9,7 @@ import { syncTrConnection } from "../services/pytr/sync.js";
 const connectBodySchema = z.object({
   phone: z.string().min(3),
   pin: z.string().min(4),
-  portfolioId: z.string().uuid(),
+  portfolioId: z.guid(),
   // Break-glass: a manually pasted aws-waf-token, used instead of the solver.
   wafToken: z.string().min(1).optional(),
 });

@@ -1,12 +1,12 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { JWTVerifyGetKey, JWTVerifyOptions, KeyLike } from "jose";
+import type { JWTVerifyGetKey, JWTVerifyOptions } from "jose";
 import { eq } from "drizzle-orm";
 import { users } from "@portfolio/db";
 
 // A key (local public key for tests) or a JWKS resolver function (remote, prod).
-export type AuthKey = KeyLike | Uint8Array | JWTVerifyGetKey;
+export type AuthKey = CryptoKey | Uint8Array | JWTVerifyGetKey;
 
 /**
  * A lazy JWKS resolver that discovers the signing keys from the issuer via OIDC
