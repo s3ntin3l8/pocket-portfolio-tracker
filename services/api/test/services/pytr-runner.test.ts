@@ -173,10 +173,13 @@ describe("PytrRunner export", () => {
     child.stdout.emit("data", Buffer.from('{"id":"e1","eventType":"CREDIT"}\n{"id":'));
     child.stdout.emit("data", Buffer.from('"e2"}\n'));
     child.emit("exit", 0);
-    expect(await exportP).toEqual([
+    const result = await exportP;
+    expect(result.events).toEqual([
       { id: "e1", eventType: "CREDIT" },
       { id: "e2" },
     ]);
+    // the rolling cookie jar is read back (here unchanged by the fake child)
+    expect(result.sessionData).toBe("JAR");
   });
 
   it("maps exit code 2 to PytrAuthError (session expired)", async () => {

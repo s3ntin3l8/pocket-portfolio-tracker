@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { portfolios, trConnections } from "@portfolio/db";
 import { requireUser } from "../plugins/auth.js";
 import { PytrUnavailableError } from "../services/pytr/runner.js";
+import { syncTrConnection } from "../services/pytr/sync.js";
 
 const connectBodySchema = z.object({
   phone: z.string().min(3),
@@ -143,6 +144,26 @@ export async function trRoute(app: FastifyInstance) {
         .where(eq(trConnections.userId, id));
 
       return { status: "connected" };
+    },
+  );
+
+  // Sync now: pull the timeline into a draft import the user then confirms. Runs
+  // inline (the same logic the hourly cron uses) so the UI gets an immediate result.
+  app.post(
+    "/tr/connection/sync",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = requireUser(request);
+      const conn = await getConnection(id);
+      if (!conn || conn.status !== "connected") {
+        return reply.code(409).send({ error: "not_connected" });
+      }
+      try {
+        return await syncTrConnection(app.db, app.encryption, app.pytr, conn);
+      } catch (err) {
+        request.log.error({ err }, "tr sync failed");
+        return reply.code(502).send({ error: "tr_sync_failed" });
+      }
     },
   );
 

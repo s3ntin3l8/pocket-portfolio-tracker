@@ -268,7 +268,7 @@ export class PytrRunner {
     phone: string;
     pin: string;
     sessionData: string;
-  }): Promise<RawTrEvent[]> {
+  }): Promise<{ events: RawTrEvent[]; sessionData: string }> {
     if (!this.opts.enabled) throw new PytrUnavailableError();
     const tmpDir = await mkdtemp(join(tmpdir(), "pytr-export-"));
     const cookiesFile = join(tmpDir, "cookies.txt");
@@ -284,11 +284,17 @@ export class PytrRunner {
       if (code !== 0) {
         throw new PytrError(stderr.trim() || `pytr export exited with code ${code}`);
       }
-      return stdout
+      const events = stdout
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean)
         .map((l) => JSON.parse(l) as RawTrEvent);
+      // The export refreshes the session cookie; persist the rolling jar to extend the
+      // session's life. Fall back to the original if it wasn't rewritten.
+      const sessionData = await readFile(cookiesFile, "utf8").catch(
+        () => input.sessionData,
+      );
+      return { events, sessionData };
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }

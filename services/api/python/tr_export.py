@@ -12,9 +12,11 @@ Contract (consumed by services/pytr/runner.ts):
          2 → session could not be resumed (re-pairing required; runner → 'expired')
          1 → any other failure (reason on stderr)
 
-Each emitted line is a raw timeline event: {id, timestamp, eventType, title, subtitle,
-amount, ..., "details": <timelineDetailV2 payload>}. The Node mapper extracts ISIN /
-shares / fees / taxes defensively — the exact detail-section keys vary by event type.
+Each emitted line is the NORMALIZED event the Node mapper consumes:
+  {id, timestamp, eventType, title, amount (signed), currency,
+   isin?, shares?, fees?, savingsPlanId?}
+Extraction of isin/shares/fees from the timeline detail is best-effort and the part most
+sensitive to pytr/TR changes; the raw detail is scanned defensively.
 
 NOTE: validated live against pytr==0.4.10; TR's private protocol can change.
 """
@@ -23,9 +25,11 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 
 RECV_TIMEOUT_S = 30
+ISIN_RE = re.compile(r"\b([A-Z]{2}[A-Z0-9]{9}\d)\b")
 
 
 async def _await_subscription(tr, sub_type, match=None):
@@ -72,12 +76,88 @@ async def _attach_details(tr, events):
     return events
 
 
+def _walk_rows(obj):
+    """Yield (lowercased title, text) pairs from a nested detail structure."""
+    if isinstance(obj, dict):
+        title = obj.get("title")
+        detail = obj.get("detail")
+        text = None
+        if isinstance(detail, dict):
+            text = detail.get("text")
+        elif isinstance(detail, str):
+            text = detail
+        if title and text:
+            yield (str(title).lower(), str(text))
+        for value in obj.values():
+            yield from _walk_rows(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from _walk_rows(item)
+
+
+def _num(text):
+    """Parse a (possibly European-formatted) number out of a label, e.g. '1.234,56 €'."""
+    match = re.search(r"-?\d[\d.\s]*(?:,\d+)?", text)
+    if not match:
+        return None
+    raw = match.group(0).replace(" ", "").replace(".", "").replace(",", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _field(details, keywords):
+    for title, text in _walk_rows(details or {}):
+        if any(k in title for k in keywords):
+            value = _num(text)
+            if value is not None:
+                return value
+    return None
+
+
+def _extract_isin(event):
+    match = ISIN_RE.search(event.get("icon") or "")
+    if match:
+        return match.group(1)
+    match = ISIN_RE.search(json.dumps(event.get("details") or {}))
+    return match.group(1) if match else None
+
+
+def _normalize(event):
+    """Flatten a raw timeline event into the shape the Node mapper consumes.
+
+    Extraction of shares/fees from the detail sections is best-effort and the part most
+    sensitive to TR/pytr changes; refine the keyword/number heuristics during live
+    validation.
+    """
+    amount = event.get("amount") or {}
+    details = event.get("details")
+    return {
+        "id": event.get("id"),
+        "timestamp": event.get("timestamp"),
+        "eventType": event.get("eventType"),
+        "title": event.get("title"),
+        "amount": amount.get("value", 0) or 0,
+        "currency": amount.get("currency") or "EUR",
+        "isin": _extract_isin(event),
+        "shares": _field(details, ["shares", "anteile", "anzahl"]),
+        "fees": _field(details, ["fee", "gebühr", "provision"]),
+        "savingsPlanId": event.get("savingsPlanId"),
+    }
+
+
 async def _run(tr) -> int:
     events = await _collect_transactions(tr)
     events = await _attach_details(tr, events)
     for event in events:
-        sys.stdout.write(json.dumps(event) + "\n")
+        sys.stdout.write(json.dumps(_normalize(event)) + "\n")
     sys.stdout.flush()
+    # Persist the rolling session so the next sync can resume without re-pairing.
+    try:
+        tr.save_websession()
+    except Exception:  # noqa: BLE001 - best effort
+        pass
     try:
         ws = await tr._get_ws()
         await ws.close()
