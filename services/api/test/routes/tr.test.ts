@@ -7,6 +7,7 @@ import { buildApp } from "../../src/app.js";
 import { getDb, closeDb } from "../../src/db/client.js";
 import {
   PytrApprovalError,
+  PytrError,
   PytrUnavailableError,
 } from "../../src/services/pytr/runner.js";
 import type { PytrRunner } from "../../src/services/pytr/runner.js";
@@ -184,6 +185,41 @@ describe("Trade Republic connection (encryption enabled)", () => {
     });
     expect(state.json().status).toBe("error");
     fake.approvalResult = "MOZILLA_COOKIE_JAR"; // restore for other tests
+  });
+
+  it("502s when pairing fails to start for a non-availability reason", async () => {
+    const t = await token("tr-pairfail");
+    const portfolioId = await portfolioFor(app, t);
+    fake.startResult = new PytrError("websocket closed before init");
+    const res = await app.inject({
+      method: "POST",
+      url: "/tr/connection",
+      headers: auth(t),
+      payload: { phone: "+49150", pin: "1234", portfolioId },
+    });
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toEqual({ error: "tr_pairing_failed" });
+    fake.startResult = { processId: "pid-1" };
+  });
+
+  it("502s when approval fails for a non-decline reason", async () => {
+    const t = await token("tr-approvalfail");
+    const portfolioId = await portfolioFor(app, t);
+    await app.inject({
+      method: "POST",
+      url: "/tr/connection",
+      headers: auth(t),
+      payload: { phone: "+49150", pin: "1234", portfolioId },
+    });
+    fake.approvalResult = new PytrError("export process crashed");
+    const res = await app.inject({
+      method: "POST",
+      url: "/tr/connection/verify",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toEqual({ error: "tr_approval_failed" });
+    fake.approvalResult = "MOZILLA_COOKIE_JAR";
   });
 
   it("503s when pytr is unavailable", async () => {

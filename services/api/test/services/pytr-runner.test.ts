@@ -115,6 +115,20 @@ describe("PytrRunner pairing", () => {
     expect(runner.hasPendingPairing("u1")).toBe(false);
   });
 
+  it("rejects when the cookie jar is unreadable after a clean exit", async () => {
+    const { spawn, nextChild } = makeSpawn();
+    const runner = makeRunner(spawn);
+    const startP = runner.startPairing("u1", { phone: "+49", pin: "1" });
+    const child = await nextChild();
+    child.emitLine('{"processId":"p","status":"awaiting_approval"}\n');
+    await startP;
+    const approvalP = runner.awaitApproval("u1");
+    // exit 0 but the child never wrote the cookie file → the read fails
+    child.emit("exit", 0);
+    await expect(approvalP).rejects.toThrow();
+    expect(runner.hasPendingPairing("u1")).toBe(false);
+  });
+
   it("uses the token waf strategy and TR_WAF_TOKEN when a pasted token is supplied", async () => {
     const { spawn, nextChild } = makeSpawn();
     const runner = makeRunner(spawn);
@@ -128,6 +142,21 @@ describe("PytrRunner pairing", () => {
     expect(child.opts.env?.TR_WAF_TOKEN).toBe("pasted-token");
     child.emitLine('{"processId":"p","status":"awaiting_approval"}\n');
     await startP;
+  });
+
+  it("caches a decline that lands before awaitApproval, then rejects from the cache", async () => {
+    const { spawn, nextChild } = makeSpawn();
+    const runner = makeRunner(spawn);
+    const startP = runner.startPairing("u1", { phone: "+49", pin: "1" });
+    const child = await nextChild();
+    child.emitLine('{"processId":"p","status":"awaiting_approval"}\n');
+    await startP;
+    // Decline arrives before the route long-polls — the outcome is cached.
+    child.stderr.emit("data", Buffer.from("login not approved: login expired"));
+    child.emit("exit", 3);
+    await new Promise((r) => setImmediate(r));
+    await expect(runner.awaitApproval("u1")).rejects.toThrow(PytrApprovalError);
+    expect(runner.hasPendingPairing("u1")).toBe(false);
   });
 
   it("rejects with PytrApprovalError when the login is declined/expires (exit 3)", async () => {
