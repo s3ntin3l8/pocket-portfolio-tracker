@@ -70,11 +70,11 @@ export function ForecastChart({
             tickFormatter={money}
           />
           <Tooltip
-            formatter={(v: number, key) => [
-              money(v),
+            formatter={(v, key) => [
+              money(Number(v)),
               key === "growth" ? t("projectedGrowth") : t("projectedContributed"),
             ]}
-            labelFormatter={(m: number) => `${t("years", { count: Math.round(m / 12) })}`}
+            labelFormatter={(m) => `${t("years", { count: Math.round(Number(m) / 12) })}`}
             contentStyle={{
               background: "var(--color-card)",
               border: "1px solid var(--color-border)",

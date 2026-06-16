@@ -34,7 +34,7 @@ interface PortfolioParams {
 }
 
 const bulkDeleteSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1),
+  ids: z.array(z.guid()).min(1),
 });
 
 export async function transactionsRoute(app: FastifyInstance) {

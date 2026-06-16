@@ -48,7 +48,7 @@ export function PriceChart({
             tickFormatter={(v: number) => formatMoney(v, currency, locale)}
           />
           <Tooltip
-            formatter={(v: number) => formatMoney(v, currency, locale)}
+            formatter={(v) => formatMoney(Number(v), currency, locale)}
             contentStyle={{
               background: "var(--color-card)",
               border: "1px solid var(--color-border)",

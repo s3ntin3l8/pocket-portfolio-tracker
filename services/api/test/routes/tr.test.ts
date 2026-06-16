@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
-import { generateKeyPair, SignJWT, type KeyLike } from "jose";
+import { generateKeyPair, SignJWT } from "jose";
 import { trConnections } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { getDb, closeDb } from "../../src/db/client.js";
@@ -42,8 +42,8 @@ const ISSUER = "https://auth.test/o/p/";
 const AUDIENCE = "portfolio-tracker";
 
 type App = Awaited<ReturnType<typeof buildApp>>;
-let privateKey: KeyLike;
-let publicKey: KeyLike;
+let privateKey: CryptoKey;
+let publicKey: CryptoKey;
 
 async function token(sub: string) {
   return new SignJWT({ email: `${sub}@example.com` })

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { generateKeyPair, SignJWT, type KeyLike } from "jose";
+import { generateKeyPair, SignJWT } from "jose";
 import { portfolios, screenshotImports } from "@portfolio/db";
 import type { ParsedTransaction } from "@portfolio/schema";
 import { buildApp } from "../../src/app.js";
@@ -11,7 +11,7 @@ const AUDIENCE = "portfolio-tracker";
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 let app: App;
-let privateKey: KeyLike;
+let privateKey: CryptoKey;
 
 async function token(sub: string) {
   return new SignJWT({ email: `${sub}@example.com` })

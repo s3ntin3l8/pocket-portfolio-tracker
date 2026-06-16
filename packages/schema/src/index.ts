@@ -77,7 +77,7 @@ export const corporateActionTypeSchema = z.enum(["split", "bonus", "rights"]);
 export type CorporateActionType = z.infer<typeof corporateActionTypeSchema>;
 
 export const corporateActionInputSchema = z.object({
-  instrumentId: z.string().uuid(),
+  instrumentId: z.guid(),
   type: corporateActionTypeSchema,
   ratio: decimalString,
   exDate: z.coerce.date(),
@@ -97,8 +97,8 @@ export const instrumentInputSchema = z.object({
 export type InstrumentInput = z.infer<typeof instrumentInputSchema>;
 
 export const transactionInputSchema = z.object({
-  portfolioId: z.string().uuid(),
-  instrumentId: z.string().uuid().nullable().optional(),
+  portfolioId: z.guid(),
+  instrumentId: z.guid().nullable().optional(),
   type: transactionTypeSchema,
   quantity: decimalString.default("0"),
   price: decimalString.default("0"),

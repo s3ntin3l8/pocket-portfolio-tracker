@@ -39,7 +39,7 @@ export function ValueAreaChart({ data }: { data: ValuePoint[] }) {
           />
           <YAxis hide domain={["dataMin - 2000000", "dataMax + 2000000"]} />
           <Tooltip
-            formatter={(value: number) => formatMoney(value, "IDR", locale)}
+            formatter={(value) => formatMoney(Number(value), "IDR", locale)}
             contentStyle={{
               background: "var(--color-popover)",
               border: "1px solid var(--color-border)",

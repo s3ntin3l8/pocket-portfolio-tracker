@@ -18,11 +18,15 @@ export function ContributionsChart({
 }) {
   const te = useTranslations("Empty");
 
-  let running = 0;
-  const points = series.map((s) => {
-    running += Number(s.contributed);
-    return { date: s.month, close: running.toString() };
-  });
+  // Running total as a prefix sum — kept reassignment-free so the React Compiler
+  // lint (react-hooks) can memoize it (series is a short monthly list).
+  const points = series.map((s, i) => ({
+    date: s.month,
+    close: series
+      .slice(0, i + 1)
+      .reduce((sum, x) => sum + Number(x.contributed), 0)
+      .toString(),
+  }));
 
   if (points.length < 2) {
     return (

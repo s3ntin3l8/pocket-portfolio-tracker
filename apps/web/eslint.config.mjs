@@ -1,14 +1,16 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
+// eslint-config-next 16 ships native ESLint flat config arrays under these subpaths,
+// so we spread them directly instead of bridging legacy configs via FlatCompat.
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextCoreWebVitals,
+  ...nextTypescript,
+  {
+    // eslint-plugin-react (bundled by eslint-config-next 16) auto-detects the React
+    // version via an ESLint-10-removed API; pin it so detection is skipped.
+    settings: { react: { version: "19" } },
+  },
   {
     // public/ holds static assets + serwist's generated service worker (public/sw.js).
     ignores: [".next/**", "node_modules/**", "next-env.d.ts", "public/**"],
