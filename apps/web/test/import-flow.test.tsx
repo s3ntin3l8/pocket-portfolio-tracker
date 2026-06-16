@@ -59,8 +59,9 @@ describe("ImportFlow", () => {
 
     fireEvent.change(fileInput(container), { target: { files: [pngFile()] } });
 
+    // The draft name now renders as row text (desktop table + mobile card) until edited.
     await waitFor(() =>
-      expect(screen.getByDisplayValue("Antam Gold")).toBeInTheDocument(),
+      expect(screen.getAllByText("Antam Gold").length).toBeGreaterThan(0),
     );
     expect(client.importScreenshot).toHaveBeenCalledWith(
       "p1",
@@ -74,6 +75,47 @@ describe("ImportFlow", () => {
       expect(screen.getByText(messages.Import.done.title)).toBeInTheDocument(),
     );
     expect(client.confirmImport).toHaveBeenCalledWith("imp1", [DRAFT]);
+  });
+
+  it("edits a draft in the dialog and confirms the edited value", async () => {
+    const client: ImportClient = {
+      importScreenshot: vi.fn(async () => ({
+        importId: "imp1",
+        drafts: [DRAFT],
+        errors: [],
+      })),
+      importCsv: vi.fn(),
+      confirmImport: vi.fn(async () => ({ confirmed: 1 })),
+    };
+    const { container } = renderFlow(client);
+
+    fireEvent.change(fileInput(container), { target: { files: [pngFile()] } });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: messages.Import.review.edit.open }),
+      ).toBeInTheDocument(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: messages.Import.review.edit.open }),
+    );
+
+    // The dialog seeds the name input from the draft; editing it patches the draft.
+    fireEvent.change(screen.getByDisplayValue("Antam Gold"), {
+      target: { value: "Antam Gold 2" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: messages.Import.review.edit.done }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
+
+    await waitFor(() =>
+      expect(screen.getByText(messages.Import.done.title)).toBeInTheDocument(),
+    );
+    expect(client.confirmImport).toHaveBeenCalledWith("imp1", [
+      { ...DRAFT, name: "Antam Gold 2" },
+    ]);
   });
 
   it("sends CSV text when the CSV tab is selected", async () => {

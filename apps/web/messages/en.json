@@ -135,6 +135,38 @@
       "quantity": "Quantity",
       "price": "Price"
     },
+    "review": {
+      "filters": {
+        "assetClass": "Asset class",
+        "action": "Action",
+        "all": "All",
+        "needsReview": "Needs review",
+        "search": "Search by name…",
+        "showing": "Showing {shown} of {total}",
+        "clear": "Clear filters"
+      },
+      "batch": {
+        "selected": "{count, plural, one {# selected} other {# selected}}",
+        "remove": "Remove selected",
+        "removePrompt": "Remove these drafts?",
+        "removeConfirm": "Remove",
+        "confirmSelected": "Confirm selected",
+        "cancel": "Cancel"
+      },
+      "selectAll": "Select all drafts",
+      "selectRow": "Select draft",
+      "edit": {
+        "title": "Edit draft",
+        "open": "Edit",
+        "done": "Done"
+      },
+      "columns": {
+        "confidence": "Confidence",
+        "assetClass": "Class",
+        "action": "Action"
+      },
+      "empty": "No drafts match your filters."
+    },
     "discard": "Discard",
     "confirm": "Confirm",
     "done": {
