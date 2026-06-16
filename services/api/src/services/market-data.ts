@@ -32,8 +32,23 @@ export interface ProviderDescriptor {
   create: () => MarketDataProvider;
 }
 
+/**
+ * Base URL the Antam/NAV providers fetch their data from. They consume a JSON endpoint;
+ * by default that endpoint is this API's own internal market-data routes, which serve the
+ * values our scrapers cache (see routes/internal-market-data.ts, services/scrapers/*).
+ * Override `MARKET_DATA_SELF_URL` if the API isn't reachable at localhost:PORT (e.g. behind
+ * a different internal hostname). The per-provider env vars below still win when set, so the
+ * URLs can be repointed at an external scraper without code changes.
+ */
+function selfBaseUrl(): string {
+  return (
+    process.env.MARKET_DATA_SELF_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`
+  );
+}
+
 // Registration order matches the historical hardcoded chain: keyed primaries first,
-// keyless Yahoo fallback last. Keys/urls still come from env (see #106).
+// keyless Yahoo fallback last. Keys/urls still come from env (see #106); the scraped
+// Antam/NAV sources default to this API's internal routes (see selfBaseUrl).
 export const PROVIDER_REGISTRY: ProviderDescriptor[] = [
   {
     id: "twelvedata",
@@ -53,15 +68,26 @@ export const PROVIDER_REGISTRY: ProviderDescriptor[] = [
     id: "antam",
     label: "Antam buyback",
     defaultPriority: 3,
-    configured: () => Boolean(process.env.ANTAM_BUYBACK_URL),
-    create: () => new AntamProvider({ baseUrl: process.env.ANTAM_BUYBACK_URL! }),
+    // Always available: defaults to the internal route fed by the buyback scraper, served
+    // from the scraped_quotes cache. 404 until the first scrape, which the provider treats
+    // as "no quote" (falls through to spot / fixture).
+    configured: () => true,
+    create: () =>
+      new AntamProvider({
+        baseUrl:
+          process.env.ANTAM_BUYBACK_URL ?? `${selfBaseUrl()}/internal/gold/antam-buyback`,
+      }),
   },
   {
     id: "nav",
     label: "Reksa Dana NAV",
     defaultPriority: 4,
-    configured: () => Boolean(process.env.NAV_BASE_URL),
-    create: () => new NavProvider({ baseUrl: process.env.NAV_BASE_URL! }),
+    // Always available: defaults to the internal route fed by the Bibit NAV scraper.
+    configured: () => true,
+    create: () =>
+      new NavProvider({
+        baseUrl: process.env.NAV_BASE_URL ?? `${selfBaseUrl()}/internal/nav`,
+      }),
   },
   {
     id: "eodhd",

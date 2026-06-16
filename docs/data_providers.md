@@ -20,8 +20,8 @@ Priority is the default tried-first order (lower = earlier). Cells reflect each 
 | -------------- | -------- | ------ | --- | ----------- | -------------- | ----------- | --------------- | -------------------- | ------ |
 | Twelve Data    | 1        | ✓      | ✓   | ✓           | —              | —           | IDX, US, XAU    | `TWELVEDATA_API_KEY` | Yes    |
 | GoldAPI        | 2        | —      | —   | ✓           | —              | —           | XAU             | `GOLDAPI_KEY`        | Yes    |
-| Antam          | 3        | —      | —   | —           | ✓              | —           | ANTAM           | `ANTAM_BUYBACK_URL`  | URL    |
-| Reksa Dana NAV | 4        | —      | —   | —           | —              | ✓           | (any)           | `NAV_BASE_URL`       | URL    |
+| Antam          | 3        | —      | —   | —           | ✓              | —           | ANTAM           | `ANTAM_BUYBACK_URL`  | Scraper|
+| Reksa Dana NAV | 4        | —      | —   | —           | —              | ✓           | (any)           | `NAV_BASE_URL`       | Scraper|
 | EODHD          | 5        | ✓      | ✓   | —           | —              | —           | US, XETRA, …    | `EODHD_API_KEY`      | Yes    |
 | Yahoo Finance  | 6        | ✓      | ✓   | —           | —              | —           | (any, suffixed) | — (keyless)          | No     |
 
@@ -70,10 +70,39 @@ no configuration.
 | -------------------- | -------------- | -------- | ----------------------------------------------------------- |
 | `TWELVEDATA_API_KEY` | Twelve Data    | No       | IDX/US equities & ETFs, gold spot.                          |
 | `GOLDAPI_KEY`        | GoldAPI        | No       | Gold spot (XAU).                                            |
-| `ANTAM_BUYBACK_URL`  | Antam          | No       | JSON endpoint URL for the buyback rate.                     |
-| `NAV_BASE_URL`       | Reksa Dana NAV | No       | Base URL for per-fund NAV lookups (`<base>/<fund-symbol>`). |
+| `ANTAM_BUYBACK_URL`  | Antam          | No       | Override the built-in scraper with an external JSON endpoint. Blank ⇒ internal scraper route (see below). |
+| `NAV_BASE_URL`       | Reksa Dana NAV | No       | Override the built-in scraper with an external `<base>/<fund-symbol>` endpoint. Blank ⇒ internal scraper route. |
+| `MARKET_DATA_SELF_URL` | Antam / NAV  | No       | Base URL the providers use to reach this API's internal scraper routes. Default `http://127.0.0.1:$PORT`. |
 | `EODHD_API_KEY`      | EODHD          | No       | US/XETRA equities & ETFs (EU / Trade Republic instruments). |
 | `OPENFIGI_API_KEY`   | OpenFIGI       | No       | Optional; only raises the discovery rate limit.             |
+
+Unlike the other providers, **Antam and Reksa Dana NAV are always on**: with their env var
+blank they fetch the built-in scrapers' internal routes (next section) instead of dropping
+out of the chain.
+
+## Built-in scrapers
+
+Antam buyback and reksa-dana NAV have no official free API, so the API scrapes them itself
+(scheduler jobs → `scraped_quotes` cache → internal routes the providers fetch). Failures
+degrade gracefully: a missing/stale value just makes the provider fall through to Fixture.
+
+| Source        | Scrapes                                         | Cache key          | Internal route                  | Schedule            |
+| ------------- | ----------------------------------------------- | ------------------ | ------------------------------- | ------------------- |
+| harga-emas.org | Antam LM buyback (`Harga pembelian kembali`)   | `gold:antam-buyback` | `GET /internal/gold/antam-buyback` | every 4h (`0 */4 * * *`) |
+| api.bibit.id  | Reksa-dana NAV catalogue (`symbol` → `nav.value`) | `nav:<symbol>`     | `GET /internal/nav/:symbol`     | daily 13:00 UTC (`0 13 * * *`) |
+
+- **Gold source:** the canonical Antam page (`logammulia.com/id/sell/gold`) sits behind
+  anti-bot protection that 403s non-browser clients, so it is unusable server-side. We read
+  the same official Antam LM buyback from harga-emas.org instead. The source URL + extraction
+  are isolated in `services/api/src/services/scrapers/antam-buyback.ts` for easy swapping.
+- **NAV source & symbol scheme:** Bibit's `products/list` returns an AES-encrypted catalogue
+  (decrypted in `bibit-nav.ts`). The **canonical fund symbol is Bibit's `symbol` field**
+  (e.g. `RD4196`) — store that on the `mutual_fund` instrument so `/internal/nav/<symbol>`
+  resolves. Per-unit NAV is `nav.value`.
+- Code: `services/api/src/services/scrapers/*`, routes in
+  `services/api/src/routes/internal-market-data.ts`, scheduled in
+  `services/api/src/services/scheduler.ts`. The internal routes are unauthenticated (they
+  expose only already-public prices and are the providers' own data source).
 
 ## Admin overrides
 
