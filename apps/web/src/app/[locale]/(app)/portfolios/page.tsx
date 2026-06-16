@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
+import { BrokerageIcon } from "@/components/brokerage-icon";
 import { loadPortfolios } from "@/lib/server-api";
 import { formatMoney } from "@/lib/utils";
 
@@ -52,14 +53,18 @@ export default async function PortfoliosPage({
             <Card key={portfolio.id}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{portfolio.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {portfolio.baseCurrency}
-                      {portfolio.portfolioType === "child" &&
-                        portfolio.birthYear !== null &&
-                        ` · ${t("born", { year: String(portfolio.birthYear) })}`}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <BrokerageIcon brokerage={portfolio.brokerage} />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{portfolio.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {portfolio.baseCurrency}
+                        {portfolio.brokerage && ` · ${portfolio.brokerage}`}
+                        {portfolio.portfolioType === "child" &&
+                          portfolio.birthYear !== null &&
+                          ` · ${t("born", { year: String(portfolio.birthYear) })}`}
+                      </p>
+                    </div>
                   </div>
                   <PortfolioFormDialog
                     mode="edit"

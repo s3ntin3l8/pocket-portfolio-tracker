@@ -110,6 +110,8 @@
     "subtitle": "Give it a name and a base currency to value it in.",
     "name": "Portfolio name",
     "namePlaceholder": "e.g. Stockbit",
+    "brokerage": "Brokerage",
+    "brokeragePlaceholder": "e.g. Trade Republic",
     "currency": "Base currency",
     "type": "Portfolio type",
     "typeStandard": "Standard",

@@ -65,6 +65,8 @@ export const portfolioInputSchema = z.object({
   // Optional beneficiary birth year (e.g. a child's account). Nullable so a PATCH
   // can clear it.
   birthYear: z.number().int().min(1900).max(2100).nullable().optional(),
+  // Optional brokerage/custodian (free text). Nullable so a PATCH can clear it.
+  brokerage: z.string().trim().nullable().optional(),
 });
 export type PortfolioInput = z.infer<typeof portfolioInputSchema>;
 
@@ -76,6 +78,7 @@ export const portfolioPatchSchema = z.object({
   baseCurrency: currencyCode.optional(),
   portfolioType: z.enum(["standard", "child"]).optional(),
   birthYear: z.number().int().min(1900).max(2100).nullable().optional(),
+  brokerage: z.string().trim().nullable().optional(),
 });
 export type PortfolioPatch = z.infer<typeof portfolioPatchSchema>;
 

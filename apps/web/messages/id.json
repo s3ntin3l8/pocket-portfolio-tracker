@@ -110,6 +110,8 @@
     "subtitle": "Beri nama dan mata uang dasar untuk menilainya.",
     "name": "Nama portofolio",
     "namePlaceholder": "mis. Stockbit",
+    "brokerage": "Broker",
+    "brokeragePlaceholder": "mis. Trade Republic",
     "currency": "Mata uang dasar",
     "type": "Jenis portofolio",
     "typeStandard": "Standar",

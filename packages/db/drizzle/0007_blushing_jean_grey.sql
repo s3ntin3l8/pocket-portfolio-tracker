@@ -1,0 +1,1 @@
+ALTER TABLE "portfolios" ADD COLUMN "brokerage" text;
