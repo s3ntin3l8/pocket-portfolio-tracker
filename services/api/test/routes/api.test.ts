@@ -557,6 +557,28 @@ describe("auth + portfolios + transactions", () => {
     expect(again.statusCode).toBe(404);
   });
 
+  it("accepts a bodyless DELETE that advertises application/json", async () => {
+    // Browsers (via the api-client) send Content-Type: application/json on every
+    // request. A bodyless DELETE carrying that header must not be rejected with a
+    // 400 (FST_ERR_CTP_EMPTY_JSON_BODY) before the route handler runs.
+    const t = await token("ctp-user");
+    const created = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: { ...auth(t), "content-type": "application/json" },
+      payload: { name: "Disposable", baseCurrency: "IDR", portfolioType: "standard" },
+    });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().id;
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/portfolios/${id}`,
+      headers: { ...auth(t), "content-type": "application/json" },
+    });
+    expect(del.statusCode).toBe(204);
+  });
+
   it("returns a live quote for the gold ticker", async () => {
     const t = await token("user-a");
     const res = await app.inject({

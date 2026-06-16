@@ -299,13 +299,17 @@ export function createApiClient(config: ApiClientConfig) {
     body?: unknown,
   ): Promise<T> {
     const token = await config.getToken?.();
+    // Only declare a JSON content-type when we actually send a body. A bodyless
+    // request (e.g. DELETE) that still advertises application/json trips Fastify's
+    // FST_ERR_CTP_EMPTY_JSON_BODY → 400 before the route handler runs.
+    const hasBody = body !== undefined;
     const res = await doFetch(`${config.baseUrl}${path}`, {
       method,
       headers: {
-        "content-type": "application/json",
+        ...(hasBody ? { "content-type": "application/json" } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
       throw new ApiError(res.status, await res.text());

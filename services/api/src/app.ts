@@ -35,6 +35,24 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     },
   });
 
+  // Tolerate an empty application/json body. Fastify's default parser rejects a
+  // request that advertises application/json with no body (FST_ERR_CTP_EMPTY_JSON_BODY
+  // → 400), which breaks bodyless DELETEs from clients that always set the header.
+  // Genuinely malformed JSON still surfaces as a 400.
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (_req, body, done) => {
+      if (body === "" || body == null) return done(null, undefined);
+      try {
+        done(null, JSON.parse(body as string));
+      } catch (err) {
+        (err as { statusCode?: number }).statusCode = 400;
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   // Surface zod validation failures as 400s instead of 500s.
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
