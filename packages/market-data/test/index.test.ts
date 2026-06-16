@@ -879,7 +879,7 @@ describe("provider usage (getUsage)", () => {
     expect(seenUrl).toContain("/user?api_token=k");
   });
 
-  it("GoldAPI reports the month's used count with no limit, via the access-token header", async () => {
+  it("GoldAPI reports the month's used count against the free-tier limit, via the access-token header", async () => {
     let token: string | undefined;
     const p = new GoldApiProvider("gold-key", {
       fetch: mockFetch((_url, init) => {
@@ -887,7 +887,7 @@ describe("provider usage (getUsage)", () => {
         return { body: { requests_month: 73 } };
       }),
     });
-    expect(await p.getUsage()).toEqual({ window: "month", used: 73, limit: null });
+    expect(await p.getUsage()).toEqual({ window: "month", used: 73, limit: 100 });
     expect(token).toBe("gold-key");
   });
 
