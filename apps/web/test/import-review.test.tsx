@@ -158,6 +158,21 @@ describe("ImportReview", () => {
   it("confirm-all calls onConfirm with no subset", () => {
     const { onConfirm } = renderReview();
     fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
-    expect(onConfirm).toHaveBeenCalledWith();
+    expect(onConfirm).toHaveBeenCalledWith(undefined);
+  });
+
+  it("disables and spins the Confirm button while the write is in flight", () => {
+    const h = handlers();
+    // A never-resolving promise keeps the write "in flight" for the assertion.
+    h.onConfirm.mockReturnValue(new Promise(() => {}));
+    renderReview(DRAFTS, h);
+    const confirm = screen.getByRole("button", { name: messages.Import.confirm });
+    fireEvent.click(confirm);
+    expect(confirm).toBeDisabled();
+    expect(confirm.querySelector(".animate-spin")).toBeInTheDocument();
+    // Other write buttons are blocked too, so a second submit can't fire.
+    expect(
+      screen.getByRole("button", { name: messages.Import.discard }),
+    ).toBeDisabled();
   });
 });
