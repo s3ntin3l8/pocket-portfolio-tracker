@@ -199,6 +199,17 @@ export const providerUsage = pgTable("provider_usage", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Cache of values scraped from unofficial web sources (Antam gold buyback, reksa-dana
+// NAV) by the scheduler and served back to the market-data providers via the internal
+// routes. A cache, not primary state — safe to truncate; a missing/stale key just makes
+// the provider fall through. Keys: "gold:antam-buyback" and "nav:<fund-symbol>".
+export const scrapedQuotes = pgTable("scraped_quotes", {
+  key: text("key").primaryKey(),
+  value: numeric("value").notNull(),
+  source: text("source"), // e.g. "harga-emas" | "bibit"
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // The source of truth. Holdings, P&L, cash balance, XIRR and net worth are derived
 // from these rows (in @portfolio/core), never stored.
 export const transactions = pgTable(

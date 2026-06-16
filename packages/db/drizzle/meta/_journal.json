@@ -71,6 +71,13 @@
       "when": 1781627721105,
       "tag": "0009_common_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781630151988,
+      "tag": "0010_loud_ultimo",
+      "breakpoints": true
     }
   ]
 }

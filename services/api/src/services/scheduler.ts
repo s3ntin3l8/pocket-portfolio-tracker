@@ -6,6 +6,7 @@ import { getDb } from "../db/client.js";
 import { getMarketData, flushUsage } from "./market-data.js";
 import { refreshHeldPrices } from "./refresh.js";
 import { recordDailySnapshots } from "./snapshots.js";
+import { refreshAntamBuyback, refreshNav } from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
 
 const QUEUE = "refresh-prices";
@@ -16,6 +17,15 @@ const SNAPSHOT_CRON = "0 16 * * *"; // daily 16:00 UTC (~23:00 WIB, after the ID
 
 const TR_SYNC_QUEUE = "tr-sync";
 const TR_SYNC_CRON = "0 * * * *"; // hourly — TR data isn't intraday; be gentle on their API
+
+const ANTAM_QUEUE = "scrape-antam";
+const ANTAM_CRON = "0 */4 * * *"; // every 4h — the Antam buyback moves intraday but slowly
+
+const NAV_QUEUE = "scrape-nav";
+// Twice daily: 16:00 UTC (~23:00 WIB), after the evening NAB publish, plus 01:00 UTC
+// (~08:00 WIB) to backfill funds whose NAB posted late overnight. NAB is once-per-day, so
+// more frequent runs would only re-fetch the same value.
+const NAV_CRON = "0 1,16 * * *";
 
 function usesPglite(url: string): boolean {
   return !url || url.startsWith("pglite://");
@@ -97,8 +107,40 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   });
   await boss.schedule(TR_SYNC_QUEUE, TR_SYNC_CRON);
 
+  // Scrape the Antam gold buyback into scraped_quotes; served back to the AntamProvider
+  // via /internal/gold/antam-buyback. The scraper self-handles failures (returns null).
+  await boss.createQueue(ANTAM_QUEUE);
+  await boss.work(ANTAM_QUEUE, async () => {
+    try {
+      const value = await refreshAntamBuyback(getDb());
+      app.log.info({ value }, "antam buyback scrape complete");
+    } catch (err) {
+      app.log.error({ err }, "antam buyback scrape failed");
+    }
+  });
+  await boss.schedule(ANTAM_QUEUE, ANTAM_CRON);
+
+  // Scrape the reksa-dana NAV catalogue (Bibit) into scraped_quotes; served back to the
+  // NavProvider via /internal/nav/:symbol.
+  await boss.createQueue(NAV_QUEUE);
+  await boss.work(NAV_QUEUE, async () => {
+    try {
+      const count = await refreshNav(getDb());
+      app.log.info({ count }, "reksa-dana nav scrape complete");
+    } catch (err) {
+      app.log.error({ err }, "reksa-dana nav scrape failed");
+    }
+  });
+  await boss.schedule(NAV_QUEUE, NAV_CRON);
+
   app.log.info(
-    { priceCron: SCHEDULE_CRON, snapshotCron: SNAPSHOT_CRON, trSyncCron: TR_SYNC_CRON },
+    {
+      priceCron: SCHEDULE_CRON,
+      snapshotCron: SNAPSHOT_CRON,
+      trSyncCron: TR_SYNC_CRON,
+      antamCron: ANTAM_CRON,
+      navCron: NAV_CRON,
+    },
     "Schedulers started",
   );
 
