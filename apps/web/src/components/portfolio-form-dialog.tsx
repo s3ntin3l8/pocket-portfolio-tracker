@@ -20,13 +20,15 @@ import {
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { SELECTED_PORTFOLIO_COOKIE } from "@/lib/portfolio-selection";
+import { KNOWN_BROKERAGES } from "@/lib/brokerages";
+import { BrokerageIcon } from "@/components/brokerage-icon";
 
 const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
 /** The portfolio fields the edit form pre-fills. */
 export type EditablePortfolio = Pick<
   Portfolio,
-  "id" | "name" | "baseCurrency" | "portfolioType" | "birthYear"
+  "id" | "name" | "baseCurrency" | "portfolioType" | "birthYear" | "brokerage"
 >;
 
 /**
@@ -60,6 +62,7 @@ export function PortfolioFormDialog({
   const [birthYear, setBirthYear] = useState(
     portfolio?.birthYear != null ? String(portfolio.birthYear) : "",
   );
+  const [brokerage, setBrokerage] = useState(portfolio?.brokerage ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -72,6 +75,7 @@ export function PortfolioFormDialog({
       setCurrency(portfolio?.baseCurrency ?? "IDR");
       setType(portfolio?.portfolioType ?? "standard");
       setBirthYear(portfolio?.birthYear != null ? String(portfolio.birthYear) : "");
+      setBrokerage(portfolio?.brokerage ?? "");
       setError(false);
       setConfirmDelete(false);
     }
@@ -91,6 +95,7 @@ export function PortfolioFormDialog({
       baseCurrency: currency,
       portfolioType: type,
       birthYear: parsedBirthYear,
+      brokerage: brokerage.trim() || null,
     };
     try {
       if (mode === "edit" && portfolio) {
@@ -154,6 +159,26 @@ export function PortfolioFormDialog({
               placeholder={t("namePlaceholder")}
               required
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="portfolio-brokerage">{t("brokerage")}</Label>
+            <div className="flex items-center gap-2">
+              <BrokerageIcon brokerage={brokerage} />
+              <Input
+                id="portfolio-brokerage"
+                value={brokerage}
+                onChange={(e) => setBrokerage(e.target.value)}
+                placeholder={t("brokeragePlaceholder")}
+                list="brokerage-suggestions"
+                autoComplete="off"
+              />
+            </div>
+            <datalist id="brokerage-suggestions">
+              {KNOWN_BROKERAGES.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
           </div>
 
           <div className="space-y-1.5">

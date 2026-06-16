@@ -33,6 +33,7 @@ function renderEdit(
     baseCurrency: "IDR",
     portfolioType: "standard" as const,
     birthYear: null,
+    brokerage: null,
   },
 ) {
   return render(
@@ -68,8 +69,29 @@ describe("PortfolioFormDialog", () => {
       baseCurrency: "IDR",
       portfolioType: "standard",
       birthYear: null,
+      brokerage: null,
     });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("captures the entered brokerage", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByRole("button", { name: m.new }));
+
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "Euro" } });
+    fireEvent.change(screen.getByLabelText(m.brokerage), {
+      target: { value: "Trade Republic" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.create }));
+
+    await waitFor(() => expect(createPortfolio).toHaveBeenCalled());
+    expect(createPortfolio).toHaveBeenCalledWith({
+      name: "Euro",
+      baseCurrency: "IDR",
+      portfolioType: "standard",
+      birthYear: null,
+      brokerage: "Trade Republic",
+    });
   });
 
   it("hides the birth-year field until the type is set to child", async () => {
@@ -97,6 +119,7 @@ describe("PortfolioFormDialog", () => {
       baseCurrency: "IDR",
       portfolioType: "child",
       birthYear: 2017,
+      brokerage: null,
     });
   });
 
@@ -113,6 +136,7 @@ describe("PortfolioFormDialog", () => {
       baseCurrency: "IDR",
       portfolioType: "standard",
       birthYear: null,
+      brokerage: null,
     });
     expect(refresh).toHaveBeenCalled();
   });

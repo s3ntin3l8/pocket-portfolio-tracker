@@ -50,6 +50,13 @@
       "when": 1781591943271,
       "tag": "0006_freezing_lorna_dane",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781622356934,
+      "tag": "0007_blushing_jean_grey",
+      "breakpoints": true
     }
   ]
 }

@@ -97,14 +97,55 @@ describe("auth + portfolios + transactions", () => {
       method: "POST",
       url: "/portfolios",
       headers: auth(t),
-      payload: { name: "Stockbit", baseCurrency: "idr" },
+      payload: { name: "Stockbit", baseCurrency: "idr", brokerage: "Stockbit" },
     });
     expect(created.statusCode).toBe(201);
     expect(created.json().baseCurrency).toBe("IDR"); // normalised
+    expect(created.json().brokerage).toBe("Stockbit");
 
     const list = await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) });
     expect(list.statusCode).toBe(200);
     expect(list.json()).toHaveLength(1);
+
+    // Brokerage defaults to null when omitted.
+    const created2 = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: auth(await token("brokerless-user")),
+      payload: { name: "No broker", baseCurrency: "idr" },
+    });
+    expect(created2.json().brokerage).toBeNull();
+  });
+
+  it("sets and clears the brokerage via PATCH", async () => {
+    const t = await token("broker-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Euro", baseCurrency: "eur", brokerage: "Trade Republic" },
+      })
+    ).json().id;
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { brokerage: "DKB" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ name: "Euro", brokerage: "DKB" });
+
+    // Explicit null clears it; other fields are untouched.
+    const cleared = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { brokerage: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json()).toMatchObject({ name: "Euro", brokerage: null });
   });
 
   it("validates portfolio input", async () => {

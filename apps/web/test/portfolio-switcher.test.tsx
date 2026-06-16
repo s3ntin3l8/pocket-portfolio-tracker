@@ -11,7 +11,7 @@ vi.mock("@/i18n/navigation", () => ({
 import { PortfolioSwitcher } from "../src/components/portfolio-switcher";
 
 function renderSwitcher(props: {
-  portfolios: { id: string; name: string }[];
+  portfolios: { id: string; name: string; brokerage: string | null }[];
   selectedId: string | null;
 }) {
   return render(
@@ -29,7 +29,7 @@ describe("PortfolioSwitcher", () => {
 
   it("renders nothing with fewer than two portfolios", () => {
     const { container } = renderSwitcher({
-      portfolios: [{ id: "p1", name: "Main" }],
+      portfolios: [{ id: "p1", name: "Main", brokerage: null }],
       selectedId: null,
     });
     expect(container.querySelector("select")).toBeNull();
@@ -38,8 +38,8 @@ describe("PortfolioSwitcher", () => {
   it("offers an All option plus each portfolio, reflecting the selection", () => {
     renderSwitcher({
       portfolios: [
-        { id: "p1", name: "Main" },
-        { id: "p2", name: "DKB" },
+        { id: "p1", name: "Main", brokerage: null },
+        { id: "p2", name: "DKB", brokerage: null },
       ],
       selectedId: "p2",
     });
@@ -52,11 +52,24 @@ describe("PortfolioSwitcher", () => {
     ).toBeInTheDocument();
   });
 
+  it("appends the brokerage to the option label when set", () => {
+    renderSwitcher({
+      portfolios: [
+        { id: "p1", name: "Main", brokerage: null },
+        { id: "p2", name: "Euro", brokerage: "Trade Republic" },
+      ],
+      selectedId: "p2",
+    });
+    expect(
+      screen.getByRole("option", { name: "Euro · Trade Republic" }),
+    ).toBeInTheDocument();
+  });
+
   it("writes the cookie and refreshes when a portfolio is chosen", () => {
     renderSwitcher({
       portfolios: [
-        { id: "p1", name: "Main" },
-        { id: "p2", name: "DKB" },
+        { id: "p1", name: "Main", brokerage: null },
+        { id: "p2", name: "DKB", brokerage: null },
       ],
       selectedId: null,
     });

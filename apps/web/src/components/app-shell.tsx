@@ -42,7 +42,7 @@ export function AppShell({
   selectedId = null,
 }: {
   children: React.ReactNode;
-  portfolios?: Pick<Portfolio, "id" | "name">[];
+  portfolios?: Pick<Portfolio, "id" | "name" | "brokerage">[];
   selectedId?: string | null;
 }) {
   const t = useTranslations("Nav");

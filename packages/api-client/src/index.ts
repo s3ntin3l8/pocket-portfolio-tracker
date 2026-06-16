@@ -26,6 +26,8 @@ export interface Portfolio {
   portfolioType: "standard" | "child";
   /** Beneficiary birth year (e.g. a child's account), or null. */
   birthYear: number | null;
+  /** Brokerage/custodian the portfolio is held at (free text), or null. */
+  brokerage: string | null;
 }
 
 /** Presentation metadata for an instrument; `null` on cash (instrument-less) rows. */

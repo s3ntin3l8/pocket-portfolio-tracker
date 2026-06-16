@@ -95,6 +95,9 @@ export const portfolios = pgTable(
     // Optional birth year of the account's beneficiary (e.g. a child's savings
     // account) — powers the "to age 18" forecast target.
     birthYear: integer("birth_year"),
+    // Optional brokerage/custodian the portfolio is held at (e.g. Trade Republic,
+    // DKB, Stockbit). Free text; powers the brokerage logo on the dashboard.
+    brokerage: text("brokerage"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -32,7 +32,11 @@ export default async function AppLayout({
     <>
       <SessionErrorGuard />
       <AppShell
-        portfolios={selection.portfolios.map((p) => ({ id: p.id, name: p.name }))}
+        portfolios={selection.portfolios.map((p) => ({
+          id: p.id,
+          name: p.name,
+          brokerage: p.brokerage,
+        }))}
         selectedId={selection.selectedId}
       >
         {children}
