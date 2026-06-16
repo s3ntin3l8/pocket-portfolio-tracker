@@ -9,15 +9,13 @@ import {
   Upload,
   FileText,
   AlertCircle,
-  Trash2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ImportReview } from "@/components/import-review";
 
 // A draft transaction as it comes back from the API (executedAt is an ISO string).
 export interface ImportDraft {
@@ -40,6 +38,29 @@ export interface ImportResult {
   importId: string;
   drafts: ImportDraft[];
   errors: { line: number; message: string }[];
+}
+
+/**
+ * A draft augmented with a stable client-side id. Selection, inline editing and the
+ * filter view all key off `uid` so they stay correct as drafts are removed (which
+ * reindexes the array) or hidden by a filter. The id never leaves the client — it is
+ * stripped before the drafts are sent to `confirmImport`.
+ */
+export type ReviewDraft = ImportDraft & { uid: string };
+
+let uidCounter = 0;
+function withUid(draft: ImportDraft): ReviewDraft {
+  const uid =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `draft-${uidCounter++}`;
+  return { ...draft, uid };
+}
+
+function stripUid(draft: ReviewDraft): ImportDraft {
+  const copy: ImportDraft & { uid?: string } = { ...draft };
+  delete copy.uid;
+  return copy;
 }
 
 /** The slice of the API client the import flow needs (injectable for tests). */
@@ -133,7 +154,7 @@ export function ImportFlow({
   const [portfolioId, setPortfolioId] = useState<string>(
     defaultPortfolioId ?? portfolios[0]?.id ?? "demo",
   );
-  const [drafts, setDrafts] = useState<ImportDraft[]>([]);
+  const [drafts, setDrafts] = useState<ReviewDraft[]>([]);
   const [importId, setImportId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
@@ -167,7 +188,7 @@ export function ImportFlow({
         return;
       }
       setImportId(result.importId);
-      setDrafts(result.drafts);
+      setDrafts(result.drafts.map(withUid));
       setStep("review");
     } catch (err) {
       setError(errorMessage(err));
@@ -181,19 +202,30 @@ export function ImportFlow({
     if (file) void handleFile(file);
   }
 
-  function updateDraft(i: number, patch: Partial<ImportDraft>) {
-    setDrafts((ds) => ds.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
+  function updateDraft(uid: string, patch: Partial<ImportDraft>) {
+    setDrafts((ds) => ds.map((d) => (d.uid === uid ? { ...d, ...patch } : d)));
   }
 
-  function removeDraft(i: number) {
-    setDrafts((ds) => ds.filter((_, idx) => idx !== i));
+  function removeDraft(uid: string) {
+    setDrafts((ds) => ds.filter((d) => d.uid !== uid));
   }
 
-  async function confirm() {
+  function removeMany(uids: string[]) {
+    const set = new Set(uids);
+    setDrafts((ds) => ds.filter((d) => !set.has(d.uid)));
+  }
+
+  // Confirm all drafts, or just the subset whose uids are passed (confirm-selected).
+  async function confirm(uids?: string[]) {
     setError(null);
     setStep("parsing");
     try {
-      const { confirmed } = await client.confirmImport(importId, drafts);
+      const subset =
+        uids && uids.length ? drafts.filter((d) => uids.includes(d.uid)) : drafts;
+      const { confirmed } = await client.confirmImport(
+        importId,
+        subset.map(stripUid),
+      );
       setConfirmedCount(confirmed);
       setStep("done");
     } catch (err) {
@@ -210,7 +242,14 @@ export function ImportFlow({
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div
+      className={cn(
+        "mx-auto space-y-6",
+        // The review step is a data table — give it the full page width; the other
+        // steps stay comfortably narrow.
+        step === "review" ? "max-w-6xl" : "max-w-xl",
+      )}
+    >
       {/* Stepper */}
       <ol className="flex items-center gap-2 text-sm">
         {STEPS.map((s, i) => (
@@ -359,76 +398,14 @@ export function ImportFlow({
       )}
 
       {step === "review" && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {t("draftCount", { count: drafts.length })} — {t("reviewHint")}
-          </p>
-
-          {drafts.map((draft, i) => (
-            <Card key={i}>
-              <CardContent className="space-y-4 p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{draft.assetClass}</Badge>
-                    <Badge variant="success">{draft.action}</Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={draft.confidence >= 0.9 ? "success" : "warning"}>
-                      {t("confidence", { pct: Math.round(draft.confidence * 100) })}
-                    </Badge>
-                    {drafts.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={t("remove")}
-                        onClick={() => removeDraft(i)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label={t("fields.name")}>
-                    <Input
-                      value={draft.name ?? ""}
-                      onChange={(e) => updateDraft(i, { name: e.target.value })}
-                    />
-                  </Field>
-                  <Field label={t("fields.executedAt")}>
-                    <Input
-                      type="date"
-                      value={draft.executedAt.slice(0, 10)}
-                      onChange={(e) => updateDraft(i, { executedAt: e.target.value })}
-                    />
-                  </Field>
-                  <Field label={t("fields.quantity")}>
-                    <Input
-                      value={draft.quantity}
-                      onChange={(e) => updateDraft(i, { quantity: e.target.value })}
-                    />
-                  </Field>
-                  <Field label={t("fields.price")}>
-                    <Input
-                      value={draft.price}
-                      onChange={(e) => updateDraft(i, { price: e.target.value })}
-                    />
-                  </Field>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={reset}>
-              {t("discard")}
-            </Button>
-            <Button onClick={confirm} disabled={drafts.length === 0}>
-              {t("confirm")}
-            </Button>
-          </div>
-        </div>
+        <ImportReview
+          drafts={drafts}
+          onUpdate={updateDraft}
+          onRemove={removeDraft}
+          onRemoveMany={removeMany}
+          onConfirm={confirm}
+          onDiscard={reset}
+        />
       )}
 
       {step === "done" && (
@@ -445,21 +422,6 @@ export function ImportFlow({
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
     </div>
   );
 }

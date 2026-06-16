@@ -135,6 +135,38 @@
       "quantity": "Jumlah",
       "price": "Harga"
     },
+    "review": {
+      "filters": {
+        "assetClass": "Kelas aset",
+        "action": "Aksi",
+        "all": "Semua",
+        "needsReview": "Perlu diperiksa",
+        "search": "Cari berdasarkan nama…",
+        "showing": "Menampilkan {shown} dari {total}",
+        "clear": "Hapus filter"
+      },
+      "batch": {
+        "selected": "{count, plural, other {# dipilih}}",
+        "remove": "Hapus yang dipilih",
+        "removePrompt": "Hapus draf ini?",
+        "removeConfirm": "Hapus",
+        "confirmSelected": "Konfirmasi yang dipilih",
+        "cancel": "Batal"
+      },
+      "selectAll": "Pilih semua draf",
+      "selectRow": "Pilih draf",
+      "edit": {
+        "title": "Ubah draf",
+        "open": "Ubah",
+        "done": "Selesai"
+      },
+      "columns": {
+        "confidence": "Keyakinan",
+        "assetClass": "Kelas",
+        "action": "Aksi"
+      },
+      "empty": "Tidak ada draf yang cocok dengan filter Anda."
+    },
     "discard": "Buang",
     "confirm": "Konfirmasi",
     "done": {
