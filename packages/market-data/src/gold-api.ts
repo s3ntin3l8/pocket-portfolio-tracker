@@ -2,11 +2,16 @@ import type {
   AssetClass,
   InstrumentRef,
   MarketDataProvider,
+  ProviderUsage,
   Quote,
 } from "./types.js";
 import type { ProviderOptions } from "./twelve-data.js";
 
 const TROY_OUNCE_GRAMS = 31.1034768;
+
+// GoldAPI's `/stat` reports the month's used count but not the plan cap, so we assume the
+// free tier's documented allowance to surface a "X / 100" remaining figure.
+const GOLDAPI_FREE_MONTHLY_LIMIT = 100;
 
 /**
  * GoldAPI.io provider — spot gold priced per gram in the requested currency
@@ -48,5 +53,25 @@ export class GoldApiProvider implements MarketDataProvider {
       currency: ref.currency,
       asOf: new Date().toISOString(),
     };
+  }
+
+  async getUsage(): Promise<ProviderUsage | null> {
+    // `/stat` reports the month's request count. GoldAPI doesn't return the plan cap, so
+    // we assume the free-tier monthly allowance for the remaining figure.
+    try {
+      const res = await this.doFetch(`${this.baseUrl}/stat`, {
+        headers: { "x-access-token": this.apiKey },
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { requests_month?: number };
+      if (data.requests_month === undefined) return null;
+      return {
+        window: "month",
+        used: data.requests_month,
+        limit: GOLDAPI_FREE_MONTHLY_LIMIT,
+      };
+    } catch {
+      return null;
+    }
   }
 }
