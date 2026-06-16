@@ -55,6 +55,36 @@ describe("createApiClient", () => {
     expect(JSON.parse(sentBody!)).toMatchObject({ name: "Stockbit" });
   });
 
+  it("sets a JSON content-type only when a body is sent", async () => {
+    let seen: RequestInit | undefined;
+    const fetchImpl = mockFetch((_url, init) => {
+      seen = init;
+      return { status: 204, body: undefined };
+    });
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      fetch: fetchImpl as unknown as typeof fetch,
+    });
+
+    // Bodyless DELETE must NOT advertise application/json, or Fastify rejects the
+    // empty body with FST_ERR_CTP_EMPTY_JSON_BODY → 400.
+    await client.deletePortfolio("p1");
+    expect(
+      (seen?.headers as Record<string, string>)["content-type"],
+    ).toBeUndefined();
+    expect(seen?.body).toBeUndefined();
+
+    // A write still carries the header so the server parses it.
+    await client.createPortfolio({
+      name: "Stockbit",
+      baseCurrency: "IDR",
+      portfolioType: "standard",
+    });
+    expect((seen?.headers as Record<string, string>)["content-type"]).toBe(
+      "application/json",
+    );
+  });
+
   it("posts a base64 image + mimeType to the screenshot import endpoint", async () => {
     let seen: { url: string; init: RequestInit } | undefined;
     const fetchImpl = mockFetch((url, init) => {

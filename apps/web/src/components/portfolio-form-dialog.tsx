@@ -118,6 +118,8 @@ export function PortfolioFormDialog({
       }
       router.refresh();
       setOpen(false);
+    } catch {
+      setError(true);
     } finally {
       setBusy(false);
     }
