@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Pencil, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Trash2, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -35,8 +35,8 @@ export interface ImportReviewProps {
   onRemove: (uid: string) => void;
   onRemoveMany: (uids: string[]) => void;
   /** Confirm all drafts, or just the passed subset (confirm-selected). */
-  onConfirm: (uids?: string[]) => void;
-  onDiscard: () => void;
+  onConfirm: (uids?: string[]) => void | Promise<void>;
+  onDiscard: () => void | Promise<void>;
 }
 
 /**
@@ -60,6 +60,33 @@ export function ImportReview({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [editingUid, setEditingUid] = useState<string | null>(null);
+  // Which write is in flight, so we can disable + spin its button. A large import
+  // (hundreds of rows) can take 20–30s to commit; without this the button looks idle.
+  const [pending, setPending] = useState<
+    "confirm" | "confirmSelected" | "discard" | null
+  >(null);
+  const busy = pending !== null;
+
+  async function runConfirm(
+    action: "confirm" | "confirmSelected",
+    uids?: string[],
+  ) {
+    setPending(action);
+    try {
+      await onConfirm(uids);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function runDiscard() {
+    setPending("discard");
+    try {
+      await onDiscard();
+    } finally {
+      setPending(null);
+    }
+  }
 
   const [assetClassFilter, setAssetClassFilter] = useState<string>(ALL);
   const [actionFilter, setActionFilter] = useState<string>(ALL);
@@ -215,7 +242,14 @@ export function ImportReview({
             {t("review.batch.selected", { count: selectedIds.length })}
           </span>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => onConfirm(selectedIds)}>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => runConfirm("confirmSelected", selectedIds)}
+            >
+              {pending === "confirmSelected" && (
+                <Loader2 className="size-3.5 animate-spin" />
+              )}
               {t("review.batch.confirmSelected")}
             </Button>
             {confirming ? (
@@ -398,10 +432,15 @@ export function ImportReview({
 
       {/* Footer */}
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onDiscard}>
+        <Button variant="ghost" onClick={runDiscard} disabled={busy}>
+          {pending === "discard" && <Loader2 className="size-4 animate-spin" />}
           {t("discard")}
         </Button>
-        <Button onClick={() => onConfirm()} disabled={drafts.length === 0}>
+        <Button
+          onClick={() => runConfirm("confirm")}
+          disabled={busy || drafts.length === 0}
+        >
+          {pending === "confirm" && <Loader2 className="size-4 animate-spin" />}
           {t("confirm")}
         </Button>
       </div>
