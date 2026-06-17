@@ -1,21 +1,12 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Layers, GitBranch } from "lucide-react";
-import type { HoldingValuation } from "@portfolio/api-client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ExportCsvButton } from "@/components/export-csv-button";
+import { HoldingsTable } from "@/components/holdings-table";
 import { Link } from "@/i18n/navigation";
 import { loadHoldings } from "@/lib/server-api";
-import { formatMoney, cn } from "@/lib/utils";
 
 const CLASS_TABS = ["all", "equity", "etf", "gold", "bond", "mutual_fund"] as const;
 
@@ -39,7 +30,6 @@ export default async function HoldingsPage({
       ? result.holdings.filter((h) => Number(h.quantity) !== 0)
       : [];
   const currency = result.status === "ok" ? result.displayCurrency : "IDR";
-  const m = (n: number) => formatMoney(n, currency, locale);
 
   // Per-unit avgCost/price are native quotes (labeled by PriceCurrency); position
   // value/P&L are in the display currency (the trailing Currency column).
@@ -130,76 +120,6 @@ export default async function HoldingsPage({
     );
   }
 
-  function HoldingsTable({ rows }: { rows: HoldingValuation[] }) {
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("instrument")}</TableHead>
-            <TableHead className="text-right">{t("quantity")}</TableHead>
-            <TableHead className="text-right">{t("avgCost")}</TableHead>
-            <TableHead className="text-right">{t("price")}</TableHead>
-            <TableHead className="text-right">{t("value")}</TableHead>
-            <TableHead className="text-right">{t("pnl")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((h) => {
-            const pnl =
-              h.unrealizedPnLDisplay !== null
-                ? Number(h.unrealizedPnLDisplay)
-                : null;
-            // Per-unit quotes stay in the instrument's own currency; position values
-            // are shown in the display currency.
-            const native = (n: number) =>
-              formatMoney(n, h.currency ?? currency, locale);
-            return (
-              <TableRow key={h.instrumentId}>
-                <TableCell>
-                  <Link
-                    href={`/instruments/${h.instrumentId}`}
-                    className="font-medium hover:underline"
-                  >
-                    {h.instrument?.symbol ?? "—"}
-                  </Link>
-                  <div className="text-xs text-muted-foreground">
-                    {h.instrument?.name ?? h.instrumentId}
-                  </div>
-                </TableCell>
-                <TableCell className="tabular text-right">
-                  {Number(h.quantity)} {h.instrument?.unit ?? ""}
-                </TableCell>
-                <TableCell className="tabular text-right">
-                  {native(Number(h.avgCost))}
-                </TableCell>
-                <TableCell className="tabular text-right">
-                  {h.price !== null ? native(Number(h.price)) : "—"}
-                </TableCell>
-                <TableCell className="tabular text-right">
-                  {h.marketValueDisplay !== null
-                    ? m(Number(h.marketValueDisplay))
-                    : "—"}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "tabular text-right",
-                    pnl === null
-                      ? "text-muted-foreground"
-                      : pnl >= 0
-                        ? "text-success"
-                        : "text-destructive",
-                  )}
-                >
-                  {pnl === null ? "—" : `${pnl >= 0 ? "+" : ""}${m(pnl)}`}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {Heading}
@@ -221,6 +141,7 @@ export default async function HoldingsPage({
                     ? holdings
                     : holdings.filter((h) => h.instrument?.assetClass === key)
                 }
+                currency={currency}
               />
             </div>
           </TabsContent>

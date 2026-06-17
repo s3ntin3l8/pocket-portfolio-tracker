@@ -44,6 +44,36 @@ const items: ImportRecord[] = [
   },
 ];
 
+const threeItems: ImportRecord[] = [
+  {
+    id: "i1",
+    portfolioId: "p1",
+    parser: "pytr",
+    status: "confirmed",
+    confidence: null,
+    count: 10,
+    createdAt: "2026-06-12T10:00:00.000Z",
+  },
+  {
+    id: "i2",
+    portfolioId: "p1",
+    parser: "csv",
+    status: "confirmed",
+    confidence: null,
+    count: 1,
+    createdAt: "2026-06-11T10:00:00.000Z",
+  },
+  {
+    id: "i3",
+    portfolioId: "p1",
+    parser: "dkb",
+    status: "confirmed",
+    confidence: null,
+    count: 5,
+    createdAt: "2026-06-10T10:00:00.000Z",
+  },
+];
+
 function renderHistory() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -82,5 +112,51 @@ describe("ImportHistory", () => {
     fireEvent.click(screen.getByRole("button", { name: m.undo }));
     await waitFor(() => expect(deleteImport).toHaveBeenCalledWith("conf1"));
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("renders sortable column headers", () => {
+    renderHistory();
+    expect(screen.getByRole("button", { name: /parser/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /status/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /items/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /timestamp/i })).toBeInTheDocument();
+  });
+
+  it("sorts by item count numerically ascending", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory items={threeItems} />
+      </NextIntlClientProvider>,
+    );
+    // Default: pytr(10), csv(1), dkb(5)
+    fireEvent.click(screen.getByRole("button", { name: /items/i }));
+    const rows = screen.getAllByRole("row").slice(1);
+    // asc: 1 (csv), 5 (dkb), 10 (pytr)
+    expect(rows[0]).toHaveTextContent("csv");
+    expect(rows[1]).toHaveTextContent("dkb");
+    expect(rows[2]).toHaveTextContent("pytr");
+  });
+
+  it("sorts by parser name alphabetically", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory items={threeItems} />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /parser/i }));
+    const rows = screen.getAllByRole("row").slice(1);
+    // asc: csv, dkb, pytr
+    expect(rows[0]).toHaveTextContent("csv");
+    expect(rows[1]).toHaveTextContent("dkb");
+    expect(rows[2]).toHaveTextContent("pytr");
+  });
+
+  it("sets aria-sort ascending then descending on repeated clicks", () => {
+    renderHistory();
+    const parserBtn = screen.getByRole("button", { name: /parser/i });
+    fireEvent.click(parserBtn);
+    expect(parserBtn.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    fireEvent.click(parserBtn);
+    expect(parserBtn.closest("th")).toHaveAttribute("aria-sort", "descending");
   });
 });

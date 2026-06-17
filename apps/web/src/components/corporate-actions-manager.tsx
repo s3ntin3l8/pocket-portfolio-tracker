@@ -8,8 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
+import { useTableSort } from "@/lib/table-sort";
+import type { ColDef } from "@/lib/table-sort";
+
+const CA_COLS: ColDef<CorporateAction>[] = [
+  { key: "type", get: (ca) => ca.type, type: "text" },
+  { key: "ratio", get: (ca) => ca.ratio, type: "numeric" },
+  { key: "exDate", get: (ca) => ca.exDate, type: "date" },
+];
 
 const TYPES = ["split", "bonus", "rights"] as const;
 
@@ -32,6 +48,7 @@ export function CorporateActionsManager({
   const router = useRouter();
 
   const [items, setItems] = useState(initial);
+  const { sortKey, sortDir, toggle: toggleSort, sort } = useTableSort<CorporateAction>(CA_COLS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,130 +99,152 @@ export function CorporateActionsManager({
   }
 
   return (
-    <ul className="divide-y divide-border text-sm">
-      {items.map((ca) =>
-        editingId === ca.id ? (
-          <li key={ca.id} className="flex flex-wrap items-end gap-2 py-2">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">
-                {tc("type")}
-              </span>
-              <Select
-                aria-label={tc("type")}
-                value={type}
-                onChange={(e) =>
-                  setType(e.target.value as (typeof TYPES)[number])
-                }
-              >
-                {TYPES.map((ty) => (
-                  <option key={ty} value={ty}>
-                    {tt(ty)}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">
-                {tc("ratio")}
-              </span>
-              <Input
-                aria-label={tc("ratio")}
-                inputMode="decimal"
-                className="w-24"
-                value={ratio}
-                onChange={(e) => setRatio(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">
-                {tc("exDate")}
-              </span>
-              <Input
-                aria-label={tc("exDate")}
-                type="date"
-                className="w-40"
-                value={exDate}
-                onChange={(e) => setExDate(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={tc("save")}
-                disabled={busy}
-                onClick={() => save(ca.id)}
-              >
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin" />
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SortableTableHead colKey="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{tc("type")}</SortableTableHead>
+          <SortableTableHead colKey="ratio" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{tc("ratio")}</SortableTableHead>
+          <SortableTableHead colKey="exDate" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{tc("exDate")}</SortableTableHead>
+          <TableCell className="h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground">
+            <span className="sr-only">{tc("edit")}</span>
+          </TableCell>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sort(items).map((ca) =>
+          editingId === ca.id ? (
+            <TableRow key={ca.id}>
+              <TableCell colSpan={4}>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">
+                      {tc("type")}
+                    </span>
+                    <Select
+                      aria-label={tc("type")}
+                      value={type}
+                      onChange={(e) =>
+                        setType(e.target.value as (typeof TYPES)[number])
+                      }
+                    >
+                      {TYPES.map((ty) => (
+                        <option key={ty} value={ty}>
+                          {tt(ty)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">
+                      {tc("ratio")}
+                    </span>
+                    <Input
+                      aria-label={tc("ratio")}
+                      inputMode="decimal"
+                      className="w-24"
+                      value={ratio}
+                      onChange={(e) => setRatio(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">
+                      {tc("exDate")}
+                    </span>
+                    <Input
+                      aria-label={tc("exDate")}
+                      type="date"
+                      className="w-40"
+                      value={exDate}
+                      onChange={(e) => setExDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={tc("save")}
+                      disabled={busy}
+                      onClick={() => save(ca.id)}
+                    >
+                      {busy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Check className="size-4" />
+                      )}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={tc("cancel")}
+                      disabled={busy}
+                      onClick={() => setEditingId(null)}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          ) : (
+            <TableRow key={ca.id}>
+              <TableCell>
+                <Badge variant="outline">{tt(ca.type)}</Badge>
+              </TableCell>
+              <TableCell className="tabular text-muted-foreground">
+                {ca.ratio}
+              </TableCell>
+              <TableCell className="tabular text-muted-foreground">
+                {df.format(new Date(ca.exDate))}
+              </TableCell>
+              <TableCell className="text-right">
+                {confirmId === ca.id ? (
+                  <span className="flex items-center justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy}
+                      onClick={() => remove(ca.id)}
+                    >
+                      {busy && <Loader2 className="size-3.5 animate-spin" />}
+                      {tc("delete")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => setConfirmId(null)}
+                    >
+                      {tc("cancel")}
+                    </Button>
+                  </span>
                 ) : (
-                  <Check className="size-4" />
+                  <span className="flex items-center justify-end gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={tc("edit")}
+                      onClick={() => beginEdit(ca)}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={tc("delete")}
+                      onClick={() => {
+                        setEditingId(null);
+                        setConfirmId(ca.id);
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </span>
                 )}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={tc("cancel")}
-                disabled={busy}
-                onClick={() => setEditingId(null)}
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-          </li>
-        ) : (
-          <li key={ca.id} className="flex items-center justify-between gap-2 py-2">
-            <Badge variant="outline">{tt(ca.type)}</Badge>
-            <span className="tabular ml-auto text-muted-foreground">
-              {t("ratio")} {ca.ratio} · {t("exDate")}{" "}
-              {df.format(new Date(ca.exDate))}
-            </span>
-            {confirmId === ca.id ? (
-              <span className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={busy}
-                  onClick={() => remove(ca.id)}
-                >
-                  {busy && <Loader2 className="size-3.5 animate-spin" />}
-                  {tc("delete")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setConfirmId(null)}
-                >
-                  {tc("cancel")}
-                </Button>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={tc("edit")}
-                  onClick={() => beginEdit(ca)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={tc("delete")}
-                  onClick={() => {
-                    setEditingId(null);
-                    setConfirmId(ca.id);
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </span>
-            )}
-          </li>
-        ),
-      )}
-    </ul>
+              </TableCell>
+            </TableRow>
+          ),
+        )}
+      </TableBody>
+    </Table>
   );
 }

@@ -1,28 +1,23 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins } from "lucide-react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/stat-card";
 import { EmptyState } from "@/components/empty-state";
 import { AllocationDonut } from "@/components/charts/allocation-donut";
 import { IncomeBarChart } from "@/components/charts/income-bar-chart";
 import { IncomeHeatmap } from "@/components/charts/income-heatmap";
+import { YieldsTable } from "@/components/income/yields-table";
+import { ByCurrencyTable } from "@/components/income/by-currency-table";
+import { UpcomingTable } from "@/components/income/upcoming-table";
+import { IncomeEventsTable } from "@/components/income/income-events-table";
 import { loadIncomeStats } from "@/lib/server-api";
 import { formatMoney, formatPercent } from "@/lib/utils";
-import type { IncomeEvent, UpcomingPayment } from "@portfolio/api-client";
+import type { IncomeEvent } from "@portfolio/api-client";
 
 /** Sum a year's events per currency (income can span currencies). */
 function totalsByCurrency(events: IncomeEvent[]): Record<string, number> {
@@ -41,10 +36,8 @@ export default async function IncomePage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Income");
-  const tt = await getTranslations("TxType");
   const tc = await getTranslations("AssetClass");
   const te = await getTranslations("Empty");
-  const df = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
 
   const result = await loadIncomeStats();
 
@@ -224,47 +217,7 @@ export default async function IncomePage({
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t("yieldTitle")}</h2>
           <div className="rounded-xl border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("instrument")}</TableHead>
-                  <TableHead className="text-right">{t("trailing")}</TableHead>
-                  <TableHead className="text-right">{t("value")}</TableHead>
-                  <TableHead className="text-right">{t("currentYield")}</TableHead>
-                  <TableHead className="text-right">{t("yieldOnCost")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {s.yields.map((y) => (
-                  <TableRow key={y.instrumentId}>
-                    <TableCell>
-                      <div className="font-medium">{y.symbol}</div>
-                      {y.name && (
-                        <div className="text-xs text-muted-foreground">
-                          {y.name}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="tabular text-right">
-                      {formatMoney(Number(y.trailingIncome), y.currency, locale)}
-                    </TableCell>
-                    <TableCell className="tabular text-right text-muted-foreground">
-                      {formatMoney(Number(y.marketValue), y.currency, locale)}
-                    </TableCell>
-                    <TableCell className="tabular text-right font-medium">
-                      {y.yield !== null
-                        ? formatPercent(Number(y.yield), locale)
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="tabular text-right text-muted-foreground">
-                      {y.yieldOnCost !== null
-                        ? formatPercent(Number(y.yieldOnCost), locale)
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <YieldsTable rows={s.yields} />
           </div>
         </section>
       )}
@@ -273,28 +226,7 @@ export default async function IncomePage({
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t("currencyTitle")}</h2>
           <div className="rounded-xl border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("type")}</TableHead>
-                  <TableHead className="text-right">{t("native")}</TableHead>
-                  <TableHead className="text-right">{t("normalized")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {s.byCurrency.map((c) => (
-                  <TableRow key={c.currency}>
-                    <TableCell className="font-medium">{c.currency}</TableCell>
-                    <TableCell className="tabular text-right">
-                      {formatMoney(Number(c.totalNative), c.currency, locale)}
-                    </TableCell>
-                    <TableCell className="tabular text-right text-muted-foreground">
-                      {m(Number(c.totalNormalized))}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <ByCurrencyTable rows={s.byCurrency} displayCurrency={currency} />
           </div>
         </section>
       )}
@@ -303,51 +235,7 @@ export default async function IncomePage({
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t("upcomingTitle")}</h2>
           <div className="rounded-xl border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("date")}</TableHead>
-                  <TableHead>{t("status")}</TableHead>
-                  <TableHead>{t("instrument")}</TableHead>
-                  <TableHead className="text-right">{t("amount")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {s.upcoming.map((c: UpcomingPayment, i: number) => (
-                  <TableRow key={`${c.instrumentId}-${c.date}-${i}`}>
-                    <TableCell className="tabular whitespace-nowrap text-muted-foreground">
-                      {df.format(new Date(c.date))}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          c.status === "scheduled"
-                            ? "default"
-                            : c.status === "announced"
-                              ? "warning"
-                              : c.status === "paid"
-                                ? "success"
-                                : "outline"
-                        }
-                      >
-                        {t(c.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{c.symbol}</div>
-                      {c.name && (
-                        <div className="text-xs text-muted-foreground">
-                          {c.name}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="tabular text-right text-success">
-                      {formatMoney(Number(c.amount), c.currency, locale)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <UpcomingTable rows={s.upcoming} />
           </div>
         </section>
       )}
@@ -369,39 +257,7 @@ export default async function IncomePage({
             </div>
 
             <div className="rounded-xl border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("date")}</TableHead>
-                    <TableHead>{t("type")}</TableHead>
-                    <TableHead>{t("instrument")}</TableHead>
-                    <TableHead className="text-right">{t("amount")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {events.map((e, i) => (
-                    <TableRow key={`${e.instrumentId}-${e.date}-${i}`}>
-                      <TableCell className="tabular whitespace-nowrap text-muted-foreground">
-                        {df.format(new Date(e.date))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="default">{tt(e.type)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{e.symbol ?? "—"}</div>
-                        {e.name && (
-                          <div className="text-xs text-muted-foreground">
-                            {e.name}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="tabular text-right text-success">
-                        {formatMoney(Number(e.amount), e.currency, locale)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <IncomeEventsTable rows={events} />
             </div>
           </section>
         );

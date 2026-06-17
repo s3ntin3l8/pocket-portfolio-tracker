@@ -221,4 +221,36 @@ describe("ImportReview", () => {
       screen.getByRole("button", { name: messages.Import.discard }),
     ).toBeDisabled();
   });
+
+  it("sorts draft rows by name ascending when name header is clicked", () => {
+    renderReview();
+    const table = screen.getByRole("table");
+    // DRAFTS: Antam Gold (a), Apple Inc (b), FR Bond (c) — already asc by name
+    // Click the name header button
+    const nameBtn = within(table).getByRole("button", { name: new RegExp(messages.Import.fields.name, "i") });
+    fireEvent.click(nameBtn);
+    const rows = within(table).getAllByRole("row").slice(1);
+    // Antam, Apple, FR Bond alphabetically
+    expect(rows[0]).toHaveTextContent("Antam Gold");
+    expect(rows[1]).toHaveTextContent("Apple Inc");
+    expect(rows[2]).toHaveTextContent("FR Bond");
+    // Second click: descending
+    fireEvent.click(nameBtn);
+    const rowsDesc = within(table).getAllByRole("row").slice(1);
+    expect(rowsDesc[0]).toHaveTextContent("FR Bond");
+    expect(rowsDesc[2]).toHaveTextContent("Antam Gold");
+  });
+
+  it("sorts draft rows by date (executedAt) ascending", () => {
+    renderReview();
+    const table = screen.getByRole("table");
+    const dateBtn = within(table).getByRole("button", { name: new RegExp(messages.Import.fields.executedAt, "i") });
+    fireEvent.click(dateBtn);
+    const rows = within(table).getAllByRole("row").slice(1);
+    // DRAFTS dates: a=2026-02-08, b=2026-02-07, c=2026-02-05
+    // asc: c (05), b (07), a (08)
+    expect(rows[0]).toHaveTextContent("FR Bond");
+    expect(rows[1]).toHaveTextContent("Apple Inc");
+    expect(rows[2]).toHaveTextContent("Antam Gold");
+  });
 });

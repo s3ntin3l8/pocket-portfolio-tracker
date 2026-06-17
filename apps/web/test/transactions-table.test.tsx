@@ -99,4 +99,52 @@ describe("TransactionsTable", () => {
     expect(screen.getByText(/IDR/)).toBeInTheDocument();
     expect(screen.getByText(/\$/)).toBeInTheDocument();
   });
+
+  it("sorts rows by date ascending when date header is clicked", () => {
+    renderTable();
+    // Default order: t1 (2026-02-01), t2 (2026-01-01) — t1 first
+    const rows = screen.getAllByRole("row").slice(1); // skip header
+    expect(rows[0]).toHaveTextContent("BBCA");
+
+    // Click the date sort header
+    fireEvent.click(screen.getByRole("button", { name: /date/i }));
+    const sortedRows = screen.getAllByRole("row").slice(1);
+    // After sorting asc by date: t2 (Jan) should come first
+    expect(sortedRows[0]).toHaveTextContent("AAPL");
+    expect(sortedRows[1]).toHaveTextContent("BBCA");
+  });
+
+  it("reverses date sort order when date header is clicked again", () => {
+    renderTable();
+    fireEvent.click(screen.getByRole("button", { name: /date/i }));
+    fireEvent.click(screen.getByRole("button", { name: /date/i }));
+    const sortedRows = screen.getAllByRole("row").slice(1);
+    // desc: t1 (Feb) should come first
+    expect(sortedRows[0]).toHaveTextContent("BBCA");
+    expect(sortedRows[1]).toHaveTextContent("AAPL");
+  });
+
+  it("sorts rows by quantity numerically (not lexicographic)", () => {
+    renderTable();
+    // ROWS: t1 qty "10", t2 qty "5"
+    // numeric asc: 5 (AAPL) first, then 10 (BBCA)
+    fireEvent.click(screen.getByRole("button", { name: /quantity/i }));
+    const sortedRows = screen.getAllByRole("row").slice(1);
+    expect(sortedRows[0]).toHaveTextContent("AAPL");
+    expect(sortedRows[1]).toHaveTextContent("BBCA");
+  });
+
+  it("shows sort icons in headers (neutral, ascending, descending)", () => {
+    renderTable();
+    // Before sorting: all headers show the neutral ChevronsUpDown icon
+    const dateBtn = screen.getByRole("button", { name: /date/i });
+    // Click once: ascending
+    fireEvent.click(dateBtn);
+    const th = dateBtn.closest("th");
+    expect(th).toHaveAttribute("aria-sort", "ascending");
+
+    // Click again: descending
+    fireEvent.click(dateBtn);
+    expect(th).toHaveAttribute("aria-sort", "descending");
+  });
 });

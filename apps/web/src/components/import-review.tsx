@@ -11,6 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTableSort } from "@/lib/table-sort";
+import type { ColDef } from "@/lib/table-sort";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +27,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ImportDraft, ImportIssue, ReviewDraft } from "@/components/import-flow";
+
+const REVIEW_COLS: ColDef<ReviewDraft>[] = [
+  { key: "confidence", get: (d) => d.confidence, type: "numeric" },
+  { key: "assetClass", get: (d) => d.assetClass, type: "text" },
+  { key: "action", get: (d) => d.action, type: "text" },
+  { key: "name", get: (d) => d.name ?? "", type: "text" },
+  { key: "executedAt", get: (d) => d.executedAt, type: "date" },
+  { key: "quantity", get: (d) => d.quantity, type: "numeric" },
+  { key: "price", get: (d) => d.price, type: "numeric" },
+];
 
 // Actions the mapping editor can assign to an unmapped event.
 const MAP_ACTIONS = [
@@ -73,6 +86,8 @@ export function ImportReview({
 }: ImportReviewProps) {
   const t = useTranslations("Import");
   const tm = useTranslations("Manage");
+
+  const { sortKey, sortDir, toggle: toggleSort, sort } = useTableSort<ReviewDraft>(REVIEW_COLS);
 
   const attention = issues.filter((i) => i.severity === "attention" && i.eventId);
   const ignorable = issues.filter((i) => !(i.severity === "attention" && i.eventId));
@@ -174,14 +189,15 @@ export function ImportReview({
 
   const view = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return drafts.filter((d) => {
+    const filtered = drafts.filter((d) => {
       if (assetClassFilter.size && !assetClassFilter.has(d.assetClass)) return false;
       if (actionFilter.size && !actionFilter.has(d.action)) return false;
       if (needsReviewOnly && d.confidence >= NEEDS_REVIEW_BELOW) return false;
       if (q && !(d.name ?? "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [drafts, assetClassFilter, actionFilter, needsReviewOnly, query]);
+    return sort(filtered);
+  }, [drafts, assetClassFilter, actionFilter, needsReviewOnly, query, sort]);
 
   // Resolve selection through the live drafts so stale uids (from removals) never count.
   const selectedIds = useMemo(
@@ -393,13 +409,13 @@ export function ImportReview({
                   onChange={toggleAll}
                 />
               </TableHead>
-              <TableHead>{t("review.columns.confidence")}</TableHead>
-              <TableHead>{t("review.columns.assetClass")}</TableHead>
-              <TableHead>{t("review.columns.action")}</TableHead>
-              <TableHead>{t("fields.name")}</TableHead>
-              <TableHead>{t("fields.executedAt")}</TableHead>
-              <TableHead className="text-right">{t("fields.quantity")}</TableHead>
-              <TableHead className="text-right">{t("fields.price")}</TableHead>
+              <SortableTableHead colKey="confidence" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("review.columns.confidence")}</SortableTableHead>
+              <SortableTableHead colKey="assetClass" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("review.columns.assetClass")}</SortableTableHead>
+              <SortableTableHead colKey="action" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("review.columns.action")}</SortableTableHead>
+              <SortableTableHead colKey="name" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("fields.name")}</SortableTableHead>
+              <SortableTableHead colKey="executedAt" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("fields.executedAt")}</SortableTableHead>
+              <SortableTableHead colKey="quantity" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("fields.quantity")}</SortableTableHead>
+              <SortableTableHead colKey="price" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("fields.price")}</SortableTableHead>
               <TableHead className="text-right">
                 <span className="sr-only">{tm("actions")}</span>
               </TableHead>
