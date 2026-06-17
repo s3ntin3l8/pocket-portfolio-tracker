@@ -25,6 +25,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
         // Birth year only applies to child portfolios.
         birthYear: input.portfolioType === "child" ? (input.birthYear ?? null) : null,
         brokerage: input.brokerage ?? null,
+        accountHolder: input.accountHolder ?? null,
       })
       .returning();
     reply.code(201);

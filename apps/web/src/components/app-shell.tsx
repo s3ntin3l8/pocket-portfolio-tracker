@@ -44,7 +44,7 @@ export function AppShell({
   isAdmin = false,
 }: {
   children: React.ReactNode;
-  portfolios?: Pick<Portfolio, "id" | "name" | "brokerage">[];
+  portfolios?: Pick<Portfolio, "id" | "name" | "brokerage" | "accountHolder">[];
   selectedId?: string | null;
   isAdmin?: boolean;
 }) {

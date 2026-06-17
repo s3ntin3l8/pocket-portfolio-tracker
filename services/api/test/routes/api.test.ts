@@ -158,6 +158,46 @@ describe("auth + portfolios + transactions", () => {
     expect(cleared.json()).toMatchObject({ name: "Euro", brokerage: null });
   });
 
+  it("sets and clears the account holder via PATCH", async () => {
+    const t = await token("holder-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Kids", baseCurrency: "idr", accountHolder: "Emma" },
+      })
+    ).json().id;
+
+    // Account holder is persisted on create.
+    const created = await app.inject({
+      method: "GET",
+      url: "/portfolios",
+      headers: auth(t),
+    });
+    expect(created.json()[0].accountHolder).toBe("Emma");
+
+    // PATCH updates it.
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { accountHolder: "Luca" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ name: "Kids", accountHolder: "Luca" });
+
+    // Explicit null clears it; other fields are untouched.
+    const cleared = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { accountHolder: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json()).toMatchObject({ name: "Kids", accountHolder: null });
+  });
+
   it("validates portfolio input", async () => {
     const res = await app.inject({
       method: "POST",

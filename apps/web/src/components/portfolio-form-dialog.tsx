@@ -29,7 +29,7 @@ const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 /** The portfolio fields the edit form pre-fills. */
 export type EditablePortfolio = Pick<
   Portfolio,
-  "id" | "name" | "baseCurrency" | "portfolioType" | "birthYear" | "brokerage"
+  "id" | "name" | "baseCurrency" | "portfolioType" | "birthYear" | "brokerage" | "accountHolder"
 >;
 
 /**
@@ -71,6 +71,7 @@ export function PortfolioFormDialog({
     portfolio?.birthYear != null ? String(portfolio.birthYear) : "",
   );
   const [brokerage, setBrokerage] = useState(portfolio?.brokerage ?? "");
+  const [accountHolder, setAccountHolder] = useState(portfolio?.accountHolder ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -123,6 +124,7 @@ export function PortfolioFormDialog({
       setType(portfolio?.portfolioType ?? "standard");
       setBirthYear(portfolio?.birthYear != null ? String(portfolio.birthYear) : "");
       setBrokerage(portfolio?.brokerage ?? "");
+      setAccountHolder(portfolio?.accountHolder ?? "");
       setError(false);
       setConfirmDelete(false);
       setCreatedPortfolio(null);
@@ -146,6 +148,7 @@ export function PortfolioFormDialog({
       portfolioType: type,
       birthYear: parsedBirthYear,
       brokerage: brokerage.trim() || null,
+      accountHolder: accountHolder.trim() || null,
     };
     try {
       if (mode === "edit" && portfolio) {
@@ -261,6 +264,16 @@ export function PortfolioFormDialog({
             {isTr && !effectivePortfolio && (
               <p className="text-xs text-muted-foreground">{t("trConnectAfterSave")}</p>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="portfolio-account-holder">{t("accountHolder")}</Label>
+            <Input
+              id="portfolio-account-holder"
+              value={accountHolder}
+              onChange={(e) => setAccountHolder(e.target.value)}
+              placeholder={t("accountHolderPlaceholder")}
+            />
           </div>
 
           <div className="space-y-1.5">

@@ -120,6 +120,13 @@
       "when": 1781693906622,
       "tag": "0016_mute_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781695113795,
+      "tag": "0017_keen_raider",
+      "breakpoints": true
     }
   ]
 }

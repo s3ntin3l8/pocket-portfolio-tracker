@@ -107,6 +107,9 @@ export const portfolios = pgTable(
     // Optional brokerage/custodian the portfolio is held at (e.g. Trade Republic,
     // DKB, Stockbit). Free text; powers the brokerage logo on the dashboard.
     brokerage: text("brokerage"),
+    // Optional free-text name of the person the portfolio belongs to (e.g. a child,
+    // spouse, or other family member managed on their behalf).
+    accountHolder: text("account_holder"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
