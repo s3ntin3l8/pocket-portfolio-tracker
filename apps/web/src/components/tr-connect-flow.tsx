@@ -23,6 +23,7 @@ export type TrConnectClient = Pick<
   | "disconnectTr"
   | "getTrConnection"
   | "updateTrCategories"
+  | "reimportTr"
 >;
 
 // Default staged categories when the connection hasn't been customised (card spending off).
@@ -73,6 +74,7 @@ export function TrConnectFlow({
   const [categories, setCategories] = useState<Set<TrImportCategory>>(
     new Set(initial.importCategories ?? DEFAULT_CATEGORIES),
   );
+  const [confirmingReimport, setConfirmingReimport] = useState(false);
 
   const expired = initial.status === "expired";
 
@@ -184,6 +186,14 @@ export function TrConnectFlow({
       await client.disconnectTr();
       setSync(null);
       setPhase("form");
+      onChanged?.();
+    });
+
+  const reimport = () =>
+    void run(async () => {
+      await client.reimportTr();
+      setConfirmingReimport(false);
+      setSync(null);
       onChanged?.();
     });
 
@@ -359,6 +369,36 @@ export function TrConnectFlow({
               <Unplug className="size-4" />
               {t("disconnect")}
             </Button>
+          </div>
+
+          {/* Re-import: clears the resolved-events ledger + pytr transactions and re-stages
+              the whole timeline fresh. Destructive, so it asks for confirmation. */}
+          <div className="border-t pt-3">
+            {confirmingReimport ? (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">{t("reimport.warning")}</span>
+                <Button variant="destructive" size="sm" onClick={reimport} disabled={busy}>
+                  {busy && <Loader2 className="size-3.5 animate-spin" />}
+                  {t("reimport.confirm")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingReimport(false)}
+                  disabled={busy}
+                >
+                  {t("cancel")}
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline"
+                onClick={() => setConfirmingReimport(true)}
+              >
+                {t("reimport.action")}
+              </button>
+            )}
           </div>
         </div>
       )}

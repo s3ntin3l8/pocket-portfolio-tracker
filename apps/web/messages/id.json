@@ -523,6 +523,11 @@
       "off": "selisih {diff}",
       "match": "cocok"
     },
+    "reimport": {
+      "action": "Impor ulang semuanya…",
+      "warning": "Ini menghapus semua transaksi Trade Republic di portofolio ini dan menyiapkan ulang seluruh linimasa untuk dikonfirmasi lagi. Suntingan manual pada baris tersebut akan hilang.",
+      "confirm": "Hapus & impor ulang"
+    },
     "disconnect": "Putuskan",
     "expiredHint": "Sesi Anda kedaluwarsa. Hubungkan kembali untuk melanjutkan sinkronisasi.",
     "error": "Terjadi kesalahan. Silakan coba lagi.",

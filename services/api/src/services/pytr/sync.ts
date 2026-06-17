@@ -1,5 +1,10 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { screenshotImports, transactions, trConnections } from "@portfolio/db";
+import {
+  screenshotImports,
+  transactions,
+  trConnections,
+  trResolvedEvents,
+} from "@portfolio/db";
 import type { ImportIssue, ParsedTransaction } from "@portfolio/schema";
 import { cashBalances } from "@portfolio/core";
 import { mapTrEvents, categoryForEventType } from "./mapper.js";
@@ -32,6 +37,8 @@ export interface SyncResult {
 interface CollectorJson {
   drafts: ParsedTransaction[];
   errors: ImportIssue[];
+  // `seenEventIds` (legacy) is no longer written — "already handled" now lives durably in
+  // tr_resolved_events; staged-not-resolved items are derived from the draft's own contents.
   seenEventIds?: string[];
 }
 
@@ -148,7 +155,8 @@ export async function syncTrConnection(
   const allowed = (id: string) =>
     enabled.has(categoryForEventType(eventTypeById.get(id) ?? ""));
 
-  // 1. Un-import any already-confirmed transactions whose source event is now cancelled.
+  // 1. Un-import any confirmed transactions whose source event is now cancelled, and forget
+  //    them in the ledger so a later re-execution can re-stage.
   let cancelled = 0;
   if (cancelledIds.size) {
     const removed = await db
@@ -162,18 +170,41 @@ export async function syncTrConnection(
       )
       .returning({ id: transactions.id });
     cancelled = removed.length;
+    await db
+      .delete(trResolvedEvents)
+      .where(
+        and(
+          eq(trResolvedEvents.portfolioId, portfolioId),
+          inArray(trResolvedEvents.eventId, [...cancelledIds]),
+        ),
+      );
   }
 
-  // 2. What's already confirmed (after the cancellation sweep) — never re-stage these.
+  // 2. The durable "resolved" ledger — the authoritative record of events already confirmed
+  //    or discarded, immune to manual transaction deletion. Seed it once from any pre-existing
+  //    confirmed pytr transactions (rows imported before the ledger existed), so deletions are
+  //    durable from the first sync after deploy without a re-stage regression.
   const confirmedRows = await db
     .select({ ext: transactions.externalId })
     .from(transactions)
     .where(and(eq(transactions.portfolioId, portfolioId), eq(transactions.source, "pytr")));
-  const confirmedIds = new Set(
-    confirmedRows.map((r) => r.ext).filter((x): x is string => Boolean(x)),
-  );
+  const confirmedIds = confirmedRows
+    .map((r) => r.ext)
+    .filter((x): x is string => Boolean(x));
+  if (confirmedIds.length) {
+    await db
+      .insert(trResolvedEvents)
+      .values(confirmedIds.map((eventId) => ({ portfolioId, eventId, resolution: "confirmed" })))
+      .onConflictDoNothing();
+  }
+  const resolvedRows = await db
+    .select({ eventId: trResolvedEvents.eventId })
+    .from(trResolvedEvents)
+    .where(eq(trResolvedEvents.portfolioId, portfolioId));
+  const resolved = new Set(resolvedRows.map((r) => r.eventId));
 
-  // 3. The open collector draft for this connection (at most one going forward).
+  // 3. The open collector draft (at most one). Its current contents are "staged" — shown but
+  //    not yet resolved, so don't duplicate them on this sync.
   const [collector] = await db
     .select()
     .from(screenshotImports)
@@ -188,46 +219,36 @@ export async function syncTrConnection(
     .orderBy(desc(screenshotImports.createdAt))
     .limit(1);
   const existing = collector ? (collector.parsedJson as CollectorJson) : null;
-  const seen = new Set<string>(
-    existing?.seenEventIds ??
-      (existing?.drafts ?? []).map((d) => d.externalId).filter((x): x is string => Boolean(x)),
-  );
+  const stagedIds = new Set<string>([
+    ...(existing?.drafts ?? []).map((d) => d.externalId).filter((x): x is string => Boolean(x)),
+    ...(existing?.errors ?? []).map((e) => e.eventId).filter((x): x is string => Boolean(x)),
+  ]);
 
-  // 4. New events = present, executed, in an enabled category, not confirmed, not seen.
+  // 4. New events = present, executed, in an enabled category, neither resolved nor staged.
   const newRaw = events.filter((e) => {
     const o = e as Record<string, unknown>;
     const id = typeof o.id === "string" ? o.id : "";
-    if (!id || confirmedIds.has(id) || seen.has(id) || !allowed(id)) return false;
+    if (!id || resolved.has(id) || stagedIds.has(id) || !allowed(id)) return false;
     if (typeof o.status === "string" && o.status.toUpperCase() !== "EXECUTED") return false;
     return true;
   });
   const { drafts: newDrafts, errors: newErrors } = mapTrEvents(newRaw);
 
-  // 5. Reconcile the collector: keep staged drafts that are still pending + present + in an
-  //    enabled category, drop ones now confirmed/cancelled/vanished/excluded, then append.
+  // 5. Keep staged items still pending (not resolved/cancelled/vanished/excluded), then append.
   const keptDrafts = (existing?.drafts ?? []).filter(
     (d) =>
       d.externalId &&
-      !confirmedIds.has(d.externalId) &&
+      !resolved.has(d.externalId) &&
       !cancelledIds.has(d.externalId) &&
       exportIds.has(d.externalId) &&
       allowed(d.externalId),
   );
+  const keptErrors = (existing?.errors ?? []).filter(
+    (e) => !e.eventId || (!resolved.has(e.eventId) && !cancelledIds.has(e.eventId)),
+  );
   const mergedDrafts = [...keptDrafts, ...newDrafts];
-  const mergedErrors = [...(existing?.errors ?? []), ...newErrors];
-
-  const nextSeen = new Set(seen);
-  for (const m of meta) {
-    if (confirmedIds.has(m.id) && !cancelledIds.has(m.id)) continue; // confirmed → tracked there
-    if (!allowed(m.id)) continue; // category-excluded → stay re-evaluatable if enabled later
-    nextSeen.add(m.id);
-  }
-  for (const id of cancelledIds) nextSeen.delete(id); // allow a re-executed event to re-stage
-  const parsedJson: CollectorJson = {
-    drafts: mergedDrafts,
-    errors: mergedErrors,
-    seenEventIds: [...nextSeen],
-  };
+  const mergedErrors = [...keptErrors, ...newErrors];
+  const parsedJson: CollectorJson = { drafts: mergedDrafts, errors: mergedErrors };
 
   // 6. Persist: update / create / close the collector.
   let importId: string | undefined = collector?.id;

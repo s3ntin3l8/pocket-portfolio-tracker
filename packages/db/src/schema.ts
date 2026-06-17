@@ -12,6 +12,7 @@ import {
   jsonb,
   uniqueIndex,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // --- Enums ---------------------------------------------------------------
@@ -182,6 +183,24 @@ export const trConnections = pgTable("tr_connections", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// A durable record of Trade Republic timeline events the user has already resolved — either
+// confirmed into a transaction or discarded. The sync excludes these from new drafts, so a
+// purposely-deleted transaction (or a discarded draft) stays gone instead of resurfacing.
+// Survives independent of the transactions table and the (ephemeral) collector draft; cleared
+// only by an explicit re-import. Keyed by portfolio (one pytr connection ↔ one portfolio).
+export const trResolvedEvents = pgTable(
+  "tr_resolved_events",
+  {
+    portfolioId: uuid("portfolio_id")
+      .notNull()
+      .references(() => portfolios.id, { onDelete: "cascade" }),
+    eventId: text("event_id").notNull(),
+    resolution: text("resolution").notNull(), // 'confirmed' | 'discarded'
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.portfolioId, t.eventId] })],
+);
 
 // Server-wide market-data provider config, editable by admins from the UI. Global (not
 // user-scoped) — this is a single-operator self-host setting. Rows OVERRIDE the env-derived

@@ -593,6 +593,7 @@ export function createApiClient(config: ApiClientConfig) {
     syncTr: () => request<TrSyncResult>("POST", "/tr/connection/sync"),
     updateTrCategories: (importCategories: TrImportCategory[]) =>
       request<TrConnection>("PATCH", "/tr/connection", { importCategories }),
+    reimportTr: () => request<{ removed: number }>("POST", "/tr/connection/reimport"),
     disconnectTr: () => request<void>("DELETE", "/tr/connection"),
   };
 }

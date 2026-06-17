@@ -15,6 +15,7 @@ function makeClient(over: Partial<TrConnectClient> = {}): TrConnectClient {
     verifyTr: vi.fn(async () => ({ status: "connected" as const })),
     syncTr: vi.fn(async () => ({ status: "connected" as const, drafts: 3 })),
     disconnectTr: vi.fn(async () => undefined),
+    reimportTr: vi.fn(async () => ({ removed: 0 })),
     updateTrCategories: vi.fn(async (importCategories) => ({
       status: "connected" as const,
       portfolioId: "p1",

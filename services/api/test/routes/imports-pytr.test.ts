@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { generateKeyPair, SignJWT } from "jose";
-import { instruments, portfolios, screenshotImports } from "@portfolio/db";
+import { instruments, portfolios, screenshotImports, trResolvedEvents } from "@portfolio/db";
 import type { ParsedTransaction } from "@portfolio/schema";
 import { buildApp } from "../../src/app.js";
 import { getDb, closeDb } from "../../src/db/client.js";
@@ -274,6 +274,34 @@ describe("pytr import → confirm", () => {
       description: "ACME · DE12",
     });
     expect(tx.documentRefs).toEqual([{ id: "d1", type: "TRADE_INVOICE", date: "01.03.2026" }]);
+  });
+
+  it("discarding a pytr draft records its events as resolved (won't resurface)", async () => {
+    const t = await token("pytr-discard");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR", baseCurrency: "EUR" },
+      })
+    ).json().id;
+    const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));
+    const importId = await stagePytrImport(portfolioId, pf.userId);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/discard`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(204);
+
+    const resolved = await getDb()
+      .select()
+      .from(trResolvedEvents)
+      .where(eq(trResolvedEvents.portfolioId, portfolioId));
+    expect(resolved.map((r) => r.eventId).sort()).toEqual(["tr-1", "tr-2"]);
+    expect(resolved.every((r) => r.resolution === "discarded")).toBe(true);
   });
 
   it("drops a mapped issue from the import once its event is confirmed", async () => {

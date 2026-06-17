@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
-import { portfolios, screenshotImports, transactions } from "@portfolio/db";
+import { portfolios, screenshotImports, transactions, trResolvedEvents } from "@portfolio/db";
 import { parsedTransactionSchema, type AssetClass } from "@portfolio/schema";
 import { requireUser } from "../plugins/auth.js";
 import { parseCsv } from "../services/parsers/csv.js";
@@ -188,6 +188,30 @@ export async function importsRoute(app: FastifyInstance) {
       if (imp.status === "confirmed") {
         return reply.code(409).send({ error: "already_confirmed" });
       }
+      // For a pytr draft, durably record its events as discarded so the next sync doesn't
+      // re-stage them (the collector would otherwise resurface them indefinitely).
+      if (imp.parser === "pytr" && imp.portfolioId) {
+        const parsed = (imp.parsedJson ?? {}) as {
+          drafts?: { externalId?: string | null }[];
+          errors?: { eventId?: string | null }[];
+        };
+        const ids = [
+          ...(parsed.drafts ?? []).map((d) => d.externalId),
+          ...(parsed.errors ?? []).map((e) => e.eventId),
+        ].filter((x): x is string => Boolean(x));
+        if (ids.length) {
+          await app.db
+            .insert(trResolvedEvents)
+            .values(
+              ids.map((eventId) => ({
+                portfolioId: imp.portfolioId!,
+                eventId,
+                resolution: "discarded",
+              })),
+            )
+            .onConflictDoNothing();
+        }
+      }
       await app.db
         .update(screenshotImports)
         .set({ status: "discarded" })
@@ -368,7 +392,7 @@ export async function importsRoute(app: FastifyInstance) {
       // Pass 2 — write the transactions and reconcile the import atomically.
       const parsed = (imp.parsedJson ?? {}) as {
         drafts?: { externalId?: string | null }[];
-        errors?: { eventId?: string }[];
+        errors?: { eventId?: string; severity?: string }[];
         seenEventIds?: string[];
       };
       const created = await app.db.transaction(async (tx) => {
@@ -405,34 +429,82 @@ export async function importsRoute(app: FastifyInstance) {
           if (row) written.push(row);
         }
 
-        // Pass-based confirm: when every staged draft has a stable id (the pytr collector),
-        // keep the row open with the un-confirmed remainder so the user can confirm in passes;
-        // close it only once nothing is left. Importers without stable ids (CSV/screenshot)
-        // keep the all-or-nothing behaviour.
         const staged = Array.isArray(parsed.drafts) ? parsed.drafts : [];
         const errors = Array.isArray(parsed.errors) ? parsed.errors : [];
-        const everyHasId = staged.length > 0 && staged.every((d) => Boolean(d.externalId));
         const confirmedExtIds = new Set(
           drafts.map((d) => d.externalId).filter((x): x is string => Boolean(x)),
         );
-        const remaining = everyHasId
-          ? staged.filter((d) => !(d.externalId && confirmedExtIds.has(d.externalId)))
-          : [];
-        // Drop issues the user just mapped + confirmed (their event id is now a transaction).
-        const remainingErrors = errors.filter(
-          (e) => !(e.eventId && confirmedExtIds.has(e.eventId)),
-        );
 
-        if (everyHasId && (remaining.length > 0 || remainingErrors.length > 0)) {
-          await tx
-            .update(screenshotImports)
-            .set({ parsedJson: { ...parsed, drafts: remaining, errors: remainingErrors } })
-            .where(eq(screenshotImports.id, imp.id));
+        if (imp.parser === "pytr") {
+          // Record confirmed events durably so a later manual deletion doesn't resurface them.
+          if (confirmedExtIds.size) {
+            await tx
+              .insert(trResolvedEvents)
+              .values(
+                [...confirmedExtIds].map((eventId) => ({
+                  portfolioId: imp.portfolioId!,
+                  eventId,
+                  resolution: "confirmed",
+                })),
+              )
+              .onConflictDoNothing();
+          }
+          // Pass-based confirm: keep the import open while drafts or *actionable* issues
+          // remain (ignorable `info` issues don't hold it open); close it otherwise.
+          const remaining = staged.filter(
+            (d) => !(d.externalId && confirmedExtIds.has(d.externalId)),
+          );
+          const remainingErrors = errors.filter(
+            (e) => !(e.eventId && confirmedExtIds.has(e.eventId)),
+          );
+          const remainingAttention = remainingErrors.filter((e) => e.severity === "attention");
+
+          if (remaining.length > 0 || remainingAttention.length > 0) {
+            await tx
+              .update(screenshotImports)
+              .set({ parsedJson: { ...parsed, drafts: remaining, errors: remainingErrors } })
+              .where(eq(screenshotImports.id, imp.id));
+          } else {
+            // Closing: record any leftover (ignorable) issues as resolved so the next sync
+            // doesn't re-surface them.
+            const leftover = remainingErrors
+              .map((e) => e.eventId)
+              .filter((x): x is string => Boolean(x));
+            if (leftover.length) {
+              await tx
+                .insert(trResolvedEvents)
+                .values(
+                  leftover.map((eventId) => ({
+                    portfolioId: imp.portfolioId!,
+                    eventId,
+                    resolution: "discarded",
+                  })),
+                )
+                .onConflictDoNothing();
+            }
+            await tx
+              .update(screenshotImports)
+              .set({ status: "confirmed" })
+              .where(eq(screenshotImports.id, imp.id));
+          }
         } else {
-          await tx
-            .update(screenshotImports)
-            .set({ status: "confirmed" })
-            .where(eq(screenshotImports.id, imp.id));
+          // Other importers (CSV/screenshot/DKB): pass-based prune when drafts carry stable
+          // ids, else all-or-nothing — unchanged behaviour, no durable ledger.
+          const everyHasId = staged.length > 0 && staged.every((d) => Boolean(d.externalId));
+          const remaining = everyHasId
+            ? staged.filter((d) => !(d.externalId && confirmedExtIds.has(d.externalId)))
+            : [];
+          if (everyHasId && remaining.length > 0) {
+            await tx
+              .update(screenshotImports)
+              .set({ parsedJson: { ...parsed, drafts: remaining } })
+              .where(eq(screenshotImports.id, imp.id));
+          } else {
+            await tx
+              .update(screenshotImports)
+              .set({ status: "confirmed" })
+              .where(eq(screenshotImports.id, imp.id));
+          }
         }
         return written;
       });

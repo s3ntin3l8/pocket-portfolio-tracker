@@ -1,7 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { portfolios, trConnections } from "@portfolio/db";
+import {
+  portfolios,
+  screenshotImports,
+  transactions,
+  trConnections,
+  trResolvedEvents,
+} from "@portfolio/db";
 import { requireUser } from "../plugins/auth.js";
 import { PytrApprovalError, PytrUnavailableError } from "../services/pytr/runner.js";
 import { syncTrConnection } from "../services/pytr/sync.js";
@@ -196,6 +202,39 @@ export async function trRoute(app: FastifyInstance) {
       }
     },
   );
+
+  // Re-import everything: wipe the portfolio's pytr transactions, clear the resolved-events
+  // ledger, and discard any open pytr draft. The next sync then re-stages the full timeline
+  // fresh (enriched) for the user to confirm — the user-driven backfill/refresh path.
+  app.post("/tr/connection/reimport", { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = requireUser(request);
+    const conn = await getConnection(id);
+    if (!conn || !conn.portfolioId) {
+      return reply.code(409).send({ error: "not_connected" });
+    }
+    const portfolioId = conn.portfolioId;
+    return app.db.transaction(async (tx) => {
+      const removed = await tx
+        .delete(transactions)
+        .where(and(eq(transactions.portfolioId, portfolioId), eq(transactions.source, "pytr")))
+        .returning({ id: transactions.id });
+      await tx
+        .delete(trResolvedEvents)
+        .where(eq(trResolvedEvents.portfolioId, portfolioId));
+      await tx
+        .update(screenshotImports)
+        .set({ status: "discarded" })
+        .where(
+          and(
+            eq(screenshotImports.userId, id),
+            eq(screenshotImports.portfolioId, portfolioId),
+            eq(screenshotImports.parser, "pytr"),
+            eq(screenshotImports.status, "draft"),
+          ),
+        );
+      return { removed: removed.length };
+    });
+  });
 
   // Disconnect: wipe the stored connection (and any pending pairing).
   app.delete(

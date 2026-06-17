@@ -7,6 +7,7 @@ import {
   trConnections,
   screenshotImports,
   transactions,
+  trResolvedEvents,
 } from "@portfolio/db";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import { EncryptionService } from "../../src/services/encryption.js";
@@ -217,6 +218,50 @@ describe("syncTrConnection", () => {
 
     const [updated] = await db.select().from(trConnections).where(eq(trConnections.id, conn.id));
     expect((updated.lastReconciliation as { cash: unknown[] }).cash).toHaveLength(1);
+  });
+
+  it("a purposely-deleted confirmed transaction stays gone (durable ledger)", async () => {
+    const conn = await makeConnection("durable");
+    const db = getDb();
+    const evs = [
+      { id: "tr-1", timestamp: "2026-03-01T10:00:00.000Z", eventType: "PAYMENT_INBOUND", amount: 500, currency: "EUR" },
+      { id: "tr-2", timestamp: "2026-03-02T10:00:00.000Z", eventType: "PAYMENT_INBOUND", amount: 100, currency: "EUR" },
+    ];
+    const runner = runnerWith(async () => ({ events: evs, sessionData: "J" }));
+
+    // tr-1 was already confirmed in a past life.
+    await db.insert(transactions).values({
+      portfolioId: conn.portfolioId!,
+      type: "deposit",
+      price: "500",
+      currency: "EUR",
+      executedAt: new Date("2026-03-01T10:00:00.000Z"),
+      source: "pytr",
+      externalId: "tr-1",
+    });
+
+    // First sync: seeds tr-1 into the ledger, stages only tr-2.
+    const r1 = await syncTrConnection(db, enc, runner, conn);
+    expect(r1.drafts).toBe(1);
+    const ledger = await db
+      .select()
+      .from(trResolvedEvents)
+      .where(eq(trResolvedEvents.portfolioId, conn.portfolioId!));
+    expect(ledger.map((l) => l.eventId)).toContain("tr-1");
+
+    // User deletes the tr-1 transaction on purpose.
+    await db.delete(transactions).where(eq(transactions.externalId, "tr-1"));
+
+    // Re-sync: tr-1 must NOT reappear (the ledger remembers it); tr-2 already staged.
+    const r2 = await syncTrConnection(db, enc, runner, conn);
+    expect(r2.drafts).toBe(0);
+    const [draft] = await db
+      .select()
+      .from(screenshotImports)
+      .where(and(eq(screenshotImports.portfolioId, conn.portfolioId!), eq(screenshotImports.status, "draft")));
+    const ids = (draft.parsedJson as { drafts: { externalId: string }[] }).drafts.map((d) => d.externalId);
+    expect(ids).toContain("tr-2");
+    expect(ids).not.toContain("tr-1");
   });
 
   it("marks the connection expired when the session can't be resumed", async () => {
