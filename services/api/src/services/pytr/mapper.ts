@@ -14,6 +14,10 @@ const trEventSchema = z.object({
   shares: z.number().nullish(),
   fees: z.number().nullish(),
   savingsPlanId: z.string().nullish(),
+  // TR booking status. Only EXECUTED events are real; CANCELED/PENDING are skipped (a
+  // cancellation of an already-confirmed event is un-imported by the sync reconciler).
+  // Absent on older fixtures — treated as EXECUTED for backward compatibility.
+  status: z.string().nullish(),
 });
 export type TrEvent = z.infer<typeof trEventSchema>;
 
@@ -34,7 +38,9 @@ const FIXED_ACTIONS: Record<string, ParsedAction> = {
   INCOMING_TRANSFER: "deposit",
   ACCOUNT_TRANSFER_INCOMING: "deposit",
   BANK_TRANSACTION_INCOMING: "deposit",
-  INTEREST_PAYOUT: "deposit",
+  // Interest on the cash balance is income, not a deposit (would otherwise be counted as a
+  // contribution and skew invested capital / money-weighted return).
+  INTEREST_PAYOUT: "interest",
   CARD_REFUND: "deposit",
   // --- cash out ---
   PAYMENT_OUTBOUND: "withdrawal",
@@ -101,6 +107,13 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     return { skip: true, reason: `unparseable event: ${parsed.error.issues[0]?.message}` };
   }
   const ev = parsed.data;
+
+  // Only EXECUTED events become drafts. A CANCELED/PENDING event is skipped here; if it was
+  // previously confirmed, the sync reconciler removes the written transaction (status flips
+  // in place on the same event id — e.g. annual dividend recalculations).
+  if (ev.status && ev.status.toUpperCase() !== "EXECUTED") {
+    return { skip: true, reason: `non-executed event (${ev.status})` };
+  }
 
   const skipReason = SKIP_EVENTS.get(ev.eventType);
   if (skipReason) {

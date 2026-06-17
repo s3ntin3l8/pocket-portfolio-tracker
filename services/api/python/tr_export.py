@@ -14,7 +14,7 @@ Contract (consumed by services/pytr/runner.ts):
 
 Each emitted line is the NORMALIZED event the Node mapper consumes:
   {id, timestamp, eventType, title, amount (signed), currency,
-   isin?, shares?, fees?, savingsPlanId?}
+   isin?, shares?, fees?, savingsPlanId?, status?}
 Extraction of isin/shares/fees from the timeline detail is best-effort and the part most
 sensitive to pytr/TR changes; the raw detail is scanned defensively.
 
@@ -198,6 +198,10 @@ def _normalize(event):
         "shares": _extract_shares(details),
         "fees": _field(details, ["fee", "gebühr", "provision"]),
         "savingsPlanId": event.get("savingsPlanId"),
+        # Booking status (EXECUTED / CANCELED / PENDING). Read from the timeline list item
+        # itself — no extra detail fetch — so the Node side can skip non-executed events and
+        # un-import ones that were cancelled after a prior sync confirmed them.
+        "status": event.get("status"),
     }
 
 

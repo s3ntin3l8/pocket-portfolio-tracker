@@ -56,12 +56,21 @@ export function DraftReviewClient({
     setError(null);
     const subset =
       uids && uids.length ? drafts.filter((d) => uids.includes(d.uid)) : drafts;
+    // A partial confirm keeps the import open server-side — stay on the page, drop the
+    // confirmed rows, and let the user continue in passes. A full confirm closes it.
+    const isPartial = subset.length < drafts.length;
     try {
       await api.confirmImport(
         importId,
         subset.map(stripUid) as unknown as Parameters<typeof api.confirmImport>[1],
       );
-      backToImport();
+      if (isPartial) {
+        const confirmed = new Set(subset.map((d) => d.uid));
+        setDrafts((ds) => ds.filter((d) => !confirmed.has(d.uid)));
+        router.refresh(); // surface the new transactions (and updated history) elsewhere
+      } else {
+        backToImport();
+      }
     } catch {
       setError(t("reviewError"));
     }

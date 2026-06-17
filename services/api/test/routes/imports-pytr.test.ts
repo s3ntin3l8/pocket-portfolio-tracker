@@ -206,6 +206,54 @@ describe("pytr import → confirm", () => {
     expect(inst).toMatchObject({ market: "XETRA", currency: "EUR" });
   });
 
+  it("partial confirm keeps the import open with the un-confirmed remainder", async () => {
+    const t = await token("pytr-passes");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR", baseCurrency: "EUR" },
+      })
+    ).json().id;
+    const [pf] = await getDb()
+      .select()
+      .from(portfolios)
+      .where(eq(portfolios.id, portfolioId));
+    const importId = await stagePytrImport(portfolioId, pf.userId);
+
+    // Confirm only the first draft (tr-1).
+    const first = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { transactions: [DRAFTS[0]] },
+    });
+    expect(first.json().confirmed).toBe(1);
+
+    // The import stays a draft, now holding only the un-confirmed remainder (tr-2).
+    const [mid] = await getDb()
+      .select()
+      .from(screenshotImports)
+      .where(eq(screenshotImports.id, importId));
+    expect(mid.status).toBe("draft");
+    expect((mid.parsedJson as { drafts: { externalId: string }[] }).drafts.map((d) => d.externalId)).toEqual(["tr-2"]);
+
+    // Confirm the rest → the import closes.
+    const second = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { transactions: [DRAFTS[1]] },
+    });
+    expect(second.json().confirmed).toBe(1);
+    const [done] = await getDb()
+      .select()
+      .from(screenshotImports)
+      .where(eq(screenshotImports.id, importId));
+    expect(done.status).toBe("confirmed");
+  });
+
   it("is idempotent: a re-synced import with the same event ids inserts nothing new", async () => {
     const t = await token("pytr-idem");
     const portfolioId = (

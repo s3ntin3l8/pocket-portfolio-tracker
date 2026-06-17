@@ -275,7 +275,6 @@ export async function importsRoute(app: FastifyInstance) {
           : "screenshot";
       // DKB and Trade Republic are both EU/ISIN brokers — identical instrument resolution.
       const isEu = isDkb || isPytr;
-      const created = [];
 
       // Resolve EU broker (DKB/Trade Republic) ISINs to a ticker/market/currency once
       // each (best-effort, cached). OpenFIGI is keyless; failures and unknown ISINs fall
@@ -317,11 +316,13 @@ export async function importsRoute(app: FastifyInstance) {
         return resolved;
       }
 
-      for (let i = 0; i < drafts.length; i++) {
-        const d = drafts[i];
-
-        // Cash movements (deposit/withdrawal) have no instrument.
-        const isCash = d.action === "deposit" || d.action === "withdrawal";
+      // Pass 1 — resolve each draft's instrument (best-effort, may hit the network). Done
+      // OUTSIDE the transaction so a slow OpenFIGI/provider lookup never holds a DB tx open.
+      const resolved: { draft: (typeof drafts)[number]; instrumentId: string | null }[] = [];
+      for (const d of drafts) {
+        // Cash movements (deposit/withdrawal/interest) have no instrument.
+        const isCash =
+          d.action === "deposit" || d.action === "withdrawal" || d.action === "interest";
         let instrumentId: string | null = null;
 
         if (!isCash) {
@@ -361,34 +362,69 @@ export async function importsRoute(app: FastifyInstance) {
           });
           instrumentId = instrument.id;
         }
-
-        const [tx] = await app.db
-          .insert(transactions)
-          .values({
-            portfolioId: imp.portfolioId,
-            instrumentId,
-            type: d.action,
-            quantity: d.quantity,
-            price: d.price,
-            fees: d.fees,
-            // The cash leg is always in the transaction's own currency (EUR for DKB),
-            // independent of where the instrument is listed/priced.
-            currency: d.currency,
-            executedAt: d.executedAt,
-            source,
-            importId: imp.id,
-            externalId: d.externalId ?? `import:${imp.id}:${i}`,
-            savingsPlanId: d.savingsPlanId ?? null,
-          })
-          .onConflictDoNothing()
-          .returning();
-        if (tx) created.push(tx);
+        resolved.push({ draft: d, instrumentId });
       }
 
-      await app.db
-        .update(screenshotImports)
-        .set({ status: "confirmed" })
-        .where(eq(screenshotImports.id, imp.id));
+      // Pass 2 — write the transactions and reconcile the import atomically.
+      const parsed = (imp.parsedJson ?? {}) as {
+        drafts?: { externalId?: string | null }[];
+        errors?: unknown[];
+        seenEventIds?: string[];
+      };
+      const created = await app.db.transaction(async (tx) => {
+        const written: (typeof transactions.$inferSelect)[] = [];
+        for (let i = 0; i < resolved.length; i++) {
+          const { draft: d, instrumentId } = resolved[i];
+          const [row] = await tx
+            .insert(transactions)
+            .values({
+              portfolioId: imp.portfolioId!,
+              instrumentId,
+              type: d.action,
+              quantity: d.quantity,
+              price: d.price,
+              fees: d.fees,
+              // The cash leg is always in the transaction's own currency (EUR for DKB),
+              // independent of where the instrument is listed/priced.
+              currency: d.currency,
+              executedAt: d.executedAt,
+              source,
+              importId: imp.id,
+              externalId: d.externalId ?? `import:${imp.id}:${i}`,
+              savingsPlanId: d.savingsPlanId ?? null,
+            })
+            .onConflictDoNothing()
+            .returning();
+          if (row) written.push(row);
+        }
+
+        // Pass-based confirm: when every staged draft has a stable id (the pytr collector),
+        // keep the row open with the un-confirmed remainder so the user can confirm in passes;
+        // close it only once nothing is left. Importers without stable ids (CSV/screenshot)
+        // keep the all-or-nothing behaviour.
+        const staged = Array.isArray(parsed.drafts) ? parsed.drafts : [];
+        const errors = Array.isArray(parsed.errors) ? parsed.errors : [];
+        const everyHasId = staged.length > 0 && staged.every((d) => Boolean(d.externalId));
+        const confirmedExtIds = new Set(
+          drafts.map((d) => d.externalId).filter((x): x is string => Boolean(x)),
+        );
+        const remaining = everyHasId
+          ? staged.filter((d) => !(d.externalId && confirmedExtIds.has(d.externalId)))
+          : [];
+
+        if (everyHasId && (remaining.length > 0 || errors.length > 0)) {
+          await tx
+            .update(screenshotImports)
+            .set({ parsedJson: { ...parsed, drafts: remaining } })
+            .where(eq(screenshotImports.id, imp.id));
+        } else {
+          await tx
+            .update(screenshotImports)
+            .set({ status: "confirmed" })
+            .where(eq(screenshotImports.id, imp.id));
+        }
+        return written;
+      });
 
       reply.code(201);
       return { confirmed: created.length, transactions: created };

@@ -33,6 +33,8 @@ export const txTypeEnum = pgEnum("transaction_type", [
   "sell",
   "dividend",
   "coupon",
+  // Interest on uninvested cash — income, not a contribution. See transactionTypeSchema.
+  "interest",
   "fee",
   "split",
   "bonus",

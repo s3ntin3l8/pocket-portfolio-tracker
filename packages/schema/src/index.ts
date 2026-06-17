@@ -21,6 +21,9 @@ export const transactionTypeSchema = z.enum([
   "sell",
   "dividend",
   "coupon",
+  // Interest paid on uninvested cash — income, NOT a contribution (kept distinct from
+  // `deposit` so it doesn't inflate invested capital / depress money-weighted return).
+  "interest",
   "fee",
   "split",
   "bonus",
@@ -148,6 +151,7 @@ export const parsedActionSchema = z.enum([
   "sell",
   "dividend",
   "coupon",
+  "interest",
   "savings_plan",
   "deposit",
   "withdrawal",

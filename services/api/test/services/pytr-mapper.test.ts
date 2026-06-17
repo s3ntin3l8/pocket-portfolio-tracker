@@ -110,8 +110,9 @@ describe("mapTrEventToDraft", () => {
   });
 
   it("maps cash movements with no instrument", () => {
+    // Interest is income, not a deposit (so it isn't counted as a contribution).
     expect(draftOf({ ...base, eventType: "INTEREST_PAYOUT", amount: 3 })).toMatchObject({
-      action: "deposit",
+      action: "interest",
       isin: null,
       quantity: "0",
       price: "3",
@@ -128,6 +129,23 @@ describe("mapTrEventToDraft", () => {
     expect(
       draftOf({ ...base, eventType: "PAYMENT_OUTBOUND", amount: -200 }),
     ).toMatchObject({ action: "withdrawal", price: "200" });
+  });
+
+  it("skips non-executed (cancelled/pending) events", () => {
+    const cancelled = mapTrEventToDraft({
+      ...base,
+      eventType: "CREDIT",
+      amount: 12,
+      isin: "US7561091049",
+      status: "CANCELED",
+    });
+    expect("skip" in cancelled && cancelled.skip).toBe(true);
+    if ("skip" in cancelled) expect(cancelled.reason).toMatch(/non-executed/i);
+
+    // EXECUTED (or absent status) still maps.
+    expect(
+      draftOf({ ...base, eventType: "PAYMENT_INBOUND", amount: 100, status: "EXECUTED" }).action,
+    ).toBe("deposit");
   });
 
   it("records card spending as a withdrawal so the cash balance stays correct", () => {

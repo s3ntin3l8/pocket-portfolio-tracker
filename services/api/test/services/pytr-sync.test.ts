@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import crypto from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   users,
   portfolios,
   trConnections,
   screenshotImports,
+  transactions,
 } from "@portfolio/db";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import { EncryptionService } from "../../src/services/encryption.js";
@@ -98,6 +99,64 @@ describe("syncTrConnection", () => {
     expect(updated.status).toBe("connected");
     expect(updated.lastSyncAt).not.toBeNull();
     expect(enc.decryptString(updated.sessionEnc!)).toBe("NEW_JAR");
+  });
+
+  it("accumulates only new events across syncs (one collector draft)", async () => {
+    const conn = await makeConnection("collector");
+    const db = getDb();
+
+    // First sync stages the two mappable events.
+    const first = await syncTrConnection(db, enc, runnerWith(async () => ({ events: EVENTS, sessionData: "J1" })), conn);
+    expect(first.drafts).toBe(2);
+
+    // Re-sync with the identical timeline → nothing new, the same single draft persists.
+    const again = await syncTrConnection(db, enc, runnerWith(async () => ({ events: EVENTS, sessionData: "J2" })), conn);
+    expect(again.drafts).toBe(0);
+    expect(again.importId).toBe(first.importId);
+
+    // A genuinely new event is appended to the existing collector.
+    const withNew = [
+      ...EVENTS,
+      { id: "tr-4", timestamp: "2026-03-04T10:00:00.000Z", eventType: "PAYMENT_INBOUND", amount: 250, currency: "EUR" },
+    ];
+    const third = await syncTrConnection(db, enc, runnerWith(async () => ({ events: withNew, sessionData: "J3" })), conn);
+    expect(third.drafts).toBe(1);
+    expect(third.importId).toBe(first.importId);
+
+    // Exactly one open pytr draft for the portfolio, holding the accumulated set.
+    const drafts = await db
+      .select()
+      .from(screenshotImports)
+      .where(and(eq(screenshotImports.portfolioId, conn.portfolioId!), eq(screenshotImports.status, "draft")));
+    expect(drafts).toHaveLength(1);
+    const parsed = drafts[0].parsedJson as { drafts: { externalId: string }[] };
+    expect(parsed.drafts.map((d) => d.externalId).sort()).toEqual(["tr-1", "tr-2", "tr-4"]);
+  });
+
+  it("un-imports a confirmed transaction whose source event was cancelled", async () => {
+    const conn = await makeConnection("cancel");
+    const db = getDb();
+
+    // Simulate a prior confirm: tr-1 already written as a transaction.
+    await db.insert(transactions).values({
+      portfolioId: conn.portfolioId!,
+      type: "deposit",
+      currency: "EUR",
+      executedAt: new Date("2026-03-01T10:00:00.000Z"),
+      source: "pytr",
+      externalId: "tr-1",
+    });
+
+    // Next sync sees tr-1 flipped to CANCELED.
+    const cancelledEvents = EVENTS.map((e) => (e.id === "tr-1" ? { ...e, status: "CANCELED" } : e));
+    const result = await syncTrConnection(db, enc, runnerWith(async () => ({ events: cancelledEvents, sessionData: "JX" })), conn);
+
+    expect(result.cancelled).toBe(1);
+    const rows = await db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.portfolioId, conn.portfolioId!), eq(transactions.externalId, "tr-1")));
+    expect(rows).toHaveLength(0);
   });
 
   it("marks the connection expired when the session can't be resumed", async () => {
