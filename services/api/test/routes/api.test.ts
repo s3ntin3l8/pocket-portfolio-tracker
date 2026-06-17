@@ -1483,6 +1483,79 @@ describe("auth + portfolios + transactions", () => {
     expect(upcomingMsft.every((u: { status: string }) => u.status === "projected")).toBe(true);
   });
 
+  it("does not forecast dividends for an instrument with no recorded position", async () => {
+    // Regression test for the root cause of the MSFT production bug:
+    // 14 dividend transactions were imported from the DKB Girokonto CSV but the
+    // opening purchase predated the exported window, leaving net_qty = 0.
+    // projectDividends gates on heldQty > 0 (packages/core/src/income.ts:146-147),
+    // so MSFT was silently skipped: historical income visible, forecast zero.
+    // Fix: add the missing opening buy transaction.
+    const { fxRates } = await import("@portfolio/db");
+    const t = await token("msft-nopos-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "No-Position Test", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const [msft] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "MSFT3",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "Microsoft (no position)",
+      })
+      .returning();
+
+    await app.db
+      .insert(fxRates)
+      .values({ base: "USD", quote: "IDR", rate: "16000", date: new Date().toISOString().slice(0, 10) })
+      .onConflictDoNothing();
+
+    // Dividend-only transactions — no buy; mirrors the DKB CSV gap.
+    // Sep and Dec of last year fall inside the projectDividends source window
+    // (now-1yr → Dec 31 of last year).
+    const yr = new Date().getUTCFullYear() - 1;
+    const sepDate = new Date(Date.UTC(yr, 8, 12)).toISOString(); // Sep 12
+    const decDate = new Date(Date.UTC(yr, 11, 12)).toISOString(); // Dec 12
+    for (const executedAt of [sepDate, decDate]) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "dividend",
+          instrumentId: msft.id,
+          quantity: "0",
+          price: "8.00",
+          currency: "USD",
+          executedAt,
+        },
+      });
+    }
+
+    const body = (
+      await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/income`,
+        headers: auth(t),
+      })
+    ).json();
+
+    // Historical income is recorded correctly...
+    expect(Number(body.lastYear)).toBeGreaterThan(0);
+    // ...but there is no forecast because the instrument is not held.
+    expect(Number(body.forecastRestOfYear)).toBe(0);
+    // Nothing appears in upcoming either.
+    const upcoming = (body.upcoming ?? []) as { instrumentId: string }[];
+    expect(upcoming.filter((u) => u.instrumentId === msft.id)).toHaveLength(0);
+  });
+
   it("FX-converts XIRR cash flows to the display currency (#A)", async () => {
     const { fxRates } = await import("@portfolio/db");
     const t = await token("xirr-fx-user"); // display currency defaults to IDR
