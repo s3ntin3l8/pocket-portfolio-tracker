@@ -44,7 +44,7 @@ export function ForecastPanel({
   // Only child portfolios carry an age-18 target.
   const yearsToEighteen =
     portfolioType === "child" && birthYear
-      ? Math.min(25, Math.max(1, 18 - (new Date().getFullYear() - birthYear)))
+      ? Math.min(50, Math.max(1, 18 - (new Date().getFullYear() - birthYear)))
       : null;
 
   const [monthly, setMonthly] = useState(Math.round(Number(monthlyAverage)));
@@ -127,10 +127,10 @@ export function ForecastPanel({
               id="forecast-years"
               type="range"
               min={1}
-              max={25}
+              max={50}
               step={1}
               value={years}
-              onChange={(e) => setYears(num(e.target.value, 1, 25))}
+              onChange={(e) => setYears(num(e.target.value, 1, 50))}
               className="h-9 w-full accent-[var(--color-primary)]"
             />
           </div>

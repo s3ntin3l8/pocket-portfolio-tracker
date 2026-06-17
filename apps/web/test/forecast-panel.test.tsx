@@ -59,6 +59,13 @@ describe("ForecastPanel", () => {
     expect(screen.getByTestId("projected-value")).toHaveTextContent("€10,800");
   });
 
+  it("accepts a horizon beyond 25 years (up to 50)", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText(/Horizon/), { target: { value: "40" } });
+    // 100/mo × 480 months = 48,000 (0% return).
+    expect(screen.getByTestId("projected-value")).toHaveTextContent("€48,000");
+  });
+
   it("hides the 'To age 18' preset when no birth year is known", () => {
     renderPanel({ portfolioType: "child" });
     expect(screen.queryByRole("button", { name: "To age 18" })).not.toBeInTheDocument();
