@@ -12,8 +12,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useApiClient } from "@/lib/api";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useTableSort } from "@/lib/table-sort";
+import type { ColDef } from "@/lib/table-sort";
+
+const IH_COLS: ColDef<ImportRecord>[] = [
+  { key: "parser", get: (r) => r.parser, type: "text" },
+  { key: "status", get: (r) => r.status, type: "text" },
+  { key: "count", get: (r) => r.count, type: "numeric" },
+  { key: "createdAt", get: (r) => r.createdAt, type: "date" },
+];
 
 const STATUS_VARIANT: Record<
   ImportRecord["status"],
@@ -36,6 +53,7 @@ export function ImportHistory({ items }: { items: ImportRecord[] }) {
   const api = useApiClient();
   const router = useRouter();
 
+  const { sortKey, sortDir, toggle: toggleSort, sort } = useTableSort<ImportRecord>(IH_COLS);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
@@ -65,90 +83,106 @@ export function ImportHistory({ items }: { items: ImportRecord[] }) {
       <CardHeader>
         <CardTitle>{t("title")}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <ul className="divide-y divide-border text-sm">
-          {items.map((imp) => {
-            const busy = busyId === imp.id;
-            return (
-              <li
-                key={imp.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
-              >
-                <Badge variant="outline" className="uppercase">
-                  {imp.parser}
-                </Badge>
-                <Badge variant={STATUS_VARIANT[imp.status]}>
-                  {t(`status.${imp.status}`)}
-                </Badge>
-                <span className="text-muted-foreground">
-                  {t("items", { count: imp.count })}
-                </span>
-                <span className="text-muted-foreground">
-                  {df.format(new Date(imp.createdAt))}
-                </span>
-                <span className="ml-auto flex items-center gap-1">
-                  {imp.status === "draft" && (
-                    <>
-                      <Button size="sm" variant="secondary" asChild>
-                        <Link href={`/import/${imp.id}`}>
-                          <Eye className="size-3.5" />
-                          {t("review")}
-                        </Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => discard(imp.id)}
-                      >
-                        {busy ? (
-                          <Loader2 className="size-3.5 animate-spin" />
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortableTableHead colKey="parser" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>Parser</SortableTableHead>
+              <SortableTableHead colKey="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>Status</SortableTableHead>
+              <SortableTableHead colKey="count" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>Items</SortableTableHead>
+              <SortableTableHead colKey="createdAt" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>Timestamp</SortableTableHead>
+              <TableCell className="h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground">
+                <span className="sr-only">Actions</span>
+              </TableCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sort(items).map((imp) => {
+              const busy = busyId === imp.id;
+              return (
+                <TableRow key={imp.id}>
+                  <TableCell>
+                    <Badge variant="outline" className="uppercase">
+                      {imp.parser}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={STATUS_VARIANT[imp.status]}>
+                      {t(`status.${imp.status}`)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {t("items", { count: imp.count })}
+                  </TableCell>
+                  <TableCell className="tabular whitespace-nowrap text-muted-foreground">
+                    {df.format(new Date(imp.createdAt))}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      {imp.status === "draft" && (
+                        <>
+                          <Button size="sm" variant="secondary" asChild>
+                            <Link href={`/import/${imp.id}`}>
+                              <Eye className="size-3.5" />
+                              {t("review")}
+                            </Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => discard(imp.id)}
+                          >
+                            {busy ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-3.5" />
+                            )}
+                            {t("discard")}
+                          </Button>
+                        </>
+                      )}
+                      {imp.status === "confirmed" &&
+                        (confirmId === imp.id ? (
+                          <>
+                            <span className="text-xs text-muted-foreground">
+                              {t("undoWarning", { count: imp.count })}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={busy}
+                              onClick={() => undo(imp.id)}
+                            >
+                              {busy && <Loader2 className="size-3.5 animate-spin" />}
+                              {t("undo")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => setConfirmId(null)}
+                            >
+                              {t("cancel")}
+                            </Button>
+                          </>
                         ) : (
-                          <Trash2 className="size-3.5" />
-                        )}
-                        {t("discard")}
-                      </Button>
-                    </>
-                  )}
-                  {imp.status === "confirmed" &&
-                    (confirmId === imp.id ? (
-                      <>
-                        <span className="text-xs text-muted-foreground">
-                          {t("undoWarning", { count: imp.count })}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={busy}
-                          onClick={() => undo(imp.id)}
-                        >
-                          {busy && <Loader2 className="size-3.5 animate-spin" />}
-                          {t("undo")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => setConfirmId(null)}
-                        >
-                          {t("cancel")}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConfirmId(imp.id)}
-                      >
-                        <Undo2 className="size-3.5" />
-                        {t("undo")}
-                      </Button>
-                    ))}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirmId(imp.id)}
+                          >
+                            <Undo2 className="size-3.5" />
+                            {t("undo")}
+                          </Button>
+                        ))}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

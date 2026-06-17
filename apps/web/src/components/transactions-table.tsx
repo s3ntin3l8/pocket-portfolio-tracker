@@ -20,12 +20,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
+import { useTableSort } from "@/lib/table-sort";
+import type { ColDef } from "@/lib/table-sort";
 
 const SOURCE_ICON: Record<string, LucideIcon> = {
   screenshot: ScanLine,
@@ -57,6 +60,24 @@ export interface TxRow {
  * (the aggregate "All portfolios" view) a Portfolio column is shown and a batch delete
  * is fanned out per portfolio, since the delete endpoint is portfolio-scoped.
  */
+const TX_COLS: ColDef<TxRow>[] = [
+  { key: "date", get: (r) => r.executedAt, type: "date" },
+  { key: "type", get: (r) => r.type, type: "text" },
+  { key: "instrument", get: (r) => r.instrument?.symbol ?? "", type: "text" },
+  { key: "portfolio", get: (r) => r.portfolioName ?? "", type: "text" },
+  { key: "quantity", get: (r) => r.quantity, type: "numeric" },
+  {
+    key: "amount",
+    get: (r) => {
+      const qty = Number(r.quantity);
+      const price = Number(r.price);
+      return qty > 0 ? qty * price : price;
+    },
+    type: "numeric",
+  },
+  { key: "source", get: (r) => r.source, type: "text" },
+];
+
 export function TransactionsTable({
   rows,
   showPortfolio = false,
@@ -71,6 +92,8 @@ export function TransactionsTable({
   const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
+
+  const { sortKey, sortDir, toggle: toggleSort, sort } = useTableSort<TxRow>(TX_COLS);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
@@ -177,20 +200,20 @@ export function TransactionsTable({
                   onChange={toggleAll}
                 />
               </TableHead>
-              <TableHead>{t("date")}</TableHead>
-              <TableHead>{t("type")}</TableHead>
-              <TableHead>{t("instrument")}</TableHead>
-              {showPortfolio && <TableHead>{t("portfolio")}</TableHead>}
-              <TableHead className="text-right">{t("quantity")}</TableHead>
-              <TableHead className="text-right">{t("amount")}</TableHead>
-              <TableHead>{t("source")}</TableHead>
+              <SortableTableHead colKey="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("date")}</SortableTableHead>
+              <SortableTableHead colKey="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("type")}</SortableTableHead>
+              <SortableTableHead colKey="instrument" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("instrument")}</SortableTableHead>
+              {showPortfolio && <SortableTableHead colKey="portfolio" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("portfolio")}</SortableTableHead>}
+              <SortableTableHead colKey="quantity" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("quantity")}</SortableTableHead>
+              <SortableTableHead colKey="amount" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("amount")}</SortableTableHead>
+              <SortableTableHead colKey="source" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("source")}</SortableTableHead>
               <TableHead className="text-right">
                 <span className="sr-only">{tm("actions")}</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((tx) => {
+            {sort(rows).map((tx) => {
               const Icon = SOURCE_ICON[tx.source] ?? PencilLine;
               const qty = Number(tx.quantity);
               const price = Number(tx.price);
