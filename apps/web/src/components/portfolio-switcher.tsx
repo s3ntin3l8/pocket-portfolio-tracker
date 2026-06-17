@@ -29,7 +29,7 @@ export function PortfolioSwitcher({
   portfolios,
   selectedId,
 }: {
-  portfolios: Pick<Portfolio, "id" | "name" | "brokerage">[];
+  portfolios: Pick<Portfolio, "id" | "name" | "brokerage" | "accountHolder">[];
   selectedId: string | null;
 }) {
   const t = useTranslations("PortfolioSwitcher");
@@ -43,8 +43,12 @@ export function PortfolioSwitcher({
   }
 
   const selected = portfolios.find((p) => p.id === selectedId);
-  const label = (p: Pick<Portfolio, "name" | "brokerage">) =>
-    p.brokerage ? `${p.name} · ${p.brokerage}` : p.name;
+  const label = (p: Pick<Portfolio, "name" | "brokerage" | "accountHolder">) => {
+    const parts = [p.name];
+    if (p.brokerage) parts.push(p.brokerage);
+    if (p.accountHolder) parts.push(p.accountHolder);
+    return parts.join(" · ");
+  };
 
   return (
     <DropdownMenu>

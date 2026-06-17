@@ -12,6 +12,7 @@ const createPortfolio = vi.fn(async () => ({
   portfolioType: "standard",
   birthYear: null,
   brokerage: null,
+  accountHolder: null,
   userId: "u1",
 }) as unknown as Portfolio);
 const updatePortfolio = vi.fn(async () => ({}) as never);
@@ -53,6 +54,7 @@ function renderEdit(
     portfolioType: "standard",
     birthYear: null,
     brokerage: null,
+    accountHolder: null,
   },
 ) {
   return render(
@@ -90,6 +92,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: null,
+      accountHolder: null,
     });
     expect(refresh).toHaveBeenCalled();
   });
@@ -111,6 +114,26 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: "Interactive Brokers",
+      accountHolder: null,
+    });
+  });
+
+  it("captures the entered account holder name", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByRole("button", { name: m.new }));
+
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "Kids Savings" } });
+    fireEvent.change(screen.getByLabelText(m.accountHolder), { target: { value: "Emma" } });
+    fireEvent.click(screen.getByRole("button", { name: m.create }));
+
+    await waitFor(() => expect(createPortfolio).toHaveBeenCalled());
+    expect(createPortfolio).toHaveBeenCalledWith({
+      name: "Kids Savings",
+      baseCurrency: "IDR",
+      portfolioType: "standard",
+      birthYear: null,
+      brokerage: null,
+      accountHolder: "Emma",
     });
   });
 
@@ -140,6 +163,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "child",
       birthYear: 2017,
       brokerage: null,
+      accountHolder: null,
     });
   });
 
@@ -157,6 +181,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: null,
+      accountHolder: null,
     });
     expect(refresh).toHaveBeenCalled();
   });
@@ -201,6 +226,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: "Trade Republic",
+      accountHolder: null,
     }));
     // Dialog stays open — TR section appears with Done button (no create button anymore)
     await waitFor(() =>
@@ -220,6 +246,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: "Trade Republic",
+      accountHolder: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -240,6 +267,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: "Stockbit",
+      accountHolder: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -255,6 +283,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: "Trade Republic",
+      accountHolder: null,
     });
     // Dialog is closed on mount — the fetch must be gated on `open`.
     expect(getTrConnection).not.toHaveBeenCalled();
@@ -279,6 +308,7 @@ describe("PortfolioFormDialog", () => {
       portfolioType: "standard",
       birthYear: null,
       brokerage: "Trade Republic",
+      accountHolder: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 

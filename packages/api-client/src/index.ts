@@ -61,6 +61,8 @@ export interface Portfolio {
   birthYear: number | null;
   /** Brokerage/custodian the portfolio is held at (free text), or null. */
   brokerage: string | null;
+  /** Name of the person the portfolio belongs to (free text), or null. */
+  accountHolder: string | null;
 }
 
 /** Presentation metadata for an instrument; `null` on cash (instrument-less) rows. */

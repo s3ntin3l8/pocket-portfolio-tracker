@@ -142,6 +142,8 @@
     "namePlaceholder": "e.g. Stockbit",
     "brokerage": "Brokerage",
     "brokeragePlaceholder": "e.g. Trade Republic",
+    "accountHolder": "Account holder",
+    "accountHolderPlaceholder": "e.g. Emma",
     "currency": "Base currency",
     "type": "Portfolio type",
     "typeStandard": "Standard",

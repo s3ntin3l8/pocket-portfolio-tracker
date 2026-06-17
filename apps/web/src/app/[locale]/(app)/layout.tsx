@@ -36,6 +36,7 @@ export default async function AppLayout({
           id: p.id,
           name: p.name,
           brokerage: p.brokerage,
+          accountHolder: p.accountHolder,
         }))}
         selectedId={selection.selectedId}
         isAdmin={Boolean(me?.isAdmin)}

@@ -72,6 +72,7 @@ export default async function PortfoliosPage({
                         <p className="truncate text-xs text-muted-foreground">
                           {portfolio.baseCurrency}
                           {portfolio.brokerage && ` · ${portfolio.brokerage}`}
+                          {portfolio.accountHolder && ` · ${portfolio.accountHolder}`}
                           {portfolio.portfolioType === "child" &&
                             portfolio.birthYear !== null &&
                             ` · ${t("born", { year: String(portfolio.birthYear) })}`}

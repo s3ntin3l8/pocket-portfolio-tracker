@@ -142,6 +142,8 @@
     "namePlaceholder": "mis. Stockbit",
     "brokerage": "Broker",
     "brokeragePlaceholder": "mis. Trade Republic",
+    "accountHolder": "Pemilik akun",
+    "accountHolderPlaceholder": "mis. Emma",
     "currency": "Mata uang dasar",
     "type": "Jenis portofolio",
     "typeStandard": "Standar",

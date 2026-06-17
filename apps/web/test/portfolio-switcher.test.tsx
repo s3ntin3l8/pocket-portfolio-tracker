@@ -11,7 +11,7 @@ vi.mock("@/i18n/navigation", () => ({
 import { PortfolioSwitcher } from "../src/components/portfolio-switcher";
 
 function renderSwitcher(props: {
-  portfolios: { id: string; name: string; brokerage: string | null }[];
+  portfolios: { id: string; name: string; brokerage: string | null; accountHolder: string | null }[];
   selectedId: string | null;
 }) {
   return render(
@@ -38,7 +38,7 @@ describe("PortfolioSwitcher", () => {
 
   it("renders nothing with fewer than two portfolios", () => {
     const { container } = renderSwitcher({
-      portfolios: [{ id: "p1", name: "Main", brokerage: null }],
+      portfolios: [{ id: "p1", name: "Main", brokerage: null, accountHolder: null }],
       selectedId: null,
     });
     expect(container).toBeEmptyDOMElement();
@@ -47,8 +47,8 @@ describe("PortfolioSwitcher", () => {
   it("shows the selected portfolio on the trigger, falling back to All", () => {
     const { rerender } = renderSwitcher({
       portfolios: [
-        { id: "p1", name: "Main", brokerage: null },
-        { id: "p2", name: "DKB", brokerage: null },
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
       ],
       selectedId: null,
     });
@@ -58,8 +58,8 @@ describe("PortfolioSwitcher", () => {
       <NextIntlClientProvider locale="en" messages={messages}>
         <PortfolioSwitcher
           portfolios={[
-            { id: "p1", name: "Main", brokerage: null },
-            { id: "p2", name: "DKB", brokerage: null },
+            { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+            { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
           ]}
           selectedId="p2"
         />
@@ -71,8 +71,8 @@ describe("PortfolioSwitcher", () => {
   it("lists an All option plus each portfolio, appending the brokerage", () => {
     renderSwitcher({
       portfolios: [
-        { id: "p1", name: "Main", brokerage: null },
-        { id: "p2", name: "Euro", brokerage: "Trade Republic" },
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "Euro", brokerage: "Trade Republic", accountHolder: null },
       ],
       selectedId: "p2",
     });
@@ -88,8 +88,8 @@ describe("PortfolioSwitcher", () => {
   it("writes the cookie and refreshes when a portfolio is chosen", () => {
     renderSwitcher({
       portfolios: [
-        { id: "p1", name: "Main", brokerage: null },
-        { id: "p2", name: "DKB", brokerage: null },
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
       ],
       selectedId: null,
     });
