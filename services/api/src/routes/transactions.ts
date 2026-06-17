@@ -338,7 +338,16 @@ export async function transactionsRoute(app: FastifyInstance) {
     }
 
     // Blend: for instruments with announced future dividends, drop projected entries.
-    const instrumentsWithAnnounced = new Set(futureAnnouncedByInstrument.keys());
+    // Only consider instruments that actually have future announcements — instruments with
+    // only past paid rows in dividend_events should still use the projected heuristic.
+    // NOTE: dividend_events is not yet populated by any live provider job, so
+    // instrumentsWithAnnounced is always empty in production today and this path
+    // is dormant. It will activate once the refreshDividends scheduler is wired up.
+    const instrumentsWithAnnounced = new Set(
+      [...futureAnnouncedByInstrument.entries()]
+        .filter(([_, rows]) => rows.some((r) => r.exDate > todayStr))
+        .map(([id]) => id),
+    );
     const blendedProjected = projectedDividends.filter(
       (d) => d.instrumentId && !instrumentsWithAnnounced.has(d.instrumentId),
     );

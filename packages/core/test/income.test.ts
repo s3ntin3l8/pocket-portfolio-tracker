@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregateIncome, type IncomeEntry } from "../src/index.js";
+import { aggregateIncome, projectDividends, type IncomeEntry } from "../src/index.js";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
@@ -159,5 +159,56 @@ describe("aggregateIncome — forecastRestOfYear / forecastFullYear", () => {
     expect(Number(result.forecastFullYear)).toBe(
       Number(result.thisYear) + Number(result.forecastRestOfYear),
     );
+  });
+});
+
+describe("projectDividends", () => {
+  // Fixed "now" → source window = (2025-06-15, 2025-12-31]; horizon end = 2026-12-31.
+  const NOW = d("2026-06-15");
+
+  /** Minimal IncomeEntry for a dividend transaction. */
+  const hist = (id: string, iso: string, amount: string, currency = "USD"): IncomeEntry => ({
+    instrumentId: id,
+    type: "dividend",
+    price: amount,
+    currency,
+    executedAt: d(iso),
+  });
+
+  it("returns empty when the instrument has no recorded position (root cause of the MSFT production bug)", () => {
+    // MSFT had dividend transactions imported from the DKB Girokonto CSV but no buy
+    // rows — the purchase predated the exported window so no position was ever recorded.
+    // projectDividends skips any instrument where heldQty ≤ 0 (income.ts:146-147),
+    // so MSFT produced historical income but zero dividend forecast.
+    const past = [hist("msft", "2025-09-12", "8.00")]; // inside source window
+    const heldQty = new Map<string, string>(); // no position recorded → not in map
+    expect(projectDividends(past, heldQty, () => "0", NOW)).toHaveLength(0);
+  });
+
+  it("projects dividends for a held instrument with history in the source window", () => {
+    // Once the opening buy is added, both Sep and Dec entries project one year forward.
+    const past = [hist("msft", "2025-09-12", "8.00"), hist("msft", "2025-12-12", "8.00")];
+    const heldQty = new Map([["msft", "10"]]);
+    const result = projectDividends(past, heldQty, () => "10", NOW);
+    expect(result).toHaveLength(2);
+    expect(result[0].date).toBe("2026-09-12");
+    expect(result[1].date).toBe("2026-12-12");
+    expect(result.every((r) => r.currency === "USD")).toBe(true);
+  });
+
+  it("skips dividends outside the source window (before now-1yr)", () => {
+    // Mar 2025 is before pastStart (2025-06-15) → not replayed.
+    const past = [hist("msft", "2025-03-12", "7.50")];
+    const heldQty = new Map([["msft", "10"]]);
+    expect(projectDividends(past, heldQty, () => "10", NOW)).toHaveLength(0);
+  });
+
+  it("scales the projected amount by the current/historical quantity ratio", () => {
+    // Historical qty = 5 shares; current qty = 10 → amount doubles.
+    const past = [hist("msft", "2025-09-12", "4.00")];
+    const heldQty = new Map([["msft", "10"]]);
+    const result = projectDividends(past, heldQty, () => "5", NOW);
+    expect(result).toHaveLength(1);
+    expect(Number(result[0].amount)).toBeCloseTo(8.0); // 4.00 × (10 / 5)
   });
 });
