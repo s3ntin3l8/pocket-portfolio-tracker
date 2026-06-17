@@ -202,7 +202,7 @@ describe("createApiClient request methods", () => {
     { name: "getPerformance", call: (c) => c.getPerformance("p1"), method: "GET", url: "/portfolios/p1/performance" },
     { name: "importCsv default auto", call: (c) => c.importCsv("p1", "x"), method: "POST", url: "/portfolios/p1/imports/csv", body: { content: "x", format: "auto" } },
     { name: "importCsv dkb", call: (c) => c.importCsv("p1", "x", "dkb"), method: "POST", url: "/portfolios/p1/imports/csv", body: { content: "x", format: "dkb" } },
-    { name: "confirmImport", call: (c) => c.confirmImport("imp1", []), method: "POST", url: "/imports/imp1/confirm", body: { transactions: [] } },
+    { name: "confirmImport", call: (c) => c.confirmImport("imp1", []), method: "POST", url: "/imports/imp1/confirm", body: { transactions: [], contracts: [] } },
     { name: "getImport", call: (c) => c.getImport("imp1"), method: "GET", url: "/imports/imp1" },
   ];
 
