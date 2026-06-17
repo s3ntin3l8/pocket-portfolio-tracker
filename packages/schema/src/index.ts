@@ -179,6 +179,24 @@ export const parsedTransactionSchema = z.object({
   externalId: z.string().nullish(),
   // Groups recurring savings-plan executions (set by the Trade Republic importer).
   savingsPlanId: z.string().nullish(),
+  // Broker enrichment (Trade Republic): informational metadata persisted on the
+  // transaction. `tax`/`fxRate`/`executedPrice` are decimal strings; `kind` distinguishes
+  // saveback/roundup; `documentRefs` are source-document pointers (see issue #150).
+  tax: decimalString.nullish(),
+  executedPrice: decimalString.nullish(),
+  fxRate: decimalString.nullish(),
+  venue: z.string().nullish(),
+  kind: z.string().nullish(),
+  description: z.string().nullish(),
+  documentRefs: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: z.string().nullish(),
+        date: z.string().nullish(),
+      }),
+    )
+    .nullish(),
   confidence: z.number().min(0).max(1),
 });
 export type ParsedTransaction = z.infer<typeof parsedTransactionSchema>;

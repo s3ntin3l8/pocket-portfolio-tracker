@@ -206,6 +206,76 @@ describe("pytr import → confirm", () => {
     expect(inst).toMatchObject({ market: "XETRA", currency: "EUR" });
   });
 
+  it("persists detail enrichment (tax, executedPrice, fxRate, kind, docs) on the transaction", async () => {
+    const t = await token("pytr-enrich");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR", baseCurrency: "EUR" },
+      })
+    ).json().id;
+    const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));
+    const [imp] = await getDb()
+      .insert(screenshotImports)
+      .values({
+        userId: pf.userId,
+        portfolioId,
+        parser: "pytr",
+        parsedJson: {
+          drafts: [
+            {
+              ...DRAFTS[0],
+              externalId: "enrich-1",
+              tax: "2.31",
+              executedPrice: "142.76",
+              fxRate: "0.8449",
+              venue: "LS Exchange",
+              kind: "saveback",
+              description: "ACME · DE12",
+              documentRefs: [{ id: "d1", type: "TRADE_INVOICE", date: "01.03.2026" }],
+            },
+          ],
+          errors: [],
+        },
+        status: "draft",
+      })
+      .returning();
+
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${imp.id}/confirm`,
+      headers: auth(t),
+      payload: {
+        transactions: [
+          {
+            ...DRAFTS[0],
+            externalId: "enrich-1",
+            tax: "2.31",
+            executedPrice: "142.76",
+            fxRate: "0.8449",
+            venue: "LS Exchange",
+            kind: "saveback",
+            description: "ACME · DE12",
+            documentRefs: [{ id: "d1", type: "TRADE_INVOICE", date: "01.03.2026" }],
+          },
+        ],
+      },
+    });
+    expect(confirm.statusCode).toBe(201);
+    const tx = confirm.json().transactions[0];
+    expect(tx).toMatchObject({
+      tax: "2.31",
+      executedPrice: "142.76",
+      fxRate: "0.8449",
+      venue: "LS Exchange",
+      kind: "saveback",
+      description: "ACME · DE12",
+    });
+    expect(tx.documentRefs).toEqual([{ id: "d1", type: "TRADE_INVOICE", date: "01.03.2026" }]);
+  });
+
   it("partial confirm keeps the import open with the un-confirmed remainder", async () => {
     const t = await token("pytr-passes");
     const portfolioId = (

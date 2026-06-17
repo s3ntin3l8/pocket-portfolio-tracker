@@ -384,6 +384,13 @@ export async function importsRoute(app: FastifyInstance) {
               quantity: d.quantity,
               price: d.price,
               fees: d.fees,
+              tax: d.tax ?? null,
+              executedPrice: d.executedPrice ?? null,
+              fxRate: d.fxRate ?? null,
+              venue: d.venue ?? null,
+              documentRefs: d.documentRefs ?? null,
+              kind: d.kind ?? null,
+              description: d.description ?? null,
               // The cash leg is always in the transaction's own currency (EUR for DKB),
               // independent of where the instrument is listed/priced.
               currency: d.currency,

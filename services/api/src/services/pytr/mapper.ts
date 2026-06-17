@@ -18,7 +18,26 @@ const trEventSchema = z.object({
   // cancellation of an already-confirmed event is un-imported by the sync reconciler).
   // Absent on older fixtures — treated as EXECUTED for backward compatibility.
   status: z.string().nullish(),
+  // Detail enrichment extracted by tr_export.py (all best-effort / nullable).
+  executedPrice: z.number().nullish(),
+  tax: z.number().nullish(),
+  fxRate: z.number().nullish(),
+  venue: z.string().nullish(),
+  description: z.string().nullish(),
+  documentRefs: z
+    .array(z.object({ id: z.string(), type: z.string().nullish(), date: z.string().nullish() }))
+    .nullish(),
 });
+
+// TR books crypto under synthetic ISINs (XF000<TICKER>…). Recognised at the source so the
+// draft carries the right asset class; full symbol/venue resolution happens at confirm.
+const TR_CRYPTO_ISIN = /^XF000[A-Z]{2,5}\d+$/;
+
+// Savings-plan-funded buys come in two flavours TR distinguishes by event type.
+const EVENT_KIND: Record<string, string> = {
+  SAVEBACK_AGGREGATE: "saveback",
+  SPARE_CHANGE_AGGREGATE: "roundup",
+};
 export type TrEvent = z.infer<typeof trEventSchema>;
 
 // The TR timeline event taxonomy (validated against a real 912-event account, 2026-06-15).
@@ -156,8 +175,12 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     price = dstr((amount - fees) / shares); // per-share, fees carried separately
   }
 
+  // Asset class at the source: crypto when TR's synthetic ISIN says so, else equity/ETF
+  // (refined at confirm via OpenFIGI). Avoids the old confirm-only crypto workaround.
+  const assetClass = ev.isin && TR_CRYPTO_ISIN.test(ev.isin) ? "crypto" : "equity";
+
   const draft: ParsedTransaction = {
-    assetClass: "equity", // TR is equities/ETFs; refined at confirm if needed
+    assetClass,
     action,
     ticker: null,
     isin: ev.isin ?? null,
@@ -173,6 +196,14 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     externalId: ev.id,
     savingsPlanId: ev.savingsPlanId ?? null,
     exchangeCode: null,
+    // Enrichment (informational; persisted on the transaction at confirm).
+    kind: EVENT_KIND[ev.eventType] ?? null,
+    tax: ev.tax != null ? dstr(Math.abs(ev.tax)) : null,
+    executedPrice: ev.executedPrice != null ? dstr(ev.executedPrice) : null,
+    fxRate: ev.fxRate != null ? dstr(ev.fxRate) : null,
+    venue: ev.venue ?? null,
+    description: ev.description ?? null,
+    documentRefs: ev.documentRefs ?? null,
   };
   return { draft };
 }

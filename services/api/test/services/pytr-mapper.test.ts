@@ -131,6 +131,39 @@ describe("mapTrEventToDraft", () => {
     ).toMatchObject({ action: "withdrawal", price: "200" });
   });
 
+  it("carries detail enrichment, kind, and source asset-class onto the draft", () => {
+    const div = draftOf({
+      ...base,
+      eventType: "CREDIT",
+      amount: 6.7,
+      isin: "US7561091049",
+      title: "Realty Income",
+      executedPrice: 142.76,
+      tax: 2.31,
+      fxRate: 0.8449,
+      venue: "LS Exchange",
+      description: "ACME Bank · DE12…",
+      documentRefs: [{ id: "doc-1", type: "CA_INCOME_INVOICE", date: "16.06.2026" }],
+    });
+    expect(div).toMatchObject({
+      tax: "2.31",
+      executedPrice: "142.76",
+      fxRate: "0.8449",
+      venue: "LS Exchange",
+      description: "ACME Bank · DE12…",
+    });
+    expect(div.documentRefs).toEqual([{ id: "doc-1", type: "CA_INCOME_INVOICE", date: "16.06.2026" }]);
+
+    // kind from event type; tax stored as a magnitude even when TR signs it negative.
+    expect(draftOf({ ...base, eventType: "SAVEBACK_AGGREGATE", amount: -9.62, shares: 0.0137, isin: "IE00B5BMR087" }).kind).toBe("saveback");
+    expect(draftOf({ ...base, eventType: "SPARE_CHANGE_AGGREGATE", amount: -0.7, shares: 0.001, isin: "IE00B5BMR087" }).kind).toBe("roundup");
+    expect(draftOf({ ...base, eventType: "CREDIT", amount: 5, isin: "US1", tax: -0.98 }).tax).toBe("0.98");
+
+    // Crypto recognised at the source from TR's synthetic XF000… ISIN.
+    expect(draftOf({ ...base, eventType: "ORDER_EXECUTED", amount: -100, shares: 0.001, isin: "XF000BTC0017" }).assetClass).toBe("crypto");
+    expect(draftOf({ ...base, eventType: "ORDER_EXECUTED", amount: -100, shares: 1, isin: "DE0007236101" }).assetClass).toBe("equity");
+  });
+
   it("skips non-executed (cancelled/pending) events", () => {
     const cancelled = mapTrEventToDraft({
       ...base,
