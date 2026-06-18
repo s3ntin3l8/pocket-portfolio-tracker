@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -774,6 +775,9 @@ export function ImportFlow({
             </p>
             <Button variant="outline" className="mt-2" onClick={reset}>
               {t("done.again")}
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/import">{t("done.history")}</Link>
             </Button>
           </CardContent>
         </Card>

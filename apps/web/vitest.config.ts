@@ -5,13 +5,22 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
+    alias: [
+      // More-specific stubs must come before the broad `@` alias so Vite matches them first.
+      // next-intl/navigation calls next/navigation which can't resolve in jsdom.
+      {
+        find: "@/i18n/navigation",
+        replacement: fileURLToPath(new URL("./test/stubs/i18n-navigation.ts", import.meta.url)),
+      },
       // Mirror the tsconfig `@/*` → src/* path so component imports resolve in tests.
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      { find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) },
       // The `server-only` guard throws outside RSC; stub it so server-side lib code
       // (e.g. lib/server-api.ts) can be unit-tested under jsdom.
-      "server-only": fileURLToPath(new URL("./test/stubs/server-only.ts", import.meta.url)),
-    },
+      {
+        find: "server-only",
+        replacement: fileURLToPath(new URL("./test/stubs/server-only.ts", import.meta.url)),
+      },
+    ],
   },
   test: {
     globals: true,

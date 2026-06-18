@@ -27,7 +27,7 @@
     "transactions": "Transactions",
     "income": "Income",
     "savings": "Savings",
-    "import": "Import",
+    "import": "Import history",
     "portfolios": "Portfolios",
     "settings": "Settings",
     "admin": "Admin",
@@ -303,7 +303,8 @@
     "done": {
       "title": "Imported",
       "hint": "{count, plural, one {# transaction added} other {# transactions added}} to your portfolio.",
-      "again": "Import another"
+      "again": "Import another",
+      "history": "View import history"
     },
     "errors": {
       "notConfigured": "No vision parser is configured yet. Add an API key to enable screenshot import.",
@@ -316,6 +317,8 @@
     }
   },
   "ImportHistory": {
+    "pageTitle": "Import history",
+    "pageSubtitle": "All past imports — review drafts or discard them here.",
     "title": "Recent imports",
     "items": "{count, plural, one {# item} other {# items}}",
     "review": "Review",
@@ -364,7 +367,9 @@
     "historyTitle": "Coming with price tracking",
     "historyBody": "Performance history appears once daily prices are collected.",
     "noMoversTitle": "No price moves yet",
-    "noMoversBody": "Day changes appear once live prices refresh for your holdings."
+    "noMoversBody": "Day changes appear once live prices refresh for your holdings.",
+    "noImportsTitle": "No imports yet",
+    "noImportsBody": "Use the Import file option on the Transactions page to get started."
   },
   "Gold": {
     "title": "Gold spot",

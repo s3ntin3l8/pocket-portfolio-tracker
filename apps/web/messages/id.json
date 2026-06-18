@@ -27,7 +27,7 @@
     "transactions": "Transaksi",
     "income": "Pendapatan",
     "savings": "Tabungan",
-    "import": "Impor",
+    "import": "Riwayat impor",
     "portfolios": "Portofolio",
     "settings": "Pengaturan",
     "admin": "Admin",
@@ -303,7 +303,8 @@
     "done": {
       "title": "Terimpor",
       "hint": "{count, plural, other {# transaksi ditambahkan}} ke portofolio Anda.",
-      "again": "Impor lagi"
+      "again": "Impor lagi",
+      "history": "Lihat riwayat impor"
     },
     "errors": {
       "notConfigured": "Belum ada pembaca visi yang dikonfigurasi. Tambahkan kunci API untuk mengaktifkan impor tangkapan layar.",
@@ -316,6 +317,8 @@
     }
   },
   "ImportHistory": {
+    "pageTitle": "Riwayat impor",
+    "pageSubtitle": "Semua impor sebelumnya — tinjau draf atau buang di sini.",
     "title": "Impor terakhir",
     "items": "{count, plural, other {# item}}",
     "review": "Tinjau",
@@ -364,7 +367,9 @@
     "historyTitle": "Segera dengan pelacakan harga",
     "historyBody": "Riwayat kinerja muncul setelah harga harian dikumpulkan.",
     "noMoversTitle": "Belum ada pergerakan harga",
-    "noMoversBody": "Perubahan harian muncul setelah harga langsung diperbarui untuk kepemilikan Anda."
+    "noMoversBody": "Perubahan harian muncul setelah harga langsung diperbarui untuk kepemilikan Anda.",
+    "noImportsTitle": "Belum ada impor",
+    "noImportsBody": "Gunakan opsi Impor berkas di halaman Transaksi untuk memulai."
   },
   "Gold": {
     "title": "Harga emas",
