@@ -156,69 +156,72 @@ function VisionCredentialCell({
   }
 
   return (
-    <div className="flex items-center gap-1">
-      {display}
-      {error && <span className="text-xs text-destructive">{error}</span>}
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+        {/* Fixed-width display area so the pencil icon aligns across all rows. */}
+        <div className="w-28 shrink-0 truncate">{display}</div>
 
-      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogTrigger asChild>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              aria-label={t("editCredential")}
+            >
+              <Pencil className="size-3" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{provider.label}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSet} className="space-y-3">
+              <div className="relative">
+                <Input
+                  type={isUrlProvider ? "url" : showKey ? "text" : "password"}
+                  placeholder={isUrlProvider ? t("visionUrlPlaceholder") : t("credentialPlaceholder")}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="pr-8 font-mono"
+                  autoComplete="off"
+                  autoFocus
+                />
+                {!isUrlProvider && (
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showKey ? t("credentialHide") : t("credentialShow")}
+                  >
+                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                )}
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" disabled={busy || !apiKey.trim()}>
+                {busy ? <Loader2 className="size-4 animate-spin" /> : t("credentialSave")}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {hasCredential && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-            aria-label={t("editCredential")}
+            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+            disabled={busy}
+            onClick={handleClear}
+            aria-label={t("credentialClear")}
           >
-            <Pencil className="size-3" />
+            {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
           </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{provider.label}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSet} className="space-y-3">
-            <div className="relative">
-              <Input
-                type={isUrlProvider ? "url" : showKey ? "text" : "password"}
-                placeholder={isUrlProvider ? t("visionUrlPlaceholder") : t("credentialPlaceholder")}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="pr-8 font-mono"
-                autoComplete="off"
-                autoFocus
-              />
-              {!isUrlProvider && (
-                <button
-                  type="button"
-                  onClick={() => setShowKey((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label={showKey ? t("credentialHide") : t("credentialShow")}
-                >
-                  {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              )}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={busy || !apiKey.trim()}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : t("credentialSave")}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {hasCredential && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-          disabled={busy}
-          onClick={handleClear}
-          aria-label={t("credentialClear")}
-        >
-          {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-        </Button>
-      )}
+        )}
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
