@@ -78,6 +78,20 @@ const ROWS: Record<string, string>[] = [
   // instant transfer out → withdrawal
   { datetime: "2024-12-28T08:45:09.549709Z", category: "CASH", type: "TRANSFER_INSTANT_OUTBOUND",
     amount: "-1100.000000", currency: "EUR", description: "Outgoing transfer", transaction_id: id(15) },
+  // incoming cash transfer (parent funding a JUNIOR depot) → deposit
+  { datetime: "2025-08-18T08:15:36.694729Z", category: "CASH", type: "TRANSFER_IN",
+    amount: "100.000000", currency: "EUR", description: "Incoming transfer from Björn", transaction_id: id(20) },
+  // Kindergeld promo bonus → income (interest, kind bonus), tiny positive cash credit
+  { datetime: "2025-09-02T14:49:49.518403Z", category: "CASH", type: "KINDERGELD_BONUS",
+    amount: "0.010000", currency: "EUR", description: "Your Kindergeld bonus", transaction_id: id(21) },
+  // stock perk credited as cash (instrument present but NO shares) → income (interest, kind bonus)
+  { datetime: "2025-08-26T14:01:55.126058Z", category: "CASH", type: "STOCKPERK", asset_class: "FUND",
+    name: "Lifestrategy 80% Equity EUR (Acc)", symbol: "IE00BMVB5R75", amount: "101.190000",
+    currency: "EUR", description: "Stockperk", transaction_id: id(22) },
+  // Vorabpauschale (advance fund tax): gross 0, only tax withheld → negative-cash income leg
+  { datetime: "2026-01-28T07:42:17.274554Z", category: "CASH", type: "EARNINGS", asset_class: "FUND",
+    name: "FTSE All-World USD (Acc)", symbol: "IE00BK5BQT80", amount: "0.000000", tax: "-0.06",
+    currency: "EUR", description: "Vorabpauschale for ISIN IE00BK5BQT80", transaction_id: id(23) },
   // --- unmappable: surfaced as errors, never silently dropped ---
   { datetime: "2025-04-24T13:03:27.956868Z", category: "CASH", type: "TAX_OPTIMIZATION",
     amount: "0.000000", tax: "-1.77", currency: "EUR", description: "Tax Optimisation", transaction_id: id(16) },
@@ -96,8 +110,8 @@ describe("parseTrCsv", () => {
   const byId = new Map(drafts.map((d) => [d.externalId, d]));
   const draft = (n: number) => byId.get(`tr-csv:${id(n)}`);
 
-  it("maps 15 representable rows to drafts and surfaces 4 unmappable rows as issues", () => {
-    expect(drafts).toHaveLength(15);
+  it("maps 19 representable rows to drafts and surfaces 4 unmappable rows as issues", () => {
+    expect(drafts).toHaveLength(19);
     expect(errors).toHaveLength(4);
     expect(errors.map((e) => e.message)).toEqual([
       expect.stringContaining("TAX_OPTIMIZATION"),
@@ -187,6 +201,40 @@ describe("parseTrCsv", () => {
 
   it("maps an instant transfer out to a withdrawal", () => {
     expect(draft(15)).toMatchObject({ action: "withdrawal", price: "1100" });
+  });
+
+  it("maps an incoming cash transfer (TRANSFER_IN) to a deposit, so it counts as a contribution", () => {
+    expect(draft(20)).toMatchObject({ action: "deposit", quantity: "0", price: "100", currency: "EUR" });
+  });
+
+  it("maps Kindergeld and stock-perk credits to income (interest, kind bonus), dropping the instrument", () => {
+    expect(draft(21)).toMatchObject({ action: "interest", kind: "bonus", price: "0.01" });
+    // STOCKPERK carries a fund instrument but no shares — it's cash income, so drop the ISIN.
+    expect(draft(22)).toMatchObject({ action: "interest", kind: "bonus", price: "101.19" });
+    expect(draft(22)?.isin).toBeUndefined();
+    expect(draft(22)?.quantity).toBe("0");
+  });
+
+  it("maps EARNINGS (Vorabpauschale) to a negative-cash income leg: cash & gain drop, not contribution", () => {
+    // Gross 0, tax 0.06 withheld → net cash −0.06. `price` is the net cashFlow reads;
+    // action `interest` keeps it out of contributed capital. Self-labelled by the name.
+    expect(draft(23)).toMatchObject({
+      action: "interest",
+      quantity: "0",
+      price: "-0.06",
+      tax: "0.06",
+      name: "Vorabpauschale for ISIN IE00BK5BQT80",
+    });
+    expect(draft(23)?.isin).toBeUndefined();
+  });
+
+  it("auto-maps every leona.csv type — none fall through to a needs-review issue", () => {
+    // The four JUNIOR-depot types are now mapped, so no attention issue is produced for them.
+    const attentionTypes = errors.filter((e) => e.severity === "attention").map((e) => e.eventType);
+    expect(attentionTypes).not.toContain("KINDERGELD_BONUS");
+    expect(attentionTypes).not.toContain("TRANSFER_IN");
+    expect(attentionTypes).not.toContain("STOCKPERK");
+    expect(attentionTypes).not.toContain("EARNINGS");
   });
 
   it("stamps a stable TR event-UUID external id and coerces the datetime", () => {

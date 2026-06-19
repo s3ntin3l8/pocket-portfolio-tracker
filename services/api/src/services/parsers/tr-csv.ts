@@ -5,15 +5,19 @@ import { splitCsvLine } from "./csv-line.js";
 // Trade Republic "Transaction export" CSV — the offline fallback to the pytr WebSocket
 // sync (services/pytr). TR lets you export the full account history as a CSV with a fixed,
 // snake_case schema. Each row becomes a draft the user confirms (and can deselect) — buys,
-// sells, dividends, interest, transfers and card spending are all represented so the
-// derived cash balance stays correct; everything else is surfaced as an error rather than
-// silently dropped.
+// sells, dividends, interest, transfers, card spending, broker promos and the German
+// Vorabpauschale tax are all represented so the derived cash balance stays correct;
+// unrecognised types are surfaced for review rather than silently dropped.
 //
-// Conventions verified against a real 981-row export (2026-06-19):
+// Conventions verified against real exports (981-row main + a JUNIOR child depot, 2026-06-19):
 //   • Trades:    |amount| = shares × price  (fee is SEPARATE, not folded into amount).
 //   • Dividends: `amount` is GROSS; the withheld `tax` is `|tax|/|amount|` = the statutory
 //                rate (26.375% DE, 15% US). Net cash credited = amount − |tax|, which is
 //                what drives cashFlow/XIRR — so `price` = net, `total` = gross (cf. cash.ts).
+//   • Promos:    BENEFITS_SAVEBACK/BONUS/KINDERGELD_BONUS/STOCKPERK are broker-credited cash
+//                → income (action `interest` + a `kind`), excluded from contributed capital.
+//   • EARNINGS:  Vorabpauschale (advance fund tax): gross 0, only `tax` withheld, so the net
+//                cash is −|tax| → a negative-cash income leg (cash & gain drop, not contribution).
 //   • Sign:      buy amount<0/shares>0, sell amount>0/shares<0, cash-in>0, cash-out<0.
 //   • FX:        amount(EUR) = original_amount × fx_rate; `fx_rate` is kept as enrichment.
 
@@ -24,6 +28,9 @@ const DEPOSIT_TYPES = new Set([
   "CUSTOMER_INPAYMENT",
   "TRANSFER_INBOUND",
   "TRANSFER_INSTANT_INBOUND",
+  // Incoming cash transfer (e.g. a parent funding a child's JUNIOR depot). Cash, not a
+  // securities transfer — plain deposit, no `kind` (cf. the share-in FREE_RECEIPT below).
+  "TRANSFER_IN",
 ]);
 const WITHDRAWAL_TYPES = new Set([
   "CUSTOMER_OUTBOUND_REQUEST",
@@ -38,10 +45,14 @@ const DIVIDEND_TYPES = new Set(["DIVIDEND", "DISTRIBUTION"]);
 // Cash credits with no share leg (cashback / promos). Broker-credited money, not a user
 // contribution — recorded as income (interest) carrying a `kind`, so it lands in cash but
 // is excluded from contributed-capital like INTEREST_PAYOUT (cf. the pytr mapper). Unlike
-// pytr's SAVEBACK_AGGREGATE, the CSV row has no reinvestment shares.
+// pytr's SAVEBACK_AGGREGATE, the CSV row has no reinvestment shares. KINDERGELD_BONUS (a TR
+// promo credit on the Kindergeld feature) and STOCKPERK (a reward credited as cash, not
+// shares — the row has an instrument but no share count) are the same: broker income.
 const CASH_CREDIT_KIND: Record<string, string> = {
   BENEFITS_SAVEBACK: "saveback",
   BONUS: "bonus",
+  KINDERGELD_BONUS: "bonus",
+  STOCKPERK: "bonus",
 };
 // Shares received with no cash consideration → bonus (quantity = received shares, price 0).
 const SHARE_IN_TYPES = new Set(["FREE_RECEIPT", "DIVIDEND_OPTION", "DIVIDEND_REINVESTMENT"]);
@@ -122,6 +133,7 @@ export function parseTrCsv(content: string): CsvParseResult {
     currency: idx("currency"),
     fxRate: idx("fx_rate"),
     txId: idx("transaction_id"),
+    description: idx("description"),
   };
 
   for (let i = 1; i < lines.length; i++) {
@@ -200,6 +212,27 @@ export function parseTrCsv(content: string): CsvParseResult {
         quantity: "0",
         price: dec(Math.abs(amount)),
         tax: tax ? dec(Math.abs(tax)) : undefined,
+        fees: "0",
+      };
+    } else if (type === "EARNINGS") {
+      // German Vorabpauschale (advance lump-sum fund tax): the gross payout is 0 and only a
+      // `tax` is withheld, so the net cash effect is −|tax|. Model it as a negative-cash
+      // income leg (cf. the dividend net/gross convention above): `price` is the net cash
+      // `cashFlow` reads, so cash and gain both drop by the tax while contribution is
+      // unchanged (interest is return, never contributed capital). No instrument leg — the
+      // tax doesn't change the holding; the name labels it for review.
+      if (tax == null) {
+        fail("EARNINGS row missing tax");
+        continue;
+      }
+      const net = (amount ?? 0) - Math.abs(tax);
+      candidate = {
+        ...base,
+        name: decodeName(get(cols.description)) || name || "Vorabpauschale",
+        action: "interest",
+        quantity: "0",
+        price: dec(net),
+        tax: dec(Math.abs(tax)),
         fees: "0",
       };
     } else if (DEPOSIT_TYPES.has(type)) {
