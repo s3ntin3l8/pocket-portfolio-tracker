@@ -14,7 +14,9 @@ Contract (consumed by services/pytr/runner.ts):
 
 Each emitted line is the NORMALIZED event the Node mapper consumes:
   {id, timestamp, eventType, title, amount (signed), currency,
-   isin?, shares?, fees?, savingsPlanId?, status?}
+   isin?, wkn?, shares?, fees?, savingsPlanId?, status?}
+The WKN is fetched per distinct ISIN from the instrument-detail channel (timeline events
+carry only an ISIN); everything else comes from the timeline list + its detail payload.
 Extraction of isin/shares/fees from the timeline detail is best-effort and the part most
 sensitive to pytr/TR changes; the raw detail is scanned defensively.
 
@@ -258,15 +260,17 @@ def _extract_isin(event):
     return match.group(1) if match else None
 
 
-def _normalize(event):
+def _normalize(event, wkn_by_isin=None):
     """Flatten a raw timeline event into the shape the Node mapper consumes.
 
     Extraction of shares/fees from the detail sections is best-effort and the part most
     sensitive to TR/pytr changes; refine the keyword/number heuristics during live
-    validation.
+    validation. `wkn_by_isin` maps each ISIN to its WKN (fetched separately from the
+    instrument-detail channel, since timeline events carry only an ISIN).
     """
     amount = event.get("amount") or {}
     details = event.get("details")
+    isin = _extract_isin(event)
     return {
         "id": event.get("id"),
         "timestamp": event.get("timestamp"),
@@ -274,7 +278,8 @@ def _normalize(event):
         "title": event.get("title"),
         "amount": amount.get("value", 0) or 0,
         "currency": amount.get("currency") or "EUR",
-        "isin": _extract_isin(event),
+        "isin": isin,
+        "wkn": (wkn_by_isin or {}).get(isin) if isin else None,
         "shares": _extract_shares(details),
         "fees": _field(details, ["fee", "gebühr", "provision"]),
         "savingsPlanId": event.get("savingsPlanId"),
@@ -292,6 +297,32 @@ def _normalize(event):
     }
 
 
+async def _collect_wkns(tr, isins):
+    """Map each distinct ISIN to its WKN via TR's instrument-detail channel.
+
+    Timeline events carry only an ISIN; the WKN (German security id) lives as a top-level
+    field on the instrument detail. Fetched once per ISIN and best-effort — a failure
+    (e.g. a synthetic crypto ISIN with no instrument record) just leaves the WKN absent.
+    """
+    out = {}
+    for isin in isins:
+        # TR books crypto under synthetic XF000… ISINs with no instrument record; querying
+        # one just blocks until the recv timeout. They never carry a WKN — skip them.
+        if isin.startswith("XF000"):
+            continue
+        try:
+            await tr.instrument_details(isin)
+            resp = await _await_subscription(
+                tr, "instrument", match=lambda s: s.get("id") == isin
+            )
+            wkn = resp.get("wkn") if isinstance(resp, dict) else None
+            if wkn:
+                out[isin] = wkn
+        except Exception:  # noqa: BLE001 - best effort; WKN is an optional enrichment
+            pass
+    return out
+
+
 async def _fetch_cash(tr):
     """TR's reported cash balance per currency, for reconciliation against our derived cash.
     Shape mirrors pytr's own use: a list of {currencyId, amount}."""
@@ -307,11 +338,73 @@ async def _fetch_cash(tr):
         return None
 
 
+async def _probe_instrument(tr, isin) -> int:
+    """One-shot diagnostic: dump TR's instrument/stock detail for an ISIN.
+
+    Used to decide where a WKN can be sourced from — TR's timeline events carry only an
+    ISIN, so if a WKN exists at all it lives on the instrument-detail channel. Prints the
+    raw payloads (no normalisation) so the field name can be read off directly. Not part
+    of the sync path; invoked manually via `--probe-instrument <ISIN>`.
+    """
+    out = {"isin": isin}
+    try:
+        await tr.instrument_details(isin)
+        out["instrument"] = await _await_subscription(tr, "instrument")
+    except Exception as exc:  # noqa: BLE001 - diagnostic; report and continue
+        out["instrument_error"] = str(exc)
+    try:
+        await tr.stock_details(isin)
+        out["stockDetails"] = await _await_subscription(tr, "stockDetails")
+    except Exception as exc:  # noqa: BLE001
+        out["stockDetails_error"] = str(exc)
+    sys.stdout.write(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+    try:
+        ws = await tr._get_ws()
+        await ws.close()
+    except Exception:  # noqa: BLE001 - cleanup only
+        pass
+    return 0
+
+
+async def _probe_timeline(tr, limit) -> int:
+    """One-shot diagnostic: dump the RAW `timeline_detail_v2` payload for a few security
+    events alongside their normalised output.
+
+    This is the payload the detail extractors (`_extract_shares/_extract_tax/_extract_fx/
+    _extract_venue/_extract_price`) actually parse. Comparing `rawDetails` against
+    `normalized` shows whether the keyword/number heuristics fire on real data — if a
+    field is null in `normalized` but visibly present in `rawDetails`, a keyword list is
+    wrong. Capture one and paste it into `REAL_DETAIL_SAMPLE` in test_tr_export.py to lock
+    the extraction shape against reality. Not part of the sync path.
+    """
+    events = await _collect_transactions(tr)
+    events = await _attach_details(tr, events)
+    picked = [e for e in events if _extract_isin(e)][:limit]
+    for e in picked:
+        out = {
+            "id": e.get("id"),
+            "eventType": e.get("eventType"),
+            "normalized": _normalize(e, {}),
+            "rawDetails": e.get("details"),
+        }
+        sys.stdout.write(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+    try:
+        ws = await tr._get_ws()
+        await ws.close()
+    except Exception:  # noqa: BLE001 - cleanup only
+        pass
+    return 0
+
+
 async def _run(tr) -> int:
     events = await _collect_transactions(tr)
     events = await _attach_details(tr, events)
+    isins = {isin for isin in (_extract_isin(e) for e in events) if isin}
+    wkn_by_isin = await _collect_wkns(tr, isins)
     for event in events:
-        sys.stdout.write(json.dumps(_normalize(event)) + "\n")
+        sys.stdout.write(json.dumps(_normalize(event, wkn_by_isin)) + "\n")
     # A trailing, clearly-tagged summary line (not an event) carrying TR's reported balances.
     cash = await _fetch_cash(tr)
     sys.stdout.write(json.dumps({"__summary__": {"cash": cash}}) + "\n")
@@ -332,6 +425,18 @@ async def _run(tr) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cookies-file", required=True)
+    parser.add_argument(
+        "--probe-instrument",
+        metavar="ISIN",
+        help="Diagnostic: dump TR instrument/stock detail for one ISIN and exit (no export).",
+    )
+    parser.add_argument(
+        "--probe-timeline",
+        type=int,
+        metavar="N",
+        help="Diagnostic: dump raw timeline_detail_v2 + normalised output for N security "
+        "events and exit (no export). Used to validate the detail extractors vs reality.",
+    )
     args = parser.parse_args()
 
     phone = os.environ.get("TR_PHONE")
@@ -358,6 +463,10 @@ def main() -> int:
         return 2
 
     try:
+        if args.probe_instrument:
+            return asyncio.run(_probe_instrument(tr, args.probe_instrument))
+        if args.probe_timeline:
+            return asyncio.run(_probe_timeline(tr, args.probe_timeline))
         return asyncio.run(_run(tr))
     except Exception as exc:  # noqa: BLE001
         print(f"export failed: {exc}", file=sys.stderr)

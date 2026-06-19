@@ -11,6 +11,9 @@ const trEventSchema = z.object({
   amount: z.number(), // signed: negative = cash out (buy/withdrawal), positive = cash in
   currency: z.string().default("EUR"),
   isin: z.string().nullish(),
+  // WKN (German security id), fetched per ISIN from TR's instrument-detail channel —
+  // the timeline events themselves carry only an ISIN. Best-effort / nullable.
+  wkn: z.string().nullish(),
   shares: z.number().nullish(),
   fees: z.number().nullish(),
   savingsPlanId: z.string().nullish(),
@@ -281,6 +284,7 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     action,
     ticker: null,
     isin: ev.isin ?? null,
+    wkn: ev.wkn ?? null,
     name: ev.title ?? ev.isin ?? ev.eventType,
     quantity,
     unit: "shares",
