@@ -1,0 +1,196 @@
+import { describe, it, expect } from "vitest";
+import { parseTrCsv } from "../../src/services/parsers/tr-csv.js";
+import { detectCsvFormat } from "../../src/services/parsers/detect.js";
+
+// Sanitised rows modelled on a real Trade Republic "Transaction export" (names →
+// Max Mustermann, IBANs/UUIDs zeroed — detect-secrets runs in pre-commit). The figures are
+// the ones that exercise the mapping rules: net-vs-gross dividends, fee-separate trades,
+// FX, crypto, cashback, share-in corporate actions and the unmappable tax adjustments.
+const COLS = [
+  "datetime", "date", "account_type", "category", "type", "asset_class", "name", "symbol",
+  "shares", "price", "amount", "fee", "tax", "currency", "original_amount",
+  "original_currency", "fx_rate", "description", "transaction_id", "counterparty_name",
+  "counterparty_iban", "payment_reference", "mcc_code",
+];
+const HEADER = COLS.join(",");
+const id = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
+function row(f: Record<string, string>): string {
+  return COLS.map((c) => `"${(f[c] ?? "").replace(/"/g, '""')}"`).join(",");
+}
+function csv(rows: Record<string, string>[]): string {
+  return [HEADER, ...rows.map(row)].join("\n");
+}
+
+const ROWS: Record<string, string>[] = [
+  // deposit (note the embedded comma — must survive quote-aware splitting)
+  { datetime: "2023-01-31T22:20:28.617262Z", category: "CASH", type: "CUSTOMER_INPAYMENT",
+    amount: "500.000000", currency: "EUR", description: "Customer inpayment, net 500", transaction_id: id(1) },
+  // stock buy: |amount| = shares*price, fee separate
+  { datetime: "2022-08-18T19:17:06.465Z", category: "TRADING", type: "BUY", asset_class: "STOCK",
+    name: "Alphabet (C)", symbol: "US02079K1079", shares: "2.0000000000", price: "120.260000",
+    amount: "-240.52", fee: "-1.00", currency: "EUR", transaction_id: id(2) },
+  // crypto buy: ticker, units
+  { datetime: "2021-07-25T06:58:14.412Z", category: "TRADING", type: "BUY", asset_class: "CRYPTO",
+    name: "Ethereum", symbol: "ETH", shares: "0.1200000000", price: "1859.500000",
+    amount: "-223.14", fee: "-1.00", currency: "EUR", transaction_id: id(3) },
+  // sell: negative shares → positive quantity, positive amount
+  { datetime: "2024-03-22T15:57:31.844Z", category: "TRADING", type: "SELL", asset_class: "STOCK",
+    name: "E.ON", symbol: "DE000ENAG999", shares: "-42.0000000000", price: "12.440000",
+    amount: "522.48", fee: "-1.00", currency: "EUR", transaction_id: id(4) },
+  // USD dividend with withholding tax + FX: price = NET (gross − tax), total = gross
+  { datetime: "2025-05-09T01:10:00.000000Z", category: "CASH", type: "DIVIDEND", asset_class: "STOCK",
+    name: "Altria Group", symbol: "US02209S1033", shares: "11.0000000000", amount: "3.940000",
+    tax: "-0.59", currency: "EUR", original_amount: "3.57", original_currency: "USD",
+    fx_rate: "1.103400", transaction_id: id(5) },
+  // fund distribution, no tax, HTML-escaped name
+  { datetime: "2024-01-02T23:05:45.497301Z", category: "CASH", type: "DISTRIBUTION", asset_class: "FUND",
+    name: "Core S&amp;P 500 USD (Dist)", symbol: "IE0031442068", shares: "5.9857000000",
+    amount: "0.790000", currency: "EUR", original_amount: "0.71", original_currency: "USD",
+    fx_rate: "1.106930", transaction_id: id(6) },
+  // interest, tax explicitly "0.00" (→ no tax)
+  { datetime: "2023-03-01T10:29:28.417746Z", category: "CASH", type: "INTEREST_PAYMENT",
+    amount: "1.740000", tax: "0.00", currency: "EUR", description: "Interest payment Booking", transaction_id: id(7) },
+  // domestic card spend → withdrawal
+  { datetime: "2024-11-24T09:16:54.048610Z", category: "CASH", type: "CARD_TRANSACTION",
+    name: "Some Merchant", amount: "-34.810000", currency: "EUR", description: "TR Card Transaction",
+    transaction_id: id(8), mcc_code: "5712" },
+  // international card spend → withdrawal, carries fx_rate
+  { datetime: "2024-11-24T13:19:11.897913Z", category: "CASH", type: "CARD_TRANSACTION_INTERNATIONAL",
+    name: "Foreign Merchant", amount: "-231.690000", currency: "EUR", original_amount: "-5866.19",
+    original_currency: "CZK", fx_rate: "0.039496", description: "TR Card Transaction",
+    transaction_id: id(9), mcc_code: "5309" },
+  // card ordering fee: amount 0, the charge lives in `fee`
+  { datetime: "2024-05-06T11:47:18.865042Z", category: "CASH", type: "CARD_ORDERING_FEE",
+    amount: "0.000000", fee: "-5.00", currency: "EUR", description: "Trade Republic Card", transaction_id: id(10) },
+  // saveback cashback: deposit + kind, name kept, no instrument
+  { datetime: "2025-02-03T15:59:12.456716Z", category: "CASH", type: "BENEFITS_SAVEBACK", asset_class: "FUND",
+    name: "Core S&amp;P 500 USD (Acc)", symbol: "IE00B5BMR087", amount: "0.550000", currency: "EUR",
+    description: "Your Saveback payment", transaction_id: id(11) },
+  // promo bonus: deposit + kind
+  { datetime: "2025-12-11T16:59:40.549057Z", category: "CASH", type: "BONUS",
+    amount: "22.860000", currency: "EUR", description: "Crypto bonus", transaction_id: id(12) },
+  // free receipt (gifted shares): bonus, currency column blank → EUR default
+  { datetime: "2022-09-16T20:41:14.655Z", category: "DELIVERY", type: "FREE_RECEIPT", asset_class: "STOCK",
+    name: "Rio Tinto", symbol: "GB0007188757", shares: "21.0000000000", description: "FREE_RECEIPT", transaction_id: id(13) },
+  // dividend reinvestment: bonus (shares in, no cash)
+  { datetime: "2025-05-02T09:48:13.603Z", category: "CORPORATE_ACTION", type: "DIVIDEND_REINVESTMENT", asset_class: "STOCK",
+    name: "Rio Tinto", symbol: "GB0007188757", shares: "1.0132700000", description: "DIVIDEND_REINVESTMENT", transaction_id: id(14) },
+  // instant transfer out → withdrawal
+  { datetime: "2024-12-28T08:45:09.549709Z", category: "CASH", type: "TRANSFER_INSTANT_OUTBOUND",
+    amount: "-1100.000000", currency: "EUR", description: "Outgoing transfer", transaction_id: id(15) },
+  // --- unmappable: surfaced as errors, never silently dropped ---
+  { datetime: "2025-04-24T13:03:27.956868Z", category: "CASH", type: "TAX_OPTIMIZATION",
+    amount: "0.000000", tax: "-1.77", currency: "EUR", description: "Tax Optimisation", transaction_id: id(16) },
+  { datetime: "2024-05-30T07:56:47.847459Z", category: "CASH", type: "SEC_ACCOUNT", asset_class: "STOCK",
+    name: "AbbVie", symbol: "US00287Y1091", amount: "0.000000", tax: "1.50", currency: "EUR", transaction_id: id(17) },
+  { datetime: "2024-08-28T14:00:43.775Z", category: "CORPORATE_ACTION", type: "DIVIDEND_OPTION_CANCELLED", asset_class: "STOCK",
+    name: "Main Street Capital", symbol: "US56035L1044", shares: "-0.1423570000", transaction_id: id(18) },
+  { datetime: "2026-01-01T00:00:00.000000Z", category: "CASH", type: "MYSTERY_EVENT",
+    amount: "1.000000", currency: "EUR", transaction_id: id(19) },
+];
+
+const TR_CSV = csv(ROWS);
+
+describe("parseTrCsv", () => {
+  const { drafts, errors } = parseTrCsv(TR_CSV);
+  const byId = new Map(drafts.map((d) => [d.externalId, d]));
+  const draft = (n: number) => byId.get(`tr-csv:${id(n)}`);
+
+  it("maps 15 representable rows to drafts and surfaces 4 unmappable rows as errors", () => {
+    expect(drafts).toHaveLength(15);
+    expect(errors).toHaveLength(4);
+    expect(errors.map((e) => e.message)).toEqual([
+      expect.stringContaining("TAX_OPTIMIZATION"),
+      expect.stringContaining("SEC_ACCOUNT"),
+      expect.stringContaining("DIVIDEND_OPTION_CANCELLED"),
+      "unsupported Trade Republic type: MYSTERY_EVENT",
+    ]);
+  });
+
+  it("maps a cash deposit (quote-aware splitting survives the comma in description)", () => {
+    expect(draft(1)).toMatchObject({ action: "deposit", quantity: "0", price: "500", currency: "EUR" });
+  });
+
+  it("maps a stock buy: |amount| = shares × price, fee carried separately", () => {
+    expect(draft(2)).toMatchObject({
+      action: "buy", assetClass: "equity", isin: "US02079K1079", ticker: undefined,
+      quantity: "2", unit: "shares", price: "120.26", fees: "1", total: "241.52", currency: "EUR",
+    });
+  });
+
+  it("maps a crypto buy with a ticker symbol and units", () => {
+    expect(draft(3)).toMatchObject({
+      action: "buy", assetClass: "crypto", ticker: "ETH", isin: undefined, unit: "units", quantity: "0.12",
+    });
+  });
+
+  it("maps a sell: negative shares → positive quantity", () => {
+    expect(draft(4)).toMatchObject({ action: "sell", quantity: "42", price: "12.44", fees: "1" });
+  });
+
+  it("maps a foreign dividend to NET price, GROSS total, and absolute tax + FX", () => {
+    expect(draft(5)).toMatchObject({
+      action: "dividend", isin: "US02209S1033", quantity: "0",
+      price: "3.35", // 3.94 gross − 0.59 tax = net cash credited (drives cashFlow/XIRR)
+      total: "3.94", tax: "0.59", fxRate: "1.103400", currency: "EUR",
+    });
+  });
+
+  it("maps a fund distribution with no tax and decodes the HTML-escaped name", () => {
+    expect(draft(6)).toMatchObject({
+      action: "dividend", assetClass: "equity", name: "Core S&P 500 USD (Dist)", price: "0.79", total: "0.79",
+    });
+    expect(draft(6)?.tax).toBeUndefined();
+  });
+
+  it("maps interest with a zero tax field to no tax", () => {
+    expect(draft(7)).toMatchObject({ action: "interest", quantity: "0", price: "1.74" });
+    expect(draft(7)?.tax).toBeUndefined();
+  });
+
+  it("records card spending as a withdrawal (domestic and international + FX)", () => {
+    expect(draft(8)).toMatchObject({ action: "withdrawal", price: "34.81" });
+    expect(draft(9)).toMatchObject({ action: "withdrawal", price: "231.69", fxRate: "0.039496" });
+  });
+
+  it("takes the card ordering fee from the fee column", () => {
+    expect(draft(10)).toMatchObject({ action: "withdrawal", price: "5" });
+  });
+
+  it("maps cashback/bonus credits to income (interest), not a deposit, so they don't inflate contributions", () => {
+    // Broker-credited money is income, not contributed capital. `interest` lands in cash
+    // but is excluded from contributed-total (unlike `deposit`); `kind` preserves the label.
+    expect(draft(11)).toMatchObject({ action: "interest", kind: "saveback", price: "0.55", name: "Core S&P 500 USD (Acc)" });
+    expect(draft(11)?.isin).toBeUndefined();
+    expect(draft(12)).toMatchObject({ action: "interest", kind: "bonus", price: "22.86" });
+  });
+
+  it("maps share-in corporate actions to a zero-price bonus, defaulting blank currency to EUR", () => {
+    expect(draft(13)).toMatchObject({ action: "bonus", isin: "GB0007188757", quantity: "21", price: "0", currency: "EUR" });
+    expect(draft(14)).toMatchObject({ action: "bonus", quantity: "1.01327", price: "0" });
+  });
+
+  it("maps an instant transfer out to a withdrawal", () => {
+    expect(draft(15)).toMatchObject({ action: "withdrawal", price: "1100" });
+  });
+
+  it("stamps a stable TR event-UUID external id and coerces the datetime", () => {
+    expect(draft(1)?.externalId).toBe(`tr-csv:${id(1)}`);
+    expect(draft(2)?.executedAt).toEqual(new Date("2022-08-18T19:17:06.465Z"));
+  });
+
+  it("returns nothing for a header-only or empty document", () => {
+    expect(parseTrCsv(HEADER).drafts).toHaveLength(0);
+    expect(parseTrCsv("").drafts).toHaveLength(0);
+  });
+});
+
+describe("detectCsvFormat — Trade Republic", () => {
+  it("detects the TR export by its transaction_id + mcc_code + counterparty_iban header", () => {
+    expect(detectCsvFormat(TR_CSV)).toBe("tr-csv");
+  });
+
+  it("does not misclassify a generic CSV as tr-csv", () => {
+    expect(detectCsvFormat("date,action,ticker,quantity,price\n2026-01-01,buy,AAPL,1,100")).toBe("generic");
+  });
+});
