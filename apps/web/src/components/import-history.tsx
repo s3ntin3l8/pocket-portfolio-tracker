@@ -46,7 +46,14 @@ const STATUS_VARIANT: Record<
  * confirmed import (which removes the transactions it wrote). Discarded rows are
  * shown for the audit trail but carry no action.
  */
-export function ImportHistory({ items }: { items: ImportRecord[] }) {
+export function ImportHistory({
+  items,
+  showTitle = true,
+}: {
+  items: ImportRecord[];
+  /** Hide the card's own title when an outer section (e.g. a collapsible) supplies it. */
+  showTitle?: boolean;
+}) {
   const t = useTranslations("ImportHistory");
   const locale = useLocale();
   const df = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
@@ -103,24 +110,26 @@ export function ImportHistory({ items }: { items: ImportRecord[] }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{t("title")}</CardTitle>
-        {discardedIds.length > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={clearingAll}
-            onClick={clearAllDiscarded}
-          >
-            {clearingAll ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="size-3.5" />
-            )}
-            {t("clearAll")}
-          </Button>
-        )}
-      </CardHeader>
+      {(showTitle || discardedIds.length > 0) && (
+        <CardHeader className="flex flex-row items-center justify-between">
+          {showTitle ? <CardTitle>{t("title")}</CardTitle> : <span />}
+          {discardedIds.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={clearingAll}
+              onClick={clearAllDiscarded}
+            >
+              {clearingAll ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="size-3.5" />
+              )}
+              {t("clearAll")}
+            </Button>
+          )}
+        </CardHeader>
+      )}
       <CardContent className="p-0">
         <Table>
           <TableHeader>
@@ -163,7 +172,7 @@ export function ImportHistory({ items }: { items: ImportRecord[] }) {
                       {imp.status === "draft" && (
                         <>
                           <Button size="sm" variant="secondary" asChild>
-                            <Link href={`/import/${imp.id}`}>
+                            <Link href={`/transactions/import/${imp.id}`}>
                               <Eye className="size-3.5" />
                               {t("review")}
                             </Link>

@@ -17,9 +17,9 @@ export default async function ImportReviewPage({
 
   const detail = await loadImport(importId);
   // Only draft imports are reviewable; anything else (missing, confirmed, discarded)
-  // goes back to the import history.
+  // goes back to the transactions page, where the import history lives.
   if (!detail || detail.status !== "draft") {
-    redirect({ href: "/import", locale });
+    redirect({ href: "/transactions", locale });
     return null;
   }
 
@@ -27,7 +27,7 @@ export default async function ImportReviewPage({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild aria-label={t("title")}>
-          <Link href="/import">
+          <Link href="/transactions">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus, PenLine, FileUp, GitBranch } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImportFlowClient } from "@/components/import-flow-client";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import type { ImportTargetPortfolio } from "@/components/import-flow";
 
@@ -21,10 +22,26 @@ export function AddTransactionMenu() {
   const ti = useTranslations("Import");
   const tca = useTranslations("CorpAction");
   const api = useApiClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [importOpen, setImportOpen] = useState(false);
   const [portfolios, setPortfolios] = useState<ImportTargetPortfolio[] | null>(null);
   const [defaultPortfolioId, setDefaultPortfolioId] = useState("");
+
+  // A screenshot shared into the app lands on /transactions?shared=1 (see sw.ts); the
+  // "Import screenshot" PWA shortcut lands on ?import=1. Either auto-opens the import sheet.
+  useEffect(() => {
+    const shared = searchParams.get("shared") === "1";
+    const importFlag = searchParams.get("import") === "1";
+    if (shared || importFlag) void openImport();
+    // `shared` is consumed + cleared by ImportFlowClient once it mounts (it needs the
+    // param to fetch the cached image first); clear the bare `import` flag here so a
+    // refresh doesn't re-open the sheet.
+    if (importFlag && !shared) router.replace(pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function openImport() {
     if (portfolios === null) {

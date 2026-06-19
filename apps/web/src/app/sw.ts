@@ -14,14 +14,15 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Cache + key the Web Share Target stashes a shared screenshot under. The import page
-// (`?shared=1`) reads it back out, then deletes it. See `share_target` in the manifest.
+// Cache + key the Web Share Target stashes a shared screenshot under. The transactions
+// page (`?shared=1`) reads it back out, then deletes it. See `share_target` in the manifest.
 export const SHARE_CACHE = "share-target";
 export const SHARE_KEY = "/shared-image";
 
 // Web Share Target: Android delivers a shared image as a multipart POST to
 // `/share-target` (no server route can receive it in a static/SSR app, so the SW does).
-// Stash the file in the Cache and redirect to the import flow, which picks it up.
+// Stash the file in the Cache and redirect to /transactions, where the Add-transaction
+// menu auto-opens the import sheet and picks it up.
 self.addEventListener("fetch", (event: FetchEvent) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "POST" || url.pathname !== "/share-target") return;
@@ -39,12 +40,12 @@ self.addEventListener("fetch", (event: FetchEvent) => {
               headers: { "content-type": image.type || "image/png" },
             }),
           );
-          return Response.redirect("/import?shared=1", 303);
+          return Response.redirect("/transactions?shared=1", 303);
         }
       } catch {
-        // Fall through to a plain redirect so the user still lands on the import page.
+        // Fall through to a plain redirect so the user still lands on the transactions page.
       }
-      return Response.redirect("/import", 303);
+      return Response.redirect("/transactions", 303);
     })(),
   );
 });

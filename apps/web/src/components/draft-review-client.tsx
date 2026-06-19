@@ -18,7 +18,7 @@ import { useRouter } from "@/i18n/navigation";
  * Review and confirm an already-staged draft import (e.g. a Trade Republic sync, or a
  * parse the user navigated away from). Reuses the same `ImportReview` table as the live
  * upload flow, seeded with the draft's transactions loaded server-side. Confirming writes
- * the transactions; discarding marks the import discarded. Both return to /import.
+ * the transactions; discarding marks the import discarded. Both return to /transactions.
  */
 export function DraftReviewClient({
   importId,
@@ -61,7 +61,7 @@ export function DraftReviewClient({
   }
 
   function backToImport() {
-    router.push("/import");
+    router.push("/transactions");
     router.refresh(); // surface the new transactions (and updated history) elsewhere
   }
 
