@@ -141,6 +141,18 @@ export const providerCredentialSchema = z
   });
 export type ProviderCredentialInput = z.infer<typeof providerCredentialSchema>;
 
+// Global import strategy for the unstructured path (screenshots + PDFs), editable by
+// admins (GET/PATCH /admin/import-settings). Picks the FIRST extraction choice:
+//   "parser_first" — deterministic broker parser first, vision-LLM fallback (default).
+//   "vision_only"  — always use the vision-LLM; skip the deterministic parser.
+// Does not affect CSV imports.
+export const importStrategySchema = z.enum(["parser_first", "vision_only"]);
+export type ImportStrategy = z.infer<typeof importStrategySchema>;
+export const importSettingsUpdateSchema = z.object({
+  strategy: importStrategySchema,
+});
+export type ImportSettingsUpdate = z.infer<typeof importSettingsUpdateSchema>;
+
 export const corporateActionTypeSchema = z.enum(["split", "bonus", "rights"]);
 export type CorporateActionType = z.infer<typeof corporateActionTypeSchema>;
 

@@ -25,14 +25,15 @@ vi.mock("next-intl/server", () => ({
 const { AdminMenu } = await import("../src/components/admin-menu");
 
 describe("AdminMenu", () => {
-  it("renders four section links with correct hrefs", async () => {
+  it("renders the section links with correct hrefs", async () => {
     const element = await AdminMenu();
     const { container } = render(element as React.ReactElement);
     const links = container.querySelectorAll("a");
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
     const hrefs = Array.from(links).map((l) => l.getAttribute("href"));
     expect(hrefs).toContain("/admin/providers");
     expect(hrefs).toContain("/admin/vision");
+    expect(hrefs).toContain("/admin/imports");
     expect(hrefs).toContain("/admin/database");
     expect(hrefs).toContain("/admin/jobs");
   });

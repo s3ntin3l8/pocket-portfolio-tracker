@@ -20,6 +20,8 @@ vi.mock("../../src/services/parsers/pdf-text.js", () => ({
 
 const { buildApp } = await import("../../src/app.js");
 const { closeDb } = await import("../../src/db/client.js");
+import { importSettings } from "@portfolio/db";
+import { IMPORT_SETTINGS_ID } from "../../src/services/import-settings.js";
 import type { ScreenshotParser } from "../../src/services/parsers/types.js";
 
 const ISSUER = "https://auth.test/o/p/";
@@ -140,5 +142,38 @@ describe("DKB PDF deterministic import path", () => {
     const list = txns.json();
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ type: "dividend", tax: "0.12", fxRate: "1.1777" });
+  });
+
+  it("skips the deterministic parser when the strategy is vision_only", async () => {
+    // Flip the global strategy: the same recognised DKB PDF must now go to vision,
+    // which (the exploding parser) throws → 502, proving the deterministic path is bypassed.
+    await app.db
+      .insert(importSettings)
+      .values({ id: IMPORT_SETTINGS_ID, strategy: "vision_only" })
+      .onConflictDoUpdate({
+        target: importSettings.id,
+        set: { strategy: "vision_only" },
+      });
+    try {
+      const t = await token("dkb-pdf-vision-only");
+      const form = pdfPart(Buffer.from("%PDF-1.4 vision-only"), "vision-only.pdf");
+      const res = await app.inject({
+        method: "POST",
+        url: "/imports/screenshot",
+        headers: { ...auth(t), ...form.headers },
+        payload: form.payload,
+      });
+      expect(res.statusCode).toBe(502);
+      expect(res.json()).toMatchObject({ error: "screenshot_parse_failed" });
+    } finally {
+      // Restore the default so the deterministic assertions above stay order-independent.
+      await app.db
+        .insert(importSettings)
+        .values({ id: IMPORT_SETTINGS_ID, strategy: "parser_first" })
+        .onConflictDoUpdate({
+          target: importSettings.id,
+          set: { strategy: "parser_first" },
+        });
+    }
   });
 });

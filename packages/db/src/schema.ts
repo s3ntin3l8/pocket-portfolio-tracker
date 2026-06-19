@@ -293,11 +293,25 @@ export const visionProviderSettings = pgTable("vision_provider_settings", {
 export const adminAuditLog = pgTable("admin_audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   actorSub: text("actor_sub").notNull(),
-  // "set_credential" | "clear_credential" | "update_providers" | "update_vision_providers"
+  // "set_credential" | "clear_credential" | "update_providers" | "update_vision_providers" | "update_import_settings"
   action: text("action").notNull(),
   target: text("target").notNull(), // provider id, e.g. "twelvedata" or "vision:gemini"
   meta: jsonb("meta"),              // non-secret context, e.g. { keyHint: "••••abc1" }
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Global, single-row config for the unstructured import path (screenshots + PDFs),
+// editable by admins from the UI. A single-operator self-host setting, so it is a
+// singleton row (always id=1). `strategy` picks the FIRST extraction choice:
+//   "parser_first" — try the deterministic broker parser (e.g. DKB securities PDFs),
+//                    fall back to the vision-LLM for anything it doesn't recognise.
+//   "vision_only"  — skip the deterministic parser entirely; always use the vision-LLM.
+// Does NOT affect CSV imports (their own deterministic /imports/csv path). A missing
+// row means the "parser_first" default.
+export const importSettings = pgTable("import_settings", {
+  id: integer("id").primaryKey().default(1), // enforced singleton (always id=1)
+  strategy: text("strategy").notNull().default("parser_first"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // The source of truth. Holdings, P&L, cash balance, XIRR and net worth are derived

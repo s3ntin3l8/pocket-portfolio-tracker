@@ -41,3 +41,5 @@ export type VisionProviderSetting = typeof schema.visionProviderSettings.$inferS
 export type NewVisionProviderSetting = typeof schema.visionProviderSettings.$inferInsert;
 export type AdminAuditEntry = typeof schema.adminAuditLog.$inferSelect;
 export type NewAdminAuditEntry = typeof schema.adminAuditLog.$inferInsert;
+export type ImportSettingsRow = typeof schema.importSettings.$inferSelect;
+export type NewImportSettingsRow = typeof schema.importSettings.$inferInsert;

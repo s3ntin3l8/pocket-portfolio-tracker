@@ -5,11 +5,17 @@ import {
   visionProviderSettings,
   providerCredentials,
   adminAuditLog,
+  importSettings,
 } from "@portfolio/db";
 import {
   providerSettingsUpdateSchema,
   providerCredentialSchema,
+  importSettingsUpdateSchema,
 } from "@portfolio/schema";
+import {
+  getImportStrategy,
+  IMPORT_SETTINGS_ID,
+} from "../services/import-settings.js";
 import {
   PROVIDER_REGISTRY,
   resolveProviderConfig,
@@ -603,6 +609,37 @@ export async function adminRoute(app: FastifyInstance) {
       });
 
       return { queued: true, name };
+    },
+  );
+
+  // ─── Import strategy (parser vs vision-LLM) ──────────────────────────────
+
+  // The global first-choice for the unstructured import path. Defaults to
+  // "parser_first" when no row exists. Does not affect CSV imports.
+  app.get("/admin/import-settings", { preHandler: app.requireAdmin }, async () => ({
+    strategy: await getImportStrategy(app.db),
+  }));
+
+  // Set the import strategy (singleton row id=1), then audit it.
+  app.patch(
+    "/admin/import-settings",
+    { preHandler: app.requireAdmin },
+    async (request) => {
+      const { strategy } = importSettingsUpdateSchema.parse(request.body);
+      await app.db
+        .insert(importSettings)
+        .values({ id: IMPORT_SETTINGS_ID, strategy })
+        .onConflictDoUpdate({
+          target: importSettings.id,
+          set: { strategy, updatedAt: new Date() },
+        });
+      await app.db.insert(adminAuditLog).values({
+        actorSub: request.user!.authSub,
+        action: "update_import_settings",
+        target: strategy,
+        meta: { strategy },
+      });
+      return { strategy };
     },
   );
 }

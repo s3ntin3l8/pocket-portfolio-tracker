@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminProviders } from "@/components/admin-providers";
 import { AdminVisionProviders } from "@/components/admin-vision-providers";
+import { AdminImportSettings } from "@/components/admin-import-settings";
 import { AdminStats } from "@/components/admin-stats";
 import { AdminJobs } from "@/components/admin-jobs";
 import { AdminMenu } from "@/components/admin-menu";
@@ -10,6 +11,7 @@ import {
   loadMe,
   loadAdminProviders,
   loadAdminVisionProviders,
+  loadAdminImportSettings,
   loadAdminStats,
   loadAdminJobs,
 } from "@/lib/server-api";
@@ -27,12 +29,14 @@ export default async function AdminPage({
   const me = await loadMe();
   if (!me?.isAdmin) notFound();
 
-  const [result, visionResult, statsResult, jobsResult] = await Promise.all([
-    loadAdminProviders(),
-    loadAdminVisionProviders(),
-    loadAdminStats(),
-    loadAdminJobs(),
-  ]);
+  const [result, visionResult, importResult, statsResult, jobsResult] =
+    await Promise.all([
+      loadAdminProviders(),
+      loadAdminVisionProviders(),
+      loadAdminImportSettings(),
+      loadAdminStats(),
+      loadAdminJobs(),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -76,6 +80,20 @@ export default async function AdminPage({
                 initialProviders={visionResult.providers}
                 encryptionEnabled={visionResult.encryptionEnabled}
               />
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("importStrategy")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">{t("importStrategyHint")}</p>
+            {importResult.status === "ok" ? (
+              <AdminImportSettings initialStrategy={importResult.strategy} />
             ) : (
               <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
             )}

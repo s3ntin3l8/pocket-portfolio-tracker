@@ -33,6 +33,7 @@ import {
   marketForEuInstrument,
 } from "../services/instruments.js";
 import { getMarketData } from "../services/market-data.js";
+import { getImportStrategy } from "../services/import-settings.js";
 import { resolveCryptoIsin, PRICEABLE_FOREIGN_MARKETS, isIdxEtfSymbol } from "@portfolio/market-data";
 
 const csvBodySchema = z.object({
@@ -297,10 +298,14 @@ export async function importsRoute(app: FastifyInstance) {
       }
 
       let parsed;
+      // Admin-configured first choice (global): "parser_first" runs the deterministic
+      // broker parser before vision; "vision_only" skips it so every PDF/image goes
+      // straight to the vision-LLM. CSV imports use their own path and are unaffected.
+      const importStrategy = await getImportStrategy(app.db);
       // Deterministic fast-path for DKB securities PDFs (Wertpapierabrechnung /
       // Dividendengutschrift / Ausschüttung): parse the text layer exactly — no LLM call,
       // no billing, no data egress. Falls through to vision for any non-DKB / scanned PDF.
-      if (mimeType === "application/pdf") {
+      if (importStrategy === "parser_first" && mimeType === "application/pdf") {
         try {
           const text = await extractPdfText(buf);
           if (detectDkbPdf(text)) {
