@@ -9,9 +9,16 @@ import type {
   UserUpdate,
   ProviderSettingUpdate,
   ProviderCredentialInput,
+  ImportStrategy,
+  ImportSettingsUpdate,
 } from "@portfolio/schema";
 
 export type { ImportIssue, ParsedGoldContract, ProviderCredentialInput } from "@portfolio/schema";
+export type { ImportStrategy, ImportSettingsUpdate } from "@portfolio/schema";
+
+export interface AdminImportSettingsResponse {
+  strategy: ImportStrategy;
+}
 
 // --- Response shapes (mirror the API) ------------------------------------
 
@@ -684,6 +691,12 @@ export function createApiClient(config: ApiClientConfig) {
         "DELETE",
         `/admin/vision-providers/${encodeURIComponent(id)}/credential`,
       ),
+
+    // Admin: import strategy (deterministic parser vs vision-LLM) for screenshots/PDFs.
+    getAdminImportSettings: () =>
+      request<AdminImportSettingsResponse>("GET", "/admin/import-settings"),
+    updateAdminImportSettings: (input: ImportSettingsUpdate) =>
+      request<AdminImportSettingsResponse>("PATCH", "/admin/import-settings", input),
 
     // Admin: server statistics (#140).
     getAdminStats: () => request<AdminStats>("GET", "/admin/stats"),

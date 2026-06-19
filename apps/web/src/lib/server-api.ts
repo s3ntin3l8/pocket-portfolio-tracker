@@ -21,6 +21,7 @@ import {
   type AdminVisionProvider,
   type AdminStats,
   type AdminJobsResponse,
+  type ImportStrategy,
 } from "@portfolio/api-client";
 import { auth } from "@/auth";
 import { SELECTED_PORTFOLIO_COOKIE } from "@/lib/portfolio-selection";
@@ -401,6 +402,20 @@ export async function loadAdminVisionProviders(): Promise<
   try {
     const { providers, encryptionEnabled } = await api.getAdminVisionProviders();
     return { status: "ok", providers, encryptionEnabled };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+/** Admin: the import strategy (parser vs vision-LLM), or "unavailable". */
+export async function loadAdminImportSettings(): Promise<
+  { status: "ok"; strategy: ImportStrategy } | { status: "unavailable" }
+> {
+  const api = await getServerApi();
+  if (!api) return { status: "unavailable" };
+  try {
+    const { strategy } = await api.getAdminImportSettings();
+    return { status: "ok", strategy };
   } catch {
     return { status: "unavailable" };
   }

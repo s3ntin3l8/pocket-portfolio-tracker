@@ -492,4 +492,95 @@ describe("admin provider config", () => {
     );
     expect(entry).toBeDefined();
   });
+
+  it("GET /admin/import-settings defaults to parser_first (admin only)", async () => {
+    const forbidden = await app.inject({
+      method: "GET",
+      url: "/admin/import-settings",
+      headers: auth(await token("nobody-import")),
+    });
+    expect(forbidden.statusCode).toBe(403);
+
+    const ok = await app.inject({
+      method: "GET",
+      url: "/admin/import-settings",
+      headers: auth(await token("admin-import", [ADMIN_GROUP])),
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ strategy: "parser_first" });
+  });
+
+  it("PATCH /admin/import-settings persists the strategy and reflects it on GET", async () => {
+    const t = await token("admin-import-patch", [ADMIN_GROUP]);
+    const patched = await app.inject({
+      method: "PATCH",
+      url: "/admin/import-settings",
+      headers: auth(t),
+      payload: { strategy: "vision_only" },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json()).toEqual({ strategy: "vision_only" });
+
+    const got = await app.inject({
+      method: "GET",
+      url: "/admin/import-settings",
+      headers: auth(t),
+    });
+    expect(got.json()).toEqual({ strategy: "vision_only" });
+
+    // Restore the default so other tests/uploads see parser_first.
+    await app.inject({
+      method: "PATCH",
+      url: "/admin/import-settings",
+      headers: auth(t),
+      payload: { strategy: "parser_first" },
+    });
+  });
+
+  it("PATCH /admin/import-settings rejects an invalid strategy with 400", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/admin/import-settings",
+      headers: auth(await token("admin-import-bad", [ADMIN_GROUP])),
+      payload: { strategy: "magic" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("PATCH /admin/import-settings is forbidden for non-admins", async () => {
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/admin/import-settings",
+      headers: auth(await token("plain-import")),
+      payload: { strategy: "vision_only" },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("PATCH /admin/import-settings records an audit log entry", async () => {
+    const t = await token("admin-import-audit", [ADMIN_GROUP]);
+    await app.inject({
+      method: "PATCH",
+      url: "/admin/import-settings",
+      headers: auth(t),
+      payload: { strategy: "vision_only" },
+    });
+    const auditRes = await app.inject({
+      method: "GET",
+      url: "/admin/audit",
+      headers: auth(t),
+    });
+    const log = auditRes.json() as { action: string; target: string }[];
+    const entry = log.find(
+      (e) => e.action === "update_import_settings" && e.target === "vision_only",
+    );
+    expect(entry).toBeDefined();
+    // Restore default.
+    await app.inject({
+      method: "PATCH",
+      url: "/admin/import-settings",
+      headers: auth(t),
+      payload: { strategy: "parser_first" },
+    });
+  });
 });
