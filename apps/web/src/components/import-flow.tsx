@@ -855,7 +855,7 @@ export function ImportFlow({
               {t("done.again")}
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/import">{t("done.history")}</Link>
+              <Link href="/transactions">{t("done.history")}</Link>
             </Button>
           </CardContent>
         </Card>

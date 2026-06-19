@@ -9,7 +9,6 @@ import {
   ScrollText,
   Coins,
   PiggyBank,
-  ScanLine,
   Briefcase,
   Settings,
   ShieldCheck,
@@ -34,7 +33,6 @@ const NAV = [
   { href: "/trades", icon: ScrollText, key: "trades" },
   { href: "/income", icon: Coins, key: "income" },
   { href: "/savings", icon: PiggyBank, key: "savings" },
-  { href: "/import", icon: ScanLine, key: "import" },
   { href: "/portfolios", icon: Briefcase, key: "portfolios" },
   { href: "/settings", icon: Settings, key: "settings" },
 ] as const;

@@ -42,7 +42,7 @@
     {
       "name": "Import screenshot",
       "short_name": "Import",
-      "url": "/import",
+      "url": "/transactions?import=1",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {

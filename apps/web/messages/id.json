@@ -27,7 +27,6 @@
     "transactions": "Transaksi",
     "income": "Pendapatan",
     "savings": "Tabungan",
-    "import": "Riwayat impor",
     "portfolios": "Portofolio",
     "settings": "Pengaturan",
     "admin": "Admin",
@@ -394,8 +393,6 @@
     }
   },
   "ImportHistory": {
-    "pageTitle": "Riwayat impor",
-    "pageSubtitle": "Semua impor sebelumnya — tinjau draf atau buang di sini.",
     "title": "Impor terakhir",
     "items": "{count, plural, other {# item}}",
     "review": "Tinjau",
@@ -444,9 +441,7 @@
     "historyTitle": "Segera dengan pelacakan harga",
     "historyBody": "Riwayat kinerja muncul setelah harga harian dikumpulkan.",
     "noMoversTitle": "Belum ada pergerakan harga",
-    "noMoversBody": "Perubahan harian muncul setelah harga langsung diperbarui untuk kepemilikan Anda.",
-    "noImportsTitle": "Belum ada impor",
-    "noImportsBody": "Gunakan opsi Impor berkas di halaman Transaksi untuk memulai."
+    "noMoversBody": "Perubahan harian muncul setelah harga langsung diperbarui untuk kepemilikan Anda."
   },
   "Gold": {
     "title": "Harga emas",

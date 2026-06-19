@@ -58,13 +58,13 @@ describe("DraftReviewClient", () => {
     await waitFor(() =>
       expect(confirmImport).toHaveBeenCalledWith("imp1", [DRAFT]),
     );
-    expect(push).toHaveBeenCalledWith("/import");
+    expect(push).toHaveBeenCalledWith("/transactions");
   });
 
   it("discards the import and returns to the import page", async () => {
     renderClient();
     fireEvent.click(screen.getByRole("button", { name: messages.Import.discard }));
     await waitFor(() => expect(discardImport).toHaveBeenCalledWith("imp1"));
-    expect(push).toHaveBeenCalledWith("/import");
+    expect(push).toHaveBeenCalledWith("/transactions");
   });
 });

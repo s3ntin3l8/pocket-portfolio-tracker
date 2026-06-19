@@ -8,9 +8,11 @@ import {
 } from "@/components/transactions-table";
 import { ExportCsvButton } from "@/components/export-csv-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
+import { RecentImportsSection } from "@/components/recent-imports-section";
 import { Link } from "@/i18n/navigation";
 import {
   getSelectedPortfolioId,
+  loadImports,
   loadPortfolio,
   loadTransactionsAcrossPortfolios,
 } from "@/lib/server-api";
@@ -50,6 +52,13 @@ export default async function TransactionsPage({
 
   // Newest first.
   rows = [...rows].sort((a, b) => b.executedAt.localeCompare(a.executedAt));
+
+  // Import history is embedded here (the standalone /import route was retired). Shown as
+  // a collapsed section whenever any imports exist — including for a portfolio that has
+  // only pending drafts and no confirmed transactions yet.
+  const imports = await loadImports();
+  const importsSection =
+    imports.length > 0 ? <RecentImportsSection items={imports} /> : null;
 
   // Plain-data CSV of the visible transactions (built client-side on click).
   const exportHeaders = [
@@ -134,6 +143,7 @@ export default async function TransactionsPage({
             )
           }
         />
+        {importsSection}
       </div>
     );
   }
@@ -146,6 +156,7 @@ export default async function TransactionsPage({
         showPortfolio={aggregate}
         defaultInvestmentsOnly={defaultInvestmentsOnly}
       />
+      {importsSection}
     </div>
   );
 }

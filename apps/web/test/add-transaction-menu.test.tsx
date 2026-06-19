@@ -1,11 +1,19 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { forwardRef } from "react";
 import messages from "../messages/en.json";
 
-// Mock i18n navigation: render Link as an anchor that forwards ref + the props Radix's
-// `asChild` Slot injects (role, tabindex…) so roving focus can find the menu items.
+const search = { value: "" };
+
+// next/navigation's useSearchParams drives the auto-open effect.
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(search.value),
+}));
+
+// Render Link as an anchor that forwards ref + the props Radix's `asChild` Slot injects
+// (role, tabindex…) so roving focus can find the menu items.
+const replace = vi.fn();
 vi.mock("@/i18n/navigation", () => ({
   Link: forwardRef<HTMLAnchorElement, React.ComponentPropsWithoutRef<"a">>(
     function Link({ children, ...props }, ref) {
@@ -16,14 +24,17 @@ vi.mock("@/i18n/navigation", () => ({
       );
     },
   ),
-  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ replace }),
   usePathname: () => "/transactions",
 }));
 
-// The menu calls useApiClient() at render; the import sheet (closed by default) never
-// mounts, so a stub client is enough.
 vi.mock("@/lib/api", () => ({
   useApiClient: () => ({ listPortfolios: vi.fn(async () => []) }),
+}));
+
+// Stub the heavy import flow — we only assert the sheet opens.
+vi.mock("@/components/import-flow-client", () => ({
+  ImportFlowClient: () => <div data-testid="import-flow" />,
 }));
 
 import { AddTransactionMenu } from "../src/components/add-transaction-menu";
@@ -46,6 +57,11 @@ function openMenu() {
 }
 
 describe("AddTransactionMenu", () => {
+  beforeEach(() => {
+    search.value = "";
+    replace.mockClear();
+  });
+
   it("offers manual entry, import, and a corporate-action shortcut", () => {
     renderMenu();
     openMenu();
@@ -66,5 +82,34 @@ describe("AddTransactionMenu", () => {
       "href",
       "/corporate-actions/new",
     );
+  });
+
+  it("keeps the import sheet closed without a share/import param", () => {
+    renderMenu();
+    expect(
+      screen.queryByRole("dialog", { name: messages.Import.title }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("auto-opens the import sheet on ?import=1 and clears the flag", async () => {
+    search.value = "import=1";
+    renderMenu();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("dialog", { name: messages.Import.title }),
+      ).toBeInTheDocument(),
+    );
+    expect(replace).toHaveBeenCalledWith("/transactions");
+  });
+
+  it("auto-opens on ?shared=1 but leaves the param for ImportFlowClient", async () => {
+    search.value = "shared=1";
+    renderMenu();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("dialog", { name: messages.Import.title }),
+      ).toBeInTheDocument(),
+    );
+    expect(replace).not.toHaveBeenCalled();
   });
 });

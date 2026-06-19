@@ -113,7 +113,7 @@ describe("ImportHistory", () => {
   it("links a draft import to its review page", () => {
     renderHistory();
     const link = screen.getByRole("link", { name: m.review });
-    expect(link).toHaveAttribute("href", "/import/draft1");
+    expect(link).toHaveAttribute("href", "/transactions/import/draft1");
   });
 
   it("undoes a confirmed import only after the two-step confirm", async () => {
