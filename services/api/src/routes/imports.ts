@@ -24,6 +24,7 @@ import { detectDkbPdf, parseDkbPdf } from "../services/parsers/dkb-pdf.js";
 import { extractPdfText } from "../services/parsers/pdf-text.js";
 import { parseIbkr } from "../services/parsers/ibkr.js";
 import { parseCoinbase } from "../services/parsers/coinbase.js";
+import { parseTrCsv } from "../services/parsers/tr-csv.js";
 import { detectCsvFormat } from "../services/parsers/detect.js";
 import { assignContentExternalIds, shortHash } from "../services/parsers/hash.js";
 import {
@@ -38,9 +39,9 @@ const csvBodySchema = z.object({
   content: z.string().min(1),
   // `auto` sniffs the content (default); otherwise force a specific parser: `dkb`
   // (German DKB depot/Girokonto), `ibkr` (Interactive Brokers Flex Trades), `coinbase`,
-  // or `generic` (the simple column CSV).
+  // `tr-csv` (Trade Republic transaction export), or `generic` (the simple column CSV).
   format: z
-    .enum(["auto", "generic", "dkb", "ibkr", "coinbase"])
+    .enum(["auto", "generic", "dkb", "ibkr", "coinbase", "tr-csv"])
     .default("auto"),
 });
 
@@ -48,12 +49,17 @@ const CSV_PARSERS = {
   dkb: parseDkb,
   ibkr: parseIbkr,
   coinbase: parseCoinbase,
+  "tr-csv": parseTrCsv,
   generic: parseCsv,
 } as const;
 
-// How a resolved format maps to the stored `parser` tag (DKB keeps its own; the
-// broker presets are all CSV-sourced).
-const PARSER_TAG: Record<string, "dkb" | "csv"> = { dkb: "dkb" };
+// How a resolved format maps to the stored `parser` tag (DKB keeps its own; Trade
+// Republic keeps its own so confirm resolves ISINs as an EU broker; the rest are the
+// generic CSV source).
+const PARSER_TAG: Record<string, "dkb" | "csv" | "tr-csv"> = {
+  dkb: "dkb",
+  "tr-csv": "tr-csv",
+};
 /** Accepted MIME types for screenshot/PDF imports. */
 function isAcceptedMime(mimeType: string): boolean {
   return mimeType.startsWith("image/") || mimeType === "application/pdf";
@@ -570,14 +576,18 @@ export async function importsRoute(app: FastifyInstance) {
       }
       const isDkb = imp.parser === "dkb";
       const isPytr = imp.parser === "pytr";
-      // pytr is its own source; DKB exports are CSV too; otherwise a screenshot.
+      // The Trade Republic CSV export is an offline ingestion of the same TR account: it
+      // resolves ISINs like the pytr path, but is a connectionless one-shot import, so it
+      // stays `source="csv"` (not the pytr collector / resolved-events branch).
+      const isTrCsv = imp.parser === "tr-csv";
+      // pytr is its own source; DKB and TR-CSV exports are CSV too; otherwise a screenshot.
       const source = isPytr
         ? "pytr"
-        : imp.parser === "csv" || isDkb
+        : imp.parser === "csv" || isDkb || isTrCsv
           ? "csv"
           : "screenshot";
       // DKB and Trade Republic are both EU/ISIN brokers — identical instrument resolution.
-      const isEu = isDkb || isPytr;
+      const isEu = isDkb || isPytr || isTrCsv;
 
       request.log.info(
         { importId: imp.id, parser: imp.parser, source, txDrafts: drafts.length, contracts: contracts.length },

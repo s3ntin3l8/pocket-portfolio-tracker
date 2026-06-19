@@ -21,11 +21,13 @@ describe("mapTrEventToDraft", () => {
       amount: -1000,
       shares: 10,
       isin: "DE0007236101",
+      wkn: "723610",
       title: "Siemens",
     });
     expect(buy).toMatchObject({
       action: "buy",
       isin: "DE0007236101",
+      wkn: "723610",
       quantity: "10",
       price: "100",
       fees: "0",

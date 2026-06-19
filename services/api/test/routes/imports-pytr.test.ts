@@ -206,6 +206,14 @@ describe("pytr import → confirm", () => {
     expect(inst).toMatchObject({ market: "XETRA", currency: "EUR" });
   });
 
+  it("carries the WKN (sourced from TR's instrument detail) onto the instrument", async () => {
+    const inst = await confirmDraftInstrument(
+      await token("tr-wkn"),
+      securityDraft({ isin: "IE00BK5BQT80", wkn: "A2PKXG", name: "Vanguard FTSE All-World", externalId: "wkn-1" }),
+    );
+    expect(inst).toMatchObject({ isin: "IE00BK5BQT80", wkn: "A2PKXG", market: "XETRA" });
+  });
+
   it("persists detail enrichment (tax, executedPrice, fxRate, kind, docs) on the transaction", async () => {
     const t = await token("pytr-enrich");
     const portfolioId = (

@@ -1,0 +1,7 @@
+# Test-only deps for the vendored pytr entrypoints. NOT installed in the Docker image
+# (production only needs requirements.txt). Used to run the tr_export.py extraction tests
+# locally and in CI. tr_export imports pytr lazily inside main(), and the tests only
+# `import tr_export` (stdlib at module load) — so the tests need pytest alone, not pytr.
+# Install with:
+#   .venv-pytr/bin/pip install -r services/api/python/requirements-dev.txt
+pytest==8.3.4

@@ -14,6 +14,7 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:py": "../../.venv-pytr/bin/python -m pytest python",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts",

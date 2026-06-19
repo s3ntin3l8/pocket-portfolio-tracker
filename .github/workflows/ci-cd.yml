@@ -20,10 +20,28 @@ jobs:
       coverage-fail-under: "70"
     secrets: inherit
 
+  test-python:
+    # The Trade Republic sync's detail extraction lives in vendored Python
+    # (services/api/python/tr_export.py); its unit tests run under pytest, which the
+    # Node reusable workflow doesn't cover. tr_export imports pytr lazily, so the tests
+    # need only pytest (not the full requirements.txt / pytr).
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test deps
+        run: pip install -r services/api/python/requirements-dev.txt
+      - name: Run pytest
+        run: python -m pytest services/api/python
+
   build-docker:
-    needs: [test-node]
+    needs: [test-node, test-python]
     # Only build/publish the image when something lands on main. PRs are validated by
-    # the cheap test-node job alone; there's no need to run the slow multi-arch Docker
+    # the cheap test jobs alone; there's no need to run the slow multi-arch Docker
     # build (and nothing to publish) on every PR commit. Policy lives here in the
     # caller, not the shared reusable workflow, so other repos can still build on PRs.
     if: ${{ github.event_name == 'push' }}
