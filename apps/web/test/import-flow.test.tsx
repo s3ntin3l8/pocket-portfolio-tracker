@@ -36,7 +36,12 @@ const DRAFT_B: ImportDraft = {
 
 function renderFlow(
   client: ImportClient,
-  portfolios: { id: string; name: string }[] = [{ id: "p1", name: "Main" }],
+  portfolios: {
+    id: string;
+    name: string;
+    brokerage: string | null;
+    accountHolder: string | null;
+  }[] = [{ id: "p1", name: "Main", brokerage: null, accountHolder: null }],
 ) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -182,8 +187,8 @@ describe("ImportFlow", () => {
       confirmImport: vi.fn(async () => ({ confirmed: 1 })),
     };
     const { container } = renderFlow(client, [
-      { id: "p1", name: "Main" },
-      { id: "p2", name: "DKB" },
+      { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+      { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
     ]);
 
     // Portfolio is NOT selected before upload — picker is now on the review step.
@@ -198,10 +203,13 @@ describe("ImportFlow", () => {
     // Upload call has NO portfolioId in the new upload-first flow.
     expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "auto");
 
-    // The portfolio picker is now shown on the review step.
-    fireEvent.change(screen.getByLabelText(messages.Import.targetPortfolio), {
-      target: { value: "p2" },
-    });
+    // The portfolio picker (rich Radix dropdown) is now shown on the review step.
+    // Radix opens on Enter under jsdom, then a menuitem click selects.
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: messages.Import.targetPortfolio }),
+      { key: "Enter" },
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: /DKB/ }));
 
     fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
     await waitFor(() =>
@@ -209,6 +217,48 @@ describe("ImportFlow", () => {
     );
     // Confirm carries the selected portfolio.
     expect(client.confirmImport).toHaveBeenCalledWith("imp4", [DRAFT], [], "p2", false);
+  });
+
+  it("maps an unrecognised-type issue into a draft and confirms it (TR CSV flag-for-review)", async () => {
+    const confirmImport = vi.fn(async () => ({ confirmed: 2 }));
+    const client: ImportClient = {
+      importScreenshot: vi.fn(),
+      importCsv: vi.fn(async () => ({
+        importId: "imp6",
+        drafts: [DRAFT],
+        // An unrecognised Trade Republic row surfaced as a mappable attention issue.
+        errors: [
+          {
+            eventId: "tr-csv:ev-1",
+            eventType: "KINDERGELD_BONUS",
+            severity: "attention" as const,
+            message: "unsupported Trade Republic type: KINDERGELD_BONUS — review to map manually",
+            raw: { name: "Kindergeld bonus", currency: "EUR", executedAt: "2026-02-01", amount: 5, shares: null },
+          },
+        ],
+      })),
+      confirmImport,
+    };
+    const { container } = renderFlow(client);
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: messages.Import.tabs.csv }));
+    fireEvent.change(fileInput(container), { target: { files: [csvFile("tr.csv")] } });
+
+    // The issue lands as a mappable row in the review table (its raw name is shown).
+    await waitFor(() => expect(screen.getByText("Kindergeld bonus")).toBeInTheDocument());
+
+    // Map it into a draft via the row Map button + dialog Save.
+    fireEvent.click(screen.getByRole("button", { name: messages.Import.review.issues.map }));
+    fireEvent.click(screen.getByRole("button", { name: messages.Import.review.issues.mapSave }));
+
+    // Confirm now carries BOTH the original draft and the mapped issue (externalId = eventId).
+    fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
+    await waitFor(() =>
+      expect(screen.getByText(messages.Import.done.title)).toBeInTheDocument(),
+    );
+    const drafts = (confirmImport.mock.calls[0] as unknown[])[1] as ImportDraft[];
+    expect(drafts).toHaveLength(2);
+    expect(drafts[1]).toMatchObject({ externalId: "tr-csv:ev-1", name: "Kindergeld bonus" });
   });
 
   it("auto-parses a screenshot handed in via initialFile (share target)", async () => {
@@ -225,7 +275,7 @@ describe("ImportFlow", () => {
       <NextIntlClientProvider locale="en" messages={messages}>
         <ImportFlow
           client={client}
-          portfolios={[{ id: "p1", name: "Main" }]}
+          portfolios={[{ id: "p1", name: "Main", brokerage: null, accountHolder: null }]}
           defaultPortfolioId="p1"
           initialFile={pngFile()}
         />
@@ -541,8 +591,8 @@ describe("ImportFlow", () => {
       confirmImport: vi.fn(async () => ({ confirmed: 1 })),
     };
     renderFlow(client, [
-      { id: "p1", name: "Main" },
-      { id: "p2", name: "Other" },
+      { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+      { id: "p2", name: "Other", brokerage: null, accountHolder: null },
     ]);
 
     fireEvent.change(fileInput(document.body), { target: { files: [pngFile()] } });

@@ -17,6 +17,7 @@ import { Link } from "@/i18n/navigation";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PortfolioPicker } from "@/components/portfolio-picker";
 import type { AccountMismatch, ImportIssue, LikelyDuplicate } from "@portfolio/api-client";
 import { accountMismatchFromError } from "@portfolio/api-client";
 import { cn } from "@/lib/utils";
@@ -144,6 +145,8 @@ type CsvFormat = "auto" | "generic" | "dkb" | "ibkr" | "coinbase";
 export interface ImportTargetPortfolio {
   id: string;
   name: string;
+  brokerage: string | null;
+  accountHolder: string | null;
 }
 
 const STEPS: Step[] = ["upload", "review", "done"];
@@ -212,7 +215,7 @@ type GroupMap = Map<string, string>;
 
 export function ImportFlow({
   client = demoClient,
-  portfolios = [{ id: "demo", name: "Demo" }],
+  portfolios = [{ id: "demo", name: "Demo", brokerage: null, accountHolder: null }],
   defaultPortfolioId,
   initialFile,
 }: {
@@ -439,6 +442,26 @@ export function ImportFlow({
   function removeMany(uids: string[]) {
     const set = new Set(uids);
     setDrafts((ds) => ds.filter((d) => !set.has(d.uid)));
+  }
+
+  // Promote an "attention" issue (e.g. an unrecognised Trade Republic CSV row) into a draft
+  // the user just completed in the map editor, then drop it from that import's issue list.
+  // The owning import is the one whose issues contain this eventId (single-group → importId).
+  function mapIssue(eventId: string, draft: ImportDraft) {
+    let owner = importId;
+    for (const [iid, list] of issueMap) {
+      if (list.some((i) => i.eventId === eventId)) {
+        owner = iid;
+        break;
+      }
+    }
+    setDrafts((ds) => [...ds, withUid(draft, owner)]);
+    setIssueMap((m) => {
+      const next = new Map(m);
+      const list = next.get(owner);
+      if (list) next.set(owner, list.filter((i) => i.eventId !== eventId));
+      return next;
+    });
   }
 
   function updateContract(index: number, patch: Partial<ImportContract>) {
@@ -773,20 +796,16 @@ export function ImportFlow({
             <>
               {portfolios.length > 1 && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="import-portfolio">{t("targetPortfolio")}</Label>
-                  <Select
-                    id="import-portfolio"
+                  <Label>{t("targetPortfolio")}</Label>
+                  <PortfolioPicker
+                    portfolios={portfolios}
                     value={portfolioByImport.get(importId) ?? portfolios[0]?.id ?? ""}
-                    onChange={(e) =>
-                      setPortfolioByImport(new Map([[importId, e.target.value]]))
+                    onChange={(id) =>
+                      setPortfolioByImport(new Map([[importId, id]]))
                     }
-                  >
-                    {portfolios.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
+                    ariaLabel={t("targetPortfolio")}
+                    triggerClassName="w-full"
+                  />
                 </div>
               )}
               <ImportReview
@@ -797,6 +816,7 @@ export function ImportFlow({
                 onConfirm={confirm}
                 onDiscard={reset}
                 issues={issueMap.get(importId) ?? []}
+                onMapIssue={mapIssue}
               />
             </>
           )}
@@ -810,6 +830,7 @@ export function ImportFlow({
               onRemoveMany={removeMany}
               onConfirm={confirm}
               onDiscard={reset}
+              onMapIssue={mapIssue}
               groups={reviewGroups}
               portfolios={portfolios.length > 1 ? portfolios : undefined}
               portfolioByImport={portfolioByImport}

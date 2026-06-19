@@ -96,6 +96,8 @@ function decodeName(s: string): string {
  * Parse a Trade Republic transaction-export CSV into draft transactions. Each recognised
  * row becomes a draft (confidence 1); rows of a recognised-but-unmappable type, and rows
  * missing required figures, are collected as errors rather than failing the whole import.
+ * Rows of an *unrecognised* type become "attention" issues the user can map manually in
+ * the review screen — never silently dropped.
  */
 export function parseTrCsv(content: string): CsvParseResult {
   const stripped = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
@@ -254,7 +256,27 @@ export function parseTrCsv(content: string): CsvParseResult {
       fail(`${type}: ${UNSUPPORTED.get(type)}`);
       continue;
     } else {
-      fail(`unsupported Trade Republic type: ${type || "(blank)"}`);
+      // An unrecognised type — don't guess its economics, but don't discard it either.
+      // Surface it as a mappable "attention" issue so the user can turn it into the right
+      // transaction in the review screen (reusing the Trade Republic map-issue editor).
+      // `eventId` mirrors the `tr-csv:${txId}` externalId convention so a mapped row dedups
+      // consistently with the rows we parsed directly; a blank txId gets a stable row id.
+      const txId = get(cols.txId).trim();
+      errors.push({
+        line: i + 1,
+        severity: "attention",
+        eventId: txId ? `tr-csv:${txId}` : `tr-csv:row-${i}`,
+        eventType: type || "(blank)",
+        message: `unsupported Trade Republic type: ${type || "(blank)"} — review to map manually`,
+        raw: {
+          isin: isin ?? null,
+          name: name ?? null,
+          currency: base.currency,
+          executedAt: base.executedAt || null,
+          amount,
+          shares,
+        },
+      });
       continue;
     }
 

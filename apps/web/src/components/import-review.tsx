@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PortfolioPicker } from "@/components/portfolio-picker";
 import {
   Dialog,
   DialogContent,
@@ -84,6 +85,8 @@ export interface ImportReviewGroup {
 export interface ImportTargetPortfolio {
   id: string;
   name: string;
+  brokerage: string | null;
+  accountHolder: string | null;
 }
 
 export interface ImportReviewProps {
@@ -257,12 +260,14 @@ export function ImportReview({
     });
   }
 
+  // Some drafts carry no asset class (cash legs: interest, deposit, withdrawal) — drop the
+  // blanks so the filter chips don't render an empty pill with a `key={undefined}` clash.
   const assetClasses = useMemo(
-    () => [...new Set(drafts.map((d) => d.assetClass))].sort(),
+    () => [...new Set(drafts.map((d) => d.assetClass).filter(Boolean))].sort(),
     [drafts],
   );
   const actions = useMemo(
-    () => [...new Set(drafts.map((d) => d.action))].sort(),
+    () => [...new Set(drafts.map((d) => d.action).filter(Boolean))].sort(),
     [drafts],
   );
 
@@ -771,24 +776,17 @@ export function ImportReview({
                               ({groupView.length + groupIssueRows.length})
                             </span>
                             {portfolios && portfolios.length > 1 && onPortfolioChange && (
-                              <Select
-                                aria-label={t("group.portfolio")}
+                              <PortfolioPicker
+                                ariaLabel={t("group.portfolio")}
+                                portfolios={portfolios}
                                 value={
                                   portfolioByImport?.get(g.importId) ??
                                   portfolios[0]?.id ??
                                   ""
                                 }
-                                onChange={(e) =>
-                                  onPortfolioChange(g.importId, e.target.value)
-                                }
-                                className="ml-auto h-7 w-auto text-xs"
-                              >
-                                {portfolios.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.name}
-                                  </option>
-                                ))}
-                              </Select>
+                                onChange={(id) => onPortfolioChange(g.importId, id)}
+                                triggerClassName="ml-auto h-7 w-auto text-xs"
+                              />
                             )}
                           </div>
                         </TableCell>
@@ -876,20 +874,15 @@ export function ImportReview({
                       </span>
                     </button>
                     {portfolios && portfolios.length > 1 && onPortfolioChange && (
-                      <Select
-                        aria-label={t("group.portfolio")}
+                      <PortfolioPicker
+                        ariaLabel={t("group.portfolio")}
+                        portfolios={portfolios}
                         value={
                           portfolioByImport?.get(g.importId) ?? portfolios[0]?.id ?? ""
                         }
-                        onChange={(e) => onPortfolioChange(g.importId, e.target.value)}
-                        className="h-7 w-auto text-xs"
-                      >
-                        {portfolios.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </Select>
+                        onChange={(id) => onPortfolioChange(g.importId, id)}
+                        triggerClassName="h-7 w-auto text-xs"
+                      />
                     )}
                   </div>
                   {!isCollapsed && groupView.map((d) => mobileDraftCard(d))}

@@ -28,7 +28,12 @@ export function AddTransactionMenu() {
   async function openImport() {
     if (portfolios === null) {
       const fetched = await api.listPortfolios();
-      const mapped = fetched.map((p) => ({ id: p.id, name: p.name }));
+      const mapped = fetched.map((p) => ({
+        id: p.id,
+        name: p.name,
+        brokerage: p.brokerage,
+        accountHolder: p.accountHolder,
+      }));
       setPortfolios(mapped);
       setDefaultPortfolioId(mapped[0]?.id ?? "");
     }

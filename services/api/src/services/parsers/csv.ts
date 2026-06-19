@@ -2,9 +2,34 @@ import { parsedTransactionSchema, type ParsedTransaction } from "@portfolio/sche
 
 // Expected header (order-independent):
 //   date,action,assetClass,ticker,name,quantity,unit,price,fees,currency
+
+/**
+ * A rejected / not-directly-mappable row surfaced to the user instead of being silently
+ * dropped. A bare `{ line, message }` renders as an ignorable note in the review screen.
+ * Adding `severity: "attention"` + a truthy `eventId` + `eventType` (and ideally `raw`)
+ * promotes it to a *mappable* row — the user can turn it into a transaction via the same
+ * map-issue editor used for Trade Republic sync issues. Structurally a superset of
+ * `@portfolio/schema`'s `ImportIssue`, so it flows over the wire unchanged.
+ */
+export interface CsvParseIssue {
+  line?: number;
+  message: string;
+  severity?: "info" | "attention";
+  eventId?: string;
+  eventType?: string;
+  raw?: {
+    isin?: string | null;
+    name?: string | null;
+    currency?: string | null;
+    executedAt?: string | null;
+    amount?: number | null;
+    shares?: number | null;
+  };
+}
+
 export interface CsvParseResult {
   drafts: ParsedTransaction[];
-  errors: { line: number; message: string }[];
+  errors: CsvParseIssue[];
   /**
    * Account identifier embedded in the file (IBAN / depot number), when the format
    * exposes one. Used for portfolio auto-detect and the account-mismatch warning.

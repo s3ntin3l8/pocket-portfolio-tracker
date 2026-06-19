@@ -96,15 +96,30 @@ describe("parseTrCsv", () => {
   const byId = new Map(drafts.map((d) => [d.externalId, d]));
   const draft = (n: number) => byId.get(`tr-csv:${id(n)}`);
 
-  it("maps 15 representable rows to drafts and surfaces 4 unmappable rows as errors", () => {
+  it("maps 15 representable rows to drafts and surfaces 4 unmappable rows as issues", () => {
     expect(drafts).toHaveLength(15);
     expect(errors).toHaveLength(4);
     expect(errors.map((e) => e.message)).toEqual([
       expect.stringContaining("TAX_OPTIMIZATION"),
       expect.stringContaining("SEC_ACCOUNT"),
       expect.stringContaining("DIVIDEND_OPTION_CANCELLED"),
-      "unsupported Trade Republic type: MYSTERY_EVENT",
+      expect.stringContaining("unsupported Trade Republic type: MYSTERY_EVENT"),
     ]);
+  });
+
+  it("surfaces an unrecognised type as a MAPPABLE attention issue, not a dead error", () => {
+    // The three recognised-but-unmappable rows stay as ignorable notes (no eventId);
+    // the unknown MYSTERY_EVENT becomes an attention issue the user can map to a draft.
+    const mystery = errors.find((e) => e.eventType === "MYSTERY_EVENT");
+    expect(mystery).toMatchObject({
+      severity: "attention",
+      eventId: `tr-csv:${id(19)}`, // mirrors the externalId convention so a mapped row dedups
+      eventType: "MYSTERY_EVENT",
+    });
+    // Carries the source fields so the map editor can seed a draft.
+    expect(mystery?.raw).toMatchObject({ currency: "EUR", amount: 1 });
+    // The recognised-but-unmappable rows are NOT promoted to mappable.
+    expect(errors.filter((e) => e.severity === "attention")).toHaveLength(1);
   });
 
   it("maps a cash deposit (quote-aware splitting survives the comma in description)", () => {
