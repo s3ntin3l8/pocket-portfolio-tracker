@@ -239,6 +239,7 @@
   "Import": {
     "title": "Import transactions",
     "subtitle": "Upload a screenshot or CSV — review the draft, then confirm.",
+    "reImportAnyway": "Re-import anyway",
     "steps": {
       "upload": "Upload",
       "review": "Review",
@@ -395,7 +396,7 @@
       "tooLarge": "That file is too large (max 25 MB). Please compress it and try again.",
       "fileRead": "Couldn't read that file. Please try again.",
       "noDrafts": "No transactions were found in that file.",
-      "alreadyConfirmed": "This file was already imported and confirmed.",
+      "alreadyConfirmed": "This file was already imported and confirmed. Re-import it if you've since deleted some of those transactions.",
       "generic": "Something went wrong. Please try again."
     }
   },
@@ -421,7 +422,10 @@
     },
     "importedBanner": "{count, plural, one {# transaction imported} other {# transactions imported}}",
     "clear": "Clear",
-    "clearAll": "Clear all discarded"
+    "clearAll": "Clear all discarded",
+    "showCompleted": "Show completed ({count})",
+    "hideCompleted": "Hide completed",
+    "onlyCompleted": "{count, plural, one {# completed import hidden} other {# completed imports hidden}}"
   },
   "Dashboard": {
     "title": "Dashboard",

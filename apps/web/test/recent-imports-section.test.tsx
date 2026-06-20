@@ -65,6 +65,11 @@ describe("RecentImportsSection", () => {
     fireEvent.click(toggle);
 
     expect(screen.getByRole("button", { expanded: true })).toBeInTheDocument();
+    // Confirmed imports are hidden by default within the history — reveal them to act.
+    expect(
+      screen.queryByRole("button", { name: messages.ImportHistory.undo }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
     expect(
       screen.getByRole("button", { name: messages.ImportHistory.undo }),
     ).toBeInTheDocument();

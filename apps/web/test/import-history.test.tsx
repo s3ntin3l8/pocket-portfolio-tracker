@@ -120,6 +120,8 @@ describe("ImportHistory", () => {
 
   it("undoes a confirmed import only after the two-step confirm", async () => {
     renderHistory();
+    // Confirmed imports are hidden by default — reveal them first.
+    fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
     // First click reveals the warning + destructive confirm; nothing removed yet.
     fireEvent.click(screen.getByRole("button", { name: m.undo }));
     expect(deleteImport).not.toHaveBeenCalled();
@@ -144,6 +146,8 @@ describe("ImportHistory", () => {
         <ImportHistory items={threeItems} />
       </NextIntlClientProvider>,
     );
+    // All three are confirmed (hidden by default) — reveal them first.
+    fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
     // Default: pytr(10), csv(1), dkb(5)
     fireEvent.click(screen.getByRole("button", { name: /items/i }));
     const rows = screen.getAllByRole("row").slice(1);
@@ -159,6 +163,7 @@ describe("ImportHistory", () => {
         <ImportHistory items={threeItems} />
       </NextIntlClientProvider>,
     );
+    fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
     fireEvent.click(screen.getByRole("button", { name: /parser/i }));
     const rows = screen.getAllByRole("row").slice(1);
     // asc: csv, dkb, pytr
@@ -209,6 +214,39 @@ describe("ImportHistory", () => {
   it("hides Clear all discarded when no discarded rows exist", () => {
     renderHistory();
     expect(screen.queryByRole("button", { name: m.clearAll })).not.toBeInTheDocument();
+  });
+
+  it("hides confirmed imports by default and reveals them via the toggle", () => {
+    renderHistory();
+    // The confirmed row (dkb) is hidden; the draft (csv) is visible.
+    expect(screen.queryByText("dkb")).not.toBeInTheDocument();
+    expect(screen.getByText("csv")).toBeInTheDocument();
+    // Toggle reveals it.
+    fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
+    expect(screen.getByText("dkb")).toBeInTheDocument();
+    // And hides it again.
+    fireEvent.click(screen.getByRole("button", { name: m.hideCompleted }));
+    expect(screen.queryByText("dkb")).not.toBeInTheDocument();
+  });
+
+  it("shows an 'all completed hidden' hint when only confirmed imports exist", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory items={threeItems} />
+      </NextIntlClientProvider>,
+    );
+    // No rows visible by default; a hint explains the hidden completed imports.
+    expect(screen.getByText(/3 completed imports hidden/)).toBeInTheDocument();
+    expect(screen.queryByText("pytr")).not.toBeInTheDocument();
+  });
+
+  it("does not render the completed toggle when no confirmed imports exist", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory items={[discardedItem]} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByRole("button", { name: /Show completed/ })).not.toBeInTheDocument();
   });
 
   it("clears all discarded imports via the header button", async () => {
