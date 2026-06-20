@@ -231,12 +231,19 @@ describe("parseDkb — Girokonto Umsatzliste, hand-curated / transliterated rows
   it("extracts the ISIN from a collapsed-spacing row (glued to the next word)", () => {
     const collapsed = drafts.find((d) => d.quantity === "3.8331");
     expect(collapsed).toMatchObject({
-      action: "buy",
+      action: "savings_plan",
       isin: "LU1737652583",
       quantity: "3.8331",
       price: "45.32390000",
       total: "173.73",
     });
+  });
+
+  it("classifies the older 'Fondssparplan' label as a savings plan (not a one-off buy)", () => {
+    // DKB renamed the label "Fondssparplan" → "Wertpapier-Sparplan" mid-2025; pre-rename
+    // rows must still map to savings_plan. The collapsed row 'Ihr FondssparplanPreis' is one.
+    const sp = drafts.find((d) => d.quantity === "3.8331");
+    expect(sp?.action).toBe("savings_plan");
   });
 
   it("derives the price from the settlement amount when 'Preis' is absent", () => {
