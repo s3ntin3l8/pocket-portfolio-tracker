@@ -63,10 +63,10 @@ export function ImportFlowClient({
   }, []);
 
   const client: ImportClient = {
-    importScreenshot: (file) =>
-      api.importScreenshot(file) as unknown as Promise<ImportResult>,
-    importCsv: (content, format) =>
-      api.importCsv(content, format) as unknown as Promise<ImportResult>,
+    importScreenshot: (file, force) =>
+      api.importScreenshot(file, force) as unknown as Promise<ImportResult>,
+    importCsv: (content, format, force) =>
+      api.importCsv(content, format, force) as unknown as Promise<ImportResult>,
     confirmImport: async (
       importId,
       drafts,

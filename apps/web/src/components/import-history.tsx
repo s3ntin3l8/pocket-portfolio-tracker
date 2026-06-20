@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Eye, Loader2, Trash2, Undo2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Trash2, Undo2 } from "lucide-react";
 import type { ImportRecord } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,9 @@ export function ImportHistory({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
+  // Completed (confirmed) imports are an audit trail, not an action queue — hide them by
+  // default so the list surfaces only what still needs attention, with a toggle to reveal.
+  const [showCompleted, setShowCompleted] = useState(false);
 
   async function discard(id: string) {
     setBusyId(id);
@@ -97,6 +100,12 @@ export function ImportHistory({
   }
 
   const discardedIds = items.filter((i) => i.status === "discarded").map((i) => i.id);
+  const confirmedCount = items.filter((i) => i.status === "confirmed").length;
+  // Hide confirmed rows unless the user opted to show them. Drafts (actionable) and
+  // discarded (still have a Clear action) always stay visible.
+  const visibleItems = showCompleted
+    ? items
+    : items.filter((i) => i.status !== "confirmed");
 
   async function clearAllDiscarded() {
     setClearingAll(true);
@@ -110,24 +119,43 @@ export function ImportHistory({
 
   return (
     <Card>
-      {(showTitle || discardedIds.length > 0) && (
-        <CardHeader className="flex flex-row items-center justify-between">
+      {(showTitle || discardedIds.length > 0 || confirmedCount > 0) && (
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           {showTitle ? <CardTitle>{t("title")}</CardTitle> : <span />}
-          {discardedIds.length > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={clearingAll}
-              onClick={clearAllDiscarded}
-            >
-              {clearingAll ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="size-3.5" />
-              )}
-              {t("clearAll")}
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {confirmedCount > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-pressed={showCompleted}
+                onClick={() => setShowCompleted((v) => !v)}
+              >
+                {showCompleted ? (
+                  <EyeOff className="size-3.5" />
+                ) : (
+                  <Eye className="size-3.5" />
+                )}
+                {showCompleted
+                  ? t("hideCompleted")
+                  : t("showCompleted", { count: confirmedCount })}
+              </Button>
+            )}
+            {discardedIds.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={clearingAll}
+                onClick={clearAllDiscarded}
+              >
+                {clearingAll ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="size-3.5" />
+                )}
+                {t("clearAll")}
+              </Button>
+            )}
+          </div>
         </CardHeader>
       )}
       <CardContent className="p-0">
@@ -144,7 +172,17 @@ export function ImportHistory({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sort(items).map((imp) => {
+            {visibleItems.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="h-16 text-center text-sm text-muted-foreground"
+                >
+                  {t("onlyCompleted", { count: confirmedCount })}
+                </TableCell>
+              </TableRow>
+            )}
+            {sort(visibleItems).map((imp) => {
               const busy = busyId === imp.id;
               return (
                 <TableRow key={imp.id}>

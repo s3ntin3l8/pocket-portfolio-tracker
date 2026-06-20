@@ -649,6 +649,105 @@ describe("CSV import → confirm flow", () => {
     expect(second.drafts).toHaveLength(0);
   });
 
+  it("re-imports a confirmed CSV after its transactions were all deleted (#229)", async () => {
+    const t = await token("redup-after-delete-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Redup", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const imp = (
+      await app.inject({ method: "POST", url: `/imports/csv`, headers: auth(t), payload: { content: CSV } })
+    ).json();
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${imp.importId}/confirm`,
+      headers: auth(t),
+      payload: { portfolioId, transactions: imp.drafts },
+    });
+    expect(confirm.statusCode).toBe(201);
+    const ids = (confirm.json().transactions as Array<{ id: string }>).map((x) => x.id);
+    expect(ids.length).toBeGreaterThan(0);
+
+    // While the transactions still exist the file-level guard blocks the re-upload (as before).
+    const blocked = (
+      await app.inject({ method: "POST", url: `/imports/csv`, headers: auth(t), payload: { content: CSV } })
+    ).json();
+    expect(blocked.alreadyConfirmed).toBe(true);
+    expect(blocked.drafts).toHaveLength(0);
+
+    // Delete every transaction the import created.
+    const del = await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions/bulk-delete`,
+      headers: auth(t),
+      payload: { ids },
+    });
+    expect(del.json().deleted).toBe(ids.length);
+
+    // Re-upload now: the confirmed import is stale (no live rows) → a fresh draft, no block.
+    const reImp = (
+      await app.inject({ method: "POST", url: `/imports/csv`, headers: auth(t), payload: { content: CSV } })
+    ).json();
+    expect(reImp.alreadyConfirmed).toBeFalsy();
+    expect(reImp.drafts.length).toBeGreaterThan(0);
+    expect(reImp.importId).not.toBe(imp.importId);
+
+    // The stale confirmed import was superseded (marked discarded) so it won't re-block.
+    const list = (await app.inject({ method: "GET", url: "/imports", headers: auth(t) })).json() as Array<{
+      id: string;
+      status: string;
+    }>;
+    expect(list.find((r) => r.id === imp.importId)?.status).toBe("discarded");
+    expect(list.find((r) => r.id === reImp.importId)?.status).toBe("draft");
+  });
+
+  it("force-re-imports a confirmed CSV even when its transactions survive (#229)", async () => {
+    const t = await token("force-reimport-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "ForceReimport", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const imp = (
+      await app.inject({ method: "POST", url: `/imports/csv`, headers: auth(t), payload: { content: CSV } })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/imports/${imp.importId}/confirm`,
+      headers: auth(t),
+      payload: { portfolioId, transactions: imp.drafts },
+    });
+
+    // No force → blocked even though it's the same file.
+    const blocked = (
+      await app.inject({ method: "POST", url: `/imports/csv`, headers: auth(t), payload: { content: CSV } })
+    ).json();
+    expect(blocked.alreadyConfirmed).toBe(true);
+
+    // force=true → fresh drafts despite the surviving transactions. Any economic
+    // duplicate is re-surfaced at confirm time (acknowledgeDuplicates), not here.
+    const forced = (
+      await app.inject({
+        method: "POST",
+        url: `/imports/csv?force=true`,
+        headers: auth(t),
+        payload: { content: CSV },
+      })
+    ).json();
+    expect(forced.alreadyConfirmed).toBeFalsy();
+    expect(forced.drafts.length).toBeGreaterThan(0);
+    expect(forced.importId).not.toBe(imp.importId);
+  });
+
   it("allows re-import after discarding (discarded imports do not block)", async () => {
     const t = await token("fingerprint-discard-user");
     const _portfolioId = (

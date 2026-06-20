@@ -239,6 +239,7 @@
   "Import": {
     "title": "Impor transaksi",
     "subtitle": "Unggah tangkapan layar atau CSV — periksa drafnya, lalu konfirmasi.",
+    "reImportAnyway": "Tetap impor ulang",
     "steps": {
       "upload": "Unggah",
       "review": "Periksa",
@@ -395,7 +396,7 @@
       "tooLarge": "Berkas terlalu besar (maks 25 MB). Kompresi berkas lalu coba lagi.",
       "fileRead": "Tidak dapat membaca berkas itu. Silakan coba lagi.",
       "noDrafts": "Tidak ada transaksi yang ditemukan di berkas itu.",
-      "alreadyConfirmed": "Berkas ini sudah diimpor dan dikonfirmasi.",
+      "alreadyConfirmed": "Berkas ini sudah diimpor dan dikonfirmasi. Impor ulang jika Anda telah menghapus sebagian transaksinya.",
       "generic": "Terjadi kesalahan. Silakan coba lagi."
     }
   },
@@ -421,7 +422,10 @@
     },
     "importedBanner": "{count, plural, other {# transaksi diimpor}}",
     "clear": "Bersihkan",
-    "clearAll": "Bersihkan semua yang dibuang"
+    "clearAll": "Bersihkan semua yang dibuang",
+    "showCompleted": "Tampilkan yang selesai ({count})",
+    "hideCompleted": "Sembunyikan yang selesai",
+    "onlyCompleted": "{count, plural, other {# impor selesai disembunyikan}}"
   },
   "Dashboard": {
     "title": "Dasbor",

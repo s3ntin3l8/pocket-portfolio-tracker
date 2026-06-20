@@ -134,6 +134,61 @@ export async function importsRoute(app: FastifyInstance) {
     return row ?? null;
   }
 
+  /** Does this import still have any live records pointing at it? A confirmed import whose
+   *  transactions (and financed-gold loans) have all since been deleted is effectively gone —
+   *  its file-level dedup row would otherwise block re-importing the same file forever (the
+   *  confirm-time cross-source backstop, not this guard, is the authoritative duplicate
+   *  protection now). Checks both `transactions` and `loans`, which carry `importId`. */
+  async function importHasLiveRecords(importId: string): Promise<boolean> {
+    const [tx] = await app.db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(eq(transactions.importId, importId))
+      .limit(1);
+    if (tx) return true;
+    const [loan] = await app.db
+      .select({ id: loans.id })
+      .from(loans)
+      .where(eq(loans.importId, importId))
+      .limit(1);
+    return Boolean(loan);
+  }
+
+  /**
+   * Resolve whether a content-hash–matched prior import should still short-circuit this
+   * upload. Returns the import to reuse for the dedup response, or null when the upload
+   * should proceed and re-parse fresh. It proceeds (returning null) in two cases:
+   *   - **force** — the user explicitly asked to re-import (e.g. some, not all, of the
+   *     earlier transactions were deleted and they want them back). Survivors are caught
+   *     again at confirm time, where `acknowledgeDuplicates` lets them drop or keep them.
+   *   - **stale** — a *confirmed* import whose transactions/loans have all been deleted, so
+   *     nothing real is left to dedup against. Detected automatically, no user action needed.
+   * In both cases the matched row is marked `discarded` so the (per-user, status≠discarded)
+   * `existingImport` lookup won't keep matching it and re-block the fresh draft we create.
+   */
+  async function resolveReuse(
+    existing: Awaited<ReturnType<typeof existingImport>> | null,
+    force: boolean,
+  ): Promise<Awaited<ReturnType<typeof existingImport>> | null> {
+    if (!existing) return null;
+    const supersede =
+      force || (existing.status === "confirmed" && !(await importHasLiveRecords(existing.id)));
+    if (!supersede) return existing;
+    await app.db
+      .update(screenshotImports)
+      .set({ status: "discarded" })
+      .where(eq(screenshotImports.id, existing.id));
+    return null;
+  }
+
+  /** Read the `force` re-import override from the request query (`?force=true`). Used by
+   *  both upload endpoints so the override works uniformly across JSON (CSV) and multipart
+   *  (screenshot/PDF) bodies without threading it through either body shape. */
+  function forceFromQuery(query: unknown): boolean {
+    const f = (query as { force?: unknown } | null)?.force;
+    return f === true || f === "true" || f === "1";
+  }
+
   /**
    * Normalize an account number for comparison: strip non-alphanumerics, lowercase.
    * Returns null when the input is empty/null so two blank values never match.
@@ -292,6 +347,7 @@ export async function importsRoute(app: FastifyInstance) {
     async (request, reply) => {
       const { id } = requireUser(request);
       const { content, format } = csvBodySchema.parse(request.body);
+      const force = forceFromQuery(request.query);
       const contentHash = shortHash(content);
 
       request.log.info(
@@ -302,7 +358,9 @@ export async function importsRoute(app: FastifyInstance) {
       // Re-upload guard: return the existing non-discarded import instead of creating
       // a duplicate draft row. Scoped per-user so the same file is blocked regardless
       // of which portfolio it was previously imported into. Discarded imports are ignored.
-      const existing = await existingImport(id, contentHash);
+      // `resolveReuse` lets the upload through (re-parsing fresh) when the user forced a
+      // re-import, or when a confirmed import's transactions were all deleted (#229).
+      const existing = await resolveReuse(await existingImport(id, contentHash), force);
       if (existing) {
         const isDraft = existing.status === "draft";
         const parsed = isDraft
@@ -459,7 +517,12 @@ export async function importsRoute(app: FastifyInstance) {
       // Scoped per-user so the same document can't be re-parsed into a different portfolio.
       // Two-tier lookup: match the forward text-layer hash *and* the legacy raw-byte hash,
       // so byte-identical re-uploads of imports created before #216 still dedup.
-      const existing = await existingImport(id, [contentHash, rawHash]);
+      // `resolveReuse` lets it through (force re-import, or a confirmed import whose records
+      // were all deleted) — see the CSV path (#229).
+      const existing = await resolveReuse(
+        await existingImport(id, [contentHash, rawHash]),
+        forceFromQuery(request.query),
+      );
       if (existing) {
         const isDraft = existing.status === "draft";
         const storedParsed = isDraft

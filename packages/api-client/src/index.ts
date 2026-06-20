@@ -1032,19 +1032,27 @@ export function createApiClient(config: ApiClientConfig) {
       return request<TradeLog>("GET", `/networth/trades?${params.toString()}`);
     },
 
+    // `force` re-imports a file the server would otherwise dedup against an earlier import
+    // (e.g. the user deleted some of those transactions and wants them back). Survivors are
+    // re-flagged at confirm time, so this never silently creates true duplicates (#229).
     importCsv: (
       content: string,
       format: "auto" | "generic" | "dkb" | "ibkr" | "coinbase" = "auto",
+      force = false,
     ) =>
-      request<CsvImportResult>("POST", `/imports/csv`, {
+      request<CsvImportResult>("POST", `/imports/csv${force ? "?force=true" : ""}`, {
         content,
         format,
       }),
-    importScreenshot: (file: File | Blob) => {
+    importScreenshot: (file: File | Blob, force = false) => {
       const form = new FormData();
       // name hint for filename preservation; mime comes from the file part itself.
       form.append("file", file, (file as File).name ?? "upload");
-      return request<ScreenshotImportResult>("POST", `/imports/screenshot`, form);
+      return request<ScreenshotImportResult>(
+        "POST",
+        `/imports/screenshot${force ? "?force=true" : ""}`,
+        form,
+      );
     },
     confirmImport: (
       importId: string,

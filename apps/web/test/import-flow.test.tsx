@@ -88,6 +88,7 @@ describe("ImportFlow", () => {
     );
     expect(client.importScreenshot).toHaveBeenCalledWith(
       expect.any(File),
+      false,
     );
 
     fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
@@ -158,8 +159,42 @@ describe("ImportFlow", () => {
 
     await waitFor(() => expect(client.importCsv).toHaveBeenCalled());
     // Format defaults to auto-detect. No portfolioId in upload (upload-first flow).
-    expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "auto");
+    expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "auto", false);
     expect(client.importScreenshot).not.toHaveBeenCalled();
+  });
+
+  it("offers a force re-import when a file was already confirmed (#229)", async () => {
+    // First call → already confirmed (blocked). Second call (force) → fresh drafts.
+    const importCsv = vi
+      .fn()
+      .mockResolvedValueOnce({ importId: "imp-x", drafts: [], errors: [], alreadyConfirmed: true })
+      .mockResolvedValueOnce({ importId: "imp-x2", drafts: [DRAFT], errors: [] });
+    const client: ImportClient = {
+      importScreenshot: vi.fn(),
+      importCsv,
+      confirmImport: vi.fn(),
+    };
+    const { container } = renderFlow(client);
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: messages.Import.tabs.csv }));
+    fireEvent.change(fileInput(container), { target: { files: [csvFile("dup.csv")] } });
+
+    // The already-confirmed error and the "Re-import anyway" override both appear.
+    await waitFor(() =>
+      expect(screen.getByText(messages.Import.errors.alreadyConfirmed)).toBeInTheDocument(),
+    );
+    const reImport = screen.getByRole("button", { name: messages.Import.reImportAnyway });
+    expect(importCsv).toHaveBeenLastCalledWith(expect.any(String), "auto", false);
+
+    fireEvent.click(reImport);
+
+    // Re-import replays the same file with force=true and lands on the review step.
+    await waitFor(() =>
+      expect(importCsv).toHaveBeenLastCalledWith(expect.any(String), "auto", true),
+    );
+    await waitFor(() =>
+      expect(screen.getAllByText("Antam Gold").length).toBeGreaterThan(0),
+    );
   });
 
   it("passes the DKB format when the DKB CSV source is selected", async () => {
@@ -178,7 +213,7 @@ describe("ImportFlow", () => {
     fireEvent.change(fileInput(container), { target: { files: [csv] } });
 
     await waitFor(() =>
-      expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "dkb"),
+      expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "dkb", false),
     );
   });
 
@@ -203,7 +238,7 @@ describe("ImportFlow", () => {
       expect(screen.getAllByText("Antam Gold").length).toBeGreaterThan(0),
     );
     // Upload call has NO portfolioId in the new upload-first flow.
-    expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "auto");
+    expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "auto", false);
 
     // The portfolio picker (rich Radix dropdown) is now shown on the review step.
     // Radix opens on Enter under jsdom, then a menuitem click selects.
@@ -290,6 +325,7 @@ describe("ImportFlow", () => {
     expect(client.importScreenshot).toHaveBeenCalledTimes(1);
     expect(client.importScreenshot).toHaveBeenCalledWith(
       expect.any(File),
+      false,
     );
     expect(client.importCsv).not.toHaveBeenCalled();
   });

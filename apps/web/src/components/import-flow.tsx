@@ -129,10 +129,12 @@ export function stripUid(draft: ReviewDraft): ImportDraft {
 export interface ImportClient {
   importScreenshot(
     file: File | Blob,
+    force?: boolean,
   ): Promise<ImportResult>;
   importCsv(
     content: string,
     format?: CsvFormat,
+    force?: boolean,
   ): Promise<ImportResult>;
   confirmImport(
     importId: string,
@@ -253,6 +255,9 @@ export function ImportFlow({
   // Files skipped during the parse pass.
   const [skipped, setSkipped] = useState<SkippedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // A single file the server rejected as an already-confirmed re-upload. Kept so the user
+  // can consciously re-import it (e.g. they deleted some of the original transactions). (#229)
+  const [reImportFile, setReImportFile] = useState<File | null>(null);
   // Account-mismatch warning (#197) — set from the upload hint or a confirm 409. Shown as
   // a banner in the review step; "Import anyway" re-confirms with the acknowledge flag.
   const [accountMismatch, setAccountMismatch] = useState<AccountMismatch | null>(null);
@@ -300,8 +305,9 @@ export function ImportFlow({
     if (files.length > 0) void handleFiles(files);
   }
 
-  async function handleFiles(files: File[]) {
+  async function handleFiles(files: File[], force = false) {
     setError(null);
+    setReImportFile(null);
     setSkipped([]);
     setFileStatuses([]);
     setStep("parsing");
@@ -315,10 +321,14 @@ export function ImportFlow({
       try {
         const result =
           mode === "csv"
-            ? await client.importCsv(await fileToText(file), csvFormat)
-            : await client.importScreenshot(file);
+            ? await client.importCsv(await fileToText(file), csvFormat, force)
+            : await client.importScreenshot(file, force);
         if (result.alreadyConfirmed) {
           setError(t("errors.alreadyConfirmed"));
+          // Offer a manual override: the file was already imported, but the user may have
+          // deleted some of those transactions and want them back (#229). A re-import with
+          // `force` re-creates the drafts; survivors are re-flagged at confirm time.
+          setReImportFile(file);
           setStep("upload");
           return;
         }
@@ -361,8 +371,8 @@ export function ImportFlow({
       try {
         const result =
           mode === "csv"
-            ? await client.importCsv(await fileToText(file), csvFormat)
-            : await client.importScreenshot(file);
+            ? await client.importCsv(await fileToText(file), csvFormat, force)
+            : await client.importScreenshot(file, force);
 
         if (result.alreadyConfirmed) {
           newSkipped.push({ file: file.name, reason: "alreadyConfirmed" });
@@ -625,10 +635,25 @@ export function ImportFlow({
       {error && (
         <div
           role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           <AlertCircle className="size-4 shrink-0" />
-          {error}
+          <span>{error}</span>
+          {reImportFile && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="ml-auto"
+              onClick={() => {
+                const f = reImportFile;
+                setReImportFile(null);
+                void handleFiles([f], true);
+              }}
+            >
+              {t("reImportAnyway")}
+            </Button>
+          )}
         </div>
       )}
 
