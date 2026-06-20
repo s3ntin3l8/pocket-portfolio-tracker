@@ -446,6 +446,16 @@
     "noMoversTitle": "No price moves yet",
     "noMoversBody": "Day changes appear once live prices refresh for your holdings."
   },
+  "Error": {
+    "title": "Something went wrong",
+    "body": "An unexpected error occurred while loading this page.",
+    "retry": "Try again"
+  },
+  "NotFound": {
+    "title": "Page not found",
+    "body": "The page you're looking for doesn't exist or has moved.",
+    "backHome": "Back to dashboard"
+  },
   "Gold": {
     "title": "Gold spot",
     "perGram": "per gram, 24k",
@@ -751,6 +761,7 @@
     "longTerm": "Tax-free (>1y)",
     "yearsAbbr": "y",
     "daysAbbr": "d",
+    "viewTransactions": "View transactions",
     "totalRealized": "Realized P&L",
     "totalDividends": "Dividends",
     "winRate": "Win rate",
