@@ -12,6 +12,7 @@ import { AllocationDonut } from "@/components/charts/allocation-donut";
 import { NetWorthHistoryChart } from "@/components/charts/net-worth-history-chart";
 import { EmptyState } from "@/components/empty-state";
 import { GoldTicker } from "@/components/gold-ticker";
+import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { loadNetWorth, loadNetWorthHistory, getSelectedPortfolioId } from "@/lib/server-api";
@@ -105,7 +106,7 @@ export default async function DashboardPage({
     return fullState(
       te("noHoldingsTitle"),
       te("noHoldingsBody"),
-      ctaButton(tm("addTransaction")),
+      <AddTransactionMenu />,
       currency,
     );
   }
@@ -200,7 +201,10 @@ export default async function DashboardPage({
           }
         />
         <StatCard label={t("positions")} value={String(openHoldings.length)} />
-        <StatCard label={t("cash")} value={m(cashTotal)} />
+        <StatCard
+          label={t("cash")}
+          value={summary.cashTracked ? m(cashTotal) : t("cashNotTracked")}
+        />
         <StatCard label={t("income")} value={m(Number(summary.totalIncome))} />
       </div>
 

@@ -423,6 +423,7 @@
     "totalPnL": "Total Untung/Rugi",
     "positions": "Posisi",
     "cash": "Kas",
+    "cashNotTracked": "Tidak dilacak",
     "income": "Pendapatan",
     "return": "Imbal hasil (per tahun)",
     "valueOverTime": "Nilai dari waktu ke waktu",
@@ -508,6 +509,7 @@
     "value": "Nilai",
     "pnl": "Untung/Rugi",
     "all": "Semua",
+    "total": "Total",
     "exportCsv": "Ekspor CSV",
     "costBasisPurchasePrice": "Harga beli",
     "costBasisTotalPaid": "Total dibayar"
