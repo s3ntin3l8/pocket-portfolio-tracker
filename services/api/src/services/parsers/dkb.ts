@@ -250,7 +250,10 @@ function parseDkbUmsatzliste(lines: string[]): CsvParseResult {
         price = (Math.abs(amountNum) / Number(quantity)).toFixed(8);
       }
       const name = collapse(vz.match(/Gesch\.Art\s+\S+\s+(.*?)\s+ISIN\b/)?.[1] ?? "");
-      const isSavingsPlan = vz.includes("Wertpapier-Sparplan");
+      // DKB renamed the savings-plan label "Fondssparplan" → "Wertpapier-Sparplan"
+      // around mid-2025; historical statements still carry the older wording, so match both.
+      const isSavingsPlan =
+        vz.includes("Wertpapier-Sparplan") || vz.includes("Fondssparplan");
       const action = isSavingsPlan ? "savings_plan" : amountNum > 0 ? "sell" : "buy";
       // The cash `Betrag` is the actual settlement amount (DKB "Auszumachender Betrag")
       // — keep it as `total` (lossless, strip the sign) and back out the Provision as
