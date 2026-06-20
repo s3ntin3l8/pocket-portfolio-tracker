@@ -460,7 +460,16 @@
     "ratio": "Ratio",
     "exDate": "Ex-date",
     "notFound": "Instrument not found",
-    "notFoundBody": "It may have been removed, or the API is unavailable."
+    "notFoundBody": "It may have been removed, or the API is unavailable.",
+    "position": "Your position",
+    "quantityLabel": "Quantity",
+    "avgCostLabel": "Avg cost",
+    "unrealizedPnl": "Unrealized P&L",
+    "noPosition": "No open position",
+    "noPositionBody": "You don't currently hold this instrument in the selected scope.",
+    "transactions": "Transactions",
+    "noTransactions": "No transactions",
+    "noTransactionsBody": "No transactions for this instrument in the selected scope."
   },
   "CorpAction": {
     "title": "Record a corporate action",
