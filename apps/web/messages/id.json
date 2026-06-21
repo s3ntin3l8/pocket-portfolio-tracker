@@ -1,4 +1,11 @@
 {
+  "Duplicates": {
+    "warning": "{count, plural, one {# transaksi terpilih} other {# transaksi terpilih}} sudah diimpor dari sumber lain. Mengimpor lagi akan membuat duplikat.",
+    "row": "{name} · {action} · {date} (sudah diimpor dari {source})",
+    "importAnyway": "Tetap impor",
+    "enrichExisting": "Perkaya yang ada",
+    "more": "+{count} lainnya"
+  },
   "Install": {
     "title": "Tambahkan Portfolio ke layar utama",
     "cta": "Instal aplikasi",
@@ -403,12 +410,6 @@
       "noMatch": "Nomor rekening pada berkas ini ({account}) tidak cocok dengan portofolio yang dipilih. Tetap impor?",
       "importAnyway": "Tetap impor"
     },
-    "duplicates": {
-      "warning": "{count, plural, one {# transaksi terpilih} other {# transaksi terpilih}} sudah diimpor dari sumber lain. Mengimpor lagi akan membuat duplikat.",
-      "row": "{name} · {action} · {date} (sudah diimpor dari {source})",
-      "importAnyway": "Tetap impor",
-      "enrichExisting": "Perkaya yang ada"
-    },
     "discard": "Buang",
     "confirm": "Konfirmasi",
     "done": {
@@ -434,11 +435,6 @@
     "reviewTitle": "Tinjau impor",
     "reviewSubtitle": "Periksa transaksinya, lalu konfirmasi untuk menambahkannya — atau buang impor ini.",
     "reviewError": "Terjadi kesalahan. Silakan coba lagi.",
-    "duplicates": {
-      "warning": "{count, plural, one {# transaksi terpilih} other {# transaksi terpilih}} sudah diimpor dari sumber lain. Mengimpor lagi akan membuat duplikat.",
-      "importAnyway": "Tetap impor",
-      "enrichExisting": "Perkaya yang ada"
-    },
     "discard": "Buang",
     "undo": "Batalkan",
     "undoWarning": "Menghapus {count, plural, other {# transaksi}}.",

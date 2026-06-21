@@ -703,7 +703,7 @@ describe("ImportFlow", () => {
 
     // The duplicate banner + "Import anyway" CTA render instead of a generic error.
     const importAnyway = await screen.findByRole("button", {
-      name: messages.Import.duplicates.importAnyway,
+      name: messages.Duplicates.importAnyway,
     });
     fireEvent.click(importAnyway);
 

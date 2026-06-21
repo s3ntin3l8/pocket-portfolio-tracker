@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { ImportReview } from "@/components/import-review";
+import { DuplicateConflictBanner } from "@/components/duplicate-conflict-banner";
 import { PortfolioPicker } from "@/components/portfolio-picker";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +19,6 @@ import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { duplicatesFromError, type DuplicateConflict, type DuplicateMatch } from "@portfolio/api-client";
 import type { ParsedTransaction } from "@portfolio/schema";
-import { Button } from "@/components/ui/button";
 
 /**
  * Review and confirm an already-staged draft import (e.g. a Trade Republic sync, or a
@@ -91,11 +91,15 @@ export function DraftReviewClient({
   }
 
   // Confirm all drafts, or just the subset whose uids are passed (confirm-selected).
+  // Default (no uids) excludes likely-duplicate rows — matching import-flow behaviour and
+  // the in-table notice. Users can still confirm a flagged row via "Confirm selected" (#196).
   async function confirm(uids?: string[], acknowledgeDup = false) {
     setError(null);
     pendingUids.current = uids;
     const subset =
-      uids && uids.length ? drafts.filter((d) => uids.includes(d.uid)) : drafts;
+      uids && uids.length
+        ? drafts.filter((d) => uids.includes(d.uid))
+        : drafts.filter((d) => !d.likelyDuplicate);
     // Store ordered subset for the enrich path (draftIndex resolves into this array).
     pendingSubset.current = subset;
     // A partial confirm keeps the import open server-side — stay on the page, drop the
@@ -190,45 +194,11 @@ export function DraftReviewClient({
         </div>
       )}
       {duplicateConflict && (
-        <div
-          role="alert"
-          className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning"
-        >
-          <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <div className="flex-1 space-y-1">
-              <p>{t("duplicates.warning", { count: duplicateConflict.count })}</p>
-              {duplicateConflict.duplicates.length > 0 && (
-                <ul className="space-y-1.5 pl-4 text-xs">
-                  {duplicateConflict.duplicates.slice(0, 5).map((d, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <span className="flex-1 text-warning/90">
-                        {d.name ?? "—"} · {d.action} · {d.executedAt}
-                      </span>
-                      {d.matchedTransactionId && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 shrink-0 text-xs"
-                          onClick={() => void enrichOneDuplicate(d)}
-                        >
-                          {t("duplicates.enrichExisting")}
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void confirm(pendingUids.current, true)}
-            >
-              {t("duplicates.importAnyway")}
-            </Button>
-          </div>
-        </div>
+        <DuplicateConflictBanner
+          conflict={duplicateConflict}
+          onEnrich={(d) => void enrichOneDuplicate(d)}
+          onImportAnyway={() => void confirm(pendingUids.current, true)}
+        />
       )}
       {portfolios.length > 1 && (
         <div className="space-y-1.5">
