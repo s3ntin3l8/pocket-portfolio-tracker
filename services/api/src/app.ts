@@ -24,16 +24,21 @@ import { mergersRoute } from "./routes/mergers.js";
 import { importsRoute } from "./routes/imports.js";
 import { trRoute } from "./routes/tr.js";
 import { adminRoute } from "./routes/admin.js";
+import { storageRoute } from "./routes/storage.js";
 import type { ScreenshotParser } from "./services/parsers/types.js";
 import { getScreenshotParser } from "./services/screenshot-parser.js";
 import { getPytrRunner } from "./services/pytr/runner.js";
 import type { PytrRunner } from "./services/pytr/runner.js";
+import type { StorageProvider } from "./storage/types.js";
+import { storagePlugin } from "./plugins/storage.js";
 
 export type BuildAppOptions = AuthPluginOptions & {
   // Injectable so tests can supply a mock parser instead of hitting Anthropic.
   screenshotParser?: ScreenshotParser;
   // Injectable so tests drive the pytr boundary without spawning Python.
   pytr?: PytrRunner;
+  // Injectable so tests can supply a fake storage driver without hitting MinIO/S3.
+  storage?: StorageProvider;
   /**
    * Test capture seam: pass an in-memory writable so test assertions can read NDJSON
    * log lines. Must NOT be used in production. Example:
@@ -140,6 +145,14 @@ export async function buildApp(opts: BuildAppOptions = {}) {
 
   app.decorate("pytr", opts.pytr ?? getPytrRunner(app.config, app.log));
 
+  // Storage — injectable in tests (pass opts.storage); the real plugin handles
+  // bucket auto-creation on non-production environments so local MinIO just works.
+  if (opts.storage) {
+    app.decorate("storage", opts.storage);
+  } else {
+    await app.register(storagePlugin);
+  }
+
   await app.register(rootRoute);
   await app.register(healthRoute);
   await app.register(meRoute);
@@ -154,6 +167,8 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(importsRoute);
   await app.register(trRoute);
   await app.register(adminRoute);
+  // Public file-serving for the folder storage provider (no auth — token in query string).
+  await app.register(storageRoute);
 
   return app;
 }
@@ -162,5 +177,6 @@ declare module "fastify" {
   interface FastifyInstance {
     screenshotParser: ScreenshotParser;
     pytr: PytrRunner;
+    storage: StorageProvider;
   }
 }

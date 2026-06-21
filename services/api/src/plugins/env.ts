@@ -80,6 +80,52 @@ const schema = {
       type: "boolean",
       default: true,
     },
+    // --- Object storage (S3-compatible: MinIO, AWS, Supabase /storage/v1/s3, R2) ---
+    // Endpoint URL for S3-compatible backends. Leave blank to use AWS's default endpoint.
+    // MinIO (local): http://localhost:9000
+    // Supabase Storage: https://<project>.supabase.co/storage/v1/s3
+    STORAGE_ENDPOINT: {
+      type: "string",
+      default: "",
+    },
+    STORAGE_REGION: {
+      type: "string",
+      default: "us-east-1",
+    },
+    STORAGE_BUCKET: {
+      type: "string",
+      default: "screenshots",
+    },
+    STORAGE_ACCESS_KEY: {
+      type: "string",
+      default: "",
+    },
+    STORAGE_SECRET_KEY: {
+      type: "string",
+      default: "",
+    },
+    // true for MinIO and Supabase (path-style URL), false for AWS (virtual-hosted-style).
+    STORAGE_FORCE_PATH_STYLE: {
+      type: "boolean",
+      default: true,
+    },
+    // Default presigned-URL TTL in seconds (used by app.storage.getSignedUrl).
+    STORAGE_SIGNED_URL_TTL: {
+      type: "number",
+      default: 3600,
+    },
+    // Base directory for the folder (local-disk) storage provider.
+    // Resolved relative to the API working directory; use an absolute path for production.
+    STORAGE_FOLDER_PATH: {
+      type: "string",
+      default: "./.storage",
+    },
+    // External origin used to build folder-provider signed URLs (e.g. https://api.example.com).
+    // Empty ⇒ root-relative path (/storage/…) — correct for same-origin reverse-proxy topology.
+    STORAGE_PUBLIC_URL: {
+      type: "string",
+      default: "",
+    },
   },
 };
 
@@ -110,6 +156,15 @@ declare module "fastify" {
       PYTR_PYTHON_BIN: string;
       PYTR_WAF_STRATEGY: "awswaf" | "playwright";
       PYTR_ENABLED: boolean;
+      STORAGE_ENDPOINT: string;
+      STORAGE_REGION: string;
+      STORAGE_BUCKET: string;
+      STORAGE_ACCESS_KEY: string;
+      STORAGE_SECRET_KEY: string;
+      STORAGE_FORCE_PATH_STYLE: boolean;
+      STORAGE_SIGNED_URL_TTL: number;
+      STORAGE_FOLDER_PATH: string;
+      STORAGE_PUBLIC_URL: string;
     };
   }
 }
