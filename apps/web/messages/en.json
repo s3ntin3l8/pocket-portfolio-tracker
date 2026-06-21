@@ -637,7 +637,6 @@
       "download": "Download source PDF",
       "fullDetailBadge": "Full tax breakdown available from settlement PDF."
     },
-    "enrichHint": "Upload the settlement PDF to add the full tax breakdown.",
     "batch": {
       "selected": "{count, plural, one {# selected} other {# selected}}",
       "delete": "Delete selected",
@@ -721,7 +720,8 @@
         "shares": "Shares",
         "grams": "Grams",
         "units": "Units"
-      }
+      },
+      "enrichHint": "Upload the settlement PDF to add the full tax breakdown."
     }
   },
   "TxType": {

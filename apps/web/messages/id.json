@@ -637,7 +637,6 @@
       "download": "Unduh PDF sumber",
       "fullDetailBadge": "Rincian pajak lengkap tersedia dari PDF penyelesaian."
     },
-    "enrichHint": "Unggah PDF penyelesaian untuk menambahkan rincian pajak lengkap.",
     "batch": {
       "selected": "{count, plural, one {# dipilih} other {# dipilih}}",
       "delete": "Hapus yang dipilih",
@@ -721,7 +720,8 @@
         "shares": "Lembar",
         "grams": "Gram",
         "units": "Unit"
-      }
+      },
+      "enrichHint": "Unggah PDF penyelesaian untuk menambahkan rincian pajak lengkap."
     }
   },
   "TxType": {

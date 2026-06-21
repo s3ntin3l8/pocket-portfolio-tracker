@@ -9,12 +9,13 @@ const push = vi.fn();
 const refresh = vi.fn();
 const confirmImport = vi.fn(async () => ({ confirmed: 1, transactions: [] }));
 const discardImport = vi.fn(async () => undefined);
+const enrichImport = vi.fn(async () => ({ enriched: 1, skipped: [] }));
 
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ push, refresh }),
 }));
 vi.mock("@/lib/api", () => ({
-  useApiClient: () => ({ confirmImport, discardImport }),
+  useApiClient: () => ({ confirmImport, discardImport, enrichImport }),
 }));
 
 import { DraftReviewClient } from "../src/components/draft-review-client";
@@ -46,6 +47,7 @@ describe("DraftReviewClient", () => {
     refresh.mockClear();
     confirmImport.mockClear();
     discardImport.mockClear();
+    enrichImport.mockClear();
   });
 
   it("renders the staged drafts", () => {
@@ -89,5 +91,55 @@ describe("DraftReviewClient", () => {
     fireEvent.click(screen.getByRole("button", { name: messages.Import.discard }));
     await waitFor(() => expect(discardImport).toHaveBeenCalledWith("imp1"));
     expect(push).toHaveBeenCalledWith("/transactions");
+  });
+
+  it("Enrich existing calls enrichImport with the draft payload and drops the draft (#230)", async () => {
+    const MATCHED_TX_ID = "tx-existing-001";
+    confirmImport.mockRejectedValueOnce(
+      new ApiError(
+        409,
+        JSON.stringify({
+          error: "duplicate_transactions",
+          count: 1,
+          duplicates: [
+            {
+              name: "Apple Inc",
+              action: "buy",
+              quantity: "3",
+              executedAt: "2026-03-01",
+              matchedSource: "csv",
+              matchedExecutedAt: "2026-03-01",
+              draftIndex: 0,
+              matchedTransactionId: MATCHED_TX_ID,
+            },
+          ],
+        }),
+      ),
+    );
+    renderClient();
+
+    fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
+
+    // Duplicate banner lists the match with "Enrich existing" button.
+    const enrichBtn = await screen.findByRole("button", {
+      name: messages.ImportHistory.duplicates.enrichExisting,
+    });
+    fireEvent.click(enrichBtn);
+
+    await waitFor(() =>
+      expect(enrichImport).toHaveBeenCalledWith(
+        "imp1",
+        [expect.objectContaining({ targetTransactionId: MATCHED_TX_ID })],
+        undefined,
+      ),
+    );
+    // The enriched draft is the only one; no re-confirm, but the draft is removed.
+    expect(confirmImport).toHaveBeenCalledTimes(1); // only the original (failed) call
+    // After enriching the sole draft the duplicate banner is cleared.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: messages.ImportHistory.duplicates.enrichExisting }),
+      ).toBeNull(),
+    );
   });
 });
