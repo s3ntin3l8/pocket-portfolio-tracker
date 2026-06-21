@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { buildApp } from "../../src/app.js";
+import { closeDb } from "../../src/db/client.js";
 
 describe("env plugin", () => {
   afterEach(async () => {
@@ -27,7 +28,16 @@ describe("env plugin", () => {
     expect(app.config.RATE_LIMIT_MAX).toBe(100);
     expect(app.config.RATE_LIMIT_WINDOW).toBe("1 minute");
     expect(app.config.MARKET_DATA_TTL_MS).toBe(900000);
+    // Storage defaults
+    expect(app.config.STORAGE_ENDPOINT).toBe("");
+    expect(app.config.STORAGE_REGION).toBe("us-east-1");
+    expect(app.config.STORAGE_BUCKET).toBe("screenshots");
+    expect(app.config.STORAGE_ACCESS_KEY).toBe("");
+    expect(app.config.STORAGE_SECRET_KEY).toBe("");
+    expect(app.config.STORAGE_FORCE_PATH_STYLE).toBe(true);
+    expect(app.config.STORAGE_SIGNED_URL_TTL).toBe(3600);
     await app.close();
+    await closeDb();
   });
 
   it("respects environment variable overrides", async () => {
