@@ -252,6 +252,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   await boss.schedule(DIVIDEND_QUEUE, DIVIDEND_CRON);
 
   // GC sweep: delete staged receipt documents from abandoned draft imports (#231).
+  await boss.createQueue(GC_RECEIPTS_QUEUE);
   await boss.work(GC_RECEIPTS_QUEUE, async () => {
     try {
       const deleted = await gcStagedReceipts(app);

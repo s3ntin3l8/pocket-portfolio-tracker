@@ -5,8 +5,18 @@ import {
   AddTransactionForm,
   type AddTransactionClient,
 } from "../src/components/add-transaction-form";
-import type { Instrument } from "@portfolio/api-client";
+import type { Instrument, SourceSummary } from "@portfolio/api-client";
 import messages from "../messages/en.json";
+
+const getSourceDocumentUrl = vi.fn(async () => ({
+  url: "https://storage.example/settlement.pdf?sig=test",
+  filename: "settlement.pdf",
+  mimeType: "application/pdf",
+}));
+
+vi.mock("@/lib/api", () => ({
+  useApiClient: () => ({ getSourceDocumentUrl }),
+}));
 
 const m = messages.Manage.tx;
 
@@ -477,5 +487,106 @@ describe("AddTransactionForm", () => {
     expect(screen.getByLabelText(m.tax)).toHaveValue("25");
     expect(screen.getByLabelText(m.notes)).toHaveValue("import note");
     expect(screen.getByLabelText(m.tags)).toHaveValue("tax-loss, idx");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TransactionSourcesSection + enrich hint (edit mode, #230)
+// ---------------------------------------------------------------------------
+
+const ms = messages.Transactions.sourcesSection;
+
+const SOURCE_WITH_DOC: SourceSummary = {
+  id: "src-pdf-1",
+  sourceType: "pdf",
+  externalId: "tr:exec:abc-123",
+  orderRef: "tr:ord:xyz-456",
+  documentId: "doc-1",
+  taxComponents: { kapitalertragsteuer: "3.75", solidaritaetszuschlag: "0.21" },
+  createdAt: "2026-03-01T12:00:00Z",
+};
+
+const SOURCE_NO_DOC: SourceSummary = {
+  id: "src-pytr-1",
+  sourceType: "pytr",
+  externalId: "tr:exec:def-789",
+  orderRef: null,
+  documentId: null,
+  taxComponents: null,
+  createdAt: "2026-03-01T10:00:00Z",
+};
+
+function renderEditForm(sources: SourceSummary[], hasFullTaxDetail: boolean) {
+  render(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <AddTransactionForm
+        client={makeClient()}
+        portfolioId="p1"
+        transactionId="tx-edit-1"
+        initial={{ ...EDIT_INITIAL, sources, hasFullTaxDetail }}
+        onSuccess={vi.fn()}
+      />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe("TransactionSourcesSection (edit mode, #230)", () => {
+  it("shows source type, externalId and tax components", () => {
+    renderEditForm([SOURCE_WITH_DOC], true);
+
+    expect(screen.getByText(ms.title)).toBeInTheDocument();
+    // sourceType rendered capitalised
+    expect(screen.getByText("pdf")).toBeInTheDocument();
+    expect(screen.getByText("tr:exec:abc-123")).toBeInTheDocument();
+    // Tax breakdown: KapSt and SolZ labels
+    expect(screen.getByText(/KapSt.*3\.75/)).toBeInTheDocument();
+    expect(screen.getByText(/SolZ.*0\.21/)).toBeInTheDocument();
+  });
+
+  it("shows the download button when documentId is present and calls getSourceDocumentUrl on click", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderEditForm([SOURCE_WITH_DOC], true);
+
+    const btn = screen.getByRole("button", { name: ms.download });
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+
+    await waitFor(() =>
+      expect(getSourceDocumentUrl).toHaveBeenCalledWith("p1", "tx-edit-1", "src-pdf-1"),
+    );
+    await waitFor(() =>
+      expect(open).toHaveBeenCalledWith(
+        expect.stringContaining("settlement.pdf"),
+        "_blank",
+        "noopener,noreferrer",
+      ),
+    );
+    open.mockRestore();
+  });
+
+  it("shows no download button when source has no documentId", () => {
+    renderEditForm([SOURCE_NO_DOC], false);
+    expect(screen.queryByRole("button", { name: ms.download })).toBeNull();
+  });
+
+  it("shows fullDetailBadge when hasFullTaxDetail", () => {
+    renderEditForm([SOURCE_WITH_DOC], true);
+    expect(screen.getByText(ms.fullDetailBadge)).toBeInTheDocument();
+  });
+
+  it("hides fullDetailBadge and shows enrichHint when !hasFullTaxDetail", () => {
+    renderEditForm([SOURCE_NO_DOC], false);
+    expect(screen.queryByText(ms.fullDetailBadge)).toBeNull();
+    expect(screen.getByText(messages.Manage.tx.enrichHint)).toBeInTheDocument();
+  });
+
+  it("shows neither sources section nor enrich hint in create mode (no transactionId)", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AddTransactionForm client={makeClient()} portfolioId="p1" onSuccess={vi.fn()} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByText(ms.title)).toBeNull();
+    expect(screen.queryByText(messages.Manage.tx.enrichHint)).toBeNull();
   });
 });
