@@ -64,6 +64,31 @@ describe("DraftReviewClient", () => {
     expect(push).toHaveBeenCalledWith("/transactions");
   });
 
+  it("excludes likely-duplicate drafts from the default Confirm (#196)", async () => {
+    // A clean draft plus a flagged one. Default Confirm should only submit the clean one.
+    const flaggedDraft: ImportDraft = {
+      ...DRAFT,
+      name: "Flagged Stock",
+      likelyDuplicate: { source: "csv", executedAt: "2026-03-01" },
+    };
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DraftReviewClient
+          importId="imp1"
+          initialPortfolioId={null}
+          drafts={[DRAFT, flaggedDraft]}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    // Click the global Confirm button (no rows selected).
+    fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
+    await waitFor(() =>
+      // Only the clean DRAFT reaches the API; the likelyDuplicate is excluded.
+      expect(confirmImport).toHaveBeenCalledWith("imp1", [DRAFT], [], undefined, false, false),
+    );
+  });
+
   it("surfaces a cross-source duplicate 409 and re-confirms with acknowledgement (#217)", async () => {
     confirmImport
       .mockRejectedValueOnce(
@@ -76,7 +101,7 @@ describe("DraftReviewClient", () => {
 
     // The duplicate banner renders instead of the generic review error.
     const importAnyway = await screen.findByRole("button", {
-      name: messages.ImportHistory.duplicates.importAnyway,
+      name: messages.Duplicates.importAnyway,
     });
     fireEvent.click(importAnyway);
 
@@ -122,7 +147,7 @@ describe("DraftReviewClient", () => {
 
     // Duplicate banner lists the match with "Enrich existing" button.
     const enrichBtn = await screen.findByRole("button", {
-      name: messages.ImportHistory.duplicates.enrichExisting,
+      name: messages.Duplicates.enrichExisting,
     });
     fireEvent.click(enrichBtn);
 
@@ -138,7 +163,7 @@ describe("DraftReviewClient", () => {
     // After enriching the sole draft the duplicate banner is cleared.
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: messages.ImportHistory.duplicates.enrichExisting }),
+        screen.queryByRole("button", { name: messages.Duplicates.enrichExisting }),
       ).toBeNull(),
     );
   });

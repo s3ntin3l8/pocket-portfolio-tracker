@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { importSkipReason, type ImportSkipReason } from "@/lib/import-errors";
 import { ImportReview } from "@/components/import-review";
 import { ContractReview } from "@/components/contract-review";
+import { DuplicateConflictBanner } from "@/components/duplicate-conflict-banner";
 
 export type { ImportIssue } from "@portfolio/api-client";
 
@@ -824,54 +825,17 @@ export function ImportFlow({
               Each match offers "Enrich existing" (fold the richer PDF detail onto the committed
               tx) or "Import anyway" for the whole batch. */}
           {duplicateConflict && (
-            <div
-              role="alert"
-              className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning"
-            >
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <div className="flex-1 space-y-1">
-                  <p>{t("duplicates.warning", { count: duplicateConflict.count })}</p>
-                  <ul className="space-y-1.5 pl-4 text-xs">
-                    {duplicateConflict.duplicates.slice(0, 5).map((d, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <span className="flex-1 text-warning/90">
-                          {t("duplicates.row", {
-                            name: d.name ?? "—",
-                            action: d.action,
-                            date: d.executedAt,
-                            source: d.matchedSource ?? "—",
-                          })}
-                        </span>
-                        {d.matchedTransactionId && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 shrink-0 text-xs"
-                            onClick={() => void enrichOneDuplicate(d)}
-                          >
-                            {t("duplicates.enrichExisting")}
-                          </Button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    void confirm(
-                      pendingConfirm.current.uids,
-                      pendingConfirm.current.acknowledgeMismatch,
-                      true,
-                    )
-                  }
-                >
-                  {t("duplicates.importAnyway")}
-                </Button>
-              </div>
-            </div>
+            <DuplicateConflictBanner
+              conflict={duplicateConflict}
+              onEnrich={(d) => void enrichOneDuplicate(d)}
+              onImportAnyway={() =>
+                void confirm(
+                  pendingConfirm.current.uids,
+                  pendingConfirm.current.acknowledgeMismatch,
+                  true,
+                )
+              }
+            />
           )}
 
           {/* Collapsible skip-notice banner — collapsed by default so it doesn't dominate */}
