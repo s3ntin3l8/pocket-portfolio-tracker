@@ -659,6 +659,7 @@
     "actions": "Actions",
     "edit": "Edit transaction",
     "downloadReceipt": "Download receipt",
+    "viewDetails": "View details",
     "delete": {
       "label": "Delete transaction",
       "confirm": "Delete",

@@ -657,6 +657,7 @@
     "actions": "Tindakan",
     "edit": "Ubah transaksi",
     "downloadReceipt": "Unduh tanda terima",
+    "viewDetails": "Lihat detail",
     "delete": {
       "label": "Hapus transaksi",
       "confirm": "Hapus",
