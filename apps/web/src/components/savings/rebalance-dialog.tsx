@@ -2,10 +2,11 @@
 
 import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Target, Loader2 } from "lucide-react";
+import { Target, Loader2, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,13 @@ import {
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { formatMoney } from "@/lib/utils";
-import type { DetectedPlan, DriftRow, SparplanContributionSplit, TargetWeight } from "@portfolio/api-client";
+import type {
+  DetectedPlan,
+  DriftRow,
+  SparplanContributionSplit,
+  TargetWeight,
+  TradeAction,
+} from "@portfolio/api-client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +53,80 @@ function sum(rows: { targetPct: number }[]): number {
 }
 
 // ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+interface TradeActionsProps {
+  tradeActions: TradeAction[];
+  allowanceUsed: string;
+  remainingAllowance: string;
+  currency: string;
+  labelByKey: Map<string, string>;
+}
+
+function TradeActionsSection({
+  tradeActions,
+  allowanceUsed,
+  remainingAllowance,
+  currency,
+  labelByKey,
+}: TradeActionsProps) {
+  const t = useTranslations("RebalanceDialog");
+  const sells = tradeActions.filter((a) => a.side === "sell");
+  const buys = tradeActions.filter((a) => a.side === "buy");
+
+  return (
+    <div className="border-t pt-3 mt-1 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">{t("tradeActions")}</p>
+      {sells.length > 0 && (
+        <div className="space-y-1">
+          {sells.map((a) => (
+            <div key={a.key} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex items-center gap-1 text-destructive shrink-0">
+                <TrendingDown className="h-3 w-3" />
+                {t("sell")}
+              </span>
+              <span className="text-muted-foreground truncate flex-1 text-xs">
+                {labelByKey.get(a.key) ?? a.key}
+              </span>
+              <span className="tabular font-medium shrink-0">
+                {formatMoney(Number(a.deltaValue), currency, "en")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {buys.length > 0 && (
+        <div className="space-y-1">
+          {buys.map((a) => (
+            <div key={a.key} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex items-center gap-1 text-green-600 dark:text-green-400 shrink-0">
+                <TrendingUp className="h-3 w-3" />
+                {t("buy")}
+              </span>
+              <span className="text-muted-foreground truncate flex-1 text-xs">
+                {labelByKey.get(a.key) ?? a.key}
+              </span>
+              <span className="tabular font-medium shrink-0">
+                {formatMoney(Number(a.deltaValue), currency, "en")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {sells.length > 0 && (
+        <p className="text-xs text-muted-foreground border-t pt-2">
+          {t("allowanceUsed", {
+            used: formatMoney(Number(allowanceUsed), currency, "en"),
+            remaining: formatMoney(Number(remainingAllowance), currency, "en"),
+          })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -58,6 +139,9 @@ function sum(rows: { targetPct: number }[]): number {
  *
  * Below the form, when drift and contributionSplit are supplied, a read-only
  * "Recommended monthly split" section shows how to deploy the next contribution.
+ *
+ * Phase D: a "Include sales (tax-aware)" toggle switches to trade recommendations
+ * with sells capped by the remaining Sparerpauschbetrag allowance.
  */
 export function RebalanceDialog({
   portfolioId,
@@ -77,6 +161,15 @@ export function RebalanceDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Phase D: tax-aware sales toggle state.
+  const [includeSales, setIncludeSales] = useState(false);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [tradeActions, setTradeActions] = useState<TradeAction[] | null>(null);
+  const [allowanceUsed, setAllowanceUsed] = useState<string | null>(null);
+  const [remainingAllowance, setRemainingAllowance] = useState<string | null>(null);
+  const [taxUnavailable, setTaxUnavailable] = useState(false);
+  const [salesError, setSalesError] = useState<string | null>(null);
 
   // Build the form rows from existing targets (or 0) on open.
   const fetchTargets = useCallback(async () => {
@@ -99,10 +192,46 @@ export function RebalanceDialog({
     }
   }, [api, portfolioId, plans, t]);
 
+  // Fetch trade recommendations when the toggle is turned on.
+  const fetchTradeRecommendations = useCallback(async () => {
+    setSalesLoading(true);
+    setSalesError(null);
+    try {
+      const result = await api.getPortfolioSparplan(portfolioId, true);
+      if (result.taxUnavailable) {
+        setTaxUnavailable(true);
+        setTradeActions(null);
+      } else {
+        setTaxUnavailable(false);
+        setTradeActions(result.tradeActions ?? []);
+        setAllowanceUsed(result.allowanceUsed ?? null);
+        setRemainingAllowance(result.remainingAllowance ?? null);
+      }
+    } catch {
+      setSalesError(t("loadSalesError"));
+    } finally {
+      setSalesLoading(false);
+    }
+  }, [api, portfolioId, t]);
+
   function handleOpenChange(value: boolean) {
     setOpen(value);
     if (value) {
       void fetchTargets();
+      // Reset toggle state when reopening.
+      setIncludeSales(false);
+      setTradeActions(null);
+      setAllowanceUsed(null);
+      setRemainingAllowance(null);
+      setTaxUnavailable(false);
+      setSalesError(null);
+    }
+  }
+
+  function handleToggleSales(checked: boolean) {
+    setIncludeSales(checked);
+    if (checked && tradeActions === null) {
+      void fetchTradeRecommendations();
     }
   }
 
@@ -138,6 +267,9 @@ export function RebalanceDialog({
   // Build a label map from plans for the recommended split section.
   const labelByKey = new Map(plans.map((p) => [p.instrumentId, p.name ?? p.symbol ?? p.instrumentId]));
   const splitByKey = new Map(contributionSplit?.map((s) => [s.key, s]) ?? []);
+
+  // Whether the toggle can be enabled (known unavailable only after first fetch).
+  const toggleDisabled = taxUnavailable;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -193,8 +325,36 @@ export function RebalanceDialog({
           </div>
         )}
 
-        {/* Recommended split (read-only, shown when drift data is available) */}
-        {!loading && drift && drift.length > 0 && contributionSplit && contributionSplit.length > 0 && (
+        {/* Phase D: Toggle between contributions-only and tax-aware sales */}
+        {!loading && drift && drift.length > 0 && (
+          <div className="border-t pt-3 mt-1">
+            <div
+              className="flex items-center gap-2"
+              title={toggleDisabled ? t("toggleDisabled") : undefined}
+            >
+              <Switch
+                id="include-sales-toggle"
+                checked={includeSales}
+                onCheckedChange={handleToggleSales}
+                disabled={toggleDisabled}
+                aria-label={includeSales ? t("toggleSales") : t("toggleContributions")}
+              />
+              <Label
+                htmlFor="include-sales-toggle"
+                className={`text-xs cursor-pointer ${toggleDisabled ? "text-muted-foreground/50" : "text-muted-foreground"}`}
+              >
+                {includeSales ? t("toggleSales") : t("toggleContributions")}
+              </Label>
+              {salesLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            </div>
+            {toggleDisabled && (
+              <p className="text-xs text-muted-foreground/70 mt-1">{t("toggleDisabled")}</p>
+            )}
+          </div>
+        )}
+
+        {/* Recommended split (contributions-only mode) */}
+        {!loading && !includeSales && drift && drift.length > 0 && contributionSplit && contributionSplit.length > 0 && (
           <div className="border-t pt-3 mt-1">
             <p className="text-xs font-medium text-muted-foreground mb-2">
               {t("recommendedSplit")}{" "}
@@ -223,6 +383,26 @@ export function RebalanceDialog({
           </div>
         )}
 
+        {/* Phase D: Trade recommendations (tax-aware sales mode) */}
+        {!loading && includeSales && !salesLoading && tradeActions && tradeActions.length > 0 &&
+          allowanceUsed !== null && remainingAllowance !== null && (
+            <TradeActionsSection
+              tradeActions={tradeActions}
+              allowanceUsed={allowanceUsed}
+              remainingAllowance={remainingAllowance}
+              currency={currency}
+              labelByKey={labelByKey}
+            />
+          )}
+
+        {/* No trade actions when all instruments are on-target */}
+        {!loading && includeSales && !salesLoading && tradeActions && tradeActions.length === 0 && (
+          <div className="border-t pt-3 mt-1">
+            <p className="text-xs text-muted-foreground">{t("tradeActions")}: —</p>
+          </div>
+        )}
+
+        {salesError && <p className="text-xs text-destructive">{salesError}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
 
         <DialogFooter>

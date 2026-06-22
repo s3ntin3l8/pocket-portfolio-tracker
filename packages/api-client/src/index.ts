@@ -913,6 +913,27 @@ export interface SparplanStats {
    * toward the target weights. Only present when `drift` is present.
    */
   contributionSplit?: SparplanContributionSplit[];
+  /**
+   * Phase D: sell + buy trade recommendations with sells capped by the remaining
+   * Sparerpauschbetrag allowance. Only present when `?includeSales=true` is passed
+   * and the portfolio's holder has a tax profile configured.
+   */
+  tradeActions?: TradeAction[];
+  /**
+   * Tf-adjusted gain that would be realised by the recommended sell actions
+   * (display currency, decimal string). Only present when `tradeActions` is present.
+   */
+  allowanceUsed?: string;
+  /**
+   * Remaining Sparerpauschbetrag after YTD income and realised gains
+   * (display currency, decimal string). Only present when `tradeActions` is present.
+   */
+  remainingAllowance?: string;
+  /**
+   * True when `?includeSales=true` was requested but the portfolio's holder has no
+   * `taxAllowanceAnnual` configured — the toggle should be disabled in the UI.
+   */
+  taxUnavailable?: boolean;
 }
 
 export type TradeMethod = "average" | "fifo";
@@ -1393,8 +1414,11 @@ export function createApiClient(config: ApiClientConfig) {
           ? `/networth/sparplan?holderId=${encodeURIComponent(holderId)}`
           : "/networth/sparplan",
       ),
-    getPortfolioSparplan: (portfolioId: string) =>
-      request<SparplanStats>("GET", `/portfolios/${portfolioId}/sparplan`),
+    getPortfolioSparplan: (portfolioId: string, includeSales?: boolean) =>
+      request<SparplanStats>(
+        "GET",
+        `/portfolios/${portfolioId}/sparplan${includeSales ? "?includeSales=true" : ""}`,
+      ),
     getNetWorthHistory: (range = "1y", opts?: { include?: string[]; exclude?: string[]; holderId?: string }) => {
       const params = new URLSearchParams({ range });
       if (opts?.include?.length) params.set("include", opts.include.join(","));

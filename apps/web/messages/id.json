@@ -964,7 +964,15 @@
     "loadError": "Gagal memuat target yang ada.",
     "saveError": "Gagal menyimpan target.",
     "recommendedSplit": "Pembagian bulanan yang disarankan",
-    "amount": "Jumlah"
+    "amount": "Jumlah",
+    "toggleContributions": "Kontribusi saja",
+    "toggleSales": "Termasuk penjualan (pajak-sadar)",
+    "toggleDisabled": "Konfigurasikan Sparerpauschbetrag untuk pemilik portofolio ini untuk mengaktifkan",
+    "tradeActions": "Rekomendasi transaksi",
+    "sell": "Jual",
+    "buy": "Beli",
+    "allowanceUsed": "Menggunakan {used} dari {remaining} sisa tunjangan bebas pajak",
+    "loadSalesError": "Gagal memuat rekomendasi transaksi."
   },
   "Tax": {
     "title": "Optimasi Pajak",

@@ -31,6 +31,7 @@ import {
   aggregatePortfolios,
   allocationBreakdown,
   rebalancingDrift,
+  rebalancingTrades,
   xirr,
   projectCoupons,
   projectDividends,
@@ -61,6 +62,7 @@ import {
   contributionSplit,
   type SparplanStats,
   type DriftRow,
+  type TradeAction,
 } from "@portfolio/core";
 import { getMarketData } from "../services/market-data.js";
 import { valuePortfolio, type InstrumentMeta } from "../services/valuation.js";
@@ -1361,17 +1363,18 @@ export async function transactionsRoute(app: FastifyInstance) {
   );
 
   // Sparplan detection for a single portfolio (in its base currency).
-  app.get<{ Params: PortfolioParams }>(
+  app.get<{ Params: PortfolioParams; Querystring: { includeSales?: string } }>(
     "/portfolios/:portfolioId/sparplan",
     { preHandler: app.authenticate },
     async (request, reply) => {
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
+      const includeSales = request.query.includeSales === "true";
       const portfolio = await ownedPortfolio(id, portfolioId);
       if (!portfolio) {
         return reply.code(404).send({ error: "portfolio_not_found" });
       }
-      const { coreTxns, summary } = await loadValuation(
+      const { coreTxns, summary, prices, metaById } = await loadValuation(
         portfolioId,
         portfolio.baseCurrency,
         undefined,
@@ -1434,7 +1437,79 @@ export async function transactionsRoute(app: FastifyInstance) {
       }));
       const split = contributionSplit(sleeves, stats.activeMonthlyTotalDisplay);
 
-      return { ...stats, drift, contributionSplit: split };
+      // Phase D: tax-aware trade recommendations when ?includeSales=true.
+      if (!includeSales) {
+        return { ...stats, drift, contributionSplit: split };
+      }
+
+      // Fetch the portfolio's holder tax profile.
+      const holderId = portfolio.accountHolderId;
+      let holderTaxProfile: {
+        taxAllowanceAnnual: string | null;
+        capitalGainsTaxRate: string | null;
+      } | null = null;
+
+      if (holderId) {
+        const [holder] = await app.db
+          .select({
+            taxAllowanceAnnual: accountHolders.taxAllowanceAnnual,
+            capitalGainsTaxRate: accountHolders.capitalGainsTaxRate,
+          })
+          .from(accountHolders)
+          .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
+          .limit(1);
+        if (holder) holderTaxProfile = holder;
+      }
+
+      if (!holderTaxProfile?.taxAllowanceAnnual) {
+        // Tax profile not configured — return existing data with taxUnavailable flag.
+        return { ...stats, drift, contributionSplit: split, taxUnavailable: true };
+      }
+
+      // Compute harvest suggestions using FIFO trade log.
+      const tradeLog = await buildTradeLog(coreTxns, prices, portfolio.baseCurrency, "fifo", undefined, metaById);
+      const tfRates = await tfRatesFor(tradeLog.trades.map((t) => t.instrumentId));
+      const allowanceAnnual = holderTaxProfile.taxAllowanceAnnual;
+      const taxRate = holderTaxProfile.capitalGainsTaxRate ?? "0.25";
+      const usage = allowanceUsageYTD({ tradeLog, tfRates, allowanceAnnual, taxRate });
+      const suggestions = harvestSuggestions({ tradeLog, tfRates, allowanceAnnual, taxRate, usage });
+
+      // Build maxSellByKey: instrumentId → harvestableGross (max tax-free sell value).
+      const maxSellByKey: Record<string, string> = {};
+      for (const s of suggestions) {
+        maxSellByKey[s.instrumentId] = s.harvestableGross;
+      }
+
+      // Compute trade actions with sells capped to the harvestable amount.
+      // totalValue must equal targetedTotal so that deltas are relative to the
+      // targeted-instrument universe (same base the drift percentages map to).
+      const tradeActions: TradeAction[] = rebalancingTrades(drift, String(targetedTotal), {
+        mode: "trade",
+        maxSellByKey,
+      });
+
+      // Compute how much of the allowance would be used by the sell actions.
+      // We sum unrealizedAdjusted for each instrument that has a sell action,
+      // clamped to the remaining allowance.
+      const sellKeys = new Set(tradeActions.filter((a) => a.side === "sell").map((a) => a.key));
+      let allowanceUsedNum = 0;
+      for (const s of suggestions) {
+        if (sellKeys.has(s.instrumentId)) {
+          allowanceUsedNum += Number(s.unrealizedAdjusted);
+        }
+      }
+      // Clamp to remaining allowance so the display never exceeds the budget.
+      const remainingNum = Number(usage.remaining);
+      const allowanceUsed = String(Math.min(allowanceUsedNum, remainingNum).toFixed(2));
+
+      return {
+        ...stats,
+        drift,
+        contributionSplit: split,
+        tradeActions,
+        allowanceUsed,
+        remainingAllowance: usage.remaining,
+      };
     },
   );
 

@@ -69,6 +69,10 @@ describe("sparplan rebalancing (Phase B)", () => {
         "RB-VWCE3": "100.00",
         "RB-EIMI2": "100.00",
         "RB-EIMI3": "100.00",
+        // Phase D symbols.
+        "RB-PHD-VWCE1": "100.00",
+        "RB-PHD-VWCE2": "100.00",
+        "RB-PHD-EIMI2": "100.00",
       })]),
     );
   });
@@ -299,5 +303,146 @@ describe("sparplan rebalancing (Phase B)", () => {
       headers: auth(t2),
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase D: ?includeSales=true
+  // ---------------------------------------------------------------------------
+
+  it("GET /portfolios/:id/sparplan?includeSales=true returns taxUnavailable:true when no tax profile", async () => {
+    const t = await token("rb-phd-notax-1");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const pf = await createPortfolio(t, "PhaseD No Tax");
+
+    const [vwce] = await app.db
+      .insert(instruments)
+      .values({ symbol: "RB-PHD-VWCE1", market: "XETRA", assetClass: "etf", currency: "EUR", name: "Rebal FTSE All-World PD1" })
+      .returning();
+
+    // Add savings plan transactions and targets.
+    const months = ["2026-01-05", "2026-02-05", "2026-03-05"];
+    for (const d of months) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${pf}/transactions`,
+        headers: auth(t),
+        payload: { type: "savings_plan", instrumentId: vwce.id, quantity: "1.0", price: "100.00", currency: "EUR", executedAt: d },
+      });
+    }
+
+    await app.inject({
+      method: "PUT",
+      url: `/portfolios/${pf}/targets`,
+      headers: auth(t),
+      payload: { dimension: "instrument", targets: [{ key: vwce.id, targetPct: 100 }] },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/sparplan?includeSales=true`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.taxUnavailable).toBe(true);
+    expect(body.tradeActions).toBeUndefined();
+    // drift + contributionSplit still present even when taxUnavailable.
+    expect(body.drift).toBeDefined();
+    expect(body.contributionSplit).toBeDefined();
+  });
+
+  it("GET /portfolios/:id/sparplan?includeSales=true returns tradeActions when tax profile is set and positions are imbalanced", async () => {
+    const t = await token("rb-phd-withtax-1");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+
+    // Create holder with tax allowance.
+    const holderRes = await app.inject({
+      method: "POST",
+      url: "/account-holders",
+      headers: auth(t),
+      payload: { name: "DE Holder PD", type: "self", taxAllowanceAnnual: "1000", capitalGainsTaxRate: "0.25" },
+    });
+    const holderId = holderRes.json().id as string;
+
+    const pf = await createPortfolio(t, "PhaseD With Tax");
+    // Link holder to portfolio.
+    await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${pf}`,
+      headers: auth(t),
+      payload: { accountHolderId: holderId },
+    });
+
+    // Insert two instruments with unique symbols for this test.
+    const [vwce] = await app.db
+      .insert(instruments)
+      .values({ symbol: "RB-PHD-VWCE2", market: "XETRA", assetClass: "etf", currency: "EUR", name: "Rebal FTSE All-World PD2" })
+      .returning();
+    const [eimi] = await app.db
+      .insert(instruments)
+      .values({ symbol: "RB-PHD-EIMI2", market: "XETRA", assetClass: "etf", currency: "EUR", name: "Rebal EM IMI PD2" })
+      .returning();
+
+    // VWCE: 9 units at €100 = €900 (90% of targeted total); target 70% → overweight.
+    // EIMI: 1 unit at €100 = €100 (10% of targeted total); target 30% → underweight.
+    // Use a buy (not savings_plan) at a lower price to create unrealized gain for harvest.
+    const months = ["2025-01-05", "2025-02-05"];
+    for (const d of months) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${pf}/transactions`,
+        headers: auth(t),
+        payload: { type: "buy", instrumentId: vwce.id, quantity: "4.5", price: "80.00", currency: "EUR", executedAt: d },
+      });
+    }
+    for (const d of months) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${pf}/transactions`,
+        headers: auth(t),
+        payload: { type: "buy", instrumentId: eimi.id, quantity: "0.5", price: "80.00", currency: "EUR", executedAt: d },
+      });
+    }
+
+    // Set targets: 70% VWCE / 30% EIMI.
+    await app.inject({
+      method: "PUT",
+      url: `/portfolios/${pf}/targets`,
+      headers: auth(t),
+      payload: {
+        dimension: "instrument",
+        targets: [
+          { key: vwce.id, targetPct: 70 },
+          { key: eimi.id, targetPct: 30 },
+        ],
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/sparplan?includeSales=true`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    // No taxUnavailable flag — tax profile is configured.
+    expect(body.taxUnavailable).toBeUndefined();
+
+    // tradeActions should be an array (sells + buys).
+    expect(body.tradeActions).toBeDefined();
+    expect(Array.isArray(body.tradeActions)).toBe(true);
+
+    // With VWCE over-weight and EIMI under-weight, expect at least one buy.
+    const buys = body.tradeActions.filter((a: { side: string }) => a.side === "buy");
+    expect(buys.length).toBeGreaterThan(0);
+
+    // Allowance fields should be present.
+    expect(body.allowanceUsed).toBeDefined();
+    expect(body.remainingAllowance).toBeDefined();
+
+    // drift and contributionSplit still present.
+    expect(body.drift).toBeDefined();
+    expect(body.contributionSplit).toBeDefined();
   });
 });
