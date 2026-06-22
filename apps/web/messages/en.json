@@ -966,7 +966,15 @@
     "loadError": "Could not load existing targets.",
     "saveError": "Could not save targets.",
     "recommendedSplit": "Recommended monthly split",
-    "amount": "Amount"
+    "amount": "Amount",
+    "toggleContributions": "Contributions only",
+    "toggleSales": "Include sales (tax-aware)",
+    "toggleDisabled": "Configure a Sparerpauschbetrag for this portfolio's holder to enable",
+    "tradeActions": "Trade recommendations",
+    "sell": "Sell",
+    "buy": "Buy",
+    "allowanceUsed": "Uses {used} of {remaining} remaining allowance tax-free",
+    "loadSalesError": "Could not load trade recommendations."
   },
   "Tax": {
     "title": "Tax Optimization",

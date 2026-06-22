@@ -124,6 +124,70 @@ describe("rebalancingTrades (trade mode)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// rebalancingTrades — mode "trade" with maxSellByKey (Phase D)
+// ---------------------------------------------------------------------------
+
+describe("rebalancingTrades (trade mode) with maxSellByKey", () => {
+  const baseDrift = [
+    { key: "equity", targetPct: 70, actualPct: 80, driftPct: 10, actualValue: "8000", status: "over" as const },
+    { key: "bond", targetPct: 30, actualPct: 20, driftPct: -10, actualValue: "2000", status: "under" as const },
+  ];
+
+  it("caps sell to maxSellByKey when cap is smaller than computed delta", () => {
+    // Uncapped: sell 1000. With cap = 400 → sell 400.
+    const actions = rebalancingTrades(baseDrift, "10000", {
+      mode: "trade",
+      maxSellByKey: { equity: "400.00" },
+    });
+    const equityAction = actions.find((a) => a.key === "equity")!;
+    expect(equityAction.side).toBe("sell");
+    expect(Number(equityAction.deltaValue)).toBeCloseTo(400, 0);
+    // Buy side is not affected by the sell cap.
+    const bondAction = actions.find((a) => a.key === "bond")!;
+    expect(bondAction.side).toBe("buy");
+    expect(Number(bondAction.deltaValue)).toBeCloseTo(1000, 0);
+  });
+
+  it("does not cap sell when cap is larger than computed delta", () => {
+    // Uncapped: sell 1000. With cap = 2000 → sell 1000 (no effect).
+    const actions = rebalancingTrades(baseDrift, "10000", {
+      mode: "trade",
+      maxSellByKey: { equity: "2000.00" },
+    });
+    const equityAction = actions.find((a) => a.key === "equity")!;
+    expect(Number(equityAction.deltaValue)).toBeCloseTo(1000, 0);
+  });
+
+  it("drops sell action when cap is zero", () => {
+    // Cap of "0" means no harvesting headroom → sell action is dropped entirely.
+    const actions = rebalancingTrades(baseDrift, "10000", {
+      mode: "trade",
+      maxSellByKey: { equity: "0" },
+    });
+    expect(actions.find((a) => a.key === "equity")).toBeUndefined();
+    // Buy still present.
+    expect(actions.find((a) => a.key === "bond")).toBeDefined();
+  });
+
+  it("does not affect buy actions via maxSellByKey", () => {
+    // Providing a maxSellByKey for a buy-side key has no effect.
+    const actions = rebalancingTrades(baseDrift, "10000", {
+      mode: "trade",
+      maxSellByKey: { bond: "50.00" }, // bond is a buy — cap is ignored
+    });
+    const bondAction = actions.find((a) => a.key === "bond")!;
+    expect(Number(bondAction.deltaValue)).toBeCloseTo(1000, 0);
+  });
+
+  it("contributions-only path (no maxSellByKey) is unchanged", () => {
+    // Baseline without any cap — same as the existing "produces buy and sell" test.
+    const actions = rebalancingTrades(baseDrift, "10000", { mode: "trade" });
+    const equityAction = actions.find((a) => a.key === "equity")!;
+    expect(Number(equityAction.deltaValue)).toBeCloseTo(1000, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // rebalancingTrades — mode "newCash"
 // ---------------------------------------------------------------------------
 

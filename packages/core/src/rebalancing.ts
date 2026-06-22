@@ -140,7 +140,14 @@ export function rebalancingDrift(
 export function rebalancingTrades(
   drift: DriftRow[],
   totalValue: string,
-  opts: { mode: "trade" | "newCash"; newCash?: string },
+  opts: {
+    mode: "trade" | "newCash";
+    newCash?: string;
+    /** Per-key maximum sell value (display currency). When provided, sell
+     *  actions are capped at this amount. Used to bound sells within the
+     *  remaining Sparerpauschbetrag headroom. */
+    maxSellByKey?: Record<string, string>;
+  },
 ): TradeAction[] {
   const { mode } = opts;
   const total = new Decimal(totalValue);
@@ -157,11 +164,23 @@ export function rebalancingTrades(
         const actualValue = new Decimal(d.actualValue);
         const delta = targetValue.minus(actualValue).abs().toDecimalPlaces(2);
 
-        return {
+        const action: TradeAction = {
           key: d.key,
           deltaValue: delta.toString(),
           side: (d.status === "under" ? "buy" : "sell") as "buy" | "sell",
         };
+
+        // Cap sell actions to the provided maximum (e.g. harvestable amount within
+        // the remaining Sparerpauschbetrag). A cap of "0" drops the action after
+        // the filter below.
+        if (action.side === "sell" && opts.maxSellByKey?.[action.key] !== undefined) {
+          const cap = new Decimal(opts.maxSellByKey[action.key]);
+          action.deltaValue = Decimal.min(new Decimal(action.deltaValue), cap)
+            .toDecimalPlaces(2)
+            .toString();
+        }
+
+        return action;
       })
       .filter((a) => new Decimal(a.deltaValue).gt(0));
   }
