@@ -167,10 +167,17 @@ export class EodhdProvider implements MarketDataProvider {
   }
 
   /**
-   * Fetch instrument profile (sector, industry, country) from the EODHD
-   * `/fundamentals/<ticker>` endpoint. Uses `filter=General` to limit the
-   * response to the top-level metadata object and avoid transferring the full
-   * fundamentals payload (~100 KB+).
+   * Fetch instrument profile (sector/weights, industry, country) from the EODHD
+   * `/fundamentals/<ticker>` endpoint.
+   *
+   * - **Stocks (equity):** uses `filter=General` for a lightweight response; reads
+   *   `Sector` → `profile.sector`.
+   * - **ETFs:** fetches the full fundamentals payload to access `ETF_Data.Sector_Weights`
+   *   (proportional weights per GICS-style sector, e.g. `{ "Technology": 0.29, … }`).
+   *   Returns `profile.sectorWeights`; `profile.sector` is left null for ETFs.
+   *
+   * Returns null when the ticker can't be resolved, the provider errors, or no
+   * useful data is returned.
    *
    * Only supports equity and ETF — returns null for other asset classes.
    */
@@ -179,27 +186,88 @@ export class EodhdProvider implements MarketDataProvider {
     if (!ticker) return null;
 
     try {
-      const res = await this.doFetch(
-        `${this.baseUrl}/fundamentals/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json&filter=General`,
-      );
-      if (!res.ok) return null;
-      const data = (await res.json()) as {
-        Sector?: string;
-        Industry?: string;
-        CountryName?: string;
-        // When filter=General is used EODHD flattens the General object to the root.
-        // Without the filter, it would be nested as data.General.Sector.
-      } | null;
-      if (!data || typeof data !== "object") return null;
-
-      const sector = data.Sector && data.Sector !== "N/A" ? data.Sector : null;
-      const industry = data.Industry && data.Industry !== "N/A" ? data.Industry : null;
-      const country = data.CountryName && data.CountryName !== "N/A" ? data.CountryName : null;
-
-      if (!sector && !industry && !country) return null;
-      return { sector, industry, country };
+      if (ref.assetClass === "etf") {
+        return await this._getEtfProfile(ticker);
+      }
+      return await this._getEquityProfile(ticker);
     } catch {
       return null;
     }
+  }
+
+  /** Fetch sector/industry/country for a single-company equity via `filter=General`. */
+  private async _getEquityProfile(ticker: string): Promise<InstrumentProfile | null> {
+    const res = await this.doFetch(
+      `${this.baseUrl}/fundamentals/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json&filter=General`,
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      Sector?: string;
+      Industry?: string;
+      CountryName?: string;
+      // When filter=General EODHD flattens the General sub-object to the root.
+    } | null;
+    if (!data || typeof data !== "object") return null;
+
+    const sector = data.Sector && data.Sector !== "N/A" ? data.Sector : null;
+    const industry = data.Industry && data.Industry !== "N/A" ? data.Industry : null;
+    const country = data.CountryName && data.CountryName !== "N/A" ? data.CountryName : null;
+
+    if (!sector && !industry && !country) return null;
+    return { sector, industry, country };
+  }
+
+  /**
+   * Fetch per-sector weights for an ETF from `ETF_Data.Sector_Weights`.
+   *
+   * EODHD response shape (under ETF_Data):
+   *   "Sector_Weights": {
+   *     "Technology": { "Equity_%": "29.50", "Relative_to_Category": "..." },
+   *     "Financials":  { "Equity_%": "13.40", … },
+   *     …
+   *   }
+   *
+   * We parse `Equity_%` / 100 for each sector, drop zero / "N/A" entries, and
+   * return the resulting fraction map. Returns null when the ETF has no weight data.
+   */
+  private async _getEtfProfile(ticker: string): Promise<InstrumentProfile | null> {
+    const res = await this.doFetch(
+      `${this.baseUrl}/fundamentals/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json`,
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      General?: { CountryName?: string };
+      ETF_Data?: {
+        Sector_Weights?: Record<string, { Equity_?: string; "Equity_%"?: string }>;
+      };
+    } | null;
+    if (!data || typeof data !== "object") return null;
+
+    const country =
+      data.General?.CountryName && data.General.CountryName !== "N/A"
+        ? data.General.CountryName
+        : null;
+
+    const rawWeights = data.ETF_Data?.Sector_Weights;
+    if (!rawWeights || typeof rawWeights !== "object") {
+      // ETF exists but EODHD has no weight data — signal an attempt with no results.
+      return country ? { sectorWeights: null, country } : null;
+    }
+
+    // Parse fraction weights, dropping zero / missing / "N/A" entries.
+    const weights: Record<string, number> = {};
+    for (const [sector, val] of Object.entries(rawWeights)) {
+      if (!val || typeof val !== "object") continue;
+      // EODHD uses "Equity_%" as the key (note the percent sign).
+      const raw = val["Equity_%"] ?? val["Equity_"];
+      if (!raw || raw === "N/A") continue;
+      const pct = parseFloat(raw);
+      if (!Number.isFinite(pct) || pct <= 0) continue;
+      weights[sector] = pct / 100;
+    }
+
+    const sectorWeights = Object.keys(weights).length > 0 ? weights : null;
+    if (!sectorWeights && !country) return null;
+    return { sectorWeights, country };
   }
 }

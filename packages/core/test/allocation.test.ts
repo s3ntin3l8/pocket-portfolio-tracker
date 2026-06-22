@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   allocationBreakdown,
   concentration,
+  normalizeSector,
   summarizePortfolio,
   type CoreTransaction,
   type AllocationInstrumentMeta,
@@ -17,6 +18,7 @@ const BBCA = "inst-bbca"; // IDX equity, IDR-quoted
 const XETR = "inst-xetr"; // XETRA equity, EUR-quoted
 const GOLD = "inst-gold"; // XAU gold, IDR-quoted
 const BOND = "inst-bond"; // BEI bond, IDR-quoted
+const ETF  = "inst-etf";  // US ETF (e.g. S&P 500), USD-quoted
 
 function tx(p: Partial<CoreTransaction> & { instrumentId?: string | null }): CoreTransaction {
   return {
@@ -255,6 +257,110 @@ describe("allocationBreakdown — bySector", () => {
     );
     expect(tech).toBeDefined();
     expect(Math.abs(Number(tech!.value) - 17_600_000)).toBeLessThan(TOLERANCE_IDR);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allocationBreakdown — ETF proportional look-through
+// ---------------------------------------------------------------------------
+
+describe("allocationBreakdown — ETF sectorWeights look-through", () => {
+  /**
+   * ETF with value = 10 000 IDR, weights: Technology 60%, Financials 30%,
+   * remainder 10% → "Other".
+   * fx: 1 USD = 16 000 IDR (same as EUR for simplicity in this isolated test).
+   */
+  const ETF_WEIGHT_INSTRUMENTS: Record<string, AllocationInstrumentMeta> = {
+    [ETF]: {
+      assetClass: "etf",
+      market: "US",
+      sector: null,
+      sectorWeights: { Technology: 0.6, Financials: 0.3 }, // sum = 0.9 → 0.1 remainder
+      name: "SP500 ETF",
+    },
+  };
+
+  function makeEtfSummary(): PortfolioSummary {
+    return summarizePortfolio({
+      transactions: [
+        // Deposit then buy ETF so cash = 0
+        { instrumentId: null, type: "deposit", price: "1", quantity: "1", fees: "0", currency: "IDR", executedAt: new Date("2026-01-01") },
+        { instrumentId: ETF,  type: "buy",     price: "1", quantity: "1", fees: "0", currency: "IDR", executedAt: new Date("2026-01-01") },
+      ],
+      prices: { [ETF]: { price: "10000", currency: "IDR" } },
+      displayCurrency: "IDR",
+      cashCounted: true,
+      fxRate: (_f, _t) => "1",
+    });
+  }
+
+  it("Technology slice ≈ 6 000 IDR (60% of 10 000)", () => {
+    const result = allocationBreakdown(makeEtfSummary(), ETF_WEIGHT_INSTRUMENTS);
+    const tech = result.bySector.find((s) => s.key === "Technology");
+    expect(tech).toBeDefined();
+    expect(Math.abs(Number(tech!.value) - 6_000)).toBeLessThan(1);
+  });
+
+  it("Financials slice ≈ 3 000 IDR (30% of 10 000)", () => {
+    const result = allocationBreakdown(makeEtfSummary(), ETF_WEIGHT_INSTRUMENTS);
+    const fin = result.bySector.find((s) => s.key === "Financials");
+    expect(fin).toBeDefined();
+    expect(Math.abs(Number(fin!.value) - 3_000)).toBeLessThan(1);
+  });
+
+  it("'Other' remainder slice ≈ 1 000 IDR (10% gap)", () => {
+    const result = allocationBreakdown(makeEtfSummary(), ETF_WEIGHT_INSTRUMENTS);
+    const other = result.bySector.find((s) => s.key === "Other");
+    expect(other).toBeDefined();
+    expect(Math.abs(Number(other!.value) - 1_000)).toBeLessThan(1);
+  });
+
+  it("sector slices reconcile: Technology + Financials + Other = total holding value", () => {
+    const result = allocationBreakdown(makeEtfSummary(), ETF_WEIGHT_INSTRUMENTS);
+    const total = result.bySector.reduce((acc, s) => acc + Number(s.value), 0);
+    // ETF market value is 10 000; allow tiny floating-point rounding
+    expect(Math.abs(total - 10_000)).toBeLessThan(0.01);
+  });
+
+  it("ETF with weights summing to exactly 1 produces no 'Other' bucket", () => {
+    const exactInst: Record<string, AllocationInstrumentMeta> = {
+      [ETF]: { assetClass: "etf", market: "US", sectorWeights: { Technology: 0.5, Financials: 0.5 } },
+    };
+    const result = allocationBreakdown(makeEtfSummary(), exactInst);
+    expect(result.bySector.find((s) => s.key === "Other")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeSector
+// ---------------------------------------------------------------------------
+
+describe("normalizeSector", () => {
+  it("normalizes known ETF alias 'Financial Services' → 'Financials'", () => {
+    expect(normalizeSector("Financial Services")).toBe("Financials");
+  });
+
+  it("normalizes 'Consumer Defensive' → 'Consumer Staples'", () => {
+    expect(normalizeSector("Consumer Defensive")).toBe("Consumer Staples");
+  });
+
+  it("normalizes 'Consumer Cyclical' → 'Consumer Discretionary'", () => {
+    expect(normalizeSector("Consumer Cyclical")).toBe("Consumer Discretionary");
+  });
+
+  it("normalizes 'Healthcare' → 'Health Care'", () => {
+    expect(normalizeSector("Healthcare")).toBe("Health Care");
+  });
+
+  it("passes through unknown sector names unchanged", () => {
+    expect(normalizeSector("Technology")).toBe("Technology");
+    expect(normalizeSector("Energy")).toBe("Energy");
+  });
+
+  it("ETF 'Financial Services' and stock 'Financials' land in the same bucket", () => {
+    // If an ETF has 'Financial Services' and a stock has 'Financials', they should
+    // aggregate together after normalization.
+    expect(normalizeSector("Financial Services")).toBe(normalizeSector("Financials"));
   });
 });
 

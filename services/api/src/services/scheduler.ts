@@ -163,6 +163,29 @@ export async function enqueueRecompute(portfolioId: string, fromDate: string): P
   }
 }
 
+/** 6 hours — repeated dashboard loads within this window collapse to one sweep. */
+const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60;
+
+/**
+ * Enqueue a sector-enrichment sweep, debounced so repeated dashboard requests
+ * within a 6-hour window collapse to a single job execution. Fire-and-forget —
+ * call with `void enqueueInstrumentMetadata()`.
+ *
+ * No-op when pg-boss is unavailable (PGlite / tests).
+ */
+export async function enqueueInstrumentMetadata(): Promise<void> {
+  if (!activeBoss) return;
+  try {
+    await activeBoss.send(
+      INSTRUMENT_META_QUEUE,
+      {},
+      { singletonKey: "sector-self-heal", singletonSeconds: INSTRUMENT_META_SINGLETON_SECONDS },
+    );
+  } catch {
+    // non-fatal
+  }
+}
+
 function usesPglite(url: string): boolean {
   return !url || url.startsWith("pglite://");
 }

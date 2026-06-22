@@ -61,7 +61,8 @@ import { valuePortfolio, type InstrumentMeta } from "../services/valuation.js";
 import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../services/fx.js";
 import { rangeStart } from "../services/snapshots.js";
 import { requireUser } from "../plugins/auth.js";
-import { enqueueRecompute } from "../services/scheduler.js";
+import { enqueueRecompute, enqueueInstrumentMetadata } from "../services/scheduler.js";
+import { needsSectorEnrichment } from "../services/instrument-metadata.js";
 import { flattenJoinRow } from "../lib/portfolio.js";
 
 interface PortfolioParams {
@@ -109,7 +110,16 @@ export async function transactionsRoute(app: FastifyInstance) {
     return new Map(
       rows.map((i) => [
         i.id,
-        { symbol: i.symbol, name: i.name, assetClass: i.assetClass, unit: i.unit, market: i.market, sector: i.sector ?? null },
+        {
+          symbol: i.symbol,
+          name: i.name,
+          assetClass: i.assetClass,
+          unit: i.unit,
+          market: i.market,
+          sector: i.sector ?? null,
+          sectorWeights: (i.sectorWeights as Record<string, number> | null) ?? null,
+          sectorCheckedAt: i.sectorCheckedAt ? new Date(i.sectorCheckedAt) : null,
+        },
       ]),
     );
   }
@@ -937,6 +947,11 @@ export async function transactionsRoute(app: FastifyInstance) {
         costBasisFromQuery(request.query),
         portfolio.cashCounted,
       );
+      // Self-heal: enqueue a sector sweep if any held instrument hasn't been
+      // enriched yet (or has a stale attempt). Debounced to once per 6h.
+      if (needsSectorEnrichment([...metaById.values()])) {
+        void enqueueInstrumentMetadata();
+      }
       return {
         ...summary,
         holdings: summary.holdings.map((h) => ({
@@ -1136,6 +1151,12 @@ export async function transactionsRoute(app: FastifyInstance) {
         ...h,
         instrument: meta.get(h.instrumentId) ?? null,
       }));
+
+      // Self-heal: enqueue a sector sweep if any held instrument hasn't been
+      // enriched yet (or has a stale attempt). Debounced to once per 6h.
+      if (needsSectorEnrichment([...meta.values()])) {
+        void enqueueInstrumentMetadata();
+      }
 
       const asOf = new Date();
       flows.push({ amount: Number(aggregated.netWorth), date: asOf });
