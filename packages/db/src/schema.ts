@@ -193,6 +193,19 @@ export const instruments = pgTable(
      *  Null until enriched; instruments where sector is not meaningful (gold,
      *  cash, mutual funds) are intentionally left null. */
     sector: text("sector"),
+    /**
+     * Per-sector allocation weights for ETFs (GICS sector → fraction 0–1).
+     * Populated by the refresh-instrument-metadata job from EODHD ETF_Data.
+     * Null for non-ETFs (they use the single `sector` field instead).
+     * Example: { "Technology": 0.29, "Financials": 0.13, … }
+     */
+    sectorWeights: jsonb("sector_weights").$type<Record<string, number>>(),
+    /**
+     * Timestamp of the last sector enrichment *attempt* (even when the provider
+     * returned nothing). Used to avoid re-querying instruments indefinitely when
+     * the provider has no sector data for them. Null = never attempted.
+     */
+    sectorCheckedAt: timestamp("sector_checked_at", { withTimezone: true }),
     // Bond-specific (nullable for non-bonds).
     faceValue: numeric("face_value"),
     couponRate: numeric("coupon_rate"),

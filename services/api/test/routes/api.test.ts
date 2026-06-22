@@ -341,7 +341,7 @@ describe("auth + portfolios + transactions", () => {
       url: `/portfolios/${portfolioId}/transactions`,
       headers: auth(t),
     });
-    expect(txList.json()[0].instrument).toEqual({
+    expect(txList.json()[0].instrument).toMatchObject({
       symbol: "BBCA",
       name: "BCA",
       assetClass: "equity",
@@ -367,7 +367,7 @@ describe("auth + portfolios + transactions", () => {
     // BBCA priced at 9500 by the fixture provider → 100 * 9500 market value.
     expect(summary.totalMarketValue).toBe("950000");
     expect(summary.holdings[0].marketValue).toBe("950000");
-    expect(summary.holdings[0].instrument).toEqual({
+    expect(summary.holdings[0].instrument).toMatchObject({
       symbol: "BBCA",
       name: "BCA",
       assetClass: "equity",

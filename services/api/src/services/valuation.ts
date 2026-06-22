@@ -22,6 +22,13 @@ export interface InstrumentMeta {
   market: string;
   /** GICS-style sector populated by the refresh-instrument-metadata job; null until enriched. */
   sector: string | null;
+  /**
+   * Per-sector allocation weights for ETFs (GICS-style sector name → fraction 0–1).
+   * Null for non-ETFs. Used for proportional sector look-through in allocationBreakdown.
+   */
+  sectorWeights: Record<string, number> | null;
+  /** Timestamp of last sector enrichment attempt; null = never attempted. */
+  sectorCheckedAt: Date | null;
 }
 
 export interface Valuation {
@@ -67,7 +74,16 @@ export async function valuePortfolio(
   const metaById = new Map<string, InstrumentMeta>(
     instrumentRows.map((i) => [
       i.id,
-      { symbol: i.symbol, name: i.name, assetClass: i.assetClass, unit: i.unit, market: i.market, sector: i.sector ?? null },
+      {
+        symbol: i.symbol,
+        name: i.name,
+        assetClass: i.assetClass,
+        unit: i.unit,
+        market: i.market,
+        sector: i.sector ?? null,
+        sectorWeights: (i.sectorWeights as Record<string, number> | null) ?? null,
+        sectorCheckedAt: i.sectorCheckedAt ? new Date(i.sectorCheckedAt) : null,
+      },
     ]),
   );
 

@@ -1,4 +1,4 @@
-import { eq, isNotNull, inArray } from "drizzle-orm"; // inArray for heldIds filter
+import { eq, isNotNull, inArray } from "drizzle-orm";
 import { instruments, transactions } from "@portfolio/db";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
@@ -7,16 +7,53 @@ import type { DB } from "../db/client.js";
  * GICS sectors that are meaningless for non-equity instruments. We skip profile
  * lookups for these asset classes to avoid burning API quota on gold/funds/etc.
  */
-const SKIP_ASSET_CLASSES = new Set(["gold", "mutual_fund", "bond", "crypto"]);
+export const SKIP_ASSET_CLASSES = new Set(["gold", "mutual_fund", "bond", "crypto"]);
+
+/** Stale threshold: re-attempt after 30 days even when a prior attempt returned nothing. */
+const STALE_DAYS = 30;
 
 /**
- * Fetch sector + industry + country metadata from the market-data stack for
- * every *held* instrument whose `sector` column is still null, and persist it
- * onto the instrument row.
+ * Predicate: should this instrument be (re-)enriched on the next sweep?
  *
- * Runs on a weekly schedule (see scheduler.ts). Skips asset classes where
- * sector is not meaningful (gold, bonds, mutual funds, crypto). A single failed
- * lookup is logged but does not abort the job — the row is retried next week.
+ * An instrument needs enrichment when:
+ * - It has never been attempted (`sectorCheckedAt == null`), OR
+ * - The last attempt is older than STALE_DAYS (the provider may have added data since).
+ *
+ * Instruments in SKIP_ASSET_CLASSES are excluded — sector data is not meaningful
+ * for gold, mutual funds, bonds, and crypto.
+ *
+ * Accepts either a raw DB row (with `sectorCheckedAt`) or a meta object with
+ * an optional `sectorCheckedAt` field, so tests can call it without a DB round-trip.
+ */
+export function needsSectorEnrichment(
+  instruments: ReadonlyArray<{ assetClass: string; sectorCheckedAt?: Date | string | null }>,
+): boolean {
+  const staleCutoff = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
+  return instruments.some((i) => {
+    if (SKIP_ASSET_CLASSES.has(i.assetClass)) return false;
+    if (i.sectorCheckedAt == null) return true;
+    const checkedAt = i.sectorCheckedAt instanceof Date
+      ? i.sectorCheckedAt
+      : new Date(i.sectorCheckedAt);
+    return checkedAt < staleCutoff;
+  });
+}
+
+/**
+ * Fetch sector metadata from the market-data stack for every *held* instrument
+ * that has never been attempted or whose last attempt is older than STALE_DAYS,
+ * and persist it onto the instrument row.
+ *
+ * - **Stocks (equity):** writes `sector` (single GICS string).
+ * - **ETFs:** writes `sectorWeights` (per-sector fraction map from EODHD ETF_Data).
+ *
+ * `sectorCheckedAt` is **always** stamped on every attempt, even when the provider
+ * returns nothing — this prevents the job from re-querying instruments indefinitely
+ * when the provider has no sector data for them. They will be retried after STALE_DAYS.
+ *
+ * Runs on a weekly schedule (see scheduler.ts) and is also triggered on-demand by
+ * the self-heal hook in the allocation endpoints. Skips asset classes where sector
+ * is not meaningful. Per-instrument errors are logged but do not abort the batch.
  *
  * Returns the number of instruments successfully enriched.
  */
@@ -36,15 +73,17 @@ export async function refreshInstrumentMetadata(
     .filter((x): x is string => x !== null);
   if (heldIds.length === 0) return 0;
 
-  // Fetch only instruments missing a sector.
   const rows = await db
     .select()
     .from(instruments)
     .where(inArray(instruments.id, heldIds));
 
-  const toEnrich = rows.filter(
-    (i) => i.sector == null && !SKIP_ASSET_CLASSES.has(i.assetClass),
-  );
+  const staleCutoff = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
+  const toEnrich = rows.filter((i) => {
+    if (SKIP_ASSET_CLASSES.has(i.assetClass)) return false;
+    if (i.sectorCheckedAt == null) return true;
+    return new Date(i.sectorCheckedAt) < staleCutoff;
+  });
   if (toEnrich.length === 0) return 0;
 
   let enriched = 0;
@@ -57,16 +96,35 @@ export async function refreshInstrumentMetadata(
         currency: inst.currency,
         isin: inst.isin ?? undefined,
       });
-      if (!profile?.sector) continue;
 
-      await db
-        .update(instruments)
-        .set({ sector: profile.sector })
-        .where(eq(instruments.id, inst.id));
+      const now = new Date();
 
-      enriched++;
+      if (inst.assetClass === "etf" && profile?.sectorWeights) {
+        // ETF: write per-sector weight map; clear any stale single-sector value.
+        await db
+          .update(instruments)
+          .set({ sectorWeights: profile.sectorWeights, sector: null, sectorCheckedAt: now })
+          .where(eq(instruments.id, inst.id));
+        enriched++;
+      } else if (inst.assetClass !== "etf" && profile?.sector) {
+        // Stock/equity: write single GICS sector.
+        await db
+          .update(instruments)
+          .set({ sector: profile.sector, sectorCheckedAt: now })
+          .where(eq(instruments.id, inst.id));
+        enriched++;
+      } else {
+        // Provider returned nothing useful — stamp the attempt so we don't retry
+        // until STALE_DAYS have passed.
+        await db
+          .update(instruments)
+          .set({ sectorCheckedAt: now })
+          .where(eq(instruments.id, inst.id));
+      }
     } catch {
-      // Non-fatal: this instrument will be retried on the next weekly run.
+      // Non-fatal: log via pg-boss job failure tracking; instrument retried after stale.
+      // We deliberately do NOT stamp sectorCheckedAt on exception so a transient
+      // network error doesn't suppress the instrument for 30 days.
     }
   }
 

@@ -88,6 +88,7 @@ export {
 export {
   allocationBreakdown,
   concentration,
+  normalizeSector,
   type AllocationInstrumentMeta,
   type AllocationSlice,
   type TopHolding,

@@ -936,6 +936,90 @@ describe("EodhdProvider", () => {
     });
     expect(await down.getQuote(xetra)).toBeNull();
   });
+
+  // ── getProfile tests ──────────────────────────────────────────────────────
+
+  it("getProfile: equity returns sector from General.Sector (filter=General)", async () => {
+    const msft: InstrumentRef = { symbol: "MSFT", market: "US", assetClass: "equity", currency: "USD" };
+    const p = new EodhdProvider({
+      apiKey: "k",
+      fetch: mockFetch(() => ({
+        body: { Sector: "Technology", Industry: "Software—Infrastructure", CountryName: "United States" },
+      })),
+    });
+    const profile = await p.getProfile(msft);
+    expect(profile).not.toBeNull();
+    expect(profile?.sector).toBe("Technology");
+    expect(profile?.industry).toBe("Software—Infrastructure");
+    expect(profile?.country).toBe("United States");
+    // Equities do not return sectorWeights.
+    expect(profile?.sectorWeights).toBeUndefined();
+  });
+
+  it("getProfile: equity treats 'N/A' as null and returns null if all fields are N/A", async () => {
+    const msft: InstrumentRef = { symbol: "MSFT", market: "US", assetClass: "equity", currency: "USD" };
+    const p = new EodhdProvider({
+      apiKey: "k",
+      fetch: mockFetch(() => ({ body: { Sector: "N/A", Industry: "N/A", CountryName: "N/A" } })),
+    });
+    expect(await p.getProfile(msft)).toBeNull();
+  });
+
+  it("getProfile: ETF returns sectorWeights from ETF_Data.Sector_Weights", async () => {
+    const etf: InstrumentRef = { symbol: "SPY", market: "US", assetClass: "etf", currency: "USD" };
+    const p = new EodhdProvider({
+      apiKey: "k",
+      fetch: mockFetch(() => ({
+        body: {
+          General: { CountryName: "United States" },
+          ETF_Data: {
+            Sector_Weights: {
+              Technology:  { "Equity_%": "29.50", Relative_to_Category: "..." },
+              Financials:  { "Equity_%": "13.40", Relative_to_Category: "..." },
+              Healthcare:  { "Equity_%": "0",     Relative_to_Category: "..." }, // zero → excluded
+              Industrials: { "Equity_%": "N/A",   Relative_to_Category: "..." }, // N/A → excluded
+            },
+          },
+        },
+      })),
+    });
+    const profile = await p.getProfile(etf);
+    expect(profile).not.toBeNull();
+    expect(profile?.sectorWeights).toEqual({
+      Technology: 0.295,
+      Financials: 0.134,
+    });
+    // ETF does not return a single sector string.
+    expect(profile?.sector).toBeUndefined();
+    expect(profile?.country).toBe("United States");
+  });
+
+  it("getProfile: ETF with no ETF_Data returns null", async () => {
+    const etf: InstrumentRef = { symbol: "UNKNOWN_ETF", market: "US", assetClass: "etf", currency: "USD" };
+    const p = new EodhdProvider({
+      apiKey: "k",
+      fetch: mockFetch(() => ({ body: { General: { CountryName: "N/A" } } })),
+    });
+    expect(await p.getProfile(etf)).toBeNull();
+  });
+
+  it("getProfile: ETF with empty Sector_Weights returns null (no country either)", async () => {
+    const etf: InstrumentRef = { symbol: "EMPTY_ETF", market: "US", assetClass: "etf", currency: "USD" };
+    const p = new EodhdProvider({
+      apiKey: "k",
+      fetch: mockFetch(() => ({ body: { ETF_Data: { Sector_Weights: {} } } })),
+    });
+    expect(await p.getProfile(etf)).toBeNull();
+  });
+
+  it("getProfile: returns null on HTTP error", async () => {
+    const msft: InstrumentRef = { symbol: "MSFT", market: "US", assetClass: "equity", currency: "USD" };
+    const p = new EodhdProvider({
+      apiKey: "k",
+      fetch: mockFetch(() => ({ ok: false, body: {} })),
+    });
+    expect(await p.getProfile(msft)).toBeNull();
+  });
 });
 
 describe("OpenFigiProvider", () => {

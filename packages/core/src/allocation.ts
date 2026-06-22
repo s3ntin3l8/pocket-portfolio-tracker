@@ -9,8 +9,19 @@ export interface AllocationInstrumentMeta {
   assetClass: string;
   /** IDX, XETRA, XAU, US, NYSE, NASDAQ, … — used to infer a region bucket. */
   market: string;
-  /** GICS-style sector, or null/undefined when not yet enriched. */
+  /** GICS-style sector for individual stocks, or null when not yet enriched.
+   *  For ETFs, use `sectorWeights` instead. */
   sector?: string | null;
+  /**
+   * Per-sector weights for ETFs (GICS-style sector name → fraction 0–1).
+   * When present, the holding's market value is decomposed proportionally
+   * across these sectors in `bySector`. The remainder (1 − Σw) is attributed
+   * to an "Other" bucket so the slices still reconcile to the holding's value.
+   * Null/absent for non-ETF instruments.
+   */
+  sectorWeights?: Record<string, number> | null;
+  /** Timestamp of last enrichment attempt. Null = never attempted. */
+  sectorCheckedAt?: Date | string | null;
   /** Human-readable name, used for topHoldings labelling. */
   name?: string;
 }
@@ -134,6 +145,31 @@ function sortedSlices(map: Map<string, Decimal>, total: Decimal): AllocationSlic
     .sort((a, b) => b.pct - a.pct);
 }
 
+/**
+ * Canonical sector name aliases. EODHD's stock `General.Sector` taxonomy and
+ * its ETF `Sector_Weights` taxonomy use slightly different names for the same
+ * sectors (e.g. "Financial Services" in ETF data vs "Financials" in stock data).
+ * This map folds the variants onto a single canonical label so sectors from
+ * different instruments compare and aggregate correctly.
+ */
+const SECTOR_ALIAS_MAP: Record<string, string> = {
+  "Financial Services": "Financials",
+  "Consumer Defensive": "Consumer Staples",
+  "Consumer Cyclical": "Consumer Discretionary",
+  "Communication Services": "Communication",
+  "Basic Materials": "Materials",
+  "Real Estate": "Real Estate", // keep as-is but ensure consistent casing
+  Utilities: "Utilities",
+  Industrials: "Industrials",
+  Healthcare: "Health Care",
+  "Health Care": "Health Care",
+};
+
+/** Return the canonical GICS-style sector name, collapsing known provider aliases. */
+export function normalizeSector(name: string): string {
+  return SECTOR_ALIAS_MAP[name] ?? name;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -201,7 +237,26 @@ export function allocationBreakdown(
 
     add(byAssetClass, m?.assetClass ?? "unknown", mv);
     add(byRegion, marketToRegion(m?.market ?? ""), mv);
-    add(bySector, m?.sector ?? "uncategorized", mv);
+
+    // Sector: ETFs decompose proportionally across their constituent weights;
+    // stocks use the single sector field; uncategorized when neither is set.
+    if (m?.sectorWeights && Object.keys(m.sectorWeights).length > 0) {
+      let sumW = 0;
+      for (const [sector, w] of Object.entries(m.sectorWeights)) {
+        if (w > 0) {
+          add(bySector, normalizeSector(sector), mv.mul(w));
+          sumW += w;
+        }
+      }
+      // Remainder (cash / unclassified within the ETF) goes to "Other".
+      if (sumW < 0.9999) {
+        add(bySector, "Other", mv.mul(1 - sumW));
+      }
+    } else if (m?.sector) {
+      add(bySector, normalizeSector(m.sector), mv);
+    } else {
+      add(bySector, "uncategorized", mv);
+    }
 
     if (h.currency != null) {
       add(holdingsByCcy, h.currency, mv);

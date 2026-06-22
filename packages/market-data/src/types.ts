@@ -62,11 +62,20 @@ export interface ProviderUsage {
 
 /**
  * Instrument profile data returned by a market-data provider, used to enrich
- * the `instruments.sector` column in the background metadata job.
+ * the `instruments.sector` (stocks) or `instruments.sector_weights` (ETFs)
+ * columns in the background metadata job.
  */
 export interface InstrumentProfile {
-  /** GICS-style sector (e.g. "Financials", "Technology"). */
+  /** GICS-style sector (e.g. "Financials", "Technology"). Set for individual
+   *  stocks. Null for ETFs — use `sectorWeights` instead. */
   sector?: string | null;
+  /**
+   * Per-sector allocation weights for ETFs. Keys are GICS-style sector names;
+   * values are fractions 0–1. Sum is typically ≤ 1 (remaining fraction may be
+   * cash/unclassified). Null for non-ETFs.
+   * Example: { "Technology": 0.29, "Financials": 0.13, … }
+   */
+  sectorWeights?: Record<string, number> | null;
   /** GICS industry (sub-sector). Informational; not stored in the DB yet. */
   industry?: string | null;
   /** Country of incorporation / primary listing. */
