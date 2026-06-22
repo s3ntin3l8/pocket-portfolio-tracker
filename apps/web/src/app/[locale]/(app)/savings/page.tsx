@@ -99,7 +99,11 @@ export default async function SavingsPage({
           <CardTitle className="text-base">{t("contributionsOverTime")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <ContributionsChart series={c.series} currency={currency} />
+          <ContributionsChart
+            series={c.series}
+            valueHistory={result.valueHistory}
+            currency={currency}
+          />
         </CardContent>
       </Card>
 

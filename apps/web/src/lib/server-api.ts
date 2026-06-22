@@ -335,7 +335,7 @@ export async function loadHoldings(
 }
 
 export type ContributionsView =
-  | { status: "ok"; data: ContributionStats }
+  | { status: "ok"; data: ContributionStats; valueHistory: PerformancePoint[] }
   | { status: "empty" }
   | { status: "unavailable" };
 
@@ -343,6 +343,11 @@ export type ContributionsView =
  * Contribution analytics for the active scope: a single portfolio when one is
  * selected, else the cross-portfolio aggregate narrowed by the holder scope (if any).
  * The single-portfolio cookie wins; the holder scope only applies in the "all" state.
+ *
+ * Also fetches the full portfolio-value history (inception→today) for the same scope,
+ * so the /savings chart can overlay contributions vs. value. The history fetch is
+ * independent — a failure returns an empty array and degrades the chart gracefully
+ * without breaking the contributions stats.
  */
 export async function loadContributions(): Promise<ContributionsView> {
   const api = await getServerApi();
@@ -356,7 +361,18 @@ export async function loadContributions(): Promise<ContributionsView> {
     const data = selected
       ? await api.getPortfolioContributions(selected.id)
       : await api.getContributions(holderId);
-    return { status: "ok", data };
+    // Fetch value history with the same scope. "all" range → rangeStart returns null
+    // (no lower bound) → full inception→today series. Wrapped independently so a
+    // history error doesn't cascade to the whole page.
+    let valueHistory: PerformancePoint[] = [];
+    try {
+      valueHistory = selected
+        ? await api.getPortfolioHistory(selected.id, "all")
+        : await api.getNetWorthHistory("all", holderId ? { holderId } : undefined);
+    } catch {
+      // History unavailable — chart degrades gracefully.
+    }
+    return { status: "ok", data, valueHistory };
   } catch {
     return { status: "unavailable" };
   }
