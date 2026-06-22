@@ -1336,10 +1336,10 @@ export function createApiClient(config: ApiClientConfig) {
       request<Candle[]>("GET", `/instruments/${id}/history?range=${encodeURIComponent(range)}`),
     createInstrument: (input: InstrumentInput) =>
       request<Instrument>("POST", "/instruments", input),
-    /** Update an instrument's identifiers (ISIN, WKN, symbol, name, assetClass). */
+    /** Update an instrument's identifiers (ISIN, WKN, symbol, name, assetClass, market). */
     updateInstrument: (
       id: string,
-      patch: { isin?: string | null; wkn?: string | null; symbol?: string; name?: string; assetClass?: string },
+      patch: { isin?: string | null; wkn?: string | null; symbol?: string; name?: string; assetClass?: string; market?: string },
     ) => request<Instrument>("PATCH", `/instruments/${id}`, patch),
     /** On-demand Börse Frankfurt enrichment — returns results with ISIN + WKN. */
     enrichInstruments: (q: string) =>
