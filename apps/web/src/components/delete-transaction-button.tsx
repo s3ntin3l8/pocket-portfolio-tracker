@@ -11,9 +11,12 @@ import { useRouter } from "@/i18n/navigation";
 export function DeleteTransactionButton({
   portfolioId,
   txId,
+  onDeleted,
 }: {
   portfolioId: string;
   txId: string;
+  /** Called after the delete succeeds (after router.refresh). */
+  onDeleted?: () => void;
 }) {
   const t = useTranslations("Manage.delete");
   const api = useApiClient();
@@ -26,6 +29,7 @@ export function DeleteTransactionButton({
     try {
       await api.deleteTransaction(portfolioId, txId);
       router.refresh();
+      onDeleted?.();
     } finally {
       setBusy(false);
       setConfirming(false);

@@ -11,6 +11,7 @@ import {
   Loader2,
   Trash2,
   Download,
+  ChevronRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -25,6 +26,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
+import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { cashFlow } from "@portfolio/core";
@@ -64,7 +66,7 @@ export interface TxRow {
 }
 
 /** Compute the signed cash-flow (actual cash movement) for a TxRow via core. */
-function txNetAmount(tx: TxRow): number {
+export function txNetAmount(tx: TxRow): number {
   return cashFlow({
     instrumentId: null,
     type: tx.type as CoreTransaction["type"],
@@ -74,6 +76,18 @@ function txNetAmount(tx: TxRow): number {
     currency: tx.currency,
     executedAt: new Date(tx.executedAt),
   }).toNumber();
+}
+
+/**
+ * Compute the gross amount for display: notional (qty×price) for trades,
+ * or gross income (price + tax) for dividends/cash flows.
+ */
+export function txAmount(tx: TxRow): number {
+  const qty = Number(tx.quantity);
+  const price = Number(tx.price);
+  return qty > 0
+    ? qty * price // trade: notional
+    : price + (tx.tax ? Number(tx.tax) : 0); // income/cash: gross
 }
 
 /**
@@ -143,6 +157,7 @@ export function TransactionsTable({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [investmentsOnly, setInvestmentsOnly] = useState(defaultInvestmentsOnly);
+  const [detailTx, setDetailTx] = useState<TxRow | null>(null);
 
   // Display-only filter; does not touch any calculation.
   const visibleRows = useMemo(
@@ -289,24 +304,26 @@ export function TransactionsTable({
           <TableBody>
             {sort(visibleRows).map((tx) => {
               const Icon = SOURCE_ICON[tx.source] ?? PencilLine;
-              const qty = Number(tx.quantity);
-              const price = Number(tx.price);
-              const amount =
-                qty > 0
-                  ? qty * price // trade: notional
-                  : price + (tx.tax ? Number(tx.tax) : 0); // income/cash: gross
+              const amount = txAmount(tx);
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
               return (
-                <TableRow key={tx.id} data-state={isSelected ? "selected" : undefined}>
+                <TableRow
+                  key={tx.id}
+                  data-state={isSelected ? "selected" : undefined}
+                  className="cursor-pointer"
+                  onClick={() => setDetailTx(tx)}
+                >
                   <TableCell>
-                    <input
-                      type="checkbox"
-                      className="size-4 align-middle accent-primary"
-                      aria-label={tb("selectRow")}
-                      checked={isSelected}
-                      onChange={() => toggle(tx.id)}
-                    />
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="size-4 align-middle accent-primary"
+                        aria-label={tb("selectRow")}
+                        checked={isSelected}
+                        onChange={() => toggle(tx.id)}
+                      />
+                    </span>
                   </TableCell>
                   <TableCell className="tabular whitespace-nowrap text-muted-foreground">
                     {df.format(new Date(tx.executedAt))}
@@ -329,7 +346,7 @@ export function TransactionsTable({
                       {tx.portfolioName ?? "—"}
                     </TableCell>
                   )}
-                  <TableCell className="tabular text-right">{qty || "—"}</TableCell>
+                  <TableCell className="tabular text-right">{Number(tx.quantity) || "—"}</TableCell>
                   <TableCell className="tabular text-right">
                     {m(amount, tx.currency)}
                   </TableCell>
@@ -352,7 +369,18 @@ export function TransactionsTable({
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={tm("viewDetails")}
+                        onClick={() => setDetailTx(tx)}
+                      >
+                        <ChevronRight className="size-4" />
+                      </Button>
                       {tx.hasDocument && (
                         <Button
                           variant="ghost"
@@ -402,6 +430,13 @@ export function TransactionsTable({
           </TableBody>
         </Table>
       </div>
+
+      <TransactionDetailSheet
+        tx={detailTx}
+        open={!!detailTx}
+        onOpenChange={(o) => { if (!o) setDetailTx(null); }}
+        onDeleted={() => { setDetailTx(null); router.refresh(); }}
+      />
     </div>
   );
 }
