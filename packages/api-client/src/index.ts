@@ -143,6 +143,8 @@ export interface AdminJob {
   lastRunAt: string | null;
   /** Status of the last run, null = never run. */
   lastStatus: "completed" | "failed" | null;
+  /** Whether this job supports a force flag that bypasses caches/stale checks. */
+  supportsForce?: boolean;
 }
 
 /** Response from GET /admin/jobs. */
@@ -1211,10 +1213,11 @@ export function createApiClient(config: ApiClientConfig) {
 
     // Admin: background jobs panel (#105 + Slice 5).
     getAdminJobs: () => request<AdminJobsResponse>("GET", "/admin/jobs"),
-    triggerAdminJob: (name: string) =>
+    triggerAdminJob: (name: string, opts?: { force?: boolean }) =>
       request<{ queued: boolean; name: string }>(
         "POST",
         `/admin/jobs/${encodeURIComponent(name)}/trigger`,
+        opts?.force ? { force: true } : undefined,
       ),
 
     getNetWorth: (costBasis?: "purchase_price" | "total_paid", holderId?: string) => {
