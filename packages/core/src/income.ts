@@ -42,6 +42,16 @@ export function inferIntervalMonths(dates: Date[]): number {
 }
 
 /**
+ * Minimum number of valid payments required in each rolling 12-month window before a YoY
+ * growth factor is computed. Annual payers produce only 1 payment per window — a single
+ * data-point ratio is too noisy (e.g. a doubling share base from savings-plan buys halves
+ * the apparent per-share even when the real dividend rate is stable). Requiring ≥ 2 per
+ * window means annual payers project flat (source: "flat", no badge), while semiannual,
+ * quarterly, and monthly payers retain a real, smoothed growth signal.
+ */
+const MIN_PAYMENTS_FOR_GROWTH = 2;
+
+/**
  * Per-share YoY growth factor using rolling 12-month windows.
  *
  * Trailing window = payments in (now − 12mo, now]; prior window = (now − 24mo, now − 12mo].
@@ -53,8 +63,9 @@ export function inferIntervalMonths(dates: Date[]): number {
  * One-off guard: amounts > 2× the median per-payment within a window are excluded (special
  * dividends / one-time distributions) before computing the mean.
  *
- * Returns 1.0 when either window is empty or non-positive (insufficient data → flat).
- * Result is clamped to [0.5, 2.0].
+ * Returns 1.0 when either window has fewer than MIN_PAYMENTS_FOR_GROWTH valid payments
+ * (insufficient data for a reliable ratio → flat). Also returns 1.0 when either window
+ * mean is non-positive. Result is clamped to [0.5, 2.0].
  */
 function computeGrowthFactor(
   perShareAmounts: { date: Date; perShare: Decimal }[],
@@ -69,6 +80,15 @@ function computeGrowthFactor(
   const priorAmts = perShareAmounts
     .filter((p) => p.date > cutoff24mo && p.date <= cutoff12mo)
     .map((p) => p.perShare.toNumber());
+
+  // Require enough data points in each window for a meaningful ratio.
+  // Annual payers (1 payment/window) fall through to flat.
+  if (
+    trailingAmts.length < MIN_PAYMENTS_FOR_GROWTH ||
+    priorAmts.length < MIN_PAYMENTS_FOR_GROWTH
+  ) {
+    return 1.0;
+  }
 
   const withoutOneOffs = (amounts: number[]): number[] => {
     if (amounts.length === 0) return [];
@@ -350,10 +370,11 @@ export function projectNextYearDividends(
   const out: ProjectedDividend[] = [];
 
   // Cut-off: require at least one payment within the trailing 24 months.
-  // Cut-off: require at least one payment within the trailing 24 months.
   // Using 24 months (not 12) captures annual payers whose payment may be
   // 12–24 months back (e.g., a March annual payer when now is June).
   const cutoff24mo = addUTCMonths(now, -24);
+  // Trailing 12-month boundary — used to anchor the per-share run-rate base.
+  const cutoff12mo = addUTCMonths(now, -12);
 
   for (const [instrumentId, entries] of byInstrument) {
     const currentQtyStr = heldQty.get(instrumentId);
@@ -369,27 +390,50 @@ export function projectNextYearDividends(
     const hasRecent = sorted.some((e) => e.executedAt >= cutoff24mo);
     if (!hasRecent) continue;
 
-    // Compute per-share for each historical payment.
-    const perShareAmounts = sorted.map((e) => {
+    // Compute per-share for each historical payment where the position is known.
+    // Payments where qtyAt returns ≤ 0 are excluded entirely — using the raw total
+    // amount as a "per-share" figure (the old fallback) manufactures an enormous
+    // outlier that skews both the base and the growth factor, particularly for
+    // instruments with a missing transfer-in (e.g. a DKB Kapitalmaßnahme that
+    // isn't in the CSV export).
+    const perShareAmounts: { date: Date; year: number; perShare: Decimal }[] = [];
+    for (const e of sorted) {
       const histQtyStr = qtyAt(instrumentId, e.executedAt);
       const histQty = new Decimal(histQtyStr);
-      // Fallback: treat raw price as the per-share amount when histQty unknown.
-      const perShare = histQty.gt(0)
-        ? new Decimal(e.price).div(histQty)
-        : new Decimal(e.price);
-      return { date: e.executedAt, year: e.executedAt.getUTCFullYear(), perShare };
-    });
+      if (histQty.lte(0)) continue; // no recorded position at this date — skip
+      perShareAmounts.push({
+        date: e.executedAt,
+        year: e.executedAt.getUTCFullYear(),
+        perShare: new Decimal(e.price).div(histQty),
+      });
+    }
 
-    // Per-share base: average per-payment over the trailing 24 months.
-    // Using 24 months (not 12) ensures annual payers whose most recent payment
-    // falls 12–24 months ago are still captured and not silently skipped.
-    const basePayments = perShareAmounts.filter((p) => p.date >= cutoff24mo);
-    if (basePayments.length === 0) continue;
-    const basePerShareSum = basePayments.reduce(
-      (s, p) => s.add(p.perShare),
-      new Decimal(0),
-    );
-    const perSharePerPayment = basePerShareSum.div(basePayments.length);
+    // Per-share base: mean of payments in the trailing 12 months (current run-rate).
+    //
+    // Anchoring to the trailing-12mo mean (not the 24-month midpoint) ensures the
+    // projected per-share reconciles with both the displayed run-rate and the YoY
+    // growth badge. Using the 24-month average as the base and then multiplying by
+    // (trailing/prior) double-counts the trailing window and produces a value that
+    // neither matches the current actual nor the badge percentage.
+    //
+    // Fallback chain (for annual payers or data gaps):
+    //   1. Trailing-12mo mean (preferred — most recent run-rate)
+    //   2. Most-recent valid payment's per-share (if trailing window is empty,
+    //      e.g. an annual payer whose last payment was 12–24 months ago)
+    //   3. Skip the instrument (no valid qty > 0 payments in the 24-month window)
+    const trailing12moAmounts = perShareAmounts.filter((p) => p.date > cutoff12mo);
+    let perSharePerPayment: Decimal;
+    if (trailing12moAmounts.length > 0) {
+      perSharePerPayment = trailing12moAmounts
+        .reduce((s, p) => s.add(p.perShare), new Decimal(0))
+        .div(trailing12moAmounts.length);
+    } else if (perShareAmounts.length > 0) {
+      // Annual payer whose last payment is 12–24 months back — use the most recent.
+      perSharePerPayment = perShareAmounts[perShareAmounts.length - 1].perShare;
+    } else {
+      // No valid (qty > 0) payments in the history — cannot compute a base; skip.
+      continue;
+    }
 
     // Infer cadence from recent dates (trailing 24 months).
     const recentDates = sorted

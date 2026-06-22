@@ -335,57 +335,63 @@ describe("projectNextYearDividends", () => {
   });
 
   it("applies YoY per-share growth and tags source: grown", () => {
+    // Semiannual payer (2 payments/yr = 2 per window) with growing per-share.
     // Rolling windows (NOW = 2026-06-15):
-    //   prior  (2024-06-15, 2025-06-15]: 2025-01-01 — perShare = 100/10 = 10
-    //   trailing (2025-06-15, 2026-06-15]: 2025-11-01 — perShare = 110/10 = 11
-    //   spacing = 10 months → inferIntervalMonths = 12 (annual)
-    //   growthFactor = trailing mean(11) / prior mean(10) = 1.1
-    //   base avg over 24mo: (10+11)/2 = 10.5; projected = 10.5 × 1.1 × 10 = 115.5
+    //   prior  (2024-06-15, 2025-06-15]: 2024-09-01, 2025-03-01 — perShare=10 each
+    //   trailing (2025-06-15, 2026-06-15]: 2025-09-01, 2026-03-01 — perShare=11 each
+    //   2 payments per window → gate passes; growthFactor = 11/10 = 1.1
+    //   base = trailing-12mo mean = 11; perShareFinal = 11 × 1.1 = 12.1
     const past = [
-      hist("aapl", "2025-01-01", "100"), // prior window — perShare=10
-      hist("aapl", "2025-11-01", "110"), // trailing window — perShare=11
+      hist("aapl", "2024-09-01", "100"), // prior window — perShare=10
+      hist("aapl", "2025-03-01", "100"), // prior window — perShare=10
+      hist("aapl", "2025-09-01", "110"), // trailing window — perShare=11
+      hist("aapl", "2026-03-01", "110"), // trailing window — perShare=11
     ];
     const heldQty = new Map([["aapl", "10"]]);
     // qtyAt: always 10 shares (constant position)
     const result = projectNextYearDividends(past, heldQty, () => "10", NOW, {
       applyGrowth: true,
     });
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2); // semiannual → 2 payments in 2027
     expect(result[0].source).toBe("grown");
     expect(result[0].growthApplied).toBeCloseTo(1.1, 5);
-    // perSharePerPayment = avg(10, 11) = 10.5; × growthFactor(1.1) × qty(10) = 115.5
-    expect(Number(result[0].amount)).toBeCloseTo(115.5, 2);
+    // base = trailing-12mo mean(11); × growthFactor(1.1) × qty(10) = 121
+    expect(Number(result[0].amount)).toBeCloseTo(121.0, 2);
   });
 
   it("clamps growth factor to 0.5 when dividend was cut by more than half", () => {
-    // prior window: perShare = 50/10 = 5; trailing window: perShare = 5/10 = 0.5
+    // Semiannual payer (2 per window) — ensures gate passes so the clamp is tested.
+    // prior window: perShare = 5 each; trailing window: perShare = 0.5 each
     // raw factor = 0.5/5 = 0.1 → clamped to 0.5
-    // spacing = 10 months → inferIntervalMonths = 12 (annual) → 1 projected payment
     const past = [
-      hist("cutco", "2025-01-01", "50"), // prior window — perShare=5
-      hist("cutco", "2025-11-01", "5"),  // trailing window — perShare=0.5
+      hist("cutco", "2024-09-01", "50"), // prior window — perShare=5
+      hist("cutco", "2025-03-01", "50"), // prior window — perShare=5
+      hist("cutco", "2025-09-01", "5"),  // trailing window — perShare=0.5
+      hist("cutco", "2026-03-01", "5"),  // trailing window — perShare=0.5
     ];
     const heldQty = new Map([["cutco", "10"]]);
     const result = projectNextYearDividends(past, heldQty, () => "10", NOW, {
       applyGrowth: true,
     });
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0].growthApplied).toBeCloseTo(0.5, 5); // clamped
   });
 
   it("clamps growth factor to 2.0 when dividend doubled or more", () => {
-    // prior window: perShare = 10/10 = 1; trailing window: perShare = 100/10 = 10
+    // Semiannual payer (2 per window) — ensures gate passes so the clamp is tested.
+    // prior window: perShare = 1 each; trailing window: perShare = 10 each
     // raw factor = 10/1 = 10 → clamped to 2.0
-    // spacing = 10 months → inferIntervalMonths = 12 (annual) → 1 projected payment
     const past = [
-      hist("raiseco", "2025-01-01", "10"),  // prior window — perShare=1
-      hist("raiseco", "2025-11-01", "100"), // trailing window — perShare=10
+      hist("raiseco", "2024-09-01", "10"),  // prior window — perShare=1
+      hist("raiseco", "2025-03-01", "10"),  // prior window — perShare=1
+      hist("raiseco", "2025-09-01", "100"), // trailing window — perShare=10
+      hist("raiseco", "2026-03-01", "100"), // trailing window — perShare=10
     ];
     const heldQty = new Map([["raiseco", "10"]]);
     const result = projectNextYearDividends(past, heldQty, () => "10", NOW, {
       applyGrowth: true,
     });
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0].growthApplied).toBeCloseTo(2.0, 5); // clamped
   });
 
@@ -484,6 +490,57 @@ describe("projectNextYearDividends", () => {
     expect(Number(result[0].amount)).toBeGreaterThan(100);
   });
 
+  it("annual payer (1 payment per 12-month window) projects flat — no spurious growth badge", () => {
+    // Regression for MWOF −48% bug: an annual ETF with an accumulating share base
+    // appears to have a halving per-share because each 12-month window holds only
+    // one data point. MIN_PAYMENTS_FOR_GROWTH = 2 gates the ratio and returns flat.
+    //
+    // Simulated data mirrors the production case:
+    //   2025-02-01: total €77, histQty=100 → perShare=0.77  (inflated by missing transfer-in)
+    //   2026-02-01: total €113, histQty=282 → perShare≈0.40 (current run-rate)
+    // Raw factor ≈ 0.52 → −48%: but only 1 payment per window → gate → flat.
+    // Base = trailing-12mo mean: 2026-02-01 is the only qualifying payment → 113/282 ≈ 0.4006
+    const past = [
+      hist("mwof", "2025-02-01", "77"),  // prior window — perShare=0.77 (inflated)
+      hist("mwof", "2026-02-01", "113"), // trailing window — perShare≈0.40 (run-rate)
+    ];
+    const heldQty = new Map([["mwof", "282"]]);
+    // qtyAt: 100 shares before 2026, 282 after (mirrors the gap from the missing transfer-in)
+    const qtyAt = (_id: string, at: Date) =>
+      at < d("2026-01-01") ? "100" : "282";
+    const result = projectNextYearDividends(past, heldQty, qtyAt, NOW, { applyGrowth: true });
+    expect(result).toHaveLength(1); // annual → 1 payment in 2027
+    expect(result[0].source).toBe("flat"); // gate blocks the noisy ratio
+    expect(result[0].growthApplied).toBeUndefined(); // no badge
+    // base = trailing-12mo run-rate: 113/282 ≈ 0.4006 per share × 282 ≈ 113
+    expect(Number(result[0].amount)).toBeCloseTo(113, 0);
+  });
+
+  it("excludes qty≤0 payments from the per-share base and growth computation", () => {
+    // When qtyAt returns 0 at a payment date (e.g. a missing transfer-in like MWOF's
+    // DKB Kapitalmaßnahme), the old code fell back to treating the raw total as a
+    // per-share figure — manufacturing a huge outlier. This test verifies the entry
+    // is excluded entirely so only valid (qty > 0) payments reach the base and growth.
+    const past = [
+      hist("etf", "2024-03-01", "60"),  // qty=0 at this date — MUST be excluded
+      hist("etf", "2025-03-01", "93"),  // qty=10 → perShare=9.3
+      hist("etf", "2026-03-01", "110"), // qty=11 → perShare≈10.0
+    ];
+    const heldQty = new Map([["etf", "11"]]);
+    const qtyAt = (_id: string, at: Date) => {
+      if (at < d("2025-01-01")) return "0"; // missing position
+      if (at < d("2026-01-01")) return "10";
+      return "11";
+    };
+    // applyGrowth: false so we only test the base; 1 payment/window anyway.
+    const result = projectNextYearDividends(past, heldQty, qtyAt, NOW, { applyGrowth: false });
+    expect(result).toHaveLength(1);
+    // trailing-12mo: 2026-03-01 → perShare = 110/11 = 10.0
+    // The 2024-03-01 qty=0 entry must NOT inflate the base
+    expect(Number(result[0].perShare)).toBeCloseTo(10.0, 4);
+    expect(Number(result[0].amount)).toBeCloseTo(110, 1);
+  });
+
   it("feeds forecastNextYear via projectedDividendsNextYear in aggregateIncome", () => {
     // With the event-based input, forecastNextYear = sum of those amounts + coupons.
     const result = aggregateIncome({
@@ -543,21 +600,27 @@ describe("projectNextYearDividends", () => {
     }
   });
 
-  it("reflects growth factor in perShare but not in quantity (flat accumulation)", () => {
-    // Two payments: 2024-07 and 2025-07. NOW = 2026-06-15; cutoff24mo = 2024-06-15.
-    // Both dates are within the 24-month window so both enter the base average.
-    // growthFactor = 2.2/2.0 = 1.1; base avg perShare = (2.0+2.2)/2 = 2.1; qty = 10.
+  it("reflects growth factor in perShare but not in quantity (base = trailing-12mo run-rate)", () => {
+    // Semiannual payer (2 per window) with growth.
+    // NOW = 2026-06-15; cutoff12mo = 2025-06-15; cutoff24mo = 2024-06-15.
+    //
+    // prior  (2024-06-15, 2025-06-15]: 2024-09-01, 2025-03-01 → perShare=2.0 each
+    // trailing (2025-06-15, 2026-06-15]: 2025-09-01, 2026-03-01 → perShare=2.2 each
+    // growthFactor = 2.2/2.0 = 1.1; base = trailing-12mo mean = 2.2
+    // perShareFinal = 2.2 × 1.1 = 2.42 (NOT the old 2.1 × 1.1 = 2.31 midpoint bug)
     const past = [
-      hist("grw", "2024-07-01", "20.00"), // 20/10 = 2.0 perShare — within 24mo window
-      hist("grw", "2025-07-01", "22.00"), // 22/10 = 2.2 perShare
+      hist("grw", "2024-09-01", "20.00"), // 20/10 = 2.0 perShare — prior window
+      hist("grw", "2025-03-01", "20.00"), // 20/10 = 2.0 perShare — prior window
+      hist("grw", "2025-09-01", "22.00"), // 22/10 = 2.2 perShare — trailing window
+      hist("grw", "2026-03-01", "22.00"), // 22/10 = 2.2 perShare — trailing window
     ];
     const heldQty = new Map([["grw", "10"]]);
     const result = projectNextYearDividends(past, heldQty, () => "10", NOW, {
       applyGrowth: true,
     });
-    expect(result).toHaveLength(1);
-    // perShare = avg(2.0, 2.2) × growthFactor(1.1) = 2.1 × 1.1 ≈ 2.31; qty = 10
-    expect(Number(result[0].perShare)).toBeCloseTo(2.31, 1);
+    expect(result).toHaveLength(2); // semiannual → 2 payments in 2027
+    // base = trailing-12mo mean(2.2) × growthFactor(1.1) = 2.42; qty = 10 (no accumulation)
+    expect(Number(result[0].perShare)).toBeCloseTo(2.42, 2);
     expect(Number(result[0].quantity)).toBeCloseTo(10, 4);
     const reconstructed = Number(result[0].perShare) * Number(result[0].quantity);
     expect(reconstructed).toBeCloseTo(Number(result[0].amount), 6);
