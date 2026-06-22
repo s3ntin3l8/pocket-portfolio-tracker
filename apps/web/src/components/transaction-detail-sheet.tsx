@@ -10,8 +10,8 @@ import { DeleteTransactionButton } from "@/components/delete-transaction-button"
 import { Link } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
-import { txAmount, txNetAmount, SOURCE_ICON } from "./transactions-table.js";
-import type { TxRow } from "./transactions-table.js";
+import { txAmount, txNetAmount, SOURCE_ICON } from "@/components/transactions-table";
+import type { TxRow } from "@/components/transactions-table";
 
 const TYPE_VARIANT: Record<string, "success" | "destructive" | "default"> = {
   buy: "success",
