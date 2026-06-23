@@ -185,13 +185,15 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                             <TableCell className="pl-9 text-muted-foreground" colSpan={2}>
                               {leg.acqDate} → {leg.sellDate}
                             </TableCell>
+                            <TableCell />
                             <TableCell className="tabular text-right text-muted-foreground">
                               {leg.holdingDays >= 365 ? `${(leg.holdingDays / 365).toFixed(1)}${t("yearsAbbr")}` : `${leg.holdingDays}${t("daysAbbr")}`}
                             </TableCell>
                             <TableCell className="tabular text-right">{Number(leg.quantity)}</TableCell>
                             <TableCell className="tabular text-right">{money(Number(leg.cost))}</TableCell>
-                            <TableCell className="tabular text-right" colSpan={2}>{money(Number(leg.proceeds))}</TableCell>
-                            <TableCell className={cn("tabular text-right", toneClass(Number(leg.gain)))} colSpan={2}>
+                            <TableCell className="tabular text-right">{money(Number(leg.proceeds))}</TableCell>
+                            <TableCell />
+                            <TableCell className={cn("tabular text-right", toneClass(Number(leg.gain)))}>
                               {signed(Number(leg.gain))}
                             </TableCell>
                             <TableCell className="text-right">

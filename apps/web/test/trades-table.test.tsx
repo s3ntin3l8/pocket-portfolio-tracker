@@ -100,4 +100,22 @@ describe("TradesTable", () => {
     fireEvent.click(screen.getAllByText("Telkom")[0]);
     expect(screen.getByText("2021-01-01 → 2021-06-01")).toBeTruthy();
   });
+
+  it("aligns leg detail cells with their corresponding header columns", () => {
+    renderTable([closed]);
+    fireEvent.click(screen.getAllByText("Telkom")[0]);
+
+    const legRow = screen.getByText("2021-01-01 → 2021-06-01").closest("tr");
+    expect(legRow).toBeTruthy();
+
+    // 9 cells: dates(colSpan=2) + exitDate(1) + held(1) + quantity(1) + invested(1) + realized(1) + dividends(1) + totalReturn(1) + annualized(1) = 10 columns
+    const legCells = legRow!.querySelectorAll("td");
+    expect(legCells.length).toBe(9);
+
+    // Verify key values are present in the leg row
+    expect(legRow!.textContent).toContain("151d");
+    expect(legRow!.textContent).toContain("€1,000");
+    expect(legRow!.textContent).toContain("€1,300");
+    expect(legRow!.textContent).toContain("€300");
+  });
 });

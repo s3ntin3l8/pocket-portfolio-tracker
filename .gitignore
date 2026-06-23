@@ -25,6 +25,9 @@ apps/web/public/swe-worker-*.js
 .claude/plans/
 .claude/tmp/
 
+# OpenCode local plans
+.opencode/plans/
+
 # Python (vendored pytr entrypoints)
 __pycache__/
 *.pyc
