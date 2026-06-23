@@ -1,3 +1,4 @@
+import path from "path";
 import type { Readable } from "stream";
 import {
   S3Client,
@@ -54,15 +55,16 @@ export class S3Provider implements StorageProvider {
     body: Buffer | Readable,
     meta: { mimeType: string; originalFilename?: string },
   ): Promise<void> {
+    const safeFilename = meta.originalFilename ? sanitiseHeaderFilename(meta.originalFilename) : undefined;
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: body,
         ContentType: meta.mimeType,
-        ...(meta.originalFilename
+        ...(safeFilename
           ? {
-              ContentDisposition: `attachment; filename="${meta.originalFilename}"`,
+              ContentDisposition: `attachment; filename="${safeFilename}"`,
             }
           : {}),
       }),
@@ -74,13 +76,14 @@ export class S3Provider implements StorageProvider {
     expiresInSeconds?: number,
     opts?: { downloadName?: string },
   ): Promise<string> {
+    const safeDownloadName = opts?.downloadName ? sanitiseHeaderFilename(opts.downloadName) : undefined;
     return s3GetSignedUrl(
       this.client,
       new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        ...(opts?.downloadName
-          ? { ResponseContentDisposition: `attachment; filename="${opts.downloadName}"` }
+        ...(safeDownloadName
+          ? { ResponseContentDisposition: `attachment; filename="${safeDownloadName}"` }
           : {}),
       }),
       { expiresIn: expiresInSeconds ?? this.signedUrlTtl },
@@ -217,4 +220,10 @@ function isNoSuchBucket(err: unknown): boolean {
     if (e["name"] === "NoSuchBucket") return true;
   }
   return false;
+}
+
+function sanitiseHeaderFilename(name: string): string {
+  const base = path.basename(name);
+  const safe = base.replace(/[^A-Za-z0-9\s.-]/g, "_").trim().slice(0, 200);
+  return safe || "document";
 }

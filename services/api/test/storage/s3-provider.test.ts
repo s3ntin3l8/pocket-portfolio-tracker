@@ -72,6 +72,36 @@ describe("S3Provider", () => {
       );
     });
 
+    it("sanitises originalFilename to safe ASCII in ContentDisposition", async () => {
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const provider = makeProvider();
+      await provider.put("file.pdf", Buffer.from("x"), {
+        mimeType: "application/pdf",
+        originalFilename: "2024-01-23_DKB_Umbuchungen_Kapitalmaßnahmen_zu_Depot_506740786_\"test\".pdf",
+      });
+
+      const calls = s3Mock.commandCalls(PutObjectCommand);
+      expect(calls[0].args[0].input.ContentDisposition).toBe(
+        'attachment; filename="2024-01-23_DKB_Umbuchungen_Kapitalma_nahmen_zu_Depot_506740786__test_.pdf"',
+      );
+    });
+
+    it("strips path components from originalFilename in ContentDisposition", async () => {
+      s3Mock.on(PutObjectCommand).resolves({});
+
+      const provider = makeProvider();
+      await provider.put("file.pdf", Buffer.from("x"), {
+        mimeType: "application/pdf",
+        originalFilename: "../../etc/passwd.pdf",
+      });
+
+      const calls = s3Mock.commandCalls(PutObjectCommand);
+      expect(calls[0].args[0].input.ContentDisposition).toBe(
+        'attachment; filename="passwd.pdf"',
+      );
+    });
+
     it("omits ContentDisposition when originalFilename is absent", async () => {
       s3Mock.on(PutObjectCommand).resolves({});
 
@@ -175,6 +205,30 @@ describe("S3Provider", () => {
       expect(url).toContain(BUCKET);
       // With forcePathStyle the URL keeps slashes as plain path segments
       expect(url).toContain("nested/path/file.pdf");
+    });
+
+    it("sanitises downloadName to safe ASCII in ResponseContentDisposition", async () => {
+      const provider = makeProvider();
+      const url = await provider.getSignedUrl("nested/path/file.pdf", 300, {
+        downloadName: "2024-01-23_DKB_Umbuchungen_Kapitalmaßnahmen_zu_Depot_506740786_\"test\".pdf",
+      });
+
+      const decodedUrl = decodeURIComponent(url);
+      expect(decodedUrl).toContain(
+        'response-content-disposition=attachment; filename="2024-01-23_DKB_Umbuchungen_Kapitalma_nahmen_zu_Depot_506740786__test_.pdf"',
+      );
+    });
+
+    it("strips path components from downloadName in ResponseContentDisposition", async () => {
+      const provider = makeProvider();
+      const url = await provider.getSignedUrl("nested/path/file.pdf", 300, {
+        downloadName: "../../etc/passwd.pdf",
+      });
+
+      const decodedUrl = decodeURIComponent(url);
+      expect(decodedUrl).toContain(
+        'response-content-disposition=attachment; filename="passwd.pdf"',
+      );
     });
   });
 
