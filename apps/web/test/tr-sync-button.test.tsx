@@ -58,7 +58,7 @@ describe("TrSyncButton", () => {
     // Hold the syncTr open so we can observe the in-flight state before polling starts.
     let resolveSyncTr!: () => void;
     syncTr.mockImplementationOnce(
-      () => new Promise<{ queued: boolean }>((res) => { resolveSyncTr = () => res({ queued: true }); }),
+      () => new Promise<{ queued: true }>((res) => { resolveSyncTr = () => res({ queued: true }); }),
     );
 
     renderButton();
