@@ -307,7 +307,25 @@ export function allocationBreakdown(
     const m = meta(h.instrumentId);
 
     add(byAssetClass, m?.assetClass ?? "unknown", mv);
-    add(byRegion, marketToRegion(m?.market ?? ""), mv);
+
+    // Region: ETFs with countryWeights decompose proportionally by country;
+    // others use the listing venue (existing behavior).
+    if (m?.countryWeights && Object.keys(m.countryWeights).length > 0) {
+      let sumW = 0;
+      for (const [country, w] of Object.entries(m.countryWeights)) {
+        if (w > 0) {
+          add(byRegion, countryToRegion(country), mv.mul(w));
+          sumW += w;
+        }
+      }
+      // Remainder (cash/unclassified within ETF) goes to listing venue region
+      if (sumW < 0.9999) {
+        add(byRegion, marketToRegion(m?.market ?? ""), mv.mul(1 - sumW));
+      }
+    } else {
+      // Fallback: use listing venue (existing behavior)
+      add(byRegion, marketToRegion(m?.market ?? ""), mv);
+    }
 
     // Sector: ETFs decompose proportionally across their constituent weights;
     // stocks use the single sector field; uncategorized when neither is set.
