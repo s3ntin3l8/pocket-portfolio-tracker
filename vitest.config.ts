@@ -28,6 +28,7 @@ export default defineConfig({
         "services/api/src/db/seed.ts",
         "services/api/src/db/migrate.ts",
         "services/api/src/db/scrape.ts",
+        "services/api/src/db/repair-eu-instruments.ts",
         // Provider wiring depends on env keys + network; covered by live use.
         "services/api/src/services/market-data.ts",
         // Thin `unpdf` I/O glue (PDF→text); the DKB parser it feeds is fully unit-tested.
