@@ -1,12 +1,14 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { instruments, lastPrices } from "@portfolio/db";
 import { isIsin, yahooSuffixForMarket } from "@portfolio/market-data";
+import type { MarketDataService } from "@portfolio/market-data";
+import type { DB } from "./client.js";
 import { ensureDb, closeDb } from "./client.js";
 import { getMarketData } from "../services/market-data.js";
 
 /**
- * One-off CLI to repair foreign (DKB / Trade Republic) instruments that were stored with
- * the wrong asset class or venue before the import resolution was fixed. Two passes:
+ * Repair foreign (DKB / Trade Republic) instruments that were stored with the wrong asset
+ * class or venue before the import resolution was fixed. Two passes:
  *
  * **Pass 1 — mutual_fund reclassification (historical, original):** UCITS ETFs mislabelled
  * `mutual_fund` (OpenFIGI reports them as securityType "ETP" but securityType2 "Mutual
@@ -20,13 +22,12 @@ import { getMarketData } from "../services/market-data.js";
  * Example: CSSPX (IE00B5BMR087 = iShares Core S&P 500 UCITS, Xetra SXR8) was priced as
  * Cohen & Steers Global Realty (US-listed CSSPX, ~$59).
  *
- * Idempotent — safe to re-run. Reads DATABASE_URL from the environment
- * (`npm run repair:instruments` loads ../../.env; in a container run
- * `node dist/db/repair-eu-instruments.js` with env already set).
+ * Idempotent — safe to re-run.
  */
-async function main() {
-  const db = await ensureDb();
-  const md = await getMarketData();
+export async function repairEuInstruments(
+  db: DB,
+  md: MarketDataService,
+): Promise<{ pass1Fixed: number; pass2Fixed: number }> {
 
   // ── Pass 1: mutual_fund reclassification ────────────────────────────────────
   const allMutual = await db
@@ -136,10 +137,15 @@ async function main() {
   }
 
   console.log(`Pass 2: Repaired ${fixed2} instrument(s).`);
-  await closeDb();
+  return { pass1Fixed: fixed, pass2Fixed: fixed2 };
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Allow running directly: `tsx src/db/repair-eu-instruments.ts`.
+const invokedDirectly =
+  process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (invokedDirectly) {
+  const db = await ensureDb();
+  const md = await getMarketData();
+  await repairEuInstruments(db, md);
+  await closeDb();
+}
