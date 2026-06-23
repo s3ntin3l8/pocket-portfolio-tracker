@@ -182,6 +182,7 @@ describe("TrConnectFlow", () => {
       lastError: null,
       importCategories: null,
       lastReconciliation: null,
+      syncing: false,
     });
     fireEvent.click(screen.getByText(messages.TradeRepublic.reprocess.action));
     await waitFor(() => expect(client.reprocessTrDocuments).toHaveBeenCalled());
