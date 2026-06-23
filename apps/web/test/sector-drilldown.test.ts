@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getDrillDownInstruments, type DrillDownInstrument } from "../src/lib/sector-drilldown";
+import { getDrillDownInstruments } from "../src/lib/sector-drilldown";
 
 function makeHolding(
   overrides: Partial<{

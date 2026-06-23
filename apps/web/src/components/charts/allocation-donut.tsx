@@ -23,10 +23,14 @@ export function AllocationDonut({
   data,
   currency = "IDR",
   total,
+  label = "Total",
+  onSliceClick,
 }: {
   data: DonutSlice[];
   currency?: string;
   total?: number;
+  label?: string;
+  onSliceClick?: (key: string) => void;
 }) {
   const locale = useLocale();
   const sum = data.reduce((s, d) => s + d.value, 0);
@@ -55,6 +59,8 @@ export function AllocationDonut({
               outerRadius={84}
               paddingAngle={2}
               strokeWidth={0}
+              onClick={(entry) => onSliceClick?.(entry.payload.key)}
+              style={{ cursor: onSliceClick ? "pointer" : undefined }}
             >
               {data.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -75,7 +81,7 @@ export function AllocationDonut({
         {formattedTotal && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Total
+              {label}
             </span>
             <span className="text-lg font-bold tabular-nums">{formattedTotal}</span>
           </div>
