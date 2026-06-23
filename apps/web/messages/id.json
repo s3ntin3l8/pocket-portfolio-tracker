@@ -524,7 +524,16 @@
     "Europe": "Eropa",
     "Africa & ME": "Afrika & Timur Tengah",
     "Asia": "Asia",
-    "Other": "Lainnya"
+    "Other": "Lainnya",
+    "US": "Amerika Utara",
+    "CA": "Amerika Utara",
+    "EU": "Eropa",
+    "ID": "Asia",
+    "JP": "Asia",
+    "SG": "Asia",
+    "HK": "Asia",
+    "AU": "Asia",
+    "Commodity": "Lainnya"
   },
   "Empty": {
     "unavailableTitle": "Tidak dapat menjangkau API",

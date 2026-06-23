@@ -526,7 +526,16 @@
     "Europe": "Europe",
     "Africa & ME": "Africa & ME",
     "Asia": "Asia",
-    "Other": "Other"
+    "Other": "Other",
+    "US": "North America",
+    "CA": "North America",
+    "EU": "Europe",
+    "ID": "Asia",
+    "JP": "Asia",
+    "SG": "Asia",
+    "HK": "Asia",
+    "AU": "Asia",
+    "Commodity": "Other"
   },
   "Empty": {
     "unavailableTitle": "Can't reach the API",
