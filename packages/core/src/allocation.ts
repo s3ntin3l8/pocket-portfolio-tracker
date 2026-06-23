@@ -20,6 +20,14 @@ export interface AllocationInstrumentMeta {
    * Null/absent for non-ETF instruments.
    */
   sectorWeights?: Record<string, number> | null;
+  /**
+   * Per-country weights for ETFs (country name → fraction 0–1).
+   * When present, the holding's market value is decomposed proportionally
+   * across countries in `byRegion` (via countryToRegion mapping).
+   * The remainder (1 − Σw) is attributed to the listing venue region.
+   * Null/absent for non-ETF instruments or ETFs without ISINs.
+   */
+  countryWeights?: Record<string, number> | null;
   /** Timestamp of last enrichment attempt. Null = never attempted. */
   sectorCheckedAt?: Date | string | null;
   /** Human-readable name, used for topHoldings labelling. */
