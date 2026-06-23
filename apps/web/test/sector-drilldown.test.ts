@@ -12,9 +12,9 @@ function makeHolding(
       market: string;
       sector: string | null;
       sectorWeights: Record<string, number> | null;
-      currency: string | null;
     } | null;
     marketValueDisplay: string | null;
+    currency: string | null;
   }>,
 ) {
   return {
@@ -25,7 +25,7 @@ function makeHolding(
     realizedPnL: "0",
     costCurrency: null,
     price: "15",
-    currency: "USD",
+    currency: overrides.currency ?? "USD",
     marketValue: "1500",
     unrealizedPnL: "500",
     marketValueDisplay: overrides.marketValueDisplay !== undefined ? overrides.marketValueDisplay : "1500",
@@ -155,8 +155,9 @@ describe("getDrillDownInstruments — currency", () => {
     const holdings = [
       makeHolding({
         instrumentId: "aapl",
-        instrument: { symbol: "AAPL", name: "Apple", assetClass: "equity", unit: "shares", market: "NASDAQ", sector: "Technology", sectorWeights: null, currency: "USD" },
+        instrument: { symbol: "AAPL", name: "Apple", assetClass: "equity", unit: "shares", market: "NASDAQ", sector: "Technology", sectorWeights: null },
         marketValueDisplay: "5000",
+        currency: "USD",
       }),
     ];
     const result = getDrillDownInstruments(holdings, "currency", "USD");
@@ -167,8 +168,9 @@ describe("getDrillDownInstruments — currency", () => {
   it("excludes equity whose currency does not match", () => {
     const holdings = [
       makeHolding({
-        instrument: { symbol: "BBCA", name: "Bank BCA", assetClass: "equity", unit: "shares", market: "IDX", sector: "Finance", sectorWeights: null, currency: "IDR" },
+        instrument: { symbol: "BBCA", name: "Bank BCA", assetClass: "equity", unit: "shares", market: "IDX", sector: "Finance", sectorWeights: null },
         marketValueDisplay: "1000",
+        currency: "IDR",
       }),
     ];
     expect(getDrillDownInstruments(holdings, "currency", "USD")).toEqual([]);
@@ -178,8 +180,9 @@ describe("getDrillDownInstruments — currency", () => {
     const holdings = [
       makeHolding({
         instrumentId: "sxr8",
-        instrument: { symbol: "SXR8", name: "S&P 500 ETF", assetClass: "etf", unit: "shares", market: "XETRA", sector: null, sectorWeights: null, currency: "EUR" },
+        instrument: { symbol: "SXR8", name: "S&P 500 ETF", assetClass: "etf", unit: "shares", market: "XETRA", sector: null, sectorWeights: null },
         marketValueDisplay: "10000",
+        currency: "EUR",
       }),
     ];
     const result = getDrillDownInstruments(holdings, "currency", "EUR");
