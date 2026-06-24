@@ -51,3 +51,5 @@ export type Document = typeof schema.documents.$inferSelect;
 export type NewDocument = typeof schema.documents.$inferInsert;
 export type TransactionSource = typeof schema.transactionSources.$inferSelect;
 export type NewTransactionSource = typeof schema.transactionSources.$inferInsert;
+export type IbkrConnection = typeof schema.ibkrConnections.$inferSelect;
+export type NewIbkrConnection = typeof schema.ibkrConnections.$inferInsert;

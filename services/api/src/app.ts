@@ -23,6 +23,7 @@ import { corporateActionsRoute } from "./routes/corporate-actions.js";
 import { mergersRoute } from "./routes/mergers.js";
 import { importsRoute } from "./routes/imports.js";
 import { trRoute } from "./routes/tr.js";
+import { ibkrRoute } from "./routes/ibkr.js";
 import { adminRoute } from "./routes/admin.js";
 import { searchRoute } from "./routes/search.js";
 import { storageRoute } from "./routes/storage.js";
@@ -32,6 +33,8 @@ import type { ScreenshotParser } from "./services/parsers/types.js";
 import { getScreenshotParser } from "./services/screenshot-parser.js";
 import { getPytrRunner } from "./services/pytr/runner.js";
 import type { PytrRunner } from "./services/pytr/runner.js";
+import { createFlexClient } from "./services/ibkr/flex-client.js";
+import type { IbkrFlexClient } from "./services/ibkr/flex-client.js";
 import type { StorageProvider } from "./storage/types.js";
 import { storagePlugin } from "./plugins/storage.js";
 
@@ -40,6 +43,8 @@ export type BuildAppOptions = AuthPluginOptions & {
   screenshotParser?: ScreenshotParser;
   // Injectable so tests drive the pytr boundary without spawning Python.
   pytr?: PytrRunner;
+  // Injectable so tests can mock the IBKR Flex client without real HTTP.
+  ibkrFlex?: IbkrFlexClient;
   // Injectable so tests can supply a fake storage driver without hitting MinIO/S3.
   storage?: StorageProvider;
   /**
@@ -147,6 +152,11 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   }
 
   app.decorate("pytr", opts.pytr ?? getPytrRunner(app.config, app.log));
+  app.decorate(
+    "ibkrFlex",
+    opts.ibkrFlex ??
+      createFlexClient({ baseUrl: app.config.IBKR_FLEX_BASE_URL }),
+  );
 
   // Storage — injectable in tests (pass opts.storage); the real plugin handles
   // bucket auto-creation on non-production environments so local MinIO just works.
@@ -169,6 +179,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(mergersRoute);
   await app.register(importsRoute);
   await app.register(trRoute);
+  await app.register(ibkrRoute);
   await app.register(adminRoute);
   await app.register(searchRoute);
   await app.register(targetsRoute);
@@ -183,6 +194,7 @@ declare module "fastify" {
   interface FastifyInstance {
     screenshotParser: ScreenshotParser;
     pytr: PytrRunner;
+    ibkrFlex: IbkrFlexClient;
     storage: StorageProvider;
   }
 }

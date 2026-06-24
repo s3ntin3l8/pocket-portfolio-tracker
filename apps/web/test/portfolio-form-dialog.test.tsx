@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { AccountHolder, Portfolio, TrConnection } from "@portfolio/api-client";
+import type { AccountHolder, IbkrConnection, Portfolio, TrConnection } from "@portfolio/api-client";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
@@ -47,6 +47,17 @@ const getTrConnection = vi.fn(
     syncing: false,
   }),
 );
+const getIbkrConnection = vi.fn(
+  async (): Promise<IbkrConnection> => ({
+    status: "disconnected",
+    portfolioId: null,
+    flexAccountId: null,
+    lastSyncAt: null,
+    lastError: null,
+    lastReconciliation: null,
+    syncing: false,
+  }),
+);
 
 vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("@/lib/api", () => ({
@@ -55,6 +66,7 @@ vi.mock("@/lib/api", () => ({
     updatePortfolio,
     deletePortfolio,
     getTrConnection,
+    getIbkrConnection,
     listAccountHolders,
     listPortfolios,
     createAccountHolder,
@@ -119,6 +131,7 @@ describe("PortfolioFormDialog", () => {
     updatePortfolio.mockClear();
     deletePortfolio.mockClear();
     getTrConnection.mockClear();
+    getIbkrConnection.mockClear();
     listAccountHolders.mockClear();
     listAccountHolders.mockResolvedValue([]);
     listPortfolios.mockClear();

@@ -330,6 +330,20 @@
       "when": 1782306539862,
       "tag": "0046_cultured_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1782313540466,
+      "tag": "0047_purple_gwen_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1782314813385,
+      "tag": "0048_new_karen_page",
+      "breakpoints": true
     }
   ]
 }

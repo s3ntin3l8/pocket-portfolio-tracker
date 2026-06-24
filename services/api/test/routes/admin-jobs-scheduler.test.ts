@@ -106,8 +106,8 @@ describe("GET /admin/jobs — live pgboss query path (scheduler available)", () 
     // Scheduler is "running" (getActiveBoss returns a non-null stub).
     expect(body.schedulerAvailable).toBe(true);
 
-    // All nine job descriptors are still listed.
-    expect(body.jobs).toHaveLength(9);
+    // All known job descriptors are still listed.
+    expect(body.jobs).toHaveLength(10);
 
     // The seeded job has a "completed" row more recent than the "failed" row.
     const prices = body.jobs.find((j) => j.name === "refresh-prices");

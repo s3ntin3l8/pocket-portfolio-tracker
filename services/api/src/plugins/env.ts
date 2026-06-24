@@ -80,6 +80,22 @@ const schema = {
       type: "boolean",
       default: true,
     },
+    // --- Interactive Brokers (Flex Web Service) ---
+    // Master switch for the IBKR Flex sync feature.
+    IBKR_FLEX_ENABLED: {
+      type: "boolean",
+      default: true,
+    },
+    // Base URL for the Flex Web Service (override for testing/staging).
+    IBKR_FLEX_BASE_URL: {
+      type: "string",
+      default: "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService",
+    },
+    // pg-boss cron for the daily IBKR Flex sync (EOD data — daily, not hourly).
+    IBKR_SYNC_CRON: {
+      type: "string",
+      default: "0 2 * * *", // daily 02:00 UTC (~09:00 WIB)
+    },
     // --- Object storage (S3-compatible: MinIO, AWS, Supabase /storage/v1/s3, R2) ---
     // Endpoint URL for S3-compatible backends. Leave blank to use AWS's default endpoint.
     // MinIO (local): http://localhost:9000
@@ -156,6 +172,9 @@ declare module "fastify" {
       PYTR_PYTHON_BIN: string;
       PYTR_WAF_STRATEGY: "awswaf" | "playwright";
       PYTR_ENABLED: boolean;
+      IBKR_FLEX_ENABLED: boolean;
+      IBKR_FLEX_BASE_URL: string;
+      IBKR_SYNC_CRON: string;
       STORAGE_ENDPOINT: string;
       STORAGE_REGION: string;
       STORAGE_BUCKET: string;
