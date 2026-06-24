@@ -1,11 +1,11 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
+import { Receipt, TrendingUp, Landmark, CalendarClock, TriangleAlert, Info } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { loadNetworthTax } from "@/lib/server-api";
 import { formatMoney } from "@/lib/utils";
-import type { TaxSummaryHolder, HarvestSuggestion } from "@portfolio/api-client";
+import type { TaxSummaryHolder, HarvestSuggestion, TaxDistribution } from "@portfolio/api-client";
 
 export default async function TaxPage({
   params,
@@ -62,7 +62,7 @@ function TaxHolderSection({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
 }) {
-  const { holder, year, currency, allowanceUsage: u, harvestSuggestions } = entry;
+  const { holder, year, currency, allowanceUsage: u, harvestSuggestions, distribution } = entry;
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
   const pct = parseFloat(u.remaining) / parseFloat(u.allowanceAnnual);
   const usedPct = Math.round((1 - Math.max(0, Math.min(1, pct))) * 100);
@@ -96,6 +96,11 @@ function TaxHolderSection({
           delta={`${t("allowance.taxSaving")}: ${money(u.taxSavingAvailable)}`}
         />
       </div>
+
+      {/* FSA distribution roll-up (only when we have distribution context) */}
+      {distribution && (
+        <DistributionCard distribution={distribution} money={money} t={t} />
+      )}
 
       {/* Progress bar */}
       <Card>
@@ -171,6 +176,57 @@ function TaxHolderSection({
         </Card>
       )}
     </section>
+  );
+}
+
+function DistributionCard({
+  distribution: d,
+  money,
+  t,
+}: {
+  distribution: TaxDistribution;
+  money: (n: string | number) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+}) {
+  const allocPct = Number(d.holderAllowanceCap) > 0
+    ? Math.round((Number(d.totalAllocated) / Number(d.holderAllowanceCap)) * 100)
+    : 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Info className="size-4" />
+          {t("distribution.title")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            label={t("distribution.cap")}
+            value={money(d.holderAllowanceCap)}
+            delta={t("distribution.capDesc")}
+          />
+          <StatCard
+            label={t("distribution.allocated")}
+            value={money(d.totalAllocated)}
+            delta={`${allocPct}%`}
+          />
+          <StatCard
+            label={t("distribution.remaining")}
+            value={money(d.remainingToDistribute)}
+            delta={t("distribution.remainingDesc")}
+          />
+        </div>
+        {d.overAllocated && (
+          <div className="flex items-start gap-2 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-600 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
+            <TriangleAlert className="size-4 mt-0.5 shrink-0" />
+            <span>{t("distribution.overAllocated")}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

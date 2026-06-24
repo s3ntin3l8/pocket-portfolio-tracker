@@ -135,9 +135,10 @@ export const accountHolders = pgTable(
     // Optional birth year — powers the "to age 18" savings forecast for a child.
     birthYear: integer("birth_year"),
     // --- German tax profile (optional; null = not configured) ---
-    // Annual Sparerpauschbetrag in EUR (default €1,000 for a single individual).
-    // Stored per-holder so it can vary (e.g. €2,000 for jointly-assessed married couples)
-    // and be updated when the law changes — never hard-coded in application code.
+    // Per-person Sparerpauschbetrag CAP in EUR (default €1,000 single, €2,000 jointly
+    // assessed). This is the legal ceiling for the whole person; the per-depot
+    // Freistellungsauftrag allocations live on portfolios.taxAllowanceAnnual and must
+    // sum to ≤ this cap. Stored per-holder so jointly-assessed couples can set €2,000.
     taxAllowanceAnnual: numeric("tax_allowance_annual"),
     // Flat Kapitalertragsteuer rate (e.g. 0.25 = 25%). Soli is computed on top.
     // Stored per-holder so church-tax payers can configure the effective combined rate.
@@ -186,6 +187,11 @@ export const portfolios = pgTable(
     // PDFs/screenshots are parsed in memory and never persisted (privacy-by-default).
     // When true, staged bytes are retained after import confirmation — see issue #231.
     documentRetention: boolean("document_retention").notNull().default(false),
+    // Per-depot Freistellungsauftrag (FSA) allocation in EUR. The holder's
+    // taxAllowanceAnnual is the per-person cap; the sum of all portfolio allocations
+    // for the same holder should not exceed it. Null = no FSA submitted for this depot
+    // → the tax page shows "unconfigured" for this portfolio.
+    taxAllowanceAnnual: numeric("tax_allowance_annual"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -135,6 +135,10 @@ export const portfolioInputSchema = z.object({
   // PDFs/screenshots are parsed in memory and never persisted (privacy-by-default).
   // When true, the source file is kept after import confirmation.
   documentRetention: z.boolean().default(false),
+  // Per-depot Freistellungsauftrag (FSA) allocation in EUR. Must not exceed the holder's
+  // taxAllowanceAnnual cap (€1,000 single / €2,000 jointly assessed). Null = no FSA
+  // submitted for this depot; the tax page shows "unconfigured" until filled in.
+  taxAllowanceAnnual: decimalString.nullable().optional(),
 });
 export type PortfolioInput = z.infer<typeof portfolioInputSchema>;
 
@@ -150,6 +154,7 @@ export const portfolioPatchSchema = z.object({
   includeInAggregate: z.boolean().optional(),
   cashCounted: z.boolean().optional(),
   documentRetention: z.boolean().optional(),
+  taxAllowanceAnnual: decimalString.nullable().optional(),
 });
 export type PortfolioPatch = z.infer<typeof portfolioPatchSchema>;
 

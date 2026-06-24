@@ -107,10 +107,10 @@ describe("tax routes", () => {
       expect(res.json().error).toBe("tax_allowance_not_configured");
     });
 
-    it("returns 422 when holder has no tax allowance configured", async () => {
+    it("returns 422 when no FSA allocation is set on the portfolio", async () => {
       const t = await token("tax-user-3");
       const holderId = await createHolder(t, { name: "No Allowance Holder" });
-      // Holder has no taxAllowanceAnnual.
+      // Portfolio has no taxAllowanceAnnual (FSA not submitted for this depot).
       const portfolioId = await createPortfolio(t, { accountHolderId: holderId });
       const res = await app.inject({
         method: "GET",
@@ -122,14 +122,15 @@ describe("tax routes", () => {
 
     it("returns tax summary for a portfolio with a configured holder", async () => {
       const t = await token("tax-user-4");
-      // Create a holder with tax allowance.
+      // Create a holder with the per-person cap.
       const holderId = await createHolder(t, {
         name: "DE Holder",
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId });
+      // Portfolio carries the per-depot FSA allocation.
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
 
       const res = await app.inject({
         method: "GET",
@@ -152,7 +153,7 @@ describe("tax routes", () => {
         name: "No Year Holder",
         taxAllowanceAnnual: "800",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "800" });
 
       const res = await app.inject({
         method: "GET",
@@ -167,7 +168,7 @@ describe("tax routes", () => {
       const t1 = await token("tax-scope-1a");
       const t2 = await token("tax-scope-1b");
       const holderId = await createHolder(t1, { name: "Holder 1", taxAllowanceAnnual: "1000" });
-      const portfolioId = await createPortfolio(t1, { accountHolderId: holderId });
+      const portfolioId = await createPortfolio(t1, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
 
       // User 2 cannot access user 1's portfolio.
       const res = await app.inject({
@@ -195,7 +196,7 @@ describe("tax routes", () => {
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       // Upsert the user and create a buy + sell for a 1000 EUR gross gain.
       await app.inject({ method: "GET", url: "/me", headers: auth(t) });
@@ -267,8 +268,8 @@ describe("tax routes", () => {
       const t = await token("tax-nw-2");
       const h1 = await createHolder(t, { name: "Holder A", taxAllowanceAnnual: "1000" });
       const h2 = await createHolder(t, { name: "Holder B", taxAllowanceAnnual: "800" });
-      await createPortfolio(t, { accountHolderId: h1 });
-      await createPortfolio(t, { accountHolderId: h2 });
+      await createPortfolio(t, { accountHolderId: h1, taxAllowanceAnnual: "1000" });
+      await createPortfolio(t, { accountHolderId: h2, taxAllowanceAnnual: "800" });
 
       const res = await app.inject({
         method: "GET",
@@ -286,8 +287,8 @@ describe("tax routes", () => {
       const t = await token("tax-nw-3");
       const h1 = await createHolder(t, { name: "Filter A", taxAllowanceAnnual: "1000" });
       const h2 = await createHolder(t, { name: "Filter B", taxAllowanceAnnual: "800" });
-      await createPortfolio(t, { accountHolderId: h1 });
-      await createPortfolio(t, { accountHolderId: h2 });
+      await createPortfolio(t, { accountHolderId: h1, taxAllowanceAnnual: "1000" });
+      await createPortfolio(t, { accountHolderId: h2, taxAllowanceAnnual: "800" });
 
       const res = await app.inject({
         method: "GET",
@@ -334,7 +335,7 @@ describe("tax routes", () => {
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      await createPortfolio(t, { accountHolderId: holderId });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
 
       const res = await app.inject({
         method: "GET",
@@ -364,6 +365,69 @@ describe("tax routes", () => {
       expect(entry.allowanceUsage.taxRate).toBe("0.25");
       expect(entry.allowanceUsage.currency).toBeDefined();
       expect(Array.isArray(entry.harvestSuggestions)).toBe(true);
+    });
+
+    it("distribution field carries FSA allocation breakdown against the cap", async () => {
+      const t = await token("tax-nw-dist");
+      const holderId = await createHolder(t, {
+        name: "Dist Holder",
+        taxAllowanceAnnual: "1000",
+      });
+      // Two depots each with partial FSA allocations summing to 700.
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "400" });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "300" });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/networth/tax?year=2025",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const [entry] = res.json() as Array<{
+        allowanceUsage: { allowanceAnnual: string };
+        distribution: {
+          holderAllowanceCap: string;
+          totalAllocated: string;
+          remainingToDistribute: string;
+          overAllocated: boolean;
+        };
+      }>;
+      // allowanceUsage uses the holder cap (€1,000), not the FSA sum (€700).
+      expect(entry.allowanceUsage.allowanceAnnual).toBe("1000.00");
+      // Distribution shows cap vs. allocated vs. remaining.
+      expect(entry.distribution.holderAllowanceCap).toBe("1000.00");
+      expect(entry.distribution.totalAllocated).toBe("700.00");
+      expect(entry.distribution.remainingToDistribute).toBe("300.00");
+      expect(entry.distribution.overAllocated).toBe(false);
+    });
+
+    it("flags over-allocation when depot FSA sum exceeds the holder cap", async () => {
+      const t = await token("tax-nw-overalloc");
+      const holderId = await createHolder(t, {
+        name: "Over Holder",
+        taxAllowanceAnnual: "1000",
+      });
+      // Two depots together exceed the €1,000 cap.
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "700" });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "500" });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/networth/tax?year=2025",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const [entry] = res.json() as Array<{
+        distribution: {
+          holderAllowanceCap: string;
+          totalAllocated: string;
+          remainingToDistribute: string;
+          overAllocated: boolean;
+        };
+      }>;
+      expect(entry.distribution.totalAllocated).toBe("1200.00");
+      expect(entry.distribution.remainingToDistribute).toBe("0.00");
+      expect(entry.distribution.overAllocated).toBe(true);
     });
   });
 
@@ -445,7 +509,7 @@ describe("tax routes", () => {
         .returning();
 
       const holderId = await createHolder(t, { name: "Past Year Holder", taxAllowanceAnnual: "1000" });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       await seedTransaction(app, portfolioId, auth(t), {
         type: "buy", instrumentId: stock.id, quantity: "10", price: "50",
@@ -483,7 +547,7 @@ describe("tax routes", () => {
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       // Hold 10 shares; dividend from last year's rest-of-year window (no withholding).
       await seedTransaction(app, portfolioId, auth(t), {
@@ -527,7 +591,7 @@ describe("tax routes", () => {
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       await seedTransaction(app, portfolioId, auth(t), {
         type: "buy", instrumentId: stock.id, quantity: "10", price: "100",
@@ -568,7 +632,7 @@ describe("tax routes", () => {
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       // Buy at 50, still open (unrealized gain drives harvest suggestion).
       await seedTransaction(app, portfolioId, auth(t), {
@@ -618,7 +682,7 @@ describe("tax routes", () => {
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       await seedTransaction(app, portfolioId, auth(t), {
         type: "buy", instrumentId: stock.id, quantity: "5", price: "100",

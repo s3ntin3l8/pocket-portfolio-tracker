@@ -1549,35 +1549,30 @@ export async function transactionsRoute(app: FastifyInstance) {
         return { ...stats, drift, contributionSplit: split };
       }
 
-      // Fetch the portfolio's holder tax profile.
+      // Fetch the portfolio's holder tax profile for the personal tax rate.
+      // The FSA slice (Freistellungsauftrag allocation) lives on the portfolio itself.
       const holderId = portfolio.accountHolderId;
-      let holderTaxProfile: {
-        taxAllowanceAnnual: string | null;
-        capitalGainsTaxRate: string | null;
-      } | null = null;
+      let holderTaxRate: string | null = null;
 
       if (holderId) {
         const [holder] = await app.db
-          .select({
-            taxAllowanceAnnual: accountHolders.taxAllowanceAnnual,
-            capitalGainsTaxRate: accountHolders.capitalGainsTaxRate,
-          })
+          .select({ capitalGainsTaxRate: accountHolders.capitalGainsTaxRate })
           .from(accountHolders)
           .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
           .limit(1);
-        if (holder) holderTaxProfile = holder;
+        if (holder) holderTaxRate = holder.capitalGainsTaxRate;
       }
 
-      if (!holderTaxProfile?.taxAllowanceAnnual) {
-        // Tax profile not configured — return existing data with taxUnavailable flag.
+      if (!portfolio.taxAllowanceAnnual) {
+        // FSA not configured for this portfolio — return existing data with taxUnavailable flag.
         return { ...stats, drift, contributionSplit: split, taxUnavailable: true };
       }
 
       // Compute harvest suggestions using FIFO trade log.
       const tradeLog = await buildTradeLog(coreTxns, prices, portfolio.baseCurrency, "fifo", undefined, metaById);
       const tfRates = await tfRatesFor(tradeLog.trades.map((t) => t.instrumentId));
-      const allowanceAnnual = holderTaxProfile.taxAllowanceAnnual;
-      const taxRate = holderTaxProfile.capitalGainsTaxRate ?? "0.25";
+      const allowanceAnnual = portfolio.taxAllowanceAnnual;
+      const taxRate = holderTaxRate ?? "0.25";
       const usage = allowanceUsageYTD({ tradeLog, tfRates, allowanceAnnual, taxRate });
       const suggestions = harvestSuggestions({ tradeLog, tfRates, allowanceAnnual, taxRate, usage });
 
@@ -2303,9 +2298,12 @@ export async function transactionsRoute(app: FastifyInstance) {
   /**
    * GET /portfolios/:portfolioId/tax
    * German Sparerpauschbetrag headroom and harvest suggestions for a single portfolio.
-   * The portfolio's holder must have `taxAllowanceAnnual` configured.
+   * The portfolio's own `taxAllowanceAnnual` (the per-depot Freistellungsauftrag slice)
+   * must be configured. The holder's capitalGainsTaxRate is used for the tax rate;
+   * the holder's taxAllowanceAnnual is the per-person cap (used for the distribution
+   * helper returned in the response so the edit modal can show "€X of €cap allocated").
    */
-  app.get<{ Params: PortfolioParams; Querystring: { year?: string; holderId?: string } }>(
+  app.get<{ Params: PortfolioParams; Querystring: { year?: string } }>(
     "/portfolios/:portfolioId/tax",
     { preHandler: app.authenticate },
     async (request, reply) => {
@@ -2317,12 +2315,18 @@ export async function transactionsRoute(app: FastifyInstance) {
         return reply.code(404).send({ error: "portfolio_not_found" });
       }
 
-      // Fetch holder (if any) for tax profile.
+      // The FSA slice lives on the portfolio itself.
+      if (!portfolio.taxAllowanceAnnual) {
+        return reply.code(422).send({ error: "tax_allowance_not_configured" });
+      }
+
+      // Fetch holder (if any) for personal tax rate + cap + distribution context.
       const holderId = portfolio.accountHolderId;
-      let holderTaxProfile: {
+      let holderProfile: {
         taxAllowanceAnnual: string | null;
         capitalGainsTaxRate: string | null;
       } | null = null;
+      let totalAllocatedForHolder = Number(portfolio.taxAllowanceAnnual);
 
       if (holderId) {
         const [holder] = await app.db
@@ -2333,12 +2337,22 @@ export async function transactionsRoute(app: FastifyInstance) {
           .from(accountHolders)
           .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
           .limit(1);
-        if (holder) holderTaxProfile = holder;
+        if (holder) holderProfile = holder;
+
+        // Sum FSA allocations across all portfolios for this holder (for the distribution helper).
+        const siblingRows = await app.db
+          .select({ taxAllowanceAnnual: portfolios.taxAllowanceAnnual })
+          .from(portfolios)
+          .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holderId)));
+        totalAllocatedForHolder = siblingRows.reduce(
+          (sum, p) => sum + Number(p.taxAllowanceAnnual ?? 0),
+          0,
+        );
       }
 
-      if (!holderTaxProfile?.taxAllowanceAnnual) {
-        return reply.code(422).send({ error: "tax_allowance_not_configured" });
-      }
+      const holderAllowanceCap = Number(holderProfile?.taxAllowanceAnnual ?? 1000);
+      const remainingToDistribute = Math.max(0, holderAllowanceCap - totalAllocatedForHolder);
+      const overAllocated = totalAllocatedForHolder > holderAllowanceCap;
 
       const now = new Date();
       const year = request.query.year ? parseInt(request.query.year, 10) : now.getUTCFullYear();
@@ -2350,8 +2364,8 @@ export async function transactionsRoute(app: FastifyInstance) {
       );
       const tradeLog = await buildTradeLog(coreTxns, prices, portfolio.baseCurrency, "fifo", undefined, metaById);
       const tfRates = await tfRatesFor(tradeLog.trades.map((t) => t.instrumentId));
-      const allowanceAnnual = holderTaxProfile.taxAllowanceAnnual;
-      const taxRate = holderTaxProfile.capitalGainsTaxRate ?? "0.25";
+      const allowanceAnnual = portfolio.taxAllowanceAnnual;
+      const taxRate = holderProfile?.capitalGainsTaxRate ?? "0.25";
 
       const forecastIncomeRestOfYear = await restOfYearForecastGross(
         coreTxns,
@@ -2372,6 +2386,13 @@ export async function transactionsRoute(app: FastifyInstance) {
           ...s,
           instrument: metaById.get(s.instrumentId) ?? null,
         })),
+        // Holder distribution context — used by the edit-portfolio modal helper.
+        holderDistribution: {
+          holderAllowanceCap: holderAllowanceCap.toFixed(2),
+          totalAllocated: totalAllocatedForHolder.toFixed(2),
+          remainingToDistribute: remainingToDistribute.toFixed(2),
+          overAllocated,
+        },
       };
     },
   );
@@ -2406,7 +2427,7 @@ export async function transactionsRoute(app: FastifyInstance) {
         if (!holder) return reply.status(404).send({ code: "holder_not_found" });
       }
 
-      // Fetch all holders with tax allowances configured.
+      // Fetch all holders (cap is on the holder; actual FSA allocations are per-portfolio).
       const holderRows = await app.db
         .select()
         .from(accountHolders)
@@ -2419,15 +2440,17 @@ export async function transactionsRoute(app: FastifyInstance) {
       const result = [];
 
       for (const holder of holderRows) {
-        if (!holder.taxAllowanceAnnual) continue; // skip unconfigured holders
-
-        // Portfolios belonging to this holder.
+        // Portfolios belonging to this holder (include taxAllowanceAnnual for FSA sum).
         const pfs = await app.db
-          .select({ id: portfolios.id, cashCounted: portfolios.cashCounted })
+          .select({ id: portfolios.id, cashCounted: portfolios.cashCounted, taxAllowanceAnnual: portfolios.taxAllowanceAnnual })
           .from(portfolios)
           .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holder.id)));
 
         if (pfs.length === 0) continue;
+
+        // Sum per-depot FSA allocations. Skip this holder if no depot has an allocation.
+        const totalAllocated = pfs.reduce((sum, p) => sum + Number(p.taxAllowanceAnnual ?? 0), 0);
+        if (totalAllocated === 0) continue;
 
         // Merge trade logs across all portfolios; accumulate rest-of-year income forecast.
         const now = new Date();
@@ -2444,9 +2467,19 @@ export async function transactionsRoute(app: FastifyInstance) {
         const mergedLog = mergeTradeLogs(logs, display, "fifo");
 
         const tfRates = await tfRatesFor(mergedLog.trades.map((t) => t.instrumentId));
-        const allowanceAnnual = holder.taxAllowanceAnnual;
         const taxRate = holder.capitalGainsTaxRate ?? "0.25";
         const forecastIncomeRestOfYear = totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
+
+        // Distribution context: how much of the per-person cap has been allocated.
+        const holderAllowanceCap = Number(holder.taxAllowanceAnnual ?? 1000);
+        const remainingToDistribute = Math.max(0, holderAllowanceCap - totalAllocated);
+        const overAllocated = totalAllocated > holderAllowanceCap;
+
+        // allowanceAnnual for the aggregate computation = the person's legal Sparerpauschbetrag
+        // cap (holder.taxAllowanceAnnual, default €1,000). The FSA sum is for the distribution
+        // display only — under-allocation is reconciled via Anlage KAP at year-end, so harvest
+        // suggestion headroom is correctly the full cap, not the allocated portion.
+        const allowanceAnnual = holderAllowanceCap.toFixed(2);
 
         const usage = allowanceUsageYTD({ tradeLog: mergedLog, tfRates, allowanceAnnual, taxRate, year, forecastIncomeRestOfYear });
         const suggestions = harvestSuggestions({ tradeLog: mergedLog, tfRates, allowanceAnnual, taxRate, year, usage });
@@ -2467,6 +2500,13 @@ export async function transactionsRoute(app: FastifyInstance) {
             ...s,
             instrument: meta.get(s.instrumentId) ?? null,
           })),
+          // Distribution summary across this holder's depots.
+          distribution: {
+            holderAllowanceCap: holderAllowanceCap.toFixed(2),
+            totalAllocated: totalAllocated.toFixed(2),
+            remainingToDistribute: remainingToDistribute.toFixed(2),
+            overAllocated,
+          },
         });
       }
 

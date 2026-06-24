@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
 import type {
   AccountHolder,
   AccountHolderType,
@@ -35,7 +35,7 @@ const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
  * (derived from the holder) and only used to gate the TR connection section. */
 export type EditablePortfolio = Pick<
   Portfolio,
-  "id" | "name" | "baseCurrency" | "accountHolderId" | "portfolioType" | "brokerage" | "accountNumber" | "includeInAggregate" | "cashCounted" | "documentRetention"
+  "id" | "name" | "baseCurrency" | "accountHolderId" | "portfolioType" | "brokerage" | "accountNumber" | "includeInAggregate" | "cashCounted" | "documentRetention" | "taxAllowanceAnnual"
 >;
 
 // Sentinel select value for "create a new holder inline".
@@ -86,6 +86,10 @@ export function PortfolioFormDialog({
   const [includeInAggregate, setIncludeInAggregate] = useState(portfolio?.includeInAggregate ?? true);
   const [cashCounted, setCashCounted] = useState(portfolio?.cashCounted ?? false);
   const [documentRetention, setDocumentRetention] = useState(portfolio?.documentRetention ?? false);
+  // Per-depot Freistellungsauftrag allocation (FSA). Empty string = no allocation.
+  const [taxAllowanceAnnual, setTaxAllowanceAnnual] = useState(portfolio?.taxAllowanceAnnual ?? "");
+  // Sibling portfolios for the same holder — used to compute "€X of €cap allocated" hint.
+  const [siblingPortfolios, setSiblingPortfolios] = useState<Portfolio[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -146,18 +150,24 @@ export function PortfolioFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, showTrSection, trFetchSeq]);
 
-  // Load the user's account holders when the dialog opens, so the picker can offer
-  // them. Mirrors the TR-connection fetch (all setState inside the async callback).
+  // Load the user's account holders and portfolios when the dialog opens.
+  // Holders feed the picker; portfolios feed the FSA allocation helper.
+  // Mirrors the TR-connection fetch (all setState inside the async callback).
   useEffect(() => {
     if (!open) return;
     let active = true;
-    api
-      .listAccountHolders()
-      .then((hs) => {
-        if (active) setHolders(hs);
+    Promise.all([api.listAccountHolders(), api.listPortfolios()])
+      .then(([hs, pfs]) => {
+        if (active) {
+          setHolders(hs);
+          setSiblingPortfolios(pfs);
+        }
       })
       .catch(() => {
-        if (active) setHolders([]);
+        if (active) {
+          setHolders([]);
+          setSiblingPortfolios([]);
+        }
       });
     return () => {
       active = false;
@@ -181,6 +191,8 @@ export function PortfolioFormDialog({
       setIncludeInAggregate(portfolio?.includeInAggregate ?? true);
       setCashCounted(portfolio?.cashCounted ?? false);
       setDocumentRetention(portfolio?.documentRetention ?? false);
+      setTaxAllowanceAnnual(portfolio?.taxAllowanceAnnual ?? "");
+      setSiblingPortfolios([]);
       setError(false);
       setConfirmDelete(false);
       setCreatedPortfolio(null);
@@ -217,6 +229,7 @@ export function PortfolioFormDialog({
         setHolders((prev) => [...prev, createdHolder]);
         setAccountHolderId(createdHolder.id);
       }
+      const fsaTrimmed = taxAllowanceAnnual.trim();
       const input = {
         name: trimmed,
         baseCurrency: currency,
@@ -226,6 +239,7 @@ export function PortfolioFormDialog({
         includeInAggregate,
         cashCounted,
         documentRetention,
+        taxAllowanceAnnual: fsaTrimmed !== "" ? fsaTrimmed : null,
       };
       if (mode === "edit" && portfolio) {
         await api.updatePortfolio(portfolio.id, input);
@@ -266,6 +280,21 @@ export function PortfolioFormDialog({
       setBusy(false);
     }
   }
+
+  // FSA allocation helper: sum all sibling portfolios' allocations for the selected
+  // holder (excluding the current portfolio to avoid double-counting), then add the
+  // current input value. Used to show "€X of €cap allocated — €Y left" in the form.
+  const effectiveHolderId = accountHolderId !== NEW_HOLDER ? accountHolderId : null;
+  const selectedHolderObj = holders.find((h) => h.id === effectiveHolderId) ?? null;
+  const holderAllowanceCap = Number(selectedHolderObj?.taxAllowanceAnnual ?? 1000);
+  const siblingsTotal = siblingPortfolios
+    .filter((p) => p.accountHolderId === effectiveHolderId && p.id !== portfolio?.id)
+    .reduce((sum, p) => sum + Number(p.taxAllowanceAnnual ?? 0), 0);
+  const currentFsaNum = Number(taxAllowanceAnnual) || 0;
+  const totalAllocated = siblingsTotal + currentFsaNum;
+  const fsaRemainingForHolder = Math.max(0, holderAllowanceCap - totalAllocated);
+  const fsaOverAllocated = effectiveHolderId != null && totalAllocated > holderAllowanceCap;
+  const showFsaHelper = effectiveHolderId != null && siblingPortfolios.length > 0;
 
   // Derive the initial state for TrConnectFlow. The connection is one-per-user: if it's
   // actively bound to a different portfolio, force the connect form so the user can
@@ -428,6 +457,40 @@ export function PortfolioFormDialog({
                 </option>
               ))}
             </Select>
+          </div>
+
+          {/* Per-depot Freistellungsauftrag (FSA) allocation */}
+          <div className="space-y-1.5">
+            <Label htmlFor="portfolio-fsa">{t("taxAllowanceAnnual")}</Label>
+            <Input
+              id="portfolio-fsa"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={1}
+              value={taxAllowanceAnnual}
+              onChange={(e) => setTaxAllowanceAnnual(e.target.value)}
+              placeholder={t("taxAllowanceAnnualPlaceholder")}
+            />
+            {showFsaHelper && !fsaOverAllocated && (
+              <p className="text-xs text-muted-foreground">
+                {t("taxAllowanceHelper", {
+                  allocated: totalAllocated.toFixed(0),
+                  cap: holderAllowanceCap.toFixed(0),
+                  remaining: fsaRemainingForHolder.toFixed(0),
+                  holder: selectedHolderObj?.name ?? "",
+                })}
+              </p>
+            )}
+            {showFsaHelper && fsaOverAllocated && (
+              <div className="flex items-start gap-1.5 text-xs text-yellow-700 dark:text-yellow-300">
+                <TriangleAlert className="size-3.5 mt-0.5 shrink-0" />
+                <span>{t("taxAllowanceOverAllocated", { cap: holderAllowanceCap.toFixed(0) })}</span>
+              </div>
+            )}
+            {!showFsaHelper && (
+              <p className="text-xs text-muted-foreground">{t("taxAllowanceAnnualHint")}</p>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

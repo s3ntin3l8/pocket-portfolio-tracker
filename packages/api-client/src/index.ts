@@ -299,12 +299,27 @@ export interface HarvestSuggestion {
   } | null;
 }
 
+/** Distribution context returned by tax endpoints — shows how the per-person cap
+ *  is being used across a holder's depots. */
+export interface TaxDistribution {
+  /** The holder's per-person Sparerpauschbetrag cap (€1,000 single / €2,000 joint), decimal string. */
+  holderAllowanceCap: string;
+  /** Sum of all per-depot FSA allocations for this holder, decimal string. */
+  totalAllocated: string;
+  /** How much of the cap is still unallocated (holderAllowanceCap − totalAllocated, ≥0), decimal string. */
+  remainingToDistribute: string;
+  /** True when the depots' total allocation exceeds the cap; year-end Anlage KAP will reconcile. */
+  overAllocated: boolean;
+}
+
 /** Response from GET /portfolios/:id/tax */
 export interface PortfolioTaxSummary {
   year: number;
   currency: string;
   allowanceUsage: AllowanceUsage;
   harvestSuggestions: HarvestSuggestion[];
+  /** Distribution context for the holder's full FSA allocation (used by the edit-portfolio modal). */
+  holderDistribution: TaxDistribution;
 }
 
 /** One holder's entry in the GET /networth/tax response. */
@@ -312,7 +327,8 @@ export interface TaxSummaryHolder {
   holder: {
     id: string;
     name: string;
-    taxAllowanceAnnual: string;
+    /** Per-person Sparerpauschbetrag cap (€1,000 / €2,000 jointly assessed). */
+    taxAllowanceAnnual: string | null;
     capitalGainsTaxRate: string | null;
     churchTax: boolean | null;
     taxResidence: string | null;
@@ -321,6 +337,8 @@ export interface TaxSummaryHolder {
   currency: string;
   allowanceUsage: AllowanceUsage;
   harvestSuggestions: HarvestSuggestion[];
+  /** Distribution summary across this holder's depots. */
+  distribution: TaxDistribution;
 }
 
 export interface Portfolio {
@@ -350,6 +368,10 @@ export interface Portfolio {
    * uploaded PDFs/screenshots are parsed in memory and never persisted (privacy-by-default).
    * When true, the source file is kept after import confirmation. */
   documentRetention: boolean;
+  /** Per-depot Freistellungsauftrag (FSA) allocation in EUR (decimal string), or null when
+   *  no FSA has been submitted for this depot. The holder's taxAllowanceAnnual cap must not
+   *  be exceeded in aggregate across all the holder's portfolios. */
+  taxAllowanceAnnual: string | null;
 }
 
 /** Presentation metadata for an instrument; `null` on cash (instrument-less) rows. */
@@ -1658,8 +1680,10 @@ export function createApiClient(config: ApiClientConfig) {
 
     /**
      * German Sparerpauschbetrag headroom + harvest suggestions for a single portfolio.
-     * The portfolio's holder must have `taxAllowanceAnnual` configured, otherwise the
-     * API returns 422 (tax_allowance_not_configured).
+     * The portfolio's own `taxAllowanceAnnual` (per-depot Freistellungsauftrag allocation)
+     * must be configured, otherwise the API returns 422 (tax_allowance_not_configured).
+     * The response includes `holderDistribution` showing how much of the holder's cap
+     * is allocated across their depots.
      */
     getPortfolioTax: (portfolioId: string, year?: number) => {
       const params = new URLSearchParams();
@@ -1673,7 +1697,9 @@ export function createApiClient(config: ApiClientConfig) {
 
     /**
      * Aggregated German tax summary across all of the user's portfolios, grouped by
-     * holder. Only holders with `taxAllowanceAnnual` configured are returned.
+     * holder. Only holders where at least one portfolio has a `taxAllowanceAnnual` (FSA
+     * allocation) are returned. Each entry includes a `distribution` field showing how
+     * much of the holder's per-person cap is allocated across their depots.
      * Optionally filter to a single holder via `holderId`.
      */
     getNetworthTax: (year?: number, holderId?: string) => {
