@@ -1,0 +1,1 @@
+ALTER TABLE "portfolios" ADD COLUMN "tax_allowance_annual" numeric;

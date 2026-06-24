@@ -260,8 +260,8 @@
     "confirmDelete": "Delete",
     "taxProfileSection": "Tax profile (DE)",
     "taxResidence": "Tax residence",
-    "taxAllowance": "Annual allowance (Sparerpauschbetrag)",
-    "taxAllowanceHint": "€1,000 for single filers; €2,000 for jointly-assessed couples.",
+    "taxAllowance": "Annual allowance cap (Sparerpauschbetrag)",
+    "taxAllowanceHint": "The per-person legal ceiling: €1,000 for single filers; €2,000 for jointly-assessed couples. The actual allocation per depot is set in each portfolio's settings.",
     "capitalGainsTaxRate": "Capital gains tax rate",
     "capitalGainsTaxRateHint": "0.25 (25% KapSt) or 0.26375 incl. Soli. Adjust for your marginal rate.",
     "churchTax": "Church tax surcharge (Kirchensteuer)"
@@ -312,6 +312,11 @@
     "cashCountedHint": "Check for a savings/deposit account (Tagesgeld, Festgeld, a child's savings depot): cash counts as money saved and is included in net worth. Leave unchecked for a brokerage or mixed/checking account: only invested capital counts and idle cash is excluded — the right default for accounts where cash is just passing through.",
     "documentRetention": "Keep source documents",
     "documentRetentionHint": "When enabled, uploaded PDFs and screenshots are retained after confirmation so you can download them later. Off by default — documents are discarded after parsing to protect your privacy.",
+    "taxAllowanceAnnual": "Freistellungsauftrag (FSA)",
+    "taxAllowanceAnnualPlaceholder": "e.g. 1000",
+    "taxAllowanceAnnualHint": "Optional. The amount of your Sparerpauschbetrag allocated to this depot. Kapitalertragsteuer is withheld only once this amount is used up.",
+    "taxAllowanceHelper": "€{allocated} of €{cap} cap allocated across {holder}'s depots — €{remaining} left",
+    "taxAllowanceOverAllocated": "Total allocation exceeds the €{cap} cap. The excess will be reconciled at year-end via Anlage KAP.",
     "trSectionTitle": "Trade Republic connection",
     "trConnectAfterSave": "Save the portfolio first to set up the Trade Republic connection.",
     "trChildUnsupported": "Trade Republic can't sync child accounts (Kinderdepot) yet — import via CSV or PDF instead.",
@@ -999,8 +1004,17 @@
     "title": "Tax Optimization",
     "subtitle": "Sparerpauschbetrag headroom and tax-free harvest suggestions. German tax only.",
     "empty": {
-      "title": "No tax allowance configured",
-      "description": "Add a Sparerpauschbetrag (annual allowance) to at least one account holder in Settings to see headroom and harvest suggestions."
+      "title": "No FSA allocation configured",
+      "description": "Add a Freistellungsauftrag (FSA) allocation to at least one portfolio in its settings to see headroom and harvest suggestions."
+    },
+    "distribution": {
+      "title": "FSA distribution across depots",
+      "cap": "Allowance cap",
+      "capDesc": "Per-person Sparerpauschbetrag",
+      "allocated": "Allocated",
+      "remaining": "Still to distribute",
+      "remainingDesc": "Unallocated to a depot",
+      "overAllocated": "Total depot allocation exceeds the personal cap. The excess withholding will be reconciled at year-end via Anlage KAP."
     },
     "allowance": {
       "annual": "Annual allowance",

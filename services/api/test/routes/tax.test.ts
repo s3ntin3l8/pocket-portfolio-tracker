@@ -107,10 +107,10 @@ describe("tax routes", () => {
       expect(res.json().error).toBe("tax_allowance_not_configured");
     });
 
-    it("returns 422 when holder has no tax allowance configured", async () => {
+    it("returns 422 when no FSA allocation is set on the portfolio", async () => {
       const t = await token("tax-user-3");
       const holderId = await createHolder(t, { name: "No Allowance Holder" });
-      // Holder has no taxAllowanceAnnual.
+      // Portfolio has no taxAllowanceAnnual (FSA not submitted for this depot).
       const portfolioId = await createPortfolio(t, { accountHolderId: holderId });
       const res = await app.inject({
         method: "GET",
@@ -122,14 +122,15 @@ describe("tax routes", () => {
 
     it("returns tax summary for a portfolio with a configured holder", async () => {
       const t = await token("tax-user-4");
-      // Create a holder with tax allowance.
+      // Create a holder with the per-person cap.
       const holderId = await createHolder(t, {
         name: "DE Holder",
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId });
+      // Portfolio carries the per-depot FSA allocation.
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
 
       const res = await app.inject({
         method: "GET",
@@ -152,7 +153,7 @@ describe("tax routes", () => {
         name: "No Year Holder",
         taxAllowanceAnnual: "800",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "800" });
 
       const res = await app.inject({
         method: "GET",
@@ -167,7 +168,7 @@ describe("tax routes", () => {
       const t1 = await token("tax-scope-1a");
       const t2 = await token("tax-scope-1b");
       const holderId = await createHolder(t1, { name: "Holder 1", taxAllowanceAnnual: "1000" });
-      const portfolioId = await createPortfolio(t1, { accountHolderId: holderId });
+      const portfolioId = await createPortfolio(t1, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
 
       // User 2 cannot access user 1's portfolio.
       const res = await app.inject({
@@ -195,7 +196,7 @@ describe("tax routes", () => {
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       // Upsert the user and create a buy + sell for a 1000 EUR gross gain.
       await app.inject({ method: "GET", url: "/me", headers: auth(t) });
@@ -267,8 +268,8 @@ describe("tax routes", () => {
       const t = await token("tax-nw-2");
       const h1 = await createHolder(t, { name: "Holder A", taxAllowanceAnnual: "1000" });
       const h2 = await createHolder(t, { name: "Holder B", taxAllowanceAnnual: "800" });
-      await createPortfolio(t, { accountHolderId: h1 });
-      await createPortfolio(t, { accountHolderId: h2 });
+      await createPortfolio(t, { accountHolderId: h1, taxAllowanceAnnual: "1000" });
+      await createPortfolio(t, { accountHolderId: h2, taxAllowanceAnnual: "800" });
 
       const res = await app.inject({
         method: "GET",
@@ -286,8 +287,8 @@ describe("tax routes", () => {
       const t = await token("tax-nw-3");
       const h1 = await createHolder(t, { name: "Filter A", taxAllowanceAnnual: "1000" });
       const h2 = await createHolder(t, { name: "Filter B", taxAllowanceAnnual: "800" });
-      await createPortfolio(t, { accountHolderId: h1 });
-      await createPortfolio(t, { accountHolderId: h2 });
+      await createPortfolio(t, { accountHolderId: h1, taxAllowanceAnnual: "1000" });
+      await createPortfolio(t, { accountHolderId: h2, taxAllowanceAnnual: "800" });
 
       const res = await app.inject({
         method: "GET",
@@ -334,7 +335,7 @@ describe("tax routes", () => {
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      await createPortfolio(t, { accountHolderId: holderId });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
 
       const res = await app.inject({
         method: "GET",
@@ -445,7 +446,7 @@ describe("tax routes", () => {
         .returning();
 
       const holderId = await createHolder(t, { name: "Past Year Holder", taxAllowanceAnnual: "1000" });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       await seedTransaction(app, portfolioId, auth(t), {
         type: "buy", instrumentId: stock.id, quantity: "10", price: "50",
@@ -483,7 +484,7 @@ describe("tax routes", () => {
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       // Hold 10 shares; dividend from last year's rest-of-year window (no withholding).
       await seedTransaction(app, portfolioId, auth(t), {
@@ -527,7 +528,7 @@ describe("tax routes", () => {
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       await seedTransaction(app, portfolioId, auth(t), {
         type: "buy", instrumentId: stock.id, quantity: "10", price: "100",
@@ -568,7 +569,7 @@ describe("tax routes", () => {
         taxAllowanceAnnual: "1000",
         capitalGainsTaxRate: "0.25",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       // Buy at 50, still open (unrealized gain drives harvest suggestion).
       await seedTransaction(app, portfolioId, auth(t), {
@@ -618,7 +619,7 @@ describe("tax routes", () => {
         capitalGainsTaxRate: "0.25",
         taxResidence: "DE",
       });
-      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR" });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, baseCurrency: "EUR", taxAllowanceAnnual: "1000" });
 
       await seedTransaction(app, portfolioId, auth(t), {
         type: "buy", instrumentId: stock.id, quantity: "5", price: "100",

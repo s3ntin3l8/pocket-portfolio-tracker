@@ -21,6 +21,7 @@ const updatePortfolio = vi.fn(async () => ({}) as never);
 const deletePortfolio = vi.fn(async () => undefined);
 // Holders the picker offers, and the holder created when the user adds one inline.
 const listAccountHolders = vi.fn(async (): Promise<AccountHolder[]> => []);
+const listPortfolios = vi.fn(async (): Promise<Portfolio[]> => []);
 const createAccountHolder = vi.fn(
   async (input: { name: string; type: string; birthYear: number | null }): Promise<AccountHolder> => ({
     id: "h-new",
@@ -55,6 +56,7 @@ vi.mock("@/lib/api", () => ({
     deletePortfolio,
     getTrConnection,
     listAccountHolders,
+    listPortfolios,
     createAccountHolder,
   }),
 }));
@@ -73,6 +75,7 @@ const baseInput = {
   includeInAggregate: true,
   cashCounted: false,
   documentRetention: false,
+  taxAllowanceAnnual: null,
 };
 
 function renderCreate() {
@@ -95,6 +98,7 @@ function renderEdit(
     includeInAggregate: true,
     cashCounted: false,
     documentRetention: false,
+    taxAllowanceAnnual: null,
   },
 ) {
   return render(
@@ -117,6 +121,8 @@ describe("PortfolioFormDialog", () => {
     getTrConnection.mockClear();
     listAccountHolders.mockClear();
     listAccountHolders.mockResolvedValue([]);
+    listPortfolios.mockClear();
+    listPortfolios.mockResolvedValue([]);
     createAccountHolder.mockClear();
     document.cookie = "pf=; max-age=0; path=/";
   });
@@ -284,7 +290,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -308,7 +315,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -329,7 +337,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -352,7 +361,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -375,7 +385,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -394,7 +405,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     // Dialog is closed on mount — the fetch must be gated on `open`.
     expect(getTrConnection).not.toHaveBeenCalled();
@@ -423,7 +435,8 @@ describe("PortfolioFormDialog", () => {
       accountNumber: null,
       includeInAggregate: true,
       cashCounted: false,
-    documentRetention: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 

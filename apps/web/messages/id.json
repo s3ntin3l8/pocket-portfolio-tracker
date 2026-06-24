@@ -261,7 +261,7 @@
     "taxProfileSection": "Profil pajak (DE)",
     "taxResidence": "Domisili pajak",
     "taxAllowance": "Batas bebas pajak tahunan (Sparerpauschbetrag)",
-    "taxAllowanceHint": "€1.000 untuk lajang; €2.000 untuk pasangan yang dihitung bersama.",
+    "taxAllowanceHint": "Plafon per orang: €1.000 untuk lajang; €2.000 untuk pasangan yang dihitung bersama. Alokasi per depot diatur di pengaturan masing-masing portofolio.",
     "capitalGainsTaxRate": "Tarif pajak keuntungan modal",
     "capitalGainsTaxRateHint": "0,25 (25% KapSt) atau 0,26375 termasuk Soli.",
     "churchTax": "Pajak gereja (Kirchensteuer)"
@@ -312,6 +312,11 @@
     "cashCountedHint": "Centang untuk rekening tabungan/deposito (Tagesgeld, Festgeld, depot tabungan anak): kas dihitung sebagai uang yang ditabung dan masuk ke kekayaan bersih. Biarkan kosong untuk rekening sekuritas atau giro/campuran: hanya modal yang diinvestasikan yang dihitung dan kas menganggur dikecualikan — default yang tepat untuk akun yang kasnya hanya numpang lewat.",
     "documentRetention": "Simpan dokumen sumber",
     "documentRetentionHint": "Saat diaktifkan, PDF dan tangkapan layar yang diunggah akan disimpan setelah konfirmasi sehingga dapat diunduh nanti. Nonaktif secara default — dokumen dihapus setelah parsing untuk melindungi privasi Anda.",
+    "taxAllowanceAnnual": "Freistellungsauftrag (FSA)",
+    "taxAllowanceAnnualPlaceholder": "misal 1000",
+    "taxAllowanceAnnualHint": "Opsional. Jumlah Sparerpauschbetrag yang dialokasikan ke depot ini. Pajak retensi hanya dipotong setelah jumlah ini terpakai.",
+    "taxAllowanceHelper": "€{allocated} dari plafon €{cap} telah dialokasikan di depot {holder} — sisa €{remaining}",
+    "taxAllowanceOverAllocated": "Total alokasi melebihi plafon €{cap}. Kelebihan akan direkonsiliasi akhir tahun lewat Anlage KAP.",
     "trSectionTitle": "Koneksi Trade Republic",
     "trConnectAfterSave": "Simpan portofolio terlebih dahulu untuk mengatur koneksi Trade Republic.",
     "trChildUnsupported": "Trade Republic belum bisa menyinkronkan akun anak (Kinderdepot) — impor lewat CSV atau PDF saja.",
@@ -997,8 +1002,17 @@
     "title": "Optimasi Pajak",
     "subtitle": "Sisa Sparerpauschbetrag dan saran panen bebas pajak. Khusus pajak Jerman.",
     "empty": {
-      "title": "Batas pajak belum dikonfigurasi",
-      "description": "Tambahkan Sparerpauschbetrag pada pemilik akun di Pengaturan untuk melihat sisa batas dan saran panen."
+      "title": "Alokasi FSA belum dikonfigurasi",
+      "description": "Tambahkan alokasi Freistellungsauftrag (FSA) pada setidaknya satu portofolio di pengaturannya untuk melihat sisa batas dan saran panen."
+    },
+    "distribution": {
+      "title": "Distribusi FSA di seluruh depot",
+      "cap": "Plafon tunjangan",
+      "capDesc": "Sparerpauschbetrag per orang",
+      "allocated": "Dialokasikan",
+      "remaining": "Belum didistribusikan",
+      "remainingDesc": "Belum dialokasikan ke depot",
+      "overAllocated": "Total alokasi depot melebihi plafon pribadi. Kelebihan pemotongan akan direkonsiliasi akhir tahun melalui Anlage KAP."
     },
     "allowance": {
       "annual": "Batas tahunan",

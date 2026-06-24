@@ -49,6 +49,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
         includeInAggregate: input.includeInAggregate,
         cashCounted: input.cashCounted,
         documentRetention: input.documentRetention,
+        taxAllowanceAnnual: input.taxAllowanceAnnual ?? null,
       })
       .returning();
     reply.code(201);

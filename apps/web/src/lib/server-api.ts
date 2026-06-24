@@ -28,6 +28,7 @@ import {
   type ImportStrategy,
   type AdminStorageResponse,
   type TaxSummaryHolder,
+  type PortfolioTaxSummary,
   type UserPreferences,
   type Anomaly,
 } from "@portfolio/api-client";
@@ -762,11 +763,60 @@ export async function loadPortfolio<T>(
  * across all holders with a configured allowance. Returns an empty array when
  * the API is unavailable or no holders are configured.
  */
+/**
+ * Load tax data scoped to the active PortfolioSwitcher selection:
+ * - single portfolio → `getPortfolioTax` (per-depot FSA, portfolio base currency)
+ * - holder scope    → `getNetworthTax(year, holderId)`
+ * - all             → `getNetworthTax(year)`
+ *
+ * Always returns a `TaxSummaryHolder[]` so the tax page component is uniform.
+ * Single-portfolio results are normalized into a one-element array where the
+ * holder stub is derived from the portfolio's own data.
+ */
 export async function loadNetworthTax(year?: number): Promise<TaxSummaryHolder[]> {
   const api = await getServerApi();
   if (!api) return [];
   try {
-    return await api.getNetworthTax(year);
+    const portfolios = await api.listPortfolios();
+    if (portfolios.length === 0) return [];
+
+    const wanted = await getSelectedPortfolioId();
+    const selected = portfolios.find((p) => p.id === wanted);
+
+    if (selected) {
+      // Single-portfolio scope: use the per-depot FSA endpoint.
+      let result: PortfolioTaxSummary;
+      try {
+        result = await api.getPortfolioTax(selected.id, year);
+      } catch (err: unknown) {
+        // 422 = FSA not configured for this portfolio — show nothing (not an error).
+        if (err && typeof err === "object" && "status" in err && (err as { status: number }).status === 422) {
+          return [];
+        }
+        throw err;
+      }
+      // Normalize into TaxSummaryHolder shape for the shared page component.
+      const holderEntry: TaxSummaryHolder = {
+        holder: {
+          id: selected.accountHolderId ?? selected.id,
+          name: selected.accountHolder ?? selected.name,
+          taxAllowanceAnnual: selected.taxAllowanceAnnual,
+          capitalGainsTaxRate: null,
+          churchTax: null,
+          taxResidence: null,
+        },
+        year: result.year,
+        currency: result.currency,
+        allowanceUsage: result.allowanceUsage,
+        harvestSuggestions: result.harvestSuggestions,
+        distribution: result.holderDistribution,
+      };
+      return [holderEntry];
+    }
+
+    // Holder or all-portfolio scope.
+    const holderId = await resolveHolderScope(portfolios);
+    return await api.getNetworthTax(year, holderId);
   } catch {
     return [];
   }

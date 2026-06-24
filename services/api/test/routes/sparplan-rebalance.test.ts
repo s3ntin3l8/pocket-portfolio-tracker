@@ -365,12 +365,12 @@ describe("sparplan rebalancing (Phase B)", () => {
     const holderId = holderRes.json().id as string;
 
     const pf = await createPortfolio(t, "PhaseD With Tax");
-    // Link holder to portfolio.
+    // Link holder to portfolio and set per-depot FSA allocation.
     await app.inject({
       method: "PATCH",
       url: `/portfolios/${pf}`,
       headers: auth(t),
-      payload: { accountHolderId: holderId },
+      payload: { accountHolderId: holderId, taxAllowanceAnnual: "1000" },
     });
 
     // Insert two instruments with unique symbols for this test.
