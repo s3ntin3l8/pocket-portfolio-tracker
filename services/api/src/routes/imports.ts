@@ -868,10 +868,12 @@ export async function importsRoute(app: FastifyInstance) {
       if (imp.status === "confirmed") {
         return reply.code(409).send({ error: "already_confirmed" });
       }
-      // For a pytr draft, durably record its events as discarded so the next sync doesn't
+      // For pytr/ibkr drafts, durably record events as discarded so the next sync doesn't
       // re-stage them (the collector would otherwise resurface them indefinitely).
       let resolvedEventsRecorded = 0;
-      if (imp.parser === "pytr" && imp.portfolioId) {
+      const isSyncParser = (imp.parser === "pytr" || imp.parser === "ibkr") && imp.portfolioId;
+      if (isSyncParser) {
+        const source = imp.parser as "pytr" | "ibkr";
         const parsed = (imp.parsedJson ?? {}) as {
           drafts?: { externalId?: string | null }[];
           errors?: { eventId?: string | null }[];
@@ -886,6 +888,7 @@ export async function importsRoute(app: FastifyInstance) {
             .values(
               ids.map((eventId) => ({
                 portfolioId: imp.portfolioId!,
+                source,
                 eventId,
                 resolution: "discarded",
               })),
@@ -1598,7 +1601,9 @@ export async function importsRoute(app: FastifyInstance) {
           drafts.map((d) => d.externalId).filter((x): x is string => Boolean(x)),
         );
 
-        if (imp.parser === "pytr") {
+        const isSyncImport = imp.parser === "pytr" || imp.parser === "ibkr";
+        if (isSyncImport) {
+          const resolvedSource = imp.parser as "pytr" | "ibkr";
           // Record confirmed events durably so a later manual deletion doesn't resurface them.
           if (confirmedExtIds.size) {
             await tx
@@ -1606,6 +1611,7 @@ export async function importsRoute(app: FastifyInstance) {
               .values(
                 [...confirmedExtIds].map((eventId) => ({
                   portfolioId: targetPortfolioId,
+                  source: resolvedSource,
                   eventId,
                   resolution: "confirmed",
                 })),
@@ -1640,6 +1646,7 @@ export async function importsRoute(app: FastifyInstance) {
                 .values(
                   leftover.map((eventId) => ({
                     portfolioId: targetPortfolioId,
+                    source: resolvedSource,
                     eventId,
                     resolution: "discarded",
                   })),

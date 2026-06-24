@@ -1,7 +1,7 @@
 import { PgBoss } from "pg-boss";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { trConnections } from "@portfolio/db";
+import { ibkrConnections, trConnections } from "@portfolio/db";
 import { getDb } from "../db/client.js";
 import { getMarketData, flushUsage } from "./market-data.js";
 import { refreshHeldPrices } from "./refresh.js";
@@ -10,6 +10,7 @@ import { refreshInstrumentMetadata } from "./instrument-metadata.js";
 import { recordDailySnapshots } from "./snapshots.js";
 import { refreshAntamBuyback, refreshGaleri24Buyback, refreshNav } from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
+import { syncIbkrConnection } from "./ibkr/sync.js";
 import { backfillPortfolioHistory, backfillStalePortfolios } from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 
@@ -21,6 +22,8 @@ const SNAPSHOT_CRON = "0 16 * * *"; // daily 16:00 UTC (~23:00 WIB, after the ID
 
 const TR_SYNC_QUEUE = "tr-sync";
 const TR_SYNC_CRON = "0 * * * *"; // hourly — TR data isn't intraday; be gentle on their API
+
+const IBKR_SYNC_QUEUE = "ibkr-sync";
 
 const ANTAM_QUEUE = "scrape-antam";
 const ANTAM_CRON = "0 */4 * * *"; // every 4h — the Antam buyback moves intraday but slowly
@@ -87,6 +90,12 @@ export const JOB_DESCRIPTORS = [
     cron: TR_SYNC_CRON,
   },
   {
+    name: IBKR_SYNC_QUEUE,
+    label: "Interactive Brokers sync",
+    description: "Fetch IBKR Flex EOD statements and stage new transactions as draft imports.",
+    cron: "0 2 * * *", // default; overridden by IBKR_SYNC_CRON env at runtime
+  },
+  {
     name: ANTAM_QUEUE,
     label: "Gold buyback scrape",
     description: "Scrape Antam and Galeri24 buyback rates into the scraped-quotes cache.",
@@ -143,6 +152,20 @@ export async function triggerJob(
 ): Promise<{ queued: boolean }> {
   if (!activeBoss) return { queued: false };
   await activeBoss.send(name, payload);
+  return { queued: true };
+}
+
+/**
+ * Enqueue a per-connection IBKR sync, deduplicated. Falls back to inline when pg-boss is
+ * unavailable (PGlite / tests).
+ */
+export async function enqueueIbkrSync(connectionId: string): Promise<{ queued: boolean }> {
+  if (!activeBoss) return { queued: false };
+  await activeBoss.send(
+    IBKR_SYNC_QUEUE,
+    { connectionId },
+    { singletonKey: `ibkr-sync:${connectionId}`, singletonSeconds: 30 },
+  );
   return { queued: true };
 }
 
@@ -302,6 +325,52 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   });
   await boss.schedule(TR_SYNC_QUEUE, TR_SYNC_CRON);
 
+  // Daily IBKR Flex sync — EOD data so daily is sufficient; no hourly hammering.
+  // `connectionId` in job data = sync that one connection only (manual trigger);
+  // absent = sync all connected accounts (cron path).
+  const ibkrSyncCron = app.config.IBKR_SYNC_CRON;
+  await boss.createQueue(IBKR_SYNC_QUEUE);
+  await boss.work(IBKR_SYNC_QUEUE, async (jobs) => {
+    const connectionId =
+      Array.isArray(jobs) && jobs.length > 0
+        ? (jobs[0]?.data as Record<string, unknown> | null)?.connectionId
+        : undefined;
+    const targetId = typeof connectionId === "string" ? connectionId : undefined;
+    try {
+      const conns = await getDb()
+        .select()
+        .from(ibkrConnections)
+        .where(
+          targetId
+            ? and(eq(ibkrConnections.id, targetId), eq(ibkrConnections.status, "connected"))
+            : eq(ibkrConnections.status, "connected"),
+        );
+      for (const conn of conns) {
+        const result = await syncIbkrConnection(
+          getDb(), app.encryption, app.ibkrFlex, conn, app.log,
+        );
+        if (result.status === "connected") {
+          app.log.info({ connectionId: conn.id, result }, "ibkr sync complete");
+        } else {
+          app.log.warn({ connectionId: conn.id, result }, "ibkr sync non-connected");
+        }
+      }
+    } catch (err) {
+      if (targetId) {
+        try {
+          await getDb()
+            .update(ibkrConnections)
+            .set({ syncing: false, updatedAt: new Date() })
+            .where(eq(ibkrConnections.id, targetId));
+        } catch {
+          // best-effort
+        }
+      }
+      app.log.error({ err }, "ibkr sync failed");
+    }
+  });
+  await boss.schedule(IBKR_SYNC_QUEUE, ibkrSyncCron);
+
   // Scrape the gold buyback rates (Antam + Galeri24) into scraped_quotes; served back to the
   // BuybackProviders via /internal/gold/<brand>-buyback. Each scraper self-handles failures
   // (returns null), so one dead source doesn't block the other.
@@ -434,6 +503,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
       priceCron: SCHEDULE_CRON,
       snapshotCron: SNAPSHOT_CRON,
       trSyncCron: TR_SYNC_CRON,
+      ibkrSyncCron,
       antamCron: ANTAM_CRON,
       navCron: NAV_CRON,
       dividendCron: DIVIDEND_CRON,

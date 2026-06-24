@@ -8,7 +8,8 @@ import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { AccountHoldersManager } from "@/components/account-holders-manager";
 import { BrokerageIcon } from "@/components/brokerage-icon";
 import { TrSyncButton } from "@/components/tr-sync-button";
-import { loadAccountHolders, loadPortfolios, loadTrConnection } from "@/lib/server-api";
+import { IbkrSyncButton } from "@/components/ibkr-sync-button";
+import { loadAccountHolders, loadPortfolios, loadTrConnection, loadIbkrConnection } from "@/lib/server-api";
 import { formatMoney } from "@/lib/utils";
 
 export default async function PortfoliosPage({
@@ -22,10 +23,12 @@ export default async function PortfoliosPage({
   const tf = await getTranslations("PortfolioForm");
   const te = await getTranslations("Empty");
   const ttr = await getTranslations("TradeRepublic");
+  const tibkr = await getTranslations("InteractiveBrokers");
 
-  const [result, connection, holders] = await Promise.all([
+  const [result, connection, ibkrConn, holders] = await Promise.all([
     loadPortfolios(),
     loadTrConnection(),
+    loadIbkrConnection(),
     loadAccountHolders(),
   ]);
 
@@ -33,6 +36,12 @@ export default async function PortfoliosPage({
   const trPortfolioId =
     connection !== null && connection.status !== "disconnected"
       ? connection.portfolioId
+      : null;
+
+  // Determine which portfolio (if any) the IBKR connection is bound to.
+  const ibkrPortfolioId =
+    ibkrConn !== null && ibkrConn.status !== "disconnected"
+      ? ibkrConn.portfolioId
       : null;
 
   return (
@@ -66,6 +75,8 @@ export default async function PortfoliosPage({
           {result.portfolios.map(({ portfolio, netWorth }) => {
             const isTrBound = portfolio.id === trPortfolioId;
             const isTrConnected = isTrBound && connection?.status === "connected";
+            const isIbkrBound = portfolio.id === ibkrPortfolioId;
+            const isIbkrConnected = isIbkrBound && ibkrConn?.status === "connected";
             return (
               <Card key={portfolio.id}>
                 <CardContent className="p-5">
@@ -86,6 +97,7 @@ export default async function PortfoliosPage({
                     </div>
                     <div className="flex items-center gap-1">
                       {isTrConnected && <TrSyncButton initialSyncing={connection?.syncing ?? false} />}
+                      {isIbkrConnected && <IbkrSyncButton initialSyncing={ibkrConn?.syncing ?? false} />}
                       <PortfolioFormDialog
                         mode="edit"
                         portfolio={portfolio}
@@ -101,6 +113,13 @@ export default async function PortfoliosPage({
                     <div className="mt-2">
                       <Badge variant="outline">
                         {ttr(`status.${connection.status}`)}
+                      </Badge>
+                    </div>
+                  )}
+                  {isIbkrBound && ibkrConn && (
+                    <div className="mt-2">
+                      <Badge variant="outline">
+                        {tibkr(`status.${ibkrConn.status}`)}
                       </Badge>
                     </div>
                   )}

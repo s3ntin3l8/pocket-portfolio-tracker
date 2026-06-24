@@ -253,6 +253,7 @@ export async function syncTrConnection(
       .where(
         and(
           eq(trResolvedEvents.portfolioId, portfolioId),
+          eq(trResolvedEvents.source, "pytr"),
           inArray(trResolvedEvents.eventId, [...cancelledIds]),
         ),
       );
@@ -275,13 +276,13 @@ export async function syncTrConnection(
   if (confirmedIds.length) {
     await db
       .insert(trResolvedEvents)
-      .values(confirmedIds.map((eventId) => ({ portfolioId, eventId, resolution: "confirmed" })))
+      .values(confirmedIds.map((eventId) => ({ portfolioId, source: "pytr", eventId, resolution: "confirmed" })))
       .onConflictDoNothing();
   }
   const resolvedRows = await db
     .select({ eventId: trResolvedEvents.eventId })
     .from(trResolvedEvents)
-    .where(eq(trResolvedEvents.portfolioId, portfolioId));
+    .where(and(eq(trResolvedEvents.portfolioId, portfolioId), eq(trResolvedEvents.source, "pytr")));
   const resolved = new Set(resolvedRows.map((r) => r.eventId));
 
   // 3. The open collector draft (at most one). Its current contents are "staged" — shown but

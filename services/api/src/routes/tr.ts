@@ -259,7 +259,7 @@ export async function trRoute(app: FastifyInstance) {
         .returning({ id: transactions.id });
       await tx
         .delete(trResolvedEvents)
-        .where(eq(trResolvedEvents.portfolioId, portfolioId));
+        .where(and(eq(trResolvedEvents.portfolioId, portfolioId), eq(trResolvedEvents.source, "pytr")));
       await tx
         .update(screenshotImports)
         .set({ status: "discarded" })

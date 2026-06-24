@@ -917,6 +917,49 @@
       "tr_sync_failed": "Sinkronisasi gagal. Silakan coba lagi."
     }
   },
+  "InteractiveBrokers": {
+    "title": "Interactive Brokers",
+    "subtitle": "Hubungkan akun IBKR melalui token Flex Web Service untuk mengimpor transaksi secara otomatis.",
+    "sectionTitle": "Koneksi Interactive Brokers",
+    "status": {
+      "disconnected": "Belum terhubung",
+      "connected": "Terhubung",
+      "expired": "Token kedaluwarsa",
+      "error": "Kesalahan"
+    },
+    "flexToken": "Token Flex",
+    "flexTokenPlaceholder": "Token Flex Web Service Anda",
+    "queryId": "ID Kueri",
+    "queryIdPlaceholder": "ID kueri Flex (angka)",
+    "setupHint": "Buat Activity Flex Query di portal IBKR (Reports → Flex Queries), lalu buat token Flex Web Service (Settings → Flex Web Service). Sertakan Trades, Cash Transactions, Open Positions, Transfers, dan Corporate Actions dalam kueri.",
+    "connect": "Hubungkan",
+    "connectedHint": "Akun Anda terhubung. Sinkronisasi menarik aktivitas baru sebagai draf transaksi untuk Anda konfirmasi.",
+    "syncNow": "Sinkronkan sekarang",
+    "syncQueued": "Sinkronisasi dimulai — transaksi baru akan muncul sebentar lagi.",
+    "disconnect": "Putuskan",
+    "expiredHint": "Token Flex Anda telah kedaluwarsa. Buat token baru di portal IBKR dan hubungkan kembali.",
+    "error": "Terjadi kesalahan. Silakan coba lagi.",
+    "lastSync": "Sinkronisasi terakhir",
+    "never": "Belum pernah",
+    "accountId": "Akun",
+    "reconcile": {
+      "title": "Rekonsiliasi kas",
+      "row": "{currency}: IBKR {reported} · kami {derived}",
+      "off": "selisih {diff}",
+      "match": "cocok"
+    },
+    "reimport": {
+      "action": "Impor ulang semuanya…",
+      "warning": "Ini menghapus semua transaksi Interactive Brokers di portofolio ini dan menyiapkan ulang seluruh linimasa untuk dikonfirmasi lagi. Suntingan manual pada baris tersebut akan hilang.",
+      "confirm": "Hapus & impor ulang"
+    },
+    "cancel": "Batal",
+    "errors": {
+      "encryption_required": "Server belum dapat menyimpan kredensial dengan aman (kunci enkripsi belum ada).",
+      "not_connected": "Belum terhubung. Hubungkan kembali lalu coba lagi.",
+      "ibkr_sync_failed": "Sinkronisasi gagal. Silakan coba lagi."
+    }
+  },
   "Trades": {
     "title": "Catatan Transaksi",
     "subtitle": "Setiap posisi dan kinerjanya, termasuk dividen.",

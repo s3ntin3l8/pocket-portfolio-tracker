@@ -8,6 +8,7 @@ import type {
   AccountHolderType,
   Portfolio,
   TrConnection,
+  IbkrConnection,
 } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import { SELECTED_PORTFOLIO_COOKIE } from "@/lib/portfolio-selection";
 import { KNOWN_BROKERAGES, resolveBrokerage } from "@/lib/brokerages";
 import { BrokerageIcon } from "@/components/brokerage-icon";
 import { TrConnectFlow } from "@/components/tr-connect-flow";
+import { IbkrConnectFlow } from "@/components/ibkr-connect-flow";
 
 const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
@@ -67,6 +69,7 @@ export function PortfolioFormDialog({
 }) {
   const t = useTranslations("PortfolioForm");
   const ttr = useTranslations("TradeRepublic");
+  const tibkr = useTranslations("InteractiveBrokers");
   const te = useTranslations("Empty");
   const api = useApiClient();
   const router = useRouter();
@@ -100,8 +103,12 @@ export function PortfolioFormDialog({
   const [trConnection, setTrConnection] = useState<TrConnection | null | false>(null);
   // Incrementing this triggers a re-fetch (used by onChanged callback).
   const [trFetchSeq, setTrFetchSeq] = useState(0);
+  // IBKR connection — same loading pattern as TR.
+  const [ibkrConnection, setIbkrConnection] = useState<IbkrConnection | null | false>(null);
+  const [ibkrFetchSeq, setIbkrFetchSeq] = useState(0);
 
   const isTr = resolveBrokerage(brokerage)?.key === "trade-republic";
+  const isIbkr = resolveBrokerage(brokerage)?.key === "interactive-brokers";
   // In edit mode the portfolio already exists; in create mode it exists after creation.
   const effectivePortfolio = mode === "edit" ? portfolio : createdPortfolio;
   // Whether the portfolio is (or would be) a child depot, derived from the chosen
@@ -123,6 +130,8 @@ export function PortfolioFormDialog({
   // Show the TR section only once we have a real portfolio id to bind against, and never
   // for a TR child account.
   const showTrSection = effectivePortfolio != null && isTr && !isTrChildSaved;
+  // IBKR section: show once the portfolio exists.
+  const showIbkrSection = effectivePortfolio != null && isIbkr;
 
   // Fetch (or re-fetch) the TR connection when the dialog is open and the section is
   // visible, or when onChanged fires (trFetchSeq bump). Gating on `open` matters: it
@@ -149,6 +158,23 @@ export function PortfolioFormDialog({
     // api is stable (context); open, showTrSection and trFetchSeq are the real triggers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, showTrSection, trFetchSeq]);
+
+  useEffect(() => {
+    if (!open || !showIbkrSection) return;
+    let active = true;
+    api
+      .getIbkrConnection()
+      .then((conn) => {
+        if (active) setIbkrConnection(conn);
+      })
+      .catch(() => {
+        if (active) setIbkrConnection(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, showIbkrSection, ibkrFetchSeq]);
 
   // Load the user's account holders and portfolios when the dialog opens.
   // Holders feed the picker; portfolios feed the FSA allocation helper.
@@ -198,6 +224,8 @@ export function PortfolioFormDialog({
       setCreatedPortfolio(null);
       setTrConnection(null);
       setTrFetchSeq(0);
+      setIbkrConnection(null);
+      setIbkrFetchSeq(0);
     }
     setOpen(next);
   }
@@ -248,8 +276,8 @@ export function PortfolioFormDialog({
       } else {
         const created = await api.createPortfolio(input);
         router.refresh();
-        if (isTr && created.portfolioType !== "child") {
-          // Stay open and reveal the TR connection section bound to the new portfolio.
+        if ((isTr && created.portfolioType !== "child") || isIbkr) {
+          // Stay open and reveal the broker connection section bound to the new portfolio.
           // TR child accounts can't sync, so close like a non-TR portfolio.
           setCreatedPortfolio(created);
         } else {
@@ -564,7 +592,7 @@ export function PortfolioFormDialog({
                   {t("delete")}
                 </Button>
               ))}
-            {/* After a TR create the portfolio is saved; swap the create button for Done. */}
+            {/* After a TR/IBKR create the portfolio is saved; swap the create button for Done. */}
             {mode === "create" && createdPortfolio ? (
               <Button type="button" onClick={() => setOpen(false)}>
                 {t("done")}
@@ -616,6 +644,31 @@ export function PortfolioFormDialog({
                   }}
                 />
               </>
+            )}
+          </div>
+        )}
+
+        {/* IBKR connection section — same pattern as TR but simpler (no 2FA phase). */}
+        {showIbkrSection && (
+          <div className="border-t pt-4">
+            <p className="mb-3 text-sm font-medium">{tibkr("sectionTitle")}</p>
+            {ibkrConnection === null ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                <span>{t("trLoading")}</span>
+              </div>
+            ) : ibkrConnection === false ? (
+              <p className="text-sm text-muted-foreground">{te("unavailableBody")}</p>
+            ) : (
+              <IbkrConnectFlow
+                client={api}
+                portfolioId={effectivePortfolio!.id}
+                initial={ibkrConnection}
+                onChanged={() => {
+                  router.refresh();
+                  setIbkrFetchSeq((s) => s + 1);
+                }}
+              />
             )}
           </div>
         )}

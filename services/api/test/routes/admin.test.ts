@@ -431,8 +431,8 @@ describe("admin provider config", () => {
     };
     // pg-boss is not running in PGlite/test env.
     expect(body.schedulerAvailable).toBe(false);
-    // All nine known job descriptors should be listed.
-    expect(body.jobs).toHaveLength(9);
+    // All known job descriptors should be listed.
+    expect(body.jobs).toHaveLength(10);
     const names = body.jobs.map((j) => j.name);
     expect(names).toContain("refresh-prices");
     expect(names).toContain("daily-snapshot");
@@ -443,6 +443,7 @@ describe("admin provider config", () => {
     expect(names).toContain("gc-staged-receipts");
     expect(names).toContain("backfill-stale-history");
     expect(names).toContain("refresh-instrument-metadata");
+    expect(names).toContain("ibkr-sync");
     // With scheduler unavailable, last-run fields are all null.
     for (const job of body.jobs) {
       expect(job.lastRunAt).toBeNull();

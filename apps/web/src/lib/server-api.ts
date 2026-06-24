@@ -21,6 +21,7 @@ import {
   type TradeLog,
   type TradeMethod,
   type TrConnection,
+  type IbkrConnection,
   type AdminProvider,
   type AdminVisionProvider,
   type AdminStats,
@@ -477,6 +478,16 @@ export async function loadTrConnection(): Promise<TrConnection | null> {
   if (!api) return null;
   try {
     return await api.getTrConnection();
+  } catch {
+    return null;
+  }
+}
+
+export async function loadIbkrConnection(): Promise<IbkrConnection | null> {
+  const api = await getServerApi();
+  if (!api) return null;
+  try {
+    return await api.getIbkrConnection();
   } catch {
     return null;
   }

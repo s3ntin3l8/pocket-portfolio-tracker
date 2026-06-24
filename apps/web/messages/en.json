@@ -919,6 +919,49 @@
       "tr_sync_failed": "Sync failed. Please try again."
     }
   },
+  "InteractiveBrokers": {
+    "title": "Interactive Brokers",
+    "subtitle": "Connect your IBKR account via a Flex Web Service token to import transactions automatically.",
+    "sectionTitle": "Interactive Brokers Connection",
+    "status": {
+      "disconnected": "Not connected",
+      "connected": "Connected",
+      "expired": "Token expired",
+      "error": "Error"
+    },
+    "flexToken": "Flex Token",
+    "flexTokenPlaceholder": "Your Flex Web Service token",
+    "queryId": "Query ID",
+    "queryIdPlaceholder": "Flex query ID (numeric)",
+    "setupHint": "Create an Activity Flex Query in the IBKR portal (Reports → Flex Queries), then generate a Flex Web Service token (Settings → Flex Web Service). Include Trades, Cash Transactions, Open Positions, Transfers, and Corporate Actions in the query.",
+    "connect": "Connect",
+    "connectedHint": "Your account is connected. Sync pulls new activity as draft transactions you confirm.",
+    "syncNow": "Sync now",
+    "syncQueued": "Sync started — new transactions will appear shortly.",
+    "disconnect": "Disconnect",
+    "expiredHint": "Your Flex token has expired. Generate a new token in the IBKR portal and reconnect.",
+    "error": "Something went wrong. Please try again.",
+    "lastSync": "Last sync",
+    "never": "Never",
+    "accountId": "Account",
+    "reconcile": {
+      "title": "Cash reconciliation",
+      "row": "{currency}: IBKR {reported} · ours {derived}",
+      "off": "off by {diff}",
+      "match": "matches"
+    },
+    "reimport": {
+      "action": "Re-import everything…",
+      "warning": "This deletes all Interactive Brokers transactions in this portfolio and re-stages the full timeline to confirm again. Manual edits to those rows are lost.",
+      "confirm": "Delete & re-import"
+    },
+    "cancel": "Cancel",
+    "errors": {
+      "encryption_required": "The server can't store credentials securely yet (encryption key missing).",
+      "not_connected": "Not connected. Reconnect and try again.",
+      "ibkr_sync_failed": "Sync failed. Please try again."
+    }
+  },
   "Trades": {
     "title": "Trade Log",
     "subtitle": "Every position and its performance, dividends included.",

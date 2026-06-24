@@ -1197,6 +1197,37 @@ export interface ImportDetail {
   errors: ImportIssue[];
 }
 
+// --- Interactive Brokers ---
+
+export type IbkrStatus = "disconnected" | "connected" | "expired" | "error";
+
+/** Public state of the user's IBKR Flex connection — never includes the token. */
+export interface IbkrConnection {
+  status: IbkrStatus;
+  portfolioId: string | null;
+  flexAccountId: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  lastReconciliation: CashReconciliation | null;
+  syncing: boolean;
+}
+
+export interface IbkrConnectInput {
+  token: string;
+  queryId: string;
+  portfolioId: string;
+}
+
+export interface IbkrSyncResult {
+  status: IbkrStatus;
+  importId?: string;
+  drafts?: number;
+  errors?: number;
+  reconciliation?: CashReconciliation;
+}
+
+// --- Trade Republic ---
+
 export type TrStatus =
   | "disconnected"
   // Push sent — awaiting the user's approval in the Trade Republic mobile app.
@@ -1815,6 +1846,15 @@ export function createApiClient(config: ApiClientConfig) {
         portfolioId,
         enrichments,
       }),
+
+    // --- Interactive Brokers ---
+    getIbkrConnection: () => request<IbkrConnection>("GET", "/ibkr/connection"),
+    connectIbkr: (input: IbkrConnectInput) =>
+      request<{ status: IbkrStatus }>("POST", "/ibkr/connection", input),
+    syncIbkr: () =>
+      request<{ queued: boolean } | IbkrSyncResult>("POST", "/ibkr/connection/sync"),
+    reimportIbkr: () => request<{ removed: number }>("POST", "/ibkr/connection/reimport"),
+    disconnectIbkr: () => request<void>("DELETE", "/ibkr/connection"),
 
     // --- Trade Republic ---
     getTrConnection: () => request<TrConnection>("GET", "/tr/connection"),
