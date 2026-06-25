@@ -531,3 +531,154 @@ def test_against_real_payload():
     out = tx._normalize(REAL_DETAIL_SAMPLE["event"])
     for key, want in REAL_DETAIL_SAMPLE["expect"].items():
         assert out[key] == want, f"{key}: got {out[key]!r}, expected {want!r}"
+
+
+# --- feed paging, positions snapshot, and the multi-feed event census -----------------
+
+import contextlib  # noqa: E402
+import io  # noqa: E402
+import json  # noqa: E402
+
+
+class FakeFeedTr:
+    """Stub for the feed-paging + subscription helpers (no websocket / pytr needed).
+
+    `feeds` maps a subscription type to an ordered list of page responses; a page with a
+    `cursors.after` value triggers another fetch, a page without one ends the feed. `snapshots`
+    maps a one-shot subscription type (e.g. compactPortfolioByType) to its single response.
+    Each feed/snapshot call enqueues a `(sub_id, {"type": ...}, response)` tuple that recv()
+    then returns FIFO — exactly what `_await_subscription` consumes.
+    """
+
+    def __init__(self, feeds=None, snapshots=None):
+        self._feeds = feeds or {}
+        self._snapshots = snapshots or {}
+        self._queue: list = []
+        self._next = 0
+        self._cursor: dict = {}
+
+    def _enqueue(self, sub_type, response):
+        sub_id = str(self._next)
+        self._next += 1
+        self._queue.append((sub_id, {"type": sub_type}, response))
+
+    async def _page(self, sub_type):
+        idx = self._cursor.get(sub_type, 0)
+        pages = self._feeds.get(sub_type, [])
+        self._cursor[sub_type] = idx + 1
+        self._enqueue(sub_type, pages[idx] if idx < len(pages) else {"items": []})
+
+    async def timeline_transactions(self, after=None):  # noqa: ARG002
+        await self._page("timelineTransactions")
+
+    async def timeline_activity_log(self, after=None):  # noqa: ARG002
+        await self._page("timelineActivityLog")
+
+    async def timeline(self, after=None):  # noqa: ARG002
+        await self._page("timeline")
+
+    async def compact_portfolio(self):
+        self._enqueue("compactPortfolioByType", self._snapshots.get("compactPortfolioByType", {}))
+
+    async def recv(self):
+        return self._queue.pop(0)
+
+    async def unsubscribe(self, sub_id):  # noqa: ARG002
+        pass
+
+    async def _get_ws(self):
+        class _WS:
+            async def close(self):
+                pass
+
+        return _WS()
+
+
+class TestFetchPositions:
+    def test_flattens_categories_and_normalises_isin(self):
+        # New compactPortfolioByType shape: positions grouped under categories[].positions,
+        # keyed by `isin` (not the old flat `positions` array with `instrumentId`).
+        snapshot = {
+            "categories": [
+                {"positions": [
+                    {"isin": "IE00B5BMR087", "netSize": "12.5"},
+                    {"isin": "US0378331005", "netSize": "0"},   # zero → dropped
+                ]},
+                {"positions": [
+                    {"isin": "DE0007236101", "netSize": "3"},
+                    {"netSize": "9"},                            # no isin → dropped
+                ]},
+            ]
+        }
+        tr = FakeFeedTr(snapshots={"compactPortfolioByType": snapshot})
+        out = asyncio.run(tx._fetch_positions(tr))
+        assert out == [
+            {"isin": "IE00B5BMR087", "qty": "12.5"},
+            {"isin": "DE0007236101", "qty": "3"},
+        ]
+
+    def test_falls_back_to_instrument_id_field(self):
+        # Defensive: tolerate the legacy `instrumentId` field if TR ever serves the old key.
+        snapshot = {"categories": [{"positions": [{"instrumentId": "US0378331005", "netSize": "1"}]}]}
+        tr = FakeFeedTr(snapshots={"compactPortfolioByType": snapshot})
+        assert asyncio.run(tx._fetch_positions(tr)) == [{"isin": "US0378331005", "qty": "1"}]
+
+    def test_missing_categories_yields_empty(self):
+        tr = FakeFeedTr(snapshots={"compactPortfolioByType": {}})
+        assert asyncio.run(tx._fetch_positions(tr)) == []
+
+
+class TestCollectFeed:
+    def test_pages_until_cursor_exhausted_and_dedups_by_id(self):
+        feeds = {
+            "timelineTransactions": [
+                {"items": [{"id": "a"}, {"id": "b"}], "cursors": {"after": "p2"}},
+                {"items": [{"id": "b", "v": 2}, {"id": "c"}]},  # no after → stop; b dedups
+            ]
+        }
+        tr = FakeFeedTr(feeds=feeds)
+        out = asyncio.run(
+            tx._collect_feed(tr, lambda after=None: tr.timeline_transactions(after), "timelineTransactions")
+        )
+        assert set(out) == {"a", "b", "c"}
+        assert out["b"]["v"] == 2  # last page wins on duplicate id
+
+
+class TestProbeEvents:
+    def test_census_across_feeds_with_overlap_and_null_eventtype(self):
+        feeds = {
+            "timelineTransactions": [
+                {"items": [
+                    {"id": "t1", "eventType": "CREDIT", "amount": {"value": 5.0}},
+                    {"id": "shared", "eventType": "ORDER_EXECUTED", "amount": {"value": -10.0}},
+                ]},
+            ],
+            # Activity log carries the cash-neutral transfer (eventType null → keyed by
+            # subtitle) AND re-lists the shared id from the transactions feed.
+            "timelineActivityLog": [
+                {"items": [
+                    {"id": "a1", "eventType": None, "subtitle": "Aktien erhalten", "title": "BAT"},
+                    {"id": "shared", "eventType": "ORDER_EXECUTED", "amount": {"value": -10.0}},
+                ]},
+            ],
+            "timeline": [{"items": []}],
+        }
+        tr = FakeFeedTr(feeds=feeds)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = asyncio.run(tx._probe_events(tr))
+        assert rc == 0
+        out = json.loads(buf.getvalue())
+
+        tx_feed = out["feeds"]["timelineTransactions"]
+        assert tx_feed["total"] == 2
+        assert tx_feed["byType"]["CREDIT"]["count"] == 1
+
+        # Null-eventType transfer is grouped under its subtitle so it is not lost.
+        act = out["feeds"]["timelineActivityLog"]["byType"]
+        assert "(null:subtitle=Aktien erhalten)" in act
+
+        # Shared id is reported so merge-by-id is provably safe (no double-count).
+        overlap = out["idOverlap"]["timelineTransactions ∩ timelineActivityLog"]
+        assert overlap["shared"] == 1
+        assert overlap["only_timelineActivityLog"] == 1

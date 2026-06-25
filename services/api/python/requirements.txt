@@ -1,8 +1,17 @@
 # Trade Republic sync runs the vendored tr_login.py / tr_export.py via pytr.
-# Pinned exactly to the latest published release — pytr drives Trade Republic's private
-# API and an uncontrolled bump can break sync. Bump deliberately and re-run the live
-# pairing validation.
+# Pinned to an exact upstream commit (not a PyPI release): the latest published release is
+# v0.4.9 (2026-04-20), which PRE-DATES TR's June-2026 WebSocket change that renamed the
+# `compactPortfolio` subscription to `compactPortfolioByType` (pytr #361). On v0.4.9 our
+# position snapshot silently fails (BAD_SUBSCRIPTION_TYPE). The pinned commit also carries
+# the TRANSFER_IN/OUT event support (#308) we mirror in tr_export.py / mapper.ts.
+#
+# pytr drives Trade Republic's private API — bump deliberately and re-run the live pairing
+# validation. Pin the exact SHA (never a moving branch) for reproducible builds. Installing
+# from git requires a `git` binary at build time (see Dockerfile / Makefile).
+#
+# Our v2 push-approval login lives in tr_login.py as a TradeRepublicApi subclass (mirrors
+# the still-unmerged pytr #355), so it survives the bump independently of the pytr version.
 #
 # We rely on pytr's no-browser AWS-WAF solver (PYTR_WAF_STRATEGY=awswaf); the Dockerfile
 # deliberately does NOT run `playwright install`, so no Chromium is downloaded.
-pytr==0.4.9
+pytr @ git+https://github.com/pytr-org/pytr.git@e69aa2d481766995413f3bc05b4ee015139a739c
