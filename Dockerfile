@@ -43,9 +43,11 @@ COPY --from=build /app/packages/schema/package.json ./packages/schema/package.js
 # run `playwright install`: with PYTR_WAF_STRATEGY=awswaf the headless-browser code path
 # is never taken, so no Chromium (~400MB) is pulled. Without the venv the feature simply
 # returns 503 — it never crashes the API.
+# `git` is required because requirements.txt pins pytr to an exact upstream commit
+# (git+https), not a PyPI release — see services/api/python/requirements.txt.
 COPY services/api/python ./services/api/python
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-venv \
+    && apt-get install -y --no-install-recommends python3 python3-venv git \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m venv /opt/pytr-venv \
     && /opt/pytr-venv/bin/pip install --no-cache-dir -r ./services/api/python/requirements.txt

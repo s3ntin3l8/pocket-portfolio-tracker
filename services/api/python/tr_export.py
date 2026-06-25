@@ -20,8 +20,9 @@ carry only an ISIN); everything else comes from the timeline list + its detail p
 Extraction of isin/shares/fees from the timeline detail is best-effort and the part most
 sensitive to pytr/TR changes; the raw detail is scanned defensively.
 
-NOTE: targets pytr==0.4.9 (the latest published release); not yet validated against a
-live account. TR's private protocol can change.
+NOTE: targets pytr pinned to an exact upstream commit (see requirements.txt) for TR's
+June-2026 `compactPortfolioByType` rename; not yet validated against a live account. TR's
+private protocol can change.
 """
 
 import argparse
@@ -49,18 +50,29 @@ async def _await_subscription(tr, sub_type, match=None):
         return response
 
 
-async def _collect_transactions(tr):
+async def _collect_feed(tr, feed_method, sub_type):
+    """Page one TR timeline feed to exhaustion; return {event_id: event}.
+
+    Every TR timeline feed (`timelineTransactions`, `timelineActivityLog`, `timeline`) shares
+    the same `{items, cursors.after}` paging shape, so one helper drives them all."""
     events = {}
-    await tr.timeline_transactions()
+    await feed_method()
     while True:
-        response = await _await_subscription(tr, "timelineTransactions")
+        response = await _await_subscription(tr, sub_type)
         for event in response.get("items", []):
             if event.get("id"):
                 events[event["id"]] = event
         after = (response.get("cursors") or {}).get("after")
         if not after:
             break
-        await tr.timeline_transactions(after)
+        await feed_method(after)
+    return events
+
+
+async def _collect_transactions(tr):
+    events = await _collect_feed(
+        tr, lambda after=None: tr.timeline_transactions(after), "timelineTransactions"
+    )
     return list(events.values())
 
 
@@ -458,17 +470,31 @@ async def _fetch_cash(tr):
 
 
 async def _fetch_positions(tr):
-    """TR's reported position snapshot per ISIN (compactPortfolio), for reconciliation
-    against our event-derived holdings. Returns [{isin, qty}] for non-zero positions."""
+    """TR's reported position snapshot per ISIN (compactPortfolioByType), for reconciliation
+    against our event-derived holdings. Returns [{isin, qty}] for non-zero positions.
+
+    TR renamed this subscription `compactPortfolio` → `compactPortfolioByType` in June 2026
+    (pytr #361); the response now groups positions under `categories[].positions` and uses
+    `isin` where the old flat `positions` array used `instrumentId`. `tr.compact_portfolio()`
+    (pytr ≥ e69aa2d) sends the new subscription type and resolves the securities-account
+    number, but returns the raw response, so we flatten + normalise the field here."""
     try:
         await tr.compact_portfolio()
-        resp = await _await_subscription(tr, "compactPortfolio")
-        positions = resp.get("positions", []) if isinstance(resp, dict) else []
+        resp = await _await_subscription(tr, "compactPortfolioByType")
+        if isinstance(resp, dict):
+            positions = [
+                pos
+                for cat in resp.get("categories", [])
+                if isinstance(cat, dict)
+                for pos in cat.get("positions", [])
+            ]
+        else:
+            positions = []
         result = []
         for p in positions:
             if not isinstance(p, dict):
                 continue
-            isin = p.get("instrumentId")
+            isin = p.get("isin") or p.get("instrumentId")
             net_size = p.get("netSize")
             if not isin or net_size is None:
                 continue
@@ -543,6 +569,72 @@ async def _probe_timeline(tr, limit) -> int:
     return 0
 
 
+async def _probe_events(tr) -> int:
+    """One-shot diagnostic: census every raw event across ALL of TR's timeline feeds.
+
+    The sync path subscribes only to `timelineTransactions` (money movements). Cash-neutral
+    securities transfers and many informational events live on `timelineActivityLog` (and the
+    legacy `timeline`) instead, so they never reach the mapper and never surface as import
+    errors. This dumps a per-feed census grouped by event type (falling back to the subtitle
+    when `eventType` is null, as the legacy transfer form is), with one sample per type, plus
+    the id-overlap between feeds — so we can see which types exist, on which feed, and whether
+    ids are shared (→ merge-by-id is safe) before changing the collector. Not part of sync.
+    """
+    feeds = (
+        ("timelineTransactions", lambda after=None: tr.timeline_transactions(after)),
+        ("timelineActivityLog", lambda after=None: tr.timeline_activity_log(after)),
+        ("timeline", lambda after=None: tr.timeline(after)),
+    )
+    by_feed = {}
+    for sub_type, method in feeds:
+        try:
+            by_feed[sub_type] = await _collect_feed(tr, method, sub_type)
+        except Exception as exc:  # noqa: BLE001 - diagnostic; report and continue
+            by_feed[sub_type] = {}
+            print(f"feed {sub_type} failed: {exc}", file=sys.stderr)
+
+    def _type_key(ev):
+        return ev.get("eventType") or f"(null:subtitle={ev.get('subtitle')})"
+
+    out = {"feeds": {}, "idOverlap": {}}
+    for sub_type, events in by_feed.items():
+        census = {}
+        for ev in events.values():
+            entry = census.setdefault(_type_key(ev), {"count": 0, "sample": None})
+            entry["count"] += 1
+            if entry["sample"] is None:
+                entry["sample"] = {
+                    "id": ev.get("id"),
+                    "eventType": ev.get("eventType"),
+                    "subtitle": ev.get("subtitle"),
+                    "title": ev.get("title"),
+                    "amount": (ev.get("amount") or {}).get("value"),
+                    "hasIsin": bool(_extract_isin(ev)),
+                }
+        out["feeds"][sub_type] = {"total": len(events), "byType": census}
+
+    # id-overlap drives the safe merge-by-id decision (shared ids → no double-count).
+    ids = {sub_type: set(events) for sub_type, events in by_feed.items()}
+    names = list(ids)
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = names[i], names[j]
+            out["idOverlap"][f"{a} ∩ {b}"] = {
+                "shared": len(ids[a] & ids[b]),
+                f"only_{a}": len(ids[a] - ids[b]),
+                f"only_{b}": len(ids[b] - ids[a]),
+            }
+
+    sys.stdout.write(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+    try:
+        ws = await tr._get_ws()
+        await ws.close()
+    except Exception:  # noqa: BLE001 - cleanup only
+        pass
+    return 0
+
+
 async def _run(tr) -> int:
     events = await _collect_transactions(tr)
     events = await _attach_details(tr, events)
@@ -583,6 +675,13 @@ def main() -> int:
         help="Diagnostic: dump raw timeline_detail_v2 + normalised output for N security "
         "events and exit (no export). Used to validate the detail extractors vs reality.",
     )
+    parser.add_argument(
+        "--probe-events",
+        action="store_true",
+        help="Diagnostic: census every raw event across ALL timeline feeds "
+        "(timelineTransactions/timelineActivityLog/timeline) with id-overlap, then exit. "
+        "Reveals event types on feeds the sync path does not subscribe to.",
+    )
     args = parser.parse_args()
 
     phone = os.environ.get("TR_PHONE")
@@ -613,6 +712,8 @@ def main() -> int:
             return asyncio.run(_probe_instrument(tr, args.probe_instrument))
         if args.probe_timeline:
             return asyncio.run(_probe_timeline(tr, args.probe_timeline))
+        if args.probe_events:
+            return asyncio.run(_probe_events(tr))
         return asyncio.run(_run(tr))
     except Exception as exc:  # noqa: BLE001
         print(f"export failed: {exc}", file=sys.stderr)
