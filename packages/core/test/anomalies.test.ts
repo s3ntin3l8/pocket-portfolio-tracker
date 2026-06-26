@@ -238,7 +238,7 @@ describe("reconciliation_gap", () => {
   it("flags a gap exceeding the threshold", () => {
     const anomalies = detectAnomalies([], [], {
       reconciliationGap: {
-        cash: [{ currency: "EUR", reported: "2809.12", derived: "2743.41", diff: "65.71" }],
+        cash: [{ currency: "EUR", reported: "1000.00", derived: "934.29", diff: "65.71" }],
       },
     });
     expect(anomalies).toHaveLength(1);
@@ -250,12 +250,12 @@ describe("reconciliation_gap", () => {
     });
   });
 
-  it("tolerates the sub-euro reconstruction residual (the real 0.83 TR drift)", () => {
-    // Live audit: derived 2808.29 vs TR-reported 2809.12 = 0.83 of accumulated per-event
-    // reconstruction drift, not a missing transaction — must not raise a false warning.
+  it("tolerates the sub-euro reconstruction residual (the ~0.83 TR drift)", () => {
+    // A live TR audit showed ~0.83 of accumulated per-event reconstruction drift (not a
+    // missing transaction) — a sub-euro gap must not raise a false warning.
     const anomalies = detectAnomalies([], [], {
       reconciliationGap: {
-        cash: [{ currency: "EUR", reported: "2809.12", derived: "2808.29", diff: "0.83" }],
+        cash: [{ currency: "EUR", reported: "1000.00", derived: "999.17", diff: "0.83" }],
       },
     });
     expect(anomalies).toHaveLength(0);
