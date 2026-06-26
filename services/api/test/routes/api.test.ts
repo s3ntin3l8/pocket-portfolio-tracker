@@ -127,6 +127,45 @@ describe("auth + portfolios + transactions", () => {
     expect(created2.json().brokerage).toBeNull();
   });
 
+  it("GET /portfolios reports transactionCount per portfolio", async () => {
+    const t = await token("count-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Counted", baseCurrency: "idr" },
+      })
+    ).json().id;
+
+    // A fresh portfolio has no transactions.
+    const before = await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) });
+    expect(before.json()[0]).toMatchObject({ id: portfolioId, transactionCount: 0 });
+
+    const [bbri] = await app.db
+      .insert(instruments)
+      .values({ symbol: "BBRI", market: "IDX", assetClass: "equity", currency: "IDR", name: "BRI" })
+      .returning();
+    for (let i = 0; i < 2; i++) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "buy",
+          instrumentId: bbri.id,
+          quantity: "10",
+          price: "5000",
+          currency: "IDR",
+          executedAt: "2026-02-10T03:00:00.000Z",
+        },
+      });
+    }
+
+    const after = await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) });
+    expect(after.json()[0]).toMatchObject({ id: portfolioId, transactionCount: 2 });
+  });
+
   it("GET /portfolios/values returns id+netWorth for each portfolio", async () => {
     const t = await token("values-user");
     const p1Id = (

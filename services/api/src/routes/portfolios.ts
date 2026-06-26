@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq } from "drizzle-orm";
-import { accountHolders, portfolios } from "@portfolio/db";
+import { and, eq, sql } from "drizzle-orm";
+import { accountHolders, portfolios, transactions } from "@portfolio/db";
 import { portfolioInputSchema, portfolioPatchSchema } from "@portfolio/schema";
 import { requireUser } from "../plugins/auth.js";
-import { flattenJoinRow, flattenPortfolio } from "../lib/portfolio.js";
+import { flattenPortfolio } from "../lib/portfolio.js";
 import { deleteReceiptsForPortfolio } from "../storage/receipts.js";
 import { valuePortfolio } from "../services/valuation.js";
 import { getMarketData } from "../services/market-data.js";
@@ -22,14 +22,24 @@ export async function portfoliosRoute(app: FastifyInstance) {
   }
 
   // List the authenticated user's portfolios, with holder-derived fields flattened in.
+  // Each row carries `transactionCount` (a cheap correlated count over the indexed
+  // portfolioId) so the delete-confirm UI can state how much data it will remove.
   app.get("/portfolios", { preHandler: app.authenticate }, async (request) => {
     const { id } = requireUser(request);
     const rows = await app.db
-      .select()
+      .select({
+        portfolio: portfolios,
+        holder: accountHolders,
+        transactionCount: sql<number>`(select count(*)::int from ${transactions}
+          where ${transactions.portfolioId} = ${portfolios.id})`,
+      })
       .from(portfolios)
       .leftJoin(accountHolders, eq(portfolios.accountHolderId, accountHolders.id))
       .where(eq(portfolios.userId, id));
-    return rows.map(flattenJoinRow);
+    return rows.map((r) => ({
+      ...flattenPortfolio(r.portfolio, r.holder),
+      transactionCount: Number(r.transactionCount),
+    }));
   });
 
   // Create a portfolio for the authenticated user.

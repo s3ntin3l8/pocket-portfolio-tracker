@@ -8,6 +8,8 @@ export interface PortfolioWithHolder extends Portfolio {
   accountHolder: string | null;
   birthYear: number | null;
   portfolioType: "standard" | "child";
+  // Populated only by the list route (GET /portfolios); create/edit responses omit it.
+  transactionCount?: number;
 }
 
 // Flatten a (portfolio, holder) join row into the public read shape. A portfolio

@@ -248,7 +248,7 @@ describe("PortfolioFormDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: m.delete }));
     expect(deletePortfolio).not.toHaveBeenCalled();
-    expect(screen.getByText(m.deleteWarning)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(m.deleteRelatedNote))).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: m.confirmDelete }));
     await waitFor(() => expect(deletePortfolio).toHaveBeenCalledWith("p1"));

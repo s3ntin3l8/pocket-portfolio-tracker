@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
-import { SELECTED_PORTFOLIO_COOKIE } from "@/lib/portfolio-selection";
+import { DeletePortfolioDialog } from "@/components/delete-portfolio-dialog";
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 300_000; // 5 min — same ceiling as runner exportTimeoutMs
@@ -165,35 +165,11 @@ export function PortfolioCardMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Delete ──────────────────────────────────────────────────────────────────
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  async function handleDelete(e: Event) {
-    e.preventDefault(); // keep menu open during the two-step confirm flow
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    setDeleting(true);
-    try {
-      await api.deletePortfolio(portfolio.id);
-      // Drop the switcher's selection if it pointed at the now-deleted portfolio.
-      if (document.cookie.includes(`${SELECTED_PORTFOLIO_COOKIE}=${portfolio.id}`)) {
-        document.cookie = `${SELECTED_PORTFOLIO_COOKIE}=all; path=/; max-age=0; samesite=lax`;
-      }
-      router.refresh();
-    } catch {
-      setDeleting(false);
-      setConfirmDelete(false);
-    }
-  }
-
   // ─── Render ───────────────────────────────────────────────────────────────────
   const anySyncing = trSyncing || ibkrSyncing;
 
   return (
-    <DropdownMenu onOpenChange={(open) => { if (!open) setConfirmDelete(false); }}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="icon" variant="ghost" aria-label="More options">
           {anySyncing ? (
@@ -237,14 +213,18 @@ export function PortfolioCardMenu({
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem
-          onSelect={(e) => void handleDelete(e)}
-          disabled={deleting}
-          className={cn(confirmDelete && "text-destructive focus:text-destructive")}
-        >
-          <Trash2 className="size-4" />
-          {confirmDelete ? tf("confirmDelete") : tf("delete")}
-        </DropdownMenuItem>
+        <DeletePortfolioDialog
+          portfolio={portfolio}
+          trigger={
+            <DropdownMenuItem
+              onSelect={(e) => e.preventDefault()}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="size-4" />
+              {tf("delete")}
+            </DropdownMenuItem>
+          }
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

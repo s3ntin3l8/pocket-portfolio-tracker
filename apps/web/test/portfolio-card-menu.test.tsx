@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ComponentProps, ReactNode } from "react";
 import messages from "../messages/en.json";
@@ -172,64 +172,30 @@ describe("PortfolioCardMenu", () => {
   });
 
   describe("delete", () => {
-    it("requires two clicks to confirm deletion", async () => {
+    it("opens a confirm dialog and deletes only after confirming", async () => {
       renderMenu();
       openMenu();
 
-      // First click: shows the confirm label, does not yet delete.
-      const deleteItem = screen.getByRole("menuitem", {
-        name: messages.PortfolioForm.delete,
-      });
-      fireEvent.click(deleteItem);
+      // Clicking the delete item opens the confirm modal; nothing is deleted yet.
+      fireEvent.click(screen.getByRole("menuitem", { name: messages.PortfolioForm.delete }));
       expect(deletePortfolio).not.toHaveBeenCalled();
 
-      // Label changes to confirmDelete.
-      const confirmItem = await screen.findByRole("menuitem", {
-        name: messages.PortfolioForm.confirmDelete,
-      });
-      expect(confirmItem).toBeInTheDocument();
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent(messages.PortfolioForm.deleteRelatedNote);
 
-      // Second click: actually deletes.
-      fireEvent.click(confirmItem);
-      await waitFor(() =>
-        expect(deletePortfolio).toHaveBeenCalledWith(PORTFOLIO.id),
-      );
-    });
-
-    it("resets the confirm state when the menu closes and reopens", async () => {
-      const { unmount } = renderMenu();
-      openMenu();
-
-      // First click: enters confirm state.
-      fireEvent.click(screen.getByRole("menuitem", { name: messages.PortfolioForm.delete }));
-      expect(
-        await screen.findByRole("menuitem", { name: messages.PortfolioForm.confirmDelete }),
-      ).toBeInTheDocument();
-
-      // Close menu by pressing Escape.
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-
-      // Reopen menu — confirm state should be reset.
-      openMenu();
-      expect(
-        screen.getByRole("menuitem", { name: messages.PortfolioForm.delete }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("menuitem", { name: messages.PortfolioForm.confirmDelete }),
-      ).not.toBeInTheDocument();
-
-      unmount();
-    });
-
-    it("calls refresh after successful deletion", async () => {
-      renderMenu();
-      openMenu();
-
-      fireEvent.click(screen.getByRole("menuitem", { name: messages.PortfolioForm.delete }));
-      const confirmItem = await screen.findByRole("menuitem", { name: messages.PortfolioForm.confirmDelete });
-      fireEvent.click(confirmItem);
-
+      // The destructive confirm button performs the delete + refresh.
+      fireEvent.click(within(dialog).getByRole("button", { name: messages.PortfolioForm.confirmDelete }));
+      await waitFor(() => expect(deletePortfolio).toHaveBeenCalledWith(PORTFOLIO.id));
       await waitFor(() => expect(refresh).toHaveBeenCalled());
+    });
+
+    it("shows the transaction count in the confirm dialog", async () => {
+      renderMenu({ portfolio: { ...PORTFOLIO, transactionCount: 142 } });
+      openMenu();
+
+      fireEvent.click(screen.getByRole("menuitem", { name: messages.PortfolioForm.delete }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent("142 transactions");
     });
   });
 });
