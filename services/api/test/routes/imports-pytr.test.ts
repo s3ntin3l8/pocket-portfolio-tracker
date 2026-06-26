@@ -124,6 +124,108 @@ describe("pytr import → confirm", () => {
     expect(deposit.instrumentId).toBeNull();
   });
 
+  // A TR PDF import mixing a security buy with two cash-movement true-ups (deposit refund +
+  // withdrawal charge) — the only cash rows a TR settlement PDF emits (tax-optimization).
+  const TR_PDF_DRAFTS: ParsedTransaction[] = [
+    {
+      assetClass: "equity",
+      action: "buy",
+      isin: "DE0007236101",
+      name: "Siemens",
+      quantity: "5",
+      unit: "shares",
+      price: "100",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2026-03-01T10:00:00.000Z"),
+      confidence: 1,
+      externalId: "trpdf-buy",
+    },
+    {
+      assetClass: "equity",
+      action: "deposit",
+      isin: null,
+      name: "Steueroptimierung",
+      quantity: "0",
+      unit: "shares",
+      price: "3.21",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2026-03-02T10:00:00.000Z"),
+      confidence: 1,
+      externalId: "trpdf-dep",
+    },
+    {
+      assetClass: "equity",
+      action: "withdrawal",
+      isin: null,
+      name: "Steueroptimierung",
+      quantity: "0",
+      unit: "shares",
+      price: "1.10",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2026-03-03T10:00:00.000Z"),
+      confidence: 1,
+      externalId: "trpdf-wd",
+    },
+  ];
+
+  async function makePortfolioAndTrPdfImport(t: string, cashCounted: boolean) {
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR", baseCurrency: "EUR", cashCounted },
+      })
+    ).json().id;
+    const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));
+    const [imp] = await getDb()
+      .insert(screenshotImports)
+      .values({
+        userId: pf.userId,
+        portfolioId,
+        parser: "tr-pdf",
+        parsedJson: { drafts: TR_PDF_DRAFTS, errors: [] },
+        status: "draft",
+      })
+      .returning();
+    return imp.id;
+  }
+
+  it("TR PDF into a cash-outside portfolio excludes cash movements, surfaces the count (#326)", async () => {
+    const t = await token("trpdf-cash-outside");
+    const importId = await makePortfolioAndTrPdfImport(t, false);
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { transactions: TR_PDF_DRAFTS },
+    });
+    expect(confirm.statusCode).toBe(201);
+    const { confirmed, excludedCashMovements, transactions } = confirm.json();
+    // Only the buy is written; the deposit + withdrawal true-ups are dropped and counted.
+    expect(confirmed).toBe(1);
+    expect(excludedCashMovements).toBe(2);
+    expect(transactions.map((x: { externalId: string }) => x.externalId)).toEqual(["trpdf-buy"]);
+  });
+
+  it("TR PDF into a cash-inside portfolio imports the cash movements too (#326)", async () => {
+    const t = await token("trpdf-cash-inside");
+    const importId = await makePortfolioAndTrPdfImport(t, true);
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { transactions: TR_PDF_DRAFTS },
+    });
+    expect(confirm.statusCode).toBe(201);
+    const { confirmed, excludedCashMovements } = confirm.json();
+    expect(confirmed).toBe(3);
+    expect(excludedCashMovements).toBe(0);
+  });
+
   // Stage + confirm one security draft for a fresh TR portfolio, returning the stored instrument.
   async function confirmDraftInstrument(t: string, draft: ParsedTransaction) {
     const portfolioId = (

@@ -17,22 +17,12 @@ function makeClient(over: Partial<TrConnectClient> = {}): TrConnectClient {
     disconnectTr: vi.fn(async () => undefined),
     reimportTr: vi.fn(async () => ({ removed: 0 })),
     reprocessTrDocuments: vi.fn(async () => ({ processed: 0 })),
-    updateTrCategories: vi.fn(async (importCategories) => ({
-      status: "connected" as const,
-      portfolioId: "p1",
-      lastSyncAt: null,
-      lastError: null,
-      importCategories,
-      lastReconciliation: null,
-      syncing: false,
-    })),
     // The awaiting phase polls this for the authoritative status; default = approved.
     getTrConnection: vi.fn(async () => ({
       status: "connected" as const,
       portfolioId: "p1",
       lastSyncAt: null,
       lastError: null,
-      importCategories: null,
       lastReconciliation: null,
       syncing: false,
     })),
@@ -45,18 +35,22 @@ const DISCONNECTED: TrConnection = {
   portfolioId: null,
   lastSyncAt: null,
   lastError: null,
-  importCategories: null,
   lastReconciliation: null,
   syncing: false,
 };
 
-function renderFlow(client: TrConnectClient, initial: TrConnection = DISCONNECTED) {
+function renderFlow(
+  client: TrConnectClient,
+  initial: TrConnection = DISCONNECTED,
+  cashCounted = false,
+) {
   const onChanged = vi.fn();
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <TrConnectFlow
         client={client}
         portfolioId="p1"
+        cashCounted={cashCounted}
         initial={initial}
         onChanged={onChanged}
       />
@@ -64,6 +58,15 @@ function renderFlow(client: TrConnectClient, initial: TrConnection = DISCONNECTE
   );
   return onChanged;
 }
+
+const CONNECTED: TrConnection = {
+  status: "connected",
+  portfolioId: "p1",
+  lastSyncAt: null,
+  lastError: null,
+  lastReconciliation: null,
+  syncing: false,
+};
 
 describe("TrConnectFlow", () => {
   it("walks connect → awaiting approval → connected (auto-polls, no code)", async () => {
@@ -121,7 +124,6 @@ describe("TrConnectFlow", () => {
         portfolioId: "p1",
         lastSyncAt: null,
         lastError: "login was not approved",
-        importCategories: null,
         lastReconciliation: null,
         syncing: false,
       })),
@@ -159,15 +161,7 @@ describe("TrConnectFlow", () => {
 
   it("syncs from the connected state and calls syncTr", async () => {
     const client = makeClient();
-    const onChanged = renderFlow(client, {
-      status: "connected",
-      portfolioId: "p1",
-      lastSyncAt: null,
-      lastError: null,
-      importCategories: null,
-      lastReconciliation: null,
-      syncing: false,
-    });
+    const onChanged = renderFlow(client, CONNECTED);
     fireEvent.click(screen.getByRole("button", { name: /Sync now/ }));
     await waitFor(() => expect(client.syncTr).toHaveBeenCalled());
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
@@ -175,15 +169,7 @@ describe("TrConnectFlow", () => {
 
   it("re-processes retained PDFs from the connected state", async () => {
     const client = makeClient();
-    renderFlow(client, {
-      status: "connected",
-      portfolioId: "p1",
-      lastSyncAt: null,
-      lastError: null,
-      importCategories: null,
-      lastReconciliation: null,
-      syncing: false,
-    });
+    renderFlow(client, CONNECTED);
     fireEvent.click(screen.getByText(messages.TradeRepublic.reprocess.action));
     await waitFor(() => expect(client.reprocessTrDocuments).toHaveBeenCalled());
     expect(await screen.findByText(messages.TradeRepublic.reprocess.done)).toBeTruthy();
@@ -195,7 +181,6 @@ describe("TrConnectFlow", () => {
       portfolioId: "p1",
       lastSyncAt: null,
       lastError: "session expired",
-      importCategories: null,
       lastReconciliation: null,
       syncing: false,
     });
@@ -252,5 +237,29 @@ describe("TrConnectFlow", () => {
         expect.objectContaining({ portfolioId: "p1" }),
       ),
     );
+  });
+
+  it("explains the import scope from the portfolio's cash boundary, with no category toggles (#326)", () => {
+    // Cash-inside: everything imported (incl. cash movements). Cash-outside: cash excluded.
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TrConnectFlow client={makeClient()} portfolioId="p1" cashCounted initial={CONNECTED} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(messages.TradeRepublic.scope.cashInside)).toBeTruthy();
+    // The old free category checkboxes are gone — the scope is derived, not chosen.
+    expect(screen.queryByText("Card spending")).not.toBeInTheDocument();
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TrConnectFlow
+          client={makeClient()}
+          portfolioId="p1"
+          cashCounted={false}
+          initial={CONNECTED}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(messages.TradeRepublic.scope.cashOutside)).toBeTruthy();
   });
 });

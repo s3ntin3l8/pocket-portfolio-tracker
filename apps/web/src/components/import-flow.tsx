@@ -150,7 +150,7 @@ export interface ImportClient {
     portfolioId?: string,
     acknowledgeAccountMismatch?: boolean,
     acknowledgeDuplicates?: boolean,
-  ): Promise<{ confirmed: number }>;
+  ): Promise<{ confirmed: number; excludedCashMovements?: number }>;
   enrichImport(
     importId: string,
     enrichments: Array<{ draft: ImportDraft; targetTransactionId: string }>,
@@ -311,6 +311,8 @@ export function ImportFlow({
   // so enrichOneDuplicate can map back to the correct draft in pendingSubset.
   const pendingErrorGroupOffset = useRef(0);
   const [confirmedCount, setConfirmedCount] = useState(0);
+  // Cash-movement rows the server dropped because the target portfolio is cash-outside (#326).
+  const [excludedCount, setExcludedCount] = useState(0);
   // Per-file status list (shown when parsing multiple files).
   const [fileStatuses, setFileStatuses] = useState<FileStatus[]>([]);
   // Drag-and-drop hover state for the dropzone.
@@ -580,7 +582,7 @@ export function ImportFlow({
 
       if (groups.size <= 1) {
         // ── Single-import fast path ──────────────────────────────────────
-        const { confirmed } = await client.confirmImport(
+        const { confirmed, excludedCashMovements } = await client.confirmImport(
           importId,
           subset.map(stripUid),
           contracts,
@@ -589,6 +591,7 @@ export function ImportFlow({
           acknowledgeDup,
         );
         setConfirmedCount(confirmed);
+        setExcludedCount(excludedCashMovements ?? 0);
       } else {
         // ── Multi-import fan-out ─────────────────────────────────────────
         // Group the to-confirm drafts by their importId.
@@ -639,7 +642,7 @@ export function ImportFlow({
                 portfolioByImport.get(iid),
                 acknowledgeMismatch,
                 acknowledgeDup,
-              ).then((r) => ({ iid, confirmed: r.confirmed }))
+              ).then((r) => ({ iid, confirmed: r.confirmed, excluded: r.excludedCashMovements ?? 0 }))
                .catch((err: unknown) => Promise.reject({ iid, err }))
             ),
         );
@@ -647,14 +650,17 @@ export function ImportFlow({
         // Remove drafts from groups that confirmed successfully.
         const committedUids = new Set<string>();
         let newConfirmed = 0;
+        let newExcluded = 0;
         for (const result of settled) {
           if (result.status === "fulfilled") {
             for (const d of byImport.get(result.value.iid) ?? []) {
               committedUids.add(d.uid);
             }
             newConfirmed += result.value.confirmed;
+            newExcluded += result.value.excluded;
           }
         }
+        setExcludedCount((c) => c + newExcluded);
         if (committedUids.size > 0) {
           setDrafts((ds) => ds.filter((d) => !committedUids.has(d.uid)));
           setConfirmedCount((c) => c + newConfirmed);
@@ -741,6 +747,7 @@ export function ImportFlow({
     setAccountMismatch(null);
     setDuplicateConflict(null);
     setConfirmedCount(0);
+    setExcludedCount(0);
     setStep("upload");
   }
 
@@ -1061,6 +1068,11 @@ export function ImportFlow({
             <p className="text-sm text-muted-foreground">
               {t("done.hint", { count: confirmedCount })}
             </p>
+            {excludedCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t("done.excludedCash", { count: excludedCount })}
+              </p>
+            )}
             <Button variant="outline" className="mt-2" onClick={reset}>
               {t("done.again")}
             </Button>

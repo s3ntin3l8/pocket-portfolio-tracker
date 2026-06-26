@@ -67,15 +67,18 @@ const EVENTS = [
   { id: "tr-3", timestamp: "2026-03-03T10:00:00.000Z", eventType: "MYSTERY", amount: 1, currency: "EUR" },
 ];
 
-async function makeConnection(suffix: string) {
+async function makeConnection(suffix: string, cashCounted = true) {
   const db = getDb();
   const [user] = await db
     .insert(users)
     .values({ authSub: `tr-sync|${suffix}`, email: `${suffix}@example.com` })
     .returning();
+  // Default to a cash-INSIDE (savings) portfolio so the generic plumbing tests import every
+  // cash movement (deposits/withdrawals) as before issue #326. Boundary-specific behavior is
+  // exercised by the dedicated cash-inside/cash-outside tests, which pass cashCounted=false.
   const [pf] = await db
     .insert(portfolios)
-    .values({ userId: user.id, name: "TR", baseCurrency: "EUR" })
+    .values({ userId: user.id, name: "TR", baseCurrency: "EUR", cashCounted })
     .returning();
   const [conn] = await db
     .insert(trConnections)
@@ -225,34 +228,79 @@ describe("syncTrConnection", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("excludes card spending by default, stages it once the category is enabled", async () => {
-    const conn = await makeConnection("categories");
+  // Boundary events shared by the two cash-boundary tests (#326): a trade, a deposit, card
+  // spending, and an unknown event type.
+  const BOUNDARY_EVENTS = [
+    { id: "b-trade", timestamp: "2026-03-01T10:00:00.000Z", eventType: "ORDER_EXECUTED", amount: -1000, shares: 10, isin: "DE0007236101", currency: "EUR" },
+    { id: "b-dep", timestamp: "2026-03-02T10:00:00.000Z", eventType: "PAYMENT_INBOUND", amount: 100, currency: "EUR" },
+    { id: "b-card", timestamp: "2026-03-03T10:00:00.000Z", eventType: "CARD_TRANSACTION", amount: -12.5, currency: "EUR" },
+    { id: "b-unknown", timestamp: "2026-03-04T10:00:00.000Z", eventType: "MYSTERY", amount: 1, currency: "EUR" },
+  ];
+
+  it("cash-inside portfolio imports everything incl. deposits and card spending (#326)", async () => {
+    const conn = await makeConnection("cash-inside", true);
     const db = getDb();
-    const evs = [
-      { id: "card-1", timestamp: "2026-03-01T10:00:00.000Z", eventType: "CARD_TRANSACTION", amount: -12.5, currency: "EUR" },
-      { id: "dep-1", timestamp: "2026-03-02T10:00:00.000Z", eventType: "PAYMENT_INBOUND", amount: 100, currency: "EUR" },
-    ];
-    const runner = runnerWith(async () => ({ events: evs, sessionData: "J" }));
+    const runner = runnerWith(async () => ({ events: BOUNDARY_EVENTS, sessionData: "J" }));
 
-    // Default categories exclude card spending → only the deposit is staged.
-    const r1 = await syncTrConnection(db, enc, runner, conn);
-    expect(r1.drafts).toBe(1);
-
-    // Enable the card category; the card event (not previously marked seen) now stages.
-    await db
-      .update(trConnections)
-      .set({ importCategories: ["trade", "income", "cashflow", "card"] })
-      .where(eq(trConnections.id, conn.id));
-    const [conn2] = await db.select().from(trConnections).where(eq(trConnections.id, conn.id));
-    const r2 = await syncTrConnection(db, enc, runner, conn2);
-    expect(r2.drafts).toBe(1); // the card txn; the deposit was already staged
+    const r = await syncTrConnection(db, enc, runner, conn);
+    // trade + deposit + card all staged; the unknown MYSTERY surfaces as an error.
+    expect(r.drafts).toBe(3);
+    expect(r.errors).toBe(1);
 
     const [draft] = await db
       .select()
       .from(screenshotImports)
       .where(and(eq(screenshotImports.portfolioId, conn.portfolioId!), eq(screenshotImports.status, "draft")));
     const parsed = draft.parsedJson as { drafts: { externalId: string }[] };
-    expect(parsed.drafts.map((d) => d.externalId).sort()).toEqual(["card-1", "dep-1"]);
+    expect(parsed.drafts.map((d) => d.externalId).sort()).toEqual(["b-card", "b-dep", "b-trade"]);
+  });
+
+  it("cash-outside portfolio excludes deposits & card, keeps trades, surfaces unknowns (#326)", async () => {
+    const conn = await makeConnection("cash-outside", false);
+    const db = getDb();
+    const runner = runnerWith(async () => ({ events: BOUNDARY_EVENTS, sessionData: "J" }));
+
+    const r = await syncTrConnection(db, enc, runner, conn);
+    // Only the trade is staged; deposit + card are excluded (not even errors). The unknown
+    // MYSTERY event is NOT a known cash movement, so it still flows through and surfaces.
+    expect(r.drafts).toBe(1);
+    expect(r.errors).toBe(1);
+
+    const [draft] = await db
+      .select()
+      .from(screenshotImports)
+      .where(and(eq(screenshotImports.portfolioId, conn.portfolioId!), eq(screenshotImports.status, "draft")));
+    const parsed = draft.parsedJson as {
+      drafts: { externalId: string }[];
+      errors: { eventId?: string }[];
+    };
+    expect(parsed.drafts.map((d) => d.externalId)).toEqual(["b-trade"]);
+    // The unknown event surfaced as an error; the cash movements did not (silently excluded
+    // from staging, but never surfaced as gaps either).
+    expect(parsed.errors.some((e) => e.eventId === "b-unknown")).toBe(true);
+    expect(parsed.errors.some((e) => e.eventId === "b-dep" || e.eventId === "b-card")).toBe(false);
+  });
+
+  it("re-stages excluded cash movements after the portfolio flips to cash-inside (#326)", async () => {
+    const conn = await makeConnection("cash-flip", false);
+    const db = getDb();
+    const runner = runnerWith(async () => ({ events: BOUNDARY_EVENTS, sessionData: "J" }));
+
+    // Cash-outside: deposit + card excluded and NOT marked seen.
+    const r1 = await syncTrConnection(db, enc, runner, conn);
+    expect(r1.drafts).toBe(1);
+
+    // Flip the boundary to cash-inside; the previously-excluded movements now stage.
+    await db.update(portfolios).set({ cashCounted: true }).where(eq(portfolios.id, conn.portfolioId!));
+    const r2 = await syncTrConnection(db, enc, runner, conn);
+    expect(r2.drafts).toBe(2); // the deposit + card; the trade was already staged
+
+    const [draft] = await db
+      .select()
+      .from(screenshotImports)
+      .where(and(eq(screenshotImports.portfolioId, conn.portfolioId!), eq(screenshotImports.status, "draft")));
+    const parsed = draft.parsedJson as { drafts: { externalId: string }[] };
+    expect(parsed.drafts.map((d) => d.externalId).sort()).toEqual(["b-card", "b-dep", "b-trade"]);
   });
 
   it("heals a previously-discarded event when the mapper now maps it to a draft", async () => {
@@ -335,6 +383,31 @@ describe("syncTrConnection", () => {
     expect((updated.lastReconciliation as { cash: unknown[] }).cash).toHaveLength(1);
     // First sync has no prior baseline, so no incremental drift is reported yet.
     expect(result.reconciliation?.cash[0]).not.toHaveProperty("driftSincePrev");
+  });
+
+  it("reconciliation is boundary-agnostic: cash-outside still derives from the full timeline (#326)", async () => {
+    // A cash-outside portfolio does NOT stage the deposit or card spend — but reconciliation
+    // must still count them, or TR's reported balance would diverge from ours. The deposit
+    // (+500) minus card spend (-12.5) = 487.5 derived, regardless of the staging filter.
+    const conn = await makeConnection("reconcile-cash-outside", false);
+    const db = getDb();
+    const evs = [
+      { id: "ro-dep", timestamp: "2026-03-01T10:00:00.000Z", eventType: "PAYMENT_INBOUND", amount: 500, currency: "EUR" },
+      { id: "ro-card", timestamp: "2026-03-02T10:00:00.000Z", eventType: "CARD_TRANSACTION", amount: -12.5, currency: "EUR" },
+    ];
+    const runner = runnerWith(async () => ({
+      events: evs,
+      sessionData: "J",
+      summary: { cash: [{ currency: "EUR", amount: 487.5 }] },
+    }));
+
+    const result = await syncTrConnection(db, enc, runner, conn);
+    // Neither cash movement was staged (cash-outside)...
+    expect(result.drafts).toBe(0);
+    // ...yet reconciliation derived the full balance and matches TR exactly (zero drift).
+    expect(result.reconciliation?.cash).toEqual([
+      { currency: "EUR", reported: "487.5", derived: "487.5", diff: "0.00" },
+    ]);
   });
 
   it("reports incremental drift vs the previous sync's reconciliation", async () => {

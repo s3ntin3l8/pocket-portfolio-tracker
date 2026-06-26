@@ -5,11 +5,7 @@ import { useTranslations } from "next-intl";
 import { AlertCircle, Loader2, RefreshCw, Plug, Smartphone, Unplug } from "lucide-react";
 import { toast } from "sonner";
 import { apiErrorCode } from "@portfolio/api-client";
-import type {
-  ApiClient,
-  TrConnection,
-  TrImportCategory,
-} from "@portfolio/api-client";
+import type { ApiClient, TrConnection } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,14 +18,9 @@ export type TrConnectClient = Pick<
   | "syncTr"
   | "disconnectTr"
   | "getTrConnection"
-  | "updateTrCategories"
   | "reimportTr"
   | "reprocessTrDocuments"
 >;
-
-// Default staged categories when the connection hasn't been customised (card spending off).
-const DEFAULT_CATEGORIES: TrImportCategory[] = ["trade", "income", "cashflow"];
-const ALL_CATEGORIES: TrImportCategory[] = ["trade", "income", "cashflow", "card"];
 
 // How long the awaiting phase waits for the approval to resolve before giving up, and
 // how often it re-checks the authoritative connection status. The window matches the
@@ -49,6 +40,7 @@ function phaseFor(status: TrConnection["status"]): Phase {
 export function TrConnectFlow({
   client,
   portfolioId,
+  cashCounted,
   initial,
   onChanged,
 }: {
@@ -58,6 +50,12 @@ export function TrConnectFlow({
    * single portfolio's edit/create dialog, so the target is implicit — there's no picker.
    */
   portfolioId: string;
+  /**
+   * The linked portfolio's cash boundary. Drives what the sync imports (issue #326): a
+   * cash-inside (savings) portfolio imports everything; a cash-outside (invest-only) one
+   * excludes cash movements. This is derived, not chosen here — we only explain it.
+   */
+  cashCounted: boolean;
   initial: TrConnection;
   onChanged?: () => void;
 }) {
@@ -69,9 +67,6 @@ export function TrConnectFlow({
   const [wafToken, setWafToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Set<TrImportCategory>>(
-    new Set(initial.importCategories ?? DEFAULT_CATEGORIES),
-  );
   const [confirmingReimport, setConfirmingReimport] = useState(false);
 
   const expired = initial.status === "expired";
@@ -202,18 +197,6 @@ export function TrConnectFlow({
       setReprocessDone(true);
     });
 
-  // Toggle a staged category and persist it. At least one must stay enabled (server-enforced).
-  const toggleCategory = (cat: TrImportCategory) => {
-    const next = new Set(categories);
-    if (next.has(cat)) next.delete(cat);
-    else next.add(cat);
-    if (next.size === 0) return; // never allow an empty selection
-    setCategories(next);
-    void run(async () => {
-      await client.updateTrCategories([...next]);
-    });
-  };
-
   return (
     <div className="max-w-md space-y-4">
       {error && (
@@ -327,22 +310,12 @@ export function TrConnectFlow({
             );
           })()}
 
-          <fieldset className="space-y-2 rounded-md border px-3 py-3">
-            <legend className="px-1 text-sm font-medium">{t("categories.title")}</legend>
-            <p className="text-xs text-muted-foreground">{t("categories.hint")}</p>
-            {ALL_CATEGORIES.map((cat) => (
-              <label key={cat} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 align-middle accent-primary"
-                  checked={categories.has(cat)}
-                  disabled={busy}
-                  onChange={() => toggleCategory(cat)}
-                />
-                {t(`categories.${cat}`)}
-              </label>
-            ))}
-          </fieldset>
+          <div className="space-y-1 rounded-md border px-3 py-3">
+            <p className="text-sm font-medium">{t("scope.title")}</p>
+            <p className="text-xs text-muted-foreground">
+              {cashCounted ? t("scope.cashInside") : t("scope.cashOutside")}
+            </p>
+          </div>
 
           <div className="flex items-center justify-end gap-3">
             <Button onClick={doSync} disabled={busy}>
