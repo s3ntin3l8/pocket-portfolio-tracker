@@ -692,6 +692,18 @@ class TestTransfers:
         # eventType-less subtitle form (the shape TR actually serves on the activity log).
         assert tx._transfer_event_type({"eventType": None, "subtitle": "Aktien erhalten"}) == "TRANSFER_IN"
         assert tx._transfer_event_type({"eventType": None, "subtitle": "Aktien übertragen"}) == "TRANSFER_OUT"
+        # The form TR actually serves: ACCOUNT_TRANSFER_{INCOMING,OUTGOING} + "Wertpapiertransfer"
+        # (eventType also used for cash transfers, so only the subtitle marks a securities one).
+        assert tx._transfer_event_type(
+            {"eventType": "ACCOUNT_TRANSFER_INCOMING", "subtitle": "Wertpapiertransfer"}
+        ) == "TRANSFER_IN"
+        assert tx._transfer_event_type(
+            {"eventType": "ACCOUNT_TRANSFER_OUTGOING", "subtitle": "Wertpapiertransfer"}
+        ) == "TRANSFER_OUT"
+        # A *cash* ACCOUNT_TRANSFER_INCOMING (other subtitle) is NOT a securities transfer.
+        assert tx._transfer_event_type(
+            {"eventType": "ACCOUNT_TRANSFER_INCOMING", "subtitle": "Fertig"}
+        ) is None
         # Non-transfers are not matched.
         assert tx._transfer_event_type({"eventType": None, "subtitle": "Zinsen"}) is None
         assert tx._transfer_event_type({"eventType": "ORDER_EXECUTED"}) is None
@@ -711,7 +723,9 @@ class TestTransfers:
                 {"items": [
                     {"id": "tr1", "eventType": None, "subtitle": "Aktien erhalten", "title": "BAT"},
                     {"id": "tr2", "eventType": "SSP_SECURITIES_TRANSFER_INCOMING"},
+                    {"id": "tr3", "eventType": "ACCOUNT_TRANSFER_INCOMING", "subtitle": "Wertpapiertransfer"},
                     {"id": "noise", "eventType": None, "subtitle": "Some notification"},
+                    {"id": "cash", "eventType": "ACCOUNT_TRANSFER_INCOMING", "subtitle": "Fertig"},
                     {"id": "t1", "eventType": None, "subtitle": "Aktien erhalten"},  # dup id
                 ]},
             ],
@@ -722,8 +736,11 @@ class TestTransfers:
         # Transfers merged with a synthesised eventType the mapper understands.
         assert by_id["tr1"]["eventType"] == "TRANSFER_IN"
         assert by_id["tr2"]["eventType"] == "TRANSFER_IN"
-        # Non-transfer activity-log noise is NOT merged (cash stays untouched).
+        # The real TR form (ACCOUNT_TRANSFER_INCOMING + Wertpapiertransfer) is merged too.
+        assert by_id["tr3"]["eventType"] == "TRANSFER_IN"
+        # Non-transfer activity-log noise + a *cash* ACCOUNT_TRANSFER_INCOMING are NOT merged.
         assert "noise" not in by_id
+        assert "cash" not in by_id
         # A dup id keeps the richer transactions-feed copy (activity-log copy ignored).
         assert by_id["t1"]["eventType"] == "ORDER_EXECUTED"
 
