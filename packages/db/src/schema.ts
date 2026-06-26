@@ -336,9 +336,10 @@ export const trConnections = pgTable("tr_connections", {
   // The pytr cookie file contents (encrypted). Null until the 2FA pairing completes.
   sessionEnc: text("session_enc"),
   status: trConnectionStatusEnum("status").notNull().default("disconnected"),
-  // Which event categories to stage as drafts (trade/income/cashflow/card). Null = the
-  // default set (everything except day-to-day card spending). TR is a full bank account,
-  // so this keeps card noise out of the portfolio unless explicitly opted in.
+  // DEPRECATED (issue #326): the sync no longer reads this. What gets staged is now derived
+  // purely from the linked portfolio's cash boundary (portfolios.cashCounted) — a cash-inside
+  // portfolio imports everything; a cash-outside one excludes cash movements. Column retained
+  // (no migration) but ignored; safe to drop in a future cleanup migration.
   importCategories: jsonb("import_categories").$type<string[]>(),
   // Last cash reconciliation: TR's reported balance vs our derived balance per currency.
   // { checkedAt, cash: [{ currency, reported, derived, diff }] }. Null until first synced.

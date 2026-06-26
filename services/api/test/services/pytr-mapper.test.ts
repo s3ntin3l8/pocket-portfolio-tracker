@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { mapTrEventToDraft, mapTrEvents, categoryForEventType } from "../../src/services/pytr/mapper.js";
+import {
+  mapTrEventToDraft,
+  mapTrEvents,
+  categoryForEventType,
+  isCashMovementEvent,
+  isCashMovementAction,
+} from "../../src/services/pytr/mapper.js";
 
 const base = {
   id: "evt-1",
@@ -404,6 +410,73 @@ describe("mapTrEventToDraft", () => {
     expect(categoryForEventType("TRANSFER_IN")).toBe("trade");
     expect(categoryForEventType("TRANSFER_OUT")).toBe("trade");
     expect(categoryForEventType("SSP_SECURITIES_TRANSFER_INCOMING")).toBe("trade");
+  });
+
+  it("flags genuine cash movements for the cash-outside boundary denylist (#326)", () => {
+    // Card spending — always a cash movement.
+    for (const et of [
+      "CARD_TRANSACTION",
+      "CARD_ATM_WITHDRAWAL",
+      "CARD_ORDER_FEE",
+      "CARD_REFUND",
+      "CARD_VERIFICATION",
+      "CARD_AFT",
+    ]) {
+      expect(isCashMovementEvent(et)).toBe(true);
+    }
+    // External cash in/out (deposit/withdrawal actions).
+    for (const et of [
+      "PAYMENT_INBOUND",
+      "PAYMENT_INBOUND_SEPA_DIRECT_DEBIT",
+      "INCOMING_TRANSFER",
+      "INCOMING_TRANSFER_DELEGATION",
+      "ACCOUNT_TRANSFER_INCOMING",
+      "BANK_TRANSACTION_INCOMING",
+      "PAYMENT_OUTBOUND",
+      "OUTGOING_TRANSFER",
+      "OUTGOING_TRANSFER_DELEGATION",
+      "BANK_TRANSACTION_OUTGOING",
+    ]) {
+      expect(isCashMovementEvent(et)).toBe(true);
+    }
+    // Sign-resolved cash transfers (CASH_BY_SIGN), incl. the tax correction (#326 decision).
+    expect(isCashMovementEvent("JUNIOR_P2P_TRANSFER")).toBe(true);
+    expect(isCashMovementEvent("SSP_TAX_CORRECTION")).toBe(true);
+  });
+
+  it("does NOT flag trades, income, transfers, or unknown events as cash movements (#326)", () => {
+    // Trades (all kinds) and savings plans / round-ups.
+    for (const et of [
+      "ORDER_EXECUTED",
+      "TRADE_INVOICE",
+      "TRADING_TRADE_EXECUTED",
+      "SAVINGS_PLAN_EXECUTED",
+      "SAVEBACK_AGGREGATE",
+      "SPARE_CHANGE_AGGREGATE",
+    ]) {
+      expect(isCashMovementEvent(et)).toBe(false);
+    }
+    // Securities transfers (Depotübertrag) — shares move, not cash.
+    expect(isCashMovementEvent("TRANSFER_IN")).toBe(false);
+    expect(isCashMovementEvent("TRANSFER_OUT")).toBe(false);
+    expect(isCashMovementEvent("SSP_SECURITIES_TRANSFER_INCOMING")).toBe(false);
+    // Income — dividends, interest, corporate actions (interest stays imported, #326 decision).
+    expect(isCashMovementEvent("CREDIT")).toBe(false);
+    expect(isCashMovementEvent("INTEREST_PAYOUT")).toBe(false);
+    expect(isCashMovementEvent("INTEREST_PAYOUT_CREATED")).toBe(false);
+    expect(isCashMovementEvent("SSP_CORPORATE_ACTION_CASH")).toBe(false);
+    expect(isCashMovementEvent("SSP_CORPORATE_ACTION_INSTRUMENT")).toBe(false);
+    // Crucially: an unknown/unmapped event type must NOT be swept into the denylist — it has
+    // to keep flowing through so it surfaces as an attention gap, never silently dropped.
+    expect(isCashMovementEvent("MYSTERY_NEW_TYPE")).toBe(false);
+  });
+
+  it("isCashMovementAction covers parsed-draft cash rows (TR PDF path) (#326)", () => {
+    expect(isCashMovementAction("deposit")).toBe(true);
+    expect(isCashMovementAction("withdrawal")).toBe(true);
+    for (const a of ["buy", "sell", "savings_plan", "dividend", "interest", "transfer_in", ""]) {
+      expect(isCashMovementAction(a)).toBe(false);
+    }
   });
 
   it("surfaces SSP_CORPORATE_ACTION_INSTRUMENT as attention when share count is missing", () => {

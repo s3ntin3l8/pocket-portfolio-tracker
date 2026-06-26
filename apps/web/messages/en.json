@@ -462,6 +462,7 @@
     "done": {
       "title": "Imported",
       "hint": "{count, plural, one {# transaction added} other {# transactions added}} to your portfolio.",
+      "excludedCash": "{count, plural, one {# cash movement was excluded} other {# cash movements were excluded}} — this is an invest-only portfolio (cash is outside its boundary).",
       "again": "Import another",
       "history": "View import history"
     },
@@ -894,13 +895,10 @@
     "synced": "Synced — {drafts} draft transactions staged. Review them on the Import page.",
     "syncNow": "Sync now",
     "syncQueued": "Sync started — new transactions will appear shortly.",
-    "categories": {
-      "title": "What to import",
-      "hint": "Trade Republic is a full bank account. Choose which activity to stage as drafts.",
-      "trade": "Trades & savings plans",
-      "income": "Dividends & interest",
-      "cashflow": "Transfers (deposits & withdrawals)",
-      "card": "Card spending"
+    "scope": {
+      "title": "What gets imported",
+      "cashInside": "Savings portfolio: all activity is imported — trades, dividends, interest, corporate actions, and cash movements (deposits, withdrawals and card spending).",
+      "cashOutside": "Invest-only portfolio: trades, dividends, interest and corporate actions are imported. Cash movements (deposits, withdrawals, card spending) are excluded to keep the cash boundary clean. Change this in the portfolio's “Cash is part of this portfolio” setting."
     },
     "reconcile": {
       "title": "Cash reconciliation",

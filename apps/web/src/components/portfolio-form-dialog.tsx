@@ -345,7 +345,14 @@ export function PortfolioFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      {/* Don't dismiss on outside interaction: this form often holds pasted broker
+          credentials, and a click elsewhere (or the window losing focus when you
+          switch tabs to copy a password) must not throw the work away. Closes only
+          via Save/Done, the X button, or Escape. */}
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? t("editTitle") : t("createTitle")}</DialogTitle>
           <DialogDescription>{t("subtitle")}</DialogDescription>
@@ -637,6 +644,7 @@ export function PortfolioFormDialog({
                 <TrConnectFlow
                   client={api}
                   portfolioId={effectivePortfolio.id}
+                  cashCounted={cashCounted}
                   initial={trInitForFlow!}
                   onChanged={() => {
                     router.refresh();

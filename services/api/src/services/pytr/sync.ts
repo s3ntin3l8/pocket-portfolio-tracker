@@ -10,7 +10,7 @@ import {
 } from "@portfolio/db";
 import type { ImportIssue, ParsedTransaction } from "@portfolio/schema";
 import { cashBalances, type CoreTransaction } from "@portfolio/core";
-import { mapTrEvents, mapTrEventToDraft, categoryForEventType } from "./mapper.js";
+import { mapTrEvents, mapTrEventToDraft, isCashMovementEvent } from "./mapper.js";
 import { PytrAuthError } from "./runner.js";
 import type { PytrRunner, TrExportSummary, DownloadDocumentsResult } from "./runner.js";
 import type { DB } from "../../db/client.js";
@@ -67,14 +67,14 @@ function isCancelled(status: unknown): boolean {
   return s === "CANCELED" || s === "CANCELLED";
 }
 
-// Default staged categories: everything except day-to-day card spending.
-const DEFAULT_CATEGORIES = ["trade", "income", "cashflow"];
-
 // Compare TR's reported cash balance against the cash we derive from the full event
 // timeline. By deriving from the mapped events (not from confirmed transactions), this
 // answers "did our mapper account for every cash movement TR knows about?" regardless of
-// how many events have been confirmed by the user. Card spending is included even when
-// that category is disabled for staging (its CARD_TRANSACTION events map to `withdrawal`).
+// how many events have been confirmed by the user. This is deliberately boundary-AGNOSTIC:
+// it maps the full timeline regardless of the cash-outside staging filter (issue #326), so
+// deposits/withdrawals/card spending are always counted here even when a cash-outside
+// portfolio doesn't stage them. Do NOT apply the staging filter to this — reconciliation must
+// see every cash movement TR knows about, or its derived balance would diverge from reported.
 // A near-zero diff means all events are mapped; a non-zero diff typically indicates
 // events with unknown types or amounts the mapper can't yet handle. Returns undefined
 // when TR didn't report a balance.
@@ -204,6 +204,18 @@ export async function syncTrConnection(
   const sessionData = encryption.decryptString(connection.sessionEnc);
   const portfolioId = connection.portfolioId;
 
+  // The portfolio's cash boundary drives what we stage (cashCounted) and document retention.
+  // Fetch both once up front and reuse below.
+  const [portfolio] = await db
+    .select({
+      cashCounted: portfolios.cashCounted,
+      documentRetention: portfolios.documentRetention,
+    })
+    .from(portfolios)
+    .where(eq(portfolios.id, portfolioId))
+    .limit(1);
+  const cashCounted = portfolio?.cashCounted ?? false;
+
   const connectionId = connection.id;
   let result: Awaited<ReturnType<PytrRunner["export"]>>;
   try {
@@ -243,11 +255,14 @@ export async function syncTrConnection(
   const cancelledIds = new Set(meta.filter((m) => isCancelled(m.status)).map((m) => m.id));
   const eventTypeById = new Map(meta.map((m) => [m.id, m.eventType]));
 
-  // Per-connection category filter: only stage events whose category is enabled. Excluded
-  // events are NOT marked seen, so enabling the category later stages them on the next sync.
-  const enabled = new Set(connection.importCategories ?? DEFAULT_CATEGORIES);
+  // Boundary-driven staging filter (issue #326): a cash-inside (savings) portfolio imports
+  // everything; a cash-outside (invest-only) portfolio excludes genuine cash movements
+  // (deposits/withdrawals/card spending) so they don't manufacture phantom flows against a
+  // value boundary that excludes cash. Unknown/unmapped event types are NOT excluded — they
+  // flow through and surface as attention gaps (never silently dropped). Excluded events stay
+  // NOT-seen, so flipping the portfolio to cash-inside re-stages them on the next sync.
   const allowed = (id: string) =>
-    enabled.has(categoryForEventType(eventTypeById.get(id) ?? ""));
+    cashCounted ? true : !isCashMovementEvent(eventTypeById.get(id) ?? "");
 
   // 1. Un-import any confirmed transactions whose source event is now cancelled, and forget
   //    them in the ledger so a later re-execution can re-stage.
@@ -459,12 +474,6 @@ export async function syncTrConnection(
   let documentsStored: number | undefined;
 
   if (storage && importId && newDrafts.length > 0) {
-    const [portfolio] = await db
-      .select({ documentRetention: portfolios.documentRetention })
-      .from(portfolios)
-      .where(eq(portfolios.id, portfolioId))
-      .limit(1);
-
     if (portfolio?.documentRetention) {
       // Collect (eventId, docId) pairs from new drafts' documentRefs.
       const pairs: { eventId: string; docId: string }[] = [];

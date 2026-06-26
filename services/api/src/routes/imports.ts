@@ -26,6 +26,7 @@ import { parseCsv } from "../services/parsers/csv.js";
 import { parseDkb } from "../services/parsers/dkb.js";
 import { detectDkbPdf, parseDkbPdf } from "../services/parsers/dkb-pdf.js";
 import { detectTrPdf, parseTrPdf } from "../services/parsers/tr-pdf.js";
+import { isCashMovementAction } from "../services/pytr/mapper.js";
 import {
   enrichTransactionFromDrafts,
   enrichTransactionsFromStoredDocuments,
@@ -1164,13 +1165,15 @@ export async function importsRoute(app: FastifyInstance) {
         return reply.code(409).send({ error: "already_confirmed" });
       }
 
+      const confirmBody = confirmBodySchema.parse(request.body);
       const {
-        transactions: drafts,
         contracts,
         portfolioId: bodyPortfolioId,
         acknowledgeAccountMismatch,
         acknowledgeDuplicates,
-      } = confirmBodySchema.parse(request.body);
+      } = confirmBody;
+      // `drafts` is `let` because a cash-outside portfolio drops cash-movement rows below.
+      let drafts = confirmBody.transactions;
       if (drafts.length === 0 && contracts.length === 0) {
         return reply.code(400).send({ error: "nothing_to_confirm" });
       }
@@ -1181,7 +1184,8 @@ export async function importsRoute(app: FastifyInstance) {
       if (!targetPortfolioId) {
         return reply.code(400).send({ error: "portfolio_required" });
       }
-      if (!(await ownedPortfolio(id, targetPortfolioId))) {
+      const targetPortfolio = await ownedPortfolio(id, targetPortfolioId);
+      if (!targetPortfolio) {
         return reply.code(404).send({ error: "portfolio_not_found" });
       }
 
@@ -1226,6 +1230,26 @@ export async function importsRoute(app: FastifyInstance) {
       // DKB, Trade Republic, and IBKR all carry ISINs in their exports — use the
       // OpenFIGI ISIN-resolution path for all of them.
       const isEu = isDkb || isPytr || isTrCsv || isDkbPdf || isTrPdf || isIbkr;
+
+      // Cash-boundary filter (issue #326): a cash-outside (invest-only) portfolio excludes
+      // genuine cash movements (deposits/withdrawals) so they don't manufacture phantom flows
+      // against a value boundary that excludes cash. The pytr *sync* path already gates these
+      // at staging; the deterministic TR PDF path only learns its target portfolio here at
+      // confirm time, so it filters here instead. The only cash-movement rows a TR PDF emits
+      // are tax-optimization deposit/withdrawal true-ups. Surfaced (logged + returned), never
+      // silently dropped. Generalizes to any cash-outside import if we choose to widen `isTrPdf`.
+      let excludedCashMovements = 0;
+      if (isTrPdf && !targetPortfolio.cashCounted) {
+        const before = drafts.length;
+        drafts = drafts.filter((d) => !isCashMovementAction(d.action));
+        excludedCashMovements = before - drafts.length;
+        if (excludedCashMovements > 0) {
+          request.log.info(
+            { importId: imp.id, excludedCashMovements, portfolioId: targetPortfolioId },
+            "confirm: excluded cash movements (cash-outside portfolio)",
+          );
+        }
+      }
 
       request.log.info(
         { importId: imp.id, parser: imp.parser, source, txDrafts: drafts.length, contracts: contracts.length },
@@ -1835,12 +1859,20 @@ export async function importsRoute(app: FastifyInstance) {
           enriched,
           skipped,
           skippedDuplicates: attempted - created.length,
+          excludedCashMovements,
           finalStatus,
         },
         "confirm complete",
       );
       reply.code(201);
-      return { confirmed: created.length, transactions: created, likelyDuplicates, enriched, skipped };
+      return {
+        confirmed: created.length,
+        transactions: created,
+        likelyDuplicates,
+        enriched,
+        skipped,
+        excludedCashMovements,
+      };
     },
   );
 

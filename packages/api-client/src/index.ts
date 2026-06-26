@@ -1265,8 +1265,6 @@ export type TrStatus =
   | "expired"
   | "error";
 
-export type TrImportCategory = "trade" | "income" | "cashflow" | "card";
-
 /** TR's reported cash + position snapshot vs our derived figures (decimal strings). */
 export interface CashReconciliation {
   checkedAt: string;
@@ -1281,8 +1279,6 @@ export interface TrConnection {
   portfolioId: string | null;
   lastSyncAt: string | null;
   lastError: string | null;
-  /** Which event categories the sync stages; null = default (everything but card spending). */
-  importCategories: TrImportCategory[] | null;
   /** Last cash reconciliation (TR-reported vs derived), or null until first synced. */
   lastReconciliation: CashReconciliation | null;
   /** True while a background sync job is running. Poll GET /tr/connection to observe. */
@@ -1812,7 +1808,15 @@ export function createApiClient(config: ApiClientConfig) {
       acknowledgeAccountMismatch = false,
       acknowledgeDuplicates = false,
     ) =>
-      request<{ confirmed: number; transactions: Transaction[]; likelyDuplicates: number; enriched: number; skipped: number }>(
+      request<{
+        confirmed: number;
+        transactions: Transaction[];
+        likelyDuplicates: number;
+        enriched: number;
+        skipped: number;
+        /** Cash-movement rows dropped because the target portfolio is cash-outside (#326). */
+        excludedCashMovements: number;
+      }>(
         "POST",
         `/imports/${importId}/confirm`,
         {
@@ -1905,8 +1909,6 @@ export function createApiClient(config: ApiClientConfig) {
     // login in the TR mobile app (or it is declined / the window expires).
     verifyTr: () => request<{ status: TrStatus }>("POST", "/tr/connection/verify"),
     syncTr: () => request<{ queued: boolean } | TrSyncResult>("POST", "/tr/connection/sync"),
-    updateTrCategories: (importCategories: TrImportCategory[]) =>
-      request<TrConnection>("PATCH", "/tr/connection", { importCategories }),
     reimportTr: () => request<{ removed: number }>("POST", "/tr/connection/reimport"),
     reprocessTrDocuments: () =>
       request<{ processed: number }>("POST", "/tr/connection/reprocess-documents"),

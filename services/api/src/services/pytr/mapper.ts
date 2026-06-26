@@ -206,6 +206,28 @@ const ATTENTION_SKIPS = new Set<string>();
 // received with no cash; maps to `bonus` (no cash leg, quantity = received shares).
 const SHARE_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_INSTRUMENT";
 
+// Genuine cash movements that a cash-outside (invest-only) portfolio must NOT import: cash
+// is outside its value boundary, so deposits/withdrawals/card spending would manufacture
+// phantom flows (CLAUDE.md "one boundary per portfolio"). Keyed off the mapped *action* — not
+// the coarse `cashflow` category — so unknown/unmapped event types (which `categoryForEventType`
+// also buckets as `cashflow`) are NOT swept up here: they must still surface as attention gaps,
+// never be silently dropped. A cash-inside (savings) portfolio imports everything, including
+// these. Card events are always cash movements (debit-card spend reduces the cash balance).
+export function isCashMovementEvent(eventType: string): boolean {
+  if (CARD_EVENTS.has(eventType)) return true;
+  // CASH_BY_SIGN events (JUNIOR_P2P_TRANSFER, SSP_TAX_CORRECTION, CARD_AFT) resolve to
+  // deposit/withdrawal by the amount's sign — all pure cash movements.
+  if (CASH_BY_SIGN.has(eventType)) return true;
+  return isCashMovementAction(FIXED_ACTIONS[eventType] ?? "");
+}
+
+// Action-level variant for already-parsed drafts (e.g. the TR PDF path, which has a draft
+// `action` but no TR `eventType`). Deposits/withdrawals are the only cash movements a parsed
+// draft carries — card spending never reaches a draft.
+export function isCashMovementAction(action: string): boolean {
+  return action === "deposit" || action === "withdrawal";
+}
+
 // Actions that move shares (need an instrument + a per-share price). The rest are pure
 // cash movements recorded as a lump sum in `price`.
 const SECURITY_ACTIONS = new Set<ParsedAction>([

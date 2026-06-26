@@ -11,7 +11,6 @@ const getTrConnection = vi.fn(async () => ({
   portfolioId: "p1",
   lastSyncAt: null,
   lastError: null,
-  importCategories: null,
   lastReconciliation: null,
   syncing: false,
 }));
@@ -110,7 +109,6 @@ describe("PortfolioCardMenu", () => {
         portfolioId: "p1",
         lastSyncAt: null,
         lastError: null,
-        importCategories: null,
         lastReconciliation: null,
         syncing: false,
       });
@@ -163,7 +161,6 @@ describe("PortfolioCardMenu", () => {
         portfolioId: "p1",
         lastSyncAt: null,
         lastError: null,
-        importCategories: null,
         lastReconciliation: null,
         syncing: false,
       });

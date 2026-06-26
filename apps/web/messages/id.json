@@ -460,6 +460,7 @@
     "done": {
       "title": "Terimpor",
       "hint": "{count, plural, other {# transaksi ditambahkan}} ke portofolio Anda.",
+      "excludedCash": "{count, plural, other {# pergerakan kas dikecualikan}} — ini portofolio khusus investasi (kas di luar batasnya).",
       "again": "Impor lagi",
       "history": "Lihat riwayat impor"
     },
@@ -892,13 +893,10 @@
     "synced": "Tersinkron — {drafts} draf transaksi disiapkan. Tinjau di halaman Impor.",
     "syncNow": "Sinkronkan sekarang",
     "syncQueued": "Sinkronisasi dimulai — transaksi baru akan muncul sebentar lagi.",
-    "categories": {
+    "scope": {
       "title": "Apa yang diimpor",
-      "hint": "Trade Republic adalah rekening bank penuh. Pilih aktivitas mana yang dijadikan draf.",
-      "trade": "Perdagangan & rencana tabungan",
-      "income": "Dividen & bunga",
-      "cashflow": "Transfer (setoran & penarikan)",
-      "card": "Belanja kartu"
+      "cashInside": "Portofolio tabungan: semua aktivitas diimpor — perdagangan, dividen, bunga, aksi korporasi, dan pergerakan kas (setoran, penarikan, dan belanja kartu).",
+      "cashOutside": "Portofolio khusus investasi: perdagangan, dividen, bunga, dan aksi korporasi diimpor. Pergerakan kas (setoran, penarikan, belanja kartu) dikecualikan agar batas kas tetap bersih. Ubah ini pada pengaturan “Kas termasuk bagian portofolio ini”."
     },
     "reconcile": {
       "title": "Rekonsiliasi kas",

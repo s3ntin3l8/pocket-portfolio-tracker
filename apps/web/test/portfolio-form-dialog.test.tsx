@@ -42,7 +42,6 @@ const getTrConnection = vi.fn(
     portfolioId: null,
     lastSyncAt: null,
     lastError: null,
-    importCategories: null,
     lastReconciliation: null,
     syncing: false,
   }),
@@ -543,7 +542,6 @@ describe("PortfolioFormDialog", () => {
       portfolioId: "p-tr",
       lastSyncAt: null,
       lastError: null,
-      importCategories: null,
       lastReconciliation: null,
       syncing: false,
     });
