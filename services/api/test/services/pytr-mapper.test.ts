@@ -158,6 +158,14 @@ describe("mapTrEventToDraft", () => {
     expect(draftOf({ ...base, eventType: "PAYMENT_INBOUND", amount: 1000 }).action).toBe(
       "deposit",
     );
+    // Delegated (standing-order) transfers are the same external cash movement as their
+    // non-delegation counterparts.
+    expect(
+      draftOf({ ...base, eventType: "INCOMING_TRANSFER_DELEGATION", amount: 250 }).action,
+    ).toBe("deposit");
+    expect(
+      draftOf({ ...base, eventType: "OUTGOING_TRANSFER_DELEGATION", amount: -250 }).action,
+    ).toBe("withdrawal");
     expect(draftOf({ ...base, eventType: "BANK_TRANSACTION_INCOMING", amount: 50 }).action).toBe(
       "deposit",
     );

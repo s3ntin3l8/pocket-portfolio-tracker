@@ -94,6 +94,9 @@ const FIXED_ACTIONS: Record<string, ParsedAction> = {
   PAYMENT_INBOUND_APPLE_PAY: "deposit",
   PAYMENT_INBOUND_GOOGLE_PAY: "deposit",
   INCOMING_TRANSFER: "deposit",
+  // Delegated (e.g. standing-order) variant of the same external cash-in — pytr maps it to
+  // DEPOSIT too. Economically identical to INCOMING_TRANSFER, so safe to mirror.
+  INCOMING_TRANSFER_DELEGATION: "deposit",
   ACCOUNT_TRANSFER_INCOMING: "deposit",
   BANK_TRANSACTION_INCOMING: "deposit",
   // Interest on the cash balance is income, not a deposit (would otherwise be counted as a
@@ -107,6 +110,8 @@ const FIXED_ACTIONS: Record<string, ParsedAction> = {
   // --- cash out ---
   PAYMENT_OUTBOUND: "withdrawal",
   OUTGOING_TRANSFER: "withdrawal",
+  // Delegated variant of the same external cash-out — pytr maps it to REMOVAL (withdrawal).
+  OUTGOING_TRANSFER_DELEGATION: "withdrawal",
   BANK_TRANSACTION_OUTGOING: "withdrawal",
   CARD_TRANSACTION: "withdrawal", // debit-card spend from the cash account
   CARD_ATM_WITHDRAWAL: "withdrawal",
