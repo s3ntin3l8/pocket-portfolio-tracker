@@ -83,17 +83,29 @@ _TRANSFER_EVENT_TYPES = {
     "SSP_SECURITIES_TRANSFER_INCOMING": "TRANSFER_IN",
 }
 
+# A securities transfer (Depotübertrag) is the subtitle TR actually serves on the activity
+# log: eventType ACCOUNT_TRANSFER_{INCOMING,OUTGOING} with subtitle "Wertpapiertransfer"
+# (validated live, 2026-06). The eventType also maps to a cash deposit/withdrawal for
+# *cash* transfers, so we only treat it as a securities transfer when this subtitle is set,
+# taking the direction from the eventType.
+_SECURITIES_TRANSFER_SUBTITLE = "wertpapiertransfer"
+
 
 def _transfer_event_type(event):
     """Return the synthetic TRANSFER_IN/TRANSFER_OUT type for a securities-transfer event,
-    or None if the event is not a transfer. Matches the explicit event type first, then the
-    eventType-less subtitle form."""
-    et = event.get("eventType")
+    or None if the event is not a transfer. Matches the explicit event type, the
+    eventType-less "Aktien erhalten/übertragen" subtitle, and the "Wertpapiertransfer"
+    subtitle (direction inferred from an INCOMING/OUTGOING event type)."""
+    et = event.get("eventType") or ""
     if et in _TRANSFER_EVENT_TYPES:
         return _TRANSFER_EVENT_TYPES[et]
-    if not et:
-        sub = (event.get("subtitle") or "").strip().lower()
-        return _TRANSFER_SUBTITLES.get(sub)
+    sub = (event.get("subtitle") or "").strip().lower()
+    if sub in _TRANSFER_SUBTITLES:
+        return _TRANSFER_SUBTITLES[sub]
+    if sub == _SECURITIES_TRANSFER_SUBTITLE:
+        if "OUTGOING" in et or et.endswith("_OUT"):
+            return "TRANSFER_OUT"
+        return "TRANSFER_IN"  # default to inbound (ACCOUNT_TRANSFER_INCOMING, etc.)
     return None
 
 
