@@ -372,6 +372,9 @@ export interface Portfolio {
    *  no FSA has been submitted for this depot. The holder's taxAllowanceAnnual cap must not
    *  be exceeded in aggregate across all the holder's portfolios. */
   taxAllowanceAnnual: string | null;
+  /** Number of transactions in the portfolio. Populated only by the list endpoint
+   *  (GET /portfolios) — used by the delete-confirm UI; omitted on create/edit responses. */
+  transactionCount?: number;
 }
 
 /** Presentation metadata for an instrument; `null` on cash (instrument-less) rows. */

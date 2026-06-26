@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
-import { SELECTED_PORTFOLIO_COOKIE } from "@/lib/portfolio-selection";
+import { deletePortfolioWithCleanup } from "@/lib/delete-portfolio";
 import { KNOWN_BROKERAGES, resolveBrokerage } from "@/lib/brokerages";
 import { BrokerageIcon } from "@/components/brokerage-icon";
 import { TrConnectFlow } from "@/components/tr-connect-flow";
@@ -37,7 +37,7 @@ const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
  * (derived from the holder) and only used to gate the TR connection section. */
 export type EditablePortfolio = Pick<
   Portfolio,
-  "id" | "name" | "baseCurrency" | "accountHolderId" | "portfolioType" | "brokerage" | "accountNumber" | "includeInAggregate" | "cashCounted" | "documentRetention" | "taxAllowanceAnnual"
+  "id" | "name" | "baseCurrency" | "accountHolderId" | "portfolioType" | "brokerage" | "accountNumber" | "includeInAggregate" | "cashCounted" | "documentRetention" | "taxAllowanceAnnual" | "transactionCount"
 >;
 
 // Sentinel select value for "create a new holder inline".
@@ -295,12 +295,7 @@ export function PortfolioFormDialog({
     if (!portfolio) return;
     setBusy(true);
     try {
-      await api.deletePortfolio(portfolio.id);
-      // Drop the switcher's selection if it pointed at the now-deleted portfolio.
-      if (document.cookie.includes(`${SELECTED_PORTFOLIO_COOKIE}=${portfolio.id}`)) {
-        document.cookie = `${SELECTED_PORTFOLIO_COOKIE}=all; path=/; max-age=0; samesite=lax`;
-      }
-      router.refresh();
+      await deletePortfolioWithCleanup(api, router, portfolio.id);
       setOpen(false);
     } catch {
       setError(true);
@@ -576,7 +571,10 @@ export function PortfolioFormDialog({
             {mode === "edit" &&
               (confirmDelete ? (
                 <div className="mr-auto flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <p className="text-xs text-muted-foreground">{t("deleteWarning")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("deleteWarning", { count: portfolio?.transactionCount ?? 0 })}{" "}
+                    {t("deleteRelatedNote")}
+                  </p>
                   <Button
                     type="button"
                     size="sm"
