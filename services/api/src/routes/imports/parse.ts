@@ -20,7 +20,6 @@ import {
   classifyMatch,
   parserToTxSource,
   isEuParser,
-  isDeterministicParser,
 } from "../../services/parsers/dedup.js";
 import { findCommittedDuplicates } from "../../services/parsers/likely-duplicates.js";
 import { getImportStrategy } from "../../services/import-settings.js";
@@ -301,7 +300,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
     const res = await materializeDrafts(app, {
       drafts: toWrite,
       targetPortfolioId,
-      source: parserToTxSource(parserTag) as "csv" | "pdf" | "ibkr",
+      source: parserToTxSource(parserTag) as "csv" | "pdf" | "ibkr" | "screenshot",
       importId: imp.id,
       status: "draft",
       isEu: isEuParser(parserTag),
@@ -733,11 +732,14 @@ export function registerParseImportRoutes(app: FastifyInstance) {
         source: parserTag,
       });
 
-      // Direct-materialize (Phase 2): deterministic PDF parsers (DKB/TR) with an unambiguous
-      // target portfolio and no gold contracts → write drafts into the table now. The vision
-      // (LLM) parser is NOT deterministic, so it stays in the review flow (Phase 3).
+      // Direct-materialize (Phase 2 deterministic PDF; Phase 3 also vision screenshots): an
+      // unambiguous account match + no gold contracts → write drafts into the table now. The
+      // per-draft `confidence` rides onto transaction_sources so the table can flag low-
+      // confidence rows as "needs review". Accountless / unmatched / gold-contract uploads
+      // still fall back to the review screen (+ portfolio picker). The vision parser is lossy,
+      // but its detected account must match a portfolio's exactly, so mis-routing is unlikely;
+      // and a low-confidence row is editable/confirmable in the table like any other draft.
       if (
-        isDeterministicParser(parserTag) &&
         matchedPortfolioId &&
         result.drafts.length > 0 &&
         result.contracts.length === 0 &&

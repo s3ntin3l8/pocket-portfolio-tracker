@@ -777,7 +777,8 @@
       "badgeCashNeutral": "Cash-neutral",
       "badgeDraft": "Draft",
       "confirmDraft": "Confirm",
-      "discardDraft": "Discard"
+      "discardDraft": "Discard",
+      "needsReview": "Low confidence — review before confirming"
     },
     "portfolio": {
       "title": "Create a portfolio",

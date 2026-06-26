@@ -600,6 +600,9 @@ export interface Transaction {
   hasDocument: boolean;
   /** True when at least one source row has per-component taxComponents (i.e. a settlement PDF was parsed). */
   hasFullTaxDetail: boolean;
+  /** True when a source row's parse confidence is low (a lossy LLM-vision parse) — the table
+   *  flags such draft rows for review. Deterministic imports are never flagged. */
+  needsReview?: boolean;
   /** All source-provenance rows for this transaction; empty when none have been written yet. */
   sources: SourceSummary[];
 }
