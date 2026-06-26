@@ -1517,7 +1517,14 @@ describe("screenshot import → confirm flow", () => {
       payload: detectForm.payload,
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().matchedPortfolioId).toBe(pid1);
+    // Phase 3: an account-matched screenshot materializes straight into the matched portfolio.
+    expect(res.json().materialized).toBe(true);
+    expect(res.json().portfolioId).toBe(pid1);
+    const list = (
+      await detectApp.inject({ method: "GET", url: `/portfolios/${pid1}/transactions`, headers: auth(t) })
+    ).json() as Array<{ status: string }>;
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((r) => r.status === "draft")).toBe(true);
 
     await detectApp.close();
   });
@@ -1870,6 +1877,22 @@ describe("import dedup + account mismatch (#196, #197)", () => {
     });
     const t = await mkTok("acct-user");
 
+    // Upload BEFORE the matching depot exists, so the file stays in the review flow (no
+    // account auto-match → no direct-materialize) and we can exercise the confirm-time
+    // account-mismatch guard by confirming into the wrong portfolio.
+    const up = screenshotPart(Buffer.from("acct-doc"), "image/png");
+    const r = await a.inject({
+      method: "POST",
+      url: "/imports/screenshot",
+      headers: { ...auth(t), ...up.headers },
+      payload: up.payload,
+    });
+    expect(r.statusCode).toBe(201);
+    expect(r.json().materialized).toBeFalsy(); // stayed in review (no portfolio matched yet)
+    const importId = r.json().importId;
+    const drafts = r.json().drafts;
+
+    // Now create the depot the file actually belongs to (account 506740786) and a wrong one.
     const a1 = (
       await a.inject({
         method: "POST",
@@ -1886,18 +1909,6 @@ describe("import dedup + account mismatch (#196, #197)", () => {
         payload: { name: "Other B", baseCurrency: "EUR" },
       })
     ).json().id;
-
-    const up = screenshotPart(Buffer.from("acct-doc"), "image/png");
-    const r = await a.inject({
-      method: "POST",
-      url: "/imports/screenshot",
-      headers: { ...auth(t), ...up.headers },
-      payload: up.payload,
-    });
-    expect(r.statusCode).toBe(201);
-    expect(r.json().matchedPortfolioId).toBe(a1); // routed to the matching depot
-    const importId = r.json().importId;
-    const drafts = r.json().drafts;
 
     // Confirm into the WRONG portfolio without acknowledging → 409 with the verdict.
     const blocked = await a.inject({
@@ -1919,6 +1930,44 @@ describe("import dedup + account mismatch (#196, #197)", () => {
       payload: { portfolioId: b, transactions: drafts, acknowledgeAccountMismatch: true },
     });
     expect(forced.statusCode).toBe(201);
+
+    await a.close();
+  });
+
+  it("materializes a low-confidence vision import on account match and flags it needsReview (Phase 3)", async () => {
+    const lowConf: ParsedTransaction = { ...GOLD_DRAFT, confidence: 0.5 };
+    const { a, mkTok } = await freshApp({
+      name: "mock-lowconf",
+      isConfigured: () => true,
+      parse: async () => ({ drafts: [lowConf], contracts: [], accountNumber: "LCONF-1234567" }),
+    });
+    const t = await mkTok("lowconf-user");
+    const pid = (
+      await a.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "LowConf", baseCurrency: "IDR", accountNumber: "LCONF1234567" },
+      })
+    ).json().id;
+
+    const up = screenshotPart(Buffer.from("lowconf-img"), "image/png");
+    const r = await a.inject({
+      method: "POST",
+      url: "/imports/screenshot",
+      headers: { ...auth(t), ...up.headers },
+      payload: up.payload,
+    });
+    expect(r.statusCode).toBe(201);
+    expect(r.json().materialized).toBe(true);
+    expect(r.json().portfolioId).toBe(pid);
+
+    // The materialized draft carries the low parse confidence → flagged for review.
+    const list = (
+      await a.inject({ method: "GET", url: `/portfolios/${pid}/transactions`, headers: auth(t) })
+    ).json() as Array<{ status: string; needsReview?: boolean; source: string }>;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ status: "draft", source: "screenshot", needsReview: true });
 
     await a.close();
   });

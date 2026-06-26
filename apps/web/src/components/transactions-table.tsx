@@ -81,6 +81,8 @@ export interface TxRow {
   sources?: SourceSummary[];
   /** Visibility status; undefined ⇒ "normal". archived = ignored everywhere. */
   status?: TransactionStatus;
+  /** Low-confidence parse — draft rows flagged for review get an extra marker. */
+  needsReview?: boolean;
 }
 
 /** Compute the signed cash-flow (actual cash movement) for a TxRow via core. The status
@@ -613,6 +615,15 @@ export function TransactionsTable({
                         >
                           {tm("status.badgeDraft")}
                         </Badge>
+                      )}
+                      {status === "draft" && tx.needsReview && (
+                        <span
+                          className="inline-flex items-center"
+                          title={tm("status.needsReview")}
+                          aria-label={tm("status.needsReview")}
+                        >
+                          <AlertTriangle className="size-3.5 text-amber-500" />
+                        </span>
                       )}
                       {status === "archived" && (
                         <Badge variant="outline">{tm("status.badgeArchived")}</Badge>

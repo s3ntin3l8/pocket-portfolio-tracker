@@ -350,6 +350,16 @@ describe("TransactionsTable", () => {
       expect(screen.getByText(md.badgeDraft)).toBeInTheDocument();
     });
 
+    it("shows a needs-review marker on a low-confidence draft, and not otherwise", () => {
+      renderSingleRow({ ...ROWS[0], status: "draft", needsReview: true });
+      expect(screen.getByLabelText(md.needsReview)).toBeInTheDocument();
+    });
+
+    it("does not show the needs-review marker on a confident draft", () => {
+      renderSingleRow({ ...ROWS[0], status: "draft", needsReview: false });
+      expect(screen.queryByLabelText(md.needsReview)).toBeNull();
+    });
+
     it("confirming a draft row calls resolveDraftTransactions with action=confirm", async () => {
       resolveDraftTransactions.mockClear();
       renderSingleRow({ ...ROWS[0], status: "draft" });

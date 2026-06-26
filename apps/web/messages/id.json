@@ -775,7 +775,8 @@
       "badgeCashNeutral": "Netral kas",
       "badgeDraft": "Draf",
       "confirmDraft": "Konfirmasi",
-      "discardDraft": "Buang"
+      "discardDraft": "Buang",
+      "needsReview": "Keyakinan rendah — tinjau sebelum konfirmasi"
     },
     "portfolio": {
       "title": "Buat portofolio",

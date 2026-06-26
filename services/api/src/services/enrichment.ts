@@ -341,6 +341,32 @@ export async function sourcesForTransactions(
 }
 
 /**
+ * Returns the set of transaction ids whose parse confidence is below `threshold` — i.e. at
+ * least one source row carries a low confidence score (a lossy LLM-vision parse). Used to flag
+ * draft rows as "needs review" in the transactions table. Deterministic parsers emit
+ * confidence 1 and never qualify; rows with no confidence recorded are treated as confident.
+ */
+export async function txIdsNeedingReview(
+  app: AppLike,
+  txIds: string[],
+  threshold = 0.9,
+): Promise<Set<string>> {
+  if (txIds.length === 0) return new Set();
+  const rows = await db(app)
+    .select({
+      transactionId: transactionSources.transactionId,
+      confidence: transactionSources.confidence,
+    })
+    .from(transactionSources)
+    .where(inArray(transactionSources.transactionId, txIds));
+  return new Set(
+    rows
+      .filter((r) => r.confidence != null && Number(r.confidence) < threshold)
+      .map((r) => r.transactionId),
+  );
+}
+
+/**
  * Returns the set of transaction ids that have at least one source row with
  * non-null taxComponents — i.e. a settlement PDF was parsed for this transaction.
  */

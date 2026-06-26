@@ -25,6 +25,7 @@ import {
 import { gatherDocumentNaming, buildDocumentName } from "../storage/naming.js";
 import {
   txIdsWithFullTaxDetail,
+  txIdsNeedingReview,
   sourcesForTransactions,
 } from "../services/enrichment.js";
 import { transactionInputSchema } from "@portfolio/schema";
@@ -818,12 +819,14 @@ export async function transactionsRoute(app: FastifyInstance) {
         .map((r) => r.importId)
         .filter((x): x is string => x !== null);
       const allTxIds = rows.map((r) => r.id);
-      const [importIdsWithDocs, txIdsWithDocs, fullTaxDetail, sourcesMap] = await Promise.all([
-        importIdsWithDocuments(app, allImportIds),
-        transactionIdsWithDocuments(app, allTxIds),
-        txIdsWithFullTaxDetail(app, allTxIds),
-        sourcesForTransactions(app, allTxIds),
-      ]);
+      const [importIdsWithDocs, txIdsWithDocs, fullTaxDetail, needsReview, sourcesMap] =
+        await Promise.all([
+          importIdsWithDocuments(app, allImportIds),
+          transactionIdsWithDocuments(app, allTxIds),
+          txIdsWithFullTaxDetail(app, allTxIds),
+          txIdsNeedingReview(app, allTxIds),
+          sourcesForTransactions(app, allTxIds),
+        ]);
       return rows.map((r) => ({
         ...r,
         instrument: r.instrumentId ? (meta.get(r.instrumentId) ?? null) : null,
@@ -831,6 +834,8 @@ export async function transactionsRoute(app: FastifyInstance) {
           txIdsWithDocs.has(r.id) ||
           (r.importId ? importIdsWithDocs.has(r.importId) : false),
         hasFullTaxDetail: fullTaxDetail.has(r.id),
+        // Low-confidence draft from a lossy parse — flag it for review in the table.
+        needsReview: needsReview.has(r.id),
         sources: sourcesMap.get(r.id) ?? [],
       }));
     },
