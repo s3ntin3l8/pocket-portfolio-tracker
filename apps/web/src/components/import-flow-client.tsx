@@ -86,14 +86,8 @@ export function ImportFlowClient({
       router.refresh(); // surface the new transactions on other screens
       return res;
     },
-    enrichImport: (importId, enrichments, portfolioId) =>
-      api.enrichImport(
-        importId,
-        enrichments as unknown as Parameters<typeof api.enrichImport>[1],
-        portfolioId,
-      ),
-    checkImportDuplicates: (importId, portfolioId) =>
-      api.checkImportDuplicates(importId, portfolioId),
+    materializeImport: (importId, portfolioId, acknowledgeAccountMismatch) =>
+      api.materializeImport(importId, portfolioId, acknowledgeAccountMismatch),
   };
 
   return (

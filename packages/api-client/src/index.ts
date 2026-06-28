@@ -1150,9 +1150,12 @@ export interface CsvImportResult {
   alreadyConfirmed?: boolean;
   /** Portfolio whose accountNumber matched the file's detected account, if any. */
   matchedPortfolioId?: string | null;
+  /** Portfolio to pre-select in the upload "confirm portfolio" step: the account match,
+   *  else the user's sole portfolio. Null when neither applies (user must pick). */
+  suggestedPortfolioId?: string | null;
   /** Set when the file's account looks like it belongs to a different portfolio. */
   accountMismatch?: AccountMismatch | null;
-  /** Phase 2: a deterministic import whose account matched a portfolio was written straight
+  /** A deterministic import whose account matched a portfolio was written straight
    *  into the transactions table as draft rows (no review step). `drafts` is then absent. */
   materialized?: boolean;
   /** Target portfolio for a materialized import. */
@@ -1173,9 +1176,12 @@ export interface ScreenshotImportResult {
   alreadyConfirmed?: boolean;
   /** Portfolio whose accountNumber matched the document's detected account, if any. */
   matchedPortfolioId?: string | null;
+  /** Portfolio to pre-select in the upload "confirm portfolio" step: the account match,
+   *  else the user's sole portfolio. Null when neither applies (user must pick). */
+  suggestedPortfolioId?: string | null;
   /** Set when the file's account looks like it belongs to a different portfolio. */
   accountMismatch?: AccountMismatch | null;
-  /** Phase 2: a deterministic PDF whose account matched a portfolio was written straight
+  /** A deterministic PDF whose account matched a portfolio was written straight
    *  into the transactions table as draft rows (no review step). `drafts` is then absent. */
   materialized?: boolean;
   /** Target portfolio for a materialized import. */
@@ -1664,6 +1670,26 @@ export function createApiClient(config: ApiClientConfig) {
         `/portfolios/${portfolioId}/transactions/resolve-drafts`,
         { ids: [txId], action: "discard" },
       ),
+    /** Reassign transactions to another portfolio (move a wrong-portfolio import in one
+     * action). Rows already in the target, or whose economic identity already exists there,
+     * are skipped (`skippedConflicts`); financed-gold legs are skipped (`skippedLoans`). */
+    reassignTransactions: (
+      portfolioId: string,
+      ids: string[],
+      targetPortfolioId: string,
+    ) =>
+      request<{ moved: number; skippedConflicts: number; skippedLoans: number }>(
+        "POST",
+        `/portfolios/${portfolioId}/transactions/reassign`,
+        { ids, targetPortfolioId },
+      ),
+    /** Reassign every transaction an import wrote to another portfolio. */
+    reassignImport: (importId: string, targetPortfolioId: string) =>
+      request<{ moved: number; skippedConflicts: number; skippedLoans: number }>(
+        "POST",
+        `/imports/${importId}/reassign`,
+        { targetPortfolioId },
+      ),
     /** Record a fund merger (Fondsverschmelzung) as an atomic sell+buy pair. */
     createMerger: (portfolioId: string, input: Omit<MergerInput, "portfolioId">) =>
       request<Transaction[]>("POST", `/portfolios/${portfolioId}/mergers`, input),
@@ -1875,6 +1901,27 @@ export function createApiClient(config: ApiClientConfig) {
           acknowledgeDuplicates,
         },
       ),
+    /**
+     * Materialize a staged import's parsed drafts into the chosen portfolio as `status='draft'`
+     * transactions (the upload "confirm portfolio" step). Reads the server-stored drafts — it
+     * never re-parses, so an account-mismatch acknowledge does not re-run a vision LLM. The
+     * server returns a 409 `account_mismatch` verdict unless `acknowledgeAccountMismatch` is set.
+     */
+    materializeImport: (
+      importId: string,
+      portfolioId: string,
+      acknowledgeAccountMismatch = false,
+    ) =>
+      request<{
+        importId: string;
+        materialized: boolean;
+        portfolioId: string;
+        materializedCount: number;
+        excludedCashMovements: number;
+      }>("POST", `/imports/${importId}/materialize`, {
+        portfolioId,
+        acknowledgeAccountMismatch,
+      }),
     /**
      * Preview which drafts in an import economically duplicate (or enrich) transactions in
      * the chosen portfolio — without persisting anything. Call this when the user selects or
