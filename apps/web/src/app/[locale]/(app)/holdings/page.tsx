@@ -8,9 +8,27 @@ import { HoldingsTable } from "@/components/holdings-table";
 import { CostBasisToggle } from "@/components/cost-basis-toggle";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
-import { loadHoldings, loadAnomalies } from "@/lib/server-api";
+import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
+import { AllocationCard } from "@/components/holdings/allocation-card";
+import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
+import {
+  loadHoldings,
+  loadAnomalies,
+  loadNetWorth,
+  loadNetWorthHistory,
+  getSelectedPortfolioId,
+} from "@/lib/server-api";
+import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
 
 const CLASS_TABS = ["all", "equity", "etf", "gold", "bond", "mutual_fund", "crypto"] as const;
+
+/**
+ * The range the Holdings hero chart initially loads. Deliberately a day-grained range
+ * (not 1D/7D): intraday snapshots are brand new (PR #386) and only backfill over time,
+ * so defaulting to an intraday range would show "Collecting intraday data…" as the
+ * landing state on every fresh install/portfolio. 1D/7D stay one tap away as chips.
+ */
+const HERO_INITIAL_RANGE = "1y";
 
 type CostBasisMode = "purchase_price" | "total_paid";
 
@@ -29,12 +47,16 @@ export default async function HoldingsPage({
   const t = await getTranslations("Holdings");
   const ta = await getTranslations("Anomalies");
   const tc = await getTranslations("AssetClass");
+  const tr = await getTranslations("Region");
   const te = await getTranslations("Empty");
   const tf = await getTranslations("PortfolioForm");
 
-  const [result, anomalies] = await Promise.all([
+  const [result, anomalies, netWorthResult, history, selectedId] = await Promise.all([
     loadHoldings(costBasis, portfolioParam),
     loadAnomalies(portfolioParam),
+    loadNetWorth(),
+    loadNetWorthHistory(HERO_INITIAL_RANGE),
+    getSelectedPortfolioId(),
   ]);
 
   // Open positions only (computeHoldings also returns closed, zero-quantity ones).
@@ -94,8 +116,15 @@ export default async function HoldingsPage({
   const Heading = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          <span className="sm:hidden">{t("titleMobile")}</span>
+          <span className="hidden sm:inline">{t("title")}</span>
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {result.status === "ok" && holdings.length > 0
+            ? t("subtitleCount", { count: holdings.length })
+            : t("subtitle")}
+        </p>
       </div>
       {result.status === "ok" && (
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -205,41 +234,105 @@ export default async function HoldingsPage({
       </div>
     ) : null;
 
+  // ── Glance hero + allocation + region/currency (aggregate/single-portfolio scope
+  // via loadNetWorth — same cookie-driven scope the rest of the app uses, independent
+  // of the `?portfolio=` override that only applies to the positions table below). ──
+  const summary = netWorthResult.status === "ok" ? netWorthResult.data : null;
+  const allocation = summary?.allocation;
+
+  const glanceSection = summary && (
+    <>
+      <HeroGlanceCard
+        netWorth={summary.netWorth}
+        currency={summary.displayCurrency}
+        initialHistory={history}
+        initialRange={HERO_INITIAL_RANGE}
+        selectedId={selectedId}
+      />
+
+      {allocation && allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
+        <AllocationCard
+          title={t("allocation.title")}
+          slices={allocation.byAssetClass
+            .filter((s) => Number(s.value) > 0)
+            .map((s) => ({
+              key: s.key,
+              label: s.key === "cash" ? tc("cash") : tc(s.key),
+              value: Number(s.value),
+            }))}
+          currency={summary.displayCurrency}
+          total={Number(summary.netWorth)}
+          totalLabel={t("allocation.totalLabel")}
+          totalValueFormatted={formatMoney(Number(summary.netWorth), summary.displayCurrency, locale)}
+          allTimeLabel={t("allocation.allTimeLabel")}
+          allTimePct={
+            Number(summary.totalCost) > 0
+              ? formatPercent(Number(summary.totalUnrealizedPnL) / Number(summary.totalCost), locale)
+              : null
+          }
+          todayLabel={t("allocation.todayLabel")}
+          todayAmount={formatSignedMoney(Number(summary.totalDayChange), summary.displayCurrency, locale)}
+        />
+      )}
+
+      {allocation && (
+        <RegionCurrencyCard
+          regionTitle={t("byRegion")}
+          currencyTitle={t("byCurrency")}
+          regionRows={allocation.byRegion
+            .filter((s) => Number(s.value) > 0)
+            .map((s) => ({ key: s.key, label: tr(s.key), pct: s.pct }))}
+          currencyRows={allocation.byCurrency
+            .filter((s) => Number(s.value) > 0)
+            .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
+        />
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-6">
       {Heading}
       {anomalyBanner}
+      {glanceSection}
 
-      <Tabs defaultValue="all">
-        <div className="overflow-x-auto">
-        <TabsList>
+      <div className="space-y-3">
+        <h2 className="text-lg font-bold">
+          <span className="sm:hidden">{t("positionsSectionMobile")}</span>
+          <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
+        </h2>
+
+        <Tabs defaultValue="all">
+          <div className="overflow-x-auto">
+          <TabsList>
+            {CLASS_TABS.map((key) => (
+              <TabsTrigger
+                key={key}
+                value={key}
+                disabled={key !== "all" && (classCounts[key] ?? 0) === 0}
+              >
+                {key === "all" ? t("all") : tc(key)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          </div>
           {CLASS_TABS.map((key) => (
-            <TabsTrigger
-              key={key}
-              value={key}
-              disabled={key !== "all" && (classCounts[key] ?? 0) === 0}
-            >
-              {key === "all" ? t("all") : tc(key)}
-            </TabsTrigger>
+            <TabsContent key={key} value={key}>
+              <div className="rounded-xl border border-border">
+                <HoldingsTable
+                  rows={
+                    key === "all"
+                      ? holdings
+                      : holdings.filter((h) => h.instrument?.assetClass === key)
+                  }
+                  currency={currency}
+                  cash={key === "all" && hasCash ? cash : undefined}
+                />
+              </div>
+            </TabsContent>
           ))}
-        </TabsList>
-        </div>
-        {CLASS_TABS.map((key) => (
-          <TabsContent key={key} value={key}>
-            <div className="rounded-xl border border-border">
-              <HoldingsTable
-                rows={
-                  key === "all"
-                    ? holdings
-                    : holdings.filter((h) => h.instrument?.assetClass === key)
-                }
-                currency={currency}
-                cash={key === "all" && hasCash ? cash : undefined}
-              />
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+        </Tabs>
+      </div>
     </div>
   );
 }
