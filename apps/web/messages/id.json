@@ -1398,7 +1398,9 @@
       "unrealized": "Keuntungan belum direalisasi",
       "harvestable": "Dapat dipanen",
       "taxSaving": "Penghematan pajak",
-      "tfApplied": "TF {pct}% diterapkan"
+      "tfApplied": "TF {pct}% diterapkan",
+      "button": "Panen",
+      "summary": "Panen semua {count} untuk mengimbangi {offset} keuntungan terealisasi — menghemat sekitar ~{saving}. Jerman tidak memiliki aturan wash-sale 30 hari, jadi Anda bisa membeli kembali segera."
     }
   },
   "Anomalies": {

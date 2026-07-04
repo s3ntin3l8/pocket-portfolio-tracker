@@ -8,6 +8,7 @@ import {
   type PickablePortfolio,
 } from "@/components/portfolio-picker";
 import { AddTransaction } from "@/components/add-transaction";
+import type { AddTransactionInitial } from "@/components/add-transaction-form";
 import { RecordCorporateAction } from "@/components/record-corporate-action";
 import { RecordMerger } from "@/components/record-merger";
 
@@ -29,10 +30,14 @@ export function NewEntryTabs({
   portfolios,
   initialPortfolioId,
   defaultTab = "transaction",
+  initialTransaction,
 }: {
   portfolios: PickablePortfolio[];
   initialPortfolioId: string;
   defaultTab?: NewEntryTab;
+  /** Prefill for the Transaction tab (e.g. a harvest-suggestion sell draft from
+   *  `/tax`, threaded in via `?harvestInstrument=<id>`). */
+  initialTransaction?: AddTransactionInitial;
 }) {
   const tt = useTranslations("Manage.tx");
   const tca = useTranslations("CorpAction");
@@ -62,7 +67,7 @@ export function NewEntryTabs({
       </TabsList>
       <TabsContent value="transaction" className="space-y-4">
         {picker}
-        <AddTransaction portfolioId={portfolioId} />
+        <AddTransaction portfolioId={portfolioId} initial={initialTransaction} />
       </TabsContent>
       <TabsContent value="corporate-action">
         <RecordCorporateAction />

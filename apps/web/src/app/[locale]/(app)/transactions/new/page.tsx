@@ -5,23 +5,40 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { NewEntryTabs, type NewEntryTab } from "@/components/new-entry-tabs";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
-import { resolveSelection } from "@/lib/server-api";
+import { resolveSelection, loadHarvestPrefill } from "@/lib/server-api";
+import type { AddTransactionInitial } from "@/components/add-transaction-form";
 
 export default async function NewTransactionPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ kind?: string }>;
+  searchParams: Promise<{ kind?: string; harvestInstrument?: string }>;
 }) {
   const { locale } = await params;
-  const { kind } = await searchParams;
+  const { kind, harvestInstrument } = await searchParams;
   setRequestLocale(locale);
   const tm = await getTranslations("Manage");
   const tf = await getTranslations("PortfolioForm");
   const te = await getTranslations("Empty");
 
   const selection = await resolveSelection();
+
+  // Harvest-suggestion prefill (`/tax` → "Harvest" button): a Sell draft for the
+  // suggested instrument, quantity seeded from its standing open lots.
+  const harvestPrefill = harvestInstrument ? await loadHarvestPrefill(harvestInstrument) : null;
+  const initialTransaction: AddTransactionInitial | undefined = harvestPrefill
+    ? {
+        type: "sell",
+        instrumentId: harvestInstrument!,
+        instrument: harvestPrefill.instrument,
+        quantity: harvestPrefill.quantity,
+        price: "",
+        fees: "",
+        currency: harvestPrefill.currency,
+        executedAt: new Date().toISOString().slice(0, 10),
+      }
+    : undefined;
   // The transaction lands in the switcher-selected portfolio, or the first one when the
   // aggregate ("All portfolios") scope is active; the picker in NewEntryTabs makes that
   // explicit and switchable.
@@ -82,6 +99,7 @@ export default async function NewTransactionPage({
           }))}
           initialPortfolioId={initialPortfolioId}
           defaultTab={defaultTab}
+          initialTransaction={initialTransaction}
         />
       )}
     </div>

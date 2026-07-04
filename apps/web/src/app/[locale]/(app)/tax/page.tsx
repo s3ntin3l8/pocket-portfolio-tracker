@@ -1,11 +1,17 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Receipt, TrendingUp, Landmark, CalendarClock, TriangleAlert, Info } from "lucide-react";
+import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DistributionCard,
+  HarvestRow,
+  HarvestSummaryNote,
+  type TaxTranslator,
+} from "@/components/tax/tax-cards";
 import { loadNetworthTax } from "@/lib/server-api";
 import { formatMoney } from "@/lib/utils";
-import type { TaxSummaryHolder, HarvestSuggestion, TaxDistribution } from "@portfolio/api-client";
+import type { TaxSummaryHolder } from "@portfolio/api-client";
 
 export default async function TaxPage({
   params,
@@ -59,8 +65,7 @@ function TaxHolderSection({
 }: {
   entry: TaxSummaryHolder;
   locale: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
+  t: TaxTranslator;
 }) {
   const { holder, year, currency, allowanceUsage: u, harvestSuggestions, distribution } = entry;
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
@@ -172,103 +177,10 @@ function TaxHolderSection({
                 <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
               ))}
             </div>
+            <HarvestSummaryNote suggestions={harvestSuggestions} money={money} t={t} />
           </CardContent>
         </Card>
       )}
     </section>
-  );
-}
-
-function DistributionCard({
-  distribution: d,
-  money,
-  t,
-}: {
-  distribution: TaxDistribution;
-  money: (n: string | number) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
-}) {
-  const allocPct = Number(d.holderAllowanceCap) > 0
-    ? Math.round((Number(d.totalAllocated) / Number(d.holderAllowanceCap)) * 100)
-    : 0;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Info className="size-4" />
-          {t("distribution.title")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label={t("distribution.cap")}
-            value={money(d.holderAllowanceCap)}
-            delta={t("distribution.capDesc")}
-          />
-          <StatCard
-            label={t("distribution.allocated")}
-            value={money(d.totalAllocated)}
-            delta={`${allocPct}%`}
-          />
-          <StatCard
-            label={t("distribution.remaining")}
-            value={money(d.remainingToDistribute)}
-            delta={t("distribution.remainingDesc")}
-          />
-        </div>
-        {d.overAllocated && (
-          <div className="flex items-start gap-2 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-600 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
-            <TriangleAlert className="size-4 mt-0.5 shrink-0" />
-            <span>{t("distribution.overAllocated")}</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function HarvestRow({
-  s,
-  money,
-  t,
-}: {
-  s: HarvestSuggestion;
-  money: (n: string | number) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
-}) {
-  const tfPct = Math.round(parseFloat(s.tfRate) * 100);
-
-  return (
-    <div className="py-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
-      <div className="col-span-2 sm:col-span-1">
-        <p className="font-medium text-sm">{s.instrument?.symbol ?? s.instrumentId.slice(0, 8)}</p>
-        <p className="text-xs text-muted-foreground">{s.instrument?.name}</p>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{t("harvest.unrealized")}</p>
-        <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-          {money(s.unrealizedGross)}
-        </p>
-        {tfPct > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {t("harvest.tfApplied", { pct: tfPct })}
-          </p>
-        )}
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{t("harvest.harvestable")}</p>
-        <p className="text-sm font-medium">{money(s.harvestableGross)}</p>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{t("harvest.taxSaving")}</p>
-        <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-          {money(s.taxSaving)}
-        </p>
-      </div>
-    </div>
   );
 }
