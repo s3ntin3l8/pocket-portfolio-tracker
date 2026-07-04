@@ -4,6 +4,7 @@ import { cashBalances, cashFlow } from "./cash.js";
 import { netWorth, convert, type FxRateFn } from "./networth.js";
 import { financingByInstrument, totalLiabilities } from "./loans.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
+import type { LotView } from "./lots.js";
 
 /**
  * How a financed holding's cost basis is reported. "purchase_price" keeps the
@@ -31,6 +32,14 @@ export interface HoldingValuation extends Holding {
   dayChange: string | null;
   /** Today's price move as a percentage, when known. */
   dayChangePct: string | null;
+  /**
+   * Standing open FIFO lots (acquisition order, oldest first), for a per-lot cost-basis
+   * display (e.g. instrument detail page). NOT populated by `summarizePortfolio` itself —
+   * `summarizePortfolio` has no lot ledger of its own (only `computeHoldings`'s average-cost
+   * aggregate); callers that also have the transaction/corporate-action set attach this via
+   * `openLots()` after valuing. Undefined when the caller didn't attach it.
+   */
+  lots?: LotView[];
 }
 
 export interface PortfolioSummary {
@@ -351,6 +360,14 @@ export function aggregatePortfolios(
         previousClose: h.previousClose ?? ex.previousClose,
         dayChange: addNullable(ex.dayChange, h.dayChange),
         dayChangePct: h.dayChangePct ?? ex.dayChangePct,
+        // Merge lots from both portfolios (acquisition order, oldest first). Undefined
+        // on both sides stays undefined; either side present yields a merged array.
+        lots:
+          ex.lots || h.lots
+            ? [...(ex.lots ?? []), ...(h.lots ?? [])].sort((a, b) =>
+                a.acqDate < b.acqDate ? -1 : a.acqDate > b.acqDate ? 1 : 0,
+              )
+            : undefined,
       });
     }
   }

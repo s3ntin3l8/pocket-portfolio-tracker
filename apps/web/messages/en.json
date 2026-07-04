@@ -700,7 +700,12 @@
     "noPositionBody": "You don't currently hold this instrument in the selected scope.",
     "transactions": "Transactions",
     "noTransactions": "No transactions",
-    "noTransactionsBody": "No transactions for this instrument in the selected scope."
+    "noTransactionsBody": "No transactions for this instrument in the selected scope.",
+    "openLots": "Open lots",
+    "lotAcquired": "Acquired",
+    "lotQty": "Qty",
+    "lotPrice": "Price",
+    "lotCost": "Cost"
   },
   "CorpAction": {
     "title": "Record a corporate action",
@@ -820,12 +825,15 @@
     "modeValue": "Value",
     "range": {
       "label": "Time range",
+      "1d": "1D",
+      "7d": "7D",
       "1m": "1M",
       "3m": "3M",
       "ytd": "YTD",
       "1y": "1Y",
       "all": "All"
-    }
+    },
+    "collectingIntraday": "Collecting intraday data — check back after markets are open."
   },
   "Transactions": {
     "title": "Transactions",

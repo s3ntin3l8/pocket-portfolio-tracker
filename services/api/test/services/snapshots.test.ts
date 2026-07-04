@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   instruments,
+  portfolioIntradaySnapshots,
   portfolios,
   portfolioSnapshots,
   transactions,
@@ -11,6 +12,7 @@ import { MarketDataService, FixtureProvider } from "@portfolio/market-data";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
   recordDailySnapshots,
+  recordIntradaySnapshots,
   rangeStart,
   aggregateByDate,
 } from "../../src/services/snapshots.js";
@@ -87,6 +89,125 @@ describe("recordDailySnapshots", () => {
       .from(portfolioSnapshots)
       .where(eq(portfolioSnapshots.portfolioId, portfolioId));
     expect(again).toHaveLength(1);
+  });
+});
+
+describe("recordIntradaySnapshots", () => {
+  let portfolioId: string;
+
+  beforeAll(async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "intraday-user", email: "intraday@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Intraday", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+    portfolioId = p.id;
+    const [bbca] = await db
+      .insert(instruments)
+      .values({
+        symbol: "INTRA",
+        market: "IDX", // IDX regular session: Mon–Fri 02:00–09:00 UTC
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Intraday Test Co",
+      })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId,
+        instrumentId: bbca.id,
+        type: "buy",
+        quantity: "100",
+        price: "9000",
+        currency: "IDR",
+        executedAt: new Date("2026-01-02"),
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("captures a point when a held instrument's market is open", async () => {
+    const db = getDb();
+    const svc = new MarketDataService([new FixtureProvider({ INTRA: "9500" })]);
+    // Monday 05:00 UTC — inside the IDX session.
+    const now = new Date("2026-02-09T05:00:00.000Z");
+
+    const count = await recordIntradaySnapshots(db, svc, 10_000, now);
+    // Other portfolios seeded by earlier describes in this file (also holding IDX
+    // instruments) may be captured in the same run, so only assert a lower bound —
+    // the specific per-portfolio row assertion below is what actually matters here.
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    const rows = await db
+      .select()
+      .from(portfolioIntradaySnapshots)
+      .where(eq(portfolioIntradaySnapshots.portfolioId, portfolioId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].netWorth).toBe("950000"); // 100 × 9,500
+    expect(rows[0].capturedAt.toISOString()).toBe(now.toISOString());
+  });
+
+  it("does not touch the DB when no held market is open", async () => {
+    const db = getDb();
+    const svc = new MarketDataService([new FixtureProvider({ INTRA: "9500" })]);
+    // Same Monday, 12:00 UTC — outside the IDX session.
+    const now = new Date("2026-02-09T12:00:00.000Z");
+
+    const before = await db
+      .select()
+      .from(portfolioIntradaySnapshots)
+      .where(eq(portfolioIntradaySnapshots.portfolioId, portfolioId));
+
+    const count = await recordIntradaySnapshots(db, svc, 10_000, now);
+    expect(count).toBe(0);
+
+    const after = await db
+      .select()
+      .from(portfolioIntradaySnapshots)
+      .where(eq(portfolioIntradaySnapshots.portfolioId, portfolioId));
+    expect(after).toHaveLength(before.length);
+  });
+
+  it("appends a new row rather than upserting (many rows/day allowed)", async () => {
+    const db = getDb();
+    const svc = new MarketDataService([new FixtureProvider({ INTRA: "9600" })]);
+    const now = new Date("2026-02-09T05:15:00.000Z");
+
+    await recordIntradaySnapshots(db, svc, 10_000, now);
+    const rows = await db
+      .select()
+      .from(portfolioIntradaySnapshots)
+      .where(eq(portfolioIntradaySnapshots.portfolioId, portfolioId));
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("prunes rows older than the retention window", async () => {
+    const db = getDb();
+    const svc = new MarketDataService([new FixtureProvider({ INTRA: "9500" })]);
+    await db.insert(portfolioIntradaySnapshots).values({
+      portfolioId,
+      capturedAt: new Date("2026-01-01T05:00:00.000Z"), // well past 8 days before Feb 9
+      netWorth: "1",
+      marketValue: "1",
+      currency: "IDR",
+    });
+
+    await recordIntradaySnapshots(db, svc, 10_000, new Date("2026-02-09T05:30:00.000Z"));
+
+    const rows = await db
+      .select()
+      .from(portfolioIntradaySnapshots)
+      .where(eq(portfolioIntradaySnapshots.portfolioId, portfolioId));
+    expect(rows.every((r) => r.capturedAt.getTime() > new Date("2026-01-10").getTime())).toBe(
+      true,
+    );
   });
 });
 

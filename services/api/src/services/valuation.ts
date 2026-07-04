@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { corporateActions, instruments, transactions } from "@portfolio/db";
 import {
   summarizePortfolio,
+  openLots,
   type CoreTransaction,
   type CorporateAction,
   type CostBasisMode,
@@ -135,6 +136,15 @@ export async function valuePortfolio(
     costBasisMode,
     cashCounted,
   });
+
+  // Attach standing open FIFO lots to each holding (instrument detail "Acquired / Qty /
+  // Price / Cost" table). summarizePortfolio has no lot ledger of its own — openLots
+  // replays the same transactions/corporate actions in a separate FIFO-only pass.
+  const lotsByInstrument = openLots(coreTxns, cas);
+  for (const h of summary.holdings) {
+    h.lots = lotsByInstrument.get(h.instrumentId) ?? [];
+  }
+
   return { coreTxns, summary, metaById, prices };
 }
 

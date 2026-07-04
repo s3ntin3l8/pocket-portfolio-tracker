@@ -911,6 +911,38 @@ export const portfolioSnapshots = pgTable(
 );
 
 /**
+ * Intraday portfolio-value points for the 1D/7D value-chart timeframes. Unlike
+ * `portfolioSnapshots` (day-grained, one row/day), this is captured every ~15 minutes
+ * while at least one held instrument's market is open, and intentionally allows many
+ * rows per portfolio per day (no unique index) — plain inserts, pruned to ~8 days'
+ * retention by the capture job. Prospective-only: there is no intraday price history
+ * to backfill, so this only builds up going forward from when the job starts running.
+ */
+export const portfolioIntradaySnapshots = pgTable(
+  "portfolio_intraday_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    portfolioId: uuid("portfolio_id")
+      .notNull()
+      .references(() => portfolios.id, { onDelete: "cascade" }),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    netWorth: numeric("net_worth").notNull(),
+    /** Holdings market value (excl. cash), in the portfolio's base currency. */
+    marketValue: numeric("market_value").notNull().default("0"),
+    currency: text("currency").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("portfolio_intraday_snapshots_portfolio_captured_idx").on(
+      t.portfolioId,
+      t.capturedAt,
+    ),
+  ],
+);
+
+/**
  * User-defined target allocation weights. One row per (user, portfolio_scope, dimension, key).
  * `portfolioId` is null for aggregate-level (networth dashboard) targets; non-null for
  * per-portfolio targets (e.g. Sparplan instrument-level split).

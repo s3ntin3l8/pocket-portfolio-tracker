@@ -432,10 +432,11 @@ describe("admin provider config", () => {
     // pg-boss is not running in PGlite/test env.
     expect(body.schedulerAvailable).toBe(false);
     // All known job descriptors should be listed.
-    expect(body.jobs).toHaveLength(10);
+    expect(body.jobs).toHaveLength(11);
     const names = body.jobs.map((j) => j.name);
     expect(names).toContain("refresh-prices");
     expect(names).toContain("daily-snapshot");
+    expect(names).toContain("intraday-snapshot");
     expect(names).toContain("tr-sync");
     expect(names).toContain("scrape-antam");
     expect(names).toContain("scrape-nav");

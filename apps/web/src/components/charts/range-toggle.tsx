@@ -3,8 +3,12 @@
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
-/** Snapshot-history ranges understood by the API's `rangeStart` (+ `all` → full). */
-export const RANGES = ["1m", "3m", "ytd", "1y", "all"] as const;
+/**
+ * Snapshot-history ranges. `1d`/`7d` read the timestamped intraday table (see
+ * net-worth-history-chart.tsx); the rest are understood by the API's `rangeStart`
+ * (+ `all` → full) against the day-grained daily-snapshot table.
+ */
+export const RANGES = ["1d", "7d", "1m", "3m", "ytd", "1y", "all"] as const;
 export type ChartRange = (typeof RANGES)[number];
 
 export function RangeToggle({

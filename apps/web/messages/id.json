@@ -698,7 +698,12 @@
     "noPositionBody": "Anda saat ini tidak memegang instrumen ini pada cakupan yang dipilih.",
     "transactions": "Transaksi",
     "noTransactions": "Tidak ada transaksi",
-    "noTransactionsBody": "Tidak ada transaksi untuk instrumen ini pada cakupan yang dipilih."
+    "noTransactionsBody": "Tidak ada transaksi untuk instrumen ini pada cakupan yang dipilih.",
+    "openLots": "Lot terbuka",
+    "lotAcquired": "Diperoleh",
+    "lotQty": "Jumlah",
+    "lotPrice": "Harga",
+    "lotCost": "Biaya"
   },
   "CorpAction": {
     "title": "Catat aksi korporasi",
@@ -818,12 +823,15 @@
     "modeValue": "Nilai",
     "range": {
       "label": "Rentang waktu",
+      "1d": "1H",
+      "7d": "7H",
       "1m": "1B",
       "3m": "3B",
       "ytd": "TTB",
       "1y": "1T",
       "all": "Semua"
-    }
+    },
+    "collectingIntraday": "Mengumpulkan data intraday — cek lagi setelah pasar buka."
   },
   "Transactions": {
     "title": "Transaksi",
