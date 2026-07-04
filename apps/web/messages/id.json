@@ -823,12 +823,15 @@
     "modeValue": "Nilai",
     "range": {
       "label": "Rentang waktu",
+      "1d": "1H",
+      "7d": "7H",
       "1m": "1B",
       "3m": "3B",
       "ytd": "TTB",
       "1y": "1T",
       "all": "Semua"
-    }
+    },
+    "collectingIntraday": "Mengumpulkan data intraday — cek lagi setelah pasar buka."
   },
   "Transactions": {
     "title": "Transaksi",

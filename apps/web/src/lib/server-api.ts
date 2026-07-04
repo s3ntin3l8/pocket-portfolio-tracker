@@ -8,6 +8,7 @@ import {
   type User,
   type NetWorth,
   type PerformancePoint,
+  type HistoryPoint,
   type Instrument,
   type Candle,
   type CorporateAction,
@@ -155,7 +156,7 @@ export async function loadPreferences(): Promise<UserPreferences | null> {
  */
 export async function loadNetWorthHistory(
   range = "1y",
-): Promise<PerformancePoint[]> {
+): Promise<HistoryPoint[]> {
   const api = await getServerApi();
   if (!api) return [];
   try {
@@ -416,9 +417,11 @@ export async function loadContributions(): Promise<ContributionsView> {
     // history error doesn't cascade to the whole page.
     let valueHistory: PerformancePoint[] = [];
     try {
-      valueHistory = selected
+      // range="all" always hits the day-grained daily-snapshot table (never the
+      // timestamped intraday one), so this is always PerformancePoint[] in practice.
+      valueHistory = (selected
         ? await api.getPortfolioHistory(selected.id, "all")
-        : await api.getNetWorthHistory("all", holderId ? { holderId } : undefined);
+        : await api.getNetWorthHistory("all", holderId ? { holderId } : undefined)) as PerformancePoint[];
     } catch {
       // History unavailable — chart degrades gracefully.
     }

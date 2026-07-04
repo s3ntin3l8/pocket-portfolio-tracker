@@ -2111,6 +2111,80 @@ describe("auth + portfolios + transactions", () => {
     expect(cross.statusCode).toBe(404);
   });
 
+  it("serves 1D/7D net-worth history from intraday snapshots (per portfolio + aggregate)", async () => {
+    const { portfolioIntradaySnapshots } = await import("@portfolio/db");
+    const t = await token("intraday-hist-user");
+    const mk = async (name: string) =>
+      (
+        await app.inject({
+          method: "POST",
+          url: "/portfolios",
+          headers: auth(t),
+          payload: { name, baseCurrency: "IDR" },
+        })
+      ).json().id;
+    const p1 = await mk("IH1");
+    const p2 = await mk("IH2");
+
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
+    const daysAgo = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000);
+    const recent = hoursAgo(2); // within both 1d and 7d windows
+    const midWeek = daysAgo(3); // within 7d but outside 1d
+    const stale = daysAgo(10); // outside both windows
+
+    await app.db.insert(portfolioIntradaySnapshots).values([
+      { portfolioId: p1, capturedAt: stale, netWorth: "1", marketValue: "1", currency: "IDR" },
+      { portfolioId: p1, capturedAt: midWeek, netWorth: "900000", marketValue: "900000", currency: "IDR" },
+      { portfolioId: p1, capturedAt: recent, netWorth: "1000000", marketValue: "1000000", currency: "IDR" },
+      { portfolioId: p2, capturedAt: recent, netWorth: "500000", marketValue: "500000", currency: "IDR" },
+    ]);
+
+    // 1D: only the "recent" point (2h ago) is in-window.
+    const h1d = await app.inject({
+      method: "GET",
+      url: `/portfolios/${p1}/history?range=1d`,
+      headers: auth(t),
+    });
+    expect(h1d.statusCode).toBe(200);
+    const points1d = h1d.json();
+    expect(points1d).toHaveLength(1);
+    expect(points1d[0]).toMatchObject({ netWorth: "1000000", marketValue: "1000000" });
+    expect(typeof points1d[0].at).toBe("string");
+
+    // 7D: both the "recent" and "midWeek" points are in-window, ordered oldest first.
+    const h7d = await app.inject({
+      method: "GET",
+      url: `/portfolios/${p1}/history?range=7d`,
+      headers: auth(t),
+    });
+    expect(h7d.statusCode).toBe(200);
+    const points7d = h7d.json();
+    expect(points7d).toHaveLength(2);
+    expect(points7d.map((p: { netWorth: string }) => p.netWorth)).toEqual([
+      "900000",
+      "1000000",
+    ]);
+
+    // Aggregate 1D sums same-timestamp points across the user's portfolios.
+    const agg1d = await app.inject({
+      method: "GET",
+      url: "/networth/history?range=1d",
+      headers: auth(t),
+    });
+    expect(agg1d.statusCode).toBe(200);
+    const aggPoints = agg1d.json();
+    expect(aggPoints).toHaveLength(1);
+    expect(aggPoints[0].netWorth).toBe("1500000"); // 1,000,000 + 500,000
+
+    // A non-owner can't read the portfolio's intraday history either.
+    const cross = await app.inject({
+      method: "GET",
+      url: `/portfolios/${p1}/history?range=1d`,
+      headers: auth(await token("user-b")),
+    });
+    expect(cross.statusCode).toBe(404);
+  });
+
   it("computes XIRR performance from external cash flows", async () => {
     const t = await token("perf-user");
     const portfolioId = (

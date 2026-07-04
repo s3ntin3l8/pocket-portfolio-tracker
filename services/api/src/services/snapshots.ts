@@ -1,8 +1,19 @@
+import { inArray, isNotNull, lt } from "drizzle-orm";
 import { cashFlow, convert, type FxRateFn, type PriceSeriesKind } from "@portfolio/core";
-import { portfolios, portfolioSnapshots } from "@portfolio/db";
+import {
+  instruments,
+  portfolioIntradaySnapshots,
+  portfolios,
+  portfolioSnapshots,
+  transactions,
+} from "@portfolio/db";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { valuePortfolio } from "./valuation.js";
+import { isMarketOpen } from "./market-hours.js";
+
+/** Rows are pruned after ~8 days — comfortably enough for a 7D chart with headroom. */
+const INTRADAY_RETENTION_MS = 8 * 24 * 60 * 60 * 1000;
 
 /** A point on a net-worth-over-time series. */
 export interface NetWorthPoint {
@@ -92,6 +103,91 @@ export async function recordDailySnapshots(
       });
     count++;
   }
+  return count;
+}
+
+/**
+ * Capture an intraday net-worth point (for the 1D/7D chart) for every portfolio
+ * that currently holds at least one instrument whose market is open — a plain
+ * insert (not upsert; many rows/portfolio/day are expected), followed by a prune
+ * of rows older than the retention window. Skips entirely (no DB writes at all)
+ * when no held market is open anywhere, to avoid flat overnight rows and
+ * unbounded growth from a job that runs every 15 minutes.
+ */
+export async function recordIntradaySnapshots(
+  db: DB,
+  marketData: MarketDataService,
+  ttlMs: number,
+  now: Date = new Date(),
+): Promise<number> {
+  // Which instruments are held by which portfolio (mirrors refreshHeldPrices's
+  // held-instruments query, but portfolio-scoped since the gate is per-portfolio).
+  const held = await db
+    .selectDistinct({
+      portfolioId: transactions.portfolioId,
+      instrumentId: transactions.instrumentId,
+    })
+    .from(transactions)
+    .where(isNotNull(transactions.instrumentId));
+
+  const instrumentIds = [
+    ...new Set(held.map((r) => r.instrumentId).filter((x): x is string => x !== null)),
+  ];
+  if (instrumentIds.length === 0) return 0;
+
+  const instrumentRows = await db
+    .select({ id: instruments.id, market: instruments.market })
+    .from(instruments)
+    .where(inArray(instruments.id, instrumentIds));
+  const marketById = new Map(instrumentRows.map((i) => [i.id, i.market]));
+
+  const heldInstrumentsByPortfolio = new Map<string, Set<string>>();
+  for (const r of held) {
+    if (!r.instrumentId) continue;
+    const set = heldInstrumentsByPortfolio.get(r.portfolioId) ?? new Set<string>();
+    set.add(r.instrumentId);
+    heldInstrumentsByPortfolio.set(r.portfolioId, set);
+  }
+
+  const openPortfolioIds = new Set<string>();
+  for (const [portfolioId, instrIds] of heldInstrumentsByPortfolio) {
+    for (const instrId of instrIds) {
+      const market = marketById.get(instrId);
+      if (market && isMarketOpen(market, now)) {
+        openPortfolioIds.add(portfolioId);
+        break;
+      }
+    }
+  }
+  if (openPortfolioIds.size === 0) return 0;
+
+  const pfs = await db.select().from(portfolios);
+  let count = 0;
+  for (const p of pfs) {
+    if (!openPortfolioIds.has(p.id)) continue;
+    const { summary } = await valuePortfolio(
+      db,
+      marketData,
+      ttlMs,
+      p.id,
+      p.baseCurrency,
+      undefined,
+      p.cashCounted,
+    );
+    await db.insert(portfolioIntradaySnapshots).values({
+      portfolioId: p.id,
+      capturedAt: now,
+      netWorth: summary.netWorth,
+      marketValue: summary.totalMarketValue,
+      currency: p.baseCurrency,
+    });
+    count++;
+  }
+
+  await db
+    .delete(portfolioIntradaySnapshots)
+    .where(lt(portfolioIntradaySnapshots.capturedAt, new Date(now.getTime() - INTRADAY_RETENTION_MS)));
+
   return count;
 }
 

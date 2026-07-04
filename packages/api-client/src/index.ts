@@ -800,6 +800,26 @@ export interface PerformancePoint {
   pct?: string;
 }
 
+/**
+ * A timestamped intraday point (range=1d/7d), from the timestamped intraday-snapshot
+ * table rather than the day-grained one. Uses a distinct `at` (ISO datetime) key
+ * instead of `date` so callers can tell the two shapes apart. No TWR index/pct —
+ * that needs day-level flow data the intraday table doesn't carry.
+ */
+export interface IntradayPoint {
+  at: string; // ISO datetime
+  netWorth: string;
+  marketValue: string;
+}
+
+/** A point on either the daily (`date`) or intraday (`at`) history series. */
+export type HistoryPoint = PerformancePoint | IntradayPoint;
+
+/** True when a HistoryPoint came from the 1d/7d intraday branch. */
+export function isIntradayPoint(p: HistoryPoint): p is IntradayPoint {
+  return "at" in p;
+}
+
 /** A projected future coupon payment for a held bond (instrument currency). */
 export interface ProjectedCoupon {
   instrumentId: string;
@@ -1692,10 +1712,10 @@ export function createApiClient(config: ApiClientConfig) {
       if (opts?.include?.length) params.set("include", opts.include.join(","));
       if (opts?.exclude?.length) params.set("exclude", opts.exclude.join(","));
       if (opts?.holderId) params.set("holderId", opts.holderId);
-      return request<PerformancePoint[]>("GET", `/networth/history?${params.toString()}`);
+      return request<HistoryPoint[]>("GET", `/networth/history?${params.toString()}`);
     },
     getPortfolioHistory: (portfolioId: string, range = "1y") =>
-      request<PerformancePoint[]>(
+      request<HistoryPoint[]>(
         "GET",
         `/portfolios/${portfolioId}/history?range=${encodeURIComponent(range)}`,
       ),

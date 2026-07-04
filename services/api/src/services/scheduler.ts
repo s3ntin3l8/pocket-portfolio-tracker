@@ -7,7 +7,7 @@ import { getMarketData, flushUsage } from "./market-data.js";
 import { refreshHeldPrices } from "./refresh.js";
 import { refreshDividends } from "./dividends.js";
 import { refreshInstrumentMetadata } from "./instrument-metadata.js";
-import { recordDailySnapshots } from "./snapshots.js";
+import { recordDailySnapshots, recordIntradaySnapshots } from "./snapshots.js";
 import { refreshAntamBuyback, refreshGaleri24Buyback, refreshNav } from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
 import { syncIbkrConnection } from "./ibkr/sync.js";
@@ -19,6 +19,11 @@ const SCHEDULE_CRON = "*/5 * * * *"; // every 5 minutes; the job self-gates on m
 
 const SNAPSHOT_QUEUE = "daily-snapshot";
 const SNAPSHOT_CRON = "0 16 * * *"; // daily 16:00 UTC (~23:00 WIB, after the IDX close)
+
+const INTRADAY_SNAPSHOT_QUEUE = "intraday-snapshot";
+// Every 15 minutes — the job itself gates on market hours (per held instrument) and
+// no-ops when nothing is open, so this is cheap to run around the clock.
+const INTRADAY_SNAPSHOT_CRON = "*/15 * * * *";
 
 const TR_SYNC_QUEUE = "tr-sync";
 const TR_SYNC_CRON = "0 * * * *"; // hourly — TR data isn't intraday; be gentle on their API
@@ -82,6 +87,13 @@ export const JOB_DESCRIPTORS = [
     label: "Daily snapshot",
     description: "Record daily net-worth snapshots for the dashboard chart.",
     cron: SNAPSHOT_CRON,
+  },
+  {
+    name: INTRADAY_SNAPSHOT_QUEUE,
+    label: "Intraday snapshot",
+    description:
+      "Capture a net-worth point every 15 minutes (market-hours-gated) for the 1D/7D value chart.",
+    cron: INTRADAY_SNAPSHOT_CRON,
   },
   {
     name: TR_SYNC_QUEUE,
@@ -277,6 +289,24 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     }
   });
   await boss.schedule(SNAPSHOT_QUEUE, SNAPSHOT_CRON);
+
+  // Intraday net-worth points feed the 1D/7D value-chart timeframes. Market-hours-gated
+  // and prospective-only (see recordIntradaySnapshots for the retention/pruning story).
+  await boss.createQueue(INTRADAY_SNAPSHOT_QUEUE);
+  await boss.work(INTRADAY_SNAPSHOT_QUEUE, async () => {
+    try {
+      const count = await recordIntradaySnapshots(
+        getDb(),
+        await getMarketData(),
+        app.config.MARKET_DATA_TTL_MS,
+        new Date(),
+      );
+      app.log.info({ count }, "intraday snapshot complete");
+    } catch (err) {
+      app.log.error({ err }, "intraday snapshot failed");
+    }
+  });
+  await boss.schedule(INTRADAY_SNAPSHOT_QUEUE, INTRADAY_SNAPSHOT_CRON);
 
   // Hourly Trade Republic sync + on-demand per-connection trigger.
   // When job data carries `connectionId`, only that connection is synced (the manual-sync
@@ -506,6 +536,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     {
       priceCron: SCHEDULE_CRON,
       snapshotCron: SNAPSHOT_CRON,
+      intradaySnapshotCron: INTRADAY_SNAPSHOT_CRON,
       trSyncCron: TR_SYNC_CRON,
       ibkrSyncCron,
       antamCron: ANTAM_CRON,

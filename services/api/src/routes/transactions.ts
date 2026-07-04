@@ -9,6 +9,7 @@ import {
   dividendEvents,
   documents,
   instruments,
+  portfolioIntradaySnapshots,
   portfolios,
   portfolioSnapshots,
   transactions,
@@ -1262,7 +1263,31 @@ export async function transactionsRoute(app: FastifyInstance) {
       if (!(await ownedPortfolio(id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
       }
-      const start = rangeStart(request.query.range ?? "1y");
+      const range = request.query.range ?? "1y";
+
+      // 1D/7D: read the intraday (timestamped) table instead of the day-grained one.
+      // No stored intraday history exists to backfill — this is prospective-only, so an
+      // empty array is a normal, expected response until the capture job has run.
+      if (range === "1d" || range === "7d") {
+        const since = new Date(Date.now() - (range === "1d" ? 1 : 7) * 86_400_000);
+        const rows = await app.db
+          .select()
+          .from(portfolioIntradaySnapshots)
+          .where(
+            and(
+              eq(portfolioIntradaySnapshots.portfolioId, portfolioId),
+              gte(portfolioIntradaySnapshots.capturedAt, since),
+            ),
+          )
+          .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
+        return rows.map((r) => ({
+          at: r.capturedAt.toISOString(),
+          netWorth: r.netWorth,
+          marketValue: r.marketValue ?? "0",
+        }));
+      }
+
+      const start = rangeStart(range);
       const conds = [eq(portfolioSnapshots.portfolioId, portfolioId)];
       if (start) conds.push(gte(portfolioSnapshots.date, start));
       const rows = await app.db
@@ -1995,7 +2020,46 @@ export async function transactionsRoute(app: FastifyInstance) {
       }
       if (pfIds.length === 0) return [];
 
-      const start = rangeStart(request.query.range ?? "1y");
+      const range = request.query.range ?? "1y";
+
+      // 1D/7D: aggregate the intraday (timestamped) table instead of the day-grained one.
+      // Points are grouped by their exact capture timestamp (every portfolio in one job run
+      // shares `capturedAt`) and FX-converted at today's rate, since every point is "today".
+      if (range === "1d" || range === "7d") {
+        const since = new Date(Date.now() - (range === "1d" ? 1 : 7) * 86_400_000);
+        const rows = await app.db
+          .select()
+          .from(portfolioIntradaySnapshots)
+          .where(
+            and(
+              inArray(portfolioIntradaySnapshots.portfolioId, pfIds),
+              gte(portfolioIntradaySnapshots.capturedAt, since),
+            ),
+          )
+          .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
+        if (rows.length === 0) return [];
+
+        const currencies = [...new Set(rows.map((r) => r.currency))];
+        const fx = makeFxRateFn(await getFxRates(app.db, currencies, display), display);
+
+        const byAt = new Map<string, { netWorth: number; marketValue: number }>();
+        for (const r of rows) {
+          const at = r.capturedAt.toISOString();
+          const entry = byAt.get(at) ?? { netWorth: 0, marketValue: 0 };
+          entry.netWorth += Number(convert(r.netWorth, r.currency, display, fx));
+          entry.marketValue += Number(convert(r.marketValue ?? "0", r.currency, display, fx));
+          byAt.set(at, entry);
+        }
+        return [...byAt.entries()]
+          .sort(([a], [b]) => (a < b ? -1 : 1))
+          .map(([at, v]) => ({
+            at,
+            netWorth: String(v.netWorth),
+            marketValue: String(v.marketValue),
+          }));
+      }
+
+      const start = rangeStart(range);
       const conds = [inArray(portfolioSnapshots.portfolioId, pfIds)];
       if (start) conds.push(gte(portfolioSnapshots.date, start));
       const rows = await app.db
