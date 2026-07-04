@@ -352,13 +352,14 @@
   "Portfolios": {
     "title": "Portofolio",
     "subtitle": "Buat dan kelola portofolio Anda.",
-    "value": "Nilai",
+    "value": "Total nilai",
     "create": "Buat portofolio",
     "empty": "Belum ada portofolio — buat yang pertama.",
     "born": "Lahir {year}",
     "cashIn": "Kas termasuk",
-    "docsKept": "Tersimpan",
-    "excluded": "Tidak termasuk"
+    "docsKept": "Dokumen disimpan",
+    "excluded": "Dikecualikan dari agregat",
+    "newPortfolioHint": "Manual, Trade Republic, atau IBKR"
   },
   "AccountHolders": {
     "title": "Pemilik akun",

@@ -352,13 +352,14 @@
   "Portfolios": {
     "title": "Portfolios",
     "subtitle": "Create and manage your portfolios.",
-    "value": "Value",
+    "value": "Total value",
     "create": "Create a portfolio",
     "empty": "No portfolios yet — create your first one.",
     "born": "Born {year}",
-    "cashIn": "Cash in",
-    "docsKept": "Saved",
-    "excluded": "Excluded"
+    "cashIn": "Cash counted",
+    "docsKept": "Docs kept",
+    "excluded": "Excluded from aggregate",
+    "newPortfolioHint": "Manual, Trade Republic or IBKR"
   },
   "AccountHolders": {
     "title": "Account holders",
