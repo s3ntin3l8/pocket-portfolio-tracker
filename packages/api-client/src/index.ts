@@ -654,6 +654,14 @@ export interface HoldingsResult {
   anomalies: Anomaly[];
 }
 
+/** A standing open FIFO lot (acquisition order), for a per-lot cost-basis display. */
+export interface LotView {
+  acqDate: string; // ISO date (YYYY-MM-DD)
+  qty: string;
+  unitCost: string;
+  cost: string;
+}
+
 export interface HoldingValuation extends Holding {
   price: string | null;
   currency: string | null;
@@ -669,6 +677,8 @@ export interface HoldingValuation extends Holding {
   dayChange: string | null;
   dayChangePct: string | null;
   instrument: InstrumentMeta | null;
+  /** Standing open FIFO lots (oldest first); undefined when the API didn't attach them. */
+  lots?: LotView[];
 }
 
 export interface PortfolioSummary {

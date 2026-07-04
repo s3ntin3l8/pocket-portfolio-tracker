@@ -698,7 +698,12 @@
     "noPositionBody": "Anda saat ini tidak memegang instrumen ini pada cakupan yang dipilih.",
     "transactions": "Transaksi",
     "noTransactions": "Tidak ada transaksi",
-    "noTransactionsBody": "Tidak ada transaksi untuk instrumen ini pada cakupan yang dipilih."
+    "noTransactionsBody": "Tidak ada transaksi untuk instrumen ini pada cakupan yang dipilih.",
+    "openLots": "Lot terbuka",
+    "lotAcquired": "Diperoleh",
+    "lotQty": "Jumlah",
+    "lotPrice": "Harga",
+    "lotCost": "Biaya"
   },
   "CorpAction": {
     "title": "Catat aksi korporasi",

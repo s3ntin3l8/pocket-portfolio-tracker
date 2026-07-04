@@ -120,3 +120,4 @@ export {
   type AnomalyCode,
   type ReconciliationGap,
 } from "./anomalies.js";
+export { openLots, type LotView } from "./lots.js";

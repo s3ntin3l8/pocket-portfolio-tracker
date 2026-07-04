@@ -700,7 +700,12 @@
     "noPositionBody": "You don't currently hold this instrument in the selected scope.",
     "transactions": "Transactions",
     "noTransactions": "No transactions",
-    "noTransactionsBody": "No transactions for this instrument in the selected scope."
+    "noTransactionsBody": "No transactions for this instrument in the selected scope.",
+    "openLots": "Open lots",
+    "lotAcquired": "Acquired",
+    "lotQty": "Qty",
+    "lotPrice": "Price",
+    "lotCost": "Cost"
   },
   "CorpAction": {
     "title": "Record a corporate action",

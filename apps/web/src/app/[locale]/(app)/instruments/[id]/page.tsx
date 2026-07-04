@@ -9,6 +9,7 @@ import { StatCard } from "@/components/stat-card";
 import { PriceChart } from "@/components/charts/price-chart";
 import { CorporateActionsManager } from "@/components/corporate-actions-manager";
 import { TransactionsTable } from "@/components/transactions-table";
+import { InstrumentLotsTable } from "@/components/instrument-lots-table";
 import { loadInstrument, loadInstrumentScope, loadAnomalies } from "@/lib/server-api";
 import { formatMoney, formatPercent } from "@/lib/utils";
 
@@ -69,6 +70,8 @@ export default async function InstrumentPage({
       ? pnlDisplay / costBasisDisplay
       : undefined;
   const qtyFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 8 });
+  const lots = holding?.lots ?? [];
+  const lotCurrency = holding?.currency ?? instrument.currency;
 
   return (
     <div className="space-y-6">
@@ -149,6 +152,17 @@ export default async function InstrumentPage({
           )}
         </CardContent>
       </Card>
+
+      {lots.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("openLots")}</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <InstrumentLotsTable lots={lots} currency={lotCurrency} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
