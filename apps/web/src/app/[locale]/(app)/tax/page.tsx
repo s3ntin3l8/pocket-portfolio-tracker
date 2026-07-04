@@ -1,11 +1,22 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Receipt, TrendingUp, Landmark, CalendarClock, TriangleAlert, Info } from "lucide-react";
+import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { loadNetworthTax } from "@/lib/server-api";
+import {
+  EstimatedTaxHero,
+  DisposalTable,
+  DividendsTable,
+  ByYearTable,
+  AllowanceSummaryBoxes,
+  DistributionCard,
+  HarvestRow,
+  HarvestSummaryNote,
+  type TaxTranslator,
+} from "@/components/tax/tax-cards";
+import { loadNetworthTax, loadTaxYearDetail, type TaxYearDetail } from "@/lib/server-api";
 import { formatMoney } from "@/lib/utils";
-import type { TaxSummaryHolder, HarvestSuggestion, TaxDistribution } from "@portfolio/api-client";
+import type { TaxSummaryHolder } from "@portfolio/api-client";
 
 export default async function TaxPage({
   params,
@@ -21,6 +32,7 @@ export default async function TaxPage({
   const t = await getTranslations("Tax");
 
   const holders = await loadNetworthTax(year);
+  const detailByHolder = await loadTaxYearDetail(holders, year);
 
   const Heading = (
     <div>
@@ -46,7 +58,13 @@ export default async function TaxPage({
     <div className="space-y-8">
       {Heading}
       {holders.map((entry) => (
-        <TaxHolderSection key={entry.holder.id} entry={entry} locale={locale} t={t} />
+        <TaxHolderSection
+          key={entry.holder.id}
+          entry={entry}
+          detail={detailByHolder.get(entry.holder.id) ?? null}
+          locale={locale}
+          t={t}
+        />
       ))}
     </div>
   );
@@ -54,19 +72,32 @@ export default async function TaxPage({
 
 function TaxHolderSection({
   entry,
+  detail,
   locale,
   t,
 }: {
   entry: TaxSummaryHolder;
+  detail: TaxYearDetail | null;
   locale: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
+  t: TaxTranslator;
 }) {
   const { holder, year, currency, allowanceUsage: u, harvestSuggestions, distribution } = entry;
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
   const pct = parseFloat(u.remaining) / parseFloat(u.allowanceAnnual);
   const usedPct = Math.round((1 - Math.max(0, Math.min(1, pct))) * 100);
   const hasForecast = Number(u.forecastIncomeRestOfYear) > 0;
+
+  // Taxable gains after allowance, and the estimated tax owed on them at the holder's
+  // real capital-gains rate (`u.taxRate` — already `holder.capitalGainsTaxRate ?? 0.25`
+  // from the backend, never hardcoded here). Shared by the hero card and the
+  // "Taxable gains YTD" allowance box so both agree.
+  const taxRate = Number(u.taxRate);
+  const taxable = Math.max(
+    0,
+    Number(u.realizedGainsAdjusted) + Number(u.incomeYtd) - Number(u.usedYtd),
+  );
+  const estimatedTax = taxable * taxRate;
+  const ratePct = (taxRate * 100).toLocaleString(locale, { maximumFractionDigits: 3 });
 
   return (
     <section className="space-y-4">
@@ -78,22 +109,22 @@ function TaxHolderSection({
         </h2>
       </div>
 
-      {/* Realized allowance summary cards */}
+      {/* Hero row: estimated tax + realized gains YTD + dividends YTD */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label={t("allowance.annual")}
-          value={money(u.allowanceAnnual)}
-          delta={t("allowance.annualDesc")}
+        <EstimatedTaxHero
+          label={t("hero.estimatedTax", { year })}
+          value={money(estimatedTax)}
+          description={t("hero.estimatedTaxDesc", { rate: ratePct, taxable: money(taxable) })}
         />
         <StatCard
-          label={t("allowance.used")}
-          value={money(u.usedYtd)}
-          delta={t("allowance.usedDesc")}
+          label={t("hero.realizedGains")}
+          value={money(u.realizedGainsAdjusted)}
+          delta={t("hero.realizedGainsDesc", { count: detail?.disposals.length ?? 0 })}
         />
         <StatCard
-          label={t("allowance.remaining")}
-          value={money(u.remaining)}
-          delta={`${t("allowance.taxSaving")}: ${money(u.taxSavingAvailable)}`}
+          label={t("hero.dividendsYtd")}
+          value={money(u.incomeYtd)}
+          delta={t("hero.dividendsYtdDesc", { allowance: money(u.allowanceAnnual) })}
         />
       </div>
 
@@ -102,25 +133,24 @@ function TaxHolderSection({
         <DistributionCard distribution={distribution} money={money} t={t} />
       )}
 
-      {/* Progress bar */}
-      <Card>
-        <CardContent className="pt-6 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">{t("allowance.usedPct", { pct: usedPct })}</span>
-            <span className="text-muted-foreground">
-              {money(u.realizedGainsAdjusted)} {t("allowance.gains")} +{" "}
-              {money(u.incomeYtd)} {t("allowance.income")}
-            </span>
-          </div>
-          {/* Simple inline progress bar (no external component needed) */}
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(100, usedPct)}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Realized gains disposal table + dividends withheld table */}
+      {detail && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <DisposalTable
+            rows={detail.disposals}
+            totalProceeds={detail.totalProceeds}
+            totalGain={detail.totalGain}
+            money={money}
+            t={t}
+          />
+          <DividendsTable
+            rows={detail.dividendRows}
+            totalsByCurrency={detail.dividendTotalsByCurrency}
+            locale={locale}
+            t={t}
+          />
+        </div>
+      )}
 
       {/* Rest-of-year forecast block (only when there's a non-zero projection) */}
       {hasForecast && (
@@ -154,121 +184,51 @@ function TaxHolderSection({
         </Card>
       )}
 
-      {/* Harvest suggestions (sized against projected remaining when forecast is available) */}
-      {harvestSuggestions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="size-4" />
-              {t("harvest.title")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              {hasForecast ? t("harvest.subtitle") : t("harvest.subtitleNoForecast")}
-            </p>
-            <div className="divide-y">
-              {harvestSuggestions.map((s) => (
-                <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
-              ))}
+      {/* Tax-loss harvesting: always shows the allowance summary; the position list and
+          summary note only when there's something harvestable. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="size-4" />
+            {t("harvest.title")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <AllowanceSummaryBoxes
+            usedPct={usedPct}
+            allowanceAnnual={u.allowanceAnnual}
+            usedYtd={u.usedYtd}
+            remaining={u.remaining}
+            taxSavingAvailable={u.taxSavingAvailable}
+            taxable={taxable.toString()}
+            estimatedTax={estimatedTax.toString()}
+            money={money}
+            t={t}
+          />
+          {harvestSuggestions.length > 0 ? (
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                {hasForecast ? t("harvest.subtitle") : t("harvest.subtitleNoForecast")}
+              </p>
+              <div className="divide-y">
+                {harvestSuggestions.map((s) => (
+                  <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
+                ))}
+              </div>
+              <HarvestSummaryNote suggestions={harvestSuggestions} money={money} t={t} />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("harvest.none")}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* By year */}
+      {detail && <ByYearTable rows={detail.byYear} money={money} t={t} />}
+
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        {t("footnote", { rate: ratePct, allowance: money(u.allowanceAnnual) })}
+      </p>
     </section>
-  );
-}
-
-function DistributionCard({
-  distribution: d,
-  money,
-  t,
-}: {
-  distribution: TaxDistribution;
-  money: (n: string | number) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
-}) {
-  const allocPct = Number(d.holderAllowanceCap) > 0
-    ? Math.round((Number(d.totalAllocated) / Number(d.holderAllowanceCap)) * 100)
-    : 0;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Info className="size-4" />
-          {t("distribution.title")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label={t("distribution.cap")}
-            value={money(d.holderAllowanceCap)}
-            delta={t("distribution.capDesc")}
-          />
-          <StatCard
-            label={t("distribution.allocated")}
-            value={money(d.totalAllocated)}
-            delta={`${allocPct}%`}
-          />
-          <StatCard
-            label={t("distribution.remaining")}
-            value={money(d.remainingToDistribute)}
-            delta={t("distribution.remainingDesc")}
-          />
-        </div>
-        {d.overAllocated && (
-          <div className="flex items-start gap-2 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-600 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
-            <TriangleAlert className="size-4 mt-0.5 shrink-0" />
-            <span>{t("distribution.overAllocated")}</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function HarvestRow({
-  s,
-  money,
-  t,
-}: {
-  s: HarvestSuggestion;
-  money: (n: string | number) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
-}) {
-  const tfPct = Math.round(parseFloat(s.tfRate) * 100);
-
-  return (
-    <div className="py-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
-      <div className="col-span-2 sm:col-span-1">
-        <p className="font-medium text-sm">{s.instrument?.symbol ?? s.instrumentId.slice(0, 8)}</p>
-        <p className="text-xs text-muted-foreground">{s.instrument?.name}</p>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{t("harvest.unrealized")}</p>
-        <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-          {money(s.unrealizedGross)}
-        </p>
-        {tfPct > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {t("harvest.tfApplied", { pct: tfPct })}
-          </p>
-        )}
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{t("harvest.harvestable")}</p>
-        <p className="text-sm font-medium">{money(s.harvestableGross)}</p>
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground">{t("harvest.taxSaving")}</p>
-        <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-          {money(s.taxSaving)}
-        </p>
-      </div>
-    </div>
   );
 }

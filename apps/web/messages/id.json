@@ -1295,7 +1295,27 @@
     "withholding": "Pajak dipotong",
     "emptyTitle": "Belum ada transaksi",
     "emptyBody": "Beli sebuah instrumen dan posisi Anda akan muncul di sini sebagai transaksi.",
-    "taxDisclaimer": "Angka indikatif untuk pelacakan pribadi — bukan laporan pajak resmi. Jumlah mata uang asing dikonversi pada kurs terkini, bukan tanggal tiap transaksi."
+    "taxDisclaimer": "Angka indikatif untuk pelacakan pribadi — bukan laporan pajak resmi. Jumlah mata uang asing dikonversi pada kurs terkini, bukan tanggal tiap transaksi.",
+    "detail": {
+      "closed": "Ditutup {date}",
+      "held": "ditahan",
+      "realizedPnl": "Laba/rugi terealisasi",
+      "breakdown": "Rincian",
+      "proceeds": "Hasil penjualan",
+      "costBasis": "Modal",
+      "realizedPnlRow": "Laba/rugi terealisasi",
+      "tradeDetails": "Detail transaksi",
+      "quantity": "Jumlah",
+      "avgBuyPrice": "Harga beli rata-rata",
+      "avgSellPrice": "Harga jual rata-rata",
+      "bought": "Dibeli",
+      "sold": "Dijual",
+      "holdingPeriod": "Periode kepemilikan",
+      "return": "Imbal hasil",
+      "incomeWhileHeld": "Pendapatan selama ditahan",
+      "dividendsCollected": "Dividen diterima",
+      "totalReturnIncome": "Total imbal hasil termasuk pendapatan"
+    }
   },
   "TargetDialog": {
     "trigger": "Atur target",
@@ -1378,8 +1398,51 @@
       "unrealized": "Keuntungan belum direalisasi",
       "harvestable": "Dapat dipanen",
       "taxSaving": "Penghematan pajak",
-      "tfApplied": "TF {pct}% diterapkan"
-    }
+      "tfApplied": "TF {pct}% diterapkan",
+      "button": "Panen",
+      "summary": "Panen semua {count} untuk mengimbangi {offset} keuntungan terealisasi — menghemat sekitar ~{saving}. Jerman tidak memiliki aturan wash-sale 30 hari, jadi Anda bisa membeli kembali segera.",
+      "none": "Belum ada kerugian yang bisa dipanen saat ini."
+    },
+    "hero": {
+      "estimatedTax": "Perkiraan pajak · {year}",
+      "estimatedTaxDesc": "Abgeltungsteuer {rate}% dari {taxable}",
+      "realizedGains": "Keuntungan terealisasi · YTD",
+      "realizedGainsDesc": "{count} pelepasan · disesuaikan Tf",
+      "dividendsYtd": "Dividen · YTD",
+      "dividendsYtdDesc": "kotor · batas {allowance} diterapkan"
+    },
+    "disposals": {
+      "title": "Keuntungan terealisasi · Abgeltungsteuer",
+      "subtitle": "Angka kotor, sebelum Teilfreistellung — kartu di atas sudah disesuaikan Tf.",
+      "disposal": "Pelepasan",
+      "proceeds": "Hasil",
+      "gain": "Untung",
+      "total": "Total",
+      "empty": "Tidak ada pelepasan di {year}."
+    },
+    "dividendsTable": {
+      "title": "Dividen dipotong pajak",
+      "source": "Sumber",
+      "gross": "Kotor",
+      "tax": "Pajak",
+      "net": "Bersih",
+      "total": "Total",
+      "empty": "Tidak ada pendapatan dividen/bunga di {year}."
+    },
+    "allowanceBoxes": {
+      "left": "Sisa batas bebas pajak",
+      "leftDesc": "Sparer-Pauschbetrag · {used} dari {annual} terpakai",
+      "taxableGains": "Keuntungan kena pajak YTD",
+      "taxableGainsDesc": "setelah batas bebas pajak · ~{tax} pajak jika tidak dipanen"
+    },
+    "byYear": {
+      "title": "Per tahun",
+      "year": "Tahun",
+      "realized": "Keuntungan terealisasi",
+      "dividends": "Dividen",
+      "tax": "Abgeltungsteuer"
+    },
+    "footnote": "Jerman mengenakan pajak penghasilan investasi sebesar {rate}% flat (Abgeltungsteuer + Solidaritätszuschlag). Sparer-Pauschbetrag {allowance} Anda diterapkan lebih dulu, lalu kerugian mengimbangi keuntungan dalam tahun yang sama. Hanya perkiraan, bukan nasihat pajak."
   },
   "Anomalies": {
     "bannerError": "Ditemukan {count, plural, one {# kesalahan data} other {# kesalahan data}}",
