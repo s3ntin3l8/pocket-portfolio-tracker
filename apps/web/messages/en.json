@@ -289,7 +289,13 @@
     "cost": "Cost",
     "currencyTitle": "Income by currency",
     "native": "Native",
-    "normalized": "Normalized"
+    "normalized": "Normalized",
+    "tooltipReceived": "Received",
+    "tooltipProjected": "Projected",
+    "tooltipTotal": "Total",
+    "tooltipForecast": "Forecast",
+    "heatmapDefaultSubtitle": "Tap a cell to see the month's income",
+    "heatmapCellSubtitle": "{month} · {amount}"
   },
   "Savings": {
     "title": "Savings",
@@ -335,7 +341,13 @@
     "sourceHeuristic": "Detected",
     "firstSince": "Since {date}",
     "executionCount": "{count, plural, one {execution} other {executions}}",
-    "stoppedPlans": "{count, plural, one {# stopped plan} other {# stopped plans}}"
+    "stoppedPlans": "{count, plural, one {# stopped plan} other {# stopped plans}}",
+    "scenariosLabel": "Scenario comparison",
+    "cashOnHandTitle": "Cash on hand",
+    "cashOnHandSubtitle": "Idle balances by currency",
+    "cashMeta": "Uninvested cash balance",
+    "cashNudgeLead": "{amount} is sitting idle.",
+    "cashNudgeSuggestion": "A money-market fund at ~{rate} p.a. would earn about {amount}/yr."
   },
   "Portfolios": {
     "title": "Portfolios",
