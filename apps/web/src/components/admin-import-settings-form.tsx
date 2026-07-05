@@ -6,7 +6,7 @@ import { AlertCircle, Check, Loader2 } from "lucide-react";
 import type { ApiClient, ImportStrategy } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 /** The slice of the API client this form needs (injectable for tests). */
 export type AdminImportSettingsClient = Pick<ApiClient, "updateAdminImportSettings">;
@@ -57,7 +57,7 @@ export function AdminImportSettingsForm({
   }
 
   return (
-    <form onSubmit={submit} className="max-w-md space-y-4">
+    <form onSubmit={submit} className="space-y-4">
       {error && (
         <div
           role="alert"
@@ -68,25 +68,53 @@ export function AdminImportSettingsForm({
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="import-strategy">{t("importStrategyLabel")}</Label>
-        <Select
-          id="import-strategy"
-          value={strategy}
-          onChange={(e) => {
-            setStrategy(e.target.value as ImportStrategy);
-            setSaved(false);
-          }}
+      <div className="space-y-2">
+        <Label id="import-strategy-label">{t("importStrategyLabel")}</Label>
+        <div
+          role="radiogroup"
+          aria-labelledby="import-strategy-label"
+          className="space-y-2"
         >
-          {STRATEGIES.map((s) => (
-            <option key={s} value={s}>
-              {t(`importStrategyOption_${s}`)}
-            </option>
-          ))}
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          {t(`importStrategyHint_${strategy}`)}
-        </p>
+          {STRATEGIES.map((s) => {
+            const active = strategy === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => {
+                  setStrategy(s);
+                  setSaved(false);
+                }}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-[14px] border p-3.5 text-left transition-colors",
+                  active
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-card hover:bg-background/60",
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                    active ? "border-primary" : "border-border",
+                  )}
+                >
+                  {active && <span className="size-2 rounded-full bg-primary" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold">
+                    {t(`importStrategyOption_${s}`)}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {t(`importStrategyHint_${s}`)}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

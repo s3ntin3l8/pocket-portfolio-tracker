@@ -26,17 +26,16 @@ function renderForm(
   return onSuccess;
 }
 
+const PARSER = /Deterministic parser first/;
+const VISION = /Always use vision AI/;
+
 describe("AdminImportSettingsForm", () => {
-  it("reflects the initial strategy and offers both options", () => {
+  it("reflects the initial strategy and offers both selectable options", () => {
     renderForm({ updateAdminImportSettings: vi.fn() }, "vision_only");
-    const select = screen.getByLabelText(m.importStrategyLabel) as HTMLSelectElement;
-    expect(select.value).toBe("vision_only");
-    expect(
-      screen.getByRole("option", { name: m.importStrategyOption_parser_first }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: m.importStrategyOption_vision_only }),
-    ).toBeInTheDocument();
+    const parser = screen.getByRole("radio", { name: PARSER });
+    const vision = screen.getByRole("radio", { name: VISION });
+    expect(vision).toHaveAttribute("aria-checked", "true");
+    expect(parser).toHaveAttribute("aria-checked", "false");
   });
 
   it("disables save until the strategy changes, then saves and shows saved", async () => {
@@ -48,9 +47,7 @@ describe("AdminImportSettingsForm", () => {
     const save = screen.getByRole("button", { name: m.importStrategySave });
     expect(save).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(m.importStrategyLabel), {
-      target: { value: "vision_only" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: VISION }));
     expect(save).toBeEnabled();
     fireEvent.click(save);
 
@@ -69,9 +66,7 @@ describe("AdminImportSettingsForm", () => {
     };
     renderForm(client, "parser_first");
 
-    fireEvent.change(screen.getByLabelText(m.importStrategyLabel), {
-      target: { value: "vision_only" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: VISION }));
     fireEvent.click(screen.getByRole("button", { name: m.importStrategySave }));
 
     await waitFor(() =>
