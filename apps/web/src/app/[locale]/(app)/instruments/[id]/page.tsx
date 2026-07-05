@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/stat-card";
+import { MonogramBadge } from "@/components/monogram-badge";
 import { InstrumentPriceCard } from "@/components/instrument-price-card";
 import { InstrumentIncomeCard } from "@/components/instrument-income-card";
 import { CorporateActionsManager } from "@/components/corporate-actions-manager";
@@ -120,6 +121,12 @@ export default async function InstrumentPage({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         {back}
+        {/* Reference detail header: instrument monogram chip + symbol + class badge. */}
+        <MonogramBadge
+          label={instrument.symbol}
+          assetClass={instrument.assetClass}
+          className="size-11 rounded-[13px] text-sm"
+        />
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">

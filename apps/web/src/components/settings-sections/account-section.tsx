@@ -29,7 +29,7 @@ export async function AccountSection({
       </Card>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("preferences")}
         </p>
         <Card>

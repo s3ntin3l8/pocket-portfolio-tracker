@@ -64,7 +64,7 @@ export function SettingsShell({
     <div className="md:grid md:grid-cols-[270px_1fr] md:items-start md:gap-6">
       <div className="hidden md:sticky md:top-4 md:flex md:flex-col md:gap-3 md:self-start">
         {railTop}
-        <nav className={cn("rounded-[18px] border border-border bg-card p-2", CARD_SHADOW)}>
+        <nav className={cn("rounded-[18px] bg-card p-2", CARD_SHADOW)}>
           {navItems.map((item) => {
             const active = item.key === activeKey;
             return (
@@ -72,8 +72,8 @@ export function SettingsShell({
                 key={item.key}
                 href={item.href}
                 className={cn(
-                  "my-0.5 flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-bold transition-colors",
-                  active ? "bg-muted" : "hover:bg-muted/50",
+                  "my-0.5 flex items-center gap-2.5 rounded-[12px] px-2.5 py-2.5 text-[13px] font-bold transition-colors",
+                  active ? "bg-background" : "hover:bg-background/60",
                 )}
               >
                 <span
@@ -102,7 +102,7 @@ export function SettingsShell({
             {landingGroups.map((group, i) => (
               <div
                 key={i}
-                className={cn("divide-y divide-border overflow-hidden rounded-[20px] border border-border bg-card", CARD_SHADOW)}
+                className={cn("divide-y divide-line overflow-hidden rounded-[20px] bg-card", CARD_SHADOW)}
               >
                 {group.map((item) => (
                   <Link

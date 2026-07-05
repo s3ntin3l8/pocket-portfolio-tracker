@@ -21,13 +21,16 @@ interface Props {
   prefKey: "taxRegime" | "costBasisMode";
   current: string;
   options: ChipOption[];
+  /** "compact" = the Tax screen's nested pill toggle; "wide" = the Settings screens'
+   *  full-width segmented chips (reference ccyOn/ccyOff: flex-1, 13px, 11px radius). */
+  variant?: "compact" | "wide";
   /** Extra classes for the wrapping pill. */
   className?: string;
 }
 
 /** A small segmented control that persists its selection as a global user preference
  *  and refreshes the current route so every consumer picks up the new value. */
-export function PreferenceChips({ prefKey, current, options, className }: Props) {
+export function PreferenceChips({ prefKey, current, options, variant = "compact", className }: Props) {
   const router = useRouter();
   const api = useApiClient();
   const [pending, setPending] = useState<string | null>(null);
@@ -47,6 +50,29 @@ export function PreferenceChips({ prefKey, current, options, className }: Props)
     }
   }
 
+  if (variant === "wide") {
+    return (
+      <div className={cn("flex w-full gap-[7px]", className)}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => select(o.value)}
+            disabled={pending !== null}
+            aria-pressed={current === o.value}
+            className={cn(
+              "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors disabled:opacity-60",
+              current === o.value
+                ? "bg-pill font-bold text-white"
+                : "bg-background font-semibold text-foreground",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
   return (
     <div
       className={cn(

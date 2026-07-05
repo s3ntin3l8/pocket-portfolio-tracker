@@ -91,7 +91,7 @@ export function UpdateProfileForm({
         <div
           role="group"
           aria-labelledby="profile-currency-label"
-          className="inline-flex items-center gap-1 rounded-[12px] border border-border bg-card p-[3px] shadow-card"
+          className="flex w-full max-w-sm gap-[7px]"
         >
           {CURRENCIES.map((c) => (
             <button
@@ -103,10 +103,10 @@ export function UpdateProfileForm({
               }}
               aria-pressed={currency === c}
               className={cn(
-                "rounded-[9px] px-3.5 py-1.5 text-xs font-bold transition-colors",
+                "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors",
                 currency === c
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-pill font-bold text-white"
+                  : "bg-background font-semibold text-foreground",
               )}
             >
               {c}

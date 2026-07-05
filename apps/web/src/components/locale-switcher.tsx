@@ -15,7 +15,7 @@ export function LocaleSwitcher() {
   const t = useTranslations("Settings");
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-[12px] border border-border bg-card p-[3px] shadow-card">
+    <div className="flex w-full max-w-sm gap-[7px]">
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -23,10 +23,10 @@ export function LocaleSwitcher() {
           onClick={() => router.replace(pathname, { locale: l })}
           aria-pressed={locale === l}
           className={cn(
-            "rounded-[9px] px-3.5 py-1.5 text-xs font-bold transition-colors",
+            "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors",
             locale === l
-              ? "bg-foreground text-background"
-              : "text-muted-foreground hover:text-foreground",
+              ? "bg-pill font-bold text-white"
+              : "bg-background font-semibold text-foreground",
           )}
         >
           {t(`languageOptions.${l}`)}
