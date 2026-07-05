@@ -2,8 +2,6 @@
 
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
-import { LogOut } from "lucide-react";
-import { signOut } from "next-auth/react";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -14,6 +12,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { InstallPrompt } from "@/components/install-prompt";
 import { Brand } from "@/components/brand";
 import { BottomNav } from "@/components/bottom-nav";
+import { SignOutButton } from "@/components/sign-out-button";
 import { MAIN_NAV, ADMIN_NAV, navActiveKey } from "@/components/nav-items";
 
 export function AppShell({
@@ -61,17 +60,6 @@ export function AppShell({
         selectedHolderId={selectedHolderId}
       />
     </Suspense>
-  );
-
-  const signOutButton = (
-    <button
-      type="button"
-      onClick={() => signOut({ callbackUrl: "/" })}
-      className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-    >
-      <LogOut className="size-4" />
-      {t("signOut")}
-    </button>
   );
 
   return (
@@ -130,7 +118,7 @@ export function AppShell({
               )}
             </div>
           )}
-          {signOutButton}
+          <SignOutButton />
         </div>
       </aside>
 
