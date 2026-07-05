@@ -383,7 +383,17 @@
     "cadenceSemiAnnualLabel": "Semi-tahunan",
     "cadenceAnnualLabel": "Tahunan",
     "driftOnTarget": "Sesuai target",
-    "forecastAssumptions": "jika terus menambah {amount}/bln pada {rate} p.a."
+    "forecastAssumptions": "jika terus menambah {amount}/bln pada {rate} p.a.",
+    "allocTitle": "Alokasi · target vs aktual",
+    "allocTarget": "target {pct}",
+    "allocNow": "kini {pct}",
+    "recommendedTopUp": "Top-up berikutnya · {total}",
+    "driftOnTargetStrong": "Setiap sleeve sesuai target.",
+    "driftOnTargetRest": " Top-up berikutnya menjaga komposisi tetap seimbang.",
+    "driftUnderStrong": "{name} {pct}pp di bawah target.",
+    "driftUnderRest": " Top-up berikutnya mengarahkan {amount} ke sini menuju {target}.",
+    "driftOverStrong": "{name} {pct}pp di atas target.",
+    "driftOverRest": " Kurangi top-up di sini hingga kembali ke kisaran {target}."
   },
   "Portfolios": {
     "title": "Portofolio",

@@ -383,7 +383,17 @@
     "cadenceSemiAnnualLabel": "Semi-annual",
     "cadenceAnnualLabel": "Annual",
     "driftOnTarget": "On target",
-    "forecastAssumptions": "if you keep adding {amount}/mo at {rate} p.a."
+    "forecastAssumptions": "if you keep adding {amount}/mo at {rate} p.a.",
+    "allocTitle": "Allocation · target vs actual",
+    "allocTarget": "target {pct}",
+    "allocNow": "now {pct}",
+    "recommendedTopUp": "Recommended next top-up · {total}",
+    "driftOnTargetStrong": "Every sleeve is on target.",
+    "driftOnTargetRest": " Your next top-up keeps the mix balanced.",
+    "driftUnderStrong": "{name} is {pct}pp under target.",
+    "driftUnderRest": " Next top-up routes {amount} here to steer toward {target}.",
+    "driftOverStrong": "{name} is {pct}pp over target.",
+    "driftOverRest": " Ease off top-ups here until it's back within the {target} band."
   },
   "Portfolios": {
     "title": "Portfolios",
