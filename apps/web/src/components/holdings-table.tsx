@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { MonogramBadge } from "@/components/monogram-badge";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
@@ -53,6 +53,7 @@ export interface HoldingsTableProps {
 export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   const t = useTranslations("Holdings");
   const locale = useLocale();
+  const router = useRouter();
   const { sortKey, sortDir, toggle, sort } = useTableSort<HoldingValuation>(HOLDINGS_COLS);
 
   const sorted = sort(rows);
@@ -109,7 +110,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                     ? "text-success"
                     : "text-destructive";
               return (
-                <TableRow key={h.instrumentId}>
+                <TableRow
+                  key={h.instrumentId}
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/instruments/${h.instrumentId}`)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <MonogramBadge
@@ -120,6 +125,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                         <Link
                           href={`/instruments/${h.instrumentId}`}
                           className="text-sm font-bold hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {h.instrument?.symbol ?? "—"}
                         </Link>
@@ -208,8 +214,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <Fragment key={h.instrumentId}>
               {i > 0 && <div className="col-span-3 border-t border-border" />}
 
-              {/* Col 1: badge + symbol / name */}
-              <div className="flex min-w-0 items-center gap-2.5 overflow-hidden py-3 pl-4">
+              {/* Col 1: badge + symbol / name — the whole row is tappable (reference). */}
+              <div
+                className="flex min-w-0 cursor-pointer items-center gap-2.5 overflow-hidden py-3 pl-4"
+                onClick={() => router.push(`/instruments/${h.instrumentId}`)}
+              >
                 <MonogramBadge
                   label={h.instrument?.symbol ?? h.instrumentId}
                   assetClass={h.instrument?.assetClass}
@@ -229,7 +238,10 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               </div>
 
               {/* Col 2: avg cost / quantity */}
-              <div className="text-right tabular py-3">
+              <div
+                className="text-right tabular cursor-pointer py-3"
+                onClick={() => router.push(`/instruments/${h.instrumentId}`)}
+              >
                 <div className="text-sm">{native(Number(h.avgCost))}</div>
                 <div className="text-xs text-muted-foreground">
                   {formatQuantity(Number(h.quantity), h.instrument?.unit, locale)}
@@ -237,7 +249,10 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               </div>
 
               {/* Col 3: value / P&L */}
-              <div className="text-right tabular py-3 pr-4">
+              <div
+                className="text-right tabular cursor-pointer py-3 pr-4"
+                onClick={() => router.push(`/instruments/${h.instrumentId}`)}
+              >
                 <div className="text-sm">
                   {h.marketValueDisplay !== null
                     ? display(Number(h.marketValueDisplay))
