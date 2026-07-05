@@ -23,7 +23,8 @@ export function MonogramBadge({
     return (
       <span
         className={cn(
-          "inline-flex size-8 shrink-0 items-center justify-center rounded-xl text-[0.7rem] font-extrabold",
+          // Reference chip: 38×38, border-radius 11px, font 800 12px.
+          "inline-flex size-[38px] shrink-0 items-center justify-center rounded-[11px] text-xs font-extrabold",
           className,
         )}
         style={{ backgroundColor: tone.bg, color: tone.fg }}

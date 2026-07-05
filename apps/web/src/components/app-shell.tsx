@@ -151,7 +151,9 @@ export function AppShell({
             <ThemeToggle />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] sm:px-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {/* Reference (`Pocket Prototype.dc.html` desktop): a padding:24px scroll area with
+            LEFT-ALIGNED max-width:1100px content — not a centered column. */}
+        <main className="w-full max-w-[1148px] flex-1 px-4 py-6 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] sm:px-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <InstallPrompt />
           {children}
         </main>

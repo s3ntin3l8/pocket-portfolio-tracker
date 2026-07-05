@@ -129,7 +129,7 @@ export default async function TransactionsPage({
   const heading = (action?: React.ReactNode) => (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </div>
       {action}

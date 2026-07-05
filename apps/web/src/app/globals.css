@@ -48,6 +48,7 @@
   --text-mute: #5b6b62;
   --line: #f0f3f1;
   --row-hover: #fbfcfb;
+  --pill: #11211a;
   --gold-fg: #c98a1e;
   --warn-strong: #7a5a1a;
   --warn-soft: #9a7b3a;
@@ -101,6 +102,7 @@
   --text-mute: #aebbb2;
   --line: #222a26;
   --row-hover: #1e2622;
+  --pill: #33423a;
   --gold-fg: #e0a53a;
   --warn-strong: #e6c07a;
   --warn-soft: #c2a878;
@@ -137,6 +139,11 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-card-2: var(--card-2);
+  --color-pill: var(--pill);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-text-mute: var(--text-mute);
+  --color-line: var(--line);
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;

@@ -26,7 +26,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       className={cn(
-        "border-t border-border bg-card-2 font-medium [&_tr]:border-0",
+        "border-t-2 border-line bg-card-2 text-sm font-extrabold [&_tr]:border-0",
         className,
       )}
       {...props}
@@ -38,7 +38,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
       className={cn(
-        "border-b border-border transition-colors hover:bg-muted/50",
+        "border-b border-line transition-colors hover:bg-[var(--row-hover)]",
         className,
       )}
       {...props}
@@ -50,7 +50,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-10 px-3 text-left align-middle text-[11px] font-bold uppercase tracking-[0.044em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        "h-11 px-3 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-text-3 first:pl-[22px] last:pr-[22px] [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -60,7 +60,10 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 
 function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
-    <td className={cn("px-3 py-3 align-middle", className)} {...props} />
+    <td
+      className={cn("px-3 py-3 align-middle first:pl-[22px] last:pr-[22px]", className)}
+      {...props}
+    />
   );
 }
 

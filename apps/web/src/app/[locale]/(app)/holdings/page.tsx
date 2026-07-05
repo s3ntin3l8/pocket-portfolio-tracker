@@ -124,7 +124,7 @@ export default async function HoldingsPage({
   const Heading = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-bold">
           <span className="sm:hidden">{t("titleMobile")}</span>
           <span className="hidden sm:inline">{t("title")}</span>
         </h1>
@@ -297,22 +297,26 @@ export default async function HoldingsPage({
     <div className="space-y-6">
       {Heading}
       {anomalyBanner}
-      {glanceSection}
+      {/* Reference stacks the glance cards 14px apart (each card: margin-bottom:14px). */}
+      <div className="space-y-3.5">{glanceSection}</div>
 
       <div className="space-y-3">
         <Tabs defaultValue="all">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-bold">
+            <h2 className="text-base font-bold">
               <span className="sm:hidden">{t("positionsSectionMobile")}</span>
               <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
             </h2>
             <div className="overflow-x-auto">
-              <TabsList className="h-auto gap-1.5 rounded-full bg-transparent p-0">
+              {/* Pill spec transcribed from the reference's `deskOn`/`deskOff` chips:
+                  active 700 12px white on var(--pill); inactive 600 12px on bg-card
+                  WITH a border — not a bare transparent outline. */}
+              <TabsList className="h-auto gap-2 rounded-full bg-transparent p-0">
                 {visibleClassTabs.map((key) => (
                   <TabsTrigger
                     key={key}
                     value={key}
-                    className="rounded-full border border-border px-3.5 py-[7px] text-xs font-bold text-muted-foreground data-[state=active]:border-transparent data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none"
+                    className="rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold text-foreground data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none"
                   >
                     {key === "all" ? t("all") : tc(key)}
                   </TabsTrigger>
@@ -322,7 +326,7 @@ export default async function HoldingsPage({
           </div>
           {visibleClassTabs.map((key) => (
             <TabsContent key={key} value={key}>
-              <div className="rounded-xl bg-card shadow-card">
+              <div className="overflow-hidden rounded-[18px] bg-card shadow-card">
                 <HoldingsTable
                   rows={
                     key === "all"

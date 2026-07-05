@@ -68,7 +68,7 @@ export default async function PortfoliosPage({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
           {result.status === "ok" && result.portfolios.length > 0 ? (
             <p className="text-sm text-muted-foreground">
               {t("aggregateSubtitle", {

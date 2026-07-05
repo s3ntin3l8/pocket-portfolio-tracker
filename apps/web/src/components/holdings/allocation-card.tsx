@@ -32,26 +32,30 @@ export function AllocationCard({
   todayLabel: string;
   todayAmount: string;
 }) {
+  // Transcribed from `Pocket Prototype.dc.html`: padding 20px 24px, grid auto/1fr/auto
+  // gap-28px; right column separated by a --line border, labels 600 11px text-3,
+  // total 800 22px, all-time/today 700 15px.
   return (
-    <div className="rounded-xl bg-card p-[18px] shadow-card">
-      <div className="grid gap-6 lg:grid-cols-[2fr_auto_1fr]">
+    <div className="rounded-[18px] bg-card px-6 py-5 shadow-card">
+      <div className="grid items-center gap-7 lg:grid-cols-[1fr_auto]">
         <div>
           <AllocationDonut data={slices} currency={currency} total={total} />
         </div>
-        <div className="hidden border-l border-border lg:block" />
-        <div className="hidden flex-col justify-center gap-4 lg:flex">
+        <div className="hidden flex-col gap-3.5 border-l border-line pl-7 lg:flex">
           <div>
-            <p className="text-xs text-muted-foreground">{totalLabel}</p>
-            <p className="tabular mt-1 text-xl font-extrabold">{totalValueFormatted}</p>
+            <p className="text-[11px] font-semibold text-text-3">{totalLabel}</p>
+            <p className="tabular mt-0.5 text-[22px] font-extrabold">{totalValueFormatted}</p>
           </div>
-          <div className="flex gap-6">
+          <div className="flex gap-[22px]">
             <div>
-              <p className="text-xs text-muted-foreground">{allTimeLabel}</p>
-              <p className="tabular text-sm font-semibold text-success">{allTimePct ?? "—"}</p>
+              <p className="text-[11px] font-semibold text-text-3">{allTimeLabel}</p>
+              <p className="tabular mt-0.5 text-[15px] font-bold text-success">
+                {allTimePct ?? "—"}
+              </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{todayLabel}</p>
-              <p className="tabular text-sm font-semibold">{todayAmount}</p>
+              <p className="text-[11px] font-semibold text-text-3">{todayLabel}</p>
+              <p className="tabular mt-0.5 text-[15px] font-bold">{todayAmount}</p>
             </div>
           </div>
         </div>

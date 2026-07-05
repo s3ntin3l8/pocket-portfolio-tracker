@@ -48,7 +48,7 @@ export default async function ImportReviewPage({
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-bold">
             {t("reviewTitle")}
           </h1>
           <p className="text-sm text-muted-foreground">{t("reviewSubtitle")}</p>

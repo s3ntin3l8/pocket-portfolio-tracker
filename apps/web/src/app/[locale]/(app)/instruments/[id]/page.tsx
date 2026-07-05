@@ -122,7 +122,7 @@ export default async function InstrumentPage({
         {back}
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-2xl font-bold">
               {instrument.symbol}
             </h1>
             <Badge variant="outline">{tc(instrument.assetClass)}</Badge>

@@ -49,24 +49,26 @@ export function AllocationDonut({
     }).format(n);
   const formattedTotal = displayTotal > 0 ? compact(displayTotal) : null;
 
+  // Transcribed from `Pocket Prototype.dc.html` (desktop Holdings allocation card):
+  // 128px donut (r54/13 stroke on a 120 viewBox → inner ≈50/outer ≈64 at 128px),
+  // center "Assets" 600 10px + total 800 15px; legend rows gap-10px, 10×10 3px-radius
+  // square swatch, label 600 12px, value 600 11px, pct 700 12px in a 50px column.
   return (
-    // Reference (Holdings/Income) always shows the donut and its legend side by side —
-    // a single vertical legend list to the donut's right, not stacked below it.
-    <div className="flex items-center gap-6">
-      <div className="relative h-[140px] w-[140px] shrink-0">
+    <div className="flex items-center gap-7">
+      <div className="relative h-32 w-32 shrink-0">
         <ResponsiveContainer
           width="100%"
           height="100%"
-          initialDimension={{ width: 140, height: 140 }}
+          initialDimension={{ width: 128, height: 128 }}
         >
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="label"
-              innerRadius={44}
+              innerRadius={50}
               outerRadius={64}
-              paddingAngle={2}
+              paddingAngle={0}
               strokeWidth={0}
               onClick={(entry) => onSliceClick?.(entry.payload.key)}
               style={{ cursor: onSliceClick ? "pointer" : undefined }}
@@ -90,32 +92,34 @@ export function AllocationDonut({
         </ResponsiveContainer>
         {formattedTotal && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2">
-            <span className="max-w-[90px] text-center text-[10px] leading-tight font-medium tracking-wider text-muted-foreground uppercase">
+            <span className="text-center text-[10px] font-semibold text-text-3">
               {label}
             </span>
-            <span className="tabular text-center text-sm font-bold">
+            <span className="tabular mt-0.5 text-center text-[15px] font-extrabold">
               {formattedTotal}
             </span>
           </div>
         )}
       </div>
-      <ul className="min-w-0 flex-1 space-y-2 text-sm">
+      <ul className="flex min-w-0 flex-1 flex-col gap-2.5">
         {data.map((d, i) => (
-          <li key={d.key} className="flex items-center gap-3">
+          <li key={d.key} className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onSliceClick?.(d.key)}
               className={`flex min-w-0 flex-1 items-center gap-2 ${onSliceClick ? "cursor-pointer hover:underline" : "cursor-default"}`}
             >
               <span
-                className="size-2.5 shrink-0 rounded-full"
+                className="size-2.5 shrink-0 rounded-[3px]"
                 style={{ background: COLORS[i % COLORS.length] }}
               />
-              <span className="truncate">{d.label}</span>
+              <span className="truncate text-xs font-semibold">{d.label}</span>
             </button>
-            <span className="tabular shrink-0 text-right">{compact(d.value)}</span>
+            <span className="tabular shrink-0 text-right text-[11px] font-semibold text-text-2">
+              {compact(d.value)}
+            </span>
             {showPercent && (
-              <span className="tabular w-12 shrink-0 text-right text-muted-foreground">
+              <span className="tabular w-[50px] shrink-0 text-right text-xs font-bold">
                 {((d.value / sum) * 100).toFixed(1)}%
               </span>
             )}

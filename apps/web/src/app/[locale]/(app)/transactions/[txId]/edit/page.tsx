@@ -34,7 +34,7 @@ export default async function EditTransactionPage({
         </Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-bold">{title}</h1>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
     </div>

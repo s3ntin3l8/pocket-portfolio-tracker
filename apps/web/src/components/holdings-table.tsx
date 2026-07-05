@@ -119,34 +119,34 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                       <div>
                         <Link
                           href={`/instruments/${h.instrumentId}`}
-                          className="font-medium hover:underline"
+                          className="text-sm font-bold hover:underline"
                         >
                           {h.instrument?.symbol ?? "—"}
                         </Link>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs font-medium text-text-2">
                           {h.instrument?.name ?? h.instrumentId}
                         </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-medium">
                     {formatQuantity(Number(h.quantity), h.instrument?.unit, locale)}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-medium text-text-mute">
                     {native(Number(h.avgCost))}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-medium">
                     {h.price !== null ? native(Number(h.price)) : "—"}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-bold">
                     {h.marketValueDisplay !== null
                       ? display(Number(h.marketValueDisplay))
                       : "—"}
                   </TableCell>
-                  <TableCell className={cn("tabular text-right", pnlColor)}>
+                  <TableCell className={cn("tabular text-right text-[13px] font-bold", pnlColor)}>
                     {pnl === null ? "—" : formatSignedMoney(pnl, currency, locale)}
                     {pct !== null && (
-                      <div className="text-xs">
+                      <div className="text-[11px] font-semibold">
                         {formatPercent(pct / 100, locale)}
                       </div>
                     )}
@@ -179,10 +179,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={4}>{t("total")}</TableCell>
               <TableCell className="tabular text-right">{money(totals.value)}</TableCell>
-              <TableCell className={cn("tabular text-right", totalPnlColor)}>
+              <TableCell className={cn("tabular text-right text-[13px]", totalPnlColor)}>
                 {formatSignedMoney(totals.pnl, currency, locale)}
                 {totalPct !== null && (
-                  <div className="text-xs">{formatPercent(totalPct / 100, locale)}</div>
+                  <div className="text-[11px] font-bold">
+                    {formatPercent(totalPct / 100, locale)}
+                  </div>
                 )}
               </TableCell>
             </TableRow>

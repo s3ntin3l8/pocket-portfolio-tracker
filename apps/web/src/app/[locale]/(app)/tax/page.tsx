@@ -50,7 +50,7 @@ export default async function TaxPage({
   const Heading = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">
           {regime === "ID" ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() }) : t("subtitle")}
         </p>
