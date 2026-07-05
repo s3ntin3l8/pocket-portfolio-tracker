@@ -470,6 +470,7 @@ describe("refreshInstrumentMetadata — displayName", () => {
     symbol: string;
     assetClass: "equity" | "crypto";
     market?: string;
+    isin?: string;
     displayName?: string | null;
     displayNameCheckedAt?: Date | null;
   }): Promise<string> {
@@ -482,6 +483,7 @@ describe("refreshInstrumentMetadata — displayName", () => {
         assetClass: opts.assetClass,
         unit: "shares",
         currency: "USD",
+        isin: opts.isin ?? null,
         name: opts.symbol, // raw broker string == the ticker
         displayName: opts.displayName ?? null,
         displayNameCheckedAt: opts.displayNameCheckedAt ?? null,
@@ -514,17 +516,38 @@ describe("refreshInstrumentMetadata — displayName", () => {
     expect(row.name).toBe("AAPL_NM"); // never overwritten
   });
 
-  it("stamps the attempt but leaves displayName null when no match (wrong market)", async () => {
+  it("stamps the attempt but leaves displayName null when no match (wrong market, no ISIN)", async () => {
     const db = getDb();
     const id = await createHeld({ symbol: "TCKR_NM", assetClass: "equity", market: "US" });
     await refreshInstrumentMetadata(
       db,
-      // Same ticker, different market → not a confident match.
+      // Same ticker, different market, and no ISIN to disambiguate → not a confident match.
       searchService([{ symbol: "TCKR_NM", market: "XETRA", name: "TCKR_NM", longName: "Wrong Co" }]),
     );
     const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
     expect(row.displayName).toBeNull();
     expect(row.displayNameCheckedAt).not.toBeNull();
+  });
+
+  it("accepts an ISIN-resolved name even when the resolved listing differs (ISIN is authoritative)", async () => {
+    const db = getDb();
+    // We hold the Xetra line; the resolver returns the LSE listing (different symbol/market).
+    // The ISIN pins both to the same fund, so its name is authoritative for our row.
+    const id = await createHeld({
+      symbol: "EUNL_NM",
+      assetClass: "equity",
+      market: "XETRA",
+      isin: "IE00B4L5Y983",
+    });
+    await refreshInstrumentMetadata(
+      db,
+      searchService([
+        { symbol: "IWDA", market: "LSE", name: "iShares Core MSCI World", longName: "iShares Core MSCI World UCITS ETF" },
+      ]),
+    );
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
+    expect(row.displayName).toBe("iShares Core MSCI World UCITS ETF");
+    expect(row.name).toBe("EUNL_NM"); // raw name never overwritten
   });
 
   it("does not re-enrich or overwrite an instrument that already has a displayName", async () => {

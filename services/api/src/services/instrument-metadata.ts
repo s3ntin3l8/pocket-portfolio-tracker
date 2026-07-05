@@ -235,20 +235,33 @@ export async function refreshInstrumentMetadata(
     }
   }
 
-  // Clean display-name enrichment (see `toName` above) — matched strictly on symbol AND
-  // market to avoid same-ticker-different-exchange mismatches. Non-destructive: only ever
-  // writes `displayName` (never `name`), and never re-enriches an instrument that has one.
+  // Clean display-name enrichment (see `toName` above). Non-destructive: only ever writes
+  // `displayName` (never `name`), and never re-enriches an instrument that has one.
   for (const inst of toName) {
     try {
-      // Prefer the ISIN (unique) when we have one, else the symbol.
-      const results = await service.search(inst.isin ?? inst.symbol);
-      const match = results.find(
-        (r) => r.symbol.toUpperCase() === inst.symbol.toUpperCase() && r.market === inst.market,
-      );
-      const clean = match?.longName ?? match?.name;
+      // An ISIN uniquely identifies the security, so any provider result for that ISIN
+      // names THIS instrument — even when the resolved listing (ticker/venue) differs from
+      // how we store it (e.g. OpenFIGI returns the LSE line for a fund we hold on Xetra).
+      // Take the first result carrying a real name. Without an ISIN we have only a bare
+      // ticker, which can collide across exchanges, so there we require symbol AND market
+      // to match before trusting the name.
+      let clean: string | undefined;
+      if (inst.isin) {
+        const results = await service.search(inst.isin);
+        const named = results.find(
+          (r) => (r.longName ?? r.name) && (r.longName ?? r.name) !== inst.symbol,
+        );
+        clean = named?.longName ?? named?.name;
+      } else {
+        const results = await service.search(inst.symbol);
+        const match = results.find(
+          (r) => r.symbol.toUpperCase() === inst.symbol.toUpperCase() && r.market === inst.market,
+        );
+        clean = match?.longName ?? match?.name;
+      }
       const now = new Date();
       // Only accept a name that actually improves on the bare symbol.
-      if (match && clean && clean !== inst.symbol) {
+      if (clean && clean !== inst.symbol) {
         await db
           .update(instruments)
           .set({ displayName: clean, displayNameCheckedAt: now })

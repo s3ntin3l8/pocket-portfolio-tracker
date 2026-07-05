@@ -130,7 +130,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                           {h.instrument?.symbol ?? "—"}
                         </Link>
                         <div className="text-xs font-medium text-text-2">
-                          {h.instrument?.name ?? h.instrumentId}
+                          {h.instrument?.displayName ?? h.instrument?.name ?? h.instrumentId}
                         </div>
                       </div>
                     </div>
