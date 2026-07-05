@@ -8,7 +8,7 @@ import { HoldingsTable } from "@/components/holdings-table";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
-import { AllocationCard } from "@/components/holdings/allocation-card";
+import { AllocationCard, type Tone } from "@/components/holdings/allocation-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import {
   loadHoldings,
@@ -21,6 +21,9 @@ import {
 import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
 
 const CLASS_TABS = ["all", "equity", "etf", "gold", "bond", "mutual_fund", "crypto", "cash"] as const;
+
+/** Colour direction for a signed gain figure on the allocation stats strip. */
+const toneOf = (n: number): Tone => (n > 0 ? "up" : n < 0 ? "down" : "flat");
 
 /**
  * The range the Holdings hero chart initially loads. Deliberately a day-grained range
@@ -270,13 +273,30 @@ export default async function HoldingsPage({
           totalLabel={t("allocation.totalLabel")}
           totalValueFormatted={formatMoney(Number(summary.netWorth), summary.displayCurrency, locale)}
           allTimeLabel={t("allocation.allTimeLabel")}
+          allTimeAmount={formatSignedMoney(
+            Number(summary.totalUnrealizedPnL),
+            summary.displayCurrency,
+            locale,
+          )}
           allTimePct={
             Number(summary.totalCost) > 0
               ? formatPercent(Number(summary.totalUnrealizedPnL) / Number(summary.totalCost), locale)
               : null
           }
+          allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
           todayLabel={t("allocation.todayLabel")}
           todayAmount={formatSignedMoney(Number(summary.totalDayChange), summary.displayCurrency, locale)}
+          todayPct={(() => {
+            // Day-change %: the day's move over the prior close's book value. Securities
+            // that lack a previous close contribute nothing to either totalDayChange or
+            // (via a null/0 market value) totalMarketValue, so `market − change` is the
+            // priced book's opening base. Guard a non-positive base.
+            const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
+            return base > 0
+              ? formatPercent(Number(summary.totalDayChange) / base, locale)
+              : null;
+          })()}
+          todayTone={toneOf(Number(summary.totalDayChange))}
         />
       )}
 

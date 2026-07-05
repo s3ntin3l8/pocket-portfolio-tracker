@@ -27,19 +27,26 @@ describe("AllocationCard", () => {
           totalLabel="Total value"
           totalValueFormatted="Rp 1.000.000"
           allTimeLabel="All-time"
+          allTimeAmount="+Rp 120.000"
           allTimePct="+12.0%"
+          allTimeTone="up"
           todayLabel="Today"
           todayAmount="+Rp 5.000"
+          todayPct="+0.5%"
+          todayTone="up"
         />,
       ),
     );
     expect(screen.getByText("Total value")).toBeInTheDocument();
     expect(screen.getByText("Rp 1.000.000")).toBeInTheDocument();
+    // Both performance columns render their EUR amount over their % gain.
+    expect(screen.getByText("+Rp 120.000")).toBeInTheDocument();
     expect(screen.getByText("+12.0%")).toBeInTheDocument();
     expect(screen.getByText("+Rp 5.000")).toBeInTheDocument();
+    expect(screen.getByText("+0.5%")).toBeInTheDocument();
   });
 
-  it("falls back to a dash when allTimePct is null", () => {
+  it("omits the % line when a percent is null but still shows the amount", () => {
     render(
       withIntl(
         <AllocationCard
@@ -49,13 +56,17 @@ describe("AllocationCard", () => {
           totalLabel="Total value"
           totalValueFormatted="Rp 1"
           allTimeLabel="All-time"
+          allTimeAmount="Rp 0"
           allTimePct={null}
           todayLabel="Today"
           todayAmount="Rp 0"
+          todayPct={null}
         />,
       ),
     );
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // Amount still renders; the null percent simply omits its line (no "—" placeholder).
+    expect(screen.getAllByText("Rp 0").length).toBeGreaterThan(0);
+    expect(screen.queryByText("%")).toBeNull();
   });
 });
 

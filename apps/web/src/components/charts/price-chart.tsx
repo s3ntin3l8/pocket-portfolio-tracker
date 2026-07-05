@@ -40,6 +40,25 @@ export function PriceChart({
       ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`
       : formatMoney(v, currency, locale);
 
+  const dateLabelFmt = new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  // The tooltip's label defaults to recharts' x category — which, in `minimal` mode
+  // (no <XAxis>), is the row *index* (e.g. "364" on a 1Y daily series). Pull the real
+  // `date` off the hovered point's payload instead. Day-grained points carry a raw
+  // ISO date (YYYY-MM-DD) → format it; intraday points already carry a display label
+  // (e.g. "14:30", "3 Jul") → pass it through untouched.
+  const formatLabel = (
+    _label: unknown,
+    payload: ReadonlyArray<{ payload?: { date?: string } }> | undefined,
+  ) => {
+    const d = payload?.[0]?.payload?.date;
+    if (!d) return "";
+    return /^\d{4}-\d{2}-\d{2}/.test(d) ? dateLabelFmt.format(new Date(d)) : d;
+  };
+
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer
@@ -79,6 +98,7 @@ export function PriceChart({
           )}
           <Tooltip
             formatter={(v) => formatValue(Number(v))}
+            labelFormatter={formatLabel}
             cursor={
               theme === "inverse"
                 ? { stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }

@@ -131,6 +131,7 @@ export function AppShell({
           </Link>
           <div className="min-w-0">{switcher}</div>
           <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
             <GlobalSearch holderId={selectedHolderId} />
             {/* Global add-entry affordance: reachable from every screen, owns the
                 share-target / shortcut auto-open. Suspense is required because
@@ -139,7 +140,6 @@ export function AppShell({
             <Suspense fallback={null}>
               <AddTransactionMenu autoOpenFromParams />
             </Suspense>
-            <ThemeToggle />
           </div>
         </header>
         {/* Reference (`Pocket Prototype.dc.html` desktop): a padding:24px scroll area with
