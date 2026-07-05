@@ -383,13 +383,19 @@ export function TransactionsTable({
   );
 
   const m = (n: number, currency: string) => formatMoney(n, currency, locale);
-  // Reference row date cell: short "5 Jun". Month-band label: "June 2026".
-  const df = useMemo(
-    () => new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }),
+  // Reference row date cell: short, day-first "5 Jun" (`d + " " + SHORT[mo]`), regardless
+  // of locale ordering; month-band label: "June 2026". UTC throughout so the day never
+  // drifts against the ISO date used for month grouping.
+  const monthShort = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }),
     [locale],
   );
+  const rowDate = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getUTCDate()} ${monthShort.format(d)}`;
+  };
   const monthFmt = useMemo(
-    () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }),
+    () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }),
     [locale],
   );
 
@@ -830,7 +836,7 @@ export function TransactionsTable({
                     </span>
                   </TableCell>
                   <TableCell className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
-                    {df.format(new Date(tx.executedAt))}
+                    {rowDate(tx.executedAt)}
                   </TableCell>
                   {/* Reference "Transaction" column: 36px kind chip + "Buy · SYM"
                       700 14px title + instrument name 500 12px text-2; status badges
