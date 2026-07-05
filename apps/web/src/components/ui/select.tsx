@@ -5,7 +5,7 @@ function Select({ className, ...props }: React.ComponentProps<"select">) {
   return (
     <select
       className={cn(
-        "flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>option]:bg-popover [&>option]:text-popover-foreground",
+        "flex w-full rounded-[13px] border border-border bg-card px-3.5 py-[13px] text-sm font-medium text-foreground transition-colors focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 [&>option]:bg-popover [&>option]:text-popover-foreground",
         className,
       )}
       {...props}

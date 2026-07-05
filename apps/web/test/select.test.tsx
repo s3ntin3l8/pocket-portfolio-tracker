@@ -26,7 +26,7 @@ describe("Select", () => {
 
     const select = screen.getByRole("combobox", { name: "picker" });
     // Explicit bg/text colors are the dark-mode fix; option colors keep the popup readable.
-    expect(select).toHaveClass("bg-background");
+    expect(select).toHaveClass("bg-card");
     expect(select).toHaveClass("text-foreground");
     expect(select).toHaveClass("[&>option]:bg-popover");
     expect(select).toHaveClass("custom-class");
