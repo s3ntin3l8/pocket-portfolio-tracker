@@ -83,7 +83,7 @@ export function ImportFilesTable({
         </div>
       )}
 
-      <div className="rounded-xl border border-border">
+      <div className="rounded-xl bg-card shadow-card">
         <Table>
           <TableHeader>
             <TableRow>

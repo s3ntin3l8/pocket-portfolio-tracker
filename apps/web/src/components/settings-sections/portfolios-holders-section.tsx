@@ -34,7 +34,7 @@ export async function PortfoliosHoldersSection({
           </Link>
         </div>
         {portfolios.length > 0 ? (
-          <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="divide-y divide-border overflow-hidden rounded-xl bg-card shadow-card">
             {portfolios.map(({ portfolio, netWorth }) => (
               <Link
                 key={portfolio.id}

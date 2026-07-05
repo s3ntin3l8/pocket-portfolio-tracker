@@ -747,7 +747,7 @@ export function TransactionsTable({
         />
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="overflow-x-auto rounded-xl bg-card shadow-card">
         <Table>
           <TableHeader>
             <TableRow>
