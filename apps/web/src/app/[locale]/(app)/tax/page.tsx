@@ -76,7 +76,7 @@ export default async function TaxPage({
     // here, so the DE-only empty state is gated to the DE regime.
     const te = await getTranslations("Empty");
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={Receipt}
@@ -88,7 +88,7 @@ export default async function TaxPage({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {Heading}
       {holders.map((entry) => (
         <TaxHolderSection

@@ -139,7 +139,7 @@ export default async function TransactionsPage({
 
   if (status === "unavailable") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading()}
         <EmptyState
           icon={Receipt}
@@ -153,7 +153,7 @@ export default async function TransactionsPage({
   if (rows.length === 0) {
     const isEmptyPortfolio = status === "empty";
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading()}
         <EmptyState
           icon={Receipt}
@@ -180,7 +180,7 @@ export default async function TransactionsPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {heading(addButton)}
       <TransactionsTable
         rows={rows}

@@ -51,7 +51,7 @@ export default async function IncomePage({
 
   if (result.status !== "ok") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading}
         <EmptyState
           icon={Coins}
@@ -78,7 +78,7 @@ export default async function IncomePage({
 
   if (!hasIncome) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading}
         <EmptyState
           icon={Coins}
@@ -197,7 +197,7 @@ export default async function IncomePage({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {heading}
 
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-5">

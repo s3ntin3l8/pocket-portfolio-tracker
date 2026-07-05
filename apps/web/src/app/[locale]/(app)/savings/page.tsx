@@ -43,7 +43,7 @@ export default async function SavingsPage({
   if (result.status !== "ok" || Number(result.data.totalContributed) === 0) {
     const unavailable = result.status === "unavailable";
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading}
         <EmptyState
           icon={PiggyBank}
@@ -60,7 +60,7 @@ export default async function SavingsPage({
   const gainTone = c.simpleGainPct === null ? "neutral" : c.simpleGainPct >= 0 ? "up" : "down";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {heading}
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">

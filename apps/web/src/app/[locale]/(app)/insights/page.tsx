@@ -43,7 +43,7 @@ export default async function InsightsPage({
 
   if (result.status !== "ok") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <header className="space-y-1">
           <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
@@ -80,7 +80,7 @@ export default async function InsightsPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>

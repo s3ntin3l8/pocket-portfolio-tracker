@@ -144,7 +144,7 @@ export function AppShell({
         </header>
         {/* Reference (`Pocket Prototype.dc.html` desktop): a padding:24px scroll area with
             LEFT-ALIGNED max-width:1100px content — not a centered column. */}
-        <main className="w-full max-w-[1148px] flex-1 px-4 py-6 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] sm:px-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <main className="w-full max-w-[1148px] flex-1 px-4 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <InstallPrompt />
           {children}
         </main>

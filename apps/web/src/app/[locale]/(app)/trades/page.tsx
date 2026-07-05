@@ -54,7 +54,7 @@ export default async function TradesPage({
 
   if (result.status === "unavailable") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState icon={ScrollText} title={te("unavailableTitle")} description={te("unavailableBody")} />
       </div>
@@ -63,7 +63,7 @@ export default async function TradesPage({
 
   if (!log || log.trades.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={ScrollText}
@@ -92,7 +92,7 @@ export default async function TradesPage({
   const maxAbsYear = Math.max(1, ...log.realizedByYear.map((r) => Math.abs(Number(r.amount))));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {Heading}
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">

@@ -167,7 +167,7 @@ export default async function HoldingsPage({
 
   if (result.status === "unavailable") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={Layers}
@@ -180,7 +180,7 @@ export default async function HoldingsPage({
 
   if (holdings.length === 0 && !hasCash) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={Layers}
@@ -314,7 +314,7 @@ export default async function HoldingsPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {Heading}
       {anomalyBanner}
       {/* Reference stacks the glance cards 14px apart (each card: margin-bottom:14px). */}
