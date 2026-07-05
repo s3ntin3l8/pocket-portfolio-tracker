@@ -12,8 +12,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { MonogramBadge } from "@/components/monogram-badge";
 import { Link } from "@/i18n/navigation";
-import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
+import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
 
@@ -110,18 +111,26 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               return (
                 <TableRow key={h.instrumentId}>
                   <TableCell>
-                    <Link
-                      href={`/instruments/${h.instrumentId}`}
-                      className="font-medium hover:underline"
-                    >
-                      {h.instrument?.symbol ?? "—"}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">
-                      {h.instrument?.name ?? h.instrumentId}
+                    <div className="flex items-center gap-3">
+                      <MonogramBadge
+                        label={h.instrument?.symbol ?? h.instrumentId}
+                        assetClass={h.instrument?.assetClass}
+                      />
+                      <div>
+                        <Link
+                          href={`/instruments/${h.instrumentId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {h.instrument?.symbol ?? "—"}
+                        </Link>
+                        <div className="text-xs text-muted-foreground">
+                          {h.instrument?.name ?? h.instrumentId}
+                        </div>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="tabular text-right">
-                    {Number(h.quantity)} {h.instrument?.unit ?? ""}
+                    {formatQuantity(Number(h.quantity), h.instrument?.unit, locale)}
                   </TableCell>
                   <TableCell className="tabular text-right">
                     {native(Number(h.avgCost))}
@@ -148,8 +157,13 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             {cashEntries.map(([ccy, balance]) => (
               <TableRow key={`cash-${ccy}`}>
                 <TableCell>
-                  <span className="font-medium">{t("cash")}</span>
-                  <div className="text-xs text-muted-foreground">{ccy}</div>
+                  <div className="flex items-center gap-3">
+                    <MonogramBadge label={ccy} assetClass="cash" />
+                    <div>
+                      <span className="font-medium">{t("cash")}</span>
+                      <div className="text-xs text-muted-foreground">{ccy}</div>
+                    </div>
+                  </div>
                 </TableCell>
                 <TableCell className="tabular text-right text-muted-foreground">—</TableCell>
                 <TableCell className="tabular text-right text-muted-foreground">—</TableCell>
@@ -192,16 +206,23 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <Fragment key={h.instrumentId}>
               {i > 0 && <div className="col-span-3 border-t border-border" />}
 
-              {/* Col 1: symbol / name */}
-              <div className="min-w-0 overflow-hidden py-3 pl-4">
-                <Link
-                  href={`/instruments/${h.instrumentId}`}
-                  className="font-medium hover:underline block truncate"
-                >
-                  {h.instrument?.symbol ?? "—"}
-                </Link>
-                <div className="text-xs text-muted-foreground truncate">
-                  {h.instrument?.name ?? h.instrumentId}
+              {/* Col 1: badge + symbol / name */}
+              <div className="flex min-w-0 items-center gap-2.5 overflow-hidden py-3 pl-4">
+                <MonogramBadge
+                  label={h.instrument?.symbol ?? h.instrumentId}
+                  assetClass={h.instrument?.assetClass}
+                  className="size-7"
+                />
+                <div className="min-w-0">
+                  <Link
+                    href={`/instruments/${h.instrumentId}`}
+                    className="font-medium hover:underline block truncate"
+                  >
+                    {h.instrument?.symbol ?? "—"}
+                  </Link>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {h.instrument?.name ?? h.instrumentId}
+                  </div>
                 </div>
               </div>
 
@@ -209,7 +230,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               <div className="text-right tabular py-3">
                 <div className="text-sm">{native(Number(h.avgCost))}</div>
                 <div className="text-xs text-muted-foreground">
-                  {Number(h.quantity)} {h.instrument?.unit ?? ""}
+                  {formatQuantity(Number(h.quantity), h.instrument?.unit, locale)}
                 </div>
               </div>
 
@@ -235,9 +256,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <div className="col-span-3 border-t border-border" />
 
             {/* Col 1: Cash label + currency */}
-            <div className="min-w-0 overflow-hidden py-3 pl-4">
-              <span className="font-medium">{t("cash")}</span>
-              <div className="text-xs text-muted-foreground">{ccy}</div>
+            <div className="flex min-w-0 items-center gap-2.5 overflow-hidden py-3 pl-4">
+              <MonogramBadge label={ccy} assetClass="cash" className="size-7" />
+              <div>
+                <span className="font-medium">{t("cash")}</span>
+                <div className="text-xs text-muted-foreground">{ccy}</div>
+              </div>
             </div>
 
             {/* Col 2: empty (no avg cost / quantity) */}

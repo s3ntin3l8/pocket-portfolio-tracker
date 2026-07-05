@@ -18,7 +18,6 @@ describe("AllocationCard", () => {
     render(
       withIntl(
         <AllocationCard
-          title="Allocation"
           slices={[
             { key: "equity", label: "Stocks", value: 700 },
             { key: "gold", label: "Gold", value: 300 },
@@ -34,7 +33,6 @@ describe("AllocationCard", () => {
         />,
       ),
     );
-    expect(screen.getByText("Allocation")).toBeInTheDocument();
     expect(screen.getByText("Total value")).toBeInTheDocument();
     expect(screen.getByText("Rp 1.000.000")).toBeInTheDocument();
     expect(screen.getByText("+12.0%")).toBeInTheDocument();
@@ -45,7 +43,6 @@ describe("AllocationCard", () => {
     render(
       withIntl(
         <AllocationCard
-          title="Allocation"
           slices={[{ key: "equity", label: "Stocks", value: 1 }]}
           currency="IDR"
           total={1}

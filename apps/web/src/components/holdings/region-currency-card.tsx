@@ -53,7 +53,7 @@ export function RegionCurrencyCard({
   currencyRows: Row[];
 }) {
   return (
-    <div className="flex gap-6 rounded-[22px] border border-border bg-card p-[18px] shadow-[0_1px_2px_rgba(15,27,20,.04),0_6px_16px_rgba(15,27,20,.05)] sm:gap-8">
+    <div className="flex gap-6 rounded-xl bg-card p-[18px] shadow-card sm:gap-8">
       <Column title={regionTitle} rows={regionRows} />
       <div className="w-px shrink-0 bg-border" />
       <Column title={currencyTitle} rows={currencyRows} />

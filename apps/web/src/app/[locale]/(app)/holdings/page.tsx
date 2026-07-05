@@ -75,12 +75,17 @@ export default async function HoldingsPage({
   const hasCash =
     cashTracked && Object.values(cash).some((v) => Number(v) !== 0);
 
-  // Count holdings per asset class to determine which tabs to disable.
+  // Count holdings per asset class to determine which tabs to show. Reference
+  // (Pocket Prototype.dc.html) only renders a pill for classes actually held in the
+  // current scope — not a fixed set with disabled placeholders for empty ones.
   const classCounts = holdings.reduce<Record<string, number>>((acc, h) => {
     const c = h.instrument?.assetClass;
     if (c) acc[c] = (acc[c] ?? 0) + 1;
     return acc;
   }, {});
+  const visibleClassTabs = CLASS_TABS.filter(
+    (key) => key === "all" || (classCounts[key] ?? 0) > 0,
+  );
 
   // Per-unit avgCost/price are native quotes (labeled by PriceCurrency); position
   // value/P&L are in the display currency (the trailing Currency column).
@@ -149,6 +154,7 @@ export default async function HoldingsPage({
               ]}
               rows={exportRows}
               label={t("exportCsv")}
+              iconOnly
             />
           )}
         </div>
@@ -250,7 +256,6 @@ export default async function HoldingsPage({
 
       {allocation && allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
         <AllocationCard
-          title={t("allocation.title")}
           slices={allocation.byAssetClass
             .filter((s) => Number(s.value) > 0)
             .map((s) => ({
@@ -295,28 +300,29 @@ export default async function HoldingsPage({
       {glanceSection}
 
       <div className="space-y-3">
-        <h2 className="text-lg font-bold">
-          <span className="sm:hidden">{t("positionsSectionMobile")}</span>
-          <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
-        </h2>
-
         <Tabs defaultValue="all">
-          <div className="overflow-x-auto">
-          <TabsList>
-            {CLASS_TABS.map((key) => (
-              <TabsTrigger
-                key={key}
-                value={key}
-                disabled={key !== "all" && (classCounts[key] ?? 0) === 0}
-              >
-                {key === "all" ? t("all") : tc(key)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold">
+              <span className="sm:hidden">{t("positionsSectionMobile")}</span>
+              <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
+            </h2>
+            <div className="overflow-x-auto">
+              <TabsList className="h-auto gap-1.5 rounded-full bg-transparent p-0">
+                {visibleClassTabs.map((key) => (
+                  <TabsTrigger
+                    key={key}
+                    value={key}
+                    className="rounded-full border border-border px-3.5 py-[7px] text-xs font-bold text-muted-foreground data-[state=active]:border-transparent data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none"
+                  >
+                    {key === "all" ? t("all") : tc(key)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </div>
-          {CLASS_TABS.map((key) => (
+          {visibleClassTabs.map((key) => (
             <TabsContent key={key} value={key}>
-              <div className="rounded-xl border border-border">
+              <div className="rounded-xl bg-card shadow-card">
                 <HoldingsTable
                   rows={
                     key === "all"
