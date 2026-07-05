@@ -68,10 +68,10 @@ export function CashOnHandCard({
           ))}
         </div>
 
-        <div className="flex items-start gap-2.5 rounded-xl bg-warning/10 p-3">
-          <Coins className="mt-0.5 size-4 shrink-0 text-warning" />
-          <p className="text-xs leading-relaxed text-warning/90">
-            <b className="text-warning">{t("cashNudgeLead", { amount: totalLabel })}</b>{" "}
+        <div className="flex items-start gap-2.5 rounded-xl bg-[var(--chart-2)]/[0.14] p-3">
+          <Coins className="mt-0.5 size-4 shrink-0 text-[var(--chart-2)]" />
+          <p className="text-xs leading-relaxed text-[var(--chart-2)]">
+            <b>{t("cashNudgeLead", { amount: totalLabel })}</b>{" "}
             {t("cashNudgeSuggestion", { rate: rateLabel, amount: idleEstimateLabel })}
           </p>
         </div>

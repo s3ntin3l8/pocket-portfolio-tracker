@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/utils";
+import { MonogramBadge } from "@/components/monogram-badge";
 import { RebalanceDialog } from "@/components/savings/rebalance-dialog";
 import type { SparplanStats, DetectedPlan, DriftRow, SparplanContributionSplit } from "@portfolio/api-client";
 
@@ -117,36 +118,44 @@ function PlanRow({
   const amountLabel = `${formatMoney(Number(plan.currentAmountDisplay), plan.currency, locale)} ${cadenceLabel(plan.cadenceMonths, t)}`;
 
   return (
-    <div className="flex items-start justify-between gap-4 py-3 border-b last:border-b-0">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm truncate">{label}</span>
-          {plan.symbol && plan.name && (
-            <span className="text-xs text-muted-foreground shrink-0">{plan.symbol}</span>
-          )}
-          {plan.source === "heuristic" && (
-            <Badge variant="outline" className="text-xs shrink-0">
-              {t("sourceHeuristic")}
-            </Badge>
-          )}
-          {driftRow && <DriftBadge driftRow={driftRow} td={td} />}
+    <div className="flex items-start gap-3 py-3 border-b last:border-b-0">
+      <MonogramBadge label={label} className="mt-0.5" />
+      <div className="flex flex-1 items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm truncate">{label}</span>
+            {plan.symbol && plan.name && (
+              <span className="text-xs text-muted-foreground shrink-0">{plan.symbol}</span>
+            )}
+            {plan.source === "heuristic" && (
+              <Badge variant="outline" className="text-xs shrink-0">
+                {t("sourceHeuristic")}
+              </Badge>
+            )}
+            {driftRow && <DriftBadge driftRow={driftRow} td={td} />}
+          </div>
+          <StepHistory plan={plan} locale={locale} t={t} />
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("firstSince", { date: plan.firstExecution.slice(0, 7) })}
+            {" · "}
+            {plan.executionCount}{" "}
+            {t("executionCount", { count: plan.executionCount })}
+          </p>
         </div>
-        <StepHistory plan={plan} locale={locale} t={t} />
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {t("firstSince", { date: plan.firstExecution.slice(0, 7) })}
-          {" · "}
-          {plan.executionCount}{" "}
-          {t("executionCount", { count: plan.executionCount })}
-        </p>
-      </div>
-      <div className="text-right shrink-0">
-        <p className="font-semibold text-sm tabular">{amountLabel}</p>
-        <Badge
-          variant={plan.status === "active" ? "default" : "outline"}
-          className="mt-1 text-xs"
-        >
-          {plan.status === "active" ? t("statusActive") : t("statusStopped")}
-        </Badge>
+        <div className="text-right shrink-0">
+          <p className="font-semibold text-sm tabular">{amountLabel}</p>
+          {driftRow && (
+            <p className="tabular mt-0.5 text-xs text-muted-foreground">
+              {t("nowPct", { pct: driftRow.actualPct.toFixed(0) })}
+            </p>
+          )}
+          <Badge
+            variant={plan.status === "active" ? "default" : "outline"}
+            className="mt-1 text-xs"
+          >
+            {plan.status === "active" ? t("statusActive") : t("statusStopped")}
+          </Badge>
+        </div>
       </div>
     </div>
   );
@@ -176,6 +185,11 @@ export function SparplanSection({ data, currency, locale, portfolioId, drift, co
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">{t("sparplanTitle")}</CardTitle>
+            {activePlans.length > 0 && (
+              <span className="rounded-full bg-success/15 px-2 py-0.5 text-xs font-bold text-success">
+                {t("activeCount", { count: activePlans.length })}
+              </span>
+            )}
             {/* Rebalance button — only in single-portfolio scope */}
             {portfolioId && (
               <RebalanceDialog

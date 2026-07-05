@@ -106,6 +106,15 @@ export default async function SavingsPage({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t("contributionsOverTime")}</CardTitle>
+          {c.dailySeries.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t("contributionsSubtitle", {
+                date: new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(
+                  new Date(c.dailySeries[0].date),
+                ),
+              })}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <ContributionsChart
@@ -117,26 +126,29 @@ export default async function SavingsPage({
         </CardContent>
       </Card>
 
-      {sparplanResult.status === "ok" && sparplanResult.data.plans.length > 0 && (
-        <SparplanSection
-          data={sparplanResult.data}
-          currency={currency}
-          locale={locale}
-          portfolioId={sparplanResult.portfolioId ?? undefined}
-          drift={sparplanResult.data.drift}
-          contributionSplit={sparplanResult.data.contributionSplit}
-        />
-      )}
+      {/* Plans + forecast side by side on desktop (reference: 2-col grid). */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {sparplanResult.status === "ok" && sparplanResult.data.plans.length > 0 && (
+          <SparplanSection
+            data={sparplanResult.data}
+            currency={currency}
+            locale={locale}
+            portfolioId={sparplanResult.portfolioId ?? undefined}
+            drift={sparplanResult.data.drift}
+            contributionSplit={sparplanResult.data.contributionSplit}
+          />
+        )}
 
-      <ForecastPanel
-        currentValue={c.currentValue}
-        netContributed={c.netContributed}
-        monthlyAverage={c.monthlyAverage}
-        seedAnnualReturn={c.seedAnnualReturn}
-        currency={currency}
-        birthYear={c.birthYear}
-        portfolioType={c.portfolioType}
-      />
+        <ForecastPanel
+          currentValue={c.currentValue}
+          netContributed={c.netContributed}
+          monthlyAverage={c.monthlyAverage}
+          seedAnnualReturn={c.seedAnnualReturn}
+          currency={currency}
+          birthYear={c.birthYear}
+          portfolioType={c.portfolioType}
+        />
+      </div>
 
       {holdingsResult.status === "ok" && holdingsResult.cashTracked && (
         <CashOnHandCard cash={holdingsResult.cash} locale={locale} />
