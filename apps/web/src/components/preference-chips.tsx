@@ -50,7 +50,7 @@ export function PreferenceChips({ prefKey, current, options, className }: Props)
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm",
+        "inline-flex items-center gap-1 rounded-[12px] border border-border bg-card p-[3px] shadow-card",
         className,
       )}
     >
@@ -62,7 +62,7 @@ export function PreferenceChips({ prefKey, current, options, className }: Props)
           disabled={pending !== null}
           aria-pressed={current === o.value}
           className={cn(
-            "rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors disabled:opacity-60",
+            "rounded-[9px] px-3.5 py-1.5 text-xs font-bold transition-colors disabled:opacity-60",
             current === o.value
               ? "bg-foreground text-background"
               : "text-muted-foreground hover:text-foreground",

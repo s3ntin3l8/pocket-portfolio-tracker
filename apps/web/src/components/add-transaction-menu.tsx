@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, PenLine, FileUp, GitBranch, GitMerge } from "lucide-react";
+import { Plus, PenLine, FileUp, GitBranch, GitMerge, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImportFlowClient } from "@/components/import-flow-client";
 import { Link, useRouter, usePathname } from "@/i18n/navigation";
@@ -34,13 +35,12 @@ export function AddTransactionMenu({
 } = {}) {
   const tm = useTranslations("Manage");
   const ti = useTranslations("Import");
-  const tca = useTranslations("CorpAction");
-  const tmg = useTranslations("Merger");
   const api = useApiClient();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
+  const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [portfolios, setPortfolios] = useState<ImportTargetPortfolio[] | null>(null);
   const [defaultPortfolioId, setDefaultPortfolioId] = useState("");
@@ -72,53 +72,59 @@ export function AddTransactionMenu({
       setPortfolios(mapped);
       setDefaultPortfolioId(mapped[0]?.id ?? "");
     }
+    setAddOpen(false);
     setImportOpen(true);
   }
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button aria-label={tm("addTransaction")}>
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">{tm("addTransaction")}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link href="/transactions/new">
-              <PenLine className="size-4" />
-              {ti("menu.manual")}
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void openImport()}>
-            <FileUp className="size-4" />
-            {ti("menu.import")}
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link
-              href={{
-                pathname: "/transactions/new",
-                query: { kind: "corporate-action" },
-              }}
-            >
-              <GitBranch className="size-4" />
-              {tca("link")}
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link
-              href={{
-                pathname: "/transactions/new",
-                query: { kind: "merger" },
-              }}
-            >
-              <GitMerge className="size-4" />
-              {tmg("link")}
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button aria-label={tm("addTransaction")} onClick={() => setAddOpen(true)}>
+        <Plus className="size-4" />
+        <span className="hidden sm:inline">{tm("addMenu.add")}</span>
+      </Button>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-sm p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-extrabold">{tm("addMenu.title")}</DialogTitle>
+            <DialogDescription>{tm("addMenu.subtitle")}</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2.5">
+            <AddMenuCard
+              icon={FileUp}
+              title={tm("addMenu.import")}
+              description={tm("addMenu.importDesc")}
+              tone="success"
+              tag={tm("addMenu.recommended")}
+              onClick={() => void openImport()}
+            />
+            <AddMenuCard
+              icon={PenLine}
+              title={tm("addMenu.manual")}
+              description={tm("addMenu.manualDesc")}
+              tone="warning"
+              href="/transactions/new"
+              onNavigate={() => setAddOpen(false)}
+            />
+            <AddMenuCard
+              icon={GitBranch}
+              title={tm("addMenu.corpAction")}
+              description={tm("addMenu.corpActionDesc")}
+              tone="violet"
+              href={{ pathname: "/transactions/new", query: { kind: "corporate-action" } }}
+              onNavigate={() => setAddOpen(false)}
+            />
+            <AddMenuCard
+              icon={GitMerge}
+              title={tm("addMenu.merger")}
+              description={tm("addMenu.mergerDesc")}
+              tone="teal"
+              href={{ pathname: "/transactions/new", query: { kind: "merger" } }}
+              onNavigate={() => setAddOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Sheet open={importOpen} onOpenChange={setImportOpen}>
         <SheetContent
@@ -142,5 +148,71 @@ export function AddTransactionMenu({
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+const TONE_CLASSES = {
+  success: "bg-success/15 text-success",
+  warning: "bg-warning/15 text-warning",
+  violet: "bg-[#7C5CFC]/15 text-[#7C5CFC]",
+  teal: "bg-[#0D9488]/15 text-[#0D9488]",
+} as const;
+
+/** One row in the "Add to portfolio" launcher (`Pocket Prototype.dc.html`'s
+ *  `methodCards`): icon chip + title + description, optionally a tag pill and/or a
+ *  navigation href. Renders as a `Link` when `href` is given, else a plain button. */
+function AddMenuCard({
+  icon: Icon,
+  title,
+  description,
+  tone,
+  tag,
+  href,
+  onClick,
+  onNavigate,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  tone: keyof typeof TONE_CLASSES;
+  tag?: string;
+  href?: ComponentProps<typeof Link>["href"];
+  onClick?: () => void;
+  onNavigate?: () => void;
+}) {
+  const content = (
+    <>
+      <span
+        className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${TONE_CLASSES[tone]}`}
+      >
+        <Icon className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-bold">{title}</span>
+          {tag && (
+            <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-bold text-success">
+              {tag}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </>
+  );
+  const className =
+    "flex items-center gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:bg-accent/50";
+
+  if (href) {
+    return (
+      <Link href={href} className={className} onClick={onNavigate}>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" className={className} onClick={onClick}>
+      {content}
+    </button>
   );
 }

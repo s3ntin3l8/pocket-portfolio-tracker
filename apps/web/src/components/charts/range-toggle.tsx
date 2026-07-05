@@ -37,17 +37,14 @@ export function RangeToggle({
           onClick={() => onChange(r)}
           aria-pressed={value === r}
           className={cn(
-            "rounded-full px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50",
+            "rounded-full px-3.5 py-[7px] text-xs font-bold transition-colors disabled:opacity-50",
             theme === "inverse"
               ? value === r
                 ? "bg-white text-[#0B7D58]"
                 : "bg-transparent text-white/85 hover:bg-white/10"
-              : cn(
-                  "rounded-md",
-                  value === r
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent",
-                ),
+              : value === r
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:bg-accent",
           )}
         >
           {t(r)}

@@ -8,7 +8,6 @@ import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LocaleSwitcher } from "@/components/locale-switcher";
 import { PortfolioSwitcher } from "@/components/portfolio-switcher";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { GlobalSearch } from "@/components/global-search";
@@ -26,6 +25,7 @@ export function AppShell({
   isAdmin = false,
   anomalyCount = 0,
   anomalyError = false,
+  netWorthSummary = null,
 }: {
   children: React.ReactNode;
   portfolios?: Pick<Portfolio, "id" | "name" | "brokerage" | "accountHolder">[];
@@ -35,6 +35,8 @@ export function AppShell({
   isAdmin?: boolean;
   anomalyCount?: number;
   anomalyError?: boolean;
+  /** Sidebar footer summary (reference: always-visible, pinned bottom, above sign-out). */
+  netWorthSummary?: { valueFormatted: string; allTimePctFormatted: string | null } | null;
 }) {
   const t = useTranslations("Nav");
   const pathname = usePathname();
@@ -112,7 +114,22 @@ export function AppShell({
             );
           })}
         </nav>
-        <div className="mt-auto pt-4">{signOutButton}</div>
+        <div className="mt-auto flex flex-col gap-3 pt-4">
+          {netWorthSummary && (
+            <div className="rounded-xl bg-card p-3.5 shadow-card">
+              <p className="text-xs text-muted-foreground">{t("netWorth")}</p>
+              <p className="tabular mt-1 text-lg font-extrabold">
+                {netWorthSummary.valueFormatted}
+              </p>
+              {netWorthSummary.allTimePctFormatted && (
+                <p className="tabular mt-0.5 text-xs font-semibold text-success">
+                  {netWorthSummary.allTimePctFormatted} {t("allTime")}
+                </p>
+              )}
+            </div>
+          )}
+          {signOutButton}
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
@@ -131,7 +148,6 @@ export function AppShell({
             <Suspense fallback={null}>
               <AddTransactionMenu autoOpenFromParams />
             </Suspense>
-            <LocaleSwitcher />
             <ThemeToggle />
           </div>
         </header>

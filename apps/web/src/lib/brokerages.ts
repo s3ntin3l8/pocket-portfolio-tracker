@@ -100,3 +100,33 @@ export function tintFor(name: string): string {
   }
   return `hsl(${hash} 55% 45%)`;
 }
+
+/**
+ * Soft tinted background + matching foreground color for a monogram badge, keyed by
+ * asset class — matches the reference (`Pocket Prototype.dc.html`'s per-holding
+ * `chipBg`/`chipFg`): a pastel fill with colored (not white) initials, one hue per
+ * class, rather than a hash-derived color unrelated to what's actually held.
+ */
+export function assetClassTone(assetClass: string | null | undefined): {
+  bg: string;
+  fg: string;
+} {
+  switch (assetClass) {
+    case "equity":
+      return { bg: "rgba(14,159,110,.14)", fg: "var(--chart-1)" };
+    case "etf":
+      return { bg: "rgba(124,92,252,.16)", fg: "var(--chart-4)" };
+    case "mutual_fund":
+      return { bg: "rgba(13,148,136,.16)", fg: "var(--chart-3)" };
+    case "gold":
+      return { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" };
+    case "bond":
+      return { bg: "rgba(59,130,246,.16)", fg: "#3B82F6" };
+    case "crypto":
+      return { bg: "rgba(249,115,22,.16)", fg: "#F97316" };
+    case "cash":
+      return { bg: "rgba(100,116,139,.16)", fg: "var(--chart-5)" };
+    default:
+      return { bg: "var(--muted)", fg: "var(--muted-foreground)" };
+  }
+}

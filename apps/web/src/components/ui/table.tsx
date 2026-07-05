@@ -26,7 +26,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       className={cn(
-        "border-t border-border bg-muted/30 font-medium [&_tr]:border-0",
+        "border-t border-border bg-card-2 font-medium [&_tr]:border-0",
         className,
       )}
       {...props}
@@ -50,7 +50,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        "h-10 px-3 text-left align-middle text-[11px] font-bold uppercase tracking-[0.044em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}

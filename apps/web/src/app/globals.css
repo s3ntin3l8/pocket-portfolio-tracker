@@ -51,6 +51,13 @@
   --gold-fg: #c98a1e;
   --warn-strong: #7a5a1a;
   --warn-soft: #9a7b3a;
+
+  /* Pocket card elevation — measured (getComputedStyle) from the reference design's
+     live prototype: rgba(15,27,20,.04) 0 1px 2px, rgba(15,27,20,.05) 0 8px 22px. The
+     reference has no real dark render, so the dark variant below is derived (same
+     offsets, black-based alpha) rather than measured. */
+  --shadow-card:
+    0 1px 2px rgba(15, 27, 20, 0.04), 0 8px 22px rgba(15, 27, 20, 0.05);
 }
 
 .dark {
@@ -97,6 +104,9 @@
   --gold-fg: #e0a53a;
   --warn-strong: #e6c07a;
   --warn-soft: #c2a878;
+
+  --shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 22px rgba(0, 0, 0, 0.28);
 }
 
 @theme inline {
@@ -126,6 +136,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-card-2: var(--card-2);
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;
@@ -134,6 +145,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-card: var(--shadow-card);
 }
 
 @layer base {
@@ -145,9 +158,9 @@
     color: var(--foreground);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  /* Tabular figures for money/metrics. */
+  /* Tabular figures for money/metrics — reference (Pocket Prototype.dc.html `.num`)
+     keeps these in Plus Jakarta Sans, just with tabular-nums; no mono swap. */
   .tabular {
     font-variant-numeric: tabular-nums;
-    font-family: var(--font-mono);
   }
 }

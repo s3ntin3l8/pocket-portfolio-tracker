@@ -57,7 +57,9 @@
     "activity": "Activity",
     "reports": "Reports",
     "insights": "Insights",
-    "profile": "Profile"
+    "profile": "Profile",
+    "netWorth": "Net worth",
+    "allTime": "all-time"
   },
   "Reports": {
     "title": "Reports",
@@ -299,6 +301,8 @@
     "tooltipTotal": "Total",
     "tooltipForecast": "Forecast",
     "heatmapDefaultSubtitle": "Tap a cell to see the month's income",
+    "heatmapLess": "Less",
+    "heatmapMore": "More",
     "heatmapCellSubtitle": "{month} · {amount}"
   },
   "Savings": {
@@ -318,6 +322,10 @@
     "chartContributions": "Contributions",
     "chartValue": "Portfolio value",
     "chartValueUnavailable": "Value history not yet available — run a backfill from Admin → Jobs.",
+    "footerInvested": "Invested",
+    "footerGain": "Gain",
+    "footerNowWorth": "Now worth",
+    "contributionsSubtitle": "What you put in vs. what it's worth · since {date}",
     "forecastTitle": "Forecast",
     "forecastSubtitle": "Project the value if you keep saving at an assumed annual return.",
     "monthlyAmount": "Monthly amount",
@@ -325,6 +333,7 @@
     "horizonYears": "Horizon",
     "years": "{count, plural, one {# year} other {# years}}",
     "projectedValue": "Projected value",
+    "projectedInYears": "Projected in {count, plural, one {# year} other {# years}}",
     "projectedContributed": "You contribute",
     "projectedGrowth": "Growth",
     "toAge18": "To age 18",
@@ -334,6 +343,8 @@
     "emptyBody": "Record deposits or savings-plan purchases and your saving progress appears here.",
     "sparplanTitle": "Recurring investment plans",
     "detectedMonthly": "Active monthly total",
+    "nowPct": "{pct}% now",
+    "activeCount": "{count, plural, one {# active} other {# active}}",
     "cadenceMonthly": "/month",
     "cadenceMonthlyShort": "mo",
     "cadenceQuarterly": "/quarter",
@@ -356,6 +367,7 @@
   "Portfolios": {
     "title": "Portfolios",
     "subtitle": "Create and manage your portfolios.",
+    "aggregateSubtitle": "{amount} aggregate · {count, plural, one {# portfolio} other {# portfolios}}",
     "value": "Total value",
     "create": "Create a portfolio",
     "empty": "No portfolios yet — create your first one.",
@@ -1055,6 +1067,20 @@
   },
   "Manage": {
     "addTransaction": "Add transaction",
+    "addMenu": {
+      "add": "Add",
+      "title": "Add to portfolio",
+      "subtitle": "Transactions are the source of truth — pick how to add them.",
+      "recommended": "Recommended",
+      "import": "Import",
+      "importDesc": "Screenshot, CSV or PDF — parsed and mapped automatically",
+      "manual": "Add manually",
+      "manualDesc": "Enter a single transaction yourself",
+      "corpAction": "Corporate action",
+      "corpActionDesc": "Apply a split, bonus or rights issue",
+      "merger": "Merger",
+      "mergerDesc": "Convert a holding to a new ISIN, carrying cost basis"
+    },
     "createPortfolio": "Create portfolio",
     "back": "Back",
     "actions": "Actions",
@@ -1314,6 +1340,11 @@
     "totalRealized": "Realized P&L",
     "totalDividends": "Dividends",
     "winRate": "Win rate",
+    "realizedByYearChartTitle": "Realized P&L per year",
+    "winLossTitle": "Win / loss",
+    "winLossSubtitle": "{winners} of {total} closed",
+    "winners": "Winners",
+    "losers": "Losers",
     "realizedByYear": "Realized gains by year",
     "dividendsByYear": "Dividends by year",
     "bonusesByYear": "Bonuses by year",

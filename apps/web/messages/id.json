@@ -57,7 +57,9 @@
     "activity": "Aktivitas",
     "reports": "Laporan",
     "insights": "Wawasan",
-    "profile": "Profil"
+    "profile": "Profil",
+    "netWorth": "Kekayaan bersih",
+    "allTime": "sepanjang masa"
   },
   "Reports": {
     "title": "Laporan",
@@ -299,6 +301,8 @@
     "tooltipTotal": "Total",
     "tooltipForecast": "Perkiraan",
     "heatmapDefaultSubtitle": "Ketuk sebuah sel untuk melihat pendapatan bulan itu",
+    "heatmapLess": "Sedikit",
+    "heatmapMore": "Banyak",
     "heatmapCellSubtitle": "{month} · {amount}"
   },
   "Savings": {
@@ -318,6 +322,10 @@
     "chartContributions": "Setoran",
     "chartValue": "Nilai portofolio",
     "chartValueUnavailable": "Riwayat nilai belum tersedia — jalankan backfill dari Admin → Jobs.",
+    "footerInvested": "Diinvestasikan",
+    "footerGain": "Keuntungan",
+    "footerNowWorth": "Nilai sekarang",
+    "contributionsSubtitle": "Yang Anda setor vs. nilainya sekarang · sejak {date}",
     "forecastTitle": "Proyeksi",
     "forecastSubtitle": "Proyeksikan nilainya jika Anda terus menabung dengan asumsi imbal hasil tahunan.",
     "monthlyAmount": "Jumlah bulanan",
@@ -325,6 +333,7 @@
     "horizonYears": "Jangka waktu",
     "years": "{count, plural, other {# tahun}}",
     "projectedValue": "Proyeksi nilai",
+    "projectedInYears": "Proyeksi dalam {count, plural, other {# tahun}}",
     "projectedContributed": "Setoran Anda",
     "projectedGrowth": "Pertumbuhan",
     "toAge18": "Hingga usia 18",
@@ -334,6 +343,8 @@
     "emptyBody": "Catat setoran atau pembelian rencana tabungan, dan kemajuan menabung Anda muncul di sini.",
     "sparplanTitle": "Rencana investasi rutin",
     "detectedMonthly": "Total bulanan aktif",
+    "nowPct": "{pct}% sekarang",
+    "activeCount": "{count, plural, other {# aktif}}",
     "cadenceMonthly": "/bulan",
     "cadenceMonthlyShort": "bln",
     "cadenceQuarterly": "/kuartal",
@@ -356,6 +367,7 @@
   "Portfolios": {
     "title": "Portofolio",
     "subtitle": "Buat dan kelola portofolio Anda.",
+    "aggregateSubtitle": "{amount} agregat · {count, plural, other {# portofolio}}",
     "value": "Total nilai",
     "create": "Buat portofolio",
     "empty": "Belum ada portofolio — buat yang pertama.",
@@ -1053,6 +1065,20 @@
   },
   "Manage": {
     "addTransaction": "Tambah transaksi",
+    "addMenu": {
+      "add": "Tambah",
+      "title": "Tambah ke portofolio",
+      "subtitle": "Transaksi adalah sumber kebenaran — pilih cara menambahkannya.",
+      "recommended": "Direkomendasikan",
+      "import": "Impor",
+      "importDesc": "Tangkapan layar, CSV atau PDF — diurai dan dipetakan otomatis",
+      "manual": "Tambah manual",
+      "manualDesc": "Masukkan satu transaksi sendiri",
+      "corpAction": "Aksi korporasi",
+      "corpActionDesc": "Terapkan pemecahan saham, bonus, atau rights issue",
+      "merger": "Merger",
+      "mergerDesc": "Konversi kepemilikan ke ISIN baru, membawa basis biaya"
+    },
     "createPortfolio": "Buat portofolio",
     "back": "Kembali",
     "actions": "Tindakan",
@@ -1312,6 +1338,11 @@
     "totalRealized": "Laba/rugi terealisasi",
     "totalDividends": "Dividen",
     "winRate": "Tingkat menang",
+    "realizedByYearChartTitle": "Untung/rugi terealisasi per tahun",
+    "winLossTitle": "Menang / kalah",
+    "winLossSubtitle": "{winners} dari {total} ditutup",
+    "winners": "Menang",
+    "losers": "Kalah",
     "realizedByYear": "Keuntungan terealisasi per tahun",
     "dividendsByYear": "Dividen per tahun",
     "bonusesByYear": "Bonus per tahun",

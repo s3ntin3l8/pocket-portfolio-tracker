@@ -57,6 +57,16 @@ export function formatSignedMoney(
   return `${amount >= 0 ? "+" : ""}${formatMoney(amount, currency, locale, opts)}`;
 }
 
+/**
+ * Locale-formatted quantity. Reference (`Pocket Prototype.dc.html`) renders bare numbers
+ * for "shares"/"units" with no suffix, and only "grams" gets a short unit ("8 g") — not
+ * the generic "shares"/"units" schema word appended to every row.
+ */
+export function formatQuantity(quantity: number, unit: string | null | undefined, locale = "en") {
+  const n = new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(quantity);
+  return unit === "grams" ? `${n} g` : n;
+}
+
 export function formatPercent(value: number, locale = "en") {
   return new Intl.NumberFormat(locale, {
     style: "percent",

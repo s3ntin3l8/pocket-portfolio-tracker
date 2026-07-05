@@ -58,13 +58,11 @@ function renderMenu(props: { autoOpenFromParams?: boolean } = {}) {
   );
 }
 
-// Radix opens its dropdown on keyboard/pointer events, not a synthetic click; Enter on
-// the focused trigger is the most reliable opener under jsdom.
 function openMenu() {
   const trigger = screen.getByRole("button", {
     name: messages.Manage.addTransaction,
   });
-  fireEvent.keyDown(trigger, { key: "Enter" });
+  fireEvent.click(trigger);
 }
 
 describe("AddTransactionMenu", () => {
@@ -77,31 +75,42 @@ describe("AddTransactionMenu", () => {
     renderMenu();
     openMenu();
 
-    const manual = screen.getByRole("menuitem", {
-      name: messages.Import.menu.manual,
-    });
-    expect(manual.closest("a")).toHaveAttribute("href", "/transactions/new");
-
     expect(
-      screen.getByRole("menuitem", { name: messages.Import.menu.import }),
+      screen.getByRole("dialog", { name: messages.Manage.addMenu.title }),
     ).toBeInTheDocument();
 
-    const corpAction = screen.getByRole("menuitem", {
-      name: messages.CorpAction.link,
-    });
-    expect(corpAction.closest("a")).toHaveAttribute(
-      "href",
-      "/transactions/new?kind=corporate-action",
-    );
+    const manual = screen.getByText(messages.Manage.addMenu.manual).closest("a");
+    expect(manual).toHaveAttribute("href", "/transactions/new");
 
-    const merger = screen.getByRole("menuitem", { name: messages.Merger.link });
-    expect(merger.closest("a")).toHaveAttribute("href", "/transactions/new?kind=merger");
+    expect(screen.getByText(messages.Manage.addMenu.import)).toBeInTheDocument();
+    expect(screen.getByText(messages.Manage.addMenu.recommended)).toBeInTheDocument();
+
+    const corpAction = screen.getByText(messages.Manage.addMenu.corpAction).closest("a");
+    expect(corpAction).toHaveAttribute("href", "/transactions/new?kind=corporate-action");
+
+    const merger = screen.getByText(messages.Manage.addMenu.merger).closest("a");
+    expect(merger).toHaveAttribute("href", "/transactions/new?kind=merger");
   });
 
   it("keeps the import sheet closed without a share/import param", () => {
     renderMenu();
     expect(
       screen.queryByRole("dialog", { name: messages.Import.title }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the import sheet from the Import card and closes the add dialog", async () => {
+    renderMenu();
+    openMenu();
+    fireEvent.click(screen.getByText(messages.Manage.addMenu.import));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("dialog", { name: messages.Import.title }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: messages.Manage.addMenu.title }),
     ).not.toBeInTheDocument();
   });
 

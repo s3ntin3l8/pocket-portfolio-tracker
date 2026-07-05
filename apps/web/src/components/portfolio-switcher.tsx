@@ -88,38 +88,40 @@ export function PortfolioSwitcher({
     const only = portfolios[0];
     return (
       <div
-        className="inline-flex h-9 max-w-full items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground"
+        className="inline-flex h-9 max-w-full items-center gap-1.5 rounded-full bg-card py-1.5 pl-1.5 pr-3 text-xs font-semibold text-foreground shadow-card"
         aria-label={t("label")}
+        title={portfolioLabel(only)}
       >
-        <BrokerageIcon brokerage={only.brokerage} className="size-5" />
-        <span className="truncate">{portfolioLabel(only)}</span>
+        <BrokerageIcon brokerage={only.brokerage} className="size-5 rounded-md" />
+        <span className="truncate">{only.name}</span>
       </div>
     );
   }
 
-  // Determine what to show in the trigger.
+  // Determine what to show in the trigger. Compact — just the name/holder — since the
+  // full "name · brokerage · holder" detail is still shown per-row in the open dropdown.
   const triggerIcon = selectedHolder ? (
-    <Users className="size-4 shrink-0 text-muted-foreground" />
+    <Users className="size-3.5 shrink-0 text-muted-foreground" />
   ) : selectedPortfolio ? (
-    <BrokerageIcon brokerage={selectedPortfolio.brokerage} className="size-5" />
+    <BrokerageIcon brokerage={selectedPortfolio.brokerage} className="size-5 rounded-md" />
   ) : (
-    <Layers className="size-4 shrink-0 text-muted-foreground" />
+    <Layers className="size-3.5 shrink-0 text-muted-foreground" />
   );
   const triggerLabel = selectedHolder
     ? selectedHolder.name
     : selectedPortfolio
-      ? portfolioLabel(selectedPortfolio)
+      ? selectedPortfolio.name
       : t("all");
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t("label")}
-        className="inline-flex h-9 max-w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex h-9 max-w-full items-center gap-1.5 rounded-full bg-card py-1.5 pl-1.5 pr-3 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {triggerIcon}
         <span className="truncate">{triggerLabel}</span>
-        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-w-[16rem]">
         {/* Section 1: All portfolios */}
