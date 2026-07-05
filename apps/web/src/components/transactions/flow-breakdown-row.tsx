@@ -19,7 +19,7 @@ export function FlowBreakdownRow({
     <div className="flex items-center gap-2.5">
       <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: color }} />
       <span className="min-w-0 flex-1 truncate text-xs font-semibold">{label}</span>
-      <div className="h-[7px] w-[74px] shrink-0 overflow-hidden rounded-full bg-muted">
+      <div className="h-[7px] w-16 shrink-0 overflow-hidden rounded-[5px] bg-line">
         <div
           className="h-full rounded-full"
           style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }}

@@ -76,12 +76,14 @@ export function AppShell({
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card p-4 pl-[max(1rem,env(safe-area-inset-left))] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] md:flex">
-        <div className="px-1 pb-4">
+      {/* Desktop sidebar — transcribed from the reference: 236px, 22/16 padding, nav
+          items 600 14px text-mute (inactive) / 700 14px green on a green tint (active),
+          12px radius, 19px icons, 3px gap. */}
+      <aside className="hidden w-[236px] shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pt-[max(22px,env(safe-area-inset-top))] md:flex">
+        <div className="px-2 pb-6">
           <Brand />
         </div>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-[3px]">
           {navItems.map(({ href, icon: Icon, key }) => {
             const active = key === activeKey;
             const badge =
@@ -92,13 +94,13 @@ export function AppShell({
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                  "flex items-center gap-[11px] rounded-[12px] px-3 py-2.5 text-sm transition-colors",
                   active
-                    ? "bg-primary/10 font-semibold text-primary"
-                    : "font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
+                    ? "bg-[rgba(16,163,114,.14)] font-bold text-primary"
+                    : "font-semibold text-text-mute hover:bg-secondary hover:text-foreground",
                 )}
               >
-                <Icon className="size-[18px]" strokeWidth={active ? 2 : 1.8} />
+                <Icon className="size-[19px]" strokeWidth={active ? 2 : 1.8} />
                 <span className="flex-1">{t(key)}</span>
                 {badge != null && (
                   <span
@@ -116,13 +118,13 @@ export function AppShell({
         </nav>
         <div className="mt-auto flex flex-col gap-3 pt-4">
           {netWorthSummary && (
-            <div className="rounded-xl bg-card p-3.5 shadow-card">
-              <p className="text-xs text-muted-foreground">{t("netWorth")}</p>
-              <p className="tabular mt-1 text-lg font-extrabold">
+            <div className="rounded-[14px] bg-background p-3.5">
+              <p className="text-[11px] font-semibold text-text-2">{t("netWorth")}</p>
+              <p className="tabular mt-0.5 text-lg font-extrabold">
                 {netWorthSummary.valueFormatted}
               </p>
               {netWorthSummary.allTimePctFormatted && (
-                <p className="tabular mt-0.5 text-xs font-semibold text-success">
+                <p className="tabular mt-0.5 text-xs font-bold text-success">
                   {netWorthSummary.allTimePctFormatted} {t("allTime")}
                 </p>
               )}
@@ -133,7 +135,8 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b border-border bg-background/80 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] backdrop-blur">
+        {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps. */}
+        <header className="sticky top-0 z-30 flex min-h-[62px] items-center gap-3 border-b border-border bg-card pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[env(safe-area-inset-top)] md:pl-6 md:pr-6">
           {/* Mobile brand (desktop shows it in the sidebar). */}
           <Link href="/holdings" className="md:hidden" aria-label="Pocket">
             <Brand />

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
 
-const CARD = "rounded-xl bg-card p-[18px] shadow-card";
+const CARD = "rounded-[20px] bg-card p-[22px] shadow-card";
 
 const TONE_CLASS: Record<"up" | "down" | "neutral", string> = {
   up: "text-success",
@@ -25,18 +25,18 @@ function StatBlock({
   bordered?: boolean;
 }) {
   return (
-    <div className={bordered ? "border-l border-border pl-4 lg:pl-6" : ""}>
-      <p className="text-[11px] font-semibold text-muted-foreground">{label}</p>
-      <p className="tabular mt-0.5 text-lg font-extrabold sm:text-xl lg:text-2xl">{value}</p>
-      {sub && <p className={cn("tabular mt-0.5 text-[11px] font-bold", TONE_CLASS[tone])}>{sub}</p>}
+    <div className={bordered ? "border-l border-line pl-4 lg:pl-6" : ""}>
+      <p className="text-xs font-semibold text-text-2">{label}</p>
+      <p className="tabular mt-1 text-lg font-extrabold sm:text-xl lg:text-[26px]">{value}</p>
+      {sub && <p className={cn("tabular mt-0.5 text-xs font-bold", TONE_CLASS[tone])}>{sub}</p>}
     </div>
   );
 }
 
 function Breakdown({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="col-span-full border-t border-border pt-4 lg:col-span-2 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="col-span-full border-t border-line pt-4 lg:col-span-2 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">{label}</p>
       <div className="flex flex-col gap-2.5">{children}</div>
     </div>
   );

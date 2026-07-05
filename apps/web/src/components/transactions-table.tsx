@@ -116,16 +116,26 @@ const TYPE_TONE_CLASSES = {
   teal: "bg-[#0D9488]/15 text-[#0D9488]",
 } as const;
 
+// Reference SRCTYPE provenance tags: tinted 700 9px pills per source.
+const SRC_TONES: Record<string, React.CSSProperties> = {
+  csv: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  pdf: { background: "rgba(229,72,77,.13)", color: "#E5484D" },
+  screenshot: { background: "rgba(124,92,252,.16)", color: "#7C5CFC" },
+  pytr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  ibkr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  manual: { background: "var(--border)", color: "var(--text-mute)" },
+};
+
 function TypeIconChip({ type }: { type: string }) {
   const entry = TYPE_ICON[type];
   if (!entry) return null;
   const Icon = entry.icon;
   return (
     <span
-      className={`inline-flex size-6 shrink-0 items-center justify-center rounded-md ${TYPE_TONE_CLASSES[entry.tone]}`}
+      className={`inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] ${TYPE_TONE_CLASSES[entry.tone]}`}
       aria-hidden
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-[18px]" strokeWidth={2.2} />
     </span>
   );
 }
@@ -835,7 +845,6 @@ export function TransactionsTable({
           </TableHeader>
           <TableBody>
             {sort(visibleRows).map((tx) => {
-              const Icon = SOURCE_ICON[tx.source] ?? PencilLine;
               const amount = txAmount(tx);
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
@@ -861,7 +870,7 @@ export function TransactionsTable({
                       />
                     </span>
                   </TableCell>
-                  <TableCell className="tabular whitespace-nowrap text-muted-foreground">
+                  <TableCell className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
                     {df.format(new Date(tx.executedAt))}
                   </TableCell>
                   <TableCell>
@@ -910,9 +919,9 @@ export function TransactionsTable({
                         </span>
                       )}
                       <div>
-                        <div className="font-medium">{tx.instrument?.symbol ?? "—"}</div>
+                        <div className="text-sm font-bold">{tx.instrument?.symbol ?? "—"}</div>
                         {tx.instrument?.name && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs font-medium text-text-2">
                             {tx.instrument.name}
                           </div>
                         )}
@@ -924,8 +933,8 @@ export function TransactionsTable({
                       {tx.portfolioName ?? "—"}
                     </TableCell>
                   )}
-                  <TableCell className="tabular text-right">{Number(tx.quantity) || "—"}</TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-semibold text-text-2">{Number(tx.quantity) || "—"}</TableCell>
+                  <TableCell className="tabular text-right text-[13px] font-semibold">
                     {m(amount, tx.currency)}
                   </TableCell>
                   <TableCell className="tabular hidden text-right sm:table-cell">
@@ -934,12 +943,16 @@ export function TransactionsTable({
                   <TableCell className="tabular text-right">
                     {tx.tax && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell
+                    className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
+                  >
                     {m(netAmount, tx.currency)}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Icon className="size-3.5" />
+                    <span
+                      className="inline-flex items-center whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[9px] font-bold uppercase"
+                      style={SRC_TONES[tx.source] ?? SRC_TONES.manual}
+                    >
                       {t(`sources.${tx.source}`)}
                     </span>
                   </TableCell>
