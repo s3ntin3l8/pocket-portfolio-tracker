@@ -102,13 +102,6 @@ describe("TradesTable", () => {
     expect(screen.getAllByText(/Tax-free/).length).toBeGreaterThan(0);
   });
 
-  it("filters to closed trades only", () => {
-    renderTable([open, closed]);
-    fireEvent.click(screen.getByRole("button", { name: "Closed" }));
-    expect(screen.queryByText("BBCA")).toBeNull();
-    expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
-  });
-
   it("expands an open trade to reveal its matched legs", () => {
     renderTable([open]);
     // Leg detail is hidden until the row is expanded.

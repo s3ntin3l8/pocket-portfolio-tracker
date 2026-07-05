@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { monogram, tintFor } from "@/lib/brokerages";
-import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
+import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 
 interface TradeDetailSheetProps {
   /** The closed trade to show detail for; null renders nothing. Only closed trades are
@@ -83,7 +83,6 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
 
   const symbol = trade.instrument?.symbol ?? trade.instrumentId.slice(0, 8);
   const name = trade.instrument?.name ?? "";
-  const unit = trade.instrument?.unit ?? "";
 
   const realized = Number(trade.realizedPnL);
   const tone: "up" | "down" = realized >= 0 ? "up" : "down";
@@ -158,7 +157,10 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
             {t("detail.tradeDetails")}
           </h3>
           <div className="overflow-hidden rounded-2xl border border-border">
-            <Row label={t("detail.quantity")} value={`${Number(trade.quantity)} ${unit}`.trim()} />
+            <Row
+              label={t("detail.quantity")}
+              value={formatQuantity(Number(trade.quantity), trade.instrument?.unit, locale)}
+            />
             <Row
               label={t("detail.avgBuyPrice")}
               value={formatMoney(Number(trade.avgEntryPrice), trade.currency, locale)}

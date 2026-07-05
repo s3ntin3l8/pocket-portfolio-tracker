@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TradesTable } from "@/components/trades-table";
 import { TradeMethodToggle } from "@/components/trade-method-toggle";
 import { loadTrades, loadPreferences } from "@/lib/server-api";
-import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
+import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
 
 type Method = "average" | "fifo";
 
@@ -79,6 +79,17 @@ export default async function TradesPage({
   const totalInvested = log.trades.reduce((s, tr) => s + Number(tr.invested), 0);
   const totalReturnPct = totalInvested > 0 ? totalReturn / totalInvested : null;
 
+  // Win/loss split — closed trades only (an open position has no realized outcome yet).
+  const closedTrades = log.trades.filter((tr) => tr.status === "closed");
+  const winners = closedTrades.filter((tr) => Number(tr.totalReturn) > 0);
+  const losers = closedTrades.filter((tr) => Number(tr.totalReturn) < 0);
+  const winnersTotal = winners.reduce((s, tr) => s + Number(tr.totalReturn), 0);
+  const losersTotal = losers.reduce((s, tr) => s + Number(tr.totalReturn), 0);
+  const winLossDenom = winnersTotal + Math.abs(losersTotal);
+  const winPct = winLossDenom > 0 ? (winnersTotal / winLossDenom) * 100 : 0;
+
+  const maxAbsYear = Math.max(1, ...log.realizedByYear.map((r) => Math.abs(Number(r.amount))));
+
   return (
     <div className="space-y-6">
       {Heading}
@@ -99,6 +110,71 @@ export default async function TradesPage({
       </div>
 
       <TradesTable trades={log.trades} currency={currency} />
+
+      {/* ── Realized P&L per year + Win/Loss — reference blocks the tax-lens cards
+          below don't replace (kept: real tax-reporting functionality, no mock
+          equivalent). ── */}
+      {log.realizedByYear.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardContent className="p-5">
+              <h2 className="mb-4 text-sm font-semibold">{t("realizedByYearChartTitle")}</h2>
+              <div className="flex items-end justify-around gap-4" style={{ height: 140 }}>
+                {log.realizedByYear.map((r) => {
+                  const amount = Number(r.amount);
+                  const pct = Math.max(4, (Math.abs(amount) / maxAbsYear) * 100);
+                  return (
+                    <div key={r.year} className="flex flex-1 flex-col items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "tabular text-xs font-bold",
+                          amount >= 0 ? "text-success" : "text-destructive",
+                        )}
+                      >
+                        {formatSignedMoney(amount, currency, locale)}
+                      </span>
+                      <div className="flex w-full flex-1 items-end">
+                        <div
+                          className={cn(
+                            "w-full rounded-t-[4px]",
+                            amount >= 0 ? "bg-success" : "bg-destructive",
+                          )}
+                          style={{ height: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground">{r.year}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <h2 className="mb-1 text-sm font-semibold">{t("winLossTitle")}</h2>
+              <p className="tabular text-3xl font-extrabold">
+                {log.winRate === null ? "—" : formatPercent(log.winRate, locale).replace("+", "")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("winLossSubtitle", { winners: winners.length, total: closedTrades.length })}
+              </p>
+              <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-success" style={{ width: `${winPct}%` }} />
+                <div className="h-full bg-destructive" style={{ width: `${100 - winPct}%` }} />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs font-semibold">
+                <span className="text-success">
+                  {t("winners")} {formatSignedMoney(winnersTotal, currency, locale)}
+                </span>
+                <span className="text-destructive">
+                  {t("losers")} {formatSignedMoney(losersTotal, currency, locale)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ── Tax lens ── */}
       <div className="grid gap-4 lg:grid-cols-2">
