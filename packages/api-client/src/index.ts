@@ -388,6 +388,9 @@ export interface Portfolio {
 export interface InstrumentMeta {
   symbol: string;
   name: string;
+  /** Clean human-readable name (e.g. "Apple Inc.") from provider enrichment; null until
+   *  resolved. Presentation should prefer `displayName ?? name`. */
+  displayName: string | null;
   assetClass: string;
   unit: string;
   /** Exchange/venue (IDX, XETRA, XAU, …). Used for region breakdown in allocation analytics. */
@@ -680,6 +683,13 @@ export interface HoldingValuation extends Holding {
   instrument: InstrumentMeta | null;
   /** Standing open FIFO lots (oldest first); undefined when the API didn't attach them. */
   lots?: LotView[];
+  /**
+   * Recent daily closes (oldest→newest, instrument currency) for the mobile holdings
+   * sparkline. Populated by the route layer from the `prices` table, not by
+   * `summarizePortfolio` — same attach-after-valuing pattern as `lots`. Undefined or a
+   * <2-length array when there isn't enough stored history to draw a line.
+   */
+  sparkline?: number[];
 }
 
 export interface PortfolioSummary {

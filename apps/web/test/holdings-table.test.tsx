@@ -48,6 +48,7 @@ const makeHolding = (
   instrument: {
     symbol,
     name: symbol + " Corp",
+    displayName: null,
     assetClass: "equity",
     unit: "shares",
     market: "IDX",
@@ -171,5 +172,36 @@ describe("HoldingsTable", () => {
     // Only USD entry renders
     expect(cashLabels.length).toBeGreaterThan(0);
     expect(screen.queryAllByText("USD").length).toBeGreaterThan(0);
+  });
+
+  it("merges the instrument name and quantity into the mobile subtitle", () => {
+    renderTable();
+    // The mobile row shows "name · quantity" in one subtitle (quantity is no longer a column).
+    expect(screen.getByText(/BBCA Corp ·/)).toBeInTheDocument();
+  });
+
+  it("prefers the clean displayName over the raw name in the mobile subtitle", () => {
+    const named: HoldingValuation = {
+      ...makeHolding("BBCA", "100", "800"),
+      instrument: { ...makeHolding("BBCA", "100", "800").instrument!, displayName: "Bank Central Asia Tbk" },
+    };
+    renderTable({ rows: [named] });
+    expect(screen.getByText(/Bank Central Asia Tbk ·/)).toBeInTheDocument();
+    // The raw "BBCA Corp" name is no longer shown in the subtitle.
+    expect(screen.queryByText(/BBCA Corp ·/)).toBeNull();
+  });
+
+  it("renders a price-course sparkline on mobile for a holding that carries one", () => {
+    const withSpark: HoldingValuation = {
+      ...makeHolding("AAPL", "10", "1500"),
+      sparkline: [1, 2, 3, 4],
+    };
+    const { container } = renderTable({ rows: [withSpark] });
+    expect(container.querySelector("polyline")).not.toBeNull();
+  });
+
+  it("omits the sparkline for a holding with no series data", () => {
+    const { container } = renderTable({ rows: [makeHolding("AAPL", "10", "1500")] });
+    expect(container.querySelector("polyline")).toBeNull();
   });
 });

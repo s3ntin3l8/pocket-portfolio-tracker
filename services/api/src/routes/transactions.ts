@@ -82,7 +82,8 @@ import { rangeStart } from "../services/snapshots.js";
 import { requireUser } from "../plugins/auth.js";
 import { enqueueRecompute, enqueueInstrumentMetadata } from "../services/scheduler.js";
 import { reassignTransactions } from "../services/reassign.js";
-import { needsSectorEnrichment } from "../services/instrument-metadata.js";
+import { needsSectorEnrichment, needsNameEnrichment } from "../services/instrument-metadata.js";
+import { loadSparklines } from "../services/sparklines.js";
 import { flattenJoinRow } from "../lib/portfolio.js";
 
 interface PortfolioParams {
@@ -133,6 +134,7 @@ export async function transactionsRoute(app: FastifyInstance) {
         {
           symbol: i.symbol,
           name: i.name,
+          displayName: i.displayName ?? null,
           assetClass: i.assetClass,
           unit: i.unit,
           market: i.market,
@@ -1237,16 +1239,24 @@ export async function transactionsRoute(app: FastifyInstance) {
       );
       // Self-heal: enqueue a sector sweep if any held instrument hasn't been
       // enriched yet (or has a stale attempt). Debounced to once per 6h.
-      if (needsSectorEnrichment([...metaById.values()])) {
+      if (
+        needsSectorEnrichment([...metaById.values()]) ||
+        needsNameEnrichment([...metaById.values()])
+      ) {
         void enqueueInstrumentMetadata();
       }
       const allocation = allocationBreakdown(summary, metaById);
       const drift = await loadDrift(id, portfolioId, allocation);
+      const spark = await loadSparklines(
+        app.db,
+        summary.holdings.map((h) => h.instrumentId),
+      );
       return {
         ...summary,
         holdings: summary.holdings.map((h) => ({
           ...h,
           instrument: metaById.get(h.instrumentId) ?? null,
+          sparkline: spark.get(h.instrumentId),
         })),
         allocation,
         ...(Object.keys(drift).length > 0 ? { drift } : {}),
@@ -1476,14 +1486,19 @@ export async function transactionsRoute(app: FastifyInstance) {
 
       const aggregated = aggregatePortfolios(summaries, display);
       const meta = await instrumentMeta([...instrumentIds]);
+      const spark = await loadSparklines(app.db, [...instrumentIds]);
       const holdings = aggregated.holdings.map((h) => ({
         ...h,
         instrument: meta.get(h.instrumentId) ?? null,
+        sparkline: spark.get(h.instrumentId),
       }));
 
       // Self-heal: enqueue a sector sweep if any held instrument hasn't been
       // enriched yet (or has a stale attempt). Debounced to once per 6h.
-      if (needsSectorEnrichment([...meta.values()])) {
+      if (
+        needsSectorEnrichment([...meta.values()]) ||
+        needsNameEnrichment([...meta.values()])
+      ) {
         void enqueueInstrumentMetadata();
       }
 

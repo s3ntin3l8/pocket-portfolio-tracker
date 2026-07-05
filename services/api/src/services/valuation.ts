@@ -18,6 +18,9 @@ import { toCoreTxns } from "./tx-core.js";
 export interface InstrumentMeta {
   symbol: string;
   name: string;
+  /** Clean provider-resolved name (e.g. "Apple Inc."); null until enriched. UI prefers
+   *  `displayName ?? name`. */
+  displayName: string | null;
   assetClass: string;
   unit: string;
   /** Exchange/venue code (IDX, XETRA, XAU, …). Used for region breakdown in allocation analytics. */
@@ -84,6 +87,7 @@ export async function valuePortfolio(
       {
         symbol: i.symbol,
         name: i.name,
+        displayName: i.displayName ?? null,
         assetClass: i.assetClass,
         unit: i.unit,
         market: i.market,

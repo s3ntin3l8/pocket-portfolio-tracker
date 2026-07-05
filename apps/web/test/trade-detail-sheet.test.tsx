@@ -40,6 +40,7 @@ const CLOSED: Trade = {
   instrument: {
     symbol: "BBNI",
     name: "Bank Negara Indonesia",
+    displayName: null,
     assetClass: "equity",
     unit: "shares",
     market: "IDX",
@@ -76,6 +77,7 @@ const LOSER: Trade = {
   instrument: {
     symbol: "ARTO",
     name: "Bank Jago",
+    displayName: null,
     assetClass: "equity",
     unit: "shares",
     market: "IDX",

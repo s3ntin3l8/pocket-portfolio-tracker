@@ -44,6 +44,10 @@ export interface Candle {
 export interface InstrumentSearchResult {
   symbol: string;
   name: string;
+  /** The provider's clean long/short company name (e.g. "Apple Inc."), when it reports one.
+   *  Kept separate from `name` (which some callers use to prefill forms) so the enrichment
+   *  job can store a clean `displayName` without changing existing behavior. */
+  longName?: string;
   market: string; // 'IDX' | 'XETRA' | ...
   assetClass: AssetClass;
   currency: string;

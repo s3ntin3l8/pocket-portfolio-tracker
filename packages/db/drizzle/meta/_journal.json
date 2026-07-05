@@ -407,6 +407,13 @@
       "when": 1783199582577,
       "tag": "0057_flowery_enchantress",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1783258617599,
+      "tag": "0058_regular_wolverine",
+      "breakpoints": true
     }
   ]
 }
