@@ -1,6 +1,6 @@
-import type React from "react";
+import type { ReactNode } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Coins, ChevronRight } from "lucide-react";
+import { Coins } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -15,7 +15,11 @@ import { IncomeHeatmap } from "@/components/charts/income-heatmap";
 import { ReportHeader } from "@/components/report-header";
 import { YieldsTable } from "@/components/income/yields-table";
 import { ByCurrencyTable } from "@/components/income/by-currency-table";
-import { IncomeEventsTable, type IncomeEventRow } from "@/components/income/income-events-table";
+import {
+  IncomeEventsTable,
+  TimelineColumnHeader,
+  type IncomeEventRow,
+} from "@/components/income/income-events-table";
 import { loadIncomeStats } from "@/lib/server-api";
 import { formatMoney, formatPercent } from "@/lib/utils";
 
@@ -26,35 +30,6 @@ function totalsByCurrency(events: IncomeEventRow[]): Record<string, number> {
     totals[e.currency] = (totals[e.currency] ?? 0) + Number(e.amount);
   }
   return totals;
-}
-
-/** Collapsible year/forecast section using native <details>/<summary>. */
-function CollapsibleYearSection({
-  title,
-  totalsNode,
-  defaultOpen,
-  children,
-}: {
-  title: React.ReactNode;
-  totalsNode: React.ReactNode;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <details
-      className="group space-y-3"
-      {...(defaultOpen ? { open: true } : {})}
-    >
-      <summary className="flex cursor-pointer list-none items-baseline justify-between [&::-webkit-details-marker]:hidden">
-        <div className="flex items-center gap-1.5">
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-          <h2 className="text-lg font-semibold">{title}</h2>
-        </div>
-        <p className="tabular text-sm text-muted-foreground">{totalsNode}</p>
-      </summary>
-      <div className="space-y-3">{children}</div>
-    </details>
-  );
 }
 
 export default async function IncomePage({
@@ -173,6 +148,54 @@ export default async function IncomePage({
   const hasGrowth = nextYearRows.some((r) => r.status === "grown");
   const hasContributions = nextYearRows.some((r) => r.assumesContributions);
 
+  // Per-year sub-header subtitle ("received + forecast" / "forecast" / "received")
+  // and the multi-currency subtotal string shown on the right of each year header.
+  const yearSubtitle = (yearRows: IncomeEventRow[]): string => {
+    const anyForecast = yearRows.some((r) => r.status);
+    const anyReceived = yearRows.some((r) => !r.status);
+    return anyForecast
+      ? anyReceived
+        ? t("yearReceivedForecast")
+        : t("yearForecast")
+      : t("yearReceived");
+  };
+  const subtotalOf = (yearRows: IncomeEventRow[]): string =>
+    Object.entries(totalsByCurrency(yearRows))
+      .map(([cur, amount]) => formatMoney(amount, cur, locale))
+      .join(" · ");
+
+  // Ordered timeline groups: next-year forecast first, then historical years desc.
+  const timelineGroups: {
+    year: string;
+    rows: IncomeEventRow[];
+    subtitle: string;
+    subtotal: string;
+    assumptions?: ReactNode;
+  }[] = [];
+  if (nextYearRows.length > 0) {
+    timelineGroups.push({
+      year: nextYearStr,
+      rows: nextYearRows,
+      subtitle: yearSubtitle(nextYearRows),
+      subtotal: subtotalOf(nextYearRows),
+      assumptions: (
+        <>
+          {t("assumptionsBase")}
+          {hasGrowth && <> {t("assumptionsGrowth")}</>}
+          {hasContributions && <> {t("assumptionsContributions")}</>}
+        </>
+      ),
+    });
+  }
+  for (const [year, events] of [...byYear.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
+    timelineGroups.push({
+      year,
+      rows: events,
+      subtitle: yearSubtitle(events),
+      subtotal: subtotalOf(events),
+    });
+  }
+
   return (
     <div className="space-y-8">
       {heading}
@@ -289,59 +312,48 @@ export default async function IncomePage({
         )}
       </div>
 
-      {nextYearRows.length > 0 && (
-        <CollapsibleYearSection
-          defaultOpen
-          title={t("nextYearSectionTitle", { year: nextYearStr })}
-          totalsNode={
-            <>
-              {t("yearTotal")}{" "}
-              <span className="font-medium text-foreground">
-                {Object.entries(totalsByCurrency(nextYearRows))
-                  .map(([cur, amount]) => formatMoney(amount, cur, locale))
-                  .join(" · ")}
+      {/* Payments timeline — one card, year sub-headers newest-first (reference). */}
+      {timelineGroups.length > 0 && (
+        <div className="rounded-[20px] bg-card p-[22px] shadow-card">
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold">{t("paymentsTimelineTitle")}</h2>
+              <p className="mt-0.5 text-xs font-medium text-text-2">{t("paymentsTimelineSubtitle")}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2.5 rounded-[3px] bg-success" />
+                {t("legendReceived")}
               </span>
-            </>
-          }
-        >
-          <p className="text-sm text-muted-foreground">
-            {t("assumptionsBase")}
-            {hasGrowth && <> {t("assumptionsGrowth")}</>}
-            {hasContributions && <> {t("assumptionsContributions")}</>}
-          </p>
-
-          <div className="rounded-xl bg-card shadow-card">
-            <IncomeEventsTable rows={nextYearRows} />
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="size-2.5 rounded-[3px]"
+                  style={{ backgroundColor: "rgba(16,163,114,.12)", border: "1.5px dashed #0E9F6E" }}
+                />
+                {t("legendForecast")}
+              </span>
+            </div>
           </div>
-        </CollapsibleYearSection>
-      )}
 
-      {[...byYear.entries()]
-        .sort((a, b) => b[0].localeCompare(a[0]))
-        .map(([year, events]) => {
-          const totals = totalsByCurrency(events);
-          return (
-            <CollapsibleYearSection
-              key={year}
-              defaultOpen={year === currentYear}
-              title={year}
-              totalsNode={
-                <>
-                  {t("yearTotal")}{" "}
-                  <span className="font-medium text-foreground">
-                    {Object.entries(totals)
-                      .map(([cur, amount]) => formatMoney(amount, cur, locale))
-                      .join(" · ")}
-                  </span>
-                </>
-              }
-            >
-              <div className="rounded-xl bg-card shadow-card">
-                <IncomeEventsTable rows={events} />
+          <TimelineColumnHeader />
+
+          {timelineGroups.map((g) => (
+            <div key={g.year} className="mt-3.5">
+              <div className="sticky top-0 z-[2] flex items-baseline justify-between border-b border-border bg-card/95 py-2 backdrop-blur-sm">
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-[15px] font-extrabold">{g.year}</span>
+                  <span className="text-[11px] font-semibold text-text-3">{g.subtitle}</span>
+                </div>
+                <span className="tabular text-[13px] font-bold text-text-mute">{g.subtotal}</span>
               </div>
-            </CollapsibleYearSection>
-          );
-        })}
+              {g.assumptions && (
+                <p className="pt-2 text-xs text-text-2">{g.assumptions}</p>
+              )}
+              <IncomeEventsTable rows={g.rows} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -307,7 +307,15 @@
     "heatmapDefaultSubtitle": "Ketuk sebuah sel untuk melihat pendapatan bulan itu",
     "heatmapLess": "Sedikit",
     "heatmapMore": "Banyak",
-    "heatmapCellSubtitle": "{month} · {amount}"
+    "heatmapCellSubtitle": "{month} · {amount}",
+    "paymentsTimelineTitle": "Linimasa pembayaran",
+    "paymentsTimelineSubtitle": "Distribusi diterima & perkiraan",
+    "legendReceived": "Diterima",
+    "legendForecast": "Perkiraan",
+    "est": "perk.",
+    "yearReceivedForecast": "diterima + perkiraan",
+    "yearForecast": "perkiraan",
+    "yearReceived": "diterima"
   },
   "Savings": {
     "title": "Tabungan",

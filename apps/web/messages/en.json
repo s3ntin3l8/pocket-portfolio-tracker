@@ -307,7 +307,15 @@
     "heatmapDefaultSubtitle": "Tap a cell to see the month's income",
     "heatmapLess": "Less",
     "heatmapMore": "More",
-    "heatmapCellSubtitle": "{month} · {amount}"
+    "heatmapCellSubtitle": "{month} · {amount}",
+    "paymentsTimelineTitle": "Payments timeline",
+    "paymentsTimelineSubtitle": "Received & forecast distributions",
+    "legendReceived": "Received",
+    "legendForecast": "Forecast",
+    "est": "est.",
+    "yearReceivedForecast": "received + forecast",
+    "yearForecast": "forecast",
+    "yearReceived": "received"
   },
   "Savings": {
     "title": "Savings",
