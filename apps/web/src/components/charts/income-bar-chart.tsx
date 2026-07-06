@@ -151,35 +151,40 @@ export function ChartTooltip({
 
 /**
  * Total (received + projected) above each bar — reference: 700/11px, full-strength
- * text color, sitting just above the bar top. Rendered from the axis scales directly
- * rather than a `Bar`'s `LabelList`: recharts drops any *stacked* rectangle with 0
- * height (an optimization in `Bar.js`), which would silently drop the label for every
- * bar whose `projected` segment happens to be empty — i.e. every year but the current
- * one. Reading the scales sidesteps that filtering entirely.
+ * text color. All labels sit on one shared line, at the height of the *tallest* bar
+ * (not floating individually above each bar's own top), so the row reads cleanly
+ * left to right. Rendered from the axis scales directly rather than a `Bar`'s
+ * `LabelList`: recharts drops any *stacked* rectangle with 0 height (an optimization
+ * in `Bar.js`), which would silently drop the label for every bar whose `projected`
+ * segment happens to be empty — i.e. every year but the current one. Reading the
+ * scales sidesteps that filtering entirely.
  */
 function BarTotalLabels({ data, format }: { data: IncomeBar[]; format: (v: number) => string }) {
   const xScale = useXAxisScale();
   const yScale = useYAxisScale();
   if (!xScale || !yScale) return null;
+  const totals = data.map((d) => d.value + (d.projected ?? 0));
+  const maxTotal = Math.max(...totals);
+  if (maxTotal <= 0) return null;
+  const labelY = yScale(maxTotal);
+  if (labelY === undefined) return null;
   return (
     <>
       {data.map((d, i) => {
-        const total = d.value + (d.projected ?? 0);
-        if (total === 0) return null;
+        if (totals[i] === 0) return null;
         const x = xScale(d.label, { position: "middle" });
-        const y = yScale(total);
-        if (x === undefined || y === undefined) return null;
+        if (x === undefined) return null;
         return (
           <text
             key={i}
             x={x}
-            y={y - 8}
+            y={labelY - 8}
             textAnchor="middle"
             fontSize={11}
             fontWeight={700}
             fill="var(--color-foreground)"
           >
-            {format(total)}
+            {format(totals[i])}
           </text>
         );
       })}

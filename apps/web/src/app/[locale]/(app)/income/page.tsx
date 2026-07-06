@@ -223,7 +223,7 @@ export default async function IncomePage({
 
       {s.byYear.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
+          <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1.5 pb-2">
             <CardTitle>{t("perYearTitle")}</CardTitle>
             <IncomeBarChartLegend />
           </CardHeader>
