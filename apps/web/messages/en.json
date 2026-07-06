@@ -723,9 +723,12 @@
     "actionError": "Something went wrong. Please try again.",
     "downloadError": "Receipt unavailable — it may have been deleted or storage is down.",
     "reassign": "Reassign all to…",
+    "selectRows": "Select rows",
     "selectAll": "Select all",
     "selectRow": "Select import",
     "selectBatch": "Select batch",
+    "selectPrompt": "Select rows to act on",
+    "cancelSelection": "Cancel selection",
     "batchLabel": "Upload · {count, plural, one {# file} other {# files}}",
     "selectedCount": "{count, plural, one {# selected} other {# selected}}",
     "deleteSelected": "Delete selected",
@@ -1062,7 +1065,9 @@
       "notRetained": "The original document was not stored. To keep imported files, enable document retention in the portfolio settings."
     },
     "batch": {
+      "selectRows": "Select rows",
       "selected": "{count, plural, one {# selected} other {# selected}}",
+      "selectPrompt": "Select rows to act on",
       "delete": "Delete selected",
       "confirmPrompt": "Delete these transactions?",
       "confirm": "Delete",
@@ -1071,7 +1076,9 @@
       "selectRow": "Select transaction",
       "confirmDrafts": "Confirm selected",
       "discardDrafts": "Discard selected",
-      "reassign": "Reassign…"
+      "reassign": "Reassign…",
+      "loadMore": "Load more",
+      "showingCount": "Showing {shown} of {total}"
     },
     "filterDraftLabel": "Draft filter",
     "draftShowAll": "All",

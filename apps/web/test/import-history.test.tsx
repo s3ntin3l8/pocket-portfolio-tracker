@@ -67,6 +67,7 @@ const items: ImportRecord[] = [
     createdAt: "2026-06-10T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
   {
     id: "conf1",
@@ -78,6 +79,7 @@ const items: ImportRecord[] = [
     createdAt: "2026-06-09T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
 ];
 
@@ -92,6 +94,7 @@ const threeItems: ImportRecord[] = [
     createdAt: "2026-06-12T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
   {
     id: "i2",
@@ -103,6 +106,7 @@ const threeItems: ImportRecord[] = [
     createdAt: "2026-06-11T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
   {
     id: "i3",
@@ -114,6 +118,7 @@ const threeItems: ImportRecord[] = [
     createdAt: "2026-06-10T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
 ];
 
@@ -135,6 +140,7 @@ const discardedItem: ImportRecord = {
   createdAt: "2026-06-08T10:00:00.000Z",
   batchId: null,
   document: null,
+  originalFilename: null,
 };
 
 const itemsWithDiscarded: ImportRecord[] = [...items, discardedItem];
@@ -409,6 +415,7 @@ describe("ImportHistory", () => {
       createdAt: "2026-06-09T10:00:00.000Z",
       batchId: null,
       document: { id: "doc1", originalFilename: "export.pdf", mimeType: "application/pdf", sizeBytes: 12345, storedAt: "2026-06-09T10:00:00.000Z" },
+      originalFilename: "export.pdf",
     };
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
@@ -424,14 +431,16 @@ describe("ImportHistory", () => {
 
   it("bulk-deletes a multi-select of drafts in one request (no confirm step)", async () => {
     const drafts: ImportRecord[] = [
-      { id: "d1", portfolioId: "p1", parser: "csv", status: "draft", confidence: null, count: 2, createdAt: "2026-06-10T10:00:00.000Z", batchId: null, document: null },
-      { id: "d2", portfolioId: "p1", parser: "dkb", status: "draft", confidence: null, count: 3, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null },
+      { id: "d1", portfolioId: "p1", parser: "csv", status: "draft", confidence: null, count: 2, createdAt: "2026-06-10T10:00:00.000Z", batchId: null, document: null, originalFilename: null },
+      { id: "d2", portfolioId: "p1", parser: "dkb", status: "draft", confidence: null, count: 3, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null, originalFilename: null },
     ];
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <ImportHistory items={drafts} />
       </NextIntlClientProvider>,
     );
+    // Checkboxes stay hidden until selection mode is entered via the header toggle.
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
     fireEvent.click(screen.getByLabelText(m.selectAll));
     fireEvent.click(screen.getByRole("button", { name: m.deleteSelected }));
     await waitFor(() => expect(bulkDeleteImports).toHaveBeenCalledTimes(1));
@@ -440,14 +449,15 @@ describe("ImportHistory", () => {
   });
 
   it("requires a confirmation click before bulk-deleting a selection with confirmed imports", async () => {
-    const confirmed: ImportRecord = { id: "c1", portfolioId: "p1", parser: "dkb", status: "confirmed", confidence: null, count: 7, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null };
+    const confirmed: ImportRecord = { id: "c1", portfolioId: "p1", parser: "dkb", status: "confirmed", confidence: null, count: 7, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null, originalFilename: null };
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <ImportHistory items={[confirmed]} />
       </NextIntlClientProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
-    fireEvent.click(screen.getByLabelText(m.selectRow));
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    fireEvent.click(desktop().getByLabelText(m.selectRow));
     // First click → warning, no request yet.
     fireEvent.click(screen.getByRole("button", { name: m.deleteSelected }));
     expect(bulkDeleteImports).not.toHaveBeenCalled();
@@ -459,8 +469,8 @@ describe("ImportHistory", () => {
 
   it("groups same-batch uploads and selects the whole batch in one click", async () => {
     const batched: ImportRecord[] = [
-      { id: "b-a", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:01.000Z", batchId: "batch-1", document: null },
-      { id: "b-b", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:02.000Z", batchId: "batch-1", document: null },
+      { id: "b-a", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:01.000Z", batchId: "batch-1", document: null, originalFilename: "statement.pdf" },
+      { id: "b-b", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:02.000Z", batchId: "batch-1", document: null, originalFilename: "statement.pdf" },
     ];
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
@@ -469,7 +479,8 @@ describe("ImportHistory", () => {
     );
     // Shown once per layout — desktop's batch-header row and the mobile group caption.
     expect(screen.getAllByText(/Upload · 2 files/).length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByLabelText(m.selectBatch));
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    fireEvent.click(desktop().getByLabelText(m.selectBatch));
     fireEvent.click(screen.getByRole("button", { name: m.deleteSelected }));
     await waitFor(() => expect(bulkDeleteImports).toHaveBeenCalledTimes(1));
     expect(new Set(bulkDeleteImports.mock.calls[0][0])).toEqual(new Set(["b-a", "b-b"]));
@@ -479,11 +490,64 @@ describe("ImportHistory", () => {
   // Reference-fidelity redesign: icon+filename column, mobile compact cards,
   // long-press-to-select.
   // -------------------------------------------------------------------------
+  it("hides desktop checkboxes by default and reveals them via the select-rows toggle", () => {
+    renderHistory();
+    expect(desktop().queryByLabelText(m.selectAll)).toBeNull();
+    expect(desktop().queryByLabelText(m.selectRow)).toBeNull();
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+
+    expect(desktop().getByLabelText(m.selectAll)).toBeInTheDocument();
+    expect(desktop().getByLabelText(m.selectRow)).toBeInTheDocument();
+    // Entering selection mode with nothing picked yet shows the prompt, not "0 selected".
+    expect(screen.getByText(m.selectPrompt)).toBeInTheDocument();
+  });
+
+  it("cancel (X) exits selection mode and clears the selection", () => {
+    renderHistory();
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    fireEvent.click(desktop().getByLabelText(m.selectRow));
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: m.cancelSelection }));
+
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+    expect(desktop().queryByLabelText(m.selectRow)).toBeNull();
+    // Back to the toggle, ready to start a fresh selection.
+    expect(desktop().getByRole("button", { name: m.selectRows })).toBeInTheDocument();
+  });
+
   it("renders the File column header and a friendly fallback label when no document exists", () => {
     renderHistory();
     expect(desktop().getByText(m.file)).toBeInTheDocument();
     // draft1 (parser "csv") has no stored document — falls back to the friendly source label.
     expect(desktop().getByText("CSV")).toBeInTheDocument();
+  });
+
+  it("shows the real imported filename instead of the generic source label when available", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory
+          items={[
+            {
+              id: "draft-named",
+              portfolioId: "p1",
+              parser: "csv",
+              status: "draft",
+              confidence: null,
+              count: 3,
+              createdAt: "2026-06-10T10:00:00.000Z",
+              batchId: null,
+              document: null,
+              originalFilename: "dkb-umsaetze-juni.csv",
+            },
+          ]}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(desktop().getByText("dkb-umsaetze-juni.csv")).toBeInTheDocument();
+    expect(desktop().queryByText("CSV")).not.toBeInTheDocument();
   });
 
   it("renders a compact mobile card with a composed source/date/count subline", () => {

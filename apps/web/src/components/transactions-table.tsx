@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   PencilLine,
   Landmark,
+  ListChecks,
   Loader2,
   Trash2,
   Search,
@@ -293,6 +294,12 @@ export function TransactionsTable({
   const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [query, setQuery] = useState("");
   const [showFlagged, setShowFlagged] = useState(false);
+  // How many of the (already filtered+sorted) rows to render — the ledger can grow long
+  // for old/frequent portfolios, pushing "Recent imports" far below the fold. Capped with
+  // an explicit "Load more" button rather than infinite-scroll: scroll-triggered loading
+  // never bottoms out, which would make Recent imports permanently unreachable by scroll.
+  const PAGE_SIZE = 25;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [detailTx, setDetailTx] = useState<TxRow | null>(null);
   const [editTx, setEditTx] = useState<TxRow | null>(null);
 
@@ -312,6 +319,17 @@ export function TransactionsTable({
   // state during render is React's recommended pattern over a setState-in-effect.
   if (draftFilter === "drafts" && draftCount === 0) {
     setDraftFilter("all");
+  }
+
+  // Re-cap the visible window whenever the effective view changes, so a newly narrowed
+  // filter/search/sort starts short instead of inheriting a stale "loaded 200" from the
+  // previous view. Tracks the prior signature in state (not a ref) per React's documented
+  // "adjusting state when a value changes during render" pattern.
+  const viewSignature = `${chipFilter}|${yearFilter}|${draftFilter}|${query}|${showFlagged}|${sortKey}`;
+  const [prevViewSignature, setPrevViewSignature] = useState(viewSignature);
+  if (viewSignature !== prevViewSignature) {
+    setPrevViewSignature(viewSignature);
+    setVisibleCount(PAGE_SIZE);
   }
 
   // Derive distinct options from `rows` so selects only show values present in the data.
@@ -592,6 +610,16 @@ export function TransactionsTable({
   const colSpan = showPortfolio ? 8 : 7;
 
   const sortedRows = sort(visibleRows);
+  // Cap how many of the (filtered+sorted) rows actually render — see PAGE_SIZE/visibleCount
+  // above. Select-all and the empty-state check deliberately keep reading `visibleRows` (the
+  // full filtered set), not this window, so "select all" still covers everything filtered,
+  // not just what's currently rendered. Memoized (unlike `sortedRows`, a bare re-sort call)
+  // so it has a stable identity for `dayGroups`' dependency array below.
+  const windowedRows = useMemo(
+    () => sortedRows.slice(0, visibleCount),
+    [sortedRows, visibleCount],
+  );
+  const hasMore = sortedRows.length > windowedRows.length;
   // The reference groups the ledger into month bands. That only reads coherently while the
   // list is in date order (the default, or an explicit Date sort); any other sort renders flat.
   const groupByMonth = sortKey === null || sortKey === "date";
@@ -609,14 +637,14 @@ export function TransactionsTable({
   );
   const dayGroups = useMemo(() => {
     const groups: { day: string; label: string; rows: TxRow[] }[] = [];
-    for (const tx of sortedRows) {
+    for (const tx of windowedRows) {
       const day = tx.executedAt.slice(0, 10);
       const last = groups[groups.length - 1];
       if (last && last.day === day) last.rows.push(tx);
       else groups.push({ day, label: dayFmt.format(new Date(tx.executedAt)), rows: [tx] });
     }
     return groups;
-  }, [sortedRows, dayFmt]);
+  }, [windowedRows, dayFmt]);
 
   // Anomaly banner — only when anomalies exist (only passed in single-portfolio view).
   const anomalyErrors = anomalies.filter((a) => a.severity === "error");
@@ -796,8 +824,8 @@ export function TransactionsTable({
         </div>
       </div>
 
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
+      {selectionMode && (
+        <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
           <span className="flex items-center gap-2 text-muted-foreground">
             {/* Exit selection mode (clearing the set also hides the checkboxes again). */}
             <button
@@ -805,79 +833,80 @@ export function TransactionsTable({
               onClick={clearSelection}
               aria-label={tb("cancel")}
               title={tb("cancel")}
-              className="text-muted-foreground hover:text-foreground"
+              className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
             >
               <X className="size-4" />
             </button>
-            {tb("selected", { count: selected.size })}
+            {selected.size > 0 ? tb("selected", { count: selected.size }) : tb("selectPrompt")}
           </span>
-          {confirming ? (
-            <span className="flex items-center gap-2">
-              <span className="text-muted-foreground">{tb("confirmPrompt")}</span>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={onBatchDelete}
-                disabled={busy}
-              >
-                {busy && <Loader2 className="size-3.5 animate-spin" />}
-                {tb("confirm")}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirming(false)}
-                disabled={busy}
-              >
-                {tb("cancel")}
-              </Button>
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              {selectedDraftIds.length > 0 && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => onBatchResolve("confirm")}
-                    disabled={busy}
-                  >
-                    {busy && <Loader2 className="size-3.5 animate-spin" />}
-                    <Check className="size-3.5" />
-                    {tb("confirmDrafts")}
-                  </Button>
+          {selected.size > 0 &&
+            (confirming ? (
+              <span className="flex items-center gap-2">
+                <span className="text-muted-foreground">{tb("confirmPrompt")}</span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={onBatchDelete}
+                  disabled={busy}
+                >
+                  {busy && <Loader2 className="size-3.5 animate-spin" />}
+                  {tb("confirm")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirming(false)}
+                  disabled={busy}
+                >
+                  {tb("cancel")}
+                </Button>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                {selectedDraftIds.length > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onBatchResolve("confirm")}
+                      disabled={busy}
+                    >
+                      {busy && <Loader2 className="size-3.5 animate-spin" />}
+                      <Check className="size-3.5" />
+                      {tb("confirmDrafts")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onBatchResolve("discard")}
+                      disabled={busy}
+                    >
+                      {tb("discardDrafts")}
+                    </Button>
+                  </>
+                )}
+                {canReassign && (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => onBatchResolve("discard")}
+                    onClick={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
                     disabled={busy}
                   >
-                    {tb("discardDrafts")}
+                    <FolderInput className="size-3.5" />
+                    {tb("reassign")}
                   </Button>
-                </>
-              )}
-              {canReassign && (
+                )}
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
+                  variant="destructive"
+                  onClick={() => setConfirming(true)}
                   disabled={busy}
                 >
-                  <FolderInput className="size-3.5" />
-                  {tb("reassign")}
+                  <Trash2 className="size-3.5" />
+                  {tb("delete")}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => setConfirming(true)}
-                disabled={busy}
-              >
-                <Trash2 className="size-3.5" />
-                {tb("delete")}
-              </Button>
-            </span>
-          )}
+              </span>
+            ))}
         </div>
       )}
 
@@ -903,10 +932,13 @@ export function TransactionsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              {/* Checkbox column collapses to zero width until selection mode is entered
-                  (keeps colSpan stable so the month bands still span correctly). */}
-              <TableHead className={selectionMode ? "w-10" : "w-0 p-0"}>
-                {selectionMode && (
+              {/* Checkbox column: a select-rows toggle until selection mode is entered, then
+                  the "select all" checkbox. Fixed wide enough that both the toggle button and
+                  the checkbox fit without the column ever needing to grow (table-layout:auto
+                  otherwise resizes it per the widest content-box actually rendered, which
+                  visibly shifted every column after it when swapping between the two). */}
+              <TableHead className="w-16">
+                {selectionMode ? (
                   <input
                     type="checkbox"
                     className="size-4 align-middle accent-primary"
@@ -914,6 +946,17 @@ export function TransactionsTable({
                     checked={allSelected}
                     onChange={toggleAll}
                   />
+                ) : (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6"
+                    title={tb("selectRows")}
+                    aria-label={tb("selectRows")}
+                    onClick={() => setSelectionMode(true)}
+                  >
+                    <ListChecks className="size-4" />
+                  </Button>
                 )}
               </TableHead>
               <SortableTableHead colKey="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("date")}</SortableTableHead>
@@ -926,7 +969,7 @@ export function TransactionsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedRows.map((tx, i) => {
+            {windowedRows.map((tx, i) => {
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
               const anomaly = anomalyByTxId.get(tx.id);
@@ -935,7 +978,7 @@ export function TransactionsTable({
               // The band uses role="presentation" so it stays out of row counts/queries.
               const monthKey = tx.executedAt.slice(0, 7);
               const showBand =
-                groupByMonth && (i === 0 || sortedRows[i - 1].executedAt.slice(0, 7) !== monthKey);
+                groupByMonth && (i === 0 || windowedRows[i - 1].executedAt.slice(0, 7) !== monthKey);
               return (
                 <Fragment key={tx.id}>
                   {showBand && (
@@ -956,7 +999,7 @@ export function TransactionsTable({
                   onClick={() => onRowActivate(tx)}
                   {...longPressHandlers(tx.id)}
                 >
-                  <TableCell className={selectionMode ? "" : "w-0 p-0"}>
+                  <TableCell className="w-16">
                     {selectionMode && (
                       <span onClick={(e) => e.stopPropagation()}>
                         <input
@@ -1157,6 +1200,20 @@ export function TransactionsTable({
           </div>
         )}
       </div>
+
+      {/* Explicit "Load more" rather than scroll-triggered/infinite loading — an
+          intersection-observer approach never bottoms out, which would make "Recent
+          imports" (rendered below this table) permanently unreachable by scrolling. */}
+      {visibleRows.length > 0 && hasMore && (
+        <div className="flex flex-col items-center gap-2 py-2">
+          <Button variant="outline" size="sm" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+            {tb("loadMore")}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {tb("showingCount", { shown: windowedRows.length, total: sortedRows.length })}
+          </span>
+        </div>
+      )}
 
       <TransactionDetailSheet
         tx={detailTx}

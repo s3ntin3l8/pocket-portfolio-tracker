@@ -159,6 +159,7 @@ export interface ImportClient {
   ): Promise<ImportResult>;
   importCsv(
     content: string,
+    filename?: string,
     format?: CsvFormat,
     force?: boolean,
     batchId?: string,
@@ -443,7 +444,7 @@ export function ImportFlow({
       const file = files[0]!;
       try {
         const result = isCsvFile(file)
-          ? await client.importCsv(await fileToText(file), "auto", force)
+          ? await client.importCsv(await fileToText(file), file.name, "auto", force)
           : await client.importScreenshot(file, force);
         if (result.alreadyConfirmed) {
           setError(t("errors.alreadyConfirmed"));
@@ -503,7 +504,7 @@ export function ImportFlow({
       setStatus(i, "parsing");
       try {
         const result = isCsvFile(file)
-          ? await client.importCsv(await fileToText(file), "auto", force, batchId)
+          ? await client.importCsv(await fileToText(file), file.name, "auto", force, batchId)
           : await client.importScreenshot(file, force, batchId);
         if (result.alreadyConfirmed) {
           setStatus(i, "failed");

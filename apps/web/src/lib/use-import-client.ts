@@ -22,8 +22,8 @@ export function useImportClient(): ImportClient {
     () => ({
       importScreenshot: (file, force, batchId) =>
         api.importScreenshot(file, force, batchId) as unknown as Promise<ImportResult>,
-      importCsv: (content, format, force, batchId) =>
-        api.importCsv(content, format, force, batchId) as unknown as Promise<ImportResult>,
+      importCsv: (content, filename, format, force, batchId) =>
+        api.importCsv(content, filename, format, force, batchId) as unknown as Promise<ImportResult>,
       confirmImport: (
         importId,
         drafts,

@@ -721,9 +721,12 @@
     "actionError": "Terjadi kesalahan. Silakan coba lagi.",
     "downloadError": "Tanda terima tidak tersedia — mungkin sudah dihapus atau penyimpanan sedang bermasalah.",
     "reassign": "Pindahkan semua ke…",
+    "selectRows": "Pilih baris",
     "selectAll": "Pilih semua",
     "selectRow": "Pilih impor",
     "selectBatch": "Pilih batch",
+    "selectPrompt": "Pilih baris untuk ditindaklanjuti",
+    "cancelSelection": "Batalkan pemilihan",
     "batchLabel": "Unggahan · {count, plural, other {# berkas}}",
     "selectedCount": "{count, plural, other {# dipilih}}",
     "deleteSelected": "Hapus pilihan",
@@ -1060,7 +1063,9 @@
       "notRetained": "Dokumen asli tidak disimpan. Untuk menyimpan file yang diimpor, aktifkan retensi dokumen di pengaturan portofolio."
     },
     "batch": {
+      "selectRows": "Pilih baris",
       "selected": "{count, plural, one {# dipilih} other {# dipilih}}",
+      "selectPrompt": "Pilih baris untuk ditindaklanjuti",
       "delete": "Hapus yang dipilih",
       "confirmPrompt": "Hapus transaksi ini?",
       "confirm": "Hapus",
@@ -1069,7 +1074,9 @@
       "selectRow": "Pilih transaksi",
       "confirmDrafts": "Konfirmasi yang dipilih",
       "discardDrafts": "Buang yang dipilih",
-      "reassign": "Pindahkan…"
+      "reassign": "Pindahkan…",
+      "loadMore": "Muat lainnya",
+      "showingCount": "Menampilkan {shown} dari {total}"
     },
     "filterDraftLabel": "Filter draf",
     "draftShowAll": "Semua",

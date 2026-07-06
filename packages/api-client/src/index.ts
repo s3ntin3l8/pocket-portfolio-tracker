@@ -1295,6 +1295,12 @@ export interface ImportRecord {
   createdAt: string;
   /** Retained source document, if one exists and the portfolio has retention enabled. */
   document: ImportDocumentSummary | null;
+  /**
+   * The uploaded file's original name, for display — available even before confirm/retention
+   * (a "staged" document still carries it), unlike {@link document} which is retained-only.
+   * Never implies a downloadable file exists; use `document` for that.
+   */
+  originalFilename: string | null;
 }
 
 /** Signed-URL response for a retained source document. */
@@ -2012,12 +2018,14 @@ export function createApiClient(config: ApiClientConfig) {
     // re-flagged at confirm time, so this never silently creates true duplicates (#229).
     importCsv: (
       content: string,
+      filename?: string,
       format: "auto" | "generic" | "dkb" | "ibkr" | "ibkr-xml" | "coinbase" | "tr-csv" = "auto",
       force = false,
       batchId?: string,
     ) =>
       request<CsvImportResult>("POST", `/imports/csv${uploadQuery(force, batchId)}`, {
         content,
+        filename,
         format,
       }),
     importScreenshot: (file: File | Blob, force = false, batchId?: string) => {

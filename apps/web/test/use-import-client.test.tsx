@@ -27,8 +27,8 @@ describe("useImportClient", () => {
     await client.importScreenshot(file, true, "batch-1");
     expect(api.importScreenshot).toHaveBeenCalledWith(file, true, "batch-1");
 
-    await client.importCsv("a,b", "auto", false, "batch-1");
-    expect(api.importCsv).toHaveBeenCalledWith("a,b", "auto", false, "batch-1");
+    await client.importCsv("a,b", "x.csv", "auto", false, "batch-1");
+    expect(api.importCsv).toHaveBeenCalledWith("a,b", "x.csv", "auto", false, "batch-1");
 
     await client.confirmImport("imp", [], [], "p1", true, false);
     expect(api.confirmImport).toHaveBeenCalledWith("imp", [], [], "p1", true, false);

@@ -151,7 +151,7 @@ describe("ImportFlow", () => {
 
     fireEvent.change(fileInput(container), { target: { files: [csvFile("t.csv")] } });
     await waitFor(() => expect(client.importCsv).toHaveBeenCalled());
-    expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "auto", false);
+    expect(client.importCsv).toHaveBeenCalledWith(expect.any(String), "t.csv", "auto", false);
     expect(client.importScreenshot).not.toHaveBeenCalled();
   });
 
@@ -425,12 +425,12 @@ describe("ImportFlow", () => {
       expect(screen.getByText(messages.Import.errors.alreadyConfirmed)).toBeInTheDocument(),
     );
     const reImport = screen.getByRole("button", { name: messages.Import.reImportAnyway });
-    expect(importCsv).toHaveBeenLastCalledWith(expect.any(String), "auto", false);
+    expect(importCsv).toHaveBeenLastCalledWith(expect.any(String), "dup.csv", "auto", false);
 
     fireEvent.click(reImport);
 
     await waitFor(() =>
-      expect(importCsv).toHaveBeenLastCalledWith(expect.any(String), "auto", true),
+      expect(importCsv).toHaveBeenLastCalledWith(expect.any(String), "dup.csv", "auto", true),
     );
     // Force re-import lands on the confirm-portfolio step.
     await waitFor(() => expect(confirmBtn()).toBeInTheDocument());

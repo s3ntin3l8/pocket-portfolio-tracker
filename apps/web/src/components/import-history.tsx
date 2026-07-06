@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Download, Eye, EyeOff, FolderInput, Loader2, Trash2, Undo2 } from "lucide-react";
+import { Download, Eye, EyeOff, FolderInput, ListChecks, Loader2, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { ImportRecord } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
@@ -104,10 +104,17 @@ export function ImportHistory({
   // (whose deletion removes real transactions).
   const [confirmingBulk, setConfirmingBulk] = useState(false);
 
-  // Mobile-only long-press-to-select gesture (checkboxes stay hidden until a hold). See
+  // Checkboxes stay hidden (both layouts) until selection mode is entered — a mobile
+  // long-press (below), or the desktop header's select-rows toggle. See
   // `use-long-press-select.ts` — mirrors transactions-table.tsx's own inline mechanism.
   const { selectionMode, setSelectionMode, longPressHandlers, consumeLongPress } =
     useLongPressSelect((id) => toggleOne(id));
+
+  function exitSelection() {
+    setSelected(new Set());
+    setSelectionMode(false);
+    setConfirmingBulk(false);
+  }
 
   // Friendly source-type icon/tint + display label for a row, from the raw `parser` tag.
   function sourceMeta(imp: ImportRecord) {
@@ -119,7 +126,9 @@ export function ImportHistory({
     } catch {
       /* unknown source type — keep the raw value */
     }
-    return { style, sourceLabel, label: imp.document?.originalFilename ?? sourceLabel };
+    // `originalFilename` is available pre-confirm too (a staged document), unlike `document`
+    // (retained-only) — prefer it so a draft shows its real filename before review.
+    return { style, sourceLabel, label: imp.originalFilename ?? sourceLabel };
   }
 
   async function discard(id: string) {
@@ -448,14 +457,16 @@ export function ImportHistory({
     const Icon = style.icon;
     return (
       <TableRow key={imp.id} data-state={selected.has(imp.id) ? "selected" : undefined}>
-        <TableCell className="w-10">
-          <input
-            type="checkbox"
-            className="size-4 align-middle accent-primary"
-            aria-label={t("selectRow")}
-            checked={selected.has(imp.id)}
-            onChange={() => toggleOne(imp.id)}
-          />
+        <TableCell className="w-16">
+          {selectionMode && (
+            <input
+              type="checkbox"
+              className="size-4 align-middle accent-primary"
+              aria-label={t("selectRow")}
+              checked={selected.has(imp.id)}
+              onChange={() => toggleOne(imp.id)}
+            />
+          )}
         </TableCell>
         <TableCell className="max-w-[220px]">
           <span className="flex min-w-0 items-center gap-2.5">
@@ -555,7 +566,7 @@ export function ImportHistory({
       {(showTitle || discardedIds.length > 0 || confirmedCount > 0) && (
         <CardHeader
           className={cn(
-            "flex flex-row items-center gap-2 py-3",
+            "flex flex-row items-center gap-2 py-2",
             showTitle ? "justify-between" : "justify-end",
           )}
         >
@@ -589,9 +600,11 @@ export function ImportHistory({
           {actionError}
         </div>
       )}
-      {selected.size > 0 && (
-        <div className="mx-6 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
-          <span className="text-muted-foreground">{t("selectedCount", { count: selected.size })}</span>
+      {selectionMode && (
+        <div className="mx-6 mb-3 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
+          <span className="text-muted-foreground">
+            {selected.size > 0 ? t("selectedCount", { count: selected.size }) : t("selectPrompt")}
+          </span>
           {confirmingBulk ? (
             <span className="flex items-center gap-2">
               <span className="text-muted-foreground">
@@ -606,10 +619,25 @@ export function ImportHistory({
               </Button>
             </span>
           ) : (
-            <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete}>
-              {bulkBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-              {t("deleteSelected")}
-            </Button>
+            <span className="flex items-center gap-1">
+              {selected.size > 0 && (
+                <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete}>
+                  {bulkBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                  {t("deleteSelected")}
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                title={t("cancelSelection")}
+                aria-label={t("cancelSelection")}
+                disabled={bulkBusy}
+                onClick={exitSelection}
+              >
+                <X className="size-4" />
+              </Button>
+            </span>
           )}
         </div>
       )}
@@ -619,14 +647,27 @@ export function ImportHistory({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableCell className="h-10 w-10 px-3 align-middle">
-                  <input
-                    type="checkbox"
-                    className="size-4 align-middle accent-primary"
-                    aria-label={t("selectAll")}
-                    checked={allSelected}
-                    onChange={toggleAllVisible}
-                  />
+                <TableCell className="h-10 w-16 px-3 align-middle">
+                  {selectionMode ? (
+                    <input
+                      type="checkbox"
+                      className="size-4 align-middle accent-primary"
+                      aria-label={t("selectAll")}
+                      checked={allSelected}
+                      onChange={toggleAllVisible}
+                    />
+                  ) : (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-6"
+                      title={t("selectRows")}
+                      aria-label={t("selectRows")}
+                      onClick={() => setSelectionMode(true)}
+                    >
+                      <ListChecks className="size-4" />
+                    </Button>
+                  )}
                 </TableCell>
                 <TableCell className="h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground">
                   {t("file")}
@@ -653,14 +694,16 @@ export function ImportHistory({
                 const allInGroupSelected = groupIds.every((id) => selected.has(id));
                 return [
                   <TableRow key={`batch-${group.batchId}`} className="bg-muted/40">
-                    <TableCell className="w-10">
-                      <input
-                        type="checkbox"
-                        className="size-4 align-middle accent-primary"
-                        aria-label={t("selectBatch")}
-                        checked={allInGroupSelected}
-                        onChange={() => setMany(groupIds, !allInGroupSelected)}
-                      />
+                    <TableCell className="w-16">
+                      {selectionMode && (
+                        <input
+                          type="checkbox"
+                          className="size-4 align-middle accent-primary"
+                          aria-label={t("selectBatch")}
+                          checked={allInGroupSelected}
+                          onChange={() => setMany(groupIds, !allInGroupSelected)}
+                        />
+                      )}
                     </TableCell>
                     <TableCell colSpan={6} className="text-xs font-medium text-muted-foreground" suppressHydrationWarning>
                       {t("batchLabel", { count: group.rows.length })} · {df.format(new Date(group.uploadedAt))}

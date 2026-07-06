@@ -253,6 +253,31 @@ describe("TransactionsTable", () => {
     expect(screen.queryByRole("button", { name: new RegExp(tb.delete) })).toBeNull();
   });
 
+  it("hides desktop checkboxes by default and reveals them via the select-rows toggle", () => {
+    renderTable();
+    expect(screen.queryByLabelText(tb.selectAll)).toBeNull();
+    expect(screen.queryByLabelText(tb.selectRow)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: tb.selectRows }));
+
+    expect(screen.getByLabelText(tb.selectAll)).toBeInTheDocument();
+    // Entering selection mode with nothing picked yet shows the prompt, not "0 selected".
+    expect(screen.getByText(tb.selectPrompt)).toBeInTheDocument();
+  });
+
+  it("cancel (X) exits selection mode and clears the selection", () => {
+    renderTable();
+    fireEvent.click(screen.getByRole("button", { name: tb.selectRows }));
+    fireEvent.click(screen.getByLabelText(tb.selectAll));
+    // Selection mode is active: the toggle is replaced by the select-all checkbox.
+    expect(screen.queryByRole("button", { name: tb.selectRows })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: tb.cancel }));
+
+    expect(screen.queryByLabelText(tb.selectAll)).toBeNull();
+    expect(screen.getByRole("button", { name: tb.selectRows })).toBeInTheDocument();
+  });
+
   it("formats each row's amount in its own currency, not a hardcoded one", () => {
     renderTable();
     // t1 rows are IDR, t2 rows are USD — both currencies must appear.
@@ -620,6 +645,81 @@ describe("TransactionsTable", () => {
       fireEvent.click(screen.getByRole("button", { name: messages.Transactions.filterAll }));
       const rows = screen.getAllByRole("row").slice(1);
       expect(rows.length).toBe(FILTER_ROWS.length);
+    });
+  });
+
+  describe("load more pagination", () => {
+    // No column sort is applied by default (useTableSort's `sort()` is a no-op until a
+    // header is clicked), so the render order is simply array/insertion order — the same
+    // order page.tsx already sorts rows into (newest-first) before handing them to this
+    // component. "Instrument 0" (index 0) falls inside the first PAGE_SIZE-row window;
+    // "Instrument 29" (the last index, for n=30) falls past it until Load more is clicked.
+    function manyRows(n: number): TxRow[] {
+      return Array.from({ length: n }, (_, i) => {
+        const day = String((i % 28) + 1).padStart(2, "0");
+        return {
+          id: `m${i}`,
+          portfolioId: "p1",
+          type: "buy",
+          quantity: "1",
+          price: "100",
+          fees: "0",
+          tax: null,
+          fxRate: null,
+          currency: "IDR",
+          executedAt: `2026-01-${day}T00:00:00.000Z`,
+          source: "manual",
+          instrument: { symbol: `SYM${i}`, name: `Instrument ${i}` },
+        } satisfies TxRow;
+      });
+    }
+
+    function renderMany(n: number) {
+      return render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={manyRows(n)} />
+        </NextIntlClientProvider>,
+      );
+    }
+
+    it("caps the ledger at 25 rows and shows a Load more control with a count", () => {
+      renderMany(30);
+      expect(screen.getAllByRole("row").length - 1).toBe(25); // -1 for the header row
+      // The 30th (last-index) row falls past the initial 25-row window.
+      expect(screen.queryByText("Instrument 29")).toBeNull();
+      expect(screen.getByRole("button", { name: tb.loadMore })).toBeInTheDocument();
+      expect(
+        screen.getByText(tb.showingCount.replace("{shown}", "25").replace("{total}", "30")),
+      ).toBeInTheDocument();
+    });
+
+    it("clicking Load more reveals the rest and then hides the control", () => {
+      renderMany(30);
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      expect(screen.getAllByRole("row").length - 1).toBe(30);
+      expect(screen.getByText("Instrument 29")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+    });
+
+    it("hides Load more when the full set already fits on one page", () => {
+      renderMany(10);
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+    });
+
+    it("re-caps the window when a filter narrows the view", () => {
+      renderFilterTable(); // 3 rows, well under the page size — nothing to load initially
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+      // Narrowing further must not somehow surface a stale "loaded more" state.
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+    });
+
+    it("select-all covers the full filtered set, not just the rendered window", () => {
+      renderMany(30);
+      enterSelectionMode("Instrument 0"); // present in the initial window
+      fireEvent.click(screen.getByLabelText(tb.selectAll));
+      // 30 rows total, only 25 rendered — the count must reflect all 30, not the window.
+      expect(screen.getByText("30 selected")).toBeInTheDocument();
     });
   });
 
