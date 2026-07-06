@@ -140,13 +140,13 @@ export function NetWorthHistoryChart({
       unit={effectiveMode === "performance" ? "percent" : "currency"}
       theme={isHero ? "inverse" : "default"}
       minimal={isHero}
-      height={isHero ? 72 : 280}
+      height={isHero ? 150 : 280}
     />
   );
 
   if (isHero) {
     return (
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {intraday && data.length < 2 ? (
           collectingNote
         ) : data.length > 1 ? (

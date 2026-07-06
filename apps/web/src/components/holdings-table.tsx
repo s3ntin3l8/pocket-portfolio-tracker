@@ -1,6 +1,5 @@
 "use client";
 
-import { Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HoldingValuation } from "@portfolio/api-client";
 import {
@@ -12,8 +11,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { Link } from "@/i18n/navigation";
-import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
+import { MonogramBadge } from "@/components/monogram-badge";
+import { HoldingSparkline } from "@/components/holding-sparkline";
+import { Link, useRouter } from "@/i18n/navigation";
+import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
 
@@ -52,6 +53,7 @@ export interface HoldingsTableProps {
 export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   const t = useTranslations("Holdings");
   const locale = useLocale();
+  const router = useRouter();
   const { sortKey, sortDir, toggle, sort } = useTableSort<HoldingValuation>(HOLDINGS_COLS);
 
   const sorted = sort(rows);
@@ -108,36 +110,49 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                     ? "text-success"
                     : "text-destructive";
               return (
-                <TableRow key={h.instrumentId}>
+                <TableRow
+                  key={h.instrumentId}
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/instruments/${h.instrumentId}`)}
+                >
                   <TableCell>
-                    <Link
-                      href={`/instruments/${h.instrumentId}`}
-                      className="font-medium hover:underline"
-                    >
-                      {h.instrument?.symbol ?? "—"}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">
-                      {h.instrument?.name ?? h.instrumentId}
+                    <div className="flex items-center gap-3">
+                      <MonogramBadge
+                        label={h.instrument?.symbol ?? h.instrumentId}
+                        assetClass={h.instrument?.assetClass}
+                      />
+                      <div>
+                        <Link
+                          href={`/instruments/${h.instrumentId}`}
+                          className="text-sm font-bold hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {h.instrument?.symbol ?? "—"}
+                        </Link>
+                        <div className="text-xs font-medium text-text-2">
+                          {h.instrument?.displayName ?? h.instrument?.name ?? h.instrumentId}
+                        </div>
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="tabular text-right">
-                    {Number(h.quantity)} {h.instrument?.unit ?? ""}
+                  <TableCell className="tabular text-right text-[13px] font-medium">
+                    {formatQuantity(Number(h.quantity), h.instrument?.unit, locale)}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-medium text-text-mute">
                     {native(Number(h.avgCost))}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-medium">
                     {h.price !== null ? native(Number(h.price)) : "—"}
                   </TableCell>
-                  <TableCell className="tabular text-right">
+                  <TableCell className="tabular text-right text-[13px] font-bold">
                     {h.marketValueDisplay !== null
                       ? display(Number(h.marketValueDisplay))
                       : "—"}
                   </TableCell>
-                  <TableCell className={cn("tabular text-right", pnlColor)}>
+                  <TableCell className={cn("tabular text-right text-[13px] font-bold", pnlColor)}>
                     {pnl === null ? "—" : formatSignedMoney(pnl, currency, locale)}
                     {pct !== null && (
-                      <div className="text-xs">
+                      <div className="text-[11px] font-semibold">
                         {formatPercent(pct / 100, locale)}
                       </div>
                     )}
@@ -148,8 +163,13 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             {cashEntries.map(([ccy, balance]) => (
               <TableRow key={`cash-${ccy}`}>
                 <TableCell>
-                  <span className="font-medium">{t("cash")}</span>
-                  <div className="text-xs text-muted-foreground">{ccy}</div>
+                  <div className="flex items-center gap-3">
+                    <MonogramBadge label={ccy} assetClass="cash" />
+                    <div>
+                      <span className="font-medium">{t("cash")}</span>
+                      <div className="text-xs text-muted-foreground">{ccy}</div>
+                    </div>
+                  </div>
                 </TableCell>
                 <TableCell className="tabular text-right text-muted-foreground">—</TableCell>
                 <TableCell className="tabular text-right text-muted-foreground">—</TableCell>
@@ -165,10 +185,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={4}>{t("total")}</TableCell>
               <TableCell className="tabular text-right">{money(totals.value)}</TableCell>
-              <TableCell className={cn("tabular text-right", totalPnlColor)}>
+              <TableCell className={cn("tabular text-right text-[13px]", totalPnlColor)}>
                 {formatSignedMoney(totals.pnl, currency, locale)}
                 {totalPct !== null && (
-                  <div className="text-xs">{formatPercent(totalPct / 100, locale)}</div>
+                  <div className="text-[11px] font-bold">
+                    {formatPercent(totalPct / 100, locale)}
+                  </div>
                 )}
               </TableCell>
             </TableRow>
@@ -176,89 +198,87 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
         </Table>
       </div>
 
-      {/* ── Mobile list (< md) ── */}
-      {/* Single shared grid so all rows have identical column widths,
-          which ensures col-1 (1fr) is consistently constrained and names truncate. */}
-      <div className="md:hidden grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3">
+      {/* ── Mobile list (< md) ── reference row: badge, symbol over "name · quantity",
+          a price-course sparkline, then value + percent. No avg-cost/price columns. ── */}
+      <div className="md:hidden flex flex-col">
         {sorted.map((h, i) => {
-          const { pnl, pct, native, display } = computeRowValues(h, currency, locale);
+          const { pnl, pct, display } = computeRowValues(h, currency, locale);
           const pnlColor =
             pnl === null
               ? "text-muted-foreground"
               : pnl >= 0
                 ? "text-success"
                 : "text-destructive";
+          const qty = formatQuantity(Number(h.quantity), h.instrument?.unit, locale);
+          const name = h.instrument?.displayName ?? h.instrument?.name ?? h.instrumentId;
+          const subtitle = qty ? `${name} · ${qty}` : name;
+          const hasSpark = (h.sparkline?.length ?? 0) >= 2;
           return (
-            <Fragment key={h.instrumentId}>
-              {i > 0 && <div className="col-span-3 border-t border-border" />}
-
-              {/* Col 1: symbol / name */}
-              <div className="min-w-0 overflow-hidden py-3 pl-4">
+            <div
+              key={h.instrumentId}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 py-3 pl-4 pr-4",
+                i > 0 && "border-t border-border",
+              )}
+              onClick={() => router.push(`/instruments/${h.instrumentId}`)}
+            >
+              <MonogramBadge
+                label={h.instrument?.symbol ?? h.instrumentId}
+                assetClass={h.instrument?.assetClass}
+                className="size-[42px] rounded-[13px]"
+              />
+              <div className="min-w-0 flex-1">
                 <Link
                   href={`/instruments/${h.instrumentId}`}
-                  className="font-medium hover:underline block truncate"
+                  onClick={(e) => e.stopPropagation()}
+                  className="block truncate text-[15px] font-bold hover:underline"
                 >
                   {h.instrument?.symbol ?? "—"}
                 </Link>
-                <div className="text-xs text-muted-foreground truncate">
-                  {h.instrument?.name ?? h.instrumentId}
-                </div>
+                <div className="truncate text-xs font-medium text-text-2">{subtitle}</div>
               </div>
-
-              {/* Col 2: avg cost / quantity */}
-              <div className="text-right tabular py-3">
-                <div className="text-sm">{native(Number(h.avgCost))}</div>
-                <div className="text-xs text-muted-foreground">
-                  {Number(h.quantity)} {h.instrument?.unit ?? ""}
-                </div>
-              </div>
-
-              {/* Col 3: value / P&L */}
-              <div className="text-right tabular py-3 pr-4">
-                <div className="text-sm">
+              {hasSpark && <HoldingSparkline values={h.sparkline!} />}
+              <div className="shrink-0 text-right tabular">
+                <div className="text-sm font-bold">
                   {h.marketValueDisplay !== null
                     ? display(Number(h.marketValueDisplay))
                     : "—"}
                 </div>
-                <div className={cn("text-xs", pnlColor)}>
-                  {pnl === null
-                    ? "—"
-                    : `${formatSignedMoney(pnl, currency, locale)}${pct !== null ? ` ${formatPercent(pct / 100, locale)}` : ""}`}
+                <div className={cn("text-xs font-bold", pnlColor)}>
+                  {pct !== null ? formatPercent(pct / 100, locale) : "—"}
                 </div>
               </div>
-            </Fragment>
+            </div>
           );
         })}
 
-        {cashEntries.map(([ccy, balance]) => (
-          <Fragment key={`cash-${ccy}`}>
-            <div className="col-span-3 border-t border-border" />
-
-            {/* Col 1: Cash label + currency */}
-            <div className="min-w-0 overflow-hidden py-3 pl-4">
-              <span className="font-medium">{t("cash")}</span>
-              <div className="text-xs text-muted-foreground">{ccy}</div>
+        {cashEntries.map(([ccy, balance], ci) => (
+          <div
+            key={`cash-${ccy}`}
+            className={cn(
+              "flex items-center gap-3 py-3 pl-4 pr-4",
+              (sorted.length > 0 || ci > 0) && "border-t border-border",
+            )}
+          >
+            <MonogramBadge label={ccy} assetClass="cash" className="size-[42px] rounded-[13px]" />
+            <div className="min-w-0 flex-1">
+              <span className="text-[15px] font-bold">{t("cash")}</span>
+              <div className="truncate text-xs font-medium text-text-2">{ccy}</div>
             </div>
-
-            {/* Col 2: empty (no avg cost / quantity) */}
-            <div aria-hidden />
-
-            {/* Col 3: balance */}
-            <div className="text-right tabular py-3 pr-4">
-              <div className="text-sm">{formatMoney(Number(balance), ccy, locale)}</div>
-              <div className="text-xs text-muted-foreground">—</div>
+            <div className="shrink-0 text-right tabular text-sm font-bold">
+              {formatMoney(Number(balance), ccy, locale)}
             </div>
-          </Fragment>
+          </div>
         ))}
 
         {/* Totals row */}
-        <div className="col-span-3 border-t-2 border-border" />
-        <div className="py-3 pl-4 font-medium">{t("total")}</div>
-        <div aria-hidden />
-        <div className="text-right tabular py-3 pr-4">
-          <div className="text-sm font-medium">{money(totals.value)}</div>
-          <div className={cn("text-xs", totalPnlColor)}>
-            {`${formatSignedMoney(totals.pnl, currency, locale)}${totalPct !== null ? ` ${formatPercent(totalPct / 100, locale)}` : ""}`}
+        <div className="flex items-center gap-3 border-t-2 border-border py-3 pl-4 pr-4">
+          <span className="flex-1 font-bold">{t("total")}</span>
+          <div className="shrink-0 text-right tabular">
+            <div className="text-sm font-extrabold">{money(totals.value)}</div>
+            <div className={cn("text-xs font-bold", totalPnlColor)}>
+              {totalPct !== null ? formatPercent(totalPct / 100, locale) : ""}
+            </div>
           </div>
         </div>
       </div>

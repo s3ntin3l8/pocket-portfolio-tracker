@@ -134,8 +134,5 @@ describe("ForecastPanel", () => {
     expect(screen.getByTestId("projected-value")).toHaveTextContent("€22,000");
     expect(screen.getByTestId("projected-contributed")).toHaveTextContent("€20,000");
     expect(screen.getByTestId("projected-growth")).toHaveTextContent("€2,000");
-
-    expect(screen.getByText("incl. €8,000.00 contributed so far")).toBeInTheDocument();
-    expect(screen.getByText("incl. €2,000.00 growth so far")).toBeInTheDocument();
   });
 });

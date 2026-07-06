@@ -52,7 +52,7 @@ export function HeroGlanceCard({
 
   return (
     <div
-      className="rounded-[26px] p-5 pb-4 text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-[20px]"
+      className="rounded-[26px] px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-[20px]"
       style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
     >
       <p className="text-[13px] font-semibold text-white/78">{t("label")}</p>
@@ -62,7 +62,7 @@ export function HeroGlanceCard({
 
       {hasDelta && (
         <div className="mt-2 flex items-center gap-2">
-          <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-xs font-bold">
+          <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
             {delta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(delta), currency, locale)}
           </span>
           {pct !== null && (
@@ -73,7 +73,7 @@ export function HeroGlanceCard({
         </div>
       )}
 
-      <div className="mt-3">
+      <div className="mt-3.5">
         <NetWorthHistoryChart
           initial={initialHistory}
           currency={currency}

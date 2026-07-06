@@ -499,6 +499,32 @@ export async function getDocumentSummaryForImport(
 }
 
 /**
+ * Batched, display-only filename lookup for the imports list — deliberately looser than
+ * {@link getDocumentSummariesForImports}: includes "staged" docs (not yet confirmed) so a
+ * draft import can show its real filename before review, not just after a retained confirm.
+ * Never drives the Download-receipt action (that stays gated to a retained document) — this
+ * is just the name string, which carries none of the storage/retention cost the raw file does.
+ */
+export async function getOriginalFilenamesForImports(
+  app: AppLikeDb,
+  importIds: string[],
+): Promise<Map<string, string>> {
+  if (importIds.length === 0) return new Map();
+  const rows = await db(app)
+    .select({ importId: documents.importId, originalFilename: documents.originalFilename })
+    .from(documents)
+    .where(
+      and(inArray(documents.importId, importIds), inArray(documents.status, ["staged", "retained"])),
+    );
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.importId || !r.originalFilename || out.has(r.importId)) continue; // first per import
+    out.set(r.importId, r.originalFilename);
+  }
+  return out;
+}
+
+/**
  * Batched form of {@link getDocumentSummaryForImport}: one query for many imports, keyed by
  * importId (first retained doc per import, mirroring the single-import `.limit(1)`). Lets the
  * imports-list endpoint avoid a per-row query.

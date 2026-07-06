@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT, exportJWK, type JWK } from "jose";
-import { instruments } from "@portfolio/db";
+import { eq } from "drizzle-orm";
+import { instruments, prices } from "@portfolio/db";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
@@ -465,6 +466,43 @@ describe("auth + portfolios + transactions", () => {
     expect(summary.holdings[0].previousClose).toBe("9000");
     expect(summary.holdings[0].dayChange).toBe("50000");
     expect(summary.totalDayChange).toBe("50000");
+  });
+
+  it("attaches a per-holding sparkline series on /summary and /networth", async () => {
+    const t = await token("user-a");
+    const portfolioId = (
+      await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) })
+    ).json()[0].id;
+
+    const [bbca] = await app.db
+      .select()
+      .from(instruments)
+      .where(eq(instruments.symbol, "BBCA"));
+    // Seed three stored daily closes (ascending).
+    await app.db.insert(prices).values([
+      { instrumentId: bbca.id, date: "2026-01-13", close: "9000", currency: "IDR" },
+      { instrumentId: bbca.id, date: "2026-01-14", close: "9200", currency: "IDR" },
+      { instrumentId: bbca.id, date: "2026-01-15", close: "9500", currency: "IDR" },
+    ]);
+
+    const summary = (
+      await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/summary`,
+        headers: auth(t),
+      })
+    ).json();
+    // Ordered oldest→newest and attached to the held instrument.
+    expect(summary.holdings[0].sparkline).toEqual([9000, 9200, 9500]);
+
+    // The aggregate net-worth path rebuilds holdings — the series must survive there too.
+    const networth = (
+      await app.inject({ method: "GET", url: "/networth", headers: auth(t) })
+    ).json();
+    const bbcaHolding = networth.holdings.find(
+      (h: { instrumentId: string }) => h.instrumentId === bbca.id,
+    );
+    expect(bbcaHolding.sparkline).toEqual([9000, 9200, 9500]);
   });
 
   it("finds-or-creates and searches instruments", async () => {

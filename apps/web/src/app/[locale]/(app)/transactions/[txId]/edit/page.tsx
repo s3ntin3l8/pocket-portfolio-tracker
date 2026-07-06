@@ -22,13 +22,19 @@ export default async function EditTransactionPage({
 
   const header = (title: string, subtitle: string) => (
     <div className="flex items-center gap-3">
-      <Button variant="ghost" size="icon" asChild aria-label={t("back")}>
+      <Button
+        variant="outline"
+        size="icon"
+        asChild
+        aria-label={t("back")}
+        className="rounded-xl bg-card shadow-card"
+      >
         <Link href="/transactions">
           <ArrowLeft className="size-4" />
         </Link>
       </Button>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-bold">{title}</h1>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
     </div>

@@ -22,6 +22,7 @@ import {
   deleteReceiptsForImport,
   getDocumentForImport,
   getDocumentSummariesForImports,
+  getOriginalFilenamesForImports,
   retainDocumentForTransaction,
 } from "../storage/receipts.js";
 import { gatherDocumentNaming, buildDocumentName } from "../storage/naming.js";
@@ -140,6 +141,12 @@ export async function importsRoute(app: FastifyInstance) {
     // Batch the per-import document summary into one query (vs. one per confirmed row).
     const confirmedIds = rows.filter((r) => r.status === "confirmed").map((r) => r.id);
     const docByImport = await getDocumentSummariesForImports(app, confirmedIds);
+    // Display-only filename, independent of confirm/retention — a "staged" doc still exists
+    // for a draft (pre-confirm) import, so the list can show its real filename before review.
+    const filenameByImport = await getOriginalFilenamesForImports(
+      app,
+      rows.map((r) => r.id),
+    );
     return rows.map((r) => {
       const parsed = (r.parsedJson ?? {}) as { drafts?: unknown[] };
       const document = r.status === "confirmed" ? (docByImport.get(r.id) ?? null) : null;
@@ -153,6 +160,7 @@ export async function importsRoute(app: FastifyInstance) {
         batchId: r.batchId,
         createdAt: r.createdAt,
         document,
+        originalFilename: filenameByImport.get(r.id) ?? null,
       };
     });
   });

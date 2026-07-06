@@ -35,34 +35,40 @@ function wrap(ui: React.ReactNode) {
 }
 
 describe("IncomeEventsTable", () => {
-  it("renders type badge for historical events", () => {
+  // The timeline renders both a desktop grid row and a mobile flex row (CSS hides one);
+  // in jsdom both are in the DOM, so symbols appear more than once → use *AllByText.
+  it("renders the instrument and its type for historical events", () => {
     wrap(<IncomeEventsTable rows={[HISTORICAL]} />);
-    expect(screen.getByText("BBCA")).toBeInTheDocument();
-    expect(screen.getByText("Dividend")).toBeInTheDocument();
+    expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Dividend").length).toBeGreaterThan(0);
+    // No forecast markers on a received row.
+    expect(screen.queryByText("est.")).not.toBeInTheDocument();
   });
 
-  it("renders status badge for upcoming payments with gray styling", () => {
+  it("de-emphasises forecast payments with an est. tag and reduced opacity", () => {
     const { container } = wrap(<IncomeEventsTable rows={[UPCOMING]} />);
-    expect(screen.getByText("TLKM")).toBeInTheDocument();
-    expect(screen.getByText("Projected")).toBeInTheDocument();
-    // The row should have muted-foreground class for grayish text
-    const rows = container.querySelectorAll("tr");
-    const dataRow = rows[1]; // skip header
-    expect(dataRow.className).toContain("text-muted-foreground");
+    expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
+    // Forecast is conveyed by the "est." micro-tag (no separate status pill).
+    expect(screen.getAllByText("est.").length).toBeGreaterThan(0);
+    // The row wrapper carries opacity 0.78 (reference forecast de-emphasis).
+    const dimmed = Array.from(container.querySelectorAll<HTMLElement>("[style]")).some(
+      (el) => el.style.opacity === "0.78",
+    );
+    expect(dimmed).toBe(true);
   });
 
   it("renders mixed historical and upcoming rows", () => {
     wrap(<IncomeEventsTable rows={[HISTORICAL, UPCOMING]} />);
-    expect(screen.getByText("BBCA")).toBeInTheDocument();
-    expect(screen.getByText("TLKM")).toBeInTheDocument();
-    expect(screen.getByText("Dividend")).toBeInTheDocument();
-    expect(screen.getByText("Projected")).toBeInTheDocument();
+    expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("est.").length).toBeGreaterThan(0);
   });
 
-  it("historical rows do not have muted styling", () => {
+  it("does not dim historical rows", () => {
     const { container } = wrap(<IncomeEventsTable rows={[HISTORICAL]} />);
-    const rows = container.querySelectorAll("tr");
-    const dataRow = rows[1];
-    expect(dataRow.className).not.toContain("text-muted-foreground");
+    const dimmed = Array.from(container.querySelectorAll<HTMLElement>("[style]")).some(
+      (el) => el.style.opacity === "0.78",
+    );
+    expect(dimmed).toBe(false);
   });
 });

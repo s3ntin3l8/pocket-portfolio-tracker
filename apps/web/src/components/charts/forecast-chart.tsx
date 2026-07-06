@@ -1,22 +1,16 @@
 "use client";
 
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
+import { AreaChart, Area, Line, Tooltip, ResponsiveContainer } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
 import type { ForecastPoint } from "@portfolio/core";
 import { formatMoney } from "@/lib/utils";
 
 /**
- * Stacked projection: your money (present value + contributions) at the base,
- * compound growth on top. The whole series is a projection, so it's drawn with
- * a dashed stroke to read as "what-if", not actual history.
+ * Forecast sparkline for the green-gradient forecast hero: a solid white **value**
+ * line (present value + contributions + growth) with a soft white fill, and a dashed
+ * white **contributed** line underneath it (what you'd have put in with no growth at
+ * all) — mirrors the reference's white-on-green treatment, no axes/grid (matches the
+ * Holdings hero's "minimal" sparkline convention).
  */
 export function ForecastChart({
   series,
@@ -31,74 +25,55 @@ export function ForecastChart({
   const t = useTranslations("Savings");
   const pv = Number(presentValue);
 
-  const data = series.map((p) => {
-    const principal = pv + Number(p.contributed);
-    const growth = Math.max(0, Number(p.value) - principal);
-    return { month: p.monthIndex, principal, growth };
-  });
+  const data = series.map((p) => ({
+    month: p.monthIndex,
+    value: Number(p.value),
+    contributed: pv + Number(p.contributed),
+  }));
 
   const money = (v: number) => formatMoney(v, currency, locale);
-  const year = (m: number) => `${Math.round(m / 12)}`;
 
   return (
-    <div className="h-[280px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+    <div className="h-[160px] w-full">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 160 }}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id="forecast-principal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.05} />
-            </linearGradient>
-            <linearGradient id="forecast-growth" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-success)" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="var(--color-success)" stopOpacity={0.08} />
+            <linearGradient id="forecast-value-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.42} />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-          <XAxis
-            dataKey="month"
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-            tickLine={false}
-            tickFormatter={year}
-            minTickGap={32}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-            tickLine={false}
-            axisLine={false}
-            width={72}
-            tickFormatter={money}
-          />
           <Tooltip
             formatter={(v, key) => [
               money(Number(v)),
-              key === "growth" ? t("projectedGrowth") : t("projectedContributed"),
+              key === "contributed" ? t("projectedContributed") : t("projectedValue"),
             ]}
-            labelFormatter={(m) => `${t("years", { count: Math.round(Number(m) / 12) })}`}
+            labelFormatter={(m) => t("years", { count: Math.round(Number(m) / 12) })}
+            cursor={{ stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }}
             contentStyle={{
-              background: "var(--color-card)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
+              background: "#0f1b14",
+              border: "none",
+              borderRadius: 10,
+              color: "#fff",
               fontSize: 12,
             }}
           />
           <Area
             type="monotone"
-            dataKey="principal"
-            stackId="v"
-            stroke="var(--color-primary)"
-            strokeWidth={2}
-            strokeDasharray="5 4"
-            fill="url(#forecast-principal)"
+            dataKey="value"
+            stroke="#ffffff"
+            strokeWidth={2.4}
+            fill="url(#forecast-value-fill)"
+            activeDot={{ r: 5, fill: "#fff", stroke: "#0B7D58", strokeWidth: 2.5 }}
           />
-          <Area
+          <Line
             type="monotone"
-            dataKey="growth"
-            stackId="v"
-            stroke="var(--color-success)"
-            strokeWidth={2}
-            strokeDasharray="5 4"
-            fill="url(#forecast-growth)"
+            dataKey="contributed"
+            stroke="rgba(255,255,255,.65)"
+            strokeWidth={1.6}
+            strokeDasharray="4 4"
+            dot={false}
+            activeDot={false}
           />
         </AreaChart>
       </ResponsiveContainer>

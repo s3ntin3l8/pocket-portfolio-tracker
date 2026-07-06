@@ -43,17 +43,17 @@ describe("bestAndWorst", () => {
       holding({
         instrumentId: "a",
         dayChangePct: "-8.0", // biggest magnitude, but a loser
-        instrument: { symbol: "AAA", market: "IDX", assetClass: "equity", unit: "share", sector: null, sectorWeights: null, countryWeights: null, name: "Alpha" },
+        instrument: { symbol: "AAA", market: "IDX", assetClass: "equity", unit: "share", sector: null, sectorWeights: null, countryWeights: null, name: "Alpha", displayName: null },
       }),
       holding({
         instrumentId: "b",
         dayChangePct: "3.0",
-        instrument: { symbol: "BBB", market: "IDX", assetClass: "equity", unit: "share", sector: null, sectorWeights: null, countryWeights: null, name: "Beta" },
+        instrument: { symbol: "BBB", market: "IDX", assetClass: "equity", unit: "share", sector: null, sectorWeights: null, countryWeights: null, name: "Beta", displayName: null },
       }),
       holding({
         instrumentId: "c",
         dayChangePct: "-1.0",
-        instrument: { symbol: "CCC", market: "IDX", assetClass: "gold", unit: "gram", sector: null, sectorWeights: null, countryWeights: null, name: "Gamma" },
+        instrument: { symbol: "CCC", market: "IDX", assetClass: "gold", unit: "gram", sector: null, sectorWeights: null, countryWeights: null, name: "Gamma", displayName: null },
       }),
     ];
 

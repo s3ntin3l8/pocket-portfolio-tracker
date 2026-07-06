@@ -20,7 +20,7 @@ export interface ShellNavItem {
   badge?: string;
 }
 
-const CARD_SHADOW = "shadow-[0_1px_2px_rgba(15,27,20,.04),0_6px_16px_rgba(15,27,20,.05)]";
+const CARD_SHADOW = "shadow-card";
 
 /**
  * Shared master-detail shell for `/settings/*` and `/admin/*`: a sticky left rail of
@@ -39,6 +39,7 @@ export function SettingsShell({
   railTop,
   railBottom,
   landingTop,
+  landingBottom,
   children,
 }: {
   navItems: ShellNavItem[];
@@ -48,6 +49,8 @@ export function SettingsShell({
   railTop?: React.ReactNode;
   railBottom?: React.ReactNode;
   landingTop?: React.ReactNode;
+  /** Rendered at the bottom of the mobile landing (the rail's `railBottom` is desktop-only). */
+  landingBottom?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -64,7 +67,7 @@ export function SettingsShell({
     <div className="md:grid md:grid-cols-[270px_1fr] md:items-start md:gap-6">
       <div className="hidden md:sticky md:top-4 md:flex md:flex-col md:gap-3 md:self-start">
         {railTop}
-        <nav className={cn("rounded-[18px] border border-border bg-card p-2", CARD_SHADOW)}>
+        <nav className={cn("rounded-[18px] bg-card p-2", CARD_SHADOW)}>
           {navItems.map((item) => {
             const active = item.key === activeKey;
             return (
@@ -72,8 +75,8 @@ export function SettingsShell({
                 key={item.key}
                 href={item.href}
                 className={cn(
-                  "my-0.5 flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-bold transition-colors",
-                  active ? "bg-muted" : "hover:bg-muted/50",
+                  "my-0.5 flex items-center gap-2.5 rounded-[12px] px-2.5 py-2.5 text-[13px] font-bold transition-colors",
+                  active ? "bg-background" : "hover:bg-background/60",
                 )}
               >
                 <span
@@ -88,6 +91,7 @@ export function SettingsShell({
                     {item.badge}
                   </span>
                 )}
+                <ChevronRight className="size-4 shrink-0 text-text-3" />
               </Link>
             );
           })}
@@ -101,8 +105,8 @@ export function SettingsShell({
             {landingTop}
             {landingGroups.map((group, i) => (
               <div
-                key={i}
-                className={cn("divide-y divide-border overflow-hidden rounded-[20px] border border-border bg-card", CARD_SHADOW)}
+                key={`group-${i}`}
+                className={cn("divide-y divide-line overflow-hidden rounded-[20px] bg-card", CARD_SHADOW)}
               >
                 {group.map((item) => (
                   <Link
@@ -134,6 +138,7 @@ export function SettingsShell({
                 ))}
               </div>
             ))}
+            {landingBottom}
           </div>
         )}
 

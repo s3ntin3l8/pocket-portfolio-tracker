@@ -8,17 +8,17 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
+import { MonogramBadge } from "@/components/monogram-badge";
 import { Link } from "@/i18n/navigation";
 import { TradeDetailSheet } from "@/components/trade-detail-sheet";
-import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
+import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort, type ColDef } from "@/lib/table-sort";
-
-type Filter = "all" | "open" | "closed";
 
 const COLS: ColDef<Trade>[] = [
   { key: "instrument", get: (t) => t.instrument?.symbol ?? "", type: "text" },
@@ -48,7 +48,6 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
   const t = useTranslations("Trades");
   const locale = useLocale();
   const { sortKey, sortDir, toggle, sort } = useTableSort<Trade>(COLS);
-  const [filter, setFilter] = useState<Filter>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Closed trades open the detail sheet (matches the design); open positions have no
   // exit date/price, so they keep the inline leg-expansion below instead.
@@ -59,12 +58,16 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
   const money = (n: number, ccy = currency) => formatMoney(n, ccy, locale);
   const signed = (n: number) => formatSignedMoney(n, currency, locale);
 
-  const visible = useMemo(() => {
-    const filtered = trades.filter((tr) =>
-      filter === "all" ? true : filter === "open" ? tr.status === "open" : tr.status === "closed",
-    );
-    return sort(filtered);
-  }, [trades, filter, sort]);
+  const visible = useMemo(() => sort(trades), [trades, sort]);
+
+  // Totals footer — closed trades only (an open position's realized P&L isn't final).
+  const closedTotal = useMemo(
+    () =>
+      trades
+        .filter((tr) => tr.status === "closed")
+        .reduce((s, tr) => s + Number(tr.realizedPnL), 0),
+    [trades],
+  );
 
   const toggleRow = (key: string) =>
     setExpanded((prev) => {
@@ -79,29 +82,9 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
     else if (tr.legs.length > 0) toggleRow(key);
   };
 
-  const FILTERS: Filter[] = ["all", "open", "closed"];
-
   return (
     <div className="space-y-3">
-      <div className="inline-flex items-center rounded-lg border border-border bg-muted p-1 text-sm font-medium">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={cn(
-              "rounded-md px-3 py-1 transition-colors",
-              filter === f
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t(`filter_${f}`)}
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-xl border border-border">
+      <div className="rounded-xl bg-card shadow-card">
         {/* ── Desktop table (lg+) ── */}
         <div className="hidden overflow-x-auto lg:block">
           <Table>
@@ -137,7 +120,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                       onClick={() => handleRowClick(tr, key)}
                     >
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           {tr.status === "open" && (
                             <ChevronRight
                               className={cn(
@@ -147,6 +130,11 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                               )}
                             />
                           )}
+                          <MonogramBadge
+                            label={tr.instrument?.symbol ?? tr.instrumentId}
+                            assetClass={tr.instrument?.assetClass}
+                            className="size-8"
+                          />
                           <div>
                             <Link
                               href={`/instruments/${tr.instrumentId}`}
@@ -183,7 +171,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                         )}
                       </TableCell>
                       <TableCell className="tabular text-right">
-                        {Number(tr.quantity)} {tr.instrument?.unit ?? ""}
+                        {formatQuantity(Number(tr.quantity), tr.instrument?.unit, locale)}
                       </TableCell>
                       <TableCell className="tabular text-right">{money(Number(tr.invested))}</TableCell>
                       <TableCell className={cn("tabular text-right", toneClass(realized))}>
@@ -244,6 +232,26 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                 );
               })}
             </TableBody>
+            <TableFooter>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={6} className="font-semibold">
+                  {t("totalRealized")}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "tabular text-right font-semibold",
+                    closedTotal > 0
+                      ? "text-success"
+                      : closedTotal < 0
+                        ? "text-destructive"
+                        : "",
+                  )}
+                >
+                  {signed(closedTotal)}
+                </TableCell>
+                <TableCell colSpan={3} />
+              </TableRow>
+            </TableFooter>
           </Table>
         </div>
 
@@ -260,7 +268,13 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                 )}
                 onClick={() => tr.status === "closed" && setDetailTrade(tr)}
               >
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <MonogramBadge
+                    label={tr.instrument?.symbol ?? tr.instrumentId}
+                    assetClass={tr.instrument?.assetClass}
+                    className="mt-0.5 size-8"
+                  />
+                  <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/instruments/${tr.instrumentId}`}
@@ -275,6 +289,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                   <div className="text-xs text-muted-foreground">
                     {tr.entryDate}
                     {tr.exitDate ? ` → ${tr.exitDate}` : ""} · {heldLabel(tr.holdingDays)}
+                  </div>
                   </div>
                 </div>
                 <div className="text-right tabular">

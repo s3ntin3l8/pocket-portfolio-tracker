@@ -60,13 +60,19 @@ export default async function NewTransactionPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label={tm("back")}>
+        <Button
+          variant="outline"
+          size="icon"
+          asChild
+          aria-label={tm("back")}
+          className="rounded-xl bg-card shadow-card"
+        >
           <Link href="/transactions">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+          <h1 className="text-2xl font-bold">{heading}</h1>
           <p className="text-sm text-muted-foreground">
             {creatingPortfolio ? tm("portfolio.needFirst") : t("subtitle")}
           </p>

@@ -22,12 +22,13 @@ export async function InvestingSection({
   return (
     <div className="space-y-4">
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("investingTaxLabel")}
         </p>
         <Card>
           <CardContent className="p-4">
             <PreferenceChips
+              variant="wide"
               prefKey="taxRegime"
               current={taxRegime}
               options={[
@@ -43,12 +44,13 @@ export async function InvestingSection({
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("investingCostBasisLabel")}
         </p>
         <Card>
           <CardContent className="p-4">
             <PreferenceChips
+              variant="wide"
               prefKey="costBasisMode"
               current={costBasisMode}
               options={[

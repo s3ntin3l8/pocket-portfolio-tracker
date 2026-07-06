@@ -734,7 +734,7 @@ export function ImportReview({
       )}
 
       {/* Desktop: dense table */}
-      <div className="hidden rounded-xl border border-border md:block">
+      <div className="hidden rounded-xl bg-card shadow-card md:block">
         <Table>
           <TableHeader>
             <TableRow>

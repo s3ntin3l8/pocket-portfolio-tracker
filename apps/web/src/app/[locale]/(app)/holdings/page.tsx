@@ -8,7 +8,7 @@ import { HoldingsTable } from "@/components/holdings-table";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
-import { AllocationCard } from "@/components/holdings/allocation-card";
+import { AllocationCard, type Tone } from "@/components/holdings/allocation-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import {
   loadHoldings,
@@ -20,7 +20,10 @@ import {
 } from "@/lib/server-api";
 import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
 
-const CLASS_TABS = ["all", "equity", "etf", "gold", "bond", "mutual_fund", "crypto"] as const;
+const CLASS_TABS = ["all", "equity", "etf", "gold", "bond", "mutual_fund", "crypto", "cash"] as const;
+
+/** Colour direction for a signed gain figure on the allocation stats strip. */
+const toneOf = (n: number): Tone => (n > 0 ? "up" : n < 0 ? "down" : "flat");
 
 /**
  * The range the Holdings hero chart initially loads. Deliberately a day-grained range
@@ -75,12 +78,19 @@ export default async function HoldingsPage({
   const hasCash =
     cashTracked && Object.values(cash).some((v) => Number(v) !== 0);
 
-  // Count holdings per asset class to determine which tabs to disable.
+  // Count holdings per asset class to determine which tabs to show. Reference
+  // (Pocket Prototype.dc.html) only renders a pill for classes actually held in the
+  // current scope — not a fixed set with disabled placeholders for empty ones.
   const classCounts = holdings.reduce<Record<string, number>>((acc, h) => {
     const c = h.instrument?.assetClass;
     if (c) acc[c] = (acc[c] ?? 0) + 1;
     return acc;
   }, {});
+  const visibleClassTabs = CLASS_TABS.filter(
+    (key) =>
+      key === "all" ||
+      (key === "cash" ? hasCash : (classCounts[key] ?? 0) > 0),
+  );
 
   // Per-unit avgCost/price are native quotes (labeled by PriceCurrency); position
   // value/P&L are in the display currency (the trailing Currency column).
@@ -116,49 +126,48 @@ export default async function HoldingsPage({
       ]),
   ];
 
+  // Title + (icon-only) export share the top line; the subtitle spans the full width below
+  // it — same pattern as the Activity page header.
   const Heading = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">
           <span className="sm:hidden">{t("titleMobile")}</span>
           <span className="hidden sm:inline">{t("title")}</span>
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {result.status === "ok" && holdings.length > 0
-            ? t("subtitleCount", { count: holdings.length })
-            : t("subtitle")}
-        </p>
+        {result.status === "ok" && holdings.length > 0 && (
+          <ExportCsvButton
+            filename="holdings.csv"
+            headers={[
+              "Symbol",
+              "Name",
+              "AssetClass",
+              "Quantity",
+              "Unit",
+              "AvgCost",
+              "Price",
+              "PriceCurrency",
+              "MarketValue",
+              "UnrealizedPnL",
+              "Currency",
+            ]}
+            rows={exportRows}
+            label={t("exportCsv")}
+            iconOnly
+          />
+        )}
       </div>
-      {result.status === "ok" && (
-        <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {holdings.length > 0 && (
-            <ExportCsvButton
-              filename="holdings.csv"
-              headers={[
-                "Symbol",
-                "Name",
-                "AssetClass",
-                "Quantity",
-                "Unit",
-                "AvgCost",
-                "Price",
-                "PriceCurrency",
-                "MarketValue",
-                "UnrealizedPnL",
-                "Currency",
-              ]}
-              rows={exportRows}
-              label={t("exportCsv")}
-            />
-          )}
-        </div>
-      )}
+      <p className="text-sm text-muted-foreground">
+        {result.status === "ok" && holdings.length > 0
+          ? t("subtitleCount", { count: holdings.length })
+          : t("subtitle")}
+      </p>
     </div>
   );
 
   if (result.status === "unavailable") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={Layers}
@@ -171,7 +180,7 @@ export default async function HoldingsPage({
 
   if (holdings.length === 0 && !hasCash) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={Layers}
@@ -250,7 +259,6 @@ export default async function HoldingsPage({
 
       {allocation && allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
         <AllocationCard
-          title={t("allocation.title")}
           slices={allocation.byAssetClass
             .filter((s) => Number(s.value) > 0)
             .map((s) => ({
@@ -263,13 +271,30 @@ export default async function HoldingsPage({
           totalLabel={t("allocation.totalLabel")}
           totalValueFormatted={formatMoney(Number(summary.netWorth), summary.displayCurrency, locale)}
           allTimeLabel={t("allocation.allTimeLabel")}
+          allTimeAmount={formatSignedMoney(
+            Number(summary.totalUnrealizedPnL),
+            summary.displayCurrency,
+            locale,
+          )}
           allTimePct={
             Number(summary.totalCost) > 0
               ? formatPercent(Number(summary.totalUnrealizedPnL) / Number(summary.totalCost), locale)
               : null
           }
+          allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
           todayLabel={t("allocation.todayLabel")}
           todayAmount={formatSignedMoney(Number(summary.totalDayChange), summary.displayCurrency, locale)}
+          todayPct={(() => {
+            // Day-change %: the day's move over the prior close's book value. Securities
+            // that lack a previous close contribute nothing to either totalDayChange or
+            // (via a null/0 market value) totalMarketValue, so `market − change` is the
+            // priced book's opening base. Guard a non-positive base.
+            const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
+            return base > 0
+              ? formatPercent(Number(summary.totalDayChange) / base, locale)
+              : null;
+          })()}
+          todayTone={toneOf(Number(summary.totalDayChange))}
         />
       )}
 
@@ -289,34 +314,39 @@ export default async function HoldingsPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {Heading}
       {anomalyBanner}
-      {glanceSection}
+      {/* Reference stacks the glance cards 14px apart (each card: margin-bottom:14px). */}
+      <div className="space-y-3.5">{glanceSection}</div>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-bold">
-          <span className="sm:hidden">{t("positionsSectionMobile")}</span>
-          <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
-        </h2>
-
         <Tabs defaultValue="all">
-          <div className="overflow-x-auto">
-          <TabsList>
-            {CLASS_TABS.map((key) => (
-              <TabsTrigger
-                key={key}
-                value={key}
-                disabled={key !== "all" && (classCounts[key] ?? 0) === 0}
-              >
-                {key === "all" ? t("all") : tc(key)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-bold">
+              <span className="sm:hidden">{t("positionsSectionMobile")}</span>
+              <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
+            </h2>
+            <div className="overflow-x-auto">
+              {/* Pill spec transcribed from the reference's `deskOn`/`deskOff` chips:
+                  active 700 12px white on var(--pill); inactive 600 12px on bg-card
+                  WITH a border — not a bare transparent outline. */}
+              <TabsList className="h-auto gap-2 rounded-full border-0 bg-transparent p-0">
+                {visibleClassTabs.map((key) => (
+                  <TabsTrigger
+                    key={key}
+                    value={key}
+                    className="rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold text-foreground data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none"
+                  >
+                    {key === "all" ? t("all") : tc(key)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </div>
-          {CLASS_TABS.map((key) => (
+          {visibleClassTabs.map((key) => (
             <TabsContent key={key} value={key}>
-              <div className="rounded-xl border border-border">
+              <div className="overflow-hidden rounded-[18px] bg-card shadow-card">
                 <HoldingsTable
                   rows={
                     key === "all"
@@ -324,7 +354,7 @@ export default async function HoldingsPage({
                       : holdings.filter((h) => h.instrument?.assetClass === key)
                   }
                   currency={currency}
-                  cash={key === "all" && hasCash ? cash : undefined}
+                  cash={(key === "all" || key === "cash") && hasCash ? cash : undefined}
                 />
               </div>
             </TabsContent>

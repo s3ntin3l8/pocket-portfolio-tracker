@@ -66,6 +66,7 @@ describe("DisposalTable", () => {
         totalGain="700"
         money={money}
         t={t}
+        year={2026}
       />,
     );
     expect(screen.getByText("NVDA")).toBeInTheDocument();
@@ -80,7 +81,9 @@ describe("DisposalTable", () => {
   });
 
   it("renders the empty state when there are no disposals", () => {
-    render(<DisposalTable rows={[]} totalProceeds="0" totalGain="0" money={money} t={t} />);
+    render(
+      <DisposalTable rows={[]} totalProceeds="0" totalGain="0" money={money} t={t} year={2026} />,
+    );
     expect(screen.getByText(/No disposals/)).toBeInTheDocument();
     expect(screen.queryByText("Total")).not.toBeInTheDocument();
   });
@@ -216,14 +219,15 @@ describe("HarvestRow", () => {
 
   it("renders the harvest button linking to the prefilled sell draft", () => {
     render(<HarvestRow s={suggestion} money={money} t={t} />);
-    expect(screen.getByText("NIO")).toBeInTheDocument();
+    expect(screen.getByText("NIO Inc.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Harvest" });
     expect(link).toHaveAttribute("href", "/transactions/new?harvestInstrument=i-nio");
   });
 
   it("shows the Teilfreistellung note when a TF rate applies", () => {
     render(<HarvestRow s={suggestion} money={money} t={t} />);
-    expect(screen.getByText("TF 30% applied")).toBeInTheDocument();
+    // The TF note is now folded into the row's single meta line.
+    expect(screen.getByText(/TF 30% applied/)).toBeInTheDocument();
   });
 });
 
@@ -293,6 +297,7 @@ describe("IdSalesTable", () => {
         totalSalesTax="2242.00"
         money={money}
         t={t}
+        year={2026}
       />,
     );
     expect(screen.getByText("BBNI")).toBeInTheDocument();
@@ -307,7 +312,9 @@ describe("IdSalesTable", () => {
   });
 
   it("renders the empty state when there are no disposals", () => {
-    render(<IdSalesTable rows={[]} totalProceeds="0" totalSalesTax="0" money={money} t={t} />);
+    render(
+      <IdSalesTable rows={[]} totalProceeds="0" totalSalesTax="0" money={money} t={t} year={2026} />,
+    );
     expect(screen.getByText(/No disposals/)).toBeInTheDocument();
     expect(screen.queryByText("Total")).not.toBeInTheDocument();
   });

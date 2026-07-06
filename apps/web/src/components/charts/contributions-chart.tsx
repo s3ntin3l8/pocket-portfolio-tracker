@@ -7,9 +7,7 @@ import {
   Area,
   Line,
   XAxis,
-  YAxis,
   Tooltip,
-  CartesianGrid,
   ResponsiveContainer,
   useActiveTooltipDataPoints,
   useActiveTooltipLabel,
@@ -66,116 +64,134 @@ export function ContributionsChart({
     });
 
     const money = (v: number) => formatMoney(v, currency, locale);
+    const lastPoint = data[data.length - 1];
+    const invested = lastPoint.contributed;
+    const nowWorth = lastPoint.value;
+    const gain = nowWorth - invested;
 
     return (
-      <div className="h-[280px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={data}
-            margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-          >
-            <defs>
-              {/* Transparent base so the band starts at the lower of the two lines */}
-              <linearGradient id="cv-floor" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="transparent" stopOpacity={0} />
-              </linearGradient>
-              {/* Green fill: value > contributions */}
-              <linearGradient id="cv-gain" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="0%"
-                  stopColor="var(--color-success)"
-                  stopOpacity={0.35}
-                />
-                <stop
-                  offset="100%"
-                  stopColor="var(--color-success)"
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-              {/* Red fill: value < contributions */}
-              <linearGradient id="cv-loss" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="0%"
-                  stopColor="var(--color-destructive)"
-                  stopOpacity={0.3}
-                />
-                <stop
-                  offset="100%"
-                  stopColor="var(--color-destructive)"
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="var(--color-border)"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-              tickLine={false}
-              minTickGap={48}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              width={72}
-              tickFormatter={(v: number) => money(v)}
-            />
-            <Tooltip content={<OverlayTooltip money={money} t={t} />} />
+      <div className="space-y-3">
+        {/* Legend lives in the card header (right of the title) — see the Savings page. */}
+        <div className="h-[200px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={data}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
+              <defs>
+                {/* Transparent base so the band starts at the lower of the two lines */}
+                <linearGradient id="cv-floor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="transparent" stopOpacity={0} />
+                </linearGradient>
+                {/* Green fill: value > contributions (the reference's default look) */}
+                <linearGradient id="cv-gain" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor="var(--color-success)"
+                    stopOpacity={0.18}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--color-success)"
+                    stopOpacity={0}
+                  />
+                </linearGradient>
+                {/* Red fill: value < contributions — real signal (currently underwater),
+                    kept but toned down; the reference sample data never dips below cost. */}
+                <linearGradient id="cv-loss" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor="var(--color-destructive)"
+                    stopOpacity={0.18}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--color-destructive)"
+                    stopOpacity={0}
+                  />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={48}
+              />
+              <Tooltip content={<OverlayTooltip money={money} t={t} />} />
 
-            {/* Transparent base Area — establishes the lower boundary of the band */}
-            <Area
-              type="monotone"
-              dataKey="floor"
-              stackId="band"
-              stroke="none"
-              fill="url(#cv-floor)"
-              legendType="none"
-              tooltipType="none"
-            />
-            {/* Green gain band */}
-            <Area
-              type="monotone"
-              dataKey="gain"
-              stackId="band"
-              stroke="none"
-              fill="url(#cv-gain)"
-              legendType="none"
-              tooltipType="none"
-            />
-            {/* Red loss band */}
-            <Area
-              type="monotone"
-              dataKey="loss"
-              stackId="band"
-              stroke="none"
-              fill="url(#cv-loss)"
-              legendType="none"
-              tooltipType="none"
-            />
+              {/* Transparent base Area — establishes the lower boundary of the band */}
+              <Area
+                type="monotone"
+                dataKey="floor"
+                stackId="band"
+                stroke="none"
+                fill="url(#cv-floor)"
+                legendType="none"
+                tooltipType="none"
+              />
+              {/* Green gain band */}
+              <Area
+                type="monotone"
+                dataKey="gain"
+                stackId="band"
+                stroke="none"
+                fill="url(#cv-gain)"
+                legendType="none"
+                tooltipType="none"
+              />
+              {/* Red loss band */}
+              <Area
+                type="monotone"
+                dataKey="loss"
+                stackId="band"
+                stroke="none"
+                fill="url(#cv-loss)"
+                legendType="none"
+                tooltipType="none"
+              />
 
-            {/* Crisp boundary: contributions step line */}
-            <Line
-              type="stepAfter"
-              dataKey="contributed"
-              stroke="var(--color-muted-foreground)"
-              strokeWidth={1.5}
-              dot={false}
-              strokeDasharray="4 3"
-            />
-            {/* Crisp boundary: daily value line */}
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="var(--color-primary)"
-              strokeWidth={2}
-              dot={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+              {/* Crisp boundary: contributions step line */}
+              <Line
+                type="stepAfter"
+                dataKey="contributed"
+                stroke="var(--color-muted-foreground)"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="4 3"
+              />
+              {/* Crisp boundary: daily value line */}
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="var(--color-success)"
+                strokeWidth={2}
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Invested / Gain / Now worth footer — reference shows this row under the chart. */}
+        <div className="flex items-center gap-6 border-t border-border pt-3">
+          <div>
+            <p className="text-xs text-muted-foreground">{t("footerInvested")}</p>
+            <p className="tabular mt-0.5 text-sm font-extrabold">{money(invested)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("footerGain")}</p>
+            <p
+              className={`tabular mt-0.5 text-sm font-extrabold ${gain >= 0 ? "text-success" : "text-destructive"}`}
+            >
+              {gain >= 0 ? "+" : ""}
+              {money(gain)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t("footerNowWorth")}</p>
+            <p className="tabular mt-0.5 text-sm font-extrabold">{money(nowWorth)}</p>
+          </div>
+        </div>
       </div>
     );
   }

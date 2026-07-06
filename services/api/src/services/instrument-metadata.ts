@@ -9,6 +9,13 @@ import type { DB } from "../db/client.js";
  */
 export const SKIP_ASSET_CLASSES = new Set(["gold", "mutual_fund", "bond", "crypto"]);
 
+/**
+ * Asset classes where a provider *search name* is meaningless — physical gold contracts and
+ * cash. Everything else (crypto, etf, equity, bond, mutual_fund) can carry a clean display
+ * name, so — unlike sector enrichment — crypto is intentionally NOT skipped here.
+ */
+export const NAME_SKIP_ASSET_CLASSES = new Set(["gold", "cash"]);
+
 /** Stale threshold: re-attempt after 30 days even when a prior attempt returned nothing. */
 const STALE_DAYS = 30;
 
@@ -35,6 +42,34 @@ export function needsSectorEnrichment(
     const checkedAt = i.sectorCheckedAt instanceof Date
       ? i.sectorCheckedAt
       : new Date(i.sectorCheckedAt);
+    return checkedAt < staleCutoff;
+  });
+}
+
+/**
+ * Predicate: should any of these instruments have a clean `displayName` resolved on the
+ * next sweep? True when an instrument (outside {@link NAME_SKIP_ASSET_CLASSES}) has no
+ * `displayName` yet and either was never attempted or the last attempt is stale. An
+ * instrument that already has a `displayName` is never re-enriched (best-effort, never
+ * overwrite). Accepts raw rows or meta objects; a missing `displayNameCheckedAt` is treated
+ * as "never attempted" (so the self-heal hook fires for any as-yet-unnamed instrument).
+ */
+export function needsNameEnrichment(
+  instruments: ReadonlyArray<{
+    assetClass: string;
+    displayName?: string | null;
+    displayNameCheckedAt?: Date | string | null;
+  }>,
+): boolean {
+  const staleCutoff = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
+  return instruments.some((i) => {
+    if (NAME_SKIP_ASSET_CLASSES.has(i.assetClass)) return false;
+    if (i.displayName) return false; // already named — never re-enrich
+    if (i.displayNameCheckedAt == null) return true;
+    const checkedAt =
+      i.displayNameCheckedAt instanceof Date
+        ? i.displayNameCheckedAt
+        : new Date(i.displayNameCheckedAt);
     return checkedAt < staleCutoff;
   });
 }
@@ -89,7 +124,16 @@ export async function refreshInstrumentMetadata(
     if (i.sectorCheckedAt == null) return true;
     return new Date(i.sectorCheckedAt) < staleCutoff;
   });
-  if (toEnrich.length === 0) return 0;
+  // Clean display-name enrichment runs independently of the sector pass (a SEPARATE filter
+  // — crypto is included here, and it must run even when no sector work is due).
+  const toName = rows.filter((i) => {
+    if (NAME_SKIP_ASSET_CLASSES.has(i.assetClass)) return false;
+    if (i.displayName) return false; // never overwrite an existing name
+    if (opts.force) return true;
+    if (i.displayNameCheckedAt == null) return true;
+    return new Date(i.displayNameCheckedAt) < staleCutoff;
+  });
+  if (toEnrich.length === 0 && toName.length === 0) return 0;
 
   let enriched = 0;
   let skipped = 0;
@@ -191,8 +235,57 @@ export async function refreshInstrumentMetadata(
     }
   }
 
+  // Clean display-name enrichment (see `toName` above). Non-destructive: only ever writes
+  // `displayName` (never `name`), and never re-enriches an instrument that has one.
+  for (const inst of toName) {
+    try {
+      // An ISIN uniquely identifies the security, so any provider result for that ISIN
+      // names THIS instrument — even when the resolved listing (ticker/venue) differs from
+      // how we store it (e.g. OpenFIGI returns the LSE line for a fund we hold on Xetra).
+      // Take the first result carrying a real name. Without an ISIN we have only a bare
+      // ticker, which can collide across exchanges, so there we require symbol AND market
+      // to match before trusting the name.
+      let clean: string | undefined;
+      if (inst.isin) {
+        const results = await service.search(inst.isin);
+        const named = results.find(
+          (r) => (r.longName ?? r.name) && (r.longName ?? r.name) !== inst.symbol,
+        );
+        clean = named?.longName ?? named?.name;
+      } else {
+        const results = await service.search(inst.symbol);
+        const match = results.find(
+          (r) => r.symbol.toUpperCase() === inst.symbol.toUpperCase() && r.market === inst.market,
+        );
+        clean = match?.longName ?? match?.name;
+      }
+      const now = new Date();
+      // Only accept a name that actually improves on the bare symbol.
+      if (clean && clean !== inst.symbol) {
+        await db
+          .update(instruments)
+          .set({ displayName: clean, displayNameCheckedAt: now })
+          .where(eq(instruments.id, inst.id));
+        enriched++;
+      } else {
+        // No confident match — stamp the attempt so we don't re-query until STALE_DAYS.
+        await db
+          .update(instruments)
+          .set({ displayNameCheckedAt: now })
+          .where(eq(instruments.id, inst.id));
+        skipped++;
+      }
+    } catch (err) {
+      // Non-fatal: don't stamp on exception so a transient error retries next run.
+      console.warn(
+        `[instrument-metadata] name search failed for ${inst.symbol} (${inst.market}):`,
+        err,
+      );
+    }
+  }
+
   console.info(
-    `[instrument-metadata] batch complete — enriched: ${enriched}, no-data: ${skipped}, total attempted: ${toEnrich.length}`,
+    `[instrument-metadata] batch complete — enriched: ${enriched}, no-data: ${skipped}, total attempted: ${toEnrich.length}, names attempted: ${toName.length}`,
   );
   return enriched;
 }

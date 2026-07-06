@@ -5,9 +5,14 @@ import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
   refreshInstrumentMetadata,
   needsSectorEnrichment,
+  needsNameEnrichment,
   SKIP_ASSET_CLASSES,
 } from "../../src/services/instrument-metadata.js";
-import type { MarketDataService, InstrumentProfile } from "@portfolio/market-data";
+import type {
+  MarketDataService,
+  InstrumentProfile,
+  InstrumentSearchResult,
+} from "@portfolio/market-data";
 
 // ---------------------------------------------------------------------------
 // needsSectorEnrichment (pure predicate — no DB needed)
@@ -394,5 +399,180 @@ describe("refreshInstrumentMetadata", () => {
 
     const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
     expect(row.countryWeights).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// needsNameEnrichment (pure predicate)
+// ---------------------------------------------------------------------------
+
+describe("needsNameEnrichment", () => {
+  const stale = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+  const fresh = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+
+  it("is true for an unnamed instrument never attempted", () => {
+    expect(needsNameEnrichment([{ assetClass: "equity", displayName: null }])).toBe(true);
+  });
+
+  it("is true for an unnamed instrument with a stale attempt", () => {
+    expect(
+      needsNameEnrichment([{ assetClass: "equity", displayName: null, displayNameCheckedAt: stale }]),
+    ).toBe(true);
+  });
+
+  it("is false when the instrument already has a displayName", () => {
+    expect(needsNameEnrichment([{ assetClass: "equity", displayName: "Apple Inc." }])).toBe(false);
+  });
+
+  it("is false for a recent unmatched attempt", () => {
+    expect(
+      needsNameEnrichment([{ assetClass: "equity", displayName: null, displayNameCheckedAt: fresh }]),
+    ).toBe(false);
+  });
+
+  it("includes crypto (unlike sector enrichment) but skips gold/cash", () => {
+    expect(needsNameEnrichment([{ assetClass: "crypto", displayName: null }])).toBe(true);
+    expect(needsNameEnrichment([{ assetClass: "gold", displayName: null }])).toBe(false);
+    expect(needsNameEnrichment([{ assetClass: "cash", displayName: null }])).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// refreshInstrumentMetadata — clean displayName enrichment (PGlite)
+// ---------------------------------------------------------------------------
+
+describe("refreshInstrumentMetadata — displayName", () => {
+  let portfolioId: string;
+
+  beforeAll(async () => {
+    await ensureDb();
+    const db = getDb();
+    const [user] = await db
+      .insert(users)
+      .values({ authSub: "test|name-enrich", email: "name-enrich@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: user.id, name: "Name Enrich", baseCurrency: "USD" })
+      .returning();
+    portfolioId = pf.id;
+  });
+
+  /** A service whose search() returns the given results (getProfile returns nothing). */
+  function searchService(results: Partial<InstrumentSearchResult>[]): MarketDataService {
+    return {
+      getProfile: async () => null,
+      search: async () => results as InstrumentSearchResult[],
+    } as unknown as MarketDataService;
+  }
+
+  async function createHeld(opts: {
+    symbol: string;
+    assetClass: "equity" | "crypto";
+    market?: string;
+    isin?: string;
+    displayName?: string | null;
+    displayNameCheckedAt?: Date | null;
+  }): Promise<string> {
+    const db = getDb();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: opts.symbol,
+        market: opts.market ?? "US",
+        assetClass: opts.assetClass,
+        unit: "shares",
+        currency: "USD",
+        isin: opts.isin ?? null,
+        name: opts.symbol, // raw broker string == the ticker
+        displayName: opts.displayName ?? null,
+        displayNameCheckedAt: opts.displayNameCheckedAt ?? null,
+        sectorCheckedAt: new Date(), // keep the sector pass out of the way
+      })
+      .returning();
+    await db.insert(transactions).values({
+      portfolioId,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "1",
+      price: "100",
+      fees: "0",
+      currency: "USD",
+      executedAt: new Date("2026-01-01"),
+    });
+    return inst.id;
+  }
+
+  it("resolves a clean displayName from a symbol+market match, leaving name untouched", async () => {
+    const db = getDb();
+    const id = await createHeld({ symbol: "AAPL_NM", assetClass: "equity" });
+    await refreshInstrumentMetadata(
+      db,
+      searchService([{ symbol: "AAPL_NM", market: "US", name: "AAPL_NM", longName: "Apple Inc." }]),
+    );
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
+    expect(row.displayName).toBe("Apple Inc.");
+    expect(row.displayNameCheckedAt).not.toBeNull();
+    expect(row.name).toBe("AAPL_NM"); // never overwritten
+  });
+
+  it("stamps the attempt but leaves displayName null when no match (wrong market, no ISIN)", async () => {
+    const db = getDb();
+    const id = await createHeld({ symbol: "TCKR_NM", assetClass: "equity", market: "US" });
+    await refreshInstrumentMetadata(
+      db,
+      // Same ticker, different market, and no ISIN to disambiguate → not a confident match.
+      searchService([{ symbol: "TCKR_NM", market: "XETRA", name: "TCKR_NM", longName: "Wrong Co" }]),
+    );
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
+    expect(row.displayName).toBeNull();
+    expect(row.displayNameCheckedAt).not.toBeNull();
+  });
+
+  it("accepts an ISIN-resolved name even when the resolved listing differs (ISIN is authoritative)", async () => {
+    const db = getDb();
+    // We hold the Xetra line; the resolver returns the LSE listing (different symbol/market).
+    // The ISIN pins both to the same fund, so its name is authoritative for our row.
+    const id = await createHeld({
+      symbol: "EUNL_NM",
+      assetClass: "equity",
+      market: "XETRA",
+      isin: "IE00B4L5Y983",
+    });
+    await refreshInstrumentMetadata(
+      db,
+      searchService([
+        { symbol: "IWDA", market: "LSE", name: "iShares Core MSCI World", longName: "iShares Core MSCI World UCITS ETF" },
+      ]),
+    );
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
+    expect(row.displayName).toBe("iShares Core MSCI World UCITS ETF");
+    expect(row.name).toBe("EUNL_NM"); // raw name never overwritten
+  });
+
+  it("does not re-enrich or overwrite an instrument that already has a displayName", async () => {
+    const db = getDb();
+    const id = await createHeld({
+      symbol: "SET_NM",
+      assetClass: "equity",
+      displayName: "Already Named",
+    });
+    await refreshInstrumentMetadata(
+      db,
+      searchService([{ symbol: "SET_NM", market: "US", name: "SET_NM", longName: "New Name" }]),
+    );
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
+    expect(row.displayName).toBe("Already Named");
+  });
+
+  it("enriches crypto (not skipped for names)", async () => {
+    const db = getDb();
+    const id = await createHeld({ symbol: "BTC_NM", assetClass: "crypto" });
+    await refreshInstrumentMetadata(
+      db,
+      searchService([{ symbol: "BTC_NM", market: "US", name: "BTC_NM", longName: "Bitcoin" }]),
+    );
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, id));
+    expect(row.displayName).toBe("Bitcoin");
   });
 });

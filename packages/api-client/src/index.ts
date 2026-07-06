@@ -388,6 +388,9 @@ export interface Portfolio {
 export interface InstrumentMeta {
   symbol: string;
   name: string;
+  /** Clean human-readable name (e.g. "Apple Inc.") from provider enrichment; null until
+   *  resolved. Presentation should prefer `displayName ?? name`. */
+  displayName: string | null;
   assetClass: string;
   unit: string;
   /** Exchange/venue (IDX, XETRA, XAU, …). Used for region breakdown in allocation analytics. */
@@ -680,6 +683,13 @@ export interface HoldingValuation extends Holding {
   instrument: InstrumentMeta | null;
   /** Standing open FIFO lots (oldest first); undefined when the API didn't attach them. */
   lots?: LotView[];
+  /**
+   * Recent daily closes (oldest→newest, instrument currency) for the mobile holdings
+   * sparkline. Populated by the route layer from the `prices` table, not by
+   * `summarizePortfolio` — same attach-after-valuing pattern as `lots`. Undefined or a
+   * <2-length array when there isn't enough stored history to draw a line.
+   */
+  sparkline?: number[];
 }
 
 export interface PortfolioSummary {
@@ -1285,6 +1295,12 @@ export interface ImportRecord {
   createdAt: string;
   /** Retained source document, if one exists and the portfolio has retention enabled. */
   document: ImportDocumentSummary | null;
+  /**
+   * The uploaded file's original name, for display — available even before confirm/retention
+   * (a "staged" document still carries it), unlike {@link document} which is retained-only.
+   * Never implies a downloadable file exists; use `document` for that.
+   */
+  originalFilename: string | null;
 }
 
 /** Signed-URL response for a retained source document. */
@@ -2002,12 +2018,14 @@ export function createApiClient(config: ApiClientConfig) {
     // re-flagged at confirm time, so this never silently creates true duplicates (#229).
     importCsv: (
       content: string,
+      filename?: string,
       format: "auto" | "generic" | "dkb" | "ibkr" | "ibkr-xml" | "coinbase" | "tr-csv" = "auto",
       force = false,
       batchId?: string,
     ) =>
       request<CsvImportResult>("POST", `/imports/csv${uploadQuery(force, batchId)}`, {
         content,
+        filename,
         format,
       }),
     importScreenshot: (file: File | Blob, force = false, batchId?: string) => {

@@ -442,6 +442,20 @@ describe("YahooFinanceProvider", () => {
     expect(quote?.asOf).toBe(new Date(1738972800 * 1000).toISOString());
   });
 
+  it("search falls back to shortname for longName when longname is absent", async () => {
+    const provider = new YahooFinanceProvider({
+      fetch: mockFetch(() => ({
+        body: {
+          quotes: [
+            { symbol: "BBCA.JK", shortname: "Bank Central Asia", quoteType: "EQUITY", exchange: "JKT" },
+          ],
+        },
+      })),
+    });
+    const [res] = await provider.search("bbca");
+    expect(res.longName).toBe("Bank Central Asia");
+  });
+
   it("supports equities/ETFs and gold spot, but not buyback gold", () => {
     const provider = new YahooFinanceProvider();
     expect(provider.supports("equity", "IDX")).toBe(true);
@@ -1035,6 +1049,7 @@ describe("YahooFinanceProvider.search", () => {
       {
         symbol: "BBCA",
         name: "Bank Central Asia Tbk",
+        longName: "Bank Central Asia Tbk",
         market: "IDX",
         assetClass: "equity",
         currency: "IDR",

@@ -7,8 +7,8 @@
     "more": "+{count} more"
   },
   "Install": {
-    "title": "Add Portfolio to your home screen",
-    "cta": "Install app",
+    "title": "Add Pocket to your home screen",
+    "cta": "Install Pocket",
     "dismiss": "Dismiss",
     "iosHint": "To install: tap Share, then “Add to Home Screen”."
   },
@@ -57,7 +57,9 @@
     "activity": "Activity",
     "reports": "Reports",
     "insights": "Insights",
-    "profile": "Profile"
+    "profile": "Profile",
+    "netWorth": "Net worth",
+    "allTime": "all-time"
   },
   "Reports": {
     "title": "Reports",
@@ -133,7 +135,8 @@
     },
     "diversification": {
       "label": "Diversification",
-      "caption": "classes · {markets} markets"
+      "caption": "{markets, plural, one {# market} other {# markets}} · {currencies, plural, one {# currency} other {# currencies}}",
+      "value": "{count, plural, one {# class} other {# classes}}"
     },
     "bestWorst": {
       "title": "Best & worst",
@@ -172,6 +175,8 @@
     "credentialHide": "Hide key",
     "credentialError": "Couldn't save the key. Please try again.",
     "encryptionDisabled": "Key management requires DB_ENCRYPTION_KEY to be set",
+    "credentialEncrypted": "Credentials encrypted at rest",
+    "credentialEncryptedMeta": "AES-256",
     "visionProviders": "Vision LLM providers",
     "visionProvidersHint": "Configure vision models for screenshot parsing. The highest-priority enabled provider is used. Ollama requires OLLAMA_BASE_URL (or a URL set via DB) to be configured.",
     "visionUrlPlaceholder": "http://localhost:11434",
@@ -210,6 +215,7 @@
     "apiCalls": "API calls",
     "apiKey": "API key",
     "keyNone": "none",
+    "keyNotNeeded": "Not needed",
     "editCredential": "Edit API key",
     "storage": "Object storage",
     "storageHint": "Configure the storage backend (S3-compatible or local folder), manage credentials, and view usage stats.",
@@ -246,7 +252,7 @@
   },
   "Income": {
     "title": "Income",
-    "subtitle": "Dividends and bond coupons across your portfolios.",
+    "subtitle": "Dividends, coupons & distributions",
     "date": "Date",
     "type": "Type",
     "instrument": "Instrument",
@@ -299,11 +305,21 @@
     "tooltipTotal": "Total",
     "tooltipForecast": "Forecast",
     "heatmapDefaultSubtitle": "Tap a cell to see the month's income",
-    "heatmapCellSubtitle": "{month} · {amount}"
+    "heatmapLess": "Less",
+    "heatmapMore": "More",
+    "heatmapCellSubtitle": "{month} · {amount}",
+    "paymentsTimelineTitle": "Payments timeline",
+    "paymentsTimelineSubtitle": "Received & forecast distributions",
+    "legendReceived": "Received",
+    "legendForecast": "Forecast",
+    "est": "est.",
+    "yearReceivedForecast": "received + forecast",
+    "yearForecast": "forecast",
+    "yearReceived": "received"
   },
   "Savings": {
     "title": "Savings",
-    "subtitle": "How much you put in over time, and where it's headed.",
+    "subtitle": "Contributions, plans & forecast",
     "totalContributed": "Total contributed",
     "monthlyAverage": "Average per month",
     "monthsActive": "{count, plural, one {# month} other {# months}}",
@@ -315,9 +331,13 @@
     "xirr": "Annualised return",
     "xirrYoungHint": "* annualised from under a year — may overstate",
     "contributionsOverTime": "Contributions over time",
-    "chartContributions": "Contributions",
-    "chartValue": "Portfolio value",
+    "chartContributions": "Contributed",
+    "chartValue": "Value",
     "chartValueUnavailable": "Value history not yet available — run a backfill from Admin → Jobs.",
+    "footerInvested": "Invested",
+    "footerGain": "Gain",
+    "footerNowWorth": "Now worth",
+    "contributionsSubtitle": "What you put in vs. what it's worth · since {date}",
     "forecastTitle": "Forecast",
     "forecastSubtitle": "Project the value if you keep saving at an assumed annual return.",
     "monthlyAmount": "Monthly amount",
@@ -325,6 +345,7 @@
     "horizonYears": "Horizon",
     "years": "{count, plural, one {# year} other {# years}}",
     "projectedValue": "Projected value",
+    "projectedInYears": "Projected in {count, plural, one {# year} other {# years}}",
     "projectedContributed": "You contribute",
     "projectedGrowth": "Growth",
     "toAge18": "To age 18",
@@ -332,8 +353,10 @@
     "growthSoFar": "incl. {amount} growth so far",
     "emptyTitle": "No contributions yet",
     "emptyBody": "Record deposits or savings-plan purchases and your saving progress appears here.",
-    "sparplanTitle": "Recurring investment plans",
+    "sparplanTitle": "Savings plans",
     "detectedMonthly": "Active monthly total",
+    "nowPct": "{pct}% now",
+    "activeCount": "{count, plural, one {# active} other {# active}}",
     "cadenceMonthly": "/month",
     "cadenceMonthlyShort": "mo",
     "cadenceQuarterly": "/quarter",
@@ -351,11 +374,39 @@
     "cashOnHandSubtitle": "Idle balances by currency",
     "cashMeta": "Uninvested cash balance",
     "cashNudgeLead": "{amount} is sitting idle.",
-    "cashNudgeSuggestion": "A money-market fund at ~{rate} p.a. would earn about {amount}/yr."
+    "cashNudgeSuggestion": "A money-market fund at ~{rate} p.a. would earn about {amount}/yr.",
+    "setTargets": "Set targets",
+    "planTotalMonthly": "{amount}/mo total",
+    "planNext": "next {date}",
+    "cadenceMonthlyLabel": "Monthly",
+    "cadenceQuarterlyLabel": "Quarterly",
+    "cadenceSemiAnnualLabel": "Semi-annual",
+    "cadenceAnnualLabel": "Annual",
+    "driftOnTarget": "On target",
+    "forecastAssumptions": "if you keep adding {amount}/mo at {rate} p.a.",
+    "allocTitle": "Allocation · target vs actual",
+    "allocTarget": "target {pct}",
+    "allocNow": "now {pct}",
+    "recommendedTopUp": "Recommended next top-up · {total}",
+    "driftOnTargetStrong": "Every sleeve is on target.",
+    "driftOnTargetRest": " Your next top-up keeps the mix balanced.",
+    "driftUnderStrong": "{name} is {pct}pp under target.",
+    "driftUnderRest": " Next top-up routes {amount} here to steer toward {target}.",
+    "driftOverStrong": "{name} is {pct}pp over target.",
+    "driftOverRest": " Ease off top-ups here until it's back within the {target} band.",
+    "targetAllocation": "Target allocation",
+    "targetHelper": "A target weight per plan. Must total 100%.",
+    "targetTotal": "Total {pct}%",
+    "targetMustEqual": " · must equal 100%",
+    "targetCancel": "Cancel",
+    "targetSave": "Save targets",
+    "targetLoadError": "Couldn't load targets.",
+    "targetSaveError": "Couldn't save targets."
   },
   "Portfolios": {
     "title": "Portfolios",
     "subtitle": "Create and manage your portfolios.",
+    "aggregateSubtitle": "{amount} aggregate · {count, plural, one {# portfolio} other {# portfolios}}",
     "value": "Total value",
     "create": "Create a portfolio",
     "empty": "No portfolios yet — create your first one.",
@@ -382,7 +433,9 @@
     "taxAllowanceHint": "The per-person legal ceiling: €1,000 for single filers; €2,000 for jointly-assessed couples. The actual allocation per depot is set in each portfolio's settings.",
     "capitalGainsTaxRate": "Capital gains tax rate",
     "capitalGainsTaxRateHint": "0.25 (25% KapSt) or 0.26375 incl. Soli. Adjust for your marginal rate.",
-    "churchTax": "Church tax surcharge (Kirchensteuer)"
+    "churchTax": "Church tax surcharge (Kirchensteuer)",
+    "deleteTitle": "Delete “{name}”?",
+    "edit": "Edit holder"
   },
   "PortfolioSwitcher": {
     "label": "Portfolio",
@@ -430,13 +483,13 @@
     "confirmDelete": "Delete",
     "cancel": "Cancel",
     "includeInAggregate": "Include in net-worth aggregate",
-    "includeInAggregateHint": "Uncheck to exclude this portfolio from total net-worth calculations.",
+    "includeInAggregateHint": "Count this portfolio toward your total net worth.",
     "cashCounted": "Cash is part of this portfolio",
-    "cashCountedHint": "Check for a savings/deposit account (Tagesgeld, Festgeld, a child's savings depot): cash counts as money saved and is included in net worth. Leave unchecked for a brokerage or mixed/checking account: only invested capital counts and idle cash is excluded — the right default for accounts where cash is just passing through.",
+    "cashCountedHint": "Count idle cash toward net worth — for savings/deposit accounts, not brokerage or checking.",
     "allowNegativeCash": "Allow transient negative cash",
-    "allowNegativeCashHint": "Check this if a buy regularly posts before its funding deposit clears, so the cash balance briefly dips below zero. It stops the negative-cash data-integrity warning from flagging those self-correcting dips. Only relevant when cash is part of this portfolio.",
+    "allowNegativeCashHint": "Silence the warning when a buy briefly posts before its funding deposit clears.",
     "documentRetention": "Keep source documents",
-    "documentRetentionHint": "When enabled, uploaded PDFs and screenshots are retained after confirmation so you can download them later. Off by default — documents are discarded after parsing to protect your privacy.",
+    "documentRetentionHint": "Keep uploaded PDFs and screenshots after parsing so you can re-download them.",
     "taxAllowanceAnnual": "Freistellungsauftrag (FSA)",
     "taxAllowanceAnnualPlaceholder": "e.g. 1000",
     "taxAllowanceAnnualHint": "Optional. The amount of your Sparerpauschbetrag allocated to this depot. Kapitalertragsteuer is withheld only once this amount is used up.",
@@ -446,7 +499,11 @@
     "trConnectAfterSave": "Save the portfolio first to set up the Trade Republic connection.",
     "trChildUnsupported": "Trade Republic can't sync child accounts (Kinderdepot) yet — import via CSV or PDF instead.",
     "trLoading": "Loading connection…",
-    "done": "Done"
+    "done": "Done",
+    "sectionBasics": "Basics",
+    "sectionOwnership": "Ownership",
+    "sectionAccount": "Account",
+    "sectionAccounting": "Accounting options"
   },
   "Import": {
     "title": "Import transactions",
@@ -641,6 +698,7 @@
   },
   "ImportHistory": {
     "title": "Recent imports",
+    "file": "File",
     "items": "{count, plural, one {# item} other {# items}}",
     "review": "Review",
     "reviewTitle": "Review import",
@@ -665,9 +723,12 @@
     "actionError": "Something went wrong. Please try again.",
     "downloadError": "Receipt unavailable — it may have been deleted or storage is down.",
     "reassign": "Reassign all to…",
+    "selectRows": "Select rows",
     "selectAll": "Select all",
     "selectRow": "Select import",
     "selectBatch": "Select batch",
+    "selectPrompt": "Select rows to act on",
+    "cancelSelection": "Cancel selection",
     "batchLabel": "Upload · {count, plural, one {# file} other {# files}}",
     "selectedCount": "{count, plural, one {# selected} other {# selected}}",
     "deleteSelected": "Delete selected",
@@ -855,6 +916,10 @@
     "preferences": "Preferences",
     "appearance": "Appearance",
     "language": "Language",
+    "languageOptions": {
+      "en": "English",
+      "id": "Bahasa Indonesia"
+    },
     "displayCurrency": "Display currency",
     "displayCurrencyHint": "Net worth and totals are shown in this currency.",
     "save": "Save changes",
@@ -956,10 +1021,10 @@
     "collectingIntraday": "Collecting intraday data — check back after markets are open."
   },
   "Transactions": {
-    "title": "Transactions",
+    "title": "Activity",
     "subtitle": "Every buy, sell, dividend and cash flow.",
     "filterScope": "Scope",
-    "filterAll": "All activity",
+    "filterAll": "All",
     "filterInvestments": "Investments only",
     "filterType": "Type",
     "filterInstrument": "Instrument",
@@ -1000,7 +1065,9 @@
       "notRetained": "The original document was not stored. To keep imported files, enable document retention in the portfolio settings."
     },
     "batch": {
+      "selectRows": "Select rows",
       "selected": "{count, plural, one {# selected} other {# selected}}",
+      "selectPrompt": "Select rows to act on",
       "delete": "Delete selected",
       "confirmPrompt": "Delete these transactions?",
       "confirm": "Delete",
@@ -1009,7 +1076,9 @@
       "selectRow": "Select transaction",
       "confirmDrafts": "Confirm selected",
       "discardDrafts": "Discard selected",
-      "reassign": "Reassign…"
+      "reassign": "Reassign…",
+      "loadMore": "Load more",
+      "showingCount": "Showing {shown} of {total}"
     },
     "filterDraftLabel": "Draft filter",
     "draftShowAll": "All",
@@ -1050,11 +1119,33 @@
       "capitalDeployed": "capital deployed",
       "capitalReturned": "capital returned",
       "mostBought": "Most bought",
-      "mostSold": "Most sold"
-    }
+      "mostSold": "Most sold",
+      "chipBuys": "Buys",
+      "chipSells": "Sells",
+      "chipIncome": "Income",
+      "chipIssues": "Needs review · {count}"
+    },
+    "subtitleCount": "{count} transactions",
+    "transactionCol": "Transaction",
+    "price": "Price",
+    "breakdown": "Breakdown",
+    "details": "Details",
+    "currency": "Currency"
   },
   "Manage": {
     "addTransaction": "Add transaction",
+    "addMenu": {
+      "add": "Add",
+      "title": "Add to portfolio",
+      "subtitle": "Transactions are the source of truth — pick how to add them.",
+      "recommended": "Recommended",
+      "screenshot": "Snap a screenshot",
+      "screenshotDesc": "AI reads your broker app — IDX, Trade Republic, anything",
+      "csv": "Import a CSV",
+      "csvDesc": "From any broker export — columns mapped automatically",
+      "manual": "Add manually",
+      "manualDesc": "Enter a single transaction yourself"
+    },
     "createPortfolio": "Create portfolio",
     "back": "Back",
     "actions": "Actions",
@@ -1148,7 +1239,12 @@
       "subTypeNone": "(none)",
       "subTypeSaveback": "Saveback",
       "subTypeRoundup": "Round-up",
-      "subTypeMerger": "Merger"
+      "subTypeMerger": "Merger",
+      "groupTrade": "Trade",
+      "groupShareReceipt": "Share receipt",
+      "groupTransfer": "Transfer",
+      "groupIncome": "Income",
+      "groupCash": "Cash"
     },
     "reassign": "Reassign"
   },
@@ -1285,8 +1381,8 @@
     }
   },
   "Trades": {
-    "title": "Trade Log",
-    "subtitle": "Every position and its performance, dividends included.",
+    "title": "Realized P&L",
+    "subtitle": "Closed trades & performance",
     "methodAverage": "Average cost",
     "methodFifo": "FIFO",
     "filter_all": "All",
@@ -1314,6 +1410,11 @@
     "totalRealized": "Realized P&L",
     "totalDividends": "Dividends",
     "winRate": "Win rate",
+    "realizedByYearChartTitle": "Realized P&L per year",
+    "winLossTitle": "Win / loss",
+    "winLossSubtitle": "{winners} of {total} closed",
+    "winners": "Winners",
+    "losers": "Losers",
     "realizedByYear": "Realized gains by year",
     "dividendsByYear": "Dividends by year",
     "bonusesByYear": "Bonuses by year",
@@ -1386,8 +1487,8 @@
     "loadSalesError": "Could not load trade recommendations."
   },
   "Tax": {
-    "title": "Tax Optimization",
-    "subtitle": "Sparerpauschbetrag headroom and tax-free harvest suggestions. German tax only.",
+    "title": "Tax",
+    "subtitle": "Capital gains & tax-free harvest suggestions",
     "defaultHolderName": "All portfolios",
     "empty": {
       "title": "No FSA allocation configured",
@@ -1432,7 +1533,9 @@
       "tfApplied": "TF {pct}% applied",
       "button": "Harvest",
       "summary": "Harvest all {count} to offset {offset} of realized gains — about ~{saving} saved. Germany has no 30-day wash-sale rule, so you can buy back immediately.",
-      "none": "No harvestable losses right now."
+      "none": "No harvestable gains right now.",
+      "positionsEyebrow": "Positions you could realize",
+      "metaLine": "{offset} realizable · saves ~{saving}"
     },
     "hero": {
       "estimatedTax": "Estimated tax · {year}",

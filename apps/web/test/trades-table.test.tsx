@@ -45,7 +45,7 @@ const closed: Trade = {
       taxYear: 2021,
     },
   ],
-  instrument: { symbol: "TLKM", name: "Telkom", assetClass: "equity", unit: "shares", market: "IDX", sector: null, sectorWeights: null, countryWeights: null },
+  instrument: { symbol: "TLKM", name: "Telkom", displayName: null, assetClass: "equity", unit: "shares", market: "IDX", sector: null, sectorWeights: null, countryWeights: null },
 };
 
 const open: Trade = {
@@ -82,7 +82,7 @@ const open: Trade = {
       taxYear: 2021,
     },
   ],
-  instrument: { symbol: "BBCA", name: "BCA", assetClass: "equity", unit: "shares", market: "IDX", sector: null, sectorWeights: null, countryWeights: null },
+  instrument: { symbol: "BBCA", name: "BCA", displayName: null, assetClass: "equity", unit: "shares", market: "IDX", sector: null, sectorWeights: null, countryWeights: null },
 };
 
 function renderTable(trades: Trade[]) {
@@ -100,13 +100,6 @@ describe("TradesTable", () => {
     expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
     // The long-term (tax-free) flag surfaces on the open position held > 1 year.
     expect(screen.getAllByText(/Tax-free/).length).toBeGreaterThan(0);
-  });
-
-  it("filters to closed trades only", () => {
-    renderTable([open, closed]);
-    fireEvent.click(screen.getByRole("button", { name: "Closed" }));
-    expect(screen.queryByText("BBCA")).toBeNull();
-    expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
   });
 
   it("expands an open trade to reveal its matched legs", () => {

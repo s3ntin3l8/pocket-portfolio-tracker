@@ -40,6 +40,13 @@ export interface HoldingValuation extends Holding {
    * `openLots()` after valuing. Undefined when the caller didn't attach it.
    */
   lots?: LotView[];
+  /**
+   * Recent daily closes (oldest→newest, instrument currency) for the mobile holdings
+   * sparkline. Like `lots`, NOT populated by `summarizePortfolio` — the route layer attaches
+   * it from the `prices` table after valuing. Undefined/`<2`-length when there isn't enough
+   * stored history to draw a line.
+   */
+  sparkline?: number[];
 }
 
 export interface PortfolioSummary {

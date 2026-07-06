@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/stat-card";
+import { MonogramBadge } from "@/components/monogram-badge";
 import { InstrumentPriceCard } from "@/components/instrument-price-card";
 import { InstrumentIncomeCard } from "@/components/instrument-income-card";
 import { CorporateActionsManager } from "@/components/corporate-actions-manager";
@@ -58,7 +59,13 @@ export default async function InstrumentPage({
   const instrumentYield = incomeStats?.yields.find((y) => y.instrumentId === id) ?? null;
 
   const back = (
-    <Button variant="ghost" size="icon" asChild aria-label={t("priceHistory")}>
+    <Button
+      variant="outline"
+      size="icon"
+      asChild
+      aria-label={t("priceHistory")}
+      className="rounded-xl bg-card shadow-card"
+    >
       <Link href="/holdings">
         <ArrowLeft className="size-4" />
       </Link>
@@ -114,9 +121,15 @@ export default async function InstrumentPage({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         {back}
+        {/* Reference detail header: instrument monogram chip + symbol + class badge. */}
+        <MonogramBadge
+          label={instrument.symbol}
+          assetClass={instrument.assetClass}
+          className="size-11 rounded-[13px] text-sm"
+        />
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-2xl font-bold">
               {instrument.symbol}
             </h1>
             <Badge variant="outline">{tc(instrument.assetClass)}</Badge>
@@ -147,7 +160,7 @@ export default async function InstrumentPage({
         </CardHeader>
         <CardContent>
           {hasPosition && holding ? (
-            <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-5">
               <StatCard
                 label={t("marketValueLabel")}
                 value={

@@ -1,11 +1,20 @@
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { ImportRecord } from "@portfolio/api-client";
 
+// `rowActions()` renders identically in both the desktop table and the mobile card list —
+// both coexist in jsdom (no CSS applied, so `hidden md:block` / `md:hidden` don't actually
+// hide anything). Scope action queries to the desktop `<table>` to disambiguate, the same
+// idiom `transactions-table.test.tsx` uses for its own dual desktop/mobile render.
+function desktop() {
+  return within(screen.getByRole("table"));
+}
+
 const refresh = vi.fn();
+const pushMock = vi.fn();
 const discardImport = vi.fn(async () => undefined);
 const deleteImport = vi.fn(async () => ({ removed: 1 }));
 const clearImport = vi.fn(async () => undefined);
@@ -20,9 +29,9 @@ const getImportDocumentUrl = vi.fn(async () => ({ url: "https://example.com/doc.
 const reassignImport = vi.fn(async () => ({ moved: 4, skippedConflicts: 0, skippedLoans: 0 }));
 
 vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ refresh }),
-  Link: ({ href, children }: { href: string; children: ReactNode }) => (
-    <a href={href}>{children}</a>
+  useRouter: () => ({ refresh, push: pushMock }),
+  Link: ({ href, children, ...rest }: { href: string; children: ReactNode } & Record<string, unknown>) => (
+    <a href={href} {...rest}>{children}</a>
   ),
 }));
 vi.mock("@/lib/api", () => ({
@@ -58,6 +67,7 @@ const items: ImportRecord[] = [
     createdAt: "2026-06-10T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
   {
     id: "conf1",
@@ -69,6 +79,7 @@ const items: ImportRecord[] = [
     createdAt: "2026-06-09T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
 ];
 
@@ -83,6 +94,7 @@ const threeItems: ImportRecord[] = [
     createdAt: "2026-06-12T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
   {
     id: "i2",
@@ -94,6 +106,7 @@ const threeItems: ImportRecord[] = [
     createdAt: "2026-06-11T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
   {
     id: "i3",
@@ -105,6 +118,7 @@ const threeItems: ImportRecord[] = [
     createdAt: "2026-06-10T10:00:00.000Z",
     batchId: null,
     document: null,
+    originalFilename: null,
   },
 ];
 
@@ -126,6 +140,7 @@ const discardedItem: ImportRecord = {
   createdAt: "2026-06-08T10:00:00.000Z",
   batchId: null,
   document: null,
+  originalFilename: null,
 };
 
 const itemsWithDiscarded: ImportRecord[] = [...items, discardedItem];
@@ -133,6 +148,7 @@ const itemsWithDiscarded: ImportRecord[] = [...items, discardedItem];
 describe("ImportHistory", () => {
   beforeEach(() => {
     refresh.mockClear();
+    pushMock.mockClear();
     discardImport.mockClear();
     deleteImport.mockClear();
     clearImport.mockClear();
@@ -143,14 +159,14 @@ describe("ImportHistory", () => {
 
   it("discards a draft import", async () => {
     renderHistory();
-    fireEvent.click(screen.getByRole("button", { name: m.discard }));
+    fireEvent.click(desktop().getByRole("button", { name: m.discard }));
     await waitFor(() => expect(discardImport).toHaveBeenCalledWith("draft1"));
     expect(refresh).toHaveBeenCalled();
   });
 
   it("links a draft import to its review page", () => {
     renderHistory();
-    const link = screen.getByRole("link", { name: m.review });
+    const link = desktop().getByRole("link", { name: m.review });
     expect(link).toHaveAttribute("href", "/transactions/import/draft1");
   });
 
@@ -159,11 +175,11 @@ describe("ImportHistory", () => {
     // Confirmed imports are hidden by default — reveal them first.
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
     // First click reveals the warning + destructive confirm; nothing removed yet.
-    fireEvent.click(screen.getByRole("button", { name: m.undo }));
+    fireEvent.click(desktop().getByRole("button", { name: m.undo }));
     expect(deleteImport).not.toHaveBeenCalled();
-    expect(screen.getByText(/Removes 4 transactions/)).toBeInTheDocument();
+    expect(desktop().getByText(/Removes 4 transactions/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: m.undo }));
+    fireEvent.click(desktop().getByRole("button", { name: m.undo }));
     await waitFor(() => expect(deleteImport).toHaveBeenCalledWith("conf1"));
     expect(refresh).toHaveBeenCalled();
   });
@@ -175,7 +191,7 @@ describe("ImportHistory", () => {
       </NextIntlClientProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
-    fireEvent.click(screen.getByRole("button", { name: m.reassign }));
+    fireEvent.click(desktop().getByRole("button", { name: m.reassign }));
     // The dialog confirms the move to the chosen portfolio.
     fireEvent.click(
       screen.getByRole("button", { name: messages.Transactions.reassign.confirm }),
@@ -249,7 +265,7 @@ describe("ImportHistory", () => {
         <ImportHistory items={itemsWithDiscarded} />
       </NextIntlClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: m.clear }));
+    fireEvent.click(desktop().getByRole("button", { name: m.clear }));
     await waitFor(() => expect(clearImport).toHaveBeenCalledWith("disc1"));
     expect(refresh).toHaveBeenCalled();
   });
@@ -260,8 +276,8 @@ describe("ImportHistory", () => {
         <ImportHistory items={itemsWithDiscarded} />
       </NextIntlClientProvider>,
     );
-    // Only one Clear button — for the single discarded row.
-    expect(screen.getAllByRole("button", { name: m.clear })).toHaveLength(1);
+    // Only one Clear button in the desktop table — for the single discarded row.
+    expect(desktop().getAllByRole("button", { name: m.clear })).toHaveLength(1);
   });
 
   it("shows Clear all discarded header button when discarded rows exist", () => {
@@ -297,8 +313,9 @@ describe("ImportHistory", () => {
         <ImportHistory items={threeItems} />
       </NextIntlClientProvider>,
     );
-    // No rows visible by default; a hint explains the hidden completed imports.
-    expect(screen.getByText(/3 completed imports hidden/)).toBeInTheDocument();
+    // No rows visible by default; a hint explains the hidden completed imports (shown once
+    // per layout — desktop's empty table row and the mobile empty-state card).
+    expect(screen.getAllByText(/3 completed imports hidden/).length).toBeGreaterThan(0);
     expect(screen.queryByText("pytr")).not.toBeInTheDocument();
   });
 
@@ -336,7 +353,7 @@ describe("ImportHistory", () => {
   it("shows an error banner when discard fails", async () => {
     discardImport.mockRejectedValueOnce(new Error("network error"));
     renderHistory();
-    fireEvent.click(screen.getByRole("button", { name: m.discard }));
+    fireEvent.click(desktop().getByRole("button", { name: m.discard }));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(m.actionError),
     );
@@ -348,9 +365,9 @@ describe("ImportHistory", () => {
     deleteImport.mockRejectedValueOnce(new Error("network error"));
     renderHistory();
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
-    fireEvent.click(screen.getByRole("button", { name: m.undo }));
+    fireEvent.click(desktop().getByRole("button", { name: m.undo }));
     // Two-step: first click shows warning; second triggers the delete.
-    fireEvent.click(screen.getByRole("button", { name: m.undo }));
+    fireEvent.click(desktop().getByRole("button", { name: m.undo }));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(m.actionError),
     );
@@ -363,7 +380,7 @@ describe("ImportHistory", () => {
         <ImportHistory items={itemsWithDiscarded} />
       </NextIntlClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: m.clear }));
+    fireEvent.click(desktop().getByRole("button", { name: m.clear }));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(m.actionError),
     );
@@ -398,6 +415,7 @@ describe("ImportHistory", () => {
       createdAt: "2026-06-09T10:00:00.000Z",
       batchId: null,
       document: { id: "doc1", originalFilename: "export.pdf", mimeType: "application/pdf", sizeBytes: 12345, storedAt: "2026-06-09T10:00:00.000Z" },
+      originalFilename: "export.pdf",
     };
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
@@ -405,7 +423,7 @@ describe("ImportHistory", () => {
       </NextIntlClientProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
-    fireEvent.click(screen.getByRole("button", { name: m.downloadReceipt }));
+    fireEvent.click(desktop().getByRole("button", { name: m.downloadReceipt }));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(m.downloadError),
     );
@@ -413,14 +431,16 @@ describe("ImportHistory", () => {
 
   it("bulk-deletes a multi-select of drafts in one request (no confirm step)", async () => {
     const drafts: ImportRecord[] = [
-      { id: "d1", portfolioId: "p1", parser: "csv", status: "draft", confidence: null, count: 2, createdAt: "2026-06-10T10:00:00.000Z", batchId: null, document: null },
-      { id: "d2", portfolioId: "p1", parser: "dkb", status: "draft", confidence: null, count: 3, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null },
+      { id: "d1", portfolioId: "p1", parser: "csv", status: "draft", confidence: null, count: 2, createdAt: "2026-06-10T10:00:00.000Z", batchId: null, document: null, originalFilename: null },
+      { id: "d2", portfolioId: "p1", parser: "dkb", status: "draft", confidence: null, count: 3, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null, originalFilename: null },
     ];
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <ImportHistory items={drafts} />
       </NextIntlClientProvider>,
     );
+    // Checkboxes stay hidden until selection mode is entered via the header toggle.
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
     fireEvent.click(screen.getByLabelText(m.selectAll));
     fireEvent.click(screen.getByRole("button", { name: m.deleteSelected }));
     await waitFor(() => expect(bulkDeleteImports).toHaveBeenCalledTimes(1));
@@ -429,14 +449,15 @@ describe("ImportHistory", () => {
   });
 
   it("requires a confirmation click before bulk-deleting a selection with confirmed imports", async () => {
-    const confirmed: ImportRecord = { id: "c1", portfolioId: "p1", parser: "dkb", status: "confirmed", confidence: null, count: 7, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null };
+    const confirmed: ImportRecord = { id: "c1", portfolioId: "p1", parser: "dkb", status: "confirmed", confidence: null, count: 7, createdAt: "2026-06-09T10:00:00.000Z", batchId: null, document: null, originalFilename: null };
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <ImportHistory items={[confirmed]} />
       </NextIntlClientProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
-    fireEvent.click(screen.getByLabelText(m.selectRow));
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    fireEvent.click(desktop().getByLabelText(m.selectRow));
     // First click → warning, no request yet.
     fireEvent.click(screen.getByRole("button", { name: m.deleteSelected }));
     expect(bulkDeleteImports).not.toHaveBeenCalled();
@@ -448,18 +469,118 @@ describe("ImportHistory", () => {
 
   it("groups same-batch uploads and selects the whole batch in one click", async () => {
     const batched: ImportRecord[] = [
-      { id: "b-a", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:01.000Z", batchId: "batch-1", document: null },
-      { id: "b-b", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:02.000Z", batchId: "batch-1", document: null },
+      { id: "b-a", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:01.000Z", batchId: "batch-1", document: null, originalFilename: "statement.pdf" },
+      { id: "b-b", portfolioId: "p1", parser: "dkb-pdf", status: "draft", confidence: null, count: 1, createdAt: "2026-06-10T10:00:02.000Z", batchId: "batch-1", document: null, originalFilename: "statement.pdf" },
     ];
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <ImportHistory items={batched} />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByText(/Upload · 2 files/)).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(m.selectBatch));
+    // Shown once per layout — desktop's batch-header row and the mobile group caption.
+    expect(screen.getAllByText(/Upload · 2 files/).length).toBeGreaterThan(0);
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    fireEvent.click(desktop().getByLabelText(m.selectBatch));
     fireEvent.click(screen.getByRole("button", { name: m.deleteSelected }));
     await waitFor(() => expect(bulkDeleteImports).toHaveBeenCalledTimes(1));
     expect(new Set(bulkDeleteImports.mock.calls[0][0])).toEqual(new Set(["b-a", "b-b"]));
+  });
+
+  // -------------------------------------------------------------------------
+  // Reference-fidelity redesign: icon+filename column, mobile compact cards,
+  // long-press-to-select.
+  // -------------------------------------------------------------------------
+  it("hides desktop checkboxes by default and reveals them via the select-rows toggle", () => {
+    renderHistory();
+    expect(desktop().queryByLabelText(m.selectAll)).toBeNull();
+    expect(desktop().queryByLabelText(m.selectRow)).toBeNull();
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+
+    expect(desktop().getByLabelText(m.selectAll)).toBeInTheDocument();
+    expect(desktop().getByLabelText(m.selectRow)).toBeInTheDocument();
+    // Entering selection mode with nothing picked yet shows the prompt, not "0 selected".
+    expect(screen.getByText(m.selectPrompt)).toBeInTheDocument();
+  });
+
+  it("cancel (X) exits selection mode and clears the selection", () => {
+    renderHistory();
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    fireEvent.click(desktop().getByLabelText(m.selectRow));
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: m.cancelSelection }));
+
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+    expect(desktop().queryByLabelText(m.selectRow)).toBeNull();
+    // Back to the toggle, ready to start a fresh selection.
+    expect(desktop().getByRole("button", { name: m.selectRows })).toBeInTheDocument();
+  });
+
+  it("renders the File column header and a friendly fallback label when no document exists", () => {
+    renderHistory();
+    expect(desktop().getByText(m.file)).toBeInTheDocument();
+    // draft1 (parser "csv") has no stored document — falls back to the friendly source label.
+    expect(desktop().getByText("CSV")).toBeInTheDocument();
+  });
+
+  it("shows the real imported filename instead of the generic source label when available", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory
+          items={[
+            {
+              id: "draft-named",
+              portfolioId: "p1",
+              parser: "csv",
+              status: "draft",
+              confidence: null,
+              count: 3,
+              createdAt: "2026-06-10T10:00:00.000Z",
+              batchId: null,
+              document: null,
+              originalFilename: "dkb-umsaetze-juni.csv",
+            },
+          ]}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(desktop().getByText("dkb-umsaetze-juni.csv")).toBeInTheDocument();
+    expect(desktop().queryByText("CSV")).not.toBeInTheDocument();
+  });
+
+  it("renders a compact mobile card with a composed source/date/count subline", () => {
+    renderHistory();
+    const mobileRow = screen.getByTestId("import-mobile-draft1");
+    expect(within(mobileRow).getByText(/CSV · .* · 2 items/)).toBeInTheDocument();
+  });
+
+  it("long-press enters selection mode and reveals a checkbox on the mobile card", () => {
+    vi.useFakeTimers();
+    try {
+      renderHistory();
+      const mobileRow = screen.getByTestId("import-mobile-draft1");
+      // Checkboxes stay hidden on mobile until a long-press.
+      expect(within(mobileRow).queryByRole("checkbox")).toBeNull();
+      fireEvent.pointerDown(mobileRow, { clientX: 10, clientY: 10 });
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      const checkbox = within(mobileRow).getByRole("checkbox");
+      expect(checkbox).toBeChecked();
+      // Shared selection state — the bulk bar reacts the same as a desktop checkbox click.
+      expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("tapping a draft's mobile card (no long-press) navigates to its review page", () => {
+    renderHistory();
+    const mobileRow = screen.getByTestId("import-mobile-draft1");
+    fireEvent.click(mobileRow);
+    // A plain tap on a draft mirrors the explicit Review action.
+    expect(pushMock).toHaveBeenCalledWith("/transactions/import/draft1");
   });
 });

@@ -56,6 +56,9 @@ const accountCheckBodySchema = z.object({
 
 const csvBodySchema = z.object({
   content: z.string().min(1),
+  // The uploaded file's original name — shown in the import history list. Optional since
+  // older clients (or a bare API call) may not send it.
+  filename: z.string().optional(),
   // `auto` sniffs the content (default); otherwise force a specific parser: `dkb`
   // (German DKB depot/Girokonto), `ibkr` (Interactive Brokers Flex Trades CSV), `ibkr-xml`
   // (Interactive Brokers Activity Flex Statement XML — richer: dividends, cash, positions),
@@ -375,7 +378,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate, bodyLimit: 25 * 1024 * 1024 },
     async (request, reply) => {
       const { id } = requireUser(request);
-      const { content, format } = csvBodySchema.parse(request.body);
+      const { content, filename, format } = csvBodySchema.parse(request.body);
       const force = forceFromQuery(request.query);
       const contentHash = shortHash(content);
 
@@ -487,7 +490,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
         importId: imp.id,
         buf: Buffer.from(content, "utf8"),
         mimeType: "text/csv",
-        originalFilename: null,
+        originalFilename: filename ?? null,
         source: PARSER_TAG[resolved] ?? "csv",
       });
 

@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { ReportHeader } from "@/components/report-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreferenceChips } from "@/components/preference-chips";
@@ -48,25 +49,25 @@ export default async function TaxPage({
   const detailByHolder = await loadTaxYearDetail(holders, year);
 
   const Heading = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {regime === "ID" ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() }) : t("subtitle")}
-        </p>
-      </div>
-      <div className="flex flex-col items-start gap-1">
-        <PreferenceChips
-          prefKey="taxRegime"
-          current={regime}
-          options={[
-            { value: "DE", label: t("regime.de") },
-            { value: "ID", label: t("regime.id") },
-          ]}
-        />
-        <span className="px-0.5 text-[11px] text-muted-foreground">{t("regime.label")}</span>
-      </div>
-    </div>
+    <ReportHeader
+      title={t("title")}
+      subtitle={
+        regime === "ID" ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() }) : t("subtitle")
+      }
+      action={
+        <div className="flex flex-col items-end gap-1">
+          <PreferenceChips
+            prefKey="taxRegime"
+            current={regime}
+            options={[
+              { value: "DE", label: t("regime.de") },
+              { value: "ID", label: t("regime.id") },
+            ]}
+          />
+          <span className="px-0.5 text-[11px] text-muted-foreground">{t("regime.label")}</span>
+        </div>
+      }
+    />
   );
 
   if (holders.length === 0) {
@@ -75,7 +76,7 @@ export default async function TaxPage({
     // here, so the DE-only empty state is gated to the DE regime.
     const te = await getTranslations("Empty");
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {Heading}
         <EmptyState
           icon={Receipt}
@@ -87,7 +88,7 @@ export default async function TaxPage({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {Heading}
       {holders.map((entry) => (
         <TaxHolderSection
@@ -173,7 +174,7 @@ function TaxHolderSectionId({
   return (
     <>
       {/* Hero row: estimated tax (withheld at source) + sales tax + dividend tax */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <EstimatedTaxHero
           tone="green"
           label={t("id.hero.estimatedTax", { year })}
@@ -199,6 +200,7 @@ function TaxHolderSectionId({
           totalSalesTax={idTax.totalSalesTax}
           money={money}
           t={t}
+          year={year}
         />
         <IdDividendsTable
           rows={idTax.dividends}
@@ -251,7 +253,7 @@ function TaxHolderSectionDe({
   return (
     <>
       {/* Hero row: estimated tax + realized gains YTD + dividends YTD */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <EstimatedTaxHero
           label={t("hero.estimatedTax", { year: entry.year })}
           value={money(estimatedTax)}
@@ -283,6 +285,7 @@ function TaxHolderSectionDe({
             totalGain={detail.totalGain}
             money={money}
             t={t}
+            year={entry.year}
           />
           <DividendsTable
             rows={detail.dividendRows}
@@ -304,7 +307,7 @@ function TaxHolderSectionDe({
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">{t("forecast.disclaimer")}</p>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
               <StatCard
                 label={t("forecast.label")}
                 value={money(u.forecastIncomeRestOfYear)}
@@ -327,14 +330,27 @@ function TaxHolderSectionDe({
 
       {/* Tax-loss harvesting: always shows the allowance summary; the position list and
           summary note only when there's something harvestable. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp className="size-4" />
-            {t("harvest.title")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Card className="overflow-hidden rounded-[20px]">
+        {/* Header: title + subtitle on the left, a currency pill on the right (reference). */}
+        <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-[15px] font-bold">
+              <TrendingUp className="size-4" />
+              {t("harvest.title")}
+            </h2>
+            <p className="mt-0.5 text-xs font-medium text-text-2">
+              {hasForecast ? t("harvest.subtitle") : t("harvest.subtitleNoForecast")}
+            </p>
+          </div>
+          <span
+            className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#7C5CFC]"
+            style={{ backgroundColor: "rgba(124,92,252,.16)" }}
+          >
+            {entry.currency}
+          </span>
+        </div>
+
+        <div className="px-[22px] pb-1.5 pt-3.5">
           <AllowanceSummaryBoxes
             usedPct={usedPct}
             allowanceAnnual={u.allowanceAnnual}
@@ -346,22 +362,23 @@ function TaxHolderSectionDe({
             money={money}
             t={t}
           />
-          {harvestSuggestions.length > 0 ? (
+        </div>
+
+        {harvestSuggestions.length > 0 ? (
+          <>
+            <p className="px-[22px] pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-text-3">
+              {t("harvest.positionsEyebrow")}
+            </p>
             <div>
-              <p className="text-sm text-muted-foreground mb-2">
-                {hasForecast ? t("harvest.subtitle") : t("harvest.subtitleNoForecast")}
-              </p>
-              <div className="divide-y">
-                {harvestSuggestions.map((s) => (
-                  <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
-                ))}
-              </div>
-              <HarvestSummaryNote suggestions={harvestSuggestions} money={money} t={t} />
+              {harvestSuggestions.map((s) => (
+                <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
+              ))}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">{t("harvest.none")}</p>
-          )}
-        </CardContent>
+            <HarvestSummaryNote suggestions={harvestSuggestions} money={money} t={t} />
+          </>
+        ) : (
+          <p className="px-[22px] pb-5 pt-1 text-sm text-muted-foreground">{t("harvest.none")}</p>
+        )}
       </Card>
 
       {/* By year */}

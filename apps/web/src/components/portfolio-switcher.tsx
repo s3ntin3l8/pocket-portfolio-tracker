@@ -88,20 +88,22 @@ export function PortfolioSwitcher({
     const only = portfolios[0];
     return (
       <div
-        className="inline-flex h-9 max-w-full items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground"
+        className="inline-flex max-w-full items-center gap-[9px] rounded-[10px] bg-background py-[7px] pl-2 pr-3.5 text-sm font-semibold text-foreground"
         aria-label={t("label")}
+        title={portfolioLabel(only)}
       >
-        <BrokerageIcon brokerage={only.brokerage} className="size-5" />
+        <BrokerageIcon brokerage={only.brokerage} className="size-6 rounded-[7px]" />
         <span className="truncate">{portfolioLabel(only)}</span>
       </div>
     );
   }
 
-  // Determine what to show in the trigger.
+  // Reference desktop trigger: page-bg 10px-radius button, 600 14px, 24px icon chip,
+  // full descriptive label (`portLabelD`).
   const triggerIcon = selectedHolder ? (
     <Users className="size-4 shrink-0 text-muted-foreground" />
   ) : selectedPortfolio ? (
-    <BrokerageIcon brokerage={selectedPortfolio.brokerage} className="size-5" />
+    <BrokerageIcon brokerage={selectedPortfolio.brokerage} className="size-6 rounded-[7px]" />
   ) : (
     <Layers className="size-4 shrink-0 text-muted-foreground" />
   );
@@ -115,11 +117,11 @@ export function PortfolioSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t("label")}
-        className="inline-flex h-9 max-w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex max-w-full items-center gap-[9px] rounded-[10px] bg-background py-[7px] pl-2 pr-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {triggerIcon}
         <span className="truncate">{triggerLabel}</span>
-        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        <ChevronDown className="size-3.5 shrink-0 text-text-3" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-w-[16rem]">
         {/* Section 1: All portfolios */}

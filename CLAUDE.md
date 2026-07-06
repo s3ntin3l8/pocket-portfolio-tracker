@@ -1,9 +1,9 @@
 # CLAUDE.md — Portfolio Tracker (monorepo)
 
-Indonesian-first personal portfolio tracker: import transactions from **screenshots**
-(LLM vision) and **CSV**, track **equities, gold, bonds, mutual funds (reksa dana),
-and cash** with live IDX prices and a real-time gold ticker. Built to expand to
-**Trade Republic / international** later. Full architecture: `.claude/plans/`.
+Personal portfolio tracker (English/Indonesian language support) that imports transactions
+from **screenshots** (LLM vision) and **CSV**, tracking **equities, gold, bonds, mutual
+funds (reksa dana), and cash** with live IDX prices and a real-time gold ticker. Built to
+expand to **Trade Republic / international** later. Full architecture: `.claude/plans/`.
 
 ## Stack & topology
 

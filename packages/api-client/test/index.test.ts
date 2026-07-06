@@ -330,7 +330,8 @@ describe("createApiClient request methods", () => {
     { name: "getSummary total_paid", call: (c) => c.getSummary("p1", "total_paid"), method: "GET", url: "/portfolios/p1/summary?costBasis=total_paid" },
     { name: "getPerformance", call: (c) => c.getPerformance("p1"), method: "GET", url: "/portfolios/p1/performance" },
     { name: "importCsv default auto", call: (c) => c.importCsv("x"), method: "POST", url: "/imports/csv", body: { content: "x", format: "auto" } },
-    { name: "importCsv dkb", call: (c) => c.importCsv("x", "dkb"), method: "POST", url: "/imports/csv", body: { content: "x", format: "dkb" } },
+    { name: "importCsv with filename", call: (c) => c.importCsv("x", "orig.csv"), method: "POST", url: "/imports/csv", body: { content: "x", filename: "orig.csv", format: "auto" } },
+    { name: "importCsv dkb", call: (c) => c.importCsv("x", undefined, "dkb"), method: "POST", url: "/imports/csv", body: { content: "x", format: "dkb" } },
     { name: "confirmImport", call: (c) => c.confirmImport("imp1", []), method: "POST", url: "/imports/imp1/confirm", body: { transactions: [], contracts: [], acknowledgeAccountMismatch: false, acknowledgeDuplicates: false } },
     { name: "getImport", call: (c) => c.getImport("imp1"), method: "GET", url: "/imports/imp1" },
   ];

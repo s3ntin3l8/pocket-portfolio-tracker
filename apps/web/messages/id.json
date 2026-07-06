@@ -7,8 +7,8 @@
     "more": "+{count} lainnya"
   },
   "Install": {
-    "title": "Tambahkan Portfolio ke layar utama",
-    "cta": "Instal aplikasi",
+    "title": "Tambahkan Pocket ke layar utama",
+    "cta": "Instal Pocket",
     "dismiss": "Tutup",
     "iosHint": "Untuk memasang: ketuk Bagikan, lalu “Add to Home Screen”."
   },
@@ -57,7 +57,9 @@
     "activity": "Aktivitas",
     "reports": "Laporan",
     "insights": "Wawasan",
-    "profile": "Profil"
+    "profile": "Profil",
+    "netWorth": "Kekayaan bersih",
+    "allTime": "sepanjang masa"
   },
   "Reports": {
     "title": "Laporan",
@@ -133,7 +135,8 @@
     },
     "diversification": {
       "label": "Diversifikasi",
-      "caption": "kelas · {markets} pasar"
+      "caption": "{markets} pasar · {currencies} mata uang",
+      "value": "{count} kelas"
     },
     "bestWorst": {
       "title": "Terbaik & terburuk",
@@ -172,6 +175,8 @@
     "credentialHide": "Sembunyikan kunci",
     "credentialError": "Tidak dapat menyimpan kunci. Silakan coba lagi.",
     "encryptionDisabled": "Manajemen kunci memerlukan DB_ENCRYPTION_KEY yang dikonfigurasi",
+    "credentialEncrypted": "Kredensial dienkripsi saat disimpan",
+    "credentialEncryptedMeta": "AES-256",
     "visionProviders": "Penyedia LLM Vision",
     "visionProvidersHint": "Konfigurasi model vision untuk pemrosesan tangkapan layar. Penyedia dengan prioritas tertinggi yang aktif akan digunakan. Ollama memerlukan OLLAMA_BASE_URL (atau URL yang diatur melalui DB) untuk dikonfigurasi.",
     "visionUrlPlaceholder": "http://localhost:11434",
@@ -210,6 +215,7 @@
     "apiCalls": "Panggilan API",
     "apiKey": "Kunci API",
     "keyNone": "tidak ada",
+    "keyNotNeeded": "Tidak diperlukan",
     "editCredential": "Edit kunci API",
     "storage": "Penyimpanan berkas",
     "storageHint": "Konfigurasi backend penyimpanan (S3-kompatibel atau folder lokal), kelola kredensial, dan lihat statistik penggunaan.",
@@ -246,7 +252,7 @@
   },
   "Income": {
     "title": "Pendapatan",
-    "subtitle": "Dividen dan kupon obligasi di seluruh portofolio Anda.",
+    "subtitle": "Dividen, kupon & distribusi",
     "date": "Tanggal",
     "type": "Jenis",
     "instrument": "Instrumen",
@@ -299,11 +305,21 @@
     "tooltipTotal": "Total",
     "tooltipForecast": "Perkiraan",
     "heatmapDefaultSubtitle": "Ketuk sebuah sel untuk melihat pendapatan bulan itu",
-    "heatmapCellSubtitle": "{month} · {amount}"
+    "heatmapLess": "Sedikit",
+    "heatmapMore": "Banyak",
+    "heatmapCellSubtitle": "{month} · {amount}",
+    "paymentsTimelineTitle": "Linimasa pembayaran",
+    "paymentsTimelineSubtitle": "Distribusi diterima & perkiraan",
+    "legendReceived": "Diterima",
+    "legendForecast": "Perkiraan",
+    "est": "perk.",
+    "yearReceivedForecast": "diterima + perkiraan",
+    "yearForecast": "perkiraan",
+    "yearReceived": "diterima"
   },
   "Savings": {
     "title": "Tabungan",
-    "subtitle": "Berapa yang Anda setor dari waktu ke waktu, dan ke mana arahnya.",
+    "subtitle": "Kontribusi, rencana & proyeksi",
     "totalContributed": "Total setoran",
     "monthlyAverage": "Rata-rata per bulan",
     "monthsActive": "{count, plural, other {# bulan}}",
@@ -315,9 +331,13 @@
     "xirr": "Imbal hasil tahunan",
     "xirrYoungHint": "* disetahunkan dari data di bawah setahun — bisa berlebih",
     "contributionsOverTime": "Setoran dari waktu ke waktu",
-    "chartContributions": "Setoran",
-    "chartValue": "Nilai portofolio",
+    "chartContributions": "Kontribusi",
+    "chartValue": "Nilai",
     "chartValueUnavailable": "Riwayat nilai belum tersedia — jalankan backfill dari Admin → Jobs.",
+    "footerInvested": "Diinvestasikan",
+    "footerGain": "Keuntungan",
+    "footerNowWorth": "Nilai sekarang",
+    "contributionsSubtitle": "Yang Anda setor vs. nilainya sekarang · sejak {date}",
     "forecastTitle": "Proyeksi",
     "forecastSubtitle": "Proyeksikan nilainya jika Anda terus menabung dengan asumsi imbal hasil tahunan.",
     "monthlyAmount": "Jumlah bulanan",
@@ -325,6 +345,7 @@
     "horizonYears": "Jangka waktu",
     "years": "{count, plural, other {# tahun}}",
     "projectedValue": "Proyeksi nilai",
+    "projectedInYears": "Proyeksi dalam {count, plural, other {# tahun}}",
     "projectedContributed": "Setoran Anda",
     "projectedGrowth": "Pertumbuhan",
     "toAge18": "Hingga usia 18",
@@ -332,8 +353,10 @@
     "growthSoFar": "termasuk {amount} pertumbuhan sejauh ini",
     "emptyTitle": "Belum ada setoran",
     "emptyBody": "Catat setoran atau pembelian rencana tabungan, dan kemajuan menabung Anda muncul di sini.",
-    "sparplanTitle": "Rencana investasi rutin",
+    "sparplanTitle": "Rencana tabungan",
     "detectedMonthly": "Total bulanan aktif",
+    "nowPct": "{pct}% sekarang",
+    "activeCount": "{count, plural, other {# aktif}}",
     "cadenceMonthly": "/bulan",
     "cadenceMonthlyShort": "bln",
     "cadenceQuarterly": "/kuartal",
@@ -351,11 +374,39 @@
     "cashOnHandSubtitle": "Saldo menganggur per mata uang",
     "cashMeta": "Saldo kas belum diinvestasikan",
     "cashNudgeLead": "{amount} sedang menganggur.",
-    "cashNudgeSuggestion": "Reksa dana pasar uang dengan imbal hasil ~{rate} p.a. akan menghasilkan sekitar {amount}/thn."
+    "cashNudgeSuggestion": "Reksa dana pasar uang dengan imbal hasil ~{rate} p.a. akan menghasilkan sekitar {amount}/thn.",
+    "setTargets": "Atur target",
+    "planTotalMonthly": "{amount}/bln total",
+    "planNext": "berikutnya {date}",
+    "cadenceMonthlyLabel": "Bulanan",
+    "cadenceQuarterlyLabel": "Kuartalan",
+    "cadenceSemiAnnualLabel": "Semi-tahunan",
+    "cadenceAnnualLabel": "Tahunan",
+    "driftOnTarget": "Sesuai target",
+    "forecastAssumptions": "jika terus menambah {amount}/bln pada {rate} p.a.",
+    "allocTitle": "Alokasi · target vs aktual",
+    "allocTarget": "target {pct}",
+    "allocNow": "kini {pct}",
+    "recommendedTopUp": "Top-up berikutnya · {total}",
+    "driftOnTargetStrong": "Setiap sleeve sesuai target.",
+    "driftOnTargetRest": " Top-up berikutnya menjaga komposisi tetap seimbang.",
+    "driftUnderStrong": "{name} {pct}pp di bawah target.",
+    "driftUnderRest": " Top-up berikutnya mengarahkan {amount} ke sini menuju {target}.",
+    "driftOverStrong": "{name} {pct}pp di atas target.",
+    "driftOverRest": " Kurangi top-up di sini hingga kembali ke kisaran {target}.",
+    "targetAllocation": "Alokasi target",
+    "targetHelper": "Bobot target per rencana. Harus berjumlah 100%.",
+    "targetTotal": "Total {pct}%",
+    "targetMustEqual": " · harus sama dengan 100%",
+    "targetCancel": "Batal",
+    "targetSave": "Simpan target",
+    "targetLoadError": "Gagal memuat target.",
+    "targetSaveError": "Gagal menyimpan target."
   },
   "Portfolios": {
     "title": "Portofolio",
     "subtitle": "Buat dan kelola portofolio Anda.",
+    "aggregateSubtitle": "{amount} agregat · {count, plural, other {# portofolio}}",
     "value": "Total nilai",
     "create": "Buat portofolio",
     "empty": "Belum ada portofolio — buat yang pertama.",
@@ -382,7 +433,9 @@
     "taxAllowanceHint": "Plafon per orang: €1.000 untuk lajang; €2.000 untuk pasangan yang dihitung bersama. Alokasi per depot diatur di pengaturan masing-masing portofolio.",
     "capitalGainsTaxRate": "Tarif pajak keuntungan modal",
     "capitalGainsTaxRateHint": "0,25 (25% KapSt) atau 0,26375 termasuk Soli.",
-    "churchTax": "Pajak gereja (Kirchensteuer)"
+    "churchTax": "Pajak gereja (Kirchensteuer)",
+    "deleteTitle": "Hapus “{name}”?",
+    "edit": "Ubah pemilik"
   },
   "PortfolioSwitcher": {
     "label": "Portofolio",
@@ -430,13 +483,13 @@
     "confirmDelete": "Hapus",
     "cancel": "Batal",
     "includeInAggregate": "Sertakan dalam agregat kekayaan bersih",
-    "includeInAggregateHint": "Hilangkan centang untuk mengecualikan portofolio ini dari perhitungan total kekayaan bersih.",
+    "includeInAggregateHint": "Hitung portofolio ini dalam total nilai bersih Anda.",
     "cashCounted": "Kas adalah bagian dari portofolio ini",
-    "cashCountedHint": "Centang untuk rekening tabungan/deposito (Tagesgeld, Festgeld, depot tabungan anak): kas dihitung sebagai uang yang ditabung dan masuk ke kekayaan bersih. Biarkan kosong untuk rekening sekuritas atau giro/campuran: hanya modal yang diinvestasikan yang dihitung dan kas menganggur dikecualikan — default yang tepat untuk akun yang kasnya hanya numpang lewat.",
+    "cashCountedHint": "Hitung kas menganggur sebagai nilai bersih — untuk rekening tabungan/deposito, bukan broker.",
     "allowNegativeCash": "Izinkan saldo kas negatif sementara",
-    "allowNegativeCashHint": "Centang jika pembelian sering tercatat sebelum setoran pendanaannya masuk, sehingga saldo kas sempat di bawah nol. Ini mencegah peringatan integritas data kas-negatif menandai penurunan sesaat yang akan terkoreksi sendiri. Hanya relevan saat kas adalah bagian dari portofolio ini.",
+    "allowNegativeCashHint": "Redam peringatan saat pembelian tercatat sebelum setoran dana masuk.",
     "documentRetention": "Simpan dokumen sumber",
-    "documentRetentionHint": "Saat diaktifkan, PDF dan tangkapan layar yang diunggah akan disimpan setelah konfirmasi sehingga dapat diunduh nanti. Nonaktif secara default — dokumen dihapus setelah parsing untuk melindungi privasi Anda.",
+    "documentRetentionHint": "Simpan PDF dan tangkapan layar setelah diproses agar bisa diunduh lagi.",
     "taxAllowanceAnnual": "Freistellungsauftrag (FSA)",
     "taxAllowanceAnnualPlaceholder": "misal 1000",
     "taxAllowanceAnnualHint": "Opsional. Jumlah Sparerpauschbetrag yang dialokasikan ke depot ini. Pajak retensi hanya dipotong setelah jumlah ini terpakai.",
@@ -446,7 +499,11 @@
     "trConnectAfterSave": "Simpan portofolio terlebih dahulu untuk mengatur koneksi Trade Republic.",
     "trChildUnsupported": "Trade Republic belum bisa menyinkronkan akun anak (Kinderdepot) — impor lewat CSV atau PDF saja.",
     "trLoading": "Memuat koneksi…",
-    "done": "Selesai"
+    "done": "Selesai",
+    "sectionBasics": "Dasar",
+    "sectionOwnership": "Kepemilikan",
+    "sectionAccount": "Akun",
+    "sectionAccounting": "Opsi akuntansi"
   },
   "Import": {
     "title": "Impor transaksi",
@@ -639,6 +696,7 @@
   },
   "ImportHistory": {
     "title": "Impor terakhir",
+    "file": "Berkas",
     "items": "{count, plural, other {# item}}",
     "review": "Tinjau",
     "reviewTitle": "Tinjau impor",
@@ -663,9 +721,12 @@
     "actionError": "Terjadi kesalahan. Silakan coba lagi.",
     "downloadError": "Tanda terima tidak tersedia — mungkin sudah dihapus atau penyimpanan sedang bermasalah.",
     "reassign": "Pindahkan semua ke…",
+    "selectRows": "Pilih baris",
     "selectAll": "Pilih semua",
     "selectRow": "Pilih impor",
     "selectBatch": "Pilih batch",
+    "selectPrompt": "Pilih baris untuk ditindaklanjuti",
+    "cancelSelection": "Batalkan pemilihan",
     "batchLabel": "Unggahan · {count, plural, other {# berkas}}",
     "selectedCount": "{count, plural, other {# dipilih}}",
     "deleteSelected": "Hapus pilihan",
@@ -853,6 +914,10 @@
     "preferences": "Preferensi",
     "appearance": "Tampilan",
     "language": "Bahasa",
+    "languageOptions": {
+      "en": "English",
+      "id": "Bahasa Indonesia"
+    },
     "displayCurrency": "Mata uang tampilan",
     "displayCurrencyHint": "Kekayaan bersih dan total ditampilkan dalam mata uang ini.",
     "save": "Simpan perubahan",
@@ -954,10 +1019,10 @@
     "collectingIntraday": "Mengumpulkan data intraday — cek lagi setelah pasar buka."
   },
   "Transactions": {
-    "title": "Transaksi",
+    "title": "Aktivitas",
     "subtitle": "Setiap beli, jual, dividen, dan arus kas.",
     "filterScope": "Cakupan",
-    "filterAll": "Semua aktivitas",
+    "filterAll": "Semua",
     "filterInvestments": "Investasi saja",
     "filterType": "Jenis",
     "filterInstrument": "Instrumen",
@@ -998,7 +1063,9 @@
       "notRetained": "Dokumen asli tidak disimpan. Untuk menyimpan file yang diimpor, aktifkan retensi dokumen di pengaturan portofolio."
     },
     "batch": {
+      "selectRows": "Pilih baris",
       "selected": "{count, plural, one {# dipilih} other {# dipilih}}",
+      "selectPrompt": "Pilih baris untuk ditindaklanjuti",
       "delete": "Hapus yang dipilih",
       "confirmPrompt": "Hapus transaksi ini?",
       "confirm": "Hapus",
@@ -1007,7 +1074,9 @@
       "selectRow": "Pilih transaksi",
       "confirmDrafts": "Konfirmasi yang dipilih",
       "discardDrafts": "Buang yang dipilih",
-      "reassign": "Pindahkan…"
+      "reassign": "Pindahkan…",
+      "loadMore": "Muat lainnya",
+      "showingCount": "Menampilkan {shown} dari {total}"
     },
     "filterDraftLabel": "Filter draf",
     "draftShowAll": "Semua",
@@ -1048,11 +1117,33 @@
       "capitalDeployed": "modal dialokasikan",
       "capitalReturned": "modal dikembalikan",
       "mostBought": "Paling banyak dibeli",
-      "mostSold": "Paling banyak dijual"
-    }
+      "mostSold": "Paling banyak dijual",
+      "chipBuys": "Beli",
+      "chipSells": "Jual",
+      "chipIncome": "Pendapatan",
+      "chipIssues": "Perlu ditinjau · {count}"
+    },
+    "subtitleCount": "{count} transaksi",
+    "transactionCol": "Transaksi",
+    "price": "Harga",
+    "breakdown": "Rincian",
+    "details": "Detail",
+    "currency": "Mata uang"
   },
   "Manage": {
     "addTransaction": "Tambah transaksi",
+    "addMenu": {
+      "add": "Tambah",
+      "title": "Tambah ke portofolio",
+      "subtitle": "Transaksi adalah sumber kebenaran — pilih cara menambahkannya.",
+      "recommended": "Direkomendasikan",
+      "screenshot": "Foto layar broker",
+      "screenshotDesc": "AI membaca aplikasi broker Anda — IDX, Trade Republic, apa pun",
+      "csv": "Impor CSV",
+      "csvDesc": "Dari ekspor broker mana pun — kolom dipetakan otomatis",
+      "manual": "Tambah manual",
+      "manualDesc": "Masukkan satu transaksi sendiri"
+    },
     "createPortfolio": "Buat portofolio",
     "back": "Kembali",
     "actions": "Tindakan",
@@ -1146,7 +1237,12 @@
       "subTypeNone": "(tidak ada)",
       "subTypeSaveback": "Saveback",
       "subTypeRoundup": "Pembulatan",
-      "subTypeMerger": "Merger"
+      "subTypeMerger": "Merger",
+      "groupTrade": "Perdagangan",
+      "groupShareReceipt": "Penerimaan saham",
+      "groupTransfer": "Transfer",
+      "groupIncome": "Pendapatan",
+      "groupCash": "Kas"
     },
     "reassign": "Pindahkan"
   },
@@ -1283,8 +1379,8 @@
     }
   },
   "Trades": {
-    "title": "Catatan Transaksi",
-    "subtitle": "Setiap posisi dan kinerjanya, termasuk dividen.",
+    "title": "P&L Terwujud",
+    "subtitle": "Posisi tertutup & kinerja",
     "methodAverage": "Biaya rata-rata",
     "methodFifo": "FIFO",
     "filter_all": "Semua",
@@ -1312,6 +1408,11 @@
     "totalRealized": "Laba/rugi terealisasi",
     "totalDividends": "Dividen",
     "winRate": "Tingkat menang",
+    "realizedByYearChartTitle": "Untung/rugi terealisasi per tahun",
+    "winLossTitle": "Menang / kalah",
+    "winLossSubtitle": "{winners} dari {total} ditutup",
+    "winners": "Menang",
+    "losers": "Kalah",
     "realizedByYear": "Keuntungan terealisasi per tahun",
     "dividendsByYear": "Dividen per tahun",
     "bonusesByYear": "Bonus per tahun",
@@ -1384,8 +1485,8 @@
     "loadSalesError": "Gagal memuat rekomendasi transaksi."
   },
   "Tax": {
-    "title": "Optimasi Pajak",
-    "subtitle": "Sisa Sparerpauschbetrag dan saran panen bebas pajak. Khusus pajak Jerman.",
+    "title": "Pajak",
+    "subtitle": "Keuntungan modal & saran panen bebas pajak",
     "defaultHolderName": "Semua portofolio",
     "empty": {
       "title": "Alokasi FSA belum dikonfigurasi",
@@ -1430,7 +1531,9 @@
       "tfApplied": "TF {pct}% diterapkan",
       "button": "Panen",
       "summary": "Panen semua {count} untuk mengimbangi {offset} keuntungan terealisasi — menghemat sekitar ~{saving}. Jerman tidak memiliki aturan wash-sale 30 hari, jadi Anda bisa membeli kembali segera.",
-      "none": "Belum ada kerugian yang bisa dipanen saat ini."
+      "none": "Tidak ada keuntungan yang bisa dipanen saat ini.",
+      "positionsEyebrow": "Posisi yang bisa direalisasikan",
+      "metaLine": "{offset} bisa direalisasi · hemat ~{saving}"
     },
     "hero": {
       "estimatedTax": "Perkiraan pajak · {year}",

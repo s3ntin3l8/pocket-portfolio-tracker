@@ -40,6 +40,7 @@ const CLOSED: Trade = {
   instrument: {
     symbol: "BBNI",
     name: "Bank Negara Indonesia",
+    displayName: null,
     assetClass: "equity",
     unit: "shares",
     market: "IDX",
@@ -76,6 +77,7 @@ const LOSER: Trade = {
   instrument: {
     symbol: "ARTO",
     name: "Bank Jago",
+    displayName: null,
     assetClass: "equity",
     unit: "shares",
     market: "IDX",
@@ -127,7 +129,7 @@ describe("TradeDetailSheet", () => {
   it("renders trade details (quantity, prices, dates, holding period)", () => {
     renderSheet(CLOSED);
     expect(screen.getByText(messages.Trades.detail.tradeDetails)).toBeInTheDocument();
-    expect(screen.getByText("300 shares")).toBeInTheDocument();
+    expect(screen.getByText("300")).toBeInTheDocument();
     expect(screen.getByText("2025-06-24")).toBeInTheDocument();
     expect(screen.getByText("2026-05-18")).toBeInTheDocument();
   });

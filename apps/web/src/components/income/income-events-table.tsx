@@ -2,18 +2,8 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import type { IncomeEvent, UpcomingPayment } from "@portfolio/api-client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { Badge } from "@/components/ui/badge";
-import { formatMoney } from "@/lib/utils";
-import { useTableSort } from "@/lib/table-sort";
-import type { ColDef } from "@/lib/table-sort";
+import { monogram } from "@/lib/brokerages";
+import { formatMoney, cn } from "@/lib/utils";
 
 /** Unified row type: historical events + upcoming payments merged into one table. */
 export type IncomeEventRow = IncomeEvent & {
@@ -24,98 +14,137 @@ export type IncomeEventRow = IncomeEvent & {
   quantity?: string;
 };
 
-const COLS: ColDef<IncomeEventRow>[] = [
-  { key: "date", get: (e) => e.date, type: "date" },
-  { key: "type", get: (e) => e.status ?? e.type, type: "text" },
-  { key: "instrument", get: (e) => e.symbol ?? "", type: "text" },
-  { key: "perShare", get: (e) => e.perShare ?? "", type: "numeric" },
-  { key: "quantity", get: (e) => e.quantity ?? "", type: "numeric" },
-  { key: "amount", get: (e) => e.amount, type: "numeric" },
-];
+/**
+ * Reference "Payments timeline" grid template — shared by the column header
+ * (see {@link TimelineColumnHeader}) and every data row so columns line up.
+ * Date | Instrument | Type | Shares | Per share | Amount.
+ */
+export const TIMELINE_GRID =
+  "grid-cols-[76px_minmax(0,1.3fr)_minmax(0,0.9fr)_76px_92px_116px]";
 
-// Certainty order: projected (estimate) → grown (growth-adjusted estimate)
-//   → announced (declared) → paid (settled).
-const STATUS_VARIANT: Record<string, "default" | "warning" | "success" | "outline"> = {
-  projected: "outline",
-  grown: "outline",
-  scheduled: "default",
-  announced: "warning",
-  paid: "success",
-};
+/** Desktop-only column-header row for the payments timeline. */
+export function TimelineColumnHeader() {
+  const t = useTranslations("Income");
+  return (
+    <div
+      className={cn(
+        "hidden gap-3.5 border-b border-line px-0.5 py-2.5 text-[10px] font-bold uppercase tracking-wide text-text-3 sm:grid",
+        TIMELINE_GRID,
+      )}
+    >
+      <div>{t("date")}</div>
+      <div>{t("instrument")}</div>
+      <div>{t("type")}</div>
+      <div className="text-right">{t("shares")}</div>
+      <div className="text-right">{t("perShare")}</div>
+      <div className="text-right">{t("amount")}</div>
+    </div>
+  );
+}
+
+/** 36×36 rounded-square badge; dashed outline for forecast rows (reference).
+ *  Tinted by payment type — green for dividends, teal for coupons/interest. */
+function TimelineBadge({ label, type, forecast }: { label: string; type: string; forecast: boolean }) {
+  const tone =
+    type === "coupon" || type === "interest"
+      ? { bg: "rgba(13,148,136,.16)", fg: "#0D9488" }
+      : { bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" };
+  return (
+    <span
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] text-[10px] font-extrabold"
+      style={
+        forecast
+          ? { backgroundColor: "transparent", color: tone.fg, border: `1.5px dashed ${tone.fg}` }
+          : { backgroundColor: tone.bg, color: tone.fg }
+      }
+      aria-hidden
+    >
+      {monogram(label)}
+    </span>
+  );
+}
 
 export function IncomeEventsTable({ rows }: { rows: IncomeEventRow[] }) {
   const t = useTranslations("Income");
   const tt = useTranslations("TxType");
   const locale = useLocale();
-  const df = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
-  const { sortKey, sortDir, toggle, sort } = useTableSort<IncomeEventRow>(COLS);
+  const df = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SortableTableHead colKey="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggle}>{t("date")}</SortableTableHead>
-          <SortableTableHead colKey="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggle}>{t("type")}</SortableTableHead>
-          <SortableTableHead colKey="instrument" sortKey={sortKey} sortDir={sortDir} onToggle={toggle}>{t("instrument")}</SortableTableHead>
-          <SortableTableHead colKey="perShare" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} align="right" className="hidden sm:table-cell">{t("perShare")}</SortableTableHead>
-          <SortableTableHead colKey="quantity" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} align="right" className="hidden sm:table-cell">{t("shares")}</SortableTableHead>
-          <SortableTableHead colKey="amount" sortKey={sortKey} sortDir={sortDir} onToggle={toggle} align="right">{t("amount")}</SortableTableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sort(rows).map((e, i) => (
-          <TableRow
+    <div>
+      {rows.map((e, i) => {
+        const forecast = Boolean(e.status);
+        const label = e.symbol ?? e.name ?? "—";
+        const typeLabel = tt(e.type);
+        const dateLabel = df.format(new Date(e.date));
+        const amountLabel = formatMoney(Number(e.amount), e.currency, locale);
+        const amountClass = forecast
+          ? "text-text-2"
+          : Number(e.amount) >= 0
+            ? "text-success"
+            : "text-destructive";
+        const shares =
+          e.quantity != null
+            ? Number(e.quantity).toLocaleString(locale, { maximumFractionDigits: 4 })
+            : "—";
+        const perShare = e.perShare != null ? formatMoney(Number(e.perShare), e.currency, locale) : "—";
+        // Forecast growth/contribution assumptions no longer have a dedicated row —
+        // surface them on hover so the number's basis stays discoverable.
+        const title = [
+          e.growthApplied !== undefined
+            ? t("growthHint", { pct: `${e.growthApplied >= 1 ? "+" : ""}${((e.growthApplied - 1) * 100).toFixed(1)}%` })
+            : null,
+          e.assumesContributions ? t("contributionsHint") : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || undefined;
+
+        const estTag = forecast && (
+          <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+            {t("est")}
+          </span>
+        );
+
+        return (
+          <div
             key={`${e.instrumentId}-${e.date}-${i}`}
-            className={e.status ? "text-muted-foreground" : undefined}
+            title={title}
+            style={forecast ? { opacity: 0.78 } : undefined}
+            className={cn(i > 0 && "border-t border-line")}
           >
-            <TableCell className="tabular whitespace-nowrap text-muted-foreground">
-              {df.format(new Date(e.date))}
-            </TableCell>
-            <TableCell>
-              {e.status ? (
-                <div className="flex flex-col gap-1">
-                  <Badge variant={STATUS_VARIANT[e.status] ?? "outline"}>
-                    {t(e.status)}
-                  </Badge>
-                  {e.growthApplied !== undefined && (
-                    <span className="text-xs text-muted-foreground">
-                      {t("growthHint", {
-                        pct: `${e.growthApplied >= 1 ? "+" : ""}${((e.growthApplied - 1) * 100).toFixed(1)}%`,
-                      })}
-                    </span>
-                  )}
-                  {e.assumesContributions && (
-                    <span className="text-xs text-muted-foreground">
-                      {t("contributionsHint")}
-                    </span>
-                  )}
+            {/* Desktop: 6-column grid. */}
+            <div className={cn("hidden items-center gap-3.5 px-0.5 py-[11px] sm:grid", TIMELINE_GRID)}>
+              <span className="tabular whitespace-nowrap text-xs font-semibold text-text-2">{dateLabel}</span>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <TimelineBadge label={label} type={e.type} forecast={forecast} />
+                <span className="truncate text-[13px] font-bold">{label}</span>
+                {estTag}
+              </div>
+              <span className="truncate text-xs font-medium text-text-2">{typeLabel}</span>
+              <span className="tabular text-right text-[13px] font-semibold text-text-mute">{shares}</span>
+              <span className="tabular text-right text-[13px] font-semibold text-text-mute">{perShare}</span>
+              <span className={cn("tabular whitespace-nowrap text-right text-sm font-bold", amountClass)}>
+                {amountLabel}
+              </span>
+            </div>
+
+            {/* Mobile: flex row. */}
+            <div className="flex items-center gap-3 px-0.5 py-[11px] sm:hidden">
+              <TimelineBadge label={label} type={e.type} forecast={forecast} />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[13px] font-bold">{label}</span>
+                  {estTag}
                 </div>
-              ) : (
-                <Badge variant="default">{tt(e.type)}</Badge>
-              )}
-            </TableCell>
-            <TableCell>
-              <div className="font-medium">{e.symbol ?? "—"}</div>
-              {e.name && (
-                <div className="text-xs text-muted-foreground">{e.name}</div>
-              )}
-            </TableCell>
-            <TableCell className="hidden sm:table-cell tabular text-right text-muted-foreground">
-              {e.perShare != null
-                ? formatMoney(Number(e.perShare), e.currency, locale)
-                : "—"}
-            </TableCell>
-            <TableCell className="hidden sm:table-cell tabular text-right text-muted-foreground">
-              {e.quantity != null
-                ? Number(e.quantity).toLocaleString(locale, { maximumFractionDigits: 4 })
-                : "—"}
-            </TableCell>
-            <TableCell className={`tabular text-right ${Number(e.amount) >= 0 ? "text-success" : "text-destructive"}`}>
-              {formatMoney(Number(e.amount), e.currency, locale)}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+                <span className="truncate text-[11px] font-medium text-text-2">
+                  {typeLabel} {" · "} {dateLabel}
+                </span>
+              </div>
+              <span className={cn("tabular shrink-0 text-sm font-bold", amountClass)}>{amountLabel}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -51,10 +51,13 @@ function makeStats(plans: DetectedPlan[]): SparplanStats {
   };
 }
 
-function renderSection(stats: SparplanStats) {
+function renderSection(
+  stats: SparplanStats,
+  extra: Partial<React.ComponentProps<typeof SparplanSection>> = {},
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <SparplanSection data={stats} currency="EUR" locale="en" />
+      <SparplanSection data={stats} currency="EUR" locale="en" {...extra} />
     </NextIntlClientProvider>,
   );
 }
@@ -69,10 +72,10 @@ describe("SparplanSection", () => {
     renderSection(stats);
 
     expect(screen.getByText("Vanguard FTSE All-World")).toBeInTheDocument();
-    // Active monthly total: the card header shows it.
-    expect(screen.getByText("Active monthly total")).toBeInTheDocument();
-    // Active badge
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    // Header total subtitle shows the active monthly total.
+    expect(screen.getByText(/\/mo total/)).toBeInTheDocument();
+    // Active-count pill.
+    expect(screen.getByText("1 active")).toBeInTheDocument();
   });
 
   it("renders a stopped badge for a stopped plan", () => {
@@ -104,8 +107,8 @@ describe("SparplanSection", () => {
     });
     const stats = makeStats([plan]);
     renderSection(stats);
-    // Step label contains the date part "2026-01"
-    expect(screen.getByText(/2026-01/)).toBeInTheDocument();
+    // Step hint is an icon whose title tooltip carries the change ("… since 2026-01").
+    expect(screen.getByTitle(/2026-01/)).toBeInTheDocument();
   });
 
   it("renders a 'Detected' badge for heuristic plans", () => {
@@ -118,6 +121,37 @@ describe("SparplanSection", () => {
     const stats = makeStats([]);
     const { container } = renderSection(stats);
     expect(container.firstChild).toBeNull();
+  });
+
+  it("renders a per-plan deviation badge and the allocation section when targets are set", () => {
+    const stats = makeStats([makePlan()]);
+    renderSection(stats, {
+      drift: [
+        {
+          key: "inst-vwce",
+          label: "VWCE",
+          targetPct: 60,
+          actualPct: 52,
+          driftPct: -8,
+          actualValue: "5200",
+          status: "under",
+        },
+      ],
+      contributionSplit: [{ key: "inst-vwce", amount: "150", sharePct: 100 }],
+    });
+
+    // Deviation badge (under target → signed pp).
+    expect(screen.getByText("−8.0pp")).toBeInTheDocument();
+    // Allocation section heading + target/now legend + recommended top-up.
+    expect(screen.getByText("Allocation · target vs actual")).toBeInTheDocument();
+    expect(screen.getByText("target 60%")).toBeInTheDocument();
+    expect(screen.getByText("now 52%")).toBeInTheDocument();
+    expect(screen.getByText(/Recommended next top-up/)).toBeInTheDocument();
+  });
+
+  it("omits the allocation section when no targets/drift are present", () => {
+    renderSection(makeStats([makePlan()]));
+    expect(screen.queryByText("Allocation · target vs actual")).not.toBeInTheDocument();
   });
 
   it("shows multiple plans in the list", () => {

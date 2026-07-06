@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
@@ -25,6 +25,10 @@ vi.mock("@/lib/api", () => ({
     setTransactionStatus,
     resolveDraftTransactions,
     reassignTransactions,
+    // Needed once the in-place EditTransactionSheet mounts its AddTransactionForm.
+    getGoldSources: vi.fn(async () => []),
+    searchInstruments: vi.fn(async () => []),
+    lookupInstruments: vi.fn(async () => []),
   }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
@@ -138,6 +142,19 @@ function renderSingleRow(row: TxRow) {
 
 const tb = messages.Transactions.batch;
 
+/** Batch-select checkboxes are hidden until a long-press enters selection mode. Simulate
+ *  the press-and-hold (450ms) on a row to reveal them. */
+function enterSelectionMode(rowLabel = "Bank Central Asia") {
+  const row = screen.getByText(rowLabel).closest("tr")!;
+  vi.useFakeTimers();
+  fireEvent.pointerDown(row);
+  act(() => {
+    vi.advanceTimersByTime(500);
+  });
+  fireEvent.pointerUp(row);
+  vi.useRealTimers();
+}
+
 function renderTable(showPortfolio = false) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -159,11 +176,13 @@ describe("TransactionsTable", () => {
         <TransactionsTable rows={ROWS} showPortfolio portfolios={PORTFOLIOS} />
       </NextIntlClientProvider>,
     );
-    // Open the row's Reassign action (first row is portfolio p1).
-    const reassignButtons = screen.getAllByRole("button", {
-      name: messages.Manage.reassign,
+    // Single-row actions live in the detail sheet (opened by clicking the row), not inline.
+    fireEvent.click(screen.getByText("Bank Central Asia")); // t1 (portfolio p1)
+    // Secondary actions live in the header "⋯" overflow menu now.
+    fireEvent.keyDown(screen.getByRole("button", { name: messages.Manage.actions }), {
+      key: "Enter",
     });
-    fireEvent.click(reassignButtons[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: messages.Manage.reassign }));
 
     // The dialog shows; p1 is excluded so the only target is DKB (p2) — confirm the move.
     fireEvent.click(
@@ -174,14 +193,32 @@ describe("TransactionsTable", () => {
     );
   });
 
+  it("opens the edit sheet in place when Edit is clicked in the detail sheet", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TransactionsTable rows={ROWS} showPortfolio portfolios={PORTFOLIOS} />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
+    fireEvent.click(screen.getByRole("button", { name: messages.Manage.edit }));
+    // The edit sheet opens in place (no navigation) with its "Edit transaction" title.
+    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
+  });
+
   it("hides the reassign action when only one portfolio exists", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <TransactionsTable rows={ROWS} portfolios={[PORTFOLIOS[0]]} />
       </NextIntlClientProvider>,
     );
+    // Open the detail sheet — with a single portfolio there's nowhere to reassign to.
+    fireEvent.click(screen.getByText("Bank Central Asia"));
+    // The overflow menu still opens (status control), but Reassign isn't offered.
+    fireEvent.keyDown(screen.getByRole("button", { name: messages.Manage.actions }), {
+      key: "Enter",
+    });
     expect(
-      screen.queryByRole("button", { name: messages.Manage.reassign }),
+      screen.queryByRole("menuitem", { name: messages.Manage.reassign }),
     ).toBeNull();
   });
 
@@ -199,7 +236,8 @@ describe("TransactionsTable", () => {
 
   it("batch-deletes selected rows grouped by portfolio", async () => {
     renderTable(true);
-    // Select all, then delete (two-step confirm).
+    // Long-press to enter selection mode, then select all and delete (two-step confirm).
+    enterSelectionMode();
     fireEvent.click(screen.getByLabelText(tb.selectAll));
     fireEvent.click(screen.getByRole("button", { name: new RegExp(tb.delete) }));
     fireEvent.click(screen.getByRole("button", { name: tb.confirm }));
@@ -213,6 +251,31 @@ describe("TransactionsTable", () => {
   it("hides the batch toolbar when nothing is selected", () => {
     renderTable();
     expect(screen.queryByRole("button", { name: new RegExp(tb.delete) })).toBeNull();
+  });
+
+  it("hides desktop checkboxes by default and reveals them via the select-rows toggle", () => {
+    renderTable();
+    expect(screen.queryByLabelText(tb.selectAll)).toBeNull();
+    expect(screen.queryByLabelText(tb.selectRow)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: tb.selectRows }));
+
+    expect(screen.getByLabelText(tb.selectAll)).toBeInTheDocument();
+    // Entering selection mode with nothing picked yet shows the prompt, not "0 selected".
+    expect(screen.getByText(tb.selectPrompt)).toBeInTheDocument();
+  });
+
+  it("cancel (X) exits selection mode and clears the selection", () => {
+    renderTable();
+    fireEvent.click(screen.getByRole("button", { name: tb.selectRows }));
+    fireEvent.click(screen.getByLabelText(tb.selectAll));
+    // Selection mode is active: the toggle is replaced by the select-all checkbox.
+    expect(screen.queryByRole("button", { name: tb.selectRows })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: tb.cancel }));
+
+    expect(screen.queryByLabelText(tb.selectAll)).toBeNull();
+    expect(screen.getByRole("button", { name: tb.selectRows })).toBeInTheDocument();
   });
 
   it("formats each row's amount in its own currency, not a hardcoded one", () => {
@@ -271,27 +334,38 @@ describe("TransactionsTable", () => {
     expect(th).toHaveAttribute("aria-sort", "descending");
   });
 
-  it("renders new column headers for fees, tax, and net amount", () => {
+  it("renders the reference column headers (Transaction, Price, Source, Amount)", () => {
     renderTable();
-    expect(screen.getByRole("button", { name: /fees/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /tax/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /net amount/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: messages.Transactions.transactionCol }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /price/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /source/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /amount/i })).toBeInTheDocument();
   });
 
-  it("shows dash for zero fees and null tax, renders tax value when set", () => {
-    renderTable();
-    // t1 has fees "5" (non-zero → shows formatted), t2 has fees "0" → dash
-    // t1 has tax null → dash, t2 has tax "10" → shows formatted
-    // The cells are hidden on small screens but still in DOM; test by checking text content
+  it("shows a dash in the price column for qty-less cash rows", () => {
+    const cashRow: TxRow = {
+      id: "cash1",
+      portfolioId: "p1",
+      type: "deposit",
+      quantity: "0",
+      price: "500",
+      fees: "0",
+      tax: null,
+      fxRate: null,
+      currency: "EUR",
+      executedAt: "2026-03-01T00:00:00.000Z",
+      source: "manual",
+      instrument: null,
+    };
+    renderSingleRow(cashRow);
     const cells = screen.getAllByRole("cell");
     const cellTexts = cells.map((c) => c.textContent ?? "");
-    // t2 tax cell should show a dollar-formatted value (USD 10)
-    expect(cellTexts.some((t) => t.includes("10"))).toBe(true);
-    // tax for t1 (null) should render as —
     expect(cellTexts.some((t) => t === "—")).toBe(true);
   });
 
-  it("shows GROSS amount (price + tax) for dividend rows; net amount stays separate", () => {
+  it("shows the net cash amount for dividend rows", () => {
     // Normal dividend: price=0.07 (net), tax=0.03 (withheld) → Amount should show gross 0.10.
     const dividendRow: TxRow = {
       id: "div1",
@@ -308,13 +382,10 @@ describe("TransactionsTable", () => {
       instrument: { symbol: "O", name: "Realty Income" },
     };
     renderSingleRow(dividendRow);
-    // Amount column = gross = 0.07 + 0.03 = 0.10
-    // Net Amount column = cashFlow = 0.07
-    // Both are formatted as EUR; check both values appear and 0.07 appears at least once (net)
+    // Reference table shows one Amount column = the NET cash movement (0.07).
     const cells = screen.getAllByRole("cell");
     const texts = cells.map((c) => c.textContent ?? "");
-    // Gross (0.10) appears in the Amount cell
-    expect(texts.some((t) => t.includes("0.10") || t.includes("0,10"))).toBe(true);
+    expect(texts.some((t) => t.includes("0.07") || t.includes("0,07"))).toBe(true);
   });
 
   it("shows negative amount and net amount for a dividend reversal", () => {
@@ -333,10 +404,10 @@ describe("TransactionsTable", () => {
       instrument: { symbol: "O", name: "Realty Income" },
     };
     renderSingleRow(reversalRow);
-    // gross = -0.07 + (-0.03) = -0.10 → Amount is negative
+    // net = -0.07 → Amount is negative
     const cells = screen.getAllByRole("cell");
     const texts = cells.map((c) => c.textContent ?? "");
-    expect(texts.some((t) => t.includes("-") && (t.includes("0.10") || t.includes("0,10")))).toBe(true);
+    expect(texts.some((t) => t.includes("-") && (t.includes("0.07") || t.includes("0,07")))).toBe(true);
   });
 
   it("renders bonus_cash rows with the Bonus type badge", () => {
@@ -356,7 +427,8 @@ describe("TransactionsTable", () => {
     };
     renderSingleRow(bonusRow);
     // The TxType.bonus_cash label ("Bonus") should appear in the badge.
-    expect(screen.getByText(messages.TxType.bonus_cash)).toBeInTheDocument();
+    // Title appears in both the desktop table and the mobile card list.
+    expect(screen.getAllByText(messages.TxType.bonus_cash).length).toBeGreaterThan(0);
   });
 
   describe("transaction status", () => {
@@ -373,10 +445,15 @@ describe("TransactionsTable", () => {
       expect(screen.getByText(messages.Manage.status.badgeCashNeutral)).toBeInTheDocument();
     });
 
-    it("exposes a per-row status control", () => {
+    it("exposes a per-row status control in the detail sheet", () => {
       renderSingleRow({ ...ROWS[0], status: "normal" });
+      fireEvent.click(screen.getByText("Bank Central Asia"));
+      // Status options live in the header "⋯" overflow menu.
+      fireEvent.keyDown(screen.getByRole("button", { name: messages.Manage.actions }), {
+        key: "Enter",
+      });
       expect(
-        screen.getByRole("button", { name: messages.Manage.status.label }),
+        screen.getByRole("menuitem", { name: messages.Manage.status.archived }),
       ).toBeInTheDocument();
     });
   });
@@ -434,6 +511,7 @@ describe("TransactionsTable", () => {
     it("confirming a draft row calls resolveDraftTransactions with action=confirm", async () => {
       resolveDraftTransactions.mockClear();
       renderSingleRow({ ...ROWS[0], status: "draft" });
+      fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
       fireEvent.click(screen.getByRole("button", { name: md.confirmDraft }));
       await waitFor(() =>
         expect(resolveDraftTransactions).toHaveBeenCalledWith("p1", ["t1"], "confirm"),
@@ -443,6 +521,7 @@ describe("TransactionsTable", () => {
     it("discarding a draft row calls resolveDraftTransactions with action=discard", async () => {
       resolveDraftTransactions.mockClear();
       renderSingleRow({ ...ROWS[0], status: "draft" });
+      fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
       fireEvent.click(screen.getByRole("button", { name: md.discardDraft }));
       await waitFor(() =>
         expect(resolveDraftTransactions).toHaveBeenCalledWith("p1", ["t1"], "discard"),
@@ -498,6 +577,7 @@ describe("TransactionsTable", () => {
         </NextIntlClientProvider>,
       );
       // Select all (one normal, one draft), then confirm — only the draft is resolved.
+      enterSelectionMode();
       fireEvent.click(screen.getByLabelText(tb.selectAll));
       fireEvent.click(
         screen.getByRole("button", { name: new RegExp(tb.confirmDrafts) }),
@@ -509,66 +589,137 @@ describe("TransactionsTable", () => {
   });
 
   describe("list filters", () => {
-    it("type select is rendered and shows options for types present in the data", () => {
+    it("renders the reference filter chips (All / Buys / Sells / Income)", () => {
       renderFilterTable();
-      // FILTER_ROWS has "buy" and "dividend" — both should appear as options
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      expect(typeSelect).toBeInTheDocument();
-      // buy and dividend options (via TxType labels) should be in the DOM
-      expect(screen.getByRole("option", { name: messages.TxType.buy })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: messages.TxType.dividend })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: messages.Transactions.banners.chipSells }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: messages.Transactions.banners.chipIncome }),
+      ).toBeInTheDocument();
     });
 
-    it("filtering by type shows only matching rows", () => {
+    it("filtering by the Buys chip shows only matching rows", () => {
       renderFilterTable();
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      // Select "buy" — only f1 and f3 (both buy) should remain; f2 (dividend) should be gone
-      fireEvent.change(typeSelect, { target: { value: "buy" } });
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
       const rows = screen.getAllByRole("row").slice(1); // skip header
       expect(rows.length).toBe(2);
       expect(rows.some((r) => r.textContent?.includes("BBCA"))).toBe(true);
       expect(rows.some((r) => r.textContent?.includes("AAPL"))).toBe(true);
     });
 
-    it("filtering by instrument shows only matching rows", () => {
-      renderFilterTable();
-      const instSelect = screen.getByRole("combobox", { name: messages.Transactions.filterInstrument });
-      // Select "BBCA" — f1 and f2 match; f3 (AAPL) should be gone
-      fireEvent.change(instSelect, { target: { value: "BBCA" } });
-      const rows = screen.getAllByRole("row").slice(1);
-      expect(rows.length).toBe(2);
-      expect(rows.every((r) => r.textContent?.includes("BBCA"))).toBe(true);
-    });
+    // The year filter is a Radix dropdown (opens on keyboard/pointer, not a change event).
+    function selectYear(year: string) {
+      fireEvent.keyDown(
+        screen.getByRole("button", { name: messages.Transactions.filterYear }),
+        { key: "Enter" },
+      );
+      fireEvent.click(screen.getByRole("menuitem", { name: year }));
+    }
 
     it("filtering by year shows only matching rows", () => {
       renderFilterTable();
-      const yearSelect = screen.getByRole("combobox", { name: messages.Transactions.filterYear });
       // Select "2025" — only f1 should remain
-      fireEvent.change(yearSelect, { target: { value: "2025" } });
+      selectYear("2025");
       const rows = screen.getAllByRole("row").slice(1);
       expect(rows.length).toBe(1);
       expect(rows[0]).toHaveTextContent("BBCA");
     });
 
-    it("composes type and year filters", () => {
+    it("composes the Buys chip and year filters", () => {
       renderFilterTable();
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      const yearSelect = screen.getByRole("combobox", { name: messages.Transactions.filterYear });
       // buy AND 2026: only f3 (AAPL, 2026-04)
-      fireEvent.change(typeSelect, { target: { value: "buy" } });
-      fireEvent.change(yearSelect, { target: { value: "2026" } });
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
+      selectYear("2026");
       const rows = screen.getAllByRole("row").slice(1);
       expect(rows.length).toBe(1);
       expect(rows[0]).toHaveTextContent("AAPL");
     });
 
-    it("resetting type filter to 'all' restores all rows", () => {
+    it("resetting to the All chip restores all rows", () => {
       renderFilterTable();
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      fireEvent.change(typeSelect, { target: { value: "buy" } });
-      fireEvent.change(typeSelect, { target: { value: "all" } });
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.filterAll }));
       const rows = screen.getAllByRole("row").slice(1);
       expect(rows.length).toBe(FILTER_ROWS.length);
+    });
+  });
+
+  describe("load more pagination", () => {
+    // No column sort is applied by default (useTableSort's `sort()` is a no-op until a
+    // header is clicked), so the render order is simply array/insertion order — the same
+    // order page.tsx already sorts rows into (newest-first) before handing them to this
+    // component. "Instrument 0" (index 0) falls inside the first PAGE_SIZE-row window;
+    // "Instrument 29" (the last index, for n=30) falls past it until Load more is clicked.
+    function manyRows(n: number): TxRow[] {
+      return Array.from({ length: n }, (_, i) => {
+        const day = String((i % 28) + 1).padStart(2, "0");
+        return {
+          id: `m${i}`,
+          portfolioId: "p1",
+          type: "buy",
+          quantity: "1",
+          price: "100",
+          fees: "0",
+          tax: null,
+          fxRate: null,
+          currency: "IDR",
+          executedAt: `2026-01-${day}T00:00:00.000Z`,
+          source: "manual",
+          instrument: { symbol: `SYM${i}`, name: `Instrument ${i}` },
+        } satisfies TxRow;
+      });
+    }
+
+    function renderMany(n: number) {
+      return render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={manyRows(n)} />
+        </NextIntlClientProvider>,
+      );
+    }
+
+    it("caps the ledger at 25 rows and shows a Load more control with a count", () => {
+      renderMany(30);
+      expect(screen.getAllByRole("row").length - 1).toBe(25); // -1 for the header row
+      // The 30th (last-index) row falls past the initial 25-row window.
+      expect(screen.queryByText("Instrument 29")).toBeNull();
+      expect(screen.getByRole("button", { name: tb.loadMore })).toBeInTheDocument();
+      expect(
+        screen.getByText(tb.showingCount.replace("{shown}", "25").replace("{total}", "30")),
+      ).toBeInTheDocument();
+    });
+
+    it("clicking Load more reveals the rest and then hides the control", () => {
+      renderMany(30);
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      expect(screen.getAllByRole("row").length - 1).toBe(30);
+      expect(screen.getByText("Instrument 29")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+    });
+
+    it("hides Load more when the full set already fits on one page", () => {
+      renderMany(10);
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+    });
+
+    it("re-caps the window when a filter narrows the view", () => {
+      renderFilterTable(); // 3 rows, well under the page size — nothing to load initially
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+      // Narrowing further must not somehow surface a stale "loaded more" state.
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+    });
+
+    it("select-all covers the full filtered set, not just the rendered window", () => {
+      renderMany(30);
+      enterSelectionMode("Instrument 0"); // present in the initial window
+      fireEvent.click(screen.getByLabelText(tb.selectAll));
+      // 30 rows total, only 25 rendered — the count must reflect all 30, not the window.
+      expect(screen.getByText("30 selected")).toBeInTheDocument();
     });
   });
 
@@ -756,7 +907,8 @@ describe("TransactionsTable", () => {
     it("shows noResults message when search matches nothing", () => {
       renderFilterTable();
       fireEvent.change(getSearchInput(), { target: { value: "xyznonexistent" } });
-      expect(screen.getByText(messages.Transactions.noResults)).toBeInTheDocument();
+      // Empty message renders in both the desktop table and the mobile list.
+      expect(screen.getAllByText(messages.Transactions.noResults).length).toBeGreaterThan(0);
     });
 
     it("shows empty (not noResults) when the full row set is empty and there is no query", () => {
@@ -765,7 +917,7 @@ describe("TransactionsTable", () => {
           <TransactionsTable rows={[]} />
         </NextIntlClientProvider>,
       );
-      expect(screen.getByText(messages.Transactions.empty)).toBeInTheDocument();
+      expect(screen.getAllByText(messages.Transactions.empty).length).toBeGreaterThan(0);
       expect(screen.queryByText(messages.Transactions.noResults)).toBeNull();
     });
 
@@ -782,11 +934,10 @@ describe("TransactionsTable", () => {
       expect((input as HTMLInputElement).value).toBe("");
     });
 
-    it("composes text search with the type dropdown filter", () => {
+    it("composes text search with the Buys chip filter", () => {
       renderFilterTable();
-      // Type filter = buy; then search for AAPL → only f3 matches
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      fireEvent.change(typeSelect, { target: { value: "buy" } });
+      // Buys chip; then search for AAPL → only f3 matches
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
       fireEvent.change(getSearchInput(), { target: { value: "AAPL" } });
       const rows = screen.getAllByRole("row").slice(1);
       expect(rows.length).toBe(1);
@@ -812,7 +963,8 @@ describe("TransactionsTable", () => {
           />
         </NextIntlClientProvider>,
       );
-      const flag = screen.getByLabelText(/Negative cash balance/);
+      // The flag renders in both the desktop table and the mobile list.
+      const flag = screen.getAllByLabelText(/Negative cash balance/)[0];
       expect(flag).toHaveAttribute("title", expect.stringContaining("-€0.98"));
     });
   });
@@ -836,19 +988,17 @@ describe("TransactionsTable", () => {
       expect(screen.queryByText(b.invested)).toBeNull();
     });
 
-    it("switches to the Income banner when an income sub-type is selected", () => {
+    it("switches to the Income banner when the Income chip is selected", () => {
       renderFilterTable();
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      fireEvent.change(typeSelect, { target: { value: "dividend" } });
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipIncome }));
       expect(screen.queryByText(b.invested)).toBeNull();
       expect(screen.getByText(b.receivedYtd)).toBeInTheDocument();
       expect(screen.getByText(b.bySource)).toBeInTheDocument();
     });
 
-    it("switches to the Buys banner when the buy type is selected", () => {
+    it("switches to the Buys banner when the Buys chip is selected", () => {
       renderFilterTable();
-      const typeSelect = screen.getByRole("combobox", { name: messages.Transactions.filterType });
-      fireEvent.change(typeSelect, { target: { value: "buy" } });
+      fireEvent.click(screen.getByRole("button", { name: messages.Transactions.banners.chipBuys }));
       expect(screen.queryByText(b.invested)).toBeNull();
       expect(screen.getByText(b.investedAllTime)).toBeInTheDocument();
       expect(screen.getByText(b.mostBought)).toBeInTheDocument();

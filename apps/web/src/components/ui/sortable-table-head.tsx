@@ -43,6 +43,7 @@ export function SortableTableHead({
         type="button"
         className={cn(
           "flex items-center gap-1 hover:text-foreground",
+          isActive && "text-foreground",
           align === "right" && "w-full justify-end",
         )}
         onClick={() => onToggle(colKey)}

@@ -27,8 +27,15 @@ export function RangeToggle({
   theme?: "default" | "inverse";
 }) {
   const t = useTranslations("Chart.range");
+  // Transcribed from `Pocket Prototype.dc.html`: hero (`pOn`/`pOff`) = flex:1 buttons
+  // spanning the full chart width, white pill w/ green text when active; default
+  // (`pdOn`/`pdOff`) = compact 11px buttons, active = card bg + small shadow.
   return (
-    <div className="flex gap-1" role="group" aria-label={t("label")}>
+    <div
+      className={cn("flex", theme === "inverse" ? "w-full gap-1.5" : "gap-0.5")}
+      role="group"
+      aria-label={t("label")}
+    >
       {ranges.map((r) => (
         <button
           key={r}
@@ -37,16 +44,19 @@ export function RangeToggle({
           onClick={() => onChange(r)}
           aria-pressed={value === r}
           className={cn(
-            "rounded-full px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50",
+            "transition-colors disabled:opacity-50",
             theme === "inverse"
-              ? value === r
-                ? "bg-white text-[#0B7D58]"
-                : "bg-transparent text-white/85 hover:bg-white/10"
-              : cn(
-                  "rounded-md",
+              ? cn(
+                  "flex-1 rounded-full py-1.5 text-center text-xs",
                   value === r
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent",
+                    ? "bg-white font-bold text-[#0B7D58]"
+                    : "bg-transparent font-semibold text-white/85 hover:bg-white/10",
+                )
+              : cn(
+                  "rounded-lg px-[11px] py-1.5 text-[11px]",
+                  value === r
+                    ? "bg-card font-bold text-foreground shadow-[0_1px_3px_rgba(15,27,20,.14)]"
+                    : "font-semibold text-text-2 hover:text-foreground",
                 ),
           )}
         >

@@ -2,25 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, PenLine, FileUp, GitBranch, GitMerge } from "lucide-react";
+import { Plus, PenLine, FileSpreadsheet, Camera, ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImportFlowClient } from "@/components/import-flow-client";
-import { Link, useRouter, usePathname } from "@/i18n/navigation";
+import { NewEntryTabs } from "@/components/new-entry-tabs";
+import { useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import type { ImportTargetPortfolio } from "@/components/import-flow";
 
 /**
- * The unified add-entry menu (Manual / Import / Corporate action). Rendered globally in
- * the app-shell header (so it's reachable from every screen) and also inline in some
- * empty states.
+ * The unified add-entry launcher, transcribed from `Pocket Prototype.dc.html`'s
+ * ADD / IMPORT bottom sheet: step 1 offers "Snap a screenshot" / "Import a CSV" /
+ * "Add manually" method cards; "Add manually" swaps the sheet content (with a back
+ * button) to the Transaction / Corporate action / Merger entry tabs. Screenshot and
+ * CSV both feed the same unified import flow.
  *
  * `autoOpenFromParams` must be set on exactly ONE rendered instance per page — the global
  * shell instance. It owns the `?shared=1` / `?import=1` auto-open (PWA share-target and
@@ -34,13 +32,13 @@ export function AddTransactionMenu({
 } = {}) {
   const tm = useTranslations("Manage");
   const ti = useTranslations("Import");
-  const tca = useTranslations("CorpAction");
-  const tmg = useTranslations("Merger");
   const api = useApiClient();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
+  const [addOpen, setAddOpen] = useState(false);
+  const [step, setStep] = useState<"choose" | "manual">("choose");
   const [importOpen, setImportOpen] = useState(false);
   const [portfolios, setPortfolios] = useState<ImportTargetPortfolio[] | null>(null);
   const [defaultPortfolioId, setDefaultPortfolioId] = useState("");
@@ -60,77 +58,117 @@ export function AddTransactionMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function loadPortfolios() {
+    if (portfolios !== null) return portfolios;
+    const fetched = await api.listPortfolios();
+    const mapped = fetched.map((p) => ({
+      id: p.id,
+      name: p.name,
+      brokerage: p.brokerage,
+      accountHolder: p.accountHolder,
+    }));
+    setPortfolios(mapped);
+    setDefaultPortfolioId(mapped[0]?.id ?? "");
+    return mapped;
+  }
+
   async function openImport() {
-    if (portfolios === null) {
-      const fetched = await api.listPortfolios();
-      const mapped = fetched.map((p) => ({
-        id: p.id,
-        name: p.name,
-        brokerage: p.brokerage,
-        accountHolder: p.accountHolder,
-      }));
-      setPortfolios(mapped);
-      setDefaultPortfolioId(mapped[0]?.id ?? "");
-    }
+    await loadPortfolios();
+    setAddOpen(false);
     setImportOpen(true);
+  }
+
+  async function openManual() {
+    await loadPortfolios();
+    setStep("manual");
+  }
+
+  function onAddOpenChange(open: boolean) {
+    setAddOpen(open);
+    if (open) {
+      setStep("choose");
+      void loadPortfolios();
+    }
   }
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button aria-label={tm("addTransaction")}>
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">{tm("addTransaction")}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link href="/transactions/new">
-              <PenLine className="size-4" />
-              {ti("menu.manual")}
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void openImport()}>
-            <FileUp className="size-4" />
-            {ti("menu.import")}
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link
-              href={{
-                pathname: "/transactions/new",
-                query: { kind: "corporate-action" },
-              }}
-            >
-              <GitBranch className="size-4" />
-              {tca("link")}
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link
-              href={{
-                pathname: "/transactions/new",
-                query: { kind: "merger" },
-              }}
-            >
-              <GitMerge className="size-4" />
-              {tmg("link")}
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button aria-label={tm("addTransaction")} onClick={() => onAddOpenChange(true)}>
+        <Plus className="size-4" />
+        <span className="hidden sm:inline">{tm("addMenu.add")}</span>
+      </Button>
+
+      <Sheet open={addOpen} onOpenChange={onAddOpenChange}>
+        <SheetContent>
+          <SheetHeader className="sticky top-0 z-[2] flex-row items-center gap-2.5 bg-background px-5 pb-3 pt-3">
+            {step === "manual" && (
+              <button
+                type="button"
+                onClick={() => setStep("choose")}
+                aria-label={tm("back")}
+                className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)]"
+              >
+                <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
+              </button>
+            )}
+            <SheetTitle className="flex-1">{tm("addMenu.title")}</SheetTitle>
+            {/* spacer so the title clears the built-in close button */}
+            <span className="w-[34px] shrink-0" aria-hidden />
+          </SheetHeader>
+
+          <div className="px-5 pb-7 pt-1.5">
+            {step === "choose" ? (
+              <>
+                <p className="mx-0.5 mb-3.5 text-[13px] font-medium text-text-2">
+                  {tm("addMenu.subtitle")}
+                </p>
+                <div className="flex flex-col gap-3">
+                  <MethodCard
+                    icon={Camera}
+                    title={tm("addMenu.screenshot")}
+                    description={tm("addMenu.screenshotDesc")}
+                    tone="green"
+                    tag={tm("addMenu.recommended")}
+                    onClick={() => void openImport()}
+                  />
+                  <MethodCard
+                    icon={FileSpreadsheet}
+                    title={tm("addMenu.csv")}
+                    description={tm("addMenu.csvDesc")}
+                    tone="violet"
+                    onClick={() => void openImport()}
+                  />
+                  <MethodCard
+                    icon={PenLine}
+                    title={tm("addMenu.manual")}
+                    description={tm("addMenu.manualDesc")}
+                    tone="gold"
+                    onClick={() => void openManual()}
+                  />
+                </div>
+              </>
+            ) : (
+              portfolios && (
+                <NewEntryTabs
+                  portfolios={portfolios}
+                  initialPortfolioId={defaultPortfolioId}
+                />
+              )
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={importOpen} onOpenChange={setImportOpen}>
         <SheetContent
-          className="p-0"
-          side="bottom"
+          className="max-w-3xl"
           onInteractOutside={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
         >
-          <SheetHeader className="px-6 pt-6">
+          <SheetHeader className="px-5 pb-3 pt-3">
             <SheetTitle>{ti("title")}</SheetTitle>
           </SheetHeader>
-          <div className="overflow-y-auto px-6 pb-6 pt-4">
+          <div className="overflow-y-auto px-5 pb-7 pt-1.5">
             {portfolios && (
               <ImportFlowClient
                 portfolios={portfolios}
@@ -142,5 +180,56 @@ export function AddTransactionMenu({
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+// Reference `methodCards` tones: screenshot green, CSV violet, manual gold.
+const TONES = {
+  green: { bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
+  violet: { bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
+  gold: { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" },
+} as const;
+
+/** One step-1 method card — icon chip 46px r14, title 700 15px, desc 500 12px,
+ *  optional 700 9px "Recommended" tag; card r18 p16 bg-card + border. */
+function MethodCard({
+  icon: Icon,
+  title,
+  description,
+  tone,
+  tag,
+  onClick,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  tone: keyof typeof TONES;
+  tag?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-3.5 rounded-[18px] border border-border bg-card p-4 text-left shadow-[0_1px_2px_rgba(15,27,20,.04)] transition-transform active:scale-[.97]"
+    >
+      <span
+        className="flex size-[46px] shrink-0 items-center justify-center rounded-[14px]"
+        style={{ background: TONES[tone].bg, color: TONES[tone].fg }}
+      >
+        <Icon className="size-[23px]" strokeWidth={1.9} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold">{title}</span>
+        <span className="mt-[3px] block text-xs font-medium leading-[1.4] text-text-2">
+          {description}
+        </span>
+      </span>
+      {tag && (
+        <span className="shrink-0 rounded-[7px] bg-[rgba(16,163,114,.14)] px-2 py-1 text-[9px] font-bold text-[#0E9F6E]">
+          {tag}
+        </span>
+      )}
+    </button>
   );
 }

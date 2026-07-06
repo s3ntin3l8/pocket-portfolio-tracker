@@ -16,15 +16,17 @@ export function StatCard({
    *  semantics (unlike `delta`); used for tiles that describe rather than compare. */
   caption?: string;
 }) {
+  // Compact on mobile (smaller value + padding, scaling back up from `sm`) so the report
+  // pages can pack several tiles per row on a phone instead of each stretching full-width.
   return (
     <Card>
-      <CardContent className="p-5">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="tabular mt-2 text-2xl font-semibold">{value}</p>
+      <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
+        <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{label}</p>
+        <p className="tabular mt-1 text-[15px] font-extrabold sm:text-xl lg:text-[26px]">{value}</p>
         {delta && (
           <p
             className={cn(
-              "tabular mt-1 text-sm",
+              "tabular mt-0.5 text-[11px] font-bold sm:text-xs",
               deltaTone === "up" && "text-success",
               deltaTone === "down" && "text-destructive",
               deltaTone === "neutral" && "text-muted-foreground",
@@ -33,7 +35,9 @@ export function StatCard({
             {delta}
           </p>
         )}
-        {caption && <p className="mt-1 text-xs text-muted-foreground">{caption}</p>}
+        {caption && (
+          <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">{caption}</p>
+        )}
       </CardContent>
     </Card>
   );

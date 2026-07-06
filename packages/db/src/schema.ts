@@ -272,7 +272,18 @@ export const instruments = pgTable(
     assetClass: assetClassEnum("asset_class").notNull(),
     unit: unitEnum("unit").notNull().default("shares"),
     currency: text("currency").notNull(),
+    /** Raw name as it arrived from the broker import — kept verbatim, never healed.
+     *  Quality varies (clean "Apple Inc." from TR, cryptic "AIS-A.CO.MSCI E.M.UETFDRD"
+     *  from DKB, a bare ticker from IBKR). Prefer `displayName` for presentation. */
     name: text("name").notNull(),
+    /** Clean human-readable name (e.g. "Apple Inc.") resolved from a market-data
+     *  provider's search result by the refresh-instrument-metadata job. Null until
+     *  enriched (or when no confident match was found); the UI falls back to `name`. */
+    displayName: text("display_name"),
+    /** Timestamp of the last displayName enrichment *attempt* (even when the provider
+     *  returned no confident match). Avoids re-querying indefinitely. Null = never
+     *  attempted. Mirrors `sectorCheckedAt`. */
+    displayNameCheckedAt: timestamp("display_name_checked_at", { withTimezone: true }),
     /** GICS-style sector (e.g. "Financials", "Technology"). Populated by the
      *  refresh-instrument-metadata background job via a market-data provider.
      *  Null until enriched; instruments where sector is not meaningful (gold,

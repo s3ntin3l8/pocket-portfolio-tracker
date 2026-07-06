@@ -20,6 +20,26 @@ export function formatMoney(
   }).format(amount);
 }
 
+/**
+ * Money formatter that abbreviates large values with locale-aware compact notation
+ * ("€1.25M", "Rp 1,25 jt") so they fit tight spots like the forecast scenario chips,
+ * while values below `threshold` stay fully precise. Default threshold: 1,000,000.
+ */
+export function formatMoneyCompact(
+  amount: number,
+  currency = "IDR",
+  locale = "en",
+  threshold = 1_000_000,
+) {
+  if (Math.abs(amount) >= threshold) {
+    return formatMoney(amount, currency, locale, {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    });
+  }
+  return formatMoney(amount, currency, locale);
+}
+
 /** A loosely-typed next-intl translator scoped to the `Anomalies` namespace. The dynamic
  *  `codes.<code>` key can't be statically verified, so callers pass `ta` cast to this shape. */
 export type AnomalyTranslator = (key: string, values?: Record<string, string>) => string;
@@ -55,6 +75,16 @@ export function formatSignedMoney(
   opts: Intl.NumberFormatOptions = {},
 ) {
   return `${amount >= 0 ? "+" : ""}${formatMoney(amount, currency, locale, opts)}`;
+}
+
+/**
+ * Locale-formatted quantity. Reference (`Pocket Prototype.dc.html`) renders bare numbers
+ * for "shares"/"units" with no suffix, and only "grams" gets a short unit ("8 g") — not
+ * the generic "shares"/"units" schema word appended to every row.
+ */
+export function formatQuantity(quantity: number, unit: string | null | undefined, locale = "en") {
+  const n = new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(quantity);
+  return unit === "grams" ? `${n} g` : n;
 }
 
 export function formatPercent(value: number, locale = "en") {

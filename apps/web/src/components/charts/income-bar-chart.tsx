@@ -7,11 +7,12 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
   ResponsiveContainer,
+  useXAxisScale,
+  useYAxisScale,
 } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 
 /** One bar — a calendar year of income, or the dashed next-year forecast. */
 export interface IncomeBar {
@@ -30,6 +31,37 @@ interface TooltipRow {
   value: string;
   dot?: string;
   dotOpacity?: number;
+}
+
+/**
+ * Received / Projected / Forecast key, rendered inline with the card title
+ * (reference: single row, title left, legend right — not a separate row above
+ * the chart).
+ */
+export function IncomeBarChartLegend() {
+  const t = useTranslations("Income");
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+      <span className="flex items-center gap-1.5">
+        <span className="size-2.5 rounded-[3px] bg-primary" />
+        {t("tooltipReceived")}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span
+          className="size-2.5 rounded-[3px] bg-primary/25"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(45deg, var(--color-primary) 0 1.5px, transparent 1.5px 4px)",
+          }}
+        />
+        {t("tooltipProjected")}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="size-2.5 rounded-[3px] border border-dashed border-primary bg-primary/10" />
+        {t("tooltipForecast")}
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -118,6 +150,49 @@ export function ChartTooltip({
 }
 
 /**
+ * Total (received + projected) above each bar — reference: 700/11px, full-strength
+ * text color. All labels sit on one shared line, at the height of the *tallest* bar
+ * (not floating individually above each bar's own top), so the row reads cleanly
+ * left to right. Rendered from the axis scales directly rather than a `Bar`'s
+ * `LabelList`: recharts drops any *stacked* rectangle with 0 height (an optimization
+ * in `Bar.js`), which would silently drop the label for every bar whose `projected`
+ * segment happens to be empty — i.e. every year but the current one. Reading the
+ * scales sidesteps that filtering entirely.
+ */
+function BarTotalLabels({ data, format }: { data: IncomeBar[]; format: (v: number) => string }) {
+  const xScale = useXAxisScale();
+  const yScale = useYAxisScale();
+  if (!xScale || !yScale) return null;
+  const totals = data.map((d) => d.value + (d.projected ?? 0));
+  const maxTotal = Math.max(...totals);
+  if (maxTotal <= 0) return null;
+  const labelY = yScale(maxTotal);
+  if (labelY === undefined) return null;
+  return (
+    <>
+      {data.map((d, i) => {
+        if (totals[i] === 0) return null;
+        const x = xScale(d.label, { position: "middle" });
+        if (x === undefined) return null;
+        return (
+          <text
+            key={i}
+            x={x}
+            y={labelY - 8}
+            textAnchor="middle"
+            fontSize={11}
+            fontWeight={700}
+            fill="var(--color-foreground)"
+          >
+            {format(totals[i])}
+          </text>
+        );
+      })}
+    </>
+  );
+}
+
+/**
  * Income per calendar year as a bar chart, with the next-year forecast appended as
  * a muted bar. Current-year bars stack projected rest-of-year income on top of
  * paid amounts as a shaded segment. Theming + axes mirror
@@ -133,29 +208,33 @@ export function IncomeBarChart({
   const locale = useLocale();
   const t = useTranslations("Income");
   const money = (v: number) => formatMoney(v, currency, locale);
+  const moneyCompact = (v: number) => formatMoneyCompact(v, currency, locale);
 
   return (
-    <div className="h-[280px] w-full">
+    <div className="h-[224px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="var(--color-border)"
-            vertical={false}
-          />
+        <BarChart data={data} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            {/* Diagonal-stripe hatch for the "projected" (rest-of-year) segment. */}
+            <pattern
+              id="income-projected-stripe"
+              width={6}
+              height={6}
+              patternTransform="rotate(45)"
+              patternUnits="userSpaceOnUse"
+            >
+              <rect width={6} height={6} fill="var(--color-primary)" fillOpacity={0.14} />
+              <line x1={0} y1={0} x2={0} y2={6} stroke="var(--color-primary)" strokeOpacity={0.55} strokeWidth={2} />
+            </pattern>
+          </defs>
           <XAxis
             dataKey="label"
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
             tickLine={false}
+            axisLine={false}
             minTickGap={8}
           />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-            tickLine={false}
-            axisLine={false}
-            width={72}
-            tickFormatter={money}
-          />
+          <YAxis hide />
           <Tooltip
             cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
             content={<ChartTooltip money={money} t={t} />}
@@ -164,24 +243,20 @@ export function IncomeBarChart({
             {data.map((d, i) => (
               <Cell
                 key={i}
-                fill={
-                  d.forecast
-                    ? "var(--color-muted-foreground)"
-                    : "var(--color-primary)"
-                }
-                fillOpacity={d.forecast ? 0.4 : 1}
+                fill={d.forecast ? "var(--color-primary)" : "var(--color-primary)"}
+                fillOpacity={d.forecast ? 0.12 : 1}
+                stroke={d.forecast ? "var(--color-primary)" : undefined}
+                strokeWidth={d.forecast ? 2 : undefined}
+                strokeDasharray={d.forecast ? "4 3" : undefined}
               />
             ))}
           </Bar>
-          <Bar dataKey="projected" stackId="stack">
+          <Bar dataKey="projected" stackId="stack" radius={[4, 4, 0, 0]}>
             {data.map((d, i) => (
-              <Cell
-                key={i}
-                fill="var(--color-primary)"
-                fillOpacity={0.25}
-              />
+              <Cell key={i} fill="url(#income-projected-stripe)" />
             ))}
           </Bar>
+          <BarTotalLabels data={data} format={moneyCompact} />
         </BarChart>
       </ResponsiveContainer>
     </div>

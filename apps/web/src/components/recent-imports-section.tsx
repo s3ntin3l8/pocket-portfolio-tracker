@@ -21,11 +21,9 @@ export function RecentImportsSection({
   portfolios?: PickablePortfolio[];
 }) {
   const t = useTranslations("ImportHistory");
-  // Open by default when there's an actionable draft to review (a TR sync, a partial
-  // confirm, a shared screenshot); a confirmed/discarded-only audit trail stays collapsed.
-  const [open, setOpen] = useState(() =>
-    items.some((i) => i.status === "draft"),
-  );
+  // Collapsed by default — the import history is a secondary audit trail; the user opens
+  // it on demand. (Drafts also surface inline in the transactions list as draft rows.)
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="space-y-3">
@@ -33,13 +31,15 @@ export function RecentImportsSection({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="flex items-center gap-1.5 px-0.5 text-xs font-bold uppercase tracking-[0.04em] text-text-3 transition-colors hover:text-foreground"
       >
-        <ChevronDown
-          className={cn("size-4 transition-transform", open && "rotate-180")}
-        />
         {t("title")}
-        <span className="text-muted-foreground">({items.length})</span>
+        <span className="font-semibold normal-case tracking-normal text-text-3">
+          ({items.length})
+        </span>
+        <ChevronDown
+          className={cn("size-[13px] transition-transform", open && "rotate-180")}
+        />
       </button>
       {open && (
         <ImportHistory items={items} showTitle={false} portfolios={portfolios} />

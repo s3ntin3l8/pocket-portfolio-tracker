@@ -38,9 +38,6 @@ export default async function TransactionsPage({
 
   let status: "ok" | "empty" | "unavailable";
   let rows: TxRow[] = [];
-  // For a single cash-outside portfolio, default the list to "Investments only" so the
-  // cash/spending noise is hidden; aggregate and cash-inside views default to "All".
-  let defaultInvestmentsOnly = false;
   let singlePortfolio: { id: string; name: string; documentRetention: boolean } | null = null;
   let anomalies: Anomaly[] | null = null;
 
@@ -57,7 +54,6 @@ export default async function TransactionsPage({
     rows = txResult.status === "ok" ? txResult.data : [];
     anomalies = anomalyResult;
     if (txResult.status === "ok") {
-      defaultInvestmentsOnly = !txResult.portfolio.cashCounted;
       singlePortfolio = {
         id: txResult.portfolio.id,
         name: txResult.portfolio.name,
@@ -114,30 +110,36 @@ export default async function TransactionsPage({
         headers={exportHeaders}
         rows={exportRows}
         label={t("exportCsv")}
+        iconOnly
       />
       {singlePortfolio?.documentRetention && (
         <ExportDocumentsButton
           portfolioId={singlePortfolio.id}
           portfolioName={singlePortfolio.name}
           label={t("exportDocuments")}
+          iconOnly
         />
       )}
     </div>
   );
 
+  // Title + (icon-only) actions share the top line; the subtitle spans the full width
+  // below it — so on narrow screens the count isn't squeezed against the buttons.
   const heading = (action?: React.ReactNode) => (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        {action}
       </div>
-      {action}
+      <p className="text-sm font-medium text-text-2">
+        {rows.length > 0 ? t("subtitleCount", { count: rows.length }) : t("subtitle")}
+      </p>
     </div>
   );
 
   if (status === "unavailable") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading()}
         <EmptyState
           icon={Receipt}
@@ -151,7 +153,7 @@ export default async function TransactionsPage({
   if (rows.length === 0) {
     const isEmptyPortfolio = status === "empty";
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {heading()}
         <EmptyState
           icon={Receipt}
@@ -178,12 +180,11 @@ export default async function TransactionsPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {heading(addButton)}
       <TransactionsTable
         rows={rows}
         showPortfolio={aggregate}
-        defaultInvestmentsOnly={defaultInvestmentsOnly}
         anomalies={anomalies ?? []}
         portfolios={portfolioList}
       />

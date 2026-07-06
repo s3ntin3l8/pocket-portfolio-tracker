@@ -1,22 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ScanLine,
   FileSpreadsheet,
   PencilLine,
   Landmark,
-  Pencil,
+  ListChecks,
   Loader2,
   Trash2,
-  Download,
   Search,
   X,
   AlertTriangle,
   AlertCircle,
   Check,
   FolderInput,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  ArrowRightLeft,
+  ArrowLeftRight,
+  Coins,
+  Gem,
+  Split,
+  GitMerge,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
@@ -31,18 +41,23 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
-import { Link, useRouter } from "@/i18n/navigation";
+import { EditTransactionSheet } from "@/components/edit-transaction-sheet";
+import { useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { cashFlow } from "@portfolio/core";
-import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
+import { formatMoney, anomalyLabel, cn, type AnomalyTranslator } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
 import type { CoreTransaction } from "@portfolio/core";
 import type { SourceSummary, Anomaly, TransactionStatus } from "@portfolio/api-client";
-import { TransactionStatusButton } from "@/components/transaction-status-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ReassignDialog } from "@/components/reassign-dialog";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
 import {
@@ -67,10 +82,67 @@ export const SOURCE_ICON: Record<string, LucideIcon> = {
   ibkr: Landmark,
 };
 
-const TYPE_VARIANT: Record<string, "success" | "destructive" | "default"> = {
-  buy: "success",
-  sell: "destructive",
+/** Per-kind icon + tint, matching the reference's `TYPE` map (buy/sell arrows, a coin for
+ *  dividend/coupon, cash in/out arrows, a gem for share events, teal for transfers/merger).
+ *  `loan_drawdown`/`loan_repayment` (gold cicilan) have no reference equivalent — grouped
+ *  with cash in/out by cashflow direction. */
+const TYPE_ICON: Record<string, { icon: LucideIcon; tone: "success" | "destructive" | "warning" | "violet" | "teal" }> = {
+  buy: { icon: ArrowDownToLine, tone: "success" },
+  savings_plan: { icon: ArrowDownToLine, tone: "success" },
+  sell: { icon: ArrowUpFromLine, tone: "destructive" },
+  dividend: { icon: Coins, tone: "warning" },
+  coupon: { icon: Coins, tone: "warning" },
+  deposit: { icon: ArrowDownCircle, tone: "success" },
+  interest: { icon: ArrowDownCircle, tone: "success" },
+  bonus_cash: { icon: ArrowDownCircle, tone: "success" },
+  loan_drawdown: { icon: ArrowDownCircle, tone: "success" },
+  withdrawal: { icon: ArrowUpCircle, tone: "destructive" },
+  fee: { icon: ArrowUpCircle, tone: "destructive" },
+  tax: { icon: ArrowUpCircle, tone: "destructive" },
+  loan_repayment: { icon: ArrowUpCircle, tone: "destructive" },
+  bonus: { icon: Gem, tone: "violet" },
+  rights: { icon: Gem, tone: "violet" },
+  split: { icon: Split, tone: "violet" },
+  transfer_in: { icon: ArrowRightLeft, tone: "teal" },
+  transfer_out: { icon: ArrowLeftRight, tone: "teal" },
+  merger: { icon: GitMerge, tone: "teal" },
 };
+
+const TYPE_TONE_CLASSES = {
+  success: "bg-success/15 text-success",
+  destructive: "bg-destructive/15 text-destructive",
+  warning: "bg-warning/15 text-warning",
+  violet: "bg-[#7C5CFC]/15 text-[#7C5CFC]",
+  teal: "bg-[#0D9488]/15 text-[#0D9488]",
+} as const;
+
+// Reference SRCTYPE provenance tags: tinted 700 9px pills per source.
+const SRC_TONES: Record<string, React.CSSProperties> = {
+  csv: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  pdf: { background: "rgba(229,72,77,.13)", color: "#E5484D" },
+  screenshot: { background: "rgba(124,92,252,.16)", color: "#7C5CFC" },
+  pytr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  ibkr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  manual: { background: "var(--border)", color: "var(--text-mute)" },
+};
+
+function TypeIconChip({ type, className }: { type: string; className?: string }) {
+  const entry = TYPE_ICON[type];
+  if (!entry) return null;
+  const Icon = entry.icon;
+  return (
+    <span
+      className={cn(
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]",
+        TYPE_TONE_CLASSES[entry.tone],
+        className,
+      )}
+      aria-hidden
+    >
+      <Icon className="size-[18px]" strokeWidth={2.2} />
+    </span>
+  );
+}
 
 export interface TxRow {
   id: string;
@@ -85,7 +157,18 @@ export interface TxRow {
   currency: string;
   executedAt: string;
   source: string;
-  instrument: { symbol?: string | null; name?: string | null } | null;
+  instrument: {
+    symbol?: string | null;
+    name?: string | null;
+    /** Present at runtime (from listTransactions) — needed to prefill the edit form. */
+    assetClass?: string | null;
+    unit?: string | null;
+  } | null;
+  /** Fields carried at runtime (listTransactions) that the edit form prefills from. */
+  instrumentId?: string | null;
+  description?: string | null;
+  tags?: string[] | null;
+  kind?: string | null;
   /** True when the parent import has a retained source document (#231). */
   hasDocument?: boolean;
   /** Import dedup key; null for manually-entered transactions. */
@@ -138,53 +221,23 @@ export function txAmount(tx: TxRow): number {
  */
 const TX_COLS: ColDef<TxRow>[] = [
   { key: "date", get: (r) => r.executedAt, type: "date" },
-  { key: "type", get: (r) => r.type, type: "text" },
-  { key: "instrument", get: (r) => r.instrument?.symbol ?? "", type: "text" },
+  { key: "instrument", get: (r) => r.instrument?.symbol ?? r.type, type: "text" },
   { key: "portfolio", get: (r) => r.portfolioName ?? "", type: "text" },
   { key: "quantity", get: (r) => r.quantity, type: "numeric" },
-  {
-    key: "amount",
-    get: (r) => {
-      const qty = Number(r.quantity);
-      const price = Number(r.price);
-      if (qty > 0) return qty * price; // trade: notional (qty×price)
-      // Income (dividend/coupon/interest/bonus_cash) and deposits/withdrawals:
-      // show GROSS = net price + withheld tax. For trades-with-tax or deposit/withdrawal
-      // (where tax is null) this is just price. For dividend reversals both are negative.
-      return price + (r.tax ? Number(r.tax) : 0);
-    },
-    type: "numeric",
-  },
-  { key: "fees", get: (r) => Number(r.fees), type: "numeric" },
-  { key: "tax", get: (r) => (r.tax ? Number(r.tax) : 0), type: "numeric" },
+  { key: "price", get: (r) => Number(r.price), type: "numeric" },
   { key: "netAmount", get: (r) => txNetAmount(r), type: "numeric" },
   { key: "source", get: (r) => r.source, type: "text" },
 ];
 
-// Cash/non-investment legs hidden by the "Investments only" filter. This is a pure
-// display filter — it never affects any computed figure (see CLAUDE.md "one boundary
-// per portfolio"; counting is set by the portfolio's cash boundary, not this toggle).
-const NON_INVESTMENT_TYPES = new Set([
-  "deposit",
-  "withdrawal",
-  "fee",
-  "interest",
-  "bonus_cash",
-  "loan_drawdown",
-  "loan_repayment",
-]);
-
 export function TransactionsTable({
   rows,
   showPortfolio = false,
-  defaultInvestmentsOnly = false,
   anomalies = [],
   portfolios = [],
   showFilterBanners = true,
 }: {
   rows: TxRow[];
   showPortfolio?: boolean;
-  defaultInvestmentsOnly?: boolean;
   /** Per-transaction anomalies keyed by transactionId; shows a flag icon on the row. */
   anomalies?: Anomaly[];
   /** All of the user's portfolios — enables the "Reassign…" action (hidden when fewer
@@ -226,16 +279,29 @@ export function TransactionsTable({
   const flaggedCount = anomalyByTxId.size;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Batch-select is off by default: checkboxes stay hidden until a long-press (long-click
+  // on desktop / touch-and-hold on mobile) enters selection mode. Exiting clears both.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const clearSelection = () => {
+    setSelected(new Set());
+    setSelectionMode(false);
+  };
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [investmentsOnly, setInvestmentsOnly] = useState(defaultInvestmentsOnly);
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [instrumentFilter, setInstrumentFilter] = useState("all");
+  // Reference filter chips: All / Buys / Sells / Income (+ "Needs review · N").
+  const [chipFilter, setChipFilter] = useState<"all" | "buy" | "sell" | "income" | "issues">("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [query, setQuery] = useState("");
   const [showFlagged, setShowFlagged] = useState(false);
+  // How many of the (already filtered+sorted) rows to render — the ledger can grow long
+  // for old/frequent portfolios, pushing "Recent imports" far below the fold. Capped with
+  // an explicit "Load more" button rather than infinite-scroll: scroll-triggered loading
+  // never bottoms out, which would make Recent imports permanently unreachable by scroll.
+  const PAGE_SIZE = 25;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [detailTx, setDetailTx] = useState<TxRow | null>(null);
+  const [editTx, setEditTx] = useState<TxRow | null>(null);
 
   // When the last flagged transaction is dismissed (router.refresh re-feeds an empty
   // anomalies list), clear the filter so the user isn't stranded on an empty list.
@@ -255,20 +321,18 @@ export function TransactionsTable({
     setDraftFilter("all");
   }
 
+  // Re-cap the visible window whenever the effective view changes, so a newly narrowed
+  // filter/search/sort starts short instead of inheriting a stale "loaded 200" from the
+  // previous view. Tracks the prior signature in state (not a ref) per React's documented
+  // "adjusting state when a value changes during render" pattern.
+  const viewSignature = `${chipFilter}|${yearFilter}|${draftFilter}|${query}|${showFlagged}|${sortKey}`;
+  const [prevViewSignature, setPrevViewSignature] = useState(viewSignature);
+  if (viewSignature !== prevViewSignature) {
+    setPrevViewSignature(viewSignature);
+    setVisibleCount(PAGE_SIZE);
+  }
+
   // Derive distinct options from `rows` so selects only show values present in the data.
-  const typeOptions = useMemo(
-    () => [...new Set(rows.map((r) => r.type))].sort(),
-    [rows],
-  );
-  const instrumentOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const r of rows) {
-      if (!r.instrument) continue;
-      const key = r.instrument.symbol ?? r.instrument.name ?? "";
-      if (key && !seen.has(key)) seen.set(key, r.instrument.symbol ?? r.instrument.name ?? key);
-    }
-    return [...seen.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [rows]);
   const yearOptions = useMemo(
     () =>
       [...new Set(rows.map((r) => String(new Date(r.executedAt).getFullYear())))].sort(
@@ -284,10 +348,11 @@ export function TransactionsTable({
       (r) =>
         (!showFlagged || anomalyByTxId.has(r.id)) &&
         (draftFilter === "all" || r.status === "draft") &&
-        (!investmentsOnly || !NON_INVESTMENT_TYPES.has(r.type)) &&
-        (typeFilter === "all" || r.type === typeFilter) &&
-        (instrumentFilter === "all" ||
-          (r.instrument?.symbol ?? r.instrument?.name ?? "") === instrumentFilter) &&
+        (chipFilter === "all" ||
+          (chipFilter === "buy" && (r.type === "buy" || r.type === "savings_plan")) ||
+          (chipFilter === "sell" && r.type === "sell") ||
+          (chipFilter === "income" && ACTIVITY_INCOME_TYPES.has(r.type)) ||
+          (chipFilter === "issues" && anomalyByTxId.has(r.id))) &&
         (yearFilter === "all" ||
           String(new Date(r.executedAt).getFullYear()) === yearFilter) &&
         (!q ||
@@ -300,20 +365,13 @@ export function TransactionsTable({
           (r.portfolioName ?? "").toLowerCase().includes(q) ||
           r.source.toLowerCase().includes(q)),
     );
-  }, [rows, showFlagged, anomalyByTxId, draftFilter, investmentsOnly, typeFilter, instrumentFilter, yearFilter, query, tt]);
+  }, [rows, showFlagged, anomalyByTxId, draftFilter, chipFilter, yearFilter, query, tt]);
 
-  // Which filter-scoped summary banner (if any) to show above the list. Keyed off the same
-  // `typeFilter` the type dropdown already drives — "Buys"/"Sells"/"Income" group the
-  // individual income sub-types (dividend/coupon/interest/bonus) the dropdown lists
-  // separately, so picking any one of them still surfaces the combined Income banner.
+  // Which filter-scoped summary banner (if any) to show above the list — keyed directly
+  // off the reference-style chip filter (All/Buys/Sells/Income).
   const tBanner = useTranslations("Transactions.banners");
-  const activeBannerMode: "all" | "income" | "buy" | "sell" | null = useMemo(() => {
-    if (typeFilter === "all") return "all";
-    if (typeFilter === "buy") return "buy";
-    if (typeFilter === "sell") return "sell";
-    if (ACTIVITY_INCOME_TYPES.has(typeFilter)) return "income";
-    return null;
-  }, [typeFilter]);
+  const activeBannerMode: "all" | "income" | "buy" | "sell" | null =
+    chipFilter === "issues" ? null : chipFilter;
 
   // Banners are computed from the full (unfiltered-by-other-pickers) `rows` — they answer
   // "how much have I invested/received, all time / YTD", not "how much is in the current
@@ -374,25 +432,81 @@ export function TransactionsTable({
   );
 
   const m = (n: number, currency: string) => formatMoney(n, currency, locale);
-  const df = useMemo(
-    () => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }),
+  // Reference row date cell: short, day-first "5 Jun" (`d + " " + SHORT[mo]`), regardless
+  // of locale ordering; month-band label: "June 2026". UTC throughout so the day never
+  // drifts against the ISO date used for month grouping.
+  const monthShort = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }),
+    [locale],
+  );
+  const rowDate = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getUTCDate()} ${monthShort.format(d)}`;
+  };
+  const monthFmt = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }),
     [locale],
   );
 
   const allSelected = visibleRows.length > 0 && selected.size === visibleRows.length;
 
   function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+    // Deselecting the last row leaves selection mode (hides the checkboxes again).
+    if (next.size === 0) setSelectionMode(false);
   }
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(visibleRows.map((r) => r.id)));
   }
+
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const startLongPress = (id: string, e: React.PointerEvent) => {
+    longPressFired.current = false;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    clearLongPress();
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      setSelectionMode(true);
+      setSelected((prev) => new Set(prev).add(id));
+    }, 450);
+  };
+  // Cancel the hold only on real movement (a scroll), not the sub-pixel finger jitter that
+  // touch browsers report while holding still — a bare "cancel on any move" never fires on
+  // touch. 10px threshold distinguishes a hold from a scroll/drag.
+  const onPressMove = (e: React.PointerEvent) => {
+    const start = pressStart.current;
+    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) {
+      clearLongPress();
+    }
+  };
+  // Row tap: swallow the click that follows a long-press; in selection mode toggle the row;
+  // otherwise open the detail sheet.
+  const onRowActivate = (tx: TxRow) => {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    if (selectionMode) toggle(tx.id);
+    else setDetailTx(tx);
+  };
+  const longPressHandlers = (id: string) => ({
+    onPointerDown: (e: React.PointerEvent) => startLongPress(id, e),
+    onPointerUp: clearLongPress,
+    onPointerLeave: clearLongPress,
+    onPointerMove: onPressMove,
+  });
 
   async function onBatchDelete() {
     setBusy(true);
@@ -410,7 +524,7 @@ export function TransactionsTable({
           api.bulkDeleteTransactions(portfolioId, ids),
         ),
       );
-      setSelected(new Set());
+      clearSelection();
       router.refresh();
     } finally {
       setBusy(false);
@@ -440,7 +554,7 @@ export function TransactionsTable({
           api.resolveDraftTransactions(portfolioId, ids, action),
         ),
       );
-      setSelected(new Set());
+      clearSelection();
       router.refresh();
     } finally {
       setBusy(false);
@@ -488,13 +602,49 @@ export function TransactionsTable({
     else if (skipped > 0) toast.success(tr("successWithSkips", { moved, skipped }));
     else toast.success(tr("success", { count: moved }));
     setReassignRows(null);
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
-  // checkbox + date + type + instrument + [portfolio] + qty + amount + fees(sm) +
-  // tax + netAmount + source(sm) + actions = 11 or 12
-  const colSpan = showPortfolio ? 12 : 11;
+  // checkbox + date + transaction + [portfolio] + quantity + price + source + amount.
+  const colSpan = showPortfolio ? 8 : 7;
+
+  const sortedRows = sort(visibleRows);
+  // Cap how many of the (filtered+sorted) rows actually render — see PAGE_SIZE/visibleCount
+  // above. Select-all and the empty-state check deliberately keep reading `visibleRows` (the
+  // full filtered set), not this window, so "select all" still covers everything filtered,
+  // not just what's currently rendered. Memoized (unlike `sortedRows`, a bare re-sort call)
+  // so it has a stable identity for `dayGroups`' dependency array below.
+  const windowedRows = useMemo(
+    () => sortedRows.slice(0, visibleCount),
+    [sortedRows, visibleCount],
+  );
+  const hasMore = sortedRows.length > windowedRows.length;
+  // The reference groups the ledger into month bands. That only reads coherently while the
+  // list is in date order (the default, or an explicit Date sort); any other sort renders flat.
+  const groupByMonth = sortKey === null || sortKey === "date";
+
+  // Mobile (reference): a card per DAY rather than a table. Same ordered source list.
+  const dayFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+    [locale],
+  );
+  const dayGroups = useMemo(() => {
+    const groups: { day: string; label: string; rows: TxRow[] }[] = [];
+    for (const tx of windowedRows) {
+      const day = tx.executedAt.slice(0, 10);
+      const last = groups[groups.length - 1];
+      if (last && last.day === day) last.rows.push(tx);
+      else groups.push({ day, label: dayFmt.format(new Date(tx.executedAt)), rows: [tx] });
+    }
+    return groups;
+  }, [windowedRows, dayFmt]);
 
   // Anomaly banner — only when anomalies exist (only passed in single-portfolio view).
   const anomalyErrors = anomalies.filter((a) => a.severity === "error");
@@ -538,94 +688,8 @@ export function TransactionsTable({
   return (
     <div className="space-y-3">
       {anomalyBanner}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <select
-          aria-label={t("filterScope")}
-          value={investmentsOnly ? "investments" : "all"}
-          onChange={(e) => setInvestmentsOnly(e.target.value === "investments")}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value="all">{t("filterAll")}</option>
-          <option value="investments">{t("filterInvestments")}</option>
-        </select>
-        {typeOptions.length > 1 && (
-          <select
-            aria-label={t("filterType")}
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="all">{t("allTypes")}</option>
-            {typeOptions.map((tp) => (
-              <option key={tp} value={tp}>
-                {tt(tp as Parameters<typeof tt>[0])}
-              </option>
-            ))}
-          </select>
-        )}
-        {instrumentOptions.length > 1 && (
-          <select
-            aria-label={t("filterInstrument")}
-            value={instrumentFilter}
-            onChange={(e) => setInstrumentFilter(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="all">{t("allInstruments")}</option>
-            {instrumentOptions.map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        )}
-        {yearOptions.length > 1 && (
-          <select
-            aria-label={t("filterYear")}
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="all">{t("allYears")}</option>
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        )}
-        {draftCount > 0 && (
-          <select
-            aria-label={t("filterDraftLabel")}
-            value={draftFilter}
-            onChange={(e) => setDraftFilter(e.target.value as "all" | "drafts")}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="all">{t("draftShowAll")}</option>
-            <option value="drafts">{t("draftOnly", { count: draftCount })}</option>
-          </select>
-        )}
-        <div className="relative ml-auto flex items-center">
-          <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder={t("searchPlaceholder")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-8 w-44 pl-7 pr-7 text-xs"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label={t("searchClear")}
-              className="absolute right-2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
 
+      {/* Hero filter banner sits above the chips/search + table (chips below drive it). */}
       {showFilterBanners && allBanner && (
         <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
       )}
@@ -655,78 +719,194 @@ export function TransactionsTable({
         />
       )}
 
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
-          <span className="text-muted-foreground">
-            {tb("selected", { count: selected.size })}
+      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
+        {/* Chips scroll horizontally on mobile (no awkward multi-line wrap); wrap on desktop. */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
+        {/* Reference tChips: rounded-full pills, active = white on var(--pill),
+            inactive = 600 on card bg with a border; "Needs review · N" is tinted. */}
+        {(
+          [
+            ["all", t("filterAll")],
+            ["buy", tBanner("chipBuys")],
+            ["sell", tBanner("chipSells")],
+            ["income", tBanner("chipIncome")],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setChipFilter(key)}
+            aria-pressed={chipFilter === key}
+            className={cn(
+              "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
+              chipFilter === key
+                ? "bg-pill font-bold text-white"
+                : "border border-border bg-card font-semibold text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+        {anomalyByTxId.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setChipFilter(chipFilter === "issues" ? "all" : "issues")}
+            aria-pressed={chipFilter === "issues"}
+            className={cn(
+              "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
+              chipFilter === "issues"
+                ? "border-[var(--gold-fg)] bg-[var(--gold-fg)] text-white"
+                : "border-[rgba(224,165,58,.34)] bg-[rgba(224,165,58,.12)] text-[var(--gold-fg)]",
+            )}
+          >
+            {tBanner("chipIssues", { count: anomalyByTxId.size })}
+          </button>
+        )}
+        {yearOptions.length > 1 && (
+          // Styled dropdown (Radix) rather than a native <select> so the popup matches the
+          // app's menus and the chevron has proper right padding.
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={t("filterYear")}
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {yearFilter === "all" ? t("allYears") : yearFilter}
+                <ChevronDown className="size-3.5 shrink-0 text-text-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[9rem]">
+              {["all", ...yearOptions].map((y) => (
+                <DropdownMenuItem
+                  key={y}
+                  onSelect={() => setYearFilter(y)}
+                  className="justify-between gap-3"
+                >
+                  {y === "all" ? t("allYears") : y}
+                  {yearFilter === y && <Check className="size-4 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {draftCount > 0 && (
+          <select
+            aria-label={t("filterDraftLabel")}
+            value={draftFilter}
+            onChange={(e) => setDraftFilter(e.target.value as "all" | "drafts")}
+            className="h-8 rounded-full border border-border bg-card px-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="all">{t("draftShowAll")}</option>
+            <option value="drafts">{t("draftOnly", { count: draftCount })}</option>
+          </select>
+        )}
+        </div>
+        <div className="relative flex items-center sm:ml-auto">
+          <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder={t("searchPlaceholder")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-8 w-full pl-7 pr-7 text-xs sm:w-44"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label={t("searchClear")}
+              className="absolute right-2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {selectionMode && (
+        <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            {/* Exit selection mode (clearing the set also hides the checkboxes again). */}
+            <button
+              type="button"
+              onClick={clearSelection}
+              aria-label={tb("cancel")}
+              title={tb("cancel")}
+              className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+            {selected.size > 0 ? tb("selected", { count: selected.size }) : tb("selectPrompt")}
           </span>
-          {confirming ? (
-            <span className="flex items-center gap-2">
-              <span className="text-muted-foreground">{tb("confirmPrompt")}</span>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={onBatchDelete}
-                disabled={busy}
-              >
-                {busy && <Loader2 className="size-3.5 animate-spin" />}
-                {tb("confirm")}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirming(false)}
-                disabled={busy}
-              >
-                {tb("cancel")}
-              </Button>
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              {selectedDraftIds.length > 0 && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => onBatchResolve("confirm")}
-                    disabled={busy}
-                  >
-                    {busy && <Loader2 className="size-3.5 animate-spin" />}
-                    <Check className="size-3.5" />
-                    {tb("confirmDrafts")}
-                  </Button>
+          {selected.size > 0 &&
+            (confirming ? (
+              <span className="flex items-center gap-2">
+                <span className="text-muted-foreground">{tb("confirmPrompt")}</span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={onBatchDelete}
+                  disabled={busy}
+                >
+                  {busy && <Loader2 className="size-3.5 animate-spin" />}
+                  {tb("confirm")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirming(false)}
+                  disabled={busy}
+                >
+                  {tb("cancel")}
+                </Button>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                {selectedDraftIds.length > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onBatchResolve("confirm")}
+                      disabled={busy}
+                    >
+                      {busy && <Loader2 className="size-3.5 animate-spin" />}
+                      <Check className="size-3.5" />
+                      {tb("confirmDrafts")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onBatchResolve("discard")}
+                      disabled={busy}
+                    >
+                      {tb("discardDrafts")}
+                    </Button>
+                  </>
+                )}
+                {canReassign && (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => onBatchResolve("discard")}
+                    onClick={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
                     disabled={busy}
                   >
-                    {tb("discardDrafts")}
+                    <FolderInput className="size-3.5" />
+                    {tb("reassign")}
                   </Button>
-                </>
-              )}
-              {canReassign && (
+                )}
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
+                  variant="destructive"
+                  onClick={() => setConfirming(true)}
                   disabled={busy}
                 >
-                  <FolderInput className="size-3.5" />
-                  {tb("reassign")}
+                  <Trash2 className="size-3.5" />
+                  {tb("delete")}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => setConfirming(true)}
-                disabled={busy}
-              >
-                <Trash2 className="size-3.5" />
-                {tb("delete")}
-              </Button>
-            </span>
-          )}
+              </span>
+            ))}
         </div>
       )}
 
@@ -747,235 +927,172 @@ export function TransactionsTable({
         />
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      {/* ── Desktop table (md+) ── */}
+      <div className="hidden overflow-x-auto rounded-xl bg-card shadow-card md:block">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">
-                <input
-                  type="checkbox"
-                  className="size-4 align-middle accent-primary"
-                  aria-label={tb("selectAll")}
-                  checked={allSelected}
-                  onChange={toggleAll}
-                />
+              {/* Checkbox column: a select-rows toggle until selection mode is entered, then
+                  the "select all" checkbox. Fixed wide enough that both the toggle button and
+                  the checkbox fit without the column ever needing to grow (table-layout:auto
+                  otherwise resizes it per the widest content-box actually rendered, which
+                  visibly shifted every column after it when swapping between the two). */}
+              <TableHead className="w-16">
+                {selectionMode ? (
+                  <input
+                    type="checkbox"
+                    className="size-4 align-middle accent-primary"
+                    aria-label={tb("selectAll")}
+                    checked={allSelected}
+                    onChange={toggleAll}
+                  />
+                ) : (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6"
+                    title={tb("selectRows")}
+                    aria-label={tb("selectRows")}
+                    onClick={() => setSelectionMode(true)}
+                  >
+                    <ListChecks className="size-4" />
+                  </Button>
+                )}
               </TableHead>
               <SortableTableHead colKey="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("date")}</SortableTableHead>
-              <SortableTableHead colKey="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("type")}</SortableTableHead>
-              <SortableTableHead colKey="instrument" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("instrument")}</SortableTableHead>
+              <SortableTableHead colKey="instrument" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("transactionCol")}</SortableTableHead>
               {showPortfolio && <SortableTableHead colKey="portfolio" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("portfolio")}</SortableTableHead>}
               <SortableTableHead colKey="quantity" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("quantity")}</SortableTableHead>
-              <SortableTableHead colKey="amount" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("amount")}</SortableTableHead>
-              <SortableTableHead colKey="fees" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="hidden text-right sm:table-cell">{t("fees")}</SortableTableHead>
-              <SortableTableHead colKey="tax" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("tax")}</SortableTableHead>
-              <SortableTableHead colKey="netAmount" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("netAmount")}</SortableTableHead>
+              <SortableTableHead colKey="price" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("price")}</SortableTableHead>
               <SortableTableHead colKey="source" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell">{t("source")}</SortableTableHead>
-              <TableHead className="text-right">
-                <span className="sr-only">{tm("actions")}</span>
-              </TableHead>
+              <SortableTableHead colKey="netAmount" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="text-right">{t("amount")}</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sort(visibleRows).map((tx) => {
-              const Icon = SOURCE_ICON[tx.source] ?? PencilLine;
-              const amount = txAmount(tx);
+            {windowedRows.map((tx, i) => {
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
               const anomaly = anomalyByTxId.get(tx.id);
               const status = tx.status ?? "normal";
+              // Emit a month-separator band whenever the month changes (reference `txMonths`).
+              // The band uses role="presentation" so it stays out of row counts/queries.
+              const monthKey = tx.executedAt.slice(0, 7);
+              const showBand =
+                groupByMonth && (i === 0 || windowedRows[i - 1].executedAt.slice(0, 7) !== monthKey);
               return (
+                <Fragment key={tx.id}>
+                  {showBand && (
+                    <tr role="presentation">
+                      <td
+                        colSpan={colSpan}
+                        className="bg-card-2 px-[22px] py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3"
+                      >
+                        {monthFmt.format(new Date(tx.executedAt))}
+                      </td>
+                    </tr>
+                  )}
                 <TableRow
-                  key={tx.id}
                   data-state={isSelected ? "selected" : undefined}
-                  className={`cursor-pointer ${status === "archived" ? "opacity-50" : ""} ${
+                  className={`cursor-pointer select-none ${status === "archived" ? "opacity-50" : ""} ${
                     status === "draft" ? "bg-amber-50/40 dark:bg-amber-950/10" : ""
                   }`}
-                  onClick={() => setDetailTx(tx)}
+                  onClick={() => onRowActivate(tx)}
+                  {...longPressHandlers(tx.id)}
                 >
-                  <TableCell>
-                    <span onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="size-4 align-middle accent-primary"
-                        aria-label={tb("selectRow")}
-                        checked={isSelected}
-                        onChange={() => toggle(tx.id)}
-                      />
-                    </span>
+                  <TableCell className="w-16">
+                    {selectionMode && (
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="size-4 align-middle accent-primary"
+                          aria-label={tb("selectRow")}
+                          checked={isSelected}
+                          onChange={() => toggle(tx.id)}
+                        />
+                      </span>
+                    )}
                   </TableCell>
-                  <TableCell className="tabular whitespace-nowrap text-muted-foreground">
-                    {df.format(new Date(tx.executedAt))}
+                  <TableCell className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
+                    {rowDate(tx.executedAt)}
                   </TableCell>
+                  {/* Reference "Transaction" column: 36px kind chip + "Buy · SYM"
+                      700 14px title + instrument name 500 12px text-2; status badges
+                      and anomaly tags ride inline next to the title. */}
                   <TableCell>
-                    <span className="flex flex-wrap items-center gap-1">
-                      <Badge variant={TYPE_VARIANT[tx.type] ?? "default"}>
-                        {tt(tx.type)}
-                      </Badge>
-                      {status === "draft" && (
-                        <Badge
-                          variant="outline"
-                          className="border-amber-400/50 text-amber-600 dark:text-amber-400"
-                        >
-                          {tm("status.badgeDraft")}
-                        </Badge>
-                      )}
-                      {status === "draft" && tx.needsReview && (
-                        <span
-                          className="inline-flex items-center"
-                          title={tm("status.needsReview")}
-                          aria-label={tm("status.needsReview")}
-                        >
-                          <AlertTriangle className="size-3.5 text-amber-500" />
-                        </span>
-                      )}
-                      {status === "archived" && (
-                        <Badge variant="outline">{tm("status.badgeArchived")}</Badge>
-                      )}
-                      {status === "cash_neutral" && (
-                        <Badge variant="outline">{tm("status.badgeCashNeutral")}</Badge>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      {anomaly && (
-                        <span
-                          title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                          aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                        >
-                          {anomaly.severity === "error" ? (
-                            <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                          ) : (
-                            <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                    <div className="flex min-w-0 items-center gap-3">
+                      <TypeIconChip type={tx.type} />
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-[7px]">
+                          <span className="truncate text-sm font-bold">
+                            {tt(tx.type)}
+                            {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
+                          </span>
+                          {anomaly && (
+                            <span
+                              title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                              aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                            >
+                              {anomaly.severity === "error" ? (
+                                <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                              ) : (
+                                <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                              )}
+                            </span>
                           )}
-                        </span>
-                      )}
-                      <div>
-                        <div className="font-medium">{tx.instrument?.symbol ?? "—"}</div>
-                        {tx.instrument?.name && (
-                          <div className="text-xs text-muted-foreground">
-                            {tx.instrument.name}
-                          </div>
-                        )}
+                          {status === "draft" && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-400/50 text-amber-600 dark:text-amber-400"
+                            >
+                              {tm("status.badgeDraft")}
+                            </Badge>
+                          )}
+                          {status === "draft" && tx.needsReview && (
+                            <span
+                              className="inline-flex items-center"
+                              title={tm("status.needsReview")}
+                              aria-label={tm("status.needsReview")}
+                            >
+                              <AlertTriangle className="size-3.5 text-amber-500" />
+                            </span>
+                          )}
+                          {status === "archived" && (
+                            <Badge variant="outline">{tm("status.badgeArchived")}</Badge>
+                          )}
+                          {status === "cash_neutral" && (
+                            <Badge variant="outline">{tm("status.badgeCashNeutral")}</Badge>
+                          )}
+                        </div>
+                        <div className="truncate text-xs font-medium text-text-2">
+                          {tx.instrument?.name ?? t(`sources.${tx.source}`)}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
                   {showPortfolio && (
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-xs font-medium text-text-2">
                       {tx.portfolioName ?? "—"}
                     </TableCell>
                   )}
-                  <TableCell className="tabular text-right">{Number(tx.quantity) || "—"}</TableCell>
-                  <TableCell className="tabular text-right">
-                    {m(amount, tx.currency)}
-                  </TableCell>
-                  <TableCell className="tabular hidden text-right sm:table-cell">
-                    {Number(tx.fees) !== 0 ? m(Number(tx.fees), tx.currency) : "—"}
-                  </TableCell>
-                  <TableCell className="tabular text-right">
-                    {tx.tax && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
-                  </TableCell>
-                  <TableCell className="tabular text-right">
-                    {m(netAmount, tx.currency)}
+                  <TableCell className="tabular text-right text-[13px] font-semibold text-text-2">{Number(tx.quantity) || "—"}</TableCell>
+                  <TableCell className="tabular text-right text-[13px] font-semibold">
+                    {Number(tx.quantity) > 0 ? m(Number(tx.price), tx.currency) : "—"}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Icon className="size-3.5" />
+                    <span
+                      className="inline-flex items-center whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[9px] font-bold uppercase"
+                      style={SRC_TONES[tx.source] ?? SRC_TONES.manual}
+                    >
                       {t(`sources.${tx.source}`)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div
-                      className="flex items-center justify-end gap-0.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {tx.hasDocument && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          aria-label={tm("downloadReceipt")}
-                          onClick={async () => {
-                            try {
-                              const { url } = await api.getTransactionDocumentUrl(tx.portfolioId, tx.id);
-                              window.open(url, "_blank", "noopener,noreferrer");
-                            } catch {
-                              // Signed URL fetch failed — silently ignore (e.g. doc deleted).
-                            }
-                          }}
-                        >
-                          <Download className="size-4" />
-                        </Button>
-                      )}
-                      {status === "draft" && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={tm("status.confirmDraft")}
-                            title={tm("status.confirmDraft")}
-                            disabled={resolvingId === tx.id}
-                            onClick={() => onResolveOne(tx, "confirm")}
-                            className="size-8 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                          >
-                            {resolvingId === tx.id ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Check className="size-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            aria-label={tm("status.discardDraft")}
-                            title={tm("status.discardDraft")}
-                            disabled={resolvingId === tx.id}
-                            onClick={() => onResolveOne(tx, "discard")}
-                          >
-                            <X className="size-4" />
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        asChild
-                        aria-label={tm("edit")}
-                      >
-                        <Link href={`/transactions/${tx.id}/edit`}>
-                          <Pencil className="size-4" />
-                        </Link>
-                      </Button>
-                      {canReassign && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          aria-label={tm("reassign")}
-                          title={tm("reassign")}
-                          onClick={() => setReassignRows([tx])}
-                        >
-                          <FolderInput className="size-4" />
-                        </Button>
-                      )}
-                      {status !== "draft" && (
-                        <TransactionStatusButton
-                          portfolioId={tx.portfolioId}
-                          txId={tx.id}
-                          status={status}
-                          className="size-8"
-                        />
-                      )}
-                      <DeleteTransactionButton
-                        portfolioId={tx.portfolioId}
-                        txId={tx.id}
-                        className="size-8"
-                      />
-                    </div>
+                  <TableCell
+                    className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
+                  >
+                    {m(netAmount, tx.currency)}
                   </TableCell>
                 </TableRow>
+                </Fragment>
               );
             })}
             {visibleRows.length === 0 && (
@@ -992,12 +1109,129 @@ export function TransactionsTable({
         </Table>
       </div>
 
+      {/* ── Mobile list (< md): a card per day, reference "Activity" ledger. No date
+          column (the day is the group header), no qty/price/portfolio columns. ── */}
+      <div className="space-y-4 md:hidden">
+        {dayGroups.map((group) => (
+          <div key={group.day}>
+            <div className="mb-2 ml-1 text-[12px] font-bold uppercase tracking-[0.04em] text-text-3">
+              {group.label}
+            </div>
+            <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+              {group.rows.map((tx, i) => {
+                const netAmount = txNetAmount(tx);
+                const isSelected = selected.has(tx.id);
+                const anomaly = anomalyByTxId.get(tx.id);
+                const status = tx.status ?? "normal";
+                const sub =
+                  Number(tx.quantity) > 0
+                    ? `${Number(tx.quantity)} @ ${m(Number(tx.price), tx.currency)}`
+                    : (tx.instrument?.name ?? t(`sources.${tx.source}`));
+                return (
+                  <div
+                    key={tx.id}
+                    data-state={isSelected ? "selected" : undefined}
+                    onClick={() => onRowActivate(tx)}
+                    {...longPressHandlers(tx.id)}
+                    className={cn(
+                      "flex cursor-pointer select-none items-center gap-3 px-[15px] py-[14px]",
+                      i > 0 && "border-t border-line",
+                      status === "archived" && "opacity-50",
+                      status === "draft" && "bg-amber-50/40 dark:bg-amber-950/10",
+                      isSelected && "bg-primary/10",
+                    )}
+                  >
+                    {selectionMode && (
+                      <input
+                        type="checkbox"
+                        readOnly
+                        aria-label={tb("selectRow")}
+                        checked={isSelected}
+                        className="size-4 shrink-0 accent-primary"
+                      />
+                    )}
+                    <TypeIconChip type={tx.type} className="size-10 rounded-[12px]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-[7px]">
+                        <span className="truncate text-sm font-bold">
+                          {tt(tx.type)}
+                          {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
+                        </span>
+                        {anomaly && (
+                          <span
+                            title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                            aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                          >
+                            {anomaly.severity === "error" ? (
+                              <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                            ) : (
+                              <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-text-2">
+                        <span className="truncate">{sub}</span>
+                        <span
+                          className="inline-flex shrink-0 items-center whitespace-nowrap rounded-[6px] px-1.5 py-[2px] text-[9px] font-bold uppercase"
+                          style={SRC_TONES[tx.source] ?? SRC_TONES.manual}
+                        >
+                          {t(`sources.${tx.source}`)}
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "tabular shrink-0 text-sm font-bold",
+                        netAmount > 0 && "text-success",
+                      )}
+                    >
+                      {m(netAmount, tx.currency)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {visibleRows.length === 0 && (
+          <div className="rounded-[20px] bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
+            {query.trim() || showFlagged ? t("noResults") : t("empty")}
+          </div>
+        )}
+      </div>
+
+      {/* Explicit "Load more" rather than scroll-triggered/infinite loading — an
+          intersection-observer approach never bottoms out, which would make "Recent
+          imports" (rendered below this table) permanently unreachable by scrolling. */}
+      {visibleRows.length > 0 && hasMore && (
+        <div className="flex flex-col items-center gap-2 py-2">
+          <Button variant="outline" size="sm" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+            {tb("loadMore")}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {tb("showingCount", { shown: windowedRows.length, total: sortedRows.length })}
+          </span>
+        </div>
+      )}
+
       <TransactionDetailSheet
         tx={detailTx}
         anomaly={detailTx ? anomalyByTxId.get(detailTx.id) ?? null : null}
         open={!!detailTx}
         onOpenChange={(o) => { if (!o) setDetailTx(null); }}
         onDeleted={() => { setDetailTx(null); router.refresh(); }}
+        portfolios={portfolios}
+        onEdit={(tx) => { setDetailTx(null); setEditTx(tx); }}
+        onReassign={(tx) => { setDetailTx(null); setReassignRows([tx]); }}
+        onResolve={(tx, action) => onResolveOne(tx, action)}
+        resolving={resolvingId === detailTx?.id}
+      />
+
+      <EditTransactionSheet
+        tx={editTx}
+        open={!!editTx}
+        onOpenChange={(o) => { if (!o) setEditTx(null); }}
       />
     </div>
   );
