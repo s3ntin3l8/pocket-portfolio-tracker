@@ -2129,10 +2129,6 @@ export function createApiClient(config: ApiClientConfig) {
         portfolioId: string;
         materializedCount: number;
         excludedCashMovements: number;
-        /** Of materializedCount, how many folded detail into an already-existing
-         *  transaction (source-provenance + tax/fee/venue rollup) rather than being
-         *  dropped outright — see ImportTasksProvider's toast wording. */
-        enrichedCount: number;
       }>("POST", `/imports/${importId}/materialize`, {
         portfolioId,
         acknowledgeAccountMismatch,

@@ -442,58 +442,6 @@ describe("TransactionsTable", () => {
     expect(screen.getByRole("button", { name: /amount/i })).toBeInTheDocument();
   });
 
-  it("renders one chip per distinct source when a row has multiple provenance rows", () => {
-    const mergedRow: TxRow = {
-      id: "merged1",
-      portfolioId: "p1",
-      type: "dividend",
-      quantity: "0",
-      price: "0.65",
-      fees: "0",
-      tax: "0.12",
-      fxRate: null,
-      currency: "EUR",
-      executedAt: "2026-03-01T00:00:00.000Z",
-      source: "pdf",
-      instrument: { symbol: "MSFT", name: "Microsoft" },
-      sources: [
-        {
-          id: "src-csv",
-          sourceType: "csv",
-          externalId: null,
-          orderRef: null,
-          documentId: null,
-          taxComponents: null,
-          createdAt: "2026-03-01T00:00:00.000Z",
-          filename: null,
-          hasDocument: false,
-        },
-        {
-          id: "src-pdf",
-          sourceType: "pdf",
-          externalId: null,
-          orderRef: null,
-          documentId: "doc-1",
-          taxComponents: { quellensteuer: "0.12" },
-          createdAt: "2026-03-02T00:00:00.000Z",
-          filename: "settlement.pdf",
-          hasDocument: true,
-        },
-      ],
-    };
-    renderSingleRow(mergedRow);
-    // Desktop table + mobile card both render for the same row (jsdom doesn't apply the
-    // responsive hidden/table-cell CSS), so each chip appears at least once per view.
-    expect(screen.getAllByText(messages.Transactions.sources.csv).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(messages.Transactions.sources.pdf).length).toBeGreaterThan(0);
-  });
-
-  it("falls back to the single legacy source chip when a row has no sources[] breakdown", () => {
-    renderTable();
-    // ROWS[1] has source: "csv" and no `sources` array.
-    expect(screen.getAllByText(messages.Transactions.sources.csv).length).toBeGreaterThan(0);
-  });
-
   it("shows a dash in the price column for qty-less cash rows", () => {
     const cashRow: TxRow = {
       id: "cash1",
