@@ -673,6 +673,43 @@ async def _probe_timeline(tr, limit) -> int:
     return 0
 
 
+# Shared by --probe-events (all three, census) and --probe-feed (one, full raw dump).
+_TIMELINE_FEEDS = (
+    ("timelineTransactions", lambda tr: lambda after=None: tr.timeline_transactions(after)),
+    ("timelineActivityLog", lambda tr: lambda after=None: tr.timeline_activity_log(after)),
+    ("timeline", lambda tr: lambda after=None: tr.timeline(after)),
+)
+
+
+async def _probe_feed(tr, feed_name) -> int:
+    """One-shot diagnostic: dump EVERY raw event on a single named timeline feed, verbatim.
+
+    Unlike --probe-events (one sample per event type, across all feeds combined), this pages
+    one feed to exhaustion and prints every event as-is — for isolating whether a specific
+    feed (timeline / timelineTransactions / timelineActivityLog) is missing, malformed, or
+    slow, without the other two feeds' traffic in the way. Not part of the sync path.
+    """
+    method_by_name = dict(_TIMELINE_FEEDS)
+    if feed_name not in method_by_name:
+        print(
+            f"unknown feed {feed_name!r}; choose one of {', '.join(method_by_name)}",
+            file=sys.stderr,
+        )
+        return 1
+    feed_method = method_by_name[feed_name](tr)
+    events = await _collect_feed(tr, feed_method, feed_name)
+    for event in events.values():
+        sys.stdout.write(json.dumps(event, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+    print(f"{len(events)} events on {feed_name}", file=sys.stderr)
+    try:
+        ws = await tr._get_ws()
+        await ws.close()
+    except Exception:  # noqa: BLE001 - cleanup only
+        pass
+    return 0
+
+
 async def _probe_events(tr) -> int:
     """One-shot diagnostic: census every raw event across ALL of TR's timeline feeds.
 
@@ -684,11 +721,7 @@ async def _probe_events(tr) -> int:
     the id-overlap between feeds — so we can see which types exist, on which feed, and whether
     ids are shared (→ merge-by-id is safe) before changing the collector. Not part of sync.
     """
-    feeds = (
-        ("timelineTransactions", lambda after=None: tr.timeline_transactions(after)),
-        ("timelineActivityLog", lambda after=None: tr.timeline_activity_log(after)),
-        ("timeline", lambda after=None: tr.timeline(after)),
-    )
+    feeds = tuple((name, factory(tr)) for name, factory in _TIMELINE_FEEDS)
     by_feed = {}
     for sub_type, method in feeds:
         try:
@@ -786,6 +819,13 @@ def main() -> int:
         "(timelineTransactions/timelineActivityLog/timeline) with id-overlap, then exit. "
         "Reveals event types on feeds the sync path does not subscribe to.",
     )
+    parser.add_argument(
+        "--probe-feed",
+        choices=[name for name, _ in _TIMELINE_FEEDS],
+        metavar="FEED",
+        help="Diagnostic: dump every raw event on ONE named feed verbatim (NDJSON), then "
+        "exit. Choices: " + ", ".join(name for name, _ in _TIMELINE_FEEDS) + ".",
+    )
     args = parser.parse_args()
 
     phone = os.environ.get("TR_PHONE")
@@ -818,6 +858,8 @@ def main() -> int:
             return asyncio.run(_probe_timeline(tr, args.probe_timeline))
         if args.probe_events:
             return asyncio.run(_probe_events(tr))
+        if args.probe_feed:
+            return asyncio.run(_probe_feed(tr, args.probe_feed))
         return asyncio.run(_run(tr))
     except Exception as exc:  # noqa: BLE001
         print(f"export failed: {exc}", file=sys.stderr)
