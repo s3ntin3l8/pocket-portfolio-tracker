@@ -2129,6 +2129,7 @@ export function createApiClient(config: ApiClientConfig) {
         portfolioId: string;
         materializedCount: number;
         excludedCashMovements: number;
+        enrichedCount: number;
       }>("POST", `/imports/${importId}/materialize`, {
         portfolioId,
         acknowledgeAccountMismatch,
