@@ -38,6 +38,26 @@ const TAXOPT_REFUND =
 const TAXOPT_CHARGE =
   "Trade Republic Bank GmbH Brunnenstraße 19-21 10119 Berlin www.traderepublic.com Sitz der Gesellschaft: Berlin AG Charlottenburg HRB 244347 B Umsatzsteuer-ID DE307510626 Direktoren Andreas Torner Gernot Mittendorfer Christian Hecker Thomas Pischke TRADE REPUBLIC BANK GMBH BRUNNENSTRASSE 19-21 10119 BERLIN SEITE 1 von 1 DATUM 24.04.2025 DEPOT 1234567890 STEUERLICHE OPTIMIERUNG ÜBERSICHT Steuerliche Optimierung am 24.04.2025 ABRECHNUNG POSITION BETRAG Kapitalertragssteuer -1.68 EUR Solidaritätszuschlag -0.09 EUR GESAMT -1.77 EUR BUCHUNG VERRECHNUNGSKONTO DATUM DER ZAHLUNG BETRAG DE00000000000000000000 24.04.2025 -1.77 EUR Diese Abrechnung wird maschinell erstellt und daher nicht unterschrieben. Max Mustermann Musterstr. 1 12345 Musterstadt";
 
+// --- Format-A dividend fixtures (pre-2024Q3: German locale/comma decimal, `Stk.`
+// abbreviation, labeled ISIN) — a second, older TR dividend PDF template that coexists with
+// the (newer, above) Stücke/US-locale one across the account's history. Real sanitised text.
+
+// Real Rio Tinto payment, no UK withholding shown (no Quellensteuer line at all) but German
+// Kapitalertragsteuer/Solidaritätszuschlag charged directly on the EUR gross.
+const DIVIDEND_GBP_FORMAT_A =
+  "TRADE REPUBLIC BANK GMBH BRUNNENSTRASSE 19-21 10119 BERLIN SEITE 1 von 1 DATUM 17.04.2024 DEPOT 1234567890 Max Mustermann Musterstr. 1 12345 Musterstadt Trade Republic Bank GmbH Brunnenstraße 19-21 10119 Berlin www.traderepublic.com service@traderepublic.com Sitz der Gesellschaft: Berlin AG Charlottenburg HRB 244347 B USt-ID DE307510626 Geschäftsführer Andreas Torner Gernot Mittendorfer ABRE / 18.04.2024 / 29730825 / 87fe-5278 DIVIDENDE ABRECHNUNG POSITION BETRAG Zwischensumme 54,03 GBP Zwischensumme 0,855 EUR/GBP 63,19 EUR Kapitalertragsteuer -15,79 EUR Solidaritätszuschlag -0,87 EUR GESAMT 46,53 EUR BUCHUNG VERRECHNUNGSKONTO WERTSTELLUNG BETRAG DE00000000000000000000 18.04.2024 46,53 EUR Rio Tinto PLC Registered Shares LS -,10 in Wertpapierrechnung in Deutschland. Lagerland: Vereinigtes Königreich Diese Abrechnung wird maschinell erstellt und daher nicht unterschrieben. Sofern keine Umsatzsteuer ausgewiesen ist, handelt es sich gem. § 4 Nr. 8 UStG um eine umsatzsteuerfreie Leistung. ÜBERSICHT Dividende mit dem Ex-Tag 07.03.2024. POSITION ANZAHL ERTRAG BETRAG Rio Tinto PLC Registered Shares LS -,10 ISIN: GB0007188757 26,513245 Stk. 2,0377 GBP 54,03 GBP GESAMT 54,03 GBP";
+
+// Real PepsiCo payment, POSITION-table-first-then-ABRECHNUNG (the reverse section order
+// from the fixture above — the parser must not depend on ordering), singular "US-Emittent"
+// issuer label (vs. the newer template's plural "US-Emittenten").
+const DIVIDEND_USD_FORMAT_A =
+  "TRADE REPUBLIC BANK GMBH KÖPENICKER STRASSE 40C 10179 BERLIN Max Mustermann Musterstr. 1 12345 Musterstadt SEITE 1 von 1 DATUM 01.04.2023 DEPOT 1234567890 Trade Republic Bank GmbH Köpenicker Straße 40c 10179 Berlin www.traderepublic.com service@traderepublic.com Sitz der Gesellschaft: Berlin AG Charlottenburg HRB 244347 B USt-ID DE307510626 Geschäftsführer Andreas Torner Gernot Mittendorfer ABRE / 01.04.2023 / 48202683 / b068-08ed DIVIDENDE ÜBERSICHT Dividende mit dem Ex-Tag 02.03.2023. POSITION ANZAHL Ertrag BETRAG PepsiCo Inc. Registered Shares DL -,0166 ISIN: US7134481081 0,479969 Stk. 1,15 USD 0,55 USD GESAMT 0,55 USD ABRECHNUNG POSITION BETRAG Quellensteuer für US-Emittent -0,08 USD Zwischensumme 0,47 USD Zwischensumme 1,08403 EUR/USD 0,44 EUR GESAMT 0,44 EUR BUCHUNG VERRECHNUNGSKONTO WERTSTELLUNG BETRAG DE00000000000000000000 31.03.2023 0,44 EUR PepsiCo Inc. Registered Shares DL -,0166 in Girosammelverwahrung in Deutschland. Diese Abrechnung wird maschinell erstellt und daher nicht unterschrieben. Sofern keine Umsatzsteuer ausgewiesen ist, handelt es sich gem. § 4 Nr. 8 UStG um eine umsatzsteuerfreie Leistung.";
+
+// Real iShares fund-distribution payment — carries no "DIVIDENDE" keyword at all
+// (AUSSCHÜTTUNG instead) and no tax lines whatsoever (fully tax-free distribution).
+const AUSSCHUETTUNG_FORMAT_A =
+  "TRADE REPUBLIC BANK GMBH KÖPENICKER STRASSE 40C 10179 BERLIN SEITE 1 von 1 DATUM 27.09.2023 DEPOT 1234567890 Max Mustermann Musterstr. 1 12345 Musterstadt Trade Republic Bank GmbH Köpenicker Straße 40c 10179 Berlin www.traderepublic.com service@traderepublic.com Sitz der Gesellschaft: Berlin AG Charlottenburg HRB 244347 B USt-ID DE307510626 Geschäftsführer Andreas Torner Gernot Mittendorfer ABRE / 28.09.2023 / 83161424 / 4102-32c8 AUSSCHÜTTUNG ABRECHNUNG POSITION BETRAG Zwischensumme 0,88 USD Zwischensumme 1,0587 EUR/USD 0,83 EUR GESAMT 0,83 EUR BUCHUNG VERRECHNUNGSKONTO WERTSTELLUNG BETRAG DE00000000000000000000 27.09.2023 0,83 EUR iShs Core S&P 500 UC.ETF USDD Registered Shares USD (Dist)oN in Wertpapierrechnung in Deutschland. Lagerland: Vereinigtes Königreich Diese Abrechnung wird maschinell erstellt und daher nicht unterschrieben. Sofern keine Umsatzsteuer ausgewiesen ist, handelt es sich gem. § 4 Nr. 8 UStG um eine umsatzsteuerfreie Leistung. ÜBERSICHT Ausschüttung mit dem Ex-Tag 14.09.2023. POSITION ANZAHL ERTRAG BETRAG iShs Core S&P 500 UC.ETF USDD Registered Shares USD (Dist)oN ISIN: IE0031442068 5,98573 Stk. 0,1462 USD 0,88 USD GESAMT 0,88 USD";
+
 // A cash-transfer confirmation (ÜBERWEISUNGSBESTÄTIGUNG) — amount only, no securities or
 // tax. Must NOT be detected as a settlement (it's mapped to deposit/withdrawal already).
 const TRANSFER_REJECT =
@@ -52,6 +72,12 @@ describe("detectTrPdf", () => {
     expect(detectTrPdf(DIVIDEND_USD)).toBe(true);
     expect(detectTrPdf(INTEREST)).toBe(true);
     expect(detectTrPdf(TAXOPT_REFUND)).toBe(true);
+  });
+
+  it("accepts Format-A (pre-2024Q3, German-locale/Stk.) dividends, incl. AUSSCHÜTTUNG", () => {
+    expect(detectTrPdf(DIVIDEND_GBP_FORMAT_A)).toBe(true);
+    expect(detectTrPdf(DIVIDEND_USD_FORMAT_A)).toBe(true);
+    expect(detectTrPdf(AUSSCHUETTUNG_FORMAT_A)).toBe(true);
   });
 
   it("rejects a cash-transfer confirmation (no securities/tax to mine)", () => {
@@ -171,6 +197,72 @@ describe("parseTrPdf — dividend", () => {
     expect(d.taxComponents?.solidaritaetszuschlag).toBe("0.04");
     expect(d.taxComponents?.kapitalertragsteuer).toBe("0.78");
     expect(d.tax).toBe("2.01"); // quellensteuer(≈1.19) + kapst(0.78) + soli(0.04)
+  });
+
+  it("parses a Format-A (German-locale/Stk.) GBP dividend with no source-country withholding", () => {
+    const { drafts, errors } = parseTrPdf(DIVIDEND_GBP_FORMAT_A);
+    expect(errors).toEqual([]);
+    expect(drafts).toHaveLength(1);
+    const d = drafts[0];
+    expect(d.action).toBe("dividend");
+    expect(d.isin).toBe("GB0007188757");
+    expect(d.name).toBe("Rio Tinto PLC Registered Shares LS -,10");
+    // BUCHUNG amount is German-locale ("46,53 EUR") — must NOT go through the US-locale
+    // parser (which would strip the comma and yield "4653").
+    expect(d.price).toBe("46.53");
+    expect(d.shares).toBe("26.513245");
+    expect(d.perShare).toBe("2.0377");
+    expect(d.nativeCurrency).toBe("GBP");
+    expect(d.grossNative).toBe("54.03");
+    // No "Quellensteuer" line in this document (UK dividends carry no source withholding) —
+    // only German Kapitalertragsteuer/Solidaritätszuschlag on the EUR gross.
+    expect(d.taxComponents?.quellensteuer).toBeUndefined();
+    expect(d.taxComponents?.kapitalertragsteuer).toBe("15.79");
+    expect(d.taxComponents?.solidaritaetszuschlag).toBe("0.87");
+    expect(d.tax).toBe("16.66");
+    // total (63.19) reconciles exactly against the printed EUR Zwischensumme — net (46.53) +
+    // tax (16.66).
+    expect(d.total).toBe("63.19");
+    expect(d.fxRate).toBe("1.169535"); // 63.19 EUR ÷ 54.03 GBP
+  });
+
+  it("parses a Format-A USD dividend, POSITION-table-first, singular Quellensteuer label", () => {
+    const { drafts, errors } = parseTrPdf(DIVIDEND_USD_FORMAT_A);
+    expect(errors).toEqual([]);
+    expect(drafts).toHaveLength(1);
+    const d = drafts[0];
+    expect(d.action).toBe("dividend");
+    expect(d.isin).toBe("US7134481081");
+    // ISIN is labeled ("ISIN: <code>") in this era — the name must not swallow "ISIN:".
+    expect(d.name).toBe("PepsiCo Inc. Registered Shares DL -,0166");
+    expect(d.price).toBe("0.44");
+    expect(d.shares).toBe("0.479969");
+    expect(d.perShare).toBe("1.15");
+    expect(d.nativeCurrency).toBe("USD");
+    expect(d.grossNative).toBe("0.55");
+    // "Quellensteuer für US-Emittent" (singular) — the newer template says "US-Emittenten".
+    expect(d.taxComponents?.quellensteuer).toBe("0.07");
+    expect(d.tax).toBe("0.07");
+    expect(d.total).toBe("0.51");
+  });
+
+  it("parses an AUSSCHÜTTUNG (fund distribution, no DIVIDENDE keyword) as tax-free income", () => {
+    expect(detectTrPdf(AUSSCHUETTUNG_FORMAT_A)).toBe(true);
+    const { drafts, errors } = parseTrPdf(AUSSCHUETTUNG_FORMAT_A);
+    expect(errors).toEqual([]);
+    expect(drafts).toHaveLength(1);
+    const d = drafts[0];
+    expect(d.action).toBe("dividend");
+    expect(d.isin).toBe("IE0031442068");
+    expect(d.name).toBe("iShs Core S&P 500 UC.ETF USDD Registered Shares USD (Dist)oN");
+    expect(d.price).toBe("0.83");
+    expect(d.shares).toBe("5.98573");
+    expect(d.perShare).toBe("0.1462");
+    expect(d.nativeCurrency).toBe("USD");
+    expect(d.grossNative).toBe("0.88");
+    expect(d.tax ?? null).toBeNull();
+    expect(d.taxComponents ?? null).toBeNull();
+    expect(d.total).toBe("0.83");
   });
 });
 
