@@ -268,6 +268,7 @@ const TX_COLS: ColDef<TxRow>[] = [
   { key: "portfolio", get: (r) => r.portfolioName ?? "", type: "text" },
   { key: "quantity", get: (r) => r.quantity, type: "numeric" },
   { key: "price", get: (r) => Number(r.price), type: "numeric" },
+  { key: "tax", get: (r) => (r.tax != null ? Number(r.tax) : 0), type: "numeric" },
   { key: "netAmount", get: (r) => txNetAmount(r), type: "numeric" },
   { key: "source", get: (r) => r.source, type: "text" },
 ];
@@ -681,7 +682,7 @@ export function TransactionsTable({
   }
 
   // checkbox + date + transaction + [portfolio] + quantity + price + source + amount.
-  const colSpan = showPortfolio ? 8 : 7;
+  const colSpan = showPortfolio ? 9 : 8;
 
   const sortedRows = sort(visibleRows);
   // Cap how many of the (filtered+sorted) rows actually render — see PAGE_SIZE/visibleCount
@@ -1073,6 +1074,7 @@ export function TransactionsTable({
               {showPortfolio && <SortableTableHead colKey="portfolio" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>{t("portfolio")}</SortableTableHead>}
               <SortableTableHead colKey="quantity" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} align="right">{t("quantity")}</SortableTableHead>
               <SortableTableHead colKey="price" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} align="right">{t("price")}</SortableTableHead>
+              <SortableTableHead colKey="tax" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} align="right" className="hidden lg:table-cell">{t("tax")}</SortableTableHead>
               <SortableTableHead colKey="source" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell">{t("source")}</SortableTableHead>
               <SortableTableHead colKey="netAmount" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} align="right">{t("amount")}</SortableTableHead>
             </TableRow>
@@ -1186,6 +1188,9 @@ export function TransactionsTable({
                   <TableCell className="tabular text-right text-[13px] font-semibold text-text-2">{Number(tx.quantity) || "—"}</TableCell>
                   <TableCell className="tabular text-right text-[13px] font-semibold">
                     {Number(tx.quantity) > 0 ? m(Number(tx.price), tx.currency) : "—"}
+                  </TableCell>
+                  <TableCell className="tabular hidden text-right text-[13px] font-semibold text-text-2 lg:table-cell">
+                    {tx.tax != null && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <div className="flex flex-wrap items-center gap-1">
