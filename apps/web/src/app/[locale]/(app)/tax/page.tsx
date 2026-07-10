@@ -264,12 +264,11 @@ function TaxHolderSectionDe({
   // Taxable gains after allowance, and the estimated tax owed on them at the holder's
   // real capital-gains rate (`u.taxRate` — already `holder.capitalGainsTaxRate ?? 0.25`
   // from the backend, never hardcoded here). Shared by the hero card and the
-  // "Taxable gains YTD" allowance box so both agree.
+  // "Taxable gains YTD" allowance box so both agree. Backend-computed (u.taxableExcess) —
+  // NOT re-derived from realizedGainsAdjusted/incomeYtd/usedYtd, which lost their simple
+  // additive relationship once the two-pot loss netting (Workstream 3) landed.
   const taxRate = Number(u.taxRate);
-  const taxable = Math.max(
-    0,
-    Number(u.realizedGainsAdjusted) + Number(u.incomeYtd) - Number(u.usedYtd),
-  );
+  const taxable = Number(u.taxableExcess);
   const estimatedTax = taxable * taxRate;
   const ratePct = (taxRate * 100).toLocaleString(locale, { maximumFractionDigits: 3 });
 

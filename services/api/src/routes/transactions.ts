@@ -9,6 +9,7 @@ import {
   dividendEvents,
   documents,
   instruments,
+  lossCarryforward,
   portfolioIntradaySnapshots,
   portfolios,
   portfolioSnapshots,
@@ -2548,6 +2549,27 @@ export async function transactionsRoute(app: FastifyInstance) {
   }
 
   /**
+   * Fetch a holder's seeded loss carry-forward for one tax year, shaped for
+   * `allowanceUsageYTD`'s `lossCarryForward` input. Empty object when nothing was seeded
+   * (the default — moot until a real loss is ever certified for this holder).
+   */
+  async function lossCarryForwardFor(
+    holderId: string,
+    taxYear: number,
+  ): Promise<{ stock?: string; general?: string }> {
+    const rows = await app.db
+      .select({ pot: lossCarryforward.pot, amount: lossCarryforward.amount })
+      .from(lossCarryforward)
+      .where(and(eq(lossCarryforward.holderId, holderId), eq(lossCarryforward.taxYear, taxYear)));
+    const result: { stock?: string; general?: string } = {};
+    for (const r of rows) {
+      if (r.pot === "stock") result.stock = r.amount;
+      else if (r.pot === "general") result.general = r.amount;
+    }
+    return result;
+  }
+
+  /**
    * Compute the gross rest-of-year (today → Dec 31) dividend + coupon income forecast for
    * one portfolio, in `display` currency.  Used by the tax endpoints to feed
    * `forecastIncomeRestOfYear` into `allowanceUsageYTD`.
@@ -2746,6 +2768,9 @@ export async function transactionsRoute(app: FastifyInstance) {
         return reply.code(422).send({ error: "tax_allowance_not_configured" });
       }
 
+      const now = new Date();
+      const year = request.query.year ? parseInt(request.query.year, 10) : now.getUTCFullYear();
+
       // Fetch holder (if any) for personal tax rate + cap + distribution context.
       const holderId = portfolio.accountHolderId;
       let holderProfile: {
@@ -2753,6 +2778,14 @@ export async function transactionsRoute(app: FastifyInstance) {
         capitalGainsTaxRate: string | null;
       } | null = null;
       let totalAllocatedForHolder = Number(portfolio.taxAllowanceAnnual);
+      // Loss carry-forward is a per-PERSON figure (German tax is assessed across all of a
+      // holder's depots), so it's only correct to apply it here when this portfolio IS the
+      // holder's only depot — otherwise a multi-depot holder's whole carry-forward would be
+      // misattributed to whichever single depot happens to be viewed. Multi-depot holders
+      // get the authoritative combined answer from GET /networth/tax instead; this route
+      // omits carry-forward with a disclaimer rather than guessing an allocation.
+      let lossCarryForwardInput: { stock?: string; general?: string } | undefined;
+      let carryForwardApplied = false;
 
       if (holderId) {
         const [holder] = await app.db
@@ -2765,7 +2798,8 @@ export async function transactionsRoute(app: FastifyInstance) {
           .limit(1);
         if (holder) holderProfile = holder;
 
-        // Sum FSA allocations across all portfolios for this holder (for the distribution helper).
+        // Sum FSA allocations across all portfolios for this holder (for the distribution
+        // helper); its row count also tells us how many depots this holder has.
         const siblingRows = await app.db
           .select({ taxAllowanceAnnual: portfolios.taxAllowanceAnnual })
           .from(portfolios)
@@ -2774,14 +2808,17 @@ export async function transactionsRoute(app: FastifyInstance) {
           (sum, p) => sum + Number(p.taxAllowanceAnnual ?? 0),
           0,
         );
+
+        if (siblingRows.length <= 1) {
+          lossCarryForwardInput = await lossCarryForwardFor(holderId, year);
+          carryForwardApplied = true;
+        }
       }
 
       const holderAllowanceCap = Number(holderProfile?.taxAllowanceAnnual ?? 1000);
       const remainingToDistribute = Math.max(0, holderAllowanceCap - totalAllocatedForHolder);
       const overAllocated = totalAllocatedForHolder > holderAllowanceCap;
 
-      const now = new Date();
-      const year = request.query.year ? parseInt(request.query.year, 10) : now.getUTCFullYear();
       const { coreTxns, prices, metaById, summary } = await loadValuation(
         portfolioId,
         portfolio.baseCurrency,
@@ -2790,6 +2827,9 @@ export async function transactionsRoute(app: FastifyInstance) {
       );
       const tradeLog = await buildTradeLog(coreTxns, prices, portfolio.baseCurrency, "fifo", undefined, metaById);
       const tfRates = await tfRatesFor(tradeLog.trades.map((t) => t.instrumentId));
+      const assetClasses = Object.fromEntries(
+        [...metaById.entries()].map(([iid, m]) => [iid, m.assetClass]),
+      );
       const allowanceAnnual = portfolio.taxAllowanceAnnual;
       const taxRate = holderProfile?.capitalGainsTaxRate ?? "0.25";
 
@@ -2801,7 +2841,16 @@ export async function transactionsRoute(app: FastifyInstance) {
         now,
       );
 
-      const usage = allowanceUsageYTD({ tradeLog, tfRates, allowanceAnnual, taxRate, year, forecastIncomeRestOfYear });
+      const usage = allowanceUsageYTD({
+        tradeLog,
+        tfRates,
+        allowanceAnnual,
+        taxRate,
+        year,
+        forecastIncomeRestOfYear,
+        assetClasses,
+        lossCarryForward: lossCarryForwardInput,
+      });
       const suggestions = harvestSuggestions({ tradeLog, tfRates, allowanceAnnual, taxRate, year, usage });
 
       return {
@@ -2812,6 +2861,10 @@ export async function transactionsRoute(app: FastifyInstance) {
           ...s,
           instrument: metaById.get(s.instrumentId) ?? null,
         })),
+        // Whether this response applied the holder's seeded loss carry-forward — false
+        // for a multi-depot holder (see the comment above); the frontend should show a
+        // disclaimer pointing to the holder-aggregated /networth/tax view in that case.
+        carryForwardApplied,
         // Holder distribution context — used by the edit-portfolio modal helper.
         holderDistribution: {
           holderAllowanceCap: holderAllowanceCap.toFixed(2),
@@ -2893,8 +2946,15 @@ export async function transactionsRoute(app: FastifyInstance) {
         const mergedLog = mergeTradeLogs(logs, display, "fifo");
 
         const tfRates = await tfRatesFor(mergedLog.trades.map((t) => t.instrumentId));
+        const assetClasses = Object.fromEntries(
+          [...meta.entries()].map(([iid, m]) => [iid, m.assetClass]),
+        );
         const taxRate = holder.capitalGainsTaxRate ?? "0.25";
         const forecastIncomeRestOfYear = totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
+        // Holder-aggregated across ALL of this person's depots — the authoritative scope
+        // for a per-person loss carry-forward (see the single-depot route's comment for
+        // why it can't safely apply this itself when a holder has more than one depot).
+        const lossCarryForward = await lossCarryForwardFor(holder.id, year);
 
         // Distribution context: how much of the per-person cap has been allocated.
         const holderAllowanceCap = Number(holder.taxAllowanceAnnual ?? 1000);
@@ -2907,7 +2967,16 @@ export async function transactionsRoute(app: FastifyInstance) {
         // suggestion headroom is correctly the full cap, not the allocated portion.
         const allowanceAnnual = holderAllowanceCap.toFixed(2);
 
-        const usage = allowanceUsageYTD({ tradeLog: mergedLog, tfRates, allowanceAnnual, taxRate, year, forecastIncomeRestOfYear });
+        const usage = allowanceUsageYTD({
+          tradeLog: mergedLog,
+          tfRates,
+          allowanceAnnual,
+          taxRate,
+          year,
+          forecastIncomeRestOfYear,
+          assetClasses,
+          lossCarryForward,
+        });
         const suggestions = harvestSuggestions({ tradeLog: mergedLog, tfRates, allowanceAnnual, taxRate, year, usage });
 
         result.push({
@@ -2926,6 +2995,10 @@ export async function transactionsRoute(app: FastifyInstance) {
             ...s,
             instrument: meta.get(s.instrumentId) ?? null,
           })),
+          // Always true here — this route aggregates every depot for the holder, the
+          // correct scope for a per-person carry-forward (see /portfolios/:id/tax's
+          // conditional version of this same flag).
+          carryForwardApplied: true,
           // Distribution summary across this holder's depots.
           distribution: {
             holderAllowanceCap: holderAllowanceCap.toFixed(2),

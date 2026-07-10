@@ -141,6 +141,11 @@ export const dividendStatusEnum = pgEnum("dividend_status", [
   "paid",      // cash has settled; amount is final
 ]);
 
+// Verlustverrechnungstopf (loss pot): "stock" = Aktienverlusttopf (share-sale losses,
+// offset only stock-sale gains), "general" = Allgemeiner Verlusttopf (fund/bond/derivative
+// gains/losses, dividend/interest/coupon income, Vorabpauschale). See packages/core/src/tax.ts.
+export const lossPotEnum = pgEnum("loss_pot", ["stock", "general"]);
+
 // --- Tables --------------------------------------------------------------
 
 // Users are keyed to the Authentik OIDC subject; the API never stores passwords.
@@ -1022,6 +1027,34 @@ export const allocationTargets = pgTable(
       t.targetKey,
     ),
     index("allocation_targets_user_idx").on(t.userId),
+  ],
+).enableRLS();
+
+// Per-holder, per-year, per-pot Verlustverrechnungstopf carry-forward — a settled €-figure
+// from the holder's prior-year tax certificate, seeded via PUT /account-holders/:id/
+// loss-carryforward. German tax is assessed PER PERSON across all of their depots, so
+// this is keyed by holderId (not portfolioId) — see packages/core/src/tax.ts's two-pot
+// netting, which subtracts these amounts (raw, not re-tf-adjusted) from that pot's net
+// gain/loss before its floor. `source` distinguishes a figure lifted directly off a TR
+// tax report from a manually-entered one (both are user-provided; TR reports no API for
+// this, per tr_cash.md's "the German tax report's known simplifications" note).
+export const lossCarryforward = pgTable(
+  "loss_carryforward",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    holderId: uuid("holder_id")
+      .notNull()
+      .references(() => accountHolders.id, { onDelete: "cascade" }),
+    taxYear: integer("tax_year").notNull(),
+    pot: lossPotEnum("pot").notNull(),
+    amount: numeric("amount").notNull(),
+    source: text("source").notNull().default("manual"), // 'tr_report' | 'manual'
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("loss_carryforward_holder_year_pot_idx").on(t.holderId, t.taxYear, t.pot),
+    index("loss_carryforward_holder_idx").on(t.holderId),
   ],
 ).enableRLS();
 
