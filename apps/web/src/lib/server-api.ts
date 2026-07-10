@@ -934,7 +934,10 @@ export async function loadNetworthTax(
         incomeYtd: "0",
         vorabpauschaleAccrued: "0",
         vorabpauschaleCredited: "0",
+        stockPot: { netGainLoss: "0", carryForwardApplied: "0", used: "0" },
+        generalPot: { netGainLoss: "0", carryForwardApplied: "0", used: "0" },
         usedYtd: "0",
+        taxableExcess: "0",
         remaining: "0",
         taxRate: "0",
         taxSavingAvailable: "0",
@@ -966,6 +969,7 @@ export async function loadNetworthTax(
             currency: zeroAllowance.currency,
             allowanceUsage: zeroAllowance,
             harvestSuggestions: [],
+            carryForwardApplied: false,
             distribution: zeroDistribution,
           },
         ];
@@ -994,6 +998,7 @@ export async function loadNetworthTax(
           currency: zeroAllowance.currency,
           allowanceUsage: zeroAllowance,
           harvestSuggestions: [],
+          carryForwardApplied: false,
           distribution: zeroDistribution,
         },
       ];
@@ -1025,6 +1030,7 @@ export async function loadNetworthTax(
         currency: result.currency,
         allowanceUsage: result.allowanceUsage,
         harvestSuggestions: result.harvestSuggestions,
+        carryForwardApplied: result.carryForwardApplied,
         distribution: result.holderDistribution,
       };
       return [holderEntry];
@@ -1308,11 +1314,9 @@ export async function loadTaxYearDetail(
         const byYear: TaxYearRow[] = [...years].sort((a, b) => b - a).map((y) => {
           if (y === entry.year) {
             // Ties out to the hero card / allowanceUsage figures already on screen.
+            // Backend-computed (u.taxableExcess) — see tax/page.tsx's identical comment.
             const u = entry.allowanceUsage;
-            const taxable = Math.max(
-              0,
-              Number(u.realizedGainsAdjusted) + Number(u.incomeYtd) - Number(u.usedYtd),
-            );
+            const taxable = Number(u.taxableExcess);
             return {
               year: y,
               realized: u.realizedGainsAdjusted,

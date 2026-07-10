@@ -170,4 +170,162 @@ describe("account holders", () => {
       birthYear: null,
     });
   });
+
+  describe("loss carry-forward", () => {
+    async function makeHolder(t: string, name = "LCF Holder") {
+      const created = await app.inject({
+        method: "POST",
+        url: "/account-holders",
+        headers: auth(t),
+        payload: { name, type: "self" },
+      });
+      return created.json().id as string;
+    }
+
+    it("requires a taxYear on GET", async () => {
+      const t = await token("lcf-noyear");
+      const holderId = await makeHolder(t);
+      const res = await app.inject({
+        method: "GET",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("returns an empty entry set before anything is seeded", async () => {
+      const t = await token("lcf-empty");
+      const holderId = await makeHolder(t);
+      const res = await app.inject({
+        method: "GET",
+        url: `/account-holders/${holderId}/loss-carryforward?taxYear=2025`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ taxYear: 2025, entries: [] });
+    });
+
+    it("seeds both pots atomically via PUT, and GET reflects them", async () => {
+      const t = await token("lcf-seed");
+      const holderId = await makeHolder(t);
+      const put = await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: {
+          taxYear: 2025,
+          entries: [
+            { pot: "stock", amount: "500" },
+            { pot: "general", amount: "120.50" },
+          ],
+        },
+      });
+      expect(put.statusCode).toBe(200);
+      const entries = put.json().entries.sort((a: { pot: string }, b: { pot: string }) =>
+        a.pot.localeCompare(b.pot),
+      );
+      expect(entries).toEqual([
+        { pot: "general", amount: "120.50" },
+        { pot: "stock", amount: "500" },
+      ]);
+
+      const get = await app.inject({
+        method: "GET",
+        url: `/account-holders/${holderId}/loss-carryforward?taxYear=2025`,
+        headers: auth(t),
+      });
+      expect(get.json().entries).toHaveLength(2);
+    });
+
+    it("PUT replaces the whole set for that year (delete-then-insert, not merge)", async () => {
+      const t = await token("lcf-replace");
+      const holderId = await makeHolder(t);
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [{ pot: "stock", amount: "500" }] },
+      });
+      const second = await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [{ pot: "general", amount: "80" }] },
+      });
+      expect(second.json().entries).toEqual([{ pot: "general", amount: "80" }]);
+    });
+
+    it("keeps different tax years independent", async () => {
+      const t = await token("lcf-years");
+      const holderId = await makeHolder(t);
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2024, entries: [{ pot: "stock", amount: "100" }] },
+      });
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [{ pot: "stock", amount: "999" }] },
+      });
+      const y2024 = await app.inject({
+        method: "GET",
+        url: `/account-holders/${holderId}/loss-carryforward?taxYear=2024`,
+        headers: auth(t),
+      });
+      expect(y2024.json().entries).toEqual([{ pot: "stock", amount: "100" }]);
+    });
+
+    it("rejects a duplicate pot in the same PUT payload", async () => {
+      const t = await token("lcf-dup");
+      const holderId = await makeHolder(t);
+      const res = await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: {
+          taxYear: 2025,
+          entries: [
+            { pot: "stock", amount: "100" },
+            { pot: "stock", amount: "200" },
+          ],
+        },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("404s for a holder that doesn't belong to the requesting user", async () => {
+      const owner = await token("lcf-owner");
+      const intruder = await token("lcf-intruder");
+      const holderId = await makeHolder(owner);
+
+      const get = await app.inject({
+        method: "GET",
+        url: `/account-holders/${holderId}/loss-carryforward?taxYear=2025`,
+        headers: auth(intruder),
+      });
+      expect(get.statusCode).toBe(404);
+
+      const put = await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(intruder),
+        payload: { taxYear: 2025, entries: [{ pot: "stock", amount: "100" }] },
+      });
+      expect(put.statusCode).toBe(404);
+    });
+
+    it("404s for a nonexistent holder", async () => {
+      const t = await token("lcf-missing");
+      const res = await app.inject({
+        method: "PUT",
+        url: "/account-holders/00000000-0000-0000-0000-000000000000/loss-carryforward",
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [] },
+      });
+      expect(res.statusCode).toBe(404);
+    });
+  });
 });

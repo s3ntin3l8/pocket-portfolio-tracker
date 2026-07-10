@@ -147,6 +147,112 @@ describe("tax routes", () => {
       expect(body.harvestSuggestions).toEqual([]);
     });
 
+    it("applies loss carry-forward when the holder has exactly one depot", async () => {
+      const t = await token("tax-lcf-single");
+      const holderId = await createHolder(t, {
+        name: "Single Depot Holder",
+        taxAllowanceAnnual: "1000",
+      });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
+
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [{ pot: "general", amount: "300" }] },
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/tax?year=2025`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.carryForwardApplied).toBe(true);
+      expect(body.allowanceUsage.generalPot.carryForwardApplied).toBe("300.00");
+    });
+
+    it("omits loss carry-forward when the holder has more than one depot", async () => {
+      const t = await token("tax-lcf-multi");
+      const holderId = await createHolder(t, {
+        name: "Multi Depot Holder",
+        taxAllowanceAnnual: "1000",
+      });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "500" });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "500" });
+
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [{ pot: "general", amount: "300" }] },
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/tax?year=2025`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      // Not applied here — even though a carry-forward WAS seeded, this route can't
+      // correctly attribute it to just one of the holder's two depots. It's omitted
+      // (0.00) with a disclaimer, not silently applied to whichever depot is loaded.
+      expect(body.carryForwardApplied).toBe(false);
+      expect(body.allowanceUsage.generalPot.carryForwardApplied).toBe("0.00");
+    });
+
+    it("always applies loss carry-forward on the holder-aggregated /networth/tax view", async () => {
+      const t = await token("tax-lcf-networth");
+      const holderId = await createHolder(t, {
+        name: "Networth LCF Holder",
+        taxAllowanceAnnual: "1000",
+      });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "500" });
+      await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "500" });
+
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: 2025, entries: [{ pot: "general", amount: "300" }] },
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/networth/tax?year=2025",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const [entry] = res.json() as Array<{
+        carryForwardApplied: boolean;
+        allowanceUsage: { generalPot: { carryForwardApplied: string } };
+      }>;
+      expect(entry.carryForwardApplied).toBe(true);
+      expect(entry.allowanceUsage.generalPot.carryForwardApplied).toBe("300.00");
+    });
+
+    it("omits loss carry-forward (default {0,0}) when nothing was seeded — no behavior change", async () => {
+      const t = await token("tax-lcf-none");
+      const holderId = await createHolder(t, {
+        name: "No LCF Holder",
+        taxAllowanceAnnual: "1000",
+      });
+      const portfolioId = await createPortfolio(t, { accountHolderId: holderId, taxAllowanceAnnual: "1000" });
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/tax?year=2025`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.carryForwardApplied).toBe(true); // single depot — lookup runs, finds nothing
+      expect(body.allowanceUsage.generalPot.carryForwardApplied).toBe("0.00");
+      expect(body.allowanceUsage.usedYtd).toBe("0.00");
+    });
+
     it("uses the current year when year param is omitted", async () => {
       const t = await token("tax-user-5");
       const holderId = await createHolder(t, {

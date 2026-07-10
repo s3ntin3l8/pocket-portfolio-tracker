@@ -250,21 +250,45 @@ export interface AccountHolderInput {
 
 // --- Tax optimization types -----------------------------------------------
 
+/** One Verlusttopf's (loss pot's) netting result — see `AllowanceUsage.stockPot`/`generalPot`. */
+export interface PotUsage {
+  /** Tf-adjusted net gain/loss for this pot this year (decimal string, CAN be negative). */
+  netGainLoss: string;
+  /** Prior-year loss carry-forward subtracted from netGainLoss (decimal string, never negative). */
+  carryForwardApplied: string;
+  /** max(0, netGainLoss − carryForwardApplied) — this pot's own contribution to usedYtd. */
+  used: string;
+}
+
 /** YTD usage of the annual Sparerpauschbetrag (§20 EStG). */
 export interface AllowanceUsage {
   year: number;
   /** Annual allowance configured for this holder (decimal string). */
   allowanceAnnual: string;
-  /** Tf-adjusted FIFO realized gains this year (decimal string). */
+  /**
+   * Tf-adjusted realized gains/losses this year, summed across both pots (decimal string).
+   * Symmetric — CAN be negative (a net loss year).
+   */
   realizedGainsAdjusted: string;
-  /** Dividend/interest/coupon income this year (decimal string). */
+  /** Dividend/interest/coupon income this year (decimal string, never negative). */
   incomeYtd: string;
   /** Tf-adjusted Vorabpauschale accrued this year (§18(3) InvStG), decimal string, never negative. */
   vorabpauschaleAccrued: string;
   /** Tf-adjusted Vorabpauschale disposal credit realized this year, decimal string, never negative. */
   vorabpauschaleCredited: string;
-  /** Total used (clamped to allowance), decimal string. */
+  /** Aktienverlusttopf — realized stock (assetClass="equity") gains/losses only. */
+  stockPot: PotUsage;
+  /** Allgemeiner Verlusttopf — fund/bond/derivative gains/losses, dividend/interest/coupon
+   *  income, and the Vorabpauschale net. Gold/crypto are excluded from both pots. */
+  generalPot: PotUsage;
+  /** Total used = stockPot.used + generalPot.used, clamped to [0, allowanceAnnual]. */
   usedYtd: string;
+  /**
+   * max(0, (stockPot.used + generalPot.used) − allowanceAnnual) — the portion of this
+   * year's gains/income that's actually taxable. Use this instead of re-deriving from
+   * realizedGainsAdjusted/incomeYtd/usedYtd (no longer simply additive post-two-pot).
+   */
+  taxableExcess: string;
   /** Remaining allowance (never negative), decimal string. */
   remaining: string;
   /** Effective KapSt rate (decimal string, e.g. "0.25"). */
@@ -324,6 +348,12 @@ export interface PortfolioTaxSummary {
   currency: string;
   allowanceUsage: AllowanceUsage;
   harvestSuggestions: HarvestSuggestion[];
+  /**
+   * Whether this response applied the holder's seeded loss carry-forward. False for a
+   * multi-depot holder — a per-person carry-forward can't be correctly attributed to just
+   * one of several depots; see GET /networth/tax for the authoritative combined figure.
+   */
+  carryForwardApplied: boolean;
   /** Distribution context for the holder's full FSA allocation (used by the edit-portfolio modal). */
   holderDistribution: TaxDistribution;
 }
@@ -343,6 +373,8 @@ export interface TaxSummaryHolder {
   currency: string;
   allowanceUsage: AllowanceUsage;
   harvestSuggestions: HarvestSuggestion[];
+  /** Always true here — this route aggregates every depot for the holder. */
+  carryForwardApplied: boolean;
   /** Distribution summary across this holder's depots. */
   distribution: TaxDistribution;
 }

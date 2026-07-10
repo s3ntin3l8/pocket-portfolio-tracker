@@ -646,6 +646,7 @@ describe("loadTaxYearDetail", () => {
     realizedGainsAdjusted: "0",
     incomeYtd: "0",
     usedYtd: "0",
+    taxableExcess: "0",
     remaining: "1000",
     taxRate: "0.25",
     taxSavingAvailable: "250",

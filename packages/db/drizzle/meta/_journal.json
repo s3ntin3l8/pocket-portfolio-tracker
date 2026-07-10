@@ -442,6 +442,13 @@
       "when": 1783702050856,
       "tag": "0062_secret_living_lightning",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1783704829207,
+      "tag": "0063_sour_mysterio",
+      "breakpoints": true
     }
   ]
 }

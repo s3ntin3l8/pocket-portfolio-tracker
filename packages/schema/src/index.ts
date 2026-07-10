@@ -569,6 +569,30 @@ export const allocationTargetSetSchema = z
   );
 export type AllocationTargetSet = z.infer<typeof allocationTargetSetSchema>;
 
+// --- Loss carry-forward (Verlustverrechnungstopf) -------------------------
+
+/** One pot's carried-forward loss for a given tax year. */
+export const lossCarryforwardEntrySchema = z.object({
+  pot: z.enum(["stock", "general"]),
+  amount: decimalString,
+});
+export type LossCarryforwardEntry = z.infer<typeof lossCarryforwardEntrySchema>;
+
+/**
+ * Body schema for `PUT /account-holders/:holderId/loss-carryforward`. Replaces the
+ * entire (holderId, taxYear) set atomically — at most one entry per pot.
+ */
+export const lossCarryforwardSetSchema = z
+  .object({
+    taxYear: z.number().int().min(2000).max(2100),
+    entries: z.array(lossCarryforwardEntrySchema).max(2),
+  })
+  .refine(
+    (d) => new Set(d.entries.map((e) => e.pot)).size === d.entries.length,
+    { message: "At most one entry per pot" },
+  );
+export type LossCarryforwardSet = z.infer<typeof lossCarryforwardSetSchema>;
+
 // --- Global search -------------------------------------------------------
 
 /**

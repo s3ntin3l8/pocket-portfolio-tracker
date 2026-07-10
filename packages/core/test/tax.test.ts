@@ -254,8 +254,11 @@ describe("allowanceUsageYTD", () => {
     expect(result.remaining).toBe("0.00");
   });
 
-  it("does not let negative realized gains reduce remaining below allowance", () => {
-    // A loss year: FIFO legs with negative gain.
+  it("nets a lone loss to zero pot usage (nothing to offset), but reports it symmetrically in realizedGainsAdjusted", () => {
+    // A loss year: FIFO legs with negative gain. Pre-two-pot-redesign this asset class
+    // had no realizedGainsAdjusted symmetry (losses were silently dropped); now the loss
+    // IS counted, it just has no gain in its own pot to offset, so usage floors at 0 —
+    // the general pot's own floor, not a special-case loss exclusion.
     const log = makeTradeLog({
       trades: [
         {
@@ -300,8 +303,11 @@ describe("allowanceUsageYTD", () => {
       year: 2025,
     });
 
-    // Losses don't count as negative usage; remaining stays at full allowance.
-    expect(result.realizedGainsAdjusted).toBe("0.00");
+    // The loss IS counted (symmetric), but with nothing to offset, usage floors at 0 —
+    // remaining stays at the full allowance.
+    expect(result.realizedGainsAdjusted).toBe("-100.00");
+    expect(result.generalPot.netGainLoss).toBe("-100.00");
+    expect(result.generalPot.used).toBe("0.00");
     expect(result.usedYtd).toBe("0.00");
     expect(result.remaining).toBe("1000.00");
   });
@@ -559,6 +565,244 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     });
     expect(result.vorabpauschaleAccrued).toBe("0.00");
     expect(result.vorabpauschaleCredited).toBe("0.00");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allowanceUsageYTD — two-pot Verlustverrechnung (Workstream 3)
+// ---------------------------------------------------------------------------
+
+/** A single-leg closed trade with a given gain/loss, for one instrument/year. */
+function gainTrade(instrumentId: string, gain: string, taxYear = 2026) {
+  return {
+    instrumentId,
+    currency: "EUR",
+    status: "closed" as const,
+    entryDate: "2025-01-01",
+    exitDate: `${taxYear}-06-01`,
+    holdingDays: 500,
+    longTerm: true,
+    quantity: "10",
+    avgEntryPrice: "100",
+    avgExitPrice: "100",
+    invested: "1000",
+    realizedPnL: gain,
+    unrealizedPnL: "0",
+    dividends: "0",
+    totalReturn: gain,
+    totalReturnPct: 0,
+    annualizedPct: null,
+    legs: [
+      {
+        acqDate: "2025-01-01",
+        sellDate: `${taxYear}-06-01`,
+        quantity: "10",
+        cost: "1000",
+        proceeds: String(1000 + Number(gain)),
+        gain,
+        holdingDays: 500,
+        longTerm: true,
+        taxYear,
+      },
+    ],
+  };
+}
+
+describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
+  it("a stock loss does NOT offset a general-pot (fund) gain — no cross-pot spill", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("stock-a", "-500"), gainTrade("fund-a", "300")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity", "fund-a": "etf" },
+    });
+    expect(result.stockPot.netGainLoss).toBe("-500.00");
+    expect(result.stockPot.used).toBe("0.00");
+    expect(result.generalPot.netGainLoss).toBe("300.00");
+    expect(result.generalPot.used).toBe("300.00");
+    // Pre-two-pot this would have netted to 200 (loss offsetting the gain) — now it can't.
+    expect(result.usedYtd).toBe("300.00");
+  });
+
+  it("a general-pot (fund) loss does NOT offset a stock gain — no cross-pot spill", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("stock-a", "300"), gainTrade("fund-a", "-500")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity", "fund-a": "etf" },
+    });
+    expect(result.stockPot.used).toBe("300.00");
+    expect(result.generalPot.used).toBe("0.00");
+    expect(result.usedYtd).toBe("300.00");
+  });
+
+  it("a stock loss DOES offset another stock gain — same-pot netting still works", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("stock-a", "300"), gainTrade("stock-b", "-100")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity", "stock-b": "equity" },
+    });
+    expect(result.stockPot.netGainLoss).toBe("200.00");
+    expect(result.stockPot.used).toBe("200.00");
+    expect(result.usedYtd).toBe("200.00");
+  });
+
+  it("excludes gold and crypto trades from both pots entirely (§23 EStG regime)", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("gold-a", "5000"), gainTrade("crypto-a", "5000"), gainTrade("stock-a", "100")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "gold-a": "gold", "crypto-a": "crypto", "stock-a": "equity" },
+    });
+    // Only the stock gain counts — gold/crypto's 10,000 combined gain is invisible here.
+    expect(result.stockPot.netGainLoss).toBe("100.00");
+    expect(result.usedYtd).toBe("100.00");
+  });
+
+  it("applies Teilfreistellung symmetrically to a general-pot loss, same as a gain", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("fund-a", "-1000")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "fund-a": "0.30" },
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "fund-a": "etf" },
+    });
+    // -1000 × (1 − 0.30) = -700, not -1000 (TF reduces the loss's magnitude too).
+    expect(result.generalPot.netGainLoss).toBe("-700.00");
+  });
+
+  it("an instrument absent from assetClasses defaults to the general pot", () => {
+    const log = makeTradeLog({ trades: [gainTrade("unknown-a", "150")] });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      // assetClasses omitted entirely — matches today's pre-two-pot behavior.
+    });
+    expect(result.generalPot.used).toBe("150.00");
+    expect(result.stockPot.used).toBe("0.00");
+  });
+
+  it("subtracts loss carry-forward RAW, without re-applying Teilfreistellung", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("fund-a", "1000")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "fund-a": "0.30" },
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "fund-a": "etf" },
+      lossCarryForward: { general: "400" },
+    });
+    // Gain tf-adjusted: 1000 × 0.70 = 700. Carry-forward subtracted RAW (not × 0.70 again):
+    // 700 − 400 = 300.
+    expect(result.generalPot.netGainLoss).toBe("700.00");
+    expect(result.generalPot.carryForwardApplied).toBe("400.00");
+    expect(result.generalPot.used).toBe("300.00");
+    expect(result.usedYtd).toBe("300.00");
+  });
+
+  it("carry-forward is applied per-pot independently — a stock carry-forward doesn't touch the general pot", () => {
+    const log = makeTradeLog({
+      trades: [gainTrade("stock-a", "500"), gainTrade("fund-a", "500")],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity", "fund-a": "etf" },
+      lossCarryForward: { stock: "500" },
+    });
+    expect(result.stockPot.used).toBe("0.00"); // 500 − 500 = 0
+    expect(result.generalPot.used).toBe("500.00"); // untouched
+    expect(result.usedYtd).toBe("500.00");
+  });
+
+  it("a carry-forward larger than the pot's gain floors at 0, never goes negative", () => {
+    const log = makeTradeLog({ trades: [gainTrade("stock-a", "100")] });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity" },
+      lossCarryForward: { stock: "5000" },
+    });
+    expect(result.stockPot.used).toBe("0.00");
+  });
+
+  it("folds forecast into the general pot's subtotal before ITS floor, not after the total clamp", () => {
+    // A general pot that's net-negative before forecast (a Vorabpauschale credit exceeding
+    // this year's accrual) would floor to 0 on its own — but forecast income should be
+    // netted in BEFORE that floor, so a big enough forecast can still produce projected
+    // usage, not just "0 + forecast" (which would double-count relative to the floor).
+    const log = makeTradeLog({
+      trades: [
+        {
+          ...vorabTrade({ instrumentId: "fund-a", vorabCredit: "50", taxYear: 2026 }),
+        },
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "fund-a": "etf" },
+      forecastIncomeRestOfYear: "30",
+    });
+    // generalSubtotalNoForecast = -50 (credit only, no accrual) → floors to 0 → usedYtd 0.
+    expect(result.usedYtd).toBe("0.00");
+    // generalSubtotalWithForecast = -50 + 30 = -20 → STILL floors to 0 (not -20 + 0).
+    expect(result.projectedUsedFullYear).toBe("0.00");
+  });
+
+  it("reports taxableExcess as the amount by which pot usage exceeds the allowance", () => {
+    const log = makeTradeLog({ trades: [gainTrade("stock-a", "1500")] });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity" },
+    });
+    expect(result.usedYtd).toBe("1000.00"); // clamped
+    expect(result.taxableExcess).toBe("500.00"); // 1500 − 1000
+  });
+
+  it("taxableExcess is zero when total usage is within the allowance", () => {
+    const log = makeTradeLog({ trades: [gainTrade("stock-a", "100")] });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+      assetClasses: { "stock-a": "equity" },
+    });
+    expect(result.taxableExcess).toBe("0.00");
   });
 });
 
