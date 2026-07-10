@@ -339,6 +339,53 @@ describe("mapTrEventToDraft", () => {
     expect(draft).toMatchObject({ action: "dividend", price: "8.76", externalId: "evt-1" });
   });
 
+  it("maps a Vorabpauschale accrual (SSP_CORPORATE_ACTION_NO_CASH) to a non-cash tax booking", () => {
+    const draft = draftOf({
+      ...base,
+      eventType: "SSP_CORPORATE_ACTION_NO_CASH",
+      kind: "vorabpauschale",
+      amount: 0,
+      isin: "IE00B4L5Y983",
+      vorabBase: 4.18,
+    });
+    expect(draft).toMatchObject({
+      action: "tax",
+      isin: "IE00B4L5Y983",
+      quantity: "0",
+      price: "0",
+      tax: null,
+      vorabBase: "4.18",
+    });
+  });
+
+  it("degrades a Vorabpauschale event with no extractable base to a zero-effect booking, flagged for review", () => {
+    const draft = draftOf({
+      ...base,
+      eventType: "SSP_CORPORATE_ACTION_NO_CASH",
+      kind: "vorabpauschale",
+      amount: 0,
+      isin: "IE00B4L5Y983",
+    });
+    expect(draft).toMatchObject({ action: "tax", price: "0", vorabBase: null });
+    // Detection fired but the base couldn't be extracted — surface it as needs-review
+    // (confidence < LOW_CONFIDENCE_THRESHOLD) rather than silently booking a no-op.
+    expect(draft.confidence).toBeLessThan(0.9);
+  });
+
+  it("does not treat an SSP_CORPORATE_ACTION_NO_CASH event without the vorabpauschale kind as mapped", () => {
+    const result = mapTrEventToDraft({
+      ...base,
+      eventType: "SSP_CORPORATE_ACTION_NO_CASH",
+      amount: 0,
+      isin: "IE00B4L5Y983",
+    });
+    expect("skip" in result && result.code).toBe("unmapped_event_type");
+  });
+
+  it("categorizes Vorabpauschale under the 'income' import category", () => {
+    expect(categoryForEventType("SSP_CORPORATE_ACTION_NO_CASH")).toBe("income");
+  });
+
   it("resolves ambiguous transfers by the sign of the amount", () => {
     expect(draftOf({ ...base, eventType: "JUNIOR_P2P_TRANSFER", amount: -10 }).action).toBe(
       "withdrawal",

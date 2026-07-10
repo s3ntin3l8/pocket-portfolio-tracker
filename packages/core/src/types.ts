@@ -82,6 +82,10 @@ export interface CoreTransaction {
   // netManualAdjustments (services/pytr/reconcile.ts) to fold user-entered corrections into a
   // feed-derived reconciliation the feed itself can never see. null/undefined elsewhere.
   source?: string | null;
+  // Vorabpauschale taxable base (§18(3) InvStG), gross — only set when type="tax" and
+  // kind="vorabpauschale". Consumed by trade-log.ts's per-instrument accrual/disposal-credit
+  // tracking. null/undefined for every other transaction.
+  vorabBase?: string | null;
 }
 
 export interface CorporateAction {

@@ -659,6 +659,11 @@ export const transactions = pgTable(
     nativeCurrency: text("native_currency"),
     // Gross payment amount in `nativeCurrency`, before FX conversion and withholding tax.
     grossNative: numeric("gross_native"),
+    // Vorabpauschale taxable base (§18(3) InvStG advance lump-sum fund tax), gross — only set
+    // on a `type="tax"`/`kind="vorabpauschale"` row. Unlike perShare/grossNative (pure display
+    // enrichment) this feeds @portfolio/core's FSA calculation directly (see trade-log.ts's
+    // vorabByYear/vorabCredit and tax.ts's Teilfreistellung netting).
+    vorabBase: numeric("vorab_base"),
     venue: text("venue"), // execution venue/exchange when the broker reports it
     // Source-document references (e.g. TR postbox docs): [{ id, type, date }]. The actual
     // file URL is short-lived/presigned, so only the reference is stored (see issue #150).
@@ -752,6 +757,8 @@ export const transactionSources = pgTable(
     shares: numeric("shares"),
     nativeCurrency: text("native_currency"),
     grossNative: numeric("gross_native"),
+    // Mirrors transactions.vorabBase exactly — see there.
+    vorabBase: numeric("vorab_base"),
     venue: text("venue"),
     // Per-component tax breakdown (display + provenance; summed into transactions.tax).
     taxComponents: jsonb("tax_components"),

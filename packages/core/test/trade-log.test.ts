@@ -168,6 +168,185 @@ describe("computeTrades — dividends folded into the holding window", () => {
   });
 });
 
+describe("computeTrades — Vorabpauschale accrual + disposal credit", () => {
+  it("accrues a Vorabpauschale row into the open episode's vorabByYear, bucketed by its own year", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "4.18",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+    ];
+    const { trades } = run(txns);
+    expect(trades[0].vorabByYear).toEqual([{ year: 2026, amount: "4.18" }]);
+  });
+
+  it("credits the full accrued amount to a full-close sell (ratio = 1)", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "4.18",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+      tx({ type: "sell", quantity: "10", price: "120", executedAt: new Date("2026-06-01") }),
+    ];
+    const { trades } = run(txns);
+    const t = trades[0];
+    expect(t.status).toBe("closed");
+    expect(t.legs).toHaveLength(1);
+    expect(t.legs[0].vorabCredit).toBe("4.18");
+  });
+
+  it("credits a partial sell proportionally, distributed across FIFO slices from multiple lots", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-02-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "10",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+      // Sells 5 of 20 held (25%) — spans only the first lot (FIFO).
+      tx({ type: "sell", quantity: "5", price: "120", executedAt: new Date("2026-06-01") }),
+    ];
+    const { trades } = run(txns, { method: "fifo" });
+    const t = trades[0];
+    expect(t.status).toBe("open");
+    expect(t.legs).toHaveLength(1);
+    // 5/20 of the 10 pool = 2.5
+    expect(t.legs[0].vorabCredit).toBe("2.5");
+  });
+
+  it("distributes a partial sell's credit across multiple FIFO slices proportional to each slice's quantity", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-02-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "10",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+      // Sells 15 of 20 held (75%) — consumes all of lot 1 (10) + 5 of lot 2.
+      tx({ type: "sell", quantity: "15", price: "120", executedAt: new Date("2026-06-01") }),
+    ];
+    const { trades } = run(txns, { method: "fifo" });
+    const t = trades[0];
+    expect(t.legs).toHaveLength(2);
+    // Total credit = 15/20 × 10 = 7.5, split 10:5 across the two slices → 5 and 2.5.
+    const totalCredit = t.legs.reduce((s, l) => s + Number(l.vorabCredit), 0);
+    expect(totalCredit).toBeCloseTo(7.5, 6);
+    expect(t.legs[0].vorabCredit).toBe("5"); // slice qty 10/15 × 7.5
+    expect(t.legs[1].vorabCredit).toBe("2.5"); // slice qty 5/15 × 7.5
+  });
+
+  it("credits the average method's single leg with the full sell's proportional credit", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "20", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "10",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+      tx({ type: "sell", quantity: "5", price: "120", executedAt: new Date("2026-06-01") }),
+    ];
+    const { trades } = run(txns, { method: "average" });
+    expect(trades[0].legs).toHaveLength(1);
+    expect(trades[0].legs[0].vorabCredit).toBe("2.5");
+  });
+
+  it("carries no residual pool into the next episode after a full close (drains to ~0)", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "4.18",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+      tx({ type: "sell", quantity: "10", price: "120", executedAt: new Date("2026-06-01") }),
+      // New episode, same instrument — must start with an empty pool.
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2026-07-01") }),
+      tx({ type: "sell", quantity: "10", price: "120", executedAt: new Date("2026-12-01") }),
+    ];
+    const { trades } = run(txns);
+    expect(trades).toHaveLength(2);
+    const secondEpisode = trades.find((t) => t.entryDate === "2026-07-01")!;
+    expect(secondEpisode.legs[0].vorabCredit).toBe("0");
+    expect(secondEpisode.vorabByYear).toEqual([]);
+  });
+
+  it("degrades a Vorabpauschale row with a null/zero base to a no-op (no accrual, no crash)", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: null,
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+      tx({ type: "sell", quantity: "10", price: "120", executedAt: new Date("2026-06-01") }),
+    ];
+    const { trades } = run(txns);
+    expect(trades[0].vorabByYear).toEqual([]);
+    expect(trades[0].legs[0].vorabCredit).toBe("0");
+  });
+
+  it("degrades a Vorabpauschale row with no shares held (no open episode) to a no-op", () => {
+    // No prior buy — the accrual event precedes any holding, an edge case that should
+    // never legitimately occur but must not crash.
+    const txns = [
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "4.18",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+    ];
+    const { trades } = run(txns);
+    expect(trades).toHaveLength(0);
+  });
+
+  it("converts a foreign-currency Vorabpauschale base to the display currency", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "10",
+        currency: "USD",
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-27"),
+      }),
+    ];
+    const { trades } = run(txns, { fx: () => "0.9" });
+    expect(trades[0].vorabByYear).toEqual([{ year: 2026, amount: "9" }]);
+  });
+});
+
 describe("computeTrades — corporate actions (lot level)", () => {
   it("applies a 2:1 split: money invariant, per-share prices in current terms", () => {
     const txns = [

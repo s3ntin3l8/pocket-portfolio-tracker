@@ -135,6 +135,7 @@ export async function enrichTransactionFromDrafts(
         shares: draft.shares ?? null,
         nativeCurrency: draft.nativeCurrency ?? null,
         grossNative: draft.grossNative ?? null,
+        vorabBase: draft.vorabBase ?? null,
         taxComponents,
         rawData: null,
       })
@@ -167,6 +168,7 @@ export async function enrichTransactionFromDrafts(
       shares: transactionSources.shares,
       nativeCurrency: transactionSources.nativeCurrency,
       grossNative: transactionSources.grossNative,
+      vorabBase: transactionSources.vorabBase,
       taxComponents: transactionSources.taxComponents,
     })
     .from(transactionSources)
@@ -183,6 +185,7 @@ export async function enrichTransactionFromDrafts(
     shares: r.shares,
     nativeCurrency: r.nativeCurrency,
     grossNative: r.grossNative,
+    vorabBase: r.vorabBase,
     taxComponents: r.taxComponents as TaxComponents | null,
   }));
 
@@ -212,6 +215,7 @@ export async function enrichTransactionFromDrafts(
     if (rollup.shares !== null) patch.shares = rollup.shares;
     if (rollup.nativeCurrency !== null) patch.nativeCurrency = rollup.nativeCurrency;
     if (rollup.grossNative !== null) patch.grossNative = rollup.grossNative;
+    if (rollup.vorabBase !== null) patch.vorabBase = rollup.vorabBase;
 
     if (Object.keys(patch).length > 0) {
       await dbClient.update(transactions).set(patch).where(eq(transactions.id, transactionId));

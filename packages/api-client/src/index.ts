@@ -259,6 +259,10 @@ export interface AllowanceUsage {
   realizedGainsAdjusted: string;
   /** Dividend/interest/coupon income this year (decimal string). */
   incomeYtd: string;
+  /** Tf-adjusted Vorabpauschale accrued this year (§18(3) InvStG), decimal string, never negative. */
+  vorabpauschaleAccrued: string;
+  /** Tf-adjusted Vorabpauschale disposal credit realized this year, decimal string, never negative. */
+  vorabpauschaleCredited: string;
   /** Total used (clamped to allowance), decimal string. */
   usedYtd: string;
   /** Remaining allowance (never negative), decimal string. */
