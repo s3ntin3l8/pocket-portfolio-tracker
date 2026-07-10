@@ -52,6 +52,11 @@ export interface TradeLeg {
   holdingDays: number;
   longTerm: boolean;
   taxYear: number;
+  /** Vorabpauschale drawdown for this slice (§18(3) InvStG disposal credit against
+   * double-taxation), display currency, gross (tax.ts applies Teilfreistellung). Optional
+   * — omitted on hand-written fixtures predating this field; computeTrades always sets it
+   * (defaulting to "0" when no accrual pool exists for the instrument). */
+  vorabCredit?: string;
 }
 
 export interface Trade {
@@ -80,6 +85,12 @@ export interface Trade {
   totalReturnPct: number | null;
   annualizedPct: number | null; // XIRR over the episode's flows + terminal value
   legs: TradeLeg[];
+  /** Vorabpauschale accrued during this episode's holding window, gross, bucketed by its
+   * deemed-inflow year (display currency; no +1 shift — the source event's own executedAt
+   * already reflects the deemed-inflow date, per §18(3) InvStG). tax.ts tf-adjusts and nets
+   * this per-instrument (see allowanceUsageYTD). Optional — omitted on hand-written
+   * fixtures predating this field; computeTrades always sets it (possibly `[]`). */
+  vorabByYear?: YearAmount[];
 }
 
 export interface YearAmount {
@@ -152,6 +163,7 @@ interface Episode {
   realized: Decimal; // method-aware, instrument currency
   legs: TradeLeg[];
   flows: CashFlowPoint[]; // for XIRR, display currency
+  vorabByYear: Map<number, Decimal>; // Vorabpauschale accrued this episode, display currency
 }
 
 function makeEpisode(at: Date): Episode {
@@ -164,6 +176,7 @@ function makeEpisode(at: Date): Episode {
     soldQty: ZERO,
     realized: ZERO,
     legs: [],
+    vorabByYear: new Map(),
     flows: [],
   };
 }
@@ -249,6 +262,11 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
     let avgQty = ZERO; // average-method running quantity
     let avgCost = ZERO; // average-method running cost (fees incl.)
     let episode: Episode | null = null;
+    // Vorabpauschale accrual pool (display currency), gross — drawn down proportionally on
+    // each sell (see the "tax"/vorabpauschale branch and the sell branch below). Persists
+    // across episode boundaries within an instrument (a full close naturally drains it to
+    // ~0, since a full-close sell's ratio is 1); reset defensively at the dust-close snap.
+    let vorabPool = ZERO;
 
     const finalizeTrade = (
       ep: Episode,
@@ -365,6 +383,9 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         totalReturnPct,
         annualizedPct,
         legs: ep.legs,
+        vorabByYear: [...ep.vorabByYear.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([year, amount]) => ({ year, amount: amount.toString() })),
       });
     };
 
@@ -417,10 +438,21 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         });
       } else if (tx.type === "sell") {
         if (!episode || avgQty.lte(0)) continue;
+        const qtyBeforeSale = avgQty;
         const sellQty = Decimal.min(q, avgQty);
         const proceeds = sellQty.mul(p).sub(f); // instrument ccy
         const sellDate = tx.executedAt;
         const taxYear = sellDate.getUTCFullYear();
+
+        // Vorabpauschale disposal credit (§18(3) InvStG): draw the accrual pool down
+        // proportional to the fraction of currently-held shares this sell disposes, before
+        // any lot/quantity mutation below. Already display currency (accrued that way —
+        // see the "tax"/vorabpauschale branch), so no further conv() needed here. Stays
+        // gross; tax.ts applies Teilfreistellung when netting it against the FSA.
+        const vorabCreditThis = qtyBeforeSale.gt(0)
+          ? vorabPool.mul(sellQty).div(qtyBeforeSale)
+          : ZERO;
+        vorabPool = vorabPool.sub(vorabCreditThis);
 
         // --- average method realized ---
         const avgUnit = avgCost.div(avgQty);
@@ -452,6 +484,9 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           for (const s of fifoSlices) {
             const sliceProceeds = s.qty.mul(proceedsPerUnit);
             const days = daysBetween(s.acqDate, sellDate);
+            const sliceVorabCredit = sellQty.gt(0)
+              ? vorabCreditThis.mul(s.qty).div(sellQty)
+              : ZERO;
             episode.legs.push({
               acqDate: toDateStr(s.acqDate),
               sellDate: toDateStr(sellDate),
@@ -462,6 +497,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
               holdingDays: days,
               longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
               taxYear,
+              vorabCredit: sliceVorabCredit.toString(),
             });
           }
         } else {
@@ -476,6 +512,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
             holdingDays: days,
             longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
             taxYear,
+            vorabCredit: vorabCreditThis.toString(),
           });
         }
 
@@ -496,6 +533,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           lots = [];
           avgQty = ZERO;
           avgCost = ZERO;
+          vorabPool = ZERO;
         }
       }
       else if (tx.type === "transfer_out") {
@@ -515,6 +553,20 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         avgCost = avgCost.sub(avg.mul(transferQty));
         avgQty = avgQty.sub(transferQty);
         // Don't close the episode — remaining shares may still be held.
+      }
+      else if (tx.type === "tax" && tx.kind === "vorabpauschale") {
+        // Vorabpauschale accrual (§18(3) InvStG): a non-cash advance lump-sum fund tax
+        // base, gross (Teilfreistellung is applied by tax.ts, not here — see the file
+        // header's ownership split). Requires an open episode (shares held) and a parsed
+        // base; either being absent degrades silently to today's zero-effect booking
+        // rather than guessing.
+        if (!episode || avgQty.lte(0)) continue;
+        const base = tx.vorabBase != null ? D(tx.vorabBase) : ZERO;
+        if (base.lte(0)) continue;
+        const baseDisplay = conv(base, tx.currency);
+        vorabPool = vorabPool.add(baseDisplay);
+        const year = tx.executedAt.getUTCFullYear();
+        episode.vorabByYear.set(year, (episode.vorabByYear.get(year) ?? ZERO).add(baseDisplay));
       }
       // dividend/coupon/interest/fee/deposit/withdrawal/loan_*/bonus|split|rights TYPE:
       // no effect on the lot ledger (income is folded by window; CAs handled above).

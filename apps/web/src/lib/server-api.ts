@@ -932,6 +932,8 @@ export async function loadNetworthTax(
         allowanceAnnual: "0",
         realizedGainsAdjusted: "0",
         incomeYtd: "0",
+        vorabpauschaleAccrued: "0",
+        vorabpauschaleCredited: "0",
         usedYtd: "0",
         remaining: "0",
         taxRate: "0",

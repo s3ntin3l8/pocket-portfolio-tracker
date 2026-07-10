@@ -222,6 +222,11 @@ export interface SourceRow {
   shares?: string | null;
   nativeCurrency?: string | null;
   grossNative?: string | null;
+  // Vorabpauschale taxable base (see packages/db schema.ts). PICKED, not summed — unlike a
+  // dividend split across documents, a Vorabpauschale row has exactly one source (the pytr
+  // sync event; there is no settlement PDF to enrich against), so summing would only ever
+  // double-count a re-synced/re-enriched row.
+  vorabBase?: string | null;
 }
 
 /**
@@ -295,6 +300,7 @@ export function recomputeRollup(rows: SourceRow[]): {
   shares: string | null;
   nativeCurrency: string | null;
   grossNative: string | null;
+  vorabBase: string | null;
   hasManual: boolean;
   mergedTaxComponents: TaxComponents;
 } {
@@ -309,7 +315,8 @@ export function recomputeRollup(rows: SourceRow[]): {
     | "perShare"
     | "shares"
     | "nativeCurrency"
-    | "grossNative";
+    | "grossNative"
+    | "vorabBase";
 
   // Find the winning rank for each scalar type.
   function winningRank(field: PickableField): number {
@@ -343,7 +350,7 @@ export function recomputeRollup(rows: SourceRow[]): {
   }
 
   function pickField(
-    field: "executedPrice" | "venue" | "shares" | "nativeCurrency",
+    field: "executedPrice" | "venue" | "shares" | "nativeCurrency" | "vorabBase",
     rank: number,
   ): string | null {
     if (rank < 0) return null;
@@ -391,6 +398,7 @@ export function recomputeRollup(rows: SourceRow[]): {
     shares: pickField("shares", winningRank("shares")),
     nativeCurrency: pickField("nativeCurrency", winningRank("nativeCurrency")),
     grossNative: sumFieldExact("grossNative", winningRank("grossNative")),
+    vorabBase: pickField("vorabBase", winningRank("vorabBase")),
     hasManual,
     mergedTaxComponents,
   };

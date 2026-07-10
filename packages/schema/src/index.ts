@@ -418,6 +418,10 @@ export const parsedTransactionSchema = z.object({
   nativeCurrency: currencyCode.nullish(),
   // Gross payment amount in `nativeCurrency`, before FX conversion and withholding tax.
   grossNative: decimalString.nullish(),
+  // Vorabpauschale taxable base (§18(3) InvStG advance lump-sum fund tax), gross — only set
+  // on a `tax` action with `kind: "vorabpauschale"`. Unlike perShare/grossNative (pure
+  // display enrichment) this feeds the core engine's FSA calculation directly.
+  vorabBase: decimalString.nullish(),
   venue: z.string().nullish(),
   kind: z.string().nullish(),
   description: z.string().nullish(),

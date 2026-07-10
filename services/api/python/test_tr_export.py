@@ -405,6 +405,48 @@ class TestFieldExtractors:
         ]
         assert tx._extract_documents(DIV_DETAIL) is None
 
+    def test_vorab_base_from_bemessungsgrundlage(self):
+        details = {"sections": [{"type": "table", "data": [
+            {"title": "Bemessungsgrundlage", "detail": {"text": "4,18 €"}},
+        ]}]}
+        assert tx._extract_vorab_base(details) == 4.18
+
+    def test_vorab_base_from_vorabpauschale_row(self):
+        details = {"sections": [{"type": "table", "data": [
+            {"title": "Vorabpauschale", "detail": {"text": "4,18 €"}},
+        ]}]}
+        assert tx._extract_vorab_base(details) == 4.18
+
+    def test_vorab_base_missing_returns_none(self):
+        assert tx._extract_vorab_base(BUY_DETAIL) is None
+        assert tx._extract_vorab_base(None) is None
+
+
+class TestVorabpauschaleDetection:
+    """SSP_CORPORATE_ACTION_NO_CASH + subtitle 'Vorabpauschale' — a non-cash accrual event
+    on a specific fund holding. See mapper.ts's NO_CASH_CORPORATE_ACTION handling, gated on
+    the `kind: "vorabpauschale"` signal this produces."""
+
+    def test_is_vorabpauschale_true(self):
+        ev = {"eventType": "SSP_CORPORATE_ACTION_NO_CASH", "subtitle": "Vorabpauschale"}
+        assert tx._is_vorabpauschale(ev) is True
+
+    def test_is_vorabpauschale_case_insensitive(self):
+        ev = {"eventType": "SSP_CORPORATE_ACTION_NO_CASH", "subtitle": "VORABPAUSCHALE"}
+        assert tx._is_vorabpauschale(ev) is True
+
+    def test_is_vorabpauschale_wrong_event_type(self):
+        ev = {"eventType": "SSP_CORPORATE_ACTION_CASH", "subtitle": "Vorabpauschale"}
+        assert tx._is_vorabpauschale(ev) is False
+
+    def test_is_vorabpauschale_wrong_subtitle(self):
+        ev = {"eventType": "SSP_CORPORATE_ACTION_NO_CASH", "subtitle": "Something else"}
+        assert tx._is_vorabpauschale(ev) is False
+
+    def test_is_vorabpauschale_no_subtitle(self):
+        ev = {"eventType": "SSP_CORPORATE_ACTION_NO_CASH"}
+        assert tx._is_vorabpauschale(ev) is False
+
 
 class TestReclassification:
     """The 'Dividend correction' detection + resolution used to split a reclassification
@@ -771,6 +813,55 @@ class TestNormalize:
         }
         out = tx._normalize(correction_ev)
         assert out["dateResolutionFailed"] is True
+
+    def test_vorabpauschale_event_carries_kind_and_base(self):
+        ev = {
+            "id": "vorab-evt",
+            "timestamp": "2026-01-27T00:00:00.000Z",
+            "eventType": "SSP_CORPORATE_ACTION_NO_CASH",
+            "subtitle": "Vorabpauschale",
+            "amount": {"value": 0, "currency": "EUR"},
+            "status": "EXECUTED",
+            "isin": "IE00B4L5Y983",
+            "details": {"sections": [{"type": "table", "data": [
+                {"title": "Bemessungsgrundlage", "detail": {"text": "4,18 €"}},
+            ]}]},
+        }
+        out = tx._normalize(ev)
+        assert out["kind"] == "vorabpauschale"
+        assert out["vorabBase"] == 4.18
+        assert out["amount"] == 0
+
+    def test_vorabpauschale_event_missing_base_degrades_to_none(self):
+        # Only the summary line survives in any local export (see the detection helper's
+        # docstring) — a missing/unparseable base must not raise or invent a figure.
+        ev = {
+            "id": "vorab-evt",
+            "timestamp": "2026-01-27T00:00:00.000Z",
+            "eventType": "SSP_CORPORATE_ACTION_NO_CASH",
+            "subtitle": "Vorabpauschale",
+            "amount": {"value": 0, "currency": "EUR"},
+            "status": "EXECUTED",
+            "isin": "IE00B4L5Y983",
+            "details": {"sections": []},
+        }
+        out = tx._normalize(ev)
+        assert out["kind"] == "vorabpauschale"
+        assert out["vorabBase"] is None
+
+    def test_ordinary_event_has_no_vorab_fields(self):
+        ev = {
+            "id": "evt-div",
+            "timestamp": "2026-03-02T10:00:00.000Z",
+            "eventType": "CREDIT",
+            "subtitle": "Bardividende",
+            "amount": {"value": 1.71, "currency": "EUR"},
+            "status": "EXECUTED",
+            "details": DIV_DETAIL,
+        }
+        out = tx._normalize(ev)
+        assert out["kind"] is None
+        assert out["vorabBase"] is None
 
 
 class TestCollectWkns:

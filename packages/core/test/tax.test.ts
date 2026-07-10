@@ -381,6 +381,188 @@ describe("allowanceUsageYTD", () => {
 });
 
 // ---------------------------------------------------------------------------
+// allowanceUsageYTD — Vorabpauschale netting
+// ---------------------------------------------------------------------------
+
+/** A minimal closed trade with no gain/dividend activity, just Vorabpauschale fields —
+ *  isolates the accrual/credit netting from the realized-gain path already covered above. */
+function vorabTrade(overrides: {
+  instrumentId: string;
+  vorabByYear?: { year: number; amount: string }[];
+  vorabCredit?: string;
+  taxYear?: number;
+}) {
+  return {
+    instrumentId: overrides.instrumentId,
+    currency: "EUR",
+    status: "closed" as const,
+    entryDate: "2025-01-01",
+    exitDate: "2026-06-01",
+    holdingDays: 500,
+    longTerm: true,
+    quantity: "10",
+    avgEntryPrice: "100",
+    avgExitPrice: "100",
+    invested: "1000",
+    realizedPnL: "0",
+    unrealizedPnL: "0",
+    dividends: "0",
+    totalReturn: "0",
+    totalReturnPct: 0,
+    annualizedPct: null,
+    vorabByYear: overrides.vorabByYear,
+    legs:
+      overrides.vorabCredit !== undefined
+        ? [
+            {
+              acqDate: "2025-01-01",
+              sellDate: "2026-06-01",
+              quantity: "10",
+              cost: "1000",
+              proceeds: "1000",
+              gain: "0",
+              holdingDays: 500,
+              longTerm: true,
+              taxYear: overrides.taxYear ?? 2026,
+              vorabCredit: overrides.vorabCredit,
+            },
+          ]
+        : [],
+  };
+}
+
+describe("allowanceUsageYTD — Vorabpauschale netting", () => {
+  it("adds the tf-adjusted accrual for the requested year to usedYtd", () => {
+    const log = makeTradeLog({
+      trades: [
+        vorabTrade({ instrumentId: "etf-1", vorabByYear: [{ year: 2026, amount: "4.18" }] }),
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "etf-1": "0.30" },
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    // 4.18 × (1 − 0.30) = 2.926 → 2.93
+    expect(result.vorabpauschaleAccrued).toBe("2.93");
+    expect(result.vorabpauschaleCredited).toBe("0.00");
+    expect(result.usedYtd).toBe("2.93");
+  });
+
+  it("ignores accrual from a year other than the requested one", () => {
+    const log = makeTradeLog({
+      trades: [
+        vorabTrade({ instrumentId: "etf-1", vorabByYear: [{ year: 2025, amount: "4.18" }] }),
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "etf-1": "0.30" },
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    expect(result.vorabpauschaleAccrued).toBe("0.00");
+    expect(result.usedYtd).toBe("0.00");
+  });
+
+  it("subtracts the tf-adjusted disposal credit from usedYtd", () => {
+    const log = makeTradeLog({
+      trades: [
+        vorabTrade({ instrumentId: "etf-1", vorabCredit: "4.12", taxYear: 2026 }),
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "etf-1": "0.30" },
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    // 4.12 × (1 − 0.30) = 2.884 → 2.88, subtracted.
+    expect(result.vorabpauschaleCredited).toBe("2.88");
+    expect(result.usedYtd).toBe("0.00"); // clamped — can't go negative
+  });
+
+  it("nets a same-year accrual against a same-year credit close to zero (near-cancellation, not exact)", () => {
+    // Mirrors the real 2025-accrual/2026-disposal-credit scenario investigated live —
+    // the plan explicitly flags this as coincidental, not a mechanism guarantee, so this
+    // test asserts the mechanics (both sides applied, net near zero) rather than exactly 0.
+    const log = makeTradeLog({
+      trades: [
+        {
+          ...vorabTrade({
+            instrumentId: "etf-1",
+            vorabByYear: [{ year: 2026, amount: "4.18" }],
+            vorabCredit: "4.12",
+            taxYear: 2026,
+          }),
+        },
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "etf-1": "0.30" },
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    expect(result.vorabpauschaleAccrued).toBe("2.93"); // 4.18 × 0.70
+    expect(result.vorabpauschaleCredited).toBe("2.88"); // 4.12 × 0.70
+    // usedYtd is derived from the unrounded raw values (4.18×0.7 − 4.12×0.7 = 0.042),
+    // not the display-rounded accrued/credited strings above — small but non-zero.
+    expect(result.usedYtd).toBe("0.04");
+  });
+
+  it("a credit larger than this year's accrual reduces usedYtd below what gains/income alone would give", () => {
+    // Disposing a position whose Vorabpauschale accrued in a PRIOR year: this year has a
+    // credit but no matching accrual, and it should still reduce usedYtd (not clamp at 0
+    // before combining with other income).
+    const log = makeTradeLog({
+      dividendsByYear: [{ year: 2026, amount: "100", tax: "0" }],
+      trades: [
+        vorabTrade({ instrumentId: "etf-1", vorabCredit: "50", taxYear: 2026 }),
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "etf-1": "0.30" }, // credit tf-adjusted: 50 × 0.70 = 35
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    // income 100 − credit 35 = 65.
+    expect(result.usedYtd).toBe("65.00");
+  });
+
+  it("applies each instrument's own Teilfreistellung rate — no single blended rate", () => {
+    const log = makeTradeLog({
+      trades: [
+        vorabTrade({ instrumentId: "etf-30", vorabByYear: [{ year: 2026, amount: "10" }] }),
+        vorabTrade({ instrumentId: "bond-fund-0", vorabByYear: [{ year: 2026, amount: "10" }] }),
+      ],
+    });
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: { "etf-30": "0.30", "bond-fund-0": "0" },
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    // etf-30: 10 × 0.70 = 7.00; bond-fund-0: 10 × 1.00 = 10.00 → 17.00 total.
+    expect(result.vorabpauschaleAccrued).toBe("17.00");
+  });
+
+  it("defaults vorabpauschaleAccrued/Credited to zero when the trade log carries no Vorabpauschale data", () => {
+    const log = makeTradeLog();
+    const result = allowanceUsageYTD({
+      tradeLog: log,
+      tfRates: {},
+      allowanceAnnual: "1000",
+      year: 2026,
+    });
+    expect(result.vorabpauschaleAccrued).toBe("0.00");
+    expect(result.vorabpauschaleCredited).toBe("0.00");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // harvestSuggestions
 // ---------------------------------------------------------------------------
 

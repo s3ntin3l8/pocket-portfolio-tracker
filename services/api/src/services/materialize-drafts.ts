@@ -342,6 +342,11 @@ export async function writeResolvedDrafts(
         documentRefs: d.documentRefs ?? null,
         kind: d.kind ?? null,
         description: d.description ?? null,
+        // Unlike perShare/grossNative (pure display enrichment, only ever populated later via
+        // enrichTransactionFromDrafts' matched-draft path), a Vorabpauschale row never has a
+        // settlement PDF to enrich against — this fresh insert is the ONLY path it ever takes,
+        // so vorabBase must be carried through here or the feature silently never lands.
+        vorabBase: d.vorabBase ?? null,
         // The cash leg is always in the transaction's own currency, independent of where
         // the instrument is listed/priced.
         currency: d.currency,
@@ -369,6 +374,7 @@ export async function writeResolvedDrafts(
           executedPrice: d.executedPrice ?? null,
           fxRate: d.fxRate ?? null,
           venue: d.venue ?? null,
+          vorabBase: d.vorabBase ?? null,
           taxComponents: d.taxComponents
             ? (d.taxComponents as Record<string, unknown>)
             : null,

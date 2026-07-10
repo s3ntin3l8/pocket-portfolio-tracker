@@ -64,6 +64,7 @@ export interface MergePreview {
     shares: string | null;
     nativeCurrency: string | null;
     grossNative: string | null;
+    vorabBase: string | null;
     documentCount: number;
   };
 }
@@ -113,6 +114,7 @@ function ownScalarsAsSourceRow(row: TxRow): SourceRow {
     shares: row.shares,
     nativeCurrency: row.nativeCurrency,
     grossNative: row.grossNative,
+    vorabBase: row.vorabBase,
     taxComponents: null,
   };
 }
@@ -145,6 +147,7 @@ async function ensureSourceRow(db: DB, row: TxRow): Promise<void> {
       shares: row.shares,
       nativeCurrency: row.nativeCurrency,
       grossNative: row.grossNative,
+      vorabBase: row.vorabBase,
       taxComponents: null,
       confidence: null,
       rawData: null,
@@ -236,6 +239,7 @@ export async function mergeTransactions(
         shares: transactionSources.shares,
         nativeCurrency: transactionSources.nativeCurrency,
         grossNative: transactionSources.grossNative,
+        vorabBase: transactionSources.vorabBase,
         taxComponents: transactionSources.taxComponents,
       })
       .from(transactionSources)
@@ -255,6 +259,7 @@ export async function mergeTransactions(
       if (rollup.shares !== null) patch.shares = rollup.shares;
       if (rollup.nativeCurrency !== null) patch.nativeCurrency = rollup.nativeCurrency;
       if (rollup.grossNative !== null) patch.grossNative = rollup.grossNative;
+      if (rollup.vorabBase !== null) patch.vorabBase = rollup.vorabBase;
     }
     await tx.update(transactions).set(patch).where(eq(transactions.id, survivorId));
 
@@ -319,6 +324,7 @@ export async function previewMerge(
         shares: transactionSources.shares,
         nativeCurrency: transactionSources.nativeCurrency,
         grossNative: transactionSources.grossNative,
+        vorabBase: transactionSources.vorabBase,
         taxComponents: transactionSources.taxComponents,
       })
       .from(transactionSources)
@@ -336,6 +342,7 @@ export async function previewMerge(
         shares: transactionSources.shares,
         nativeCurrency: transactionSources.nativeCurrency,
         grossNative: transactionSources.grossNative,
+        vorabBase: transactionSources.vorabBase,
         taxComponents: transactionSources.taxComponents,
       })
       .from(transactionSources)
@@ -382,6 +389,7 @@ export async function previewMerge(
       shares: rollup.hasManual ? survivor.shares : rollup.shares,
       nativeCurrency: rollup.hasManual ? survivor.nativeCurrency : rollup.nativeCurrency,
       grossNative: rollup.hasManual ? survivor.grossNative : rollup.grossNative,
+      vorabBase: rollup.hasManual ? survivor.vorabBase : rollup.vorabBase,
       documentCount: docCount.length,
     },
   };

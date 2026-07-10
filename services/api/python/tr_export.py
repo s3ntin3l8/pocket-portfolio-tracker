@@ -14,7 +14,7 @@ Contract (consumed by services/pytr/runner.ts):
 
 Each emitted line is the NORMALIZED event the Node mapper consumes:
   {id, timestamp, eventType, title, amount (signed), currency,
-   isin?, wkn?, shares?, fees?, savingsPlanId?, status?,
+   isin?, wkn?, shares?, fees?, savingsPlanId?, status?, kind?, vorabBase?,
    trueDistributionDate?, originalAmount?, correctionAmount?, dateResolutionFailed?}
 The WKN is fetched per distinct ISIN from the instrument-detail channel (timeline events
 carry only an ISIN); everything else comes from the timeline list + its detail payload.
@@ -28,6 +28,14 @@ originalAmount/correctionAmount resolve the restated event's true period + the
 already-recognized-vs-genuinely-new amount split (see _extract_reclassification);
 dateResolutionFailed is set only when that resolution fails, so the Node mapper can fall
 back safely instead of silently mis-dating the booking.
+
+`vorabBase` is set only on a Vorabpauschale accrual event (SSP_CORPORATE_ACTION_NO_CASH,
+subtitle "Vorabpauschale" — the German advance lump-sum fund tax, §18(3) InvStG): the
+taxable base extracted from the detail, gross (Teilfreistellung is applied by the Node
+side's @portfolio/core, not here). `kind` is set to "vorabpauschale" on the same event so
+the mapper can route it without re-deriving the detection signal. Unverified against a
+captured real detail payload (see _extract_vorab_base) — a missing/unparseable base
+degrades to a zero-effect booking rather than guessing.
 
 NOTE: targets pytr pinned to an exact upstream commit (see requirements.txt) for TR's
 June-2026 `compactPortfolioByType` rename; not yet validated against a live account. TR's
@@ -524,6 +532,37 @@ def _is_crypto_bonus(event):
     return "one_percent" in blob or "1% bonus" in blob or "1 % bonus" in blob
 
 
+def _is_vorabpauschale(event):
+    """True for a Vorabpauschale accrual event: SSP_CORPORATE_ACTION_NO_CASH with subtitle
+    "Vorabpauschale" (the German advance lump-sum fund tax, §18(3) InvStG) — a non-cash
+    booking on a specific fund holding, carrying no `amount` (unlike SSP_CORPORATE_ACTION_CASH
+    dividends), only a taxable base in its detail (see _extract_vorab_base).
+
+    Detection CONFIRMED against a real account's captured activity-log export (2026-07-10):
+    id bc5b0f6b-c8c4-3a3f-9827-363dad949390, timestamped 2026-01-27T07:09:26.714+0000,
+    eventType/subtitle match this function's check exactly. Only its summary line survives
+    in that export though (the full `timelineDetail` payload was never captured) — so the
+    base extraction below is unverified against real data and deliberately conservative
+    (see _extract_vorab_base's docstring). Detection firing correctly does NOT guarantee
+    extraction succeeds; the mapper flags a null base for review rather than assuming."""
+    if event.get("eventType") != "SSP_CORPORATE_ACTION_NO_CASH":
+        return False
+    subtitle = (event.get("subtitle") or "").strip().lower()
+    return subtitle == "vorabpauschale"
+
+
+def _extract_vorab_base(details):
+    """The Vorabpauschale taxable base (Bemessungsgrundlage) — the gross accrual amount
+    before Teilfreistellung, which @portfolio/core applies itself (see mapper.ts / tax.ts).
+
+    Best-guess keywords (bemessungsgrundlage / vorabpauschale row titles), mirroring
+    _extract_price/_extract_tax's `_field` pattern. Unverified against a captured real
+    detail payload — only the event's summary line survives in any local export. Returns
+    None when no matching row is found; the mapper degrades that to a zero-effect booking
+    rather than guessing."""
+    return _field(details, ["bemessungsgrundlage", "vorabpauschale"])
+
+
 _RECLASSIFICATION_SUBTITLES = {"bardividende korrigiert", "cash dividend corrected"}
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
@@ -727,8 +766,17 @@ def _normalize(event, wkn_by_isin=None, crypto_isin_by_ticker=None, events_by_id
         "status": event.get("status") or _extract_status(details),
         # Acquisition kind hint the Node mapper can't infer from eventType alone. A crypto
         # "1% bonus" trade is a reward-funded purchase (cash-neutral) — flagged here from the
-        # detail since the timeline gives no distinguishing event type.
-        "kind": "crypto_bonus" if _is_crypto_bonus(event) else None,
+        # detail since the timeline gives no distinguishing event type. "vorabpauschale" flags
+        # a Vorabpauschale accrual (see _is_vorabpauschale) so the mapper can route it to a
+        # standalone tax booking without re-deriving the detection signal.
+        "kind": (
+            "vorabpauschale"
+            if _is_vorabpauschale(event)
+            else "crypto_bonus" if _is_crypto_bonus(event) else None
+        ),
+        # Vorabpauschale taxable base (gross); None on every other event. See
+        # _extract_vorab_base — unverified against a captured real detail payload.
+        "vorabBase": _extract_vorab_base(details) if _is_vorabpauschale(event) else None,
         # Present only on a "Dividend correction" event (see _extract_reclassification);
         # None for every ordinary event. trueDistributionDate is DD.MM.YYYY (TR's own
         # format, parsed by the Node mapper) or None if unresolved — dateResolutionFailed

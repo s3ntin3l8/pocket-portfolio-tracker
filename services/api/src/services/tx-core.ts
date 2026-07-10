@@ -20,6 +20,7 @@ export function txRowToCore(r: TxRow): CoreTransaction {
     savingsPlanId: r.savingsPlanId,
     status: r.status,
     source: r.source,
+    vorabBase: r.vorabBase,
   };
 }
 

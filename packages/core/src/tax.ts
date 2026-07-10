@@ -7,9 +7,13 @@
  *   - Teilfreistellung: partial exemption for equity/mixed funds (§20 Abs. 9 InvStG).
  *   - FIFO lot ordering: tax-correct gain attribution (oldest-lot-first disposal).
  *   - Harvest suggestions: open positions whose tf-adjusted gain fits the remaining allowance.
+ *   - Vorabpauschale (§18(3) InvStG): trade-log.ts owns the share-accounting side (per-
+ *     instrument accrual pool + disposal credit — see Trade.vorabByYear/TradeLeg.vorabCredit);
+ *     this module owns the tax-netting side (Teilfreistellung, applied per-instrument in the
+ *     same loop that tf-adjusts realized gains, then netted into the FSA usage below).
  *
- * Explicitly OUT OF SCOPE: Vorabpauschale, Verlustverrechnungstopf, church-tax surtax
- * calculation, cross-year loss carry-forward, Günstigerprüfung.
+ * Explicitly OUT OF SCOPE: Verlustverrechnungstopf, church-tax surtax calculation,
+ * cross-year loss carry-forward, Günstigerprüfung.
  *
  * All money amounts are Decimal strings (never floats). Caller supplies:
  *   - A merged TradeLog computed with method:"fifo"
@@ -37,7 +41,23 @@ export interface AllowanceUsage {
   realizedGainsAdjusted: string;
   /** Gross dividend/interest/coupon income this year (net received + withholding, display currency). */
   incomeYtd: string;
-  /** Total used = realizedGainsAdjusted + incomeYtd, clamped to [0, allowanceAnnual]. */
+  /**
+   * Tf-adjusted Vorabpauschale accrued this year (§18(3) InvStG advance lump-sum fund tax),
+   * from Trade.vorabByYear, tf-adjusted per-instrument (display currency, never negative).
+   */
+  vorabpauschaleAccrued: string;
+  /**
+   * Tf-adjusted Vorabpauschale disposal credit realized this year (from TradeLeg.vorabCredit
+   * on sells closed this year) — money already taxed via a prior accrual, credited back
+   * against double-taxation on disposal (display currency, never negative).
+   */
+  vorabpauschaleCredited: string;
+  /**
+   * Total used = realizedGainsAdjusted + incomeYtd + (vorabpauschaleAccrued −
+   * vorabpauschaleCredited), clamped to [0, allowanceAnnual]. The Vorabpauschale term may be
+   * negative (a credit exceeding this year's accrual, e.g. disposing a position whose
+   * Vorabpauschale accrued in a prior year) — that correctly REDUCES usedYtd.
+   */
   usedYtd: string;
   /** remaining = allowanceAnnual − usedYtd (never negative). */
   remaining: string;
@@ -140,9 +160,14 @@ export interface HarvestSuggestionsInput extends AllowanceUsageInput {
  *
  * Algorithm:
  *   1. Walk every CLOSED trade; for each leg whose taxYear === year, tf-adjust the gain
- *      (gain × (1 − tfRate)).  Accumulate per-trade (keyed by instrumentId).
+ *      (gain × (1 − tfRate)).  Accumulate per-trade (keyed by instrumentId). In the same
+ *      per-trade loop (same instrumentId, same tfRate), tf-adjust this year's Vorabpauschale
+ *      accrual (Trade.vorabByYear) and this year's disposal credit (Σ leg.vorabCredit) —
+ *      Vorabpauschale needs a per-instrument rate exactly like gains do; there is no single
+ *      correct blended rate across funds.
  *   2. Sum dividendsByYear for `year` (gross = net + withholding; includes interest/coupons).
- *   3. used = tf-adjusted gains + income, clamped to [0, allowanceAnnual].
+ *   3. used = tf-adjusted gains + income + (tf-adjusted accrual − tf-adjusted credit),
+ *      clamped to [0, allowanceAnnual].
  *   4. remaining = allowanceAnnual − used.
  */
 export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
@@ -151,8 +176,11 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   const taxRate = D(input.taxRate ?? "0.25");
   const currency = input.tradeLog.displayCurrency;
 
-  // Step 1: tf-adjusted realized gains from closed FIFO legs this year.
+  // Step 1: tf-adjusted realized gains from closed FIFO legs this year, plus tf-adjusted
+  // Vorabpauschale accrual/disposal-credit for the same instrument (same tfRate).
   let realizedAdjusted = ZERO;
+  let vorabAccrued = ZERO;
+  let vorabCredited = ZERO;
   for (const trade of input.tradeLog.trades) {
     const tfRaw = input.tfRates[trade.instrumentId];
     const tfRate = tfRaw !== undefined ? D(tfRaw) : ZERO;
@@ -161,10 +189,27 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
     for (const leg of trade.legs) {
       if (leg.taxYear !== year) continue;
       const gain = D(leg.gain);
-      if (gain.isZero()) continue;
       // Only count POSITIVE gains against the allowance (losses can't eat the allowance).
       if (gain.gt(ZERO)) {
         realizedAdjusted = realizedAdjusted.plus(gain.times(multiplier));
+      }
+      // Applied unconditionally on `gain`'s sign (unlike realizedAdjusted, which only
+      // counts positive gains): a disposal credit is real even on a loss-making sell — it
+      // still reduces usedYtd, which on a loss leg means it nets against OTHER income
+      // rather than against this trade's own (excluded) loss. That cross-trade netting is
+      // Verlustverrechnungstopf territory (Workstream 3) — deliberately not modeled here;
+      // doesn't manifest in the validated real data (the one accrual/credit pair was a gain).
+      const credit = D(leg.vorabCredit ?? "0");
+      if (credit.gt(ZERO)) {
+        vorabCredited = vorabCredited.plus(credit.times(multiplier));
+      }
+    }
+
+    for (const va of trade.vorabByYear ?? []) {
+      if (va.year !== year) continue;
+      const amt = D(va.amount);
+      if (amt.gt(ZERO)) {
+        vorabAccrued = vorabAccrued.plus(amt.times(multiplier));
       }
     }
   }
@@ -180,8 +225,12 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
     : ZERO;
   const positiveIncome = Decimal.max(ZERO, incomeGross);
 
-  // Step 3: total used, clamped to [0, allowance].
-  const rawUsed = realizedAdjusted.plus(positiveIncome);
+  // Step 3: total used, clamped to [0, allowance]. The accrual/credit net (vorabAccrued −
+  // vorabCredited) may be negative — a disposal credit exceeding this year's accrual (e.g.
+  // selling a position whose Vorabpauschale accrued in a prior year) correctly REDUCES
+  // usedYtd, same mechanism as TR crediting the accumulated base against a sale's gain.
+  const vorabNet = vorabAccrued.minus(vorabCredited);
+  const rawUsed = realizedAdjusted.plus(positiveIncome).plus(vorabNet);
   const usedYtd = Decimal.min(Decimal.max(ZERO, rawUsed), allowance);
 
   // Step 4: remaining.
@@ -202,6 +251,8 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
     allowanceAnnual: allowance.toFixed(2),
     realizedGainsAdjusted: realizedAdjusted.toFixed(2),
     incomeYtd: positiveIncome.toFixed(2),
+    vorabpauschaleAccrued: vorabAccrued.toFixed(2),
+    vorabpauschaleCredited: vorabCredited.toFixed(2),
     usedYtd: usedYtd.toFixed(2),
     remaining: remaining.toFixed(2),
     taxRate: taxRate.toString(),

@@ -44,6 +44,10 @@ const trEventSchema = z.object({
   originalAmount: z.number().nullish(),
   correctionAmount: z.number().nullish(),
   dateResolutionFailed: z.boolean().nullish(),
+  // Present only on a Vorabpauschale accrual event (tr_export.py's _extract_vorab_base):
+  // the gross taxable base, before Teilfreistellung (applied downstream by @portfolio/core).
+  // Null on every other event, and on a Vorabpauschale event whose base couldn't be parsed.
+  vorabBase: z.number().nullish(),
 });
 
 // TR books crypto under synthetic ISINs (XF000<TICKER>…). Recognised at the source so the
@@ -79,6 +83,10 @@ export function categoryForEventType(eventType: string): ImportCategory {
   if (TRADE_EVENTS.has(eventType)) return "trade";
   if (eventType === CASH_CORPORATE_ACTION) return "income"; // Bardividende
   if (eventType === SHARE_CORPORATE_ACTION) return "income"; // stock dividend / bonus issue
+  // Vorabpauschale: a fund-holding tax accrual, not generic cashflow — group with income
+  // (like dividends/coupons) so opting out of "cashflow" (card spending, deposits) doesn't
+  // silently disable it too.
+  if (eventType === NO_CASH_CORPORATE_ACTION) return "income";
   const action = FIXED_ACTIONS[eventType];
   if (
     action === "buy" ||
@@ -157,6 +165,12 @@ const CASH_BY_SIGN = new Set(["JUNIOR_P2P_TRANSFER", "SSP_TAX_CORRECTION", "CARD
 // A cash corporate action (e.g. "Bardividende") — a dividend when tied to an instrument,
 // otherwise a plain cash credit.
 const CASH_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_CASH";
+
+// A non-cash corporate action. Only one variant is currently mapped: a Vorabpauschale
+// accrual (tr_export.py flags it via `kind: "vorabpauschale"`, gated on the event's own
+// subtitle — see _is_vorabpauschale). Any other SSP_CORPORATE_ACTION_NO_CASH event stays
+// an unmapped_event_type gap rather than being guessed at.
+const NO_CASH_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_NO_CASH";
 
 // Events deliberately not turned into transactions, with the reason surfaced (not dropped).
 //
@@ -452,6 +466,13 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     // genuine free stock-dividend / bonus issue.
     action = ev.amount !== 0 ? "buy" : "bonus";
   }
+  if (!action && ev.eventType === NO_CASH_CORPORATE_ACTION && ev.kind === "vorabpauschale") {
+    // Vorabpauschale accrual: a standalone tax debit tied to a specific fund holding, no
+    // cash movement. `ev.isin` may be absent (a base too — see the tax-block comment below);
+    // both degrade gracefully rather than crashing (isin-less rows never reach the per-
+    // instrument accrual in trade-log.ts, so they're a silent zero-effect booking).
+    action = "tax";
+  }
   if (!action) {
     return skip(`unmapped event type: ${ev.eventType}`, "attention", ev, "unmapped_event_type");
   }
@@ -554,12 +575,23 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
   }
 
   if (action === "tax") {
-    // Standalone tax debit (Vorabpauschale): the magnitude in `price` drives cashFlow(tax) =
-    // −price. A Vorabpauschale event has gross amount 0 with the figure in the tax field, so
-    // source the magnitude from `amount` and fall back to `tax` — using the default
-    // `price = |amount|` alone would emit 0 and the tax would never reduce cash.
+    // Two distinct "tax" representations share this action:
+    //  - EARNINGS: a cash-effecting debit with gross amount 0 and the figure in the tax
+    //    field — source the magnitude from `amount` and fall back to `tax` (the default
+    //    `price = |amount|` alone would emit 0 and the debit would never reduce cash).
+    //  - NO_CASH_CORPORATE_ACTION/vorabpauschale: genuinely non-cash (amount and tax are
+    //    both 0/null), so this expression naturally yields price="0" — the magnitude lives
+    //    in `vorabBase` below instead, which trade-log.ts reads directly (not via price).
     price = formatDecimal(amount !== 0 ? amount : Math.abs(ev.tax ?? 0));
     quantity = "0";
+    // The base-extraction keywords (tr_export.py's _extract_vorab_base) are unverified
+    // against a captured detail payload for this event (only its summary line survives in
+    // any local export — see the plan). If detection fired (`kind` set) but no base could
+    // be parsed, don't silently book a zero-effect row and let the gap go unnoticed — flag
+    // it for review the same way a reconciliation mismatch does elsewhere in this function.
+    if (ev.kind === "vorabpauschale" && ev.vorabBase == null) {
+      confidence = 0.5;
+    }
   }
 
   // Asset class at the source: crypto when TR's synthetic ISIN says so, else equity/ETF
@@ -609,6 +641,9 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     venue: ev.venue ?? null,
     description: ev.description ?? null,
     documentRefs: ev.documentRefs ?? null,
+    // Vorabpauschale taxable base (gross); null on every other event, and on a
+    // Vorabpauschale event whose base couldn't be extracted (see trEventSchema).
+    vorabBase: ev.vorabBase != null ? formatDecimal(ev.vorabBase) : null,
   };
   return { draft };
 }
