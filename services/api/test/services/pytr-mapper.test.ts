@@ -91,24 +91,27 @@ describe("mapTrEventToDraft", () => {
     expect(sellWithFeesOnly).toMatchObject({ action: "sell", price: "100", fees: "10" });
   });
 
-  it("prefers TR's reported executedPrice for a sell's price over reconstructing from tax", () => {
-    // `tax` at sync time is only TR's preliminary trade-time withholding estimate — it can be
-    // corrected sharply later (settlement PDF / "Steuerliche Optimierung" true-up) without
-    // `price` being recomputed, which used to silently break qty·price−fees−tax=amount and
-    // over/under-credit cash by the full tax delta (2026-07 cash-drift bug, see tr_cash.md).
-    // `executedPrice` is TR's own reported per-share fill price and doesn't depend on `tax`, so
-    // price must come from it directly whenever it's present — regardless of what `tax` says.
+  it("prefers TR's reported executedPrice for a sell's price, and derives tax from net proceeds rather than trusting ev.tax", () => {
+    // `ev.tax` at sync time is only TR's preliminary trade-time withholding estimate — it can be
+    // corrected sharply later (settlement PDF / "Steuerliche Optimierung" true-up). The old fix
+    // (price = executedPrice, tax = ev.tax verbatim) still broke qty·price−fees−tax=amount
+    // whenever ev.tax disagreed with the net-derived figure — a *second* cash-drift regression
+    // this test now guards against (see tr_cash.md, "the persisted no-PDF sell path"). `amount`
+    // is TR's own net cash CREDITED and already reflects the real settled withholding, so tax
+    // must be derived from it (notional − fees − amount), not read off `ev.tax`.
     const sell = draftOf({
       ...base,
       eventType: "ORDER_EXECUTED",
       amount: 686.87,
       fees: -1,
-      tax: -119.36, // wildly inflated vs. the real settled tax (30.23) — must not affect price
+      tax: -119.36, // wildly inflated preliminary estimate — must not be used verbatim
       shares: -21.314851,
       isin: "GB00BP6MXD84",
       executedPrice: 33.69,
     });
-    expect(sell).toMatchObject({ action: "sell", price: "33.69", fees: "1", tax: "119.36" });
+    // price = executedPrice; tax = net-derived (21.314851×33.69 − 1 − 686.87 ≈ 30.23), not 119.36.
+    // cashFlow identity holds: qty·price − fees − tax = 686.87 = amount.
+    expect(sell).toMatchObject({ action: "sell", price: "33.69", fees: "1", tax: "30.23" });
 
     // Falls back to the tax-based reconstruction when TR reports no executedPrice.
     const sellNoExecutedPrice = draftOf({
@@ -121,6 +124,21 @@ describe("mapTrEventToDraft", () => {
       isin: "DE0007236101",
     });
     expect(sellNoExecutedPrice).toMatchObject({ action: "sell", price: "100" });
+
+    // A realized loss nets against gains → a tax CREDIT. The net-derived tax must come out
+    // negative (not clamped to 0/abs), so cashFlow adds it back rather than subtracting it.
+    const sellAtALoss = draftOf({
+      ...base,
+      eventType: "ORDER_EXECUTED",
+      amount: 1406.85,
+      fees: -1,
+      tax: -19.98, // preliminary estimate assumed a gain that didn't exist
+      shares: -9.826228,
+      isin: "US00287Y1091",
+      executedPrice: 142.76,
+    });
+    // notional = 9.826228×142.76 ≈ 1402.79; tax = 1402.79 − 1 − 1406.85 ≈ −5.06.
+    expect(sellAtALoss).toMatchObject({ action: "sell", price: "142.76", tax: "-5.06" });
   });
 
   it("maps savings plan executions and keeps the plan id", () => {

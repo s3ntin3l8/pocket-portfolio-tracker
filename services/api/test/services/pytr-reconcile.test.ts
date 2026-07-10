@@ -90,9 +90,11 @@ function adjustmentTx(p: Partial<CoreTransaction>): CoreTransaction {
 }
 
 describe("netManualAdjustments", () => {
-  // reconcileCash is deliberately feed-only (mapTrEvents) and never sees stored rows — a
-  // manual `adjustment` transaction must be folded in separately at read time, or booking
-  // the true-up would fix holdings cash but leave reconciliation_gap firing forever.
+  // reconcileCash is deliberately feed-only (mapTrEvents) and never sees stored rows — any
+  // manual-source (source:"manual") correction — a plain `adjustment` true-up, or a same-typed
+  // correction like a negative manual `dividend` (see tr_cash.md's Realty Income ghost-dividend
+  // fix) — must be folded in separately at read time, or booking the true-up would fix holdings
+  // cash but leave reconciliation_gap firing forever.
   const gap: ReconciliationGap = {
     cash: [{ currency: "EUR", reported: "3437.40", derived: "3466.12", diff: "-28.72" }],
   };
@@ -104,7 +106,19 @@ describe("netManualAdjustments", () => {
     ]);
   });
 
-  it("is a no-op when there are no adjustment transactions", () => {
+  it("folds a manual-source correction of a non-adjustment type (e.g. a negative dividend)", () => {
+    // The Realty Income ghost-dividend fix (tr_cash.md): kept as `dividend`-type (not
+    // `adjustment`) so income/tax-withheld reporting stays correct, but must still clear the
+    // banner via source==="manual", not type==="adjustment".
+    const result = netManualAdjustments(gap, [
+      adjustmentTx({ type: "dividend", source: "manual", price: "-26.70" }),
+    ]);
+    expect(result.cash).toEqual([
+      expect.objectContaining({ currency: "EUR", reported: "3437.40", derived: "3439.42", diff: "-2.02" }),
+    ]);
+  });
+
+  it("is a no-op when there are no manual-source or adjustment transactions", () => {
     const result = netManualAdjustments(gap, [
       { ...adjustmentTx({ type: "buy", quantity: "1", price: "100" }) },
     ]);

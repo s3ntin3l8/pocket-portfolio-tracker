@@ -1270,12 +1270,12 @@ export async function transactionsRoute(app: FastifyInstance) {
         | ReconciliationGap
         | null
         | undefined;
-      // Fold any manual `adjustment` transactions into the sync-derived reconciliation
-      // before anomaly detection: reconcileCash (services/pytr/reconcile.ts) is
-      // deliberately feed-only and never sees stored rows, so a user's true-up for a known
-      // feed-vs-reality gap would otherwise fix holdings cash but leave
-      // reconciliation_gap firing forever. netManualAdjustments is a no-op when there are
-      // no adjustment rows.
+      // Fold manual correction transactions into the sync-derived reconciliation before
+      // anomaly detection: reconcileCash (services/pytr/reconcile.ts) is deliberately
+      // feed-only and never sees stored rows, so a user's true-up for a known feed-vs-reality
+      // gap (a plain `adjustment` row, or a same-typed correction like a negative manual
+      // `dividend`) would otherwise fix holdings cash but leave reconciliation_gap firing
+      // forever. netManualAdjustments is a no-op when there are no such rows.
       const reconciliation = rawReconciliation
         ? netManualAdjustments(rawReconciliation, coreTxns)
         : rawReconciliation;

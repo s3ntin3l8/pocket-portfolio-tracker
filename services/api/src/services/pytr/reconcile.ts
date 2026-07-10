@@ -125,18 +125,34 @@ export function reconcileCash(
 }
 
 // `reconcileCash` derives purely from the raw TR feed (mapTrEvents), never from stored
-// rows — that's deliberate, it answers "did we map every feed event." A manual
-// `adjustment` transaction is the user's own correction for a known feed-vs-reality gap
-// the feed itself gives no signal for (see the 3b investigation); it lives only in
-// storage, so it can't move `reconcileCash`'s derived total. Fold it in here, at read
-// time, so booking the true-up actually clears the `reconciliation_gap` warning instead
-// of just fixing the holdings-cash number on a different screen. `cashFlow` already
-// zeroes archived/draft rows, so an unconfirmed adjustment has no effect until confirmed.
+// rows — that's deliberate, it answers "did we map every feed event." A manual `adjustment`
+// transaction is the user's own correction for a known feed-vs-reality gap the feed itself
+// gives no signal for (see the 3b investigation); it lives only in storage, so it can't
+// move `reconcileCash`'s derived total. Fold it in here, at read time, so booking the
+// true-up actually clears the `reconciliation_gap` warning instead of just fixing the
+// holdings-cash number on a different screen.
+//
+// A same-typed correction (e.g. a manual, negative-priced `dividend` reversing a feed-side
+// ghost dividend — see tr_cash.md's Realty Income fix) needs the SAME fold, but must NOT be
+// caught by a blanket "any source:manual row" rule: a manual `deposit`/`buy`/`withdrawal` is
+// typically a REAL cash movement the feed independently reports (or will, once synced) —
+// folding it in would mask a genuine mapping gap instead of fixing a known one (this broke
+// a real deposit+adjustment test case; caught the hard way). The narrow, unambiguous signal
+// is: a manual INCOME-type row (dividend/coupon/interest/bonus_cash) with a NEGATIVE price.
+// TR never reports a real distribution as negative, so such a row can only be a correction,
+// never a genuine income event — safe to fold unconditionally.
 export function netManualAdjustments(
   rec: ReconciliationGap,
   transactions: CoreTransaction[],
 ): ReconciliationGap {
-  const adjustments = transactions.filter((tx) => tx.type === "adjustment");
+  const INCOME_TYPES = new Set(["dividend", "coupon", "interest", "bonus_cash"]);
+  const adjustments = transactions.filter(
+    (tx) =>
+      tx.type === "adjustment" ||
+      (tx.source === "manual" &&
+        INCOME_TYPES.has(tx.type) &&
+        new Decimal(tx.price).isNegative()),
+  );
   if (adjustments.length === 0) return rec;
 
   const byCurrency = new Map<string, Decimal>();

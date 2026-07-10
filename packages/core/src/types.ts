@@ -78,6 +78,10 @@ export interface CoreTransaction {
   savingsPlanId?: string | null;
   // Visibility/lifecycle status (see {@link TransactionStatus}). undefined ⇒ "normal".
   status?: TransactionStatus | null;
+  // DB provenance ("manual" | "pytr" | "ibkr" | "csv" | "pdf" | "screenshot" | ...). Used by
+  // netManualAdjustments (services/pytr/reconcile.ts) to fold user-entered corrections into a
+  // feed-derived reconciliation the feed itself can never see. null/undefined elsewhere.
+  source?: string | null;
 }
 
 export interface CorporateAction {
