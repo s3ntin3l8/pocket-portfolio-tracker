@@ -351,6 +351,9 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
   let quantity = "0";
   let price = formatDecimal(amount); // cash lump sum by default (deposit/withdrawal/dividend/...)
   let confidence = 1;
+  // Overrides the default `ev.tax`-derived draft.tax below. Only set for a sell with a
+  // reported executedPrice (see the sell branch) — every other action keeps using ev.tax as-is.
+  let sellTaxOverride: number | null = null;
 
   if (action === "buy" || action === "sell" || action === "savings_plan") {
     const shares = Math.abs(ev.shares ?? 0);
@@ -364,16 +367,28 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
         // sell's `tax` at sync time is only ever TR's preliminary trade-time withholding
         // estimate — the real, cost-basis-aware figure is settled later (via the invoice PDF
         // or a "Steuerliche Optimierung" true-up) and can differ sharply (see tr_cash.md).
-        // Reconstructing price from that estimate (the old approach, kept below as a
-        // fallback) ties `price` to `tax`; if a later enrichment pass corrects `tax` without
-        // recomputing `price`, the cash identity qty·price − fees − tax silently breaks and
-        // cash gets over/under-credited by the full tax delta. `executedPrice` is TR's own
-        // reported per-share fill price — stable and already correct at initial sync — so
-        // using it directly avoids the coupling entirely.
         price = formatDecimal(Math.abs(ev.executedPrice));
+        // `amount` is TR's own net cash CREDITED for this sell — unlike the preliminary
+        // trade-time `tax` estimate, it already reflects the real, settled withholding (this
+        // is empirically confirmed: it exactly matches the settlement-PDF tax in every case
+        // checked — see tr_cash.md). So derive `tax` from it instead of trusting `ev.tax`:
+        // tax = notional − fees − netProceeds. This is the ONLY tax value for which
+        // cashFlow (qty·price − fees − tax) reproduces `amount` exactly — using `ev.tax`
+        // directly here would silently break that identity the same way the old
+        // price-reconstruction did (see the 2026-07 cash-drift bug in tr_cash.md). Not
+        // Math.abs'd: a sell whose withholding nets to a credit (losses offsetting gains)
+        // yields a negative tax, which cashFlow already handles (subtracting a negative adds
+        // cash back).
+        // Rounded to cents (unlike `price`, which intentionally keeps full precision for
+        // fractional-share math): this is a EUR currency amount, and shares×execPrice carries
+        // float noise past the 2nd decimal that has no business surviving into `tax`.
+        const notional = shares * Math.abs(ev.executedPrice);
+        sellTaxOverride = Math.round((notional - fees - amount) * 100) / 100;
       } else {
         // Fallback when TR doesn't report an execution price: reconstruct gross price so
         // cashFlow = qty·grossPrice − fees − tax = amount (pytr `amount` = net cash credited).
+        // No executedPrice means no independent cross-check on `tax` either, so this keeps
+        // trusting the (possibly preliminary) ev.tax as before — unchanged fallback behavior.
         const sellTax = Math.abs(ev.tax ?? 0);
         price = formatDecimal((amount + fees + sellTax) / shares);
       }
@@ -463,8 +478,16 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
         ? "reinvestment"
         : (EVENT_KIND[ev.eventType] ?? null)),
     // For a standalone `tax` debit the magnitude already lives in `price`; leave the tax
-    // FIELD null so the display's gross (price + tax) doesn't double-count it.
-    tax: action === "tax" ? null : ev.tax != null ? formatDecimal(Math.abs(ev.tax)) : null,
+    // FIELD null so the display's gross (price + tax) doesn't double-count it. A sell with a
+    // reported executedPrice uses the net-derived override (see above) instead of ev.tax.
+    tax:
+      action === "tax"
+        ? null
+        : sellTaxOverride != null
+          ? formatDecimal(sellTaxOverride)
+          : ev.tax != null
+            ? formatDecimal(Math.abs(ev.tax))
+            : null,
     executedPrice: ev.executedPrice != null ? formatDecimal(ev.executedPrice) : null,
     fxRate: ev.fxRate != null ? formatDecimal(ev.fxRate) : null,
     venue: ev.venue ?? null,

@@ -19,6 +19,7 @@ export function txRowToCore(r: TxRow): CoreTransaction {
     tax: r.tax,
     savingsPlanId: r.savingsPlanId,
     status: r.status,
+    source: r.source,
   };
 }
 
