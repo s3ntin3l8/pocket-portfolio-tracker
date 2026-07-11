@@ -67,7 +67,8 @@ All config is read from `app.config` (typed in `services/api/src/plugins/env.ts`
 
 - **Database** — `DATABASE_URL` (Postgres; `pglite://` for embedded local/test).
 - **Auth** — `AUTHENTIK_ISSUER`, `AUTHENTIK_CLIENT_ID/SECRET`, `AUTH_SECRET`, `AUTH_URL`,
-  `NEXT_PUBLIC_API_URL`; `AUTHENTIK_ADMIN_GROUP` gates the provider-admin UI.
+  `API_URL` (server-only — the browser reaches the API through the web app's same-origin
+  proxy, never directly); `AUTHENTIK_ADMIN_GROUP` gates the provider-admin UI.
 - **Storage** — `STORAGE_*` (Supabase Storage or local MinIO) for screenshots.
 - **Screenshot parsing** — `SCREENSHOT_PARSER` + per-provider keys (Claude / Gemini /
   OpenRouter / Ollama).

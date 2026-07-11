@@ -37,7 +37,16 @@ function isLocalHost(host: string): boolean {
   );
 }
 
-export function isAllowedHost(hostHeader: string | null): boolean {
+/**
+ * Validates the SAME header Auth.js's `trustHost: true` actually derives its callback/
+ * cookie origin from. Auth.js reads `x-forwarded-host` when present (falling back to
+ * `host`), so checking only `host` here would let a spoofed `x-forwarded-host` steer
+ * Auth.js's origin while this guard still saw (and approved) the real `Host` header.
+ * Depends on Traefik overwriting/stripping any client-supplied `x-forwarded-host` rather
+ * than passing it through — see the deployment's Traefik config.
+ */
+export function isAllowedHost(headers: Pick<Headers, "get">): boolean {
+  const hostHeader = headers.get("x-forwarded-host") ?? headers.get("host");
   const host = hostHeader ? hostName(hostHeader) : null;
   if (!host) return false;
   if (configuredAllowedHosts().has(host)) return true;
@@ -45,11 +54,16 @@ export function isAllowedHost(hostHeader: string | null): boolean {
 }
 
 export function bypassI18n(pathname: string): boolean {
-  return pathname === "/api/auth" || pathname.startsWith("/api/auth/");
+  return (
+    pathname === "/api/auth" ||
+    pathname.startsWith("/api/auth/") ||
+    pathname === "/api/backend" ||
+    pathname.startsWith("/api/backend/")
+  );
 }
 
 export default function proxy(request: NextRequest) {
-  if (!isAllowedHost(request.headers.get("host"))) {
+  if (!isAllowedHost(request.headers)) {
     return new NextResponse("Misdirected Request", { status: 421 });
   }
   if (bypassI18n(request.nextUrl.pathname)) {
@@ -59,6 +73,7 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Match app pathnames plus Auth.js API routes so the host guard covers callbacks.
-  matcher: ["/api/auth/:path*", "/((?!api|_next|_vercel|.*\\..*).*)"],
+  // Match app pathnames plus Auth.js API routes and the same-origin backend proxy
+  // (app/api/backend/[...path]) so the host guard covers all of them.
+  matcher: ["/api/auth/:path*", "/api/backend/:path*", "/((?!api|_next|_vercel|.*\\..*).*)"],
 };

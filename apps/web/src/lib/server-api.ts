@@ -41,13 +41,13 @@ import {
   type DocumentCategory,
 } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
-import { auth } from "@/auth";
 import {
   SELECTED_PORTFOLIO_COOKIE,
   HOLDER_SCOPE_PREFIX,
   qualifyingHolders,
 } from "@/lib/portfolio-selection";
 import { toApiRange, type InstrumentPriceRange } from "@/lib/instrument-price-range";
+import { accessTokenFromCookieHeader } from "@/lib/session-token";
 
 /**
  * The active scope derived from the `pf` cookie.
@@ -79,8 +79,10 @@ export async function getSelectedPortfolioId(): Promise<string | null> {
   return scope.kind === "portfolio" ? scope.portfolioId : null;
 }
 
-/** API base URL — config-driven so the web app can move to Vercel without a rewrite. */
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+// Server-only — the API's internal address (e.g. http://api:3000 inside the Docker
+// network in prod). Called directly, server-to-server; never exposed to the browser
+// (the browser instead goes through the same-origin proxy, see lib/api.ts).
+const apiBaseUrl = process.env.API_URL ?? "";
 
 // Auth is only enforced once configured (mirrors the (app) layout). Without it
 // there's no access token and the API can't be reached, so reads report
@@ -92,13 +94,16 @@ const authConfigured = Boolean(
 /** A server-bound api-client carrying the current session's access token, or null. */
 async function getServerApi(): Promise<ApiClient | null> {
   if (!authConfigured) return null;
-  const session = await auth();
-  const token = session?.accessToken;
+  const cookieHeader = (await cookies())
+    .getAll()
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+  const token = await accessTokenFromCookieHeader(cookieHeader);
   if (!token) return null;
   // Snapshotting the token in the closure is safe here: this client is per-request and
   // short-lived (it doesn't outlive a single RSC render). The long-lived client-side hook
-  // (`useApiClient` in lib/api.ts) reads the token live from a ref instead, because its
-  // client can outlive the token (e.g. a backgrounded multi-file import). Don't copy this
+  // (`useApiClient` in lib/api.ts) doesn't hold a token at all anymore — it goes through
+  // the same-origin proxy, which re-resolves the token on every request. Don't copy this
   // snapshot pattern into a long-lived context.
   return createApiClient({ baseUrl: apiBaseUrl, getToken: () => token });
 }

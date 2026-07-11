@@ -1,0 +1,131 @@
+# Production deployment scoped to this setup: Supabase Cloud for both Postgres and object
+# storage (no postgres/minio services — see docker-compose.yml for the local-dev-parity
+# stack that has them), an existing self-hosted Traefik instance (external `proxy` network;
+# see docker-compose.traefik.yml for the reference config it should match), and Authentik
+# OIDC.
+#
+# `api` has NO Traefik labels and never joins the `proxy` network — only `web` is publicly
+# routed. The browser reaches the API exclusively through web's same-origin proxy
+# (apps/web/src/app/api/backend/[...path]/route.ts); RSC reads call the API directly,
+# server-to-server, also over the internal `backend` network. This is the security-hardening
+# plan's Part B payoff: the Fastify API needs no public ingress at all.
+#
+# HARD DEPENDENCY: this compose file assumes Part B (the same-origin proxy) is already
+# merged and live-verified. Deploying it before that lands leaves the browser with no path
+# to the API — RSC pages would still render, but every client-side fetch would fail.
+#
+# Usage:
+#   cp .env.example .env.prod              # fill in Supabase / Authentik / provider secrets
+#   docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# (or: `make prod` — see the Makefile)
+#
+# Secrets are declared explicitly per service via `${VAR}` substitution from .env.prod
+# (which docker compose loads for variable substitution only), not a blanket `env_file:`
+# shared by both containers — `web` has no business holding DB_ENCRYPTION_KEY/
+# STORAGE_SECRET_KEY/provider API keys, and `api` has no business holding AUTH_SECRET/
+# AUTHENTIK_CLIENT_SECRET.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
+      AUTHENTIK_AUDIENCE: ${AUTHENTIK_AUDIENCE}
+      AUTHENTIK_ADMIN_GROUP: ${AUTHENTIK_ADMIN_GROUP}
+      # No CORS_ORIGIN: after Part B the browser never calls the API directly — deny all
+      # cross-origin by default. Only set this if the API is ever also exposed publicly
+      # (see the plan's "Also expose the API publicly" alternative, not used here).
+      # The API sits behind `web`'s proxy, not directly behind Traefik — trust `web` (the
+      # `backend` network's pinned subnet below) as the sole forwarder, not Traefik's IP.
+      TRUSTED_PROXY_CIDRS: ${API_TRUSTED_PROXY_CIDRS:-172.28.0.0/24}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
+      STORAGE_REGION: ${STORAGE_REGION}
+      STORAGE_BUCKET: ${STORAGE_BUCKET}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_FORCE_PATH_STYLE: ${STORAGE_FORCE_PATH_STYLE:-true}
+      STORAGE_SIGNED_URL_TTL: ${STORAGE_SIGNED_URL_TTL:-3600}
+      # Screenshot parsing (pick whichever provider(s) you've configured — see .env.example).
+      SCREENSHOT_PARSER: ${SCREENSHOT_PARSER:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_VISION_MODEL: ${ANTHROPIC_VISION_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_VISION_MODEL: ${GEMINI_VISION_MODEL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-}
+      # Market data providers (all optional — see .env.example for what each unlocks).
+      ITICK_API_KEY: ${ITICK_API_KEY:-}
+      TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
+      GOLDAPI_KEY: ${GOLDAPI_KEY:-}
+      OPENFIGI_API_KEY: ${OPENFIGI_API_KEY:-}
+      EODHD_API_KEY: ${EODHD_API_KEY:-}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      # Trade Republic sync — the venv is baked into the image (see root Dockerfile).
+      PYTR_PYTHON_BIN: /opt/pytr-venv/bin/python
+      # Opt-in rotating file logs inside the container; unset by default (journald/
+      # CloudWatch already capture container stdout in most setups) — see LOG_DIR in
+      # .env.example / services/api/src/app.ts's resolveLogDestination().
+      LOG_DIR: ${LOG_DIR:-}
+    volumes:
+      - apilogs:/app/logs
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    networks:
+      - backend
+      - proxy
+    environment:
+      NODE_ENV: production
+      # Internal-only — resolved server-side per request, never sent to the browser.
+      API_URL: http://api:3000
+      AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}
+      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL}
+      WEB_ALLOWED_HOSTS: ${WEB_ALLOWED_HOSTS}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.pocket-web.rule=Host(`${WEB_HOST}`)
+      - traefik.http.routers.pocket-web.entrypoints=websecure
+      - traefik.http.routers.pocket-web.tls=true
+      - traefik.http.routers.pocket-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}
+      - traefik.http.services.pocket-web.loadbalancer.server.port=3005
+      # Optional: attach a security-headers middleware IF an equivalent is defined in your
+      # real Traefik deployment (see docker-compose.traefik.yml's secure-headers example).
+      # Commented out by default — a router referencing a middleware that doesn't resolve
+      # is disabled entirely, so only uncomment once the middleware actually exists.
+      # - traefik.http.routers.pocket-web.middlewares=secure-headers@docker
+
+networks:
+  proxy:
+    external: true
+  # Dedicated internal network between `api` and `web` only — `api` is never on `proxy`.
+  # NOT `internal: true`: the API needs real outbound egress (Supabase, Authentik JWKS,
+  # market-data providers, LLM vision APIs); a plain user-defined bridge already gets NAT'd
+  # internet access without that flag, and `internal: true` would block it entirely.
+  # Subnet is pinned via `ipam` rather than left to Docker's auto-assignment — an
+  # auto-assigned subnet can drift across recreation, which would silently break the
+  # TRUSTED_PROXY_CIDRS match above. If you change this subnet, update
+  # API_TRUSTED_PROXY_CIDRS (or the default above) to match.
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  apilogs:

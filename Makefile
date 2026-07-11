@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web test test-coverage lint typecheck format build clean
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web test test-coverage lint typecheck format build clean prod prod-down prod-logs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -26,6 +26,15 @@ services: ## Start local backing services (Postgres + MinIO)
 
 services-down: ## Stop local backing services
 	docker compose down
+
+prod: ## Build and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
+	docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+prod-down: ## Stop the production stack
+	docker compose -f docker-compose.prod.yml --env-file .env.prod down
+
+prod-logs: ## Follow logs from the production stack
+	docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f
 
 dev: ## Start all dev servers (API + web via Turbo)
 	npm run dev

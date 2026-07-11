@@ -9,6 +9,7 @@ import { overrideMarketData, invalidateMarketData } from "../../src/services/mar
 
 const ISSUER = "https://auth.test/application/o/portfolio/";
 const AUDIENCE = "portfolio-tracker";
+const ADMIN_GROUP = "Admins";
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 
@@ -16,8 +17,8 @@ let app: App;
 let privateKey: CryptoKey;
 let publicJwk: JWK;
 
-async function token(sub: string, email = `${sub}@example.com`) {
-  return new SignJWT({ email })
+async function token(sub: string, email = `${sub}@example.com`, groups?: string[]) {
+  return new SignJWT({ email, ...(groups ? { groups } : {}) })
     .setProtectedHeader({ alg: "ES256" })
     .setSubject(sub)
     .setIssuer(ISSUER)
@@ -25,6 +26,12 @@ async function token(sub: string, email = `${sub}@example.com`) {
     .setIssuedAt()
     .setExpirationTime("1h")
     .sign(privateKey);
+}
+
+// A token whose `groups` claim includes the configured admin group — for
+// requireAdmin-gated routes (instrument PATCH, corporate-actions writes).
+async function adminToken(sub: string) {
+  return token(sub, `${sub}@example.com`, [ADMIN_GROUP]);
 }
 
 const auth = (t: string) => ({ authorization: `Bearer ${t}` });
@@ -36,6 +43,7 @@ describe("auth + portfolios + transactions", () => {
     publicJwk = await exportJWK(kp.publicKey);
     process.env.AUTHENTIK_ISSUER = ISSUER;
     process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.AUTHENTIK_ADMIN_GROUP = ADMIN_GROUP;
     // This suite shares one app across many requests in a single rate-limit window.
     process.env.RATE_LIMIT_MAX = "10000";
     app = await buildApp({ authKey: kp.publicKey });
@@ -50,6 +58,7 @@ describe("auth + portfolios + transactions", () => {
     invalidateMarketData();
     delete process.env.AUTHENTIK_ISSUER;
     delete process.env.AUTHENTIK_AUDIENCE;
+    delete process.env.AUTHENTIK_ADMIN_GROUP;
     delete process.env.RATE_LIMIT_MAX;
   });
 
@@ -609,8 +618,9 @@ describe("auth + portfolios + transactions", () => {
     expect(blank.statusCode).toBe(400);
   });
 
-  it("patches an instrument's ISIN and WKN", async () => {
+  it("patches an instrument's ISIN and WKN (admin only)", async () => {
     const t = await token("user-a");
+    const admin = await adminToken("instrument-admin");
     const create = await app.inject({
       method: "POST",
       url: "/instruments",
@@ -619,10 +629,19 @@ describe("auth + portfolios + transactions", () => {
     });
     const inst = create.json();
 
-    const patch = await app.inject({
+    // A non-admin (even the instrument's own creator) is rejected.
+    const forbidden = await app.inject({
       method: "PATCH",
       url: `/instruments/${inst.id}`,
       headers: auth(t),
+      payload: { isin: "DE0007236101", wkn: "723610" },
+    });
+    expect(forbidden.statusCode).toBe(403);
+
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/instruments/${inst.id}`,
+      headers: auth(admin),
       payload: { isin: "DE0007236101", wkn: "723610" },
     });
     expect(patch.statusCode).toBe(200);
@@ -631,6 +650,7 @@ describe("auth + portfolios + transactions", () => {
 
   it("patches an instrument's market (corrects a mis-mapped import)", async () => {
     const t = await token("user-a");
+    const admin = await adminToken("instrument-admin");
     const create = await app.inject({
       method: "POST",
       url: "/instruments",
@@ -642,7 +662,7 @@ describe("auth + portfolios + transactions", () => {
     const patch = await app.inject({
       method: "PATCH",
       url: `/instruments/${inst.id}`,
-      headers: auth(t),
+      headers: auth(admin),
       payload: { market: "US" },
     });
     expect(patch.statusCode).toBe(200);
@@ -651,6 +671,7 @@ describe("auth + portfolios + transactions", () => {
 
   it("returns 409 when patching an instrument with an ISIN already owned by another row", async () => {
     const t = await token("user-a");
+    const admin = await adminToken("instrument-admin");
     const isin = "DE000SAP0011";
     await app.inject({
       method: "POST",
@@ -667,7 +688,7 @@ describe("auth + portfolios + transactions", () => {
     const conflict = await app.inject({
       method: "PATCH",
       url: `/instruments/${row2.json().id}`,
-      headers: auth(t),
+      headers: auth(admin),
       payload: { isin },
     });
     expect(conflict.statusCode).toBe(409);
@@ -1235,6 +1256,7 @@ describe("auth + portfolios + transactions", () => {
 
   it("applies a corporate action (2:1 split) to derived holdings", async () => {
     const t = await token("ca-user");
+    const admin = await adminToken("ca-admin");
     const portfolioId = (
       await app.inject({
         method: "POST",
@@ -1267,11 +1289,20 @@ describe("auth + portfolios + transactions", () => {
       },
     });
 
+    // A non-admin cannot record a corporate action, even for their own holding.
+    const forbidden = await app.inject({
+      method: "POST",
+      url: "/corporate-actions",
+      headers: auth(t),
+      payload: { instrumentId: inst.id, type: "split", ratio: "2", exDate: "2026-02-01" },
+    });
+    expect(forbidden.statusCode).toBe(403);
+
     // 2:1 split with an ex-date after the purchase.
     const ca = await app.inject({
       method: "POST",
       url: "/corporate-actions",
-      headers: auth(t),
+      headers: auth(admin),
       payload: { instrumentId: inst.id, type: "split", ratio: "2", exDate: "2026-02-01" },
     });
     expect(ca.statusCode).toBe(201);
@@ -1297,6 +1328,7 @@ describe("auth + portfolios + transactions", () => {
 
   it("edits and deletes a corporate action, recomputing holdings", async () => {
     const t = await token("ca-edit-user");
+    const admin = await adminToken("ca-edit-admin");
     const portfolioId = (
       await app.inject({
         method: "POST",
@@ -1332,16 +1364,31 @@ describe("auth + portfolios + transactions", () => {
       await app.inject({
         method: "POST",
         url: "/corporate-actions",
-        headers: auth(t),
+        headers: auth(admin),
         payload: { instrumentId: inst.id, type: "split", ratio: "2", exDate: "2026-02-01" },
       })
     ).json();
+
+    // A non-admin can neither edit nor delete it.
+    const forbiddenPatch = await app.inject({
+      method: "PATCH",
+      url: `/corporate-actions/${ca.id}`,
+      headers: auth(t),
+      payload: { ratio: "3" },
+    });
+    expect(forbiddenPatch.statusCode).toBe(403);
+    const forbiddenDelete = await app.inject({
+      method: "DELETE",
+      url: `/corporate-actions/${ca.id}`,
+      headers: auth(t),
+    });
+    expect(forbiddenDelete.statusCode).toBe(403);
 
     // PATCH the ratio 2:1 → 3:1; holdings recompute to 300 shares.
     const patched = await app.inject({
       method: "PATCH",
       url: `/corporate-actions/${ca.id}`,
-      headers: auth(t),
+      headers: auth(admin),
       payload: { ratio: "3" },
     });
     expect(patched.statusCode).toBe(200);
@@ -1359,7 +1406,7 @@ describe("auth + portfolios + transactions", () => {
     const del = await app.inject({
       method: "DELETE",
       url: `/corporate-actions/${ca.id}`,
-      headers: auth(t),
+      headers: auth(admin),
     });
     expect(del.statusCode).toBe(204);
     const afterDelete = await app.inject({
@@ -1371,19 +1418,19 @@ describe("auth + portfolios + transactions", () => {
       afterDelete.json().holdings.find((h: { instrumentId: string }) => h.instrumentId === inst.id).quantity,
     ).toBe("100");
 
-    // Unknown ids 404.
+    // Unknown ids 404 (for an admin — a non-admin would 403 before reaching that check).
     expect(
       (
         await app.inject({
           method: "PATCH",
           url: `/corporate-actions/${ca.id}`,
-          headers: auth(t),
+          headers: auth(admin),
           payload: { ratio: "5" },
         })
       ).statusCode,
     ).toBe(404);
     expect(
-      (await app.inject({ method: "DELETE", url: `/corporate-actions/${ca.id}`, headers: auth(t) }))
+      (await app.inject({ method: "DELETE", url: `/corporate-actions/${ca.id}`, headers: auth(admin) }))
         .statusCode,
     ).toBe(404);
   });
