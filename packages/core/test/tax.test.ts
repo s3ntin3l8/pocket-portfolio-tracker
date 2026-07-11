@@ -1328,6 +1328,12 @@ describe("harvestSummary", () => {
     // Only the first position is needed to exhaust the allowance (500 > 322).
     expect(result.positionsUsed).toBe(1);
     expect(parseFloat(result.combinedTaxSaving)).toBeLessThan(naiveSum);
+    // The concrete plan directly proves "only the positions actually needed" — despite
+    // 10 suggestions being passed in, the plan names exactly ONE (the first, best-sorted
+    // one), not all 10.
+    expect(result.plan).toEqual([
+      { instrumentId: "stock-0", grossTake: "322.00", adjustedTake: "322.00" },
+    ]);
   });
 
   it("spreads allocation sequentially across multiple smaller positions", () => {
@@ -1342,6 +1348,10 @@ describe("harvestSummary", () => {
     expect(result.combinedHarvestableGross).toBe("200.00");
     expect(result.combinedTaxSaving).toBe("50.00"); // 200 × 0.25
     expect(result.positionsUsed).toBe(2);
+    expect(result.plan).toEqual([
+      { instrumentId: "a", grossTake: "100.00", adjustedTake: "100.00" },
+      { instrumentId: "b", grossTake: "100.00", adjustedTake: "100.00" },
+    ]);
   });
 
   it("Tf-adjusts before allocating, so an ETF consumes less allowance per € of gross gain", () => {
@@ -1359,6 +1369,9 @@ describe("harvestSummary", () => {
     const result = harvestSummary(suggestions, "700", "0.25");
     expect(result.combinedHarvestableGross).toBe("1000.00");
     expect(result.combinedTaxSaving).toBe("175.00"); // 700 × 0.25
+    expect(result.plan).toEqual([
+      { instrumentId: "etf-1", grossTake: "1000.00", adjustedTake: "700.00" },
+    ]);
   });
 
   it("fully tax-exempt positions (tfRate=1) are harvestable even with zero remaining allowance", () => {
@@ -1376,6 +1389,9 @@ describe("harvestSummary", () => {
     expect(result.combinedHarvestableGross).toBe("500.00");
     expect(result.combinedTaxSaving).toBe("0.00");
     expect(result.positionsUsed).toBe(1);
+    expect(result.plan).toEqual([
+      { instrumentId: "exempt-1", grossTake: "500.00", adjustedTake: "0.00" },
+    ]);
   });
 
   it("returns zero when there are no suggestions or no remaining allowance", () => {
@@ -1383,11 +1399,13 @@ describe("harvestSummary", () => {
       positionsUsed: 0,
       combinedHarvestableGross: "0.00",
       combinedTaxSaving: "0.00",
+      plan: [],
     });
     expect(harvestSummary([equitySuggestion("a", "500")], "0", "0.25")).toEqual({
       positionsUsed: 0,
       combinedHarvestableGross: "0.00",
       combinedTaxSaving: "0.00",
+      plan: [],
     });
   });
 });

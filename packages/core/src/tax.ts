@@ -165,9 +165,22 @@ export interface HarvestSuggestion {
   taxSaving: string;
 }
 
+/** One step of the concrete sequential-allocation plan — how much of ONE position to
+ *  realize. Order matches the order `plan` steps were allocated in (best-first, since
+ *  `harvestSuggestions` already sorts that way). */
+export interface HarvestPlanStep {
+  instrumentId: string;
+  /** Gross gain to realize from THIS position (display currency). */
+  grossTake: string;
+  /** Tf-adjusted amount this step draws from the remaining allowance. */
+  adjustedTake: string;
+}
+
 export interface HarvestSummary {
-  /** How many of the input suggestions actually received any allowance (fully-exempt
-   *  positions, tfRate=1, always count even once the allowance is exhausted). */
+  /** = plan.length. How many of the input suggestions actually received any allowance
+   *  (fully-exempt positions, tfRate=1, always count even once the allowance is
+   *  exhausted). Kept as its own field (redundant with plan.length) since callers that
+   *  only need the count shouldn't have to re-derive it. */
   positionsUsed: number;
   /** Combined gross gain realizable across ALL suggestions TOGETHER, sequentially capped
    *  against the SHARED remaining allowance — see {@link harvestSummary}'s doc comment
@@ -176,6 +189,11 @@ export interface HarvestSummary {
   /** Tax saved if exactly `combinedHarvestableGross` (spread across these positions) is
    *  realized. Always ≤ remaining × taxRate. */
   combinedTaxSaving: string;
+  /** The concrete plan: which position(s), and how much of each, to realize the combined
+   *  totals above. Typically MUCH shorter than the input suggestions list — often just
+   *  the single best position, since one large-enough gain can exhaust the whole
+   *  remaining allowance on its own. Empty when nothing is harvestable. */
+  plan: HarvestPlanStep[];
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +501,7 @@ export function harvestSummary(
   let allowanceLeft = D(remaining);
   let combinedGross = ZERO;
   let combinedAdjusted = ZERO;
-  let positionsUsed = 0;
+  const plan: HarvestPlanStep[] = [];
 
   for (const s of suggestions) {
     const tfRate = D(s.tfRate);
@@ -496,7 +514,11 @@ export function harvestSummary(
       // Fully tax-exempt position (tfRate=1): harvestable regardless of remaining
       // allowance — mirrors harvestSuggestions' own guard for this degenerate case.
       combinedGross = combinedGross.plus(unrealizedGross);
-      positionsUsed++;
+      plan.push({
+        instrumentId: s.instrumentId,
+        grossTake: unrealizedGross.toFixed(2),
+        adjustedTake: "0.00",
+      });
       continue;
     }
 
@@ -509,13 +531,18 @@ export function harvestSummary(
     combinedGross = combinedGross.plus(grossTake);
     combinedAdjusted = combinedAdjusted.plus(adjustedTake);
     allowanceLeft = allowanceLeft.minus(adjustedTake);
-    positionsUsed++;
+    plan.push({
+      instrumentId: s.instrumentId,
+      grossTake: grossTake.toFixed(2),
+      adjustedTake: adjustedTake.toFixed(2),
+    });
   }
 
   return {
-    positionsUsed,
+    positionsUsed: plan.length,
     combinedHarvestableGross: combinedGross.toFixed(2),
     combinedTaxSaving: combinedAdjusted.times(rate).toFixed(2),
+    plan,
   };
 }
 
