@@ -3,10 +3,14 @@ import { generateKeyPair, SignJWT } from "jose";
 
 // Mock the PDF text extractor so the route's report-PDF detection runs against a known
 // title without needing a real PDF binary. Kept in its own test file (mirrors
-// imports-dkb-pdf.test.ts) so this mock never leaks into other route tests.
+// imports-dkb-pdf.test.ts) so this mock never leaks into other route tests. Wording
+// mirrors the real TR annual tax-certificate cover letter (confirmed via unpdf
+// extraction against a real document): the printed title is "Jahressteuerbescheinigung",
+// not "Jährlicher Steuerbericht" (that phrase only appears in TR's timeline *event*
+// title metadata, a different data source — see report-pdf.ts's doc comment).
 const REPORT_TEXT =
-  "TRADE REPUBLIC BANK GMBH BRUNNENSTRASSE 19-21 10119 BERLIN SEITE 1 von 12 " +
-  "Jährlicher Steuerbericht 2025 für das Kalenderjahr 2025 Max Mustermann Musterstr. 1 12345 Musterstadt";
+  "Trade Republic Bank GmbH Brunnenstraße 19-21 10119 Berlin Berlin, 06.05.2025 Max Mustermann " +
+  "Musterstr. 1 12345 Musterstadt Jahressteuerbescheinigung für das Jahr 2025 Sehr geehrte Damen und Herren";
 
 vi.mock("../../src/services/parsers/pdf-text.js", () => ({
   extractPdfText: async () => REPORT_TEXT,
@@ -90,7 +94,7 @@ describe("report-PDF detection in POST /imports/screenshot", () => {
       isReport: true,
       reportCategory: "tax_report",
       reportTaxYear: 2025,
-      reportTitle: "Jährlicher Steuerbericht 2025",
+      reportTitle: "Jahressteuerbescheinigung 2025",
     });
 
     // Side-effect-free: no draft import row, no document row for this upload. The
