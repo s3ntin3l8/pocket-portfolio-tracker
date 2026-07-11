@@ -7,7 +7,10 @@ const h = vi.hoisted(() => {
   process.env.AUTH_SECRET = "test-secret";
   process.env.AUTHENTIK_ISSUER = "https://auth.test/o/p/";
   return {
-    session: null as null | { accessToken?: string },
+    // The resolved access token (or null when signed out) — server-api.ts reads this via
+    // the mocked accessTokenFromCookieHeader below, mirroring how it reads the real
+    // session cookie server-side rather than an Auth.js `Session` object.
+    accessToken: null as string | null,
     cookies: {} as Record<string, string>,
     // `never[]` params so any concretely-typed stub (e.g. `(id: string) => …`) assigns.
     client: {} as Record<string, (...args: never[]) => unknown>,
@@ -18,9 +21,12 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
       h.cookies[name] !== undefined ? { value: h.cookies[name] } : undefined,
+    getAll: () => Object.entries(h.cookies).map(([name, value]) => ({ name, value })),
   }),
 }));
-vi.mock("@/auth", () => ({ auth: async () => h.session }));
+vi.mock("@/lib/session-token", () => ({
+  accessTokenFromCookieHeader: async () => h.accessToken,
+}));
 vi.mock("@portfolio/api-client", () => ({ createApiClient: () => h.client }));
 
 import * as api from "../src/lib/server-api";
@@ -32,7 +38,7 @@ const PF = [
 ];
 
 beforeEach(() => {
-  h.session = { accessToken: "tok" }; // signed in by default
+  h.accessToken = "tok"; // signed in by default
   h.cookies = {};
   h.client = {
     // resolveSelection() now always calls listAccountHolders — default to empty list.
@@ -100,7 +106,7 @@ describe("resolveSelection", () => {
   });
 
   it("reports unavailable when not signed in", async () => {
-    h.session = null;
+    h.accessToken = null;
     expect(await api.resolveSelection()).toMatchObject({
       status: "unavailable",
       selectedId: null,
@@ -176,7 +182,7 @@ describe("loadHoldings", () => {
     };
     expect(await api.loadHoldings()).toMatchObject({ status: "unavailable" });
 
-    h.session = null;
+    h.accessToken = null;
     expect(await api.loadHoldings()).toMatchObject({ status: "unavailable" });
   });
 
@@ -295,7 +301,7 @@ describe("loadPortfolio", () => {
     expect(await api.loadPortfolio(async () => 1)).toMatchObject({
       status: "empty",
     });
-    h.session = null;
+    h.accessToken = null;
     expect(await api.loadPortfolio(async () => 1)).toMatchObject({
       status: "unavailable",
     });
@@ -517,7 +523,7 @@ describe("aggregate + misc loaders", () => {
   it("loadMe returns the user or null", async () => {
     h.client.me = async () => ({ id: "u1", authSub: "sub" });
     expect(await api.loadMe()).toMatchObject({ id: "u1" });
-    h.session = null;
+    h.accessToken = null;
     expect(await api.loadMe()).toBeNull();
   });
 });
@@ -587,7 +593,7 @@ describe("loadHarvestPrefill", () => {
   });
 
   it("returns null when not signed in", async () => {
-    h.session = null;
+    h.accessToken = null;
     expect(await api.loadHarvestPrefill("i1")).toBeNull();
   });
 });
@@ -1012,7 +1018,7 @@ describe("loadTaxYearDetail", () => {
   });
 
   it("returns an empty map when not signed in", async () => {
-    h.session = null;
+    h.accessToken = null;
     const holders = [
       { holder: { id: "h1" }, year: 2026, allowanceUsage: baseUsage, harvestSuggestions: [], distribution: {} },
     ] as unknown as TaxSummaryHolder[];
@@ -1125,7 +1131,7 @@ describe("loadAdminStorageProviders", () => {
   });
 
   it("returns unavailable when not signed in", async () => {
-    h.session = null;
+    h.accessToken = null;
     expect(await api.loadAdminStorageProviders()).toMatchObject({
       status: "unavailable",
     });
@@ -1137,7 +1143,7 @@ describe("getServerApi when auth is not configured", () => {
     vi.resetModules();
     delete process.env.AUTH_SECRET;
     const fresh = await import("../src/lib/server-api");
-    h.session = { accessToken: "tok" };
+    h.accessToken = "tok";
     expect(await fresh.loadMe()).toBeNull();
     // restore for any later imports
     process.env.AUTH_SECRET = "test-secret";

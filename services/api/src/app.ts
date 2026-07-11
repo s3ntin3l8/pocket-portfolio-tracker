@@ -175,6 +175,18 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(dbPlugin);
   await app.register(authPlugin, opts);
 
+  // requireAdmin-gated routes (admin/*, instrument PATCH, corporate-actions writes)
+  // become unreachable — including to the deployment's own owner — if no Authentik
+  // group is configured to grant admin. Warn loudly at boot in production so this is
+  // never a silent surprise; local/test envs don't need an admin group configured.
+  if (app.config.NODE_ENV === "production" && !app.config.AUTHENTIK_ADMIN_GROUP) {
+    app.log.warn(
+      "AUTHENTIK_ADMIN_GROUP is unset — admin-only endpoints (admin/*, instrument edits, " +
+        "corporate-action edits) will be unreachable by anyone, including the deployment " +
+        "owner, until it's set to a real Authentik group.",
+    );
+  }
+
   const screenshotParser = opts.screenshotParser ?? (await getScreenshotParser());
   app.decorate("screenshotParser", screenshotParser);
   // Log the selected vision provider once at startup (only for the real singleton, not

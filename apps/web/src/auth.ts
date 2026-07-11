@@ -3,9 +3,13 @@ import Authentik from "next-auth/providers/authentik";
 
 /**
  * Auth.js (NextAuth v5) wired to Authentik via OIDC (Authorization Code + PKCE).
- * The Authentik access token is persisted on the session so the typed api-client can
- * forward it as a Bearer to the Fastify API, which validates it against Authentik's
- * JWKS. Config is env-driven (AUTHENTIK_CLIENT_ID/SECRET/ISSUER, AUTH_SECRET).
+ * The Authentik access token is persisted on the `jwt` token ONLY (never copied onto the
+ * client-visible session, see the `session` callback below) so it stays inside the
+ * httpOnly session cookie. Server code reads it via next-auth/jwt's getToken(): the
+ * same-origin proxy (app/api/backend/[...path]/route.ts) for client-side reads, and
+ * lib/server-api.ts directly for RSC reads. The Fastify API validates it against
+ * Authentik's JWKS either way. Config is env-driven (AUTHENTIK_CLIENT_ID/SECRET/ISSUER,
+ * AUTH_SECRET).
  *
  * Authentik access tokens are short-lived (~5 min), so we request `offline_access`
  * to get a refresh token and silently rotate the access token in the `jwt` callback
@@ -127,7 +131,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     session({ session, token }) {
-      session.accessToken = token.accessToken as string | undefined;
+      // The access token stays on the JWT only — never copied onto the client-visible
+      // session. The browser reaches the API through the same-origin proxy
+      // (app/api/backend/[...path]/route.ts), which reads the token server-side via
+      // next-auth/jwt's getToken(); RSC reads do the same in lib/server-api.ts.
       session.error = token.error as string | undefined;
       return session;
     },

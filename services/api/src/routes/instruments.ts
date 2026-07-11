@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { asc, eq, ilike, or } from "drizzle-orm";
 import { instruments, providerSettings } from "@portfolio/db";
-import { instrumentInputSchema } from "@portfolio/schema";
+import { assetClassSchema, instrumentInputSchema } from "@portfolio/schema";
 import { findOrCreateInstrument, updateInstrument } from "../services/instruments.js";
 import { getMarketData, goldSources, getBorseFrankfurt } from "../services/market-data.js";
 
@@ -17,7 +17,7 @@ const patchInstrumentSchema = z.object({
   wkn: z.string().nullable().optional(),
   symbol: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
-  assetClass: z.string().optional(),
+  assetClass: assetClassSchema.optional(),
   market: z.string().min(1).optional(),
 });
 const enrichQuerySchema = z.object({ q: z.string().trim().min(1) });
@@ -131,9 +131,12 @@ export async function instrumentsRoute(app: FastifyInstance) {
 
   // Update an instrument's editable identifiers (ISIN, WKN, symbol, name, assetClass).
   // Returns 409 when the new ISIN or WKN is already taken by another row.
+  // Admin-gated: this is shared reference data that feeds every user's valuations —
+  // find-or-create (POST, above) stays open since it's load-bearing for normal
+  // add-transaction flows, but editing an existing instrument's identity is not.
   app.patch<{ Params: { id: string } }>(
     "/instruments/:id",
-    { preHandler: app.authenticate },
+    { preHandler: app.requireAdmin },
     async (request, reply) => {
       const patch = patchInstrumentSchema.parse(request.body);
       const result = await updateInstrument(app.db, request.params.id, patch);

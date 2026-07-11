@@ -1,0 +1,118 @@
+# REFERENCE ONLY. You already run Traefik separately (external `proxy` network,
+# `cloudflare` certresolver) — do NOT `docker compose up` this file blind, it would
+# conflict with your existing instance on ports 80/443. This documents the recommended
+# static configuration for exposing an app safely and is meant to be diffed against your
+# real Traefik deployment, not deployed from here.
+#
+# What this encodes, and why:
+#
+#  1. Traefik talks to Docker via a socket-proxy (tecnativa/docker-socket-proxy), never a
+#     raw /var/run/docker.sock bind-mount on Traefik itself. A compromised Traefik
+#     container with direct socket access can root the host; the proxy exposes a
+#     read-only, containers-only subset of the Docker API — enough to discover routable
+#     containers, nothing that can create/start/stop/exec into them.
+#
+#  2. `providers.docker.exposedByDefault=false` — only containers carrying
+#     `traefik.enable=true` are routed. Joining the `proxy` network alone doesn't publish
+#     anything.
+#
+#  3. HTTP (80) redirects to HTTPS (443); TLS via the `cloudflare` DNS-01 resolver (same
+#     name docker-compose.prod.yml's web router references) — no inbound port needs to be
+#     opened for an HTTP-01 challenge, and no port needs to be reachable before DNS
+#     propagates.
+#
+#  4. `entrypoints.websecure.forwardedHeaders.trustedIPs` is scoped to the actual edge in
+#     front of Traefik — your LAN/host, or Cloudflare's published IP ranges
+#     (https://www.cloudflare.com/ips/) if traffic is proxied through Cloudflare rather
+#     than DNS-only. Never leave this unrestricted on an internet-facing entrypoint: it's
+#     what makes X-Forwarded-For trustworthy for both the web app's host guard
+#     (apps/web/src/proxy.ts) and, one hop further in, the API's TRUSTED_PROXY_CIDRS.
+#
+#  5. A baseline `secure-headers` middleware (HSTS/nosniff/frame-deny) as an edge-level
+#     backstop — explicitly NOT a replacement for the app's own header/CSP work
+#     (next.config.mjs's `headers()`). Either layer alone should still hold if the other
+#     drifts; attach it to app routers via `traefik.http.routers.<name>.middlewares=
+#     secure-headers@docker` (see docker-compose.prod.yml's commented-out example).
+#
+#  6. The dashboard is gated behind basicauth on its own host rule, not left on
+#     `api.insecure=true` (which serves it unauthenticated on every entrypoint).
+#
+# Fill in TRAEFIK_TRUSTED_EDGE_CIDRS / ACME_EMAIL / CF_DNS_API_TOKEN / BASE_DOMAIN /
+# TRAEFIK_DASHBOARD_HTPASSWD via your real Traefik's env before using any of this as a
+# diff reference.
+
+services:
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://docker-socket-proxy:2375
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=proxy
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.forwardedHeaders.trustedIPs=${TRAEFIK_TRUSTED_EDGE_CIDRS}
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.cloudflare.acme.storage=/letsencrypt/acme.json
+      - --api.dashboard=true
+      - --api.insecure=false
+      - --log.level=INFO
+      - --accesslog=true
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - proxy
+    volumes:
+      - letsencrypt:/letsencrypt
+    labels:
+      # Dashboard: gated behind auth + its own host rule. Omit these labels entirely to
+      # disable the dashboard rather than expose it.
+      - traefik.enable=true
+      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${BASE_DOMAIN}`)
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=cloudflare
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+      - traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth
+      - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_HTPASSWD}
+      # Baseline security-headers middleware, reusable by any app router (see point 5
+      # above) — this is what docker-compose.prod.yml's commented-out
+      # `secure-headers@docker` label refers to.
+      - traefik.http.middlewares.secure-headers.headers.stsSeconds=63072000
+      - traefik.http.middlewares.secure-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.secure-headers.headers.frameDeny=true
+      - traefik.http.middlewares.secure-headers.headers.referrerPolicy=strict-origin-when-cross-origin
+    depends_on:
+      - docker-socket-proxy
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      # Read-only, containers-only: Traefik only ever needs to list/inspect containers to
+      # discover routable services — never create, start, stop, or exec into them. This
+      # image denies POST (i.e. mutating Docker API calls) unless explicitly enabled per
+      # resource, and every resource defaults to denied; only CONTAINERS is turned on.
+      CONTAINERS: 1
+      SERVICES: 0
+      TASKS: 0
+      NETWORKS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  letsencrypt:

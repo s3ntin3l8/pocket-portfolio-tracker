@@ -5,10 +5,11 @@ import { corporateActionInputSchema } from "@portfolio/schema";
 
 export async function corporateActionsRoute(app: FastifyInstance) {
   // Record a corporate action (split/bonus/rights) for an instrument. Shared
-  // reference data — applied to every holder's derived holdings.
+  // reference data — applied to every holder's derived holdings. Admin-gated (a bogus
+  // split/ratio corrupts every holder's quantities and cost basis).
   app.post(
     "/corporate-actions",
-    { preHandler: app.authenticate },
+    { preHandler: app.requireAdmin },
     async (request, reply) => {
       const input = corporateActionInputSchema.parse(request.body);
       const [created] = await app.db
@@ -27,10 +28,11 @@ export async function corporateActionsRoute(app: FastifyInstance) {
   );
 
   // Update a corporate action (type / ratio / ex-date / terms). Reference data —
-  // edits flow through to every holder's derived holdings.
+  // edits flow through to every holder's derived holdings. Admin-gated (same reasoning
+  // as the POST above).
   app.patch<{ Params: { id: string } }>(
     "/corporate-actions/:id",
-    { preHandler: app.authenticate },
+    { preHandler: app.requireAdmin },
     async (request, reply) => {
       const input = corporateActionInputSchema.partial().parse(request.body);
       const values: Partial<typeof corporateActions.$inferInsert> = {};
@@ -56,10 +58,10 @@ export async function corporateActionsRoute(app: FastifyInstance) {
     },
   );
 
-  // Delete a corporate action.
+  // Delete a corporate action. Admin-gated (same reasoning as POST/PATCH above).
   app.delete<{ Params: { id: string } }>(
     "/corporate-actions/:id",
-    { preHandler: app.authenticate },
+    { preHandler: app.requireAdmin },
     async (request, reply) => {
       const [deleted] = await app.db
         .delete(corporateActions)
