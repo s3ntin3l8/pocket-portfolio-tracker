@@ -445,6 +445,43 @@ describe("portfolio delete removes retained storage objects", () => {
     const newDeletes = store.deletes.slice(deletesBefore);
     expect(newDeletes.some((k) => k.startsWith("receipts/"))).toBe(true);
   });
+
+  // Guards the DELETE /portfolios ownership-check-before-file-delete ordering: a
+  // non-owner's request must 404 WITHOUT touching the victim's storage objects.
+  it("a non-owner's delete attempt 404s and leaves the victim's storage objects untouched", async () => {
+    const { t: victim, portfolioId } = await setup("portdel-victim", true);
+    const { importId, drafts } = await uploadCsv(victim);
+    await confirmImport(victim, portfolioId, importId, drafts as unknown[]);
+
+    const attacker = await makeToken(privateKey, "portdel-attacker");
+    await app.inject({ method: "GET", url: "/me", headers: auth(attacker) }); // upsert user
+
+    const deletesBefore = store.deletes.length;
+    const dataSizeBefore = store.data.size;
+    const cross = await app.inject({
+      method: "DELETE",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(attacker),
+    });
+    expect(cross.statusCode).toBe(404);
+
+    // No storage objects were deleted, and the document row itself still exists.
+    expect(store.deletes.length).toBe(deletesBefore);
+    expect(store.data.size).toBe(dataSizeBefore);
+    const [doc] = await app.db
+      .select({ id: documents.id })
+      .from(documents)
+      .where(_eq(documents.portfolioId, portfolioId));
+    expect(doc).toBeDefined();
+
+    // The owner can still delete it for real afterwards.
+    const ownerDelete = await app.inject({
+      method: "DELETE",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(victim),
+    });
+    expect(ownerDelete.statusCode).toBe(204);
+  });
 });
 
 // =============================================================================

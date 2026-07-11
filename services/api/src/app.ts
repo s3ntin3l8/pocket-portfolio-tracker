@@ -162,7 +162,15 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     }
     app.log.error(error);
     const err = error as { statusCode?: number; message?: string };
-    return reply.code(err.statusCode ?? 500).send({ error: err.message || "internal_error" });
+    const statusCode = err.statusCode ?? 500;
+    // Never echo the raw error message for a server error (unset statusCode, or >= 500) —
+    // it can carry driver/DB internals (constraint/column names). Explicit 4xx errors
+    // (validation, not-found, etc.) keep their message; detail stays server-side via the
+    // app.log.error(error) above.
+    if (statusCode >= 500) {
+      return reply.code(statusCode).send({ error: "internal_error" });
+    }
+    return reply.code(statusCode).send({ error: err.message || "internal_error" });
   });
 
   await app.register(envPlugin);

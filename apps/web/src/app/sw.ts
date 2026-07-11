@@ -1,6 +1,7 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { NetworkOnly, Serwist } from "serwist";
+import { resolveLocalePrefix } from "./sw-locale";
 
 // `__SW_MANIFEST` is injected by @serwist/next at build time (the app-shell precache
 // list). Financial data is NOT cached here: `defaultCache` only matches same-origin
@@ -31,10 +32,9 @@ self.addEventListener("fetch", (event: FetchEvent) => {
     (async () => {
       // Read the active locale from the NEXT_LOCALE cookie (set by next-intl's middleware).
       // The share-target POST comes from the OS, so the cookie should be present on the
-      // request. Fall back to "" (no prefix) which next-intl maps to the default locale.
+      // request.
       const cookieHeader = event.request.headers.get("cookie") ?? "";
-      const localeMatch = /(?:^|;\s*)NEXT_LOCALE=([^;]+)/.exec(cookieHeader);
-      const localePrefix = localeMatch ? `/${localeMatch[1]}` : "";
+      const localePrefix = resolveLocalePrefix(cookieHeader);
 
       try {
         const form = await event.request.formData();
