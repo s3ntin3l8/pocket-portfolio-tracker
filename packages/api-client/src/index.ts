@@ -16,12 +16,14 @@ import type {
   ImportSettingsUpdate,
   StorageSettingsUpdate,
   StorageSecretInput,
+  DocumentCategory,
 } from "@portfolio/schema";
 
 export { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/schema";
 export type { ImportIssue, ParsedGoldContract, ProviderCredentialInput } from "@portfolio/schema";
 export type { ImportStrategy, ImportSettingsUpdate } from "@portfolio/schema";
 export type { StorageSettingsUpdate, StorageSecretInput } from "@portfolio/schema";
+export type { DocumentCategory } from "@portfolio/schema";
 
 export interface AdminImportSettingsResponse {
   strategy: ImportStrategy;
@@ -1399,6 +1401,23 @@ export interface DocumentUrlResponse {
   mimeType: string;
 }
 
+/** An account-level document in the tax-reports inbox (TR postbox fetch or user upload). */
+export interface InboxDocument {
+  id: string;
+  category: string;
+  taxYear: number | null;
+  /** "pytr" for a TR postbox fetch, "upload" for a user upload. */
+  source: string | null;
+  originalFilename: string | null;
+  mimeType: string;
+  sizeBytes: number | null;
+  portfolioId: string | null;
+  /** Display name of the linked portfolio/connection, when known — null for uploads with
+   *  no portfolio selected. */
+  portfolioLabel: string | null;
+  storedAt: string;
+}
+
 /**
  * An event type that reached the importer but had no mapping (the safety net). A non-empty
  * list means a sync source (Trade Republic) emitted a type we don't yet classify — it is
@@ -2266,6 +2285,36 @@ export function createApiClient(config: ApiClientConfig) {
      */
     exportPortfolioDocuments: (portfolioId: string) =>
       requestBlob("GET", `/portfolios/${portfolioId}/documents/export`),
+
+    // --- Tax-reports inbox: account-level documents (TR postbox fetch + user uploads) that
+    // don't belong to any single transaction — see storage/inbox.ts on the API side. -------
+    /** List the current user's inbox documents, newest first (defaults to tax reports). */
+    listDocuments: (category?: DocumentCategory) =>
+      request<InboxDocument[]>(
+        "GET",
+        `/documents${category ? `?category=${encodeURIComponent(category)}` : ""}`,
+      ),
+    /** Signed URL for downloading an inbox document. */
+    getDocumentUrl: (documentId: string) =>
+      request<DocumentUrlResponse>("GET", `/documents/${documentId}/url`),
+    /** Upload a tax PDF straight into the inbox. `portfolioId` is optional (account label). */
+    uploadDocument: (
+      file: File | Blob,
+      opts: { category?: DocumentCategory; taxYear?: number; portfolioId?: string } = {},
+    ) => {
+      const form = new FormData();
+      form.append("file", file, (file as File).name ?? "document.pdf");
+      if (opts.category) form.append("category", opts.category);
+      if (opts.taxYear != null) form.append("taxYear", String(opts.taxYear));
+      if (opts.portfolioId) form.append("portfolioId", opts.portfolioId);
+      return request<{ id: string; duplicate: boolean; category: DocumentCategory; taxYear: number | null }>(
+        "POST",
+        "/documents",
+        form,
+      );
+    },
+    /** Delete an inbox document (removes the stored file too). */
+    deleteDocument: (documentId: string) => request<void>("DELETE", `/documents/${documentId}`),
     /**
      * Enrich an already-confirmed transaction with a richer draft (e.g. PDF after CSV) (#230).
      *

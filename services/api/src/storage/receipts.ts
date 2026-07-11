@@ -36,7 +36,7 @@ import {
 // ---- Key building ----------------------------------------------------------
 
 /** Sanitise a filename: strip directory traversal, collapse spaces, limit length. */
-function sanitiseFilename(name: string): string {
+export function sanitiseFilename(name: string): string {
   const base = path.basename(name).replace(/[^\w.-]/g, "_").slice(0, 200);
   return base || "document";
 }

@@ -103,7 +103,41 @@
       "idCaption": "Estimated final tax this year",
       "idMetricSales": "Share sales YTD",
       "idMetricDividends": "Dividends & coupons YTD"
+    },
+    "documents": {
+      "title": "Tax reports",
+      "desc": "Annual tax reports from Trade Republic, plus your own uploads.",
+      "caption": "Documents in your inbox",
+      "metricLatestYear": "Latest year",
+      "metricSources": "Sources",
+      "metricSourcesValue": "{fromTr} TR · {fromUpload} uploaded"
     }
+  },
+  "TaxReports": {
+    "title": "Tax reports",
+    "headerSubtitle": "Annual tax reports and other account-level documents",
+    "subtitle": "Fetched automatically from Trade Republic, or upload your own.",
+    "upload": "Upload",
+    "uploadSuccess": "Document uploaded",
+    "uploadError": "Couldn't upload the document. Please try again.",
+    "downloadError": "Couldn't get a download link. Please try again.",
+    "deleteConfirm": "Delete this document? This can't be undone.",
+    "deleteSuccess": "Document deleted",
+    "deleteError": "Couldn't delete the document. Please try again.",
+    "emptyTitle": "No tax reports yet",
+    "emptyBody": "Reports fetched from Trade Republic will appear here automatically, or upload one yourself.",
+    "colDocument": "Document",
+    "colYear": "Year",
+    "colSource": "Source",
+    "colAccount": "Account",
+    "colSize": "Size",
+    "colDate": "Added",
+    "colActions": "Actions",
+    "download": "Download",
+    "delete": "Delete",
+    "untitled": "Untitled document",
+    "sourcePytr": "Trade Republic",
+    "sourceUpload": "Uploaded"
   },
   "Insights": {
     "title": "Insights",

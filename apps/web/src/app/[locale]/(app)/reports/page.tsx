@@ -1,6 +1,6 @@
 import type React from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Coins, ScrollText, PiggyBank, Receipt } from "lucide-react";
+import { Coins, ScrollText, PiggyBank, Receipt, FileText } from "lucide-react";
 import { ReportCard } from "@/components/reports/report-card";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -10,6 +10,7 @@ import {
   loadNetworthTax,
   loadTaxYearDetail,
   loadPreferences,
+  loadDocuments,
 } from "@/lib/server-api";
 import { formatMoney, formatPercent } from "@/lib/utils";
 import type { TrendTone } from "@/components/reports/trend-chip";
@@ -20,6 +21,7 @@ const ICONS = {
   trades: { icon: ScrollText, bg: "rgba(224,165,58,.14)", fg: "var(--gold-fg)" },
   savings: { icon: PiggyBank, bg: "rgba(124,92,252,.12)", fg: "#7C5CFC" },
   tax: { icon: Receipt, bg: "rgba(13,148,136,.12)", fg: "var(--color-chart-3)" },
+  documents: { icon: FileText, bg: "rgba(59,130,246,.12)", fg: "#3B82F6" },
 } as const;
 
 export default async function ReportsPage({
@@ -37,13 +39,14 @@ export default async function ReportsPage({
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
   const taxRegime = prefs?.taxRegime ?? "DE";
 
-  const [income, trades, contributions, taxHolders] = await Promise.all([
+  const [income, trades, contributions, taxHolders, taxReports] = await Promise.all([
     loadIncomeStats(),
     // Cost basis is a single global preference — thread it in so this tile's
     // realized-P&L figures agree with Trades/Holdings.
     loadTrades(undefined, costBasis),
     loadContributions(),
     loadNetworthTax(undefined, taxRegime),
+    loadDocuments("tax_report"),
   ]);
   // Indonesian final tax needs the same disposals/dividendRows the Tax page itself
   // recomputes over (see tax/page.tsx) — only fetched when relevant, and only when
@@ -295,6 +298,34 @@ export default async function ReportsPage({
       />,
     );
   }
+
+  // ── Tax reports (inbox) ──────────────────────────────────────────────────
+  // Always shown (unlike the KPI cards above, which need real data to render) — this is a
+  // discovery entry point to the inbox even with zero documents yet, since the upload flow
+  // lives there.
+  const latestYear = taxReports.reduce<number | null>(
+    (max, d) => (d.taxYear != null && (max === null || d.taxYear > max) ? d.taxYear : max),
+    null,
+  );
+  const fromTr = taxReports.filter((d) => d.source === "pytr").length;
+  const fromUpload = taxReports.length - fromTr;
+  cards.push(
+    <ReportCard
+      key="documents"
+      icon={ICONS.documents.icon}
+      iconBg={ICONS.documents.bg}
+      iconFg={ICONS.documents.fg}
+      title={t("documents.title")}
+      value={String(taxReports.length)}
+      caption={t("documents.caption")}
+      metrics={[
+        { label: t("documents.metricLatestYear"), value: latestYear !== null ? String(latestYear) : "—" },
+        { label: t("documents.metricSources"), value: t("documents.metricSourcesValue", { fromTr, fromUpload }) },
+      ]}
+      href="/reports/documents"
+      openLabel={openLabel}
+    />,
+  );
 
   return (
     <div className="space-y-6">

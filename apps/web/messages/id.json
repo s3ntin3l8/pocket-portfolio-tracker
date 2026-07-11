@@ -103,7 +103,41 @@
       "idCaption": "Estimasi pajak final tahun ini",
       "idMetricSales": "Penjualan saham YTD",
       "idMetricDividends": "Dividen & kupon YTD"
+    },
+    "documents": {
+      "title": "Laporan pajak",
+      "desc": "Laporan pajak tahunan dari Trade Republic, plus unggahan Anda sendiri.",
+      "caption": "Dokumen di kotak masuk Anda",
+      "metricLatestYear": "Tahun terbaru",
+      "metricSources": "Sumber",
+      "metricSourcesValue": "{fromTr} TR · {fromUpload} diunggah"
     }
+  },
+  "TaxReports": {
+    "title": "Laporan pajak",
+    "headerSubtitle": "Laporan pajak tahunan dan dokumen tingkat akun lainnya",
+    "subtitle": "Diambil otomatis dari Trade Republic, atau unggah sendiri.",
+    "upload": "Unggah",
+    "uploadSuccess": "Dokumen diunggah",
+    "uploadError": "Gagal mengunggah dokumen. Silakan coba lagi.",
+    "downloadError": "Gagal mendapatkan tautan unduhan. Silakan coba lagi.",
+    "deleteConfirm": "Hapus dokumen ini? Tindakan ini tidak dapat dibatalkan.",
+    "deleteSuccess": "Dokumen dihapus",
+    "deleteError": "Gagal menghapus dokumen. Silakan coba lagi.",
+    "emptyTitle": "Belum ada laporan pajak",
+    "emptyBody": "Laporan dari Trade Republic akan muncul di sini secara otomatis, atau unggah sendiri.",
+    "colDocument": "Dokumen",
+    "colYear": "Tahun",
+    "colSource": "Sumber",
+    "colAccount": "Akun",
+    "colSize": "Ukuran",
+    "colDate": "Ditambahkan",
+    "colActions": "Tindakan",
+    "download": "Unduh",
+    "delete": "Hapus",
+    "untitled": "Dokumen tanpa judul",
+    "sourcePytr": "Trade Republic",
+    "sourceUpload": "Diunggah"
   },
   "Insights": {
     "title": "Wawasan",

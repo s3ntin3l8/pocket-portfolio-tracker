@@ -40,6 +40,14 @@ degrades to a zero-effect booking rather than guessing.
 NOTE: targets pytr pinned to an exact upstream commit (see requirements.txt) for TR's
 June-2026 `compactPortfolioByType` rename; not yet validated against a live account. TR's
 private protocol can change.
+
+Account-level report events (the annual tax report, "Jährlicher Steuerreport") are
+informational — SKIP_EVENTS on the Node mapper side — but are collected here from BOTH
+`timelineTransactions` and `timelineActivityLog` (see `_is_report_event` /
+`_collect_transactions`) since there's no captured live evidence pinning them to one feed;
+their `documentRefs` (populated the same way as any other event's) are what the Node
+mapper's `extractReportDocuments` turns into a tax-reports-inbox fetch. Unverified against
+a live account.
 """
 
 import argparse
@@ -121,6 +129,33 @@ _TRANSFER_EVENT_TYPES.update(_CRYPTO_TRANSFER_EVENT_TYPES)
 # taking the direction from the eventType.
 _SECURITIES_TRANSFER_SUBTITLE = "wertpapiertransfer"
 
+# Account-level report events (annual tax report; siblings added here as they're
+# classified) are informational — no cash/shares — and, like transfers, may live on the
+# activity-log feed instead of timelineTransactions. There's no captured live evidence
+# pinning them to one feed over the other, so — mirroring how pytr's OWN Timeline/dl.py
+# gets these same documents (it merges timeline_transactions + timeline_activity_log
+# wholesale before fetching details, not filtered to any subset — see vendored
+# pytr/timeline.py's tl_loop) — merge them from BOTH feeds rather than assume one.
+# `eventType`/`title` are kept as-is (unlike a transfer's synthetic override): the Node
+# mapper's extractReportDocuments (services/pytr/mapper.ts) matches on the real eventType
+# or, for legacy null-eventType events, the title.
+_REPORT_EVENT_TYPES = {
+    "TAX_YEAR_END_REPORT",
+    "TAX_YEAR_END_REPORT_CREATED",
+    "YEAR_END_TAX_REPORT",
+}
+_REPORT_TITLES = {"jährlicher steuerreport"}
+
+
+def _is_report_event(event):
+    """True for an account-level report event (by eventType, or by title for the legacy
+    null-eventType form) — see _REPORT_EVENT_TYPES/_REPORT_TITLES above."""
+    et = event.get("eventType") or ""
+    if et in _REPORT_EVENT_TYPES:
+        return True
+    title = (event.get("title") or "").strip().lower()
+    return title in _REPORT_TITLES
+
 
 def _transfer_event_type(event):
     """Return the synthetic TRANSFER_IN/TRANSFER_OUT type for a securities-transfer event,
@@ -144,16 +179,19 @@ async def _collect_transactions(tr):
     events = await _collect_feed(
         tr, lambda after=None: tr.timeline_transactions(after), "timelineTransactions"
     )
-    # Merge ONLY securities-transfer events from the activity-log feed (deduped by id). They
-    # are cash-neutral, so restricting the merge to them keeps cash derivation untouched —
-    # even a dedup miss cannot double-count cash (and the DB's (portfolio, source, externalId)
-    # unique index is a second guard). This is what makes transferred-in positions appear in
-    # holdings at all; everything else on the activity log stays out until classified.
+    # Merge securities-transfer events AND account-level report events from the activity-log
+    # feed (deduped by id) — everything else on the activity log stays out until classified.
+    # Transfers are cash-neutral, so merging them keeps cash derivation untouched (even a
+    # dedup miss cannot double-count cash; the DB's (portfolio, source, externalId) unique
+    # index is a second guard) — this is what makes transferred-in positions appear in
+    # holdings at all. Report events (_is_report_event) carry no cash/shares either; merging
+    # them is what lets the tax-reports inbox (extractReportDocuments in mapper.ts) see them
+    # at all, regardless of which of the two feeds TR actually serves them on.
     try:
         activity = await _collect_feed(
             tr, lambda after=None: tr.timeline_activity_log(after), "timelineActivityLog"
         )
-    except Exception as exc:  # noqa: BLE001 - best effort; transfers are additive
+    except Exception as exc:  # noqa: BLE001 - best effort; transfers/reports are additive
         print(f"activity-log fetch failed: {exc}", file=sys.stderr)
         activity = {}
     for event_id, event in activity.items():
@@ -162,6 +200,8 @@ async def _collect_transactions(tr):
         transfer_type = _transfer_event_type(event)
         if transfer_type:
             events[event_id] = {**event, "eventType": transfer_type}
+        elif _is_report_event(event):
+            events[event_id] = event
     return list(events.values())
 
 

@@ -614,15 +614,33 @@ export const documents = pgTable(
     // Parser/source label (claude | ollama | dkb | csv | tr-csv | pytr | …).
     source: text("source"),
     // TR postbox sync→confirm join key: the TR timeline event id whose documentRefs entry
-    // triggered this download. Null for upload-family docs (screenshot/DKB/CSV). Used to
-    // link the staged doc to its transaction at confirm time via externalId matching.
+    // triggered this download. For "tax_report"-category rows (see below) it's instead the
+    // idempotency key for the report-fetch job (the TR postbox event id), enforced unique
+    // per user via documents_user_source_event_unique_idx. Null for upload-family docs
+    // (screenshot/DKB/CSV) and for user-uploaded inbox documents.
     sourceEventId: text("source_event_id"),
+    // Discriminates the per-transaction/import "receipt" documents above (the default, and
+    // the only category before this column existed) from account-level "inbox" documents
+    // that don't belong to any single transaction — e.g. TR's annual tax report. Inbox docs
+    // are written straight to status="retained" with importId=null, bypassing the staging/GC
+    // lifecycle (gcStagedReceipts only sweeps status="staged"). More categories (cost report,
+    // quarterly report, …) can be added here later without a migration.
+    category: text("category").notNull().default("receipt"),
+    // Reporting year for inbox documents (e.g. the tax year a Steuerreport covers). Null for
+    // receipts and for inbox docs where the year isn't known/applicable.
+    taxYear: integer("tax_year"),
     storedAt: timestamp("stored_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("documents_import_id_idx").on(t.importId),
     index("documents_transaction_id_idx").on(t.transactionId),
     index("documents_user_id_idx").on(t.userId),
+    // Idempotency for the pytr report-fetch job: re-syncing the same postbox event must not
+    // duplicate the document. Partial so upload-family/receipt docs (sourceEventId=null) are
+    // unconstrained.
+    uniqueIndex("documents_user_source_event_unique_idx")
+      .on(t.userId, t.sourceEventId)
+      .where(sql`${t.sourceEventId} is not null`),
   ],
 ).enableRLS();
 

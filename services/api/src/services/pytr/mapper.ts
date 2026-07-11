@@ -231,6 +231,82 @@ const SKIP_EVENTS = new Map<string, string>([
 // Skipped events the user may actually want to map (vs. ignorable info like a card ping).
 const ATTENTION_SKIPS = new Set<string>();
 
+// --- Account-level report documents ---------------------------------------------------
+//
+// TR's annual tax report ("Jährlicher Steuerreport") and its siblings are SKIP_EVENTS
+// above — they carry no cash/share movement and never become a draft transaction — but
+// tr_export.py still attaches their postbox `documentRefs` to the normalized event just
+// like any other (see tr_export.py's _extract_documents, called unconditionally in
+// _normalize). extractReportDocuments() below reads that already-fetched data straight
+// out of the raw event batch the sync path already has in memory, so pulling these into
+// the tax-reports inbox needs no separate pytr session/entrypoint.
+
+// Newer events carry an explicit eventType.
+const REPORT_EVENT_TYPES = new Set(["TAX_YEAR_END_REPORT", "TAX_YEAR_END_REPORT_CREATED", "YEAR_END_TAX_REPORT"]);
+
+// Legacy events (pre-eventType migration) carry eventType=null and only a German title —
+// mirrors pytr's own `title_subfolder_mapping` (vendored pytr/dl.py), the one place
+// upstream documents this title→category mapping.
+const REPORT_TITLES = new Set(["Jährlicher Steuerreport"]);
+
+const REPORT_TITLE_YEAR_RE = /\b(20\d{2})\b/;
+
+// Deliberately NOT trEventSchema: that schema requires `eventType` as a non-empty string,
+// which rejects exactly the legacy (pre-eventType-migration) events this function needs to
+// match by title (eventType null/absent — see REPORT_TITLES above). Only the fields this
+// extraction actually reads are required here.
+const reportEventSchema = z.object({
+  id: z.string().min(1),
+  timestamp: z.string().min(1),
+  eventType: z.string().nullish(),
+  title: z.string().nullish(),
+  documentRefs: z
+    .array(z.object({ id: z.string(), type: z.string().nullish(), date: z.string().nullish() }))
+    .nullish(),
+});
+
+export interface ReportDocumentRef {
+  eventId: string;
+  docId: string;
+  /**
+   * Best-effort reporting year: parsed from a 4-digit year in the event title when
+   * present, else the event's posting year minus one (TR issues the annual report in
+   * Jan/Feb of year+1). Unverified against a live title carrying an explicit year — the
+   * fallback may be off by one if TR's title format or issuance timing differs from this
+   * assumption. Null only when the posting timestamp itself is unparseable.
+   */
+  taxYear: number | null;
+  title: string | null;
+}
+
+/**
+ * Extract account-level tax-report document references from a raw tr_export.py event
+ * batch (the same array passed to mapTrEvents — call both over the same input). These
+ * events are intentionally excluded from mapTrEvents' drafts (SKIP_EVENTS), so this is
+ * the only path that surfaces their documents.
+ */
+export function extractReportDocuments(rawEvents: unknown[]): ReportDocumentRef[] {
+  const out: ReportDocumentRef[] = [];
+  for (const raw of rawEvents) {
+    const parsed = reportEventSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    const ev = parsed.data;
+    const title = ev.title?.trim() ?? null;
+    const isReport = REPORT_EVENT_TYPES.has(ev.eventType ?? "") || (title != null && REPORT_TITLES.has(title));
+    if (!isReport || !ev.documentRefs || ev.documentRefs.length === 0) continue;
+
+    const titleYear = title ? REPORT_TITLE_YEAR_RE.exec(title)?.[1] : undefined;
+    const postedYear = new Date(ev.timestamp).getFullYear();
+    const taxYear = titleYear ? Number(titleYear) : Number.isFinite(postedYear) ? postedYear - 1 : null;
+
+    for (const doc of ev.documentRefs) {
+      if (!doc.id) continue;
+      out.push({ eventId: ev.id, docId: doc.id, taxYear, title });
+    }
+  }
+  return out;
+}
+
 // Share-based corporate action (stock dividend / bonus issue). TR event type for shares
 // received with no cash; maps to `bonus` (no cash leg, quantity = received shares).
 const SHARE_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_INSTRUMENT";
