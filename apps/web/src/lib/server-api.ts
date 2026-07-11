@@ -37,6 +37,8 @@ import {
   type UserPreferences,
   type Anomaly,
   type ApiToken,
+  type InboxDocument,
+  type DocumentCategory,
 } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import { auth } from "@/auth";
@@ -692,6 +694,21 @@ export async function loadIncomeStats(): Promise<IncomeStatsView> {
     return { status: "ok", data };
   } catch {
     return { status: "unavailable" };
+  }
+}
+
+/** The user's tax-reports inbox (newest first; empty when signed out / unreachable). */
+export async function loadDocuments(category?: DocumentCategory): Promise<InboxDocument[]> {
+  const api = await getServerApi();
+  if (!api) return [];
+  try {
+    // Scope to the switcher-selected portfolio when one is active (mirrors
+    // loadContributions()); undefined in the aggregate "all portfolios" / holder scope,
+    // which lists every portfolio's documents.
+    const portfolioId = await getSelectedPortfolioId();
+    return await api.listDocuments(category, portfolioId ?? undefined);
+  } catch {
+    return [];
   }
 }
 

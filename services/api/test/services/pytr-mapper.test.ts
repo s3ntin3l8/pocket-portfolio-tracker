@@ -6,6 +6,7 @@ import {
   isCashMovementEvent,
   isCashMovementAction,
   rawEventIdFromExternalId,
+  extractReportDocuments,
 } from "../../src/services/pytr/mapper.js";
 
 const base = {
@@ -795,5 +796,122 @@ describe("rawEventIdFromExternalId", () => {
     expect(rawEventIdFromExternalId("corr-evt")).toBe("corr-evt");
     expect(rawEventIdFromExternalId("evt-1")).toBe("evt-1");
     expect(rawEventIdFromExternalId("import:abc:0")).toBe("import:abc:0");
+  });
+});
+
+describe("extractReportDocuments", () => {
+  it("extracts a TAX_YEAR_END_REPORT event's documentRefs, deriving taxYear from the title", () => {
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-report-1",
+        eventType: "TAX_YEAR_END_REPORT",
+        title: "Jährlicher Steuerreport 2025",
+        amount: 0,
+        documentRefs: [{ id: "doc-1", type: "TAX_YEAR_END_REPORT", date: "2026-01-15" }],
+      },
+    ]);
+    expect(refs).toEqual([
+      { eventId: "evt-report-1", docId: "doc-1", taxYear: 2025, title: "Jährlicher Steuerreport 2025" },
+    ]);
+  });
+
+  it("falls back to posting-year minus one when the title carries no year", () => {
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-report-2",
+        timestamp: "2026-02-10T09:00:00.000Z",
+        eventType: "YEAR_END_TAX_REPORT",
+        title: "Jährlicher Steuerreport",
+        amount: 0,
+        documentRefs: [{ id: "doc-2", type: null, date: null }],
+      },
+    ]);
+    expect(refs).toEqual([
+      { eventId: "evt-report-2", docId: "doc-2", taxYear: 2025, title: "Jährlicher Steuerreport" },
+    ]);
+  });
+
+  it("matches a legacy event with no eventType by title prefix, real title carries a year suffix", () => {
+    // Real observed shape (validated live): title is "Jährlicher Steuerbericht {year}" — a
+    // prefix match, not exact equality, since an exact match against the bare "Jährlicher
+    // Steuerbericht" string would never hit a real title.
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-report-legacy-2021",
+        eventType: undefined,
+        title: "Jährlicher Steuerbericht 2021",
+        amount: 0,
+        documentRefs: [{ id: "doc-legacy" }],
+      },
+    ]);
+    expect(refs).toEqual([
+      { eventId: "evt-report-legacy-2021", docId: "doc-legacy", taxYear: 2021, title: "Jährlicher Steuerbericht 2021" },
+    ]);
+  });
+
+  it("matches a legacy event with no eventType by its title", () => {
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-report-legacy",
+        eventType: undefined,
+        title: "Jährlicher Steuerreport",
+        amount: 0,
+        documentRefs: [{ id: "doc-3" }],
+      },
+    ]);
+    expect(refs).toHaveLength(1);
+    expect(refs[0].docId).toBe("doc-3");
+  });
+
+  it("expands multiple documentRefs on the same event into multiple refs", () => {
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-report-multi",
+        eventType: "TAX_YEAR_END_REPORT_CREATED",
+        title: "Jährlicher Steuerreport 2024",
+        amount: 0,
+        documentRefs: [{ id: "doc-a" }, { id: "doc-b" }],
+      },
+    ]);
+    expect(refs.map((r) => r.docId)).toEqual(["doc-a", "doc-b"]);
+    expect(refs.every((r) => r.eventId === "evt-report-multi" && r.taxYear === 2024)).toBe(true);
+  });
+
+  it("ignores non-report events, even ones with documentRefs", () => {
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-div",
+        eventType: "SSP_CORPORATE_ACTION_CASH",
+        title: "Dividende",
+        amount: 5,
+        isin: "US0000000000",
+        documentRefs: [{ id: "doc-div" }],
+      },
+    ]);
+    expect(refs).toEqual([]);
+  });
+
+  it("ignores a report event with no documentRefs", () => {
+    const refs = extractReportDocuments([
+      {
+        ...base,
+        id: "evt-report-nodoc",
+        eventType: "TAX_YEAR_END_REPORT",
+        title: "Jährlicher Steuerreport 2025",
+        amount: 0,
+        documentRefs: null,
+      },
+    ]);
+    expect(refs).toEqual([]);
+  });
+
+  it("skips unparseable raw events without throwing", () => {
+    expect(extractReportDocuments([{ garbage: true }, null, "not-an-event"])).toEqual([]);
   });
 });

@@ -1318,6 +1318,44 @@ class TestTransfers:
         assert by_id["crypto1"]["eventType"] == "TRANSFER_IN"
         assert by_id["crypto1"]["subtitle"] == "0.026242 BTC"
 
+    def test_is_report_event(self):
+        assert tx._is_report_event({"eventType": "TAX_YEAR_END_REPORT"}) is True
+        assert tx._is_report_event({"eventType": "TAX_YEAR_END_REPORT_CREATED"}) is True
+        assert tx._is_report_event({"eventType": "YEAR_END_TAX_REPORT"}) is True
+        assert tx._is_report_event({"eventType": None, "title": "Jährlicher Steuerreport"}) is True
+        # Case-insensitive title match (legacy events carry no eventType at all).
+        assert tx._is_report_event({"eventType": None, "title": "JÄHRLICHER STEUERREPORT"}) is True
+        # Real observed shape (validated live): a year suffix — must be a prefix match, not
+        # exact equality, or every real title would silently fail to match.
+        assert tx._is_report_event({"eventType": None, "title": "Jährlicher Steuerbericht 2021"}) is True
+        assert tx._is_report_event({"eventType": "ORDER_EXECUTED", "title": "Kauforder"}) is False
+        assert tx._is_report_event({"eventType": None, "title": None}) is False
+        assert tx._is_report_event({}) is False
+
+    def test_collect_transactions_merges_report_events_from_activity_log(self):
+        # Report events (e.g. the annual tax report) may live on the activity-log feed
+        # instead of timelineTransactions — merged verbatim (eventType/title untouched,
+        # unlike a transfer's synthesised override) so the Node mapper's
+        # extractReportDocuments can match them regardless of which feed TR actually
+        # serves them on (see _collect_transactions' doc comment).
+        feeds = {
+            "timelineTransactions": [{"items": [{"id": "t1", "eventType": "ORDER_EXECUTED"}]}],
+            "timelineActivityLog": [
+                # Real observed shape (validated live against a captured account).
+                {"items": [
+                    {"id": "rep1", "eventType": "YEAR_END_TAX_REPORT", "title": "Jährlicher Steuerbericht 2021"},
+                    {"id": "rep2", "eventType": None, "title": "Jährlicher Steuerreport"},  # legacy, title-only
+                    {"id": "noise", "eventType": None, "subtitle": "Some notification"},
+                ]},
+            ],
+        }
+        tr = FakeFeedTr(feeds=feeds)
+        out = asyncio.run(tx._collect_transactions(tr))
+        by_id = {e["id"]: e for e in out}
+        assert by_id["rep1"]["eventType"] == "YEAR_END_TAX_REPORT"  # unchanged, unlike a transfer
+        assert by_id["rep2"]["title"] == "Jährlicher Steuerreport"
+        assert "noise" not in by_id
+
     def test_normalize_crypto_transfer_resolves_isin_and_shares_from_subtitle(self):
         # Unlike a securities transfer, a crypto transfer carries NEITHER an isin (icon is
         # just the generic TR logo, not ISIN-shaped) NOR a shares row in its detail — only

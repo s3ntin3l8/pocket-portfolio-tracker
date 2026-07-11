@@ -8,7 +8,7 @@ import {
   trResolvedEvents,
 } from "@portfolio/db";
 import type { ImportIssue, ParsedTransaction } from "@portfolio/schema";
-import { mapTrEvents, mapTrEventToDraft, isCashMovementEvent } from "./mapper.js";
+import { mapTrEvents, mapTrEventToDraft, isCashMovementEvent, extractReportDocuments } from "./mapper.js";
 import { PytrAuthError } from "./runner.js";
 import type { PytrRunner } from "./runner.js";
 import {
@@ -20,6 +20,7 @@ import {
 } from "./reconcile.js";
 import { applyCancellations, isCancelled } from "./cancellation.js";
 import { downloadNewDraftDocuments } from "./documents.js";
+import { fetchReportDocuments } from "./reports.js";
 import { materializeDrafts } from "../materialize-drafts.js";
 import { finalizeReceipts, linkTrReceiptsToTransactions } from "../../storage/receipts.js";
 import type { DB } from "../../db/client.js";
@@ -43,6 +44,10 @@ export interface SyncResult {
   documentsRequested?: number;
   /** How many postbox PDFs were successfully stored this sync. */
   documentsStored?: number;
+  /** How many account-level report documents (e.g. the annual tax report) were requested. */
+  reportDocumentsRequested?: number;
+  /** How many account-level report documents were successfully stored this sync. */
+  reportDocumentsStored?: number;
 }
 
 // The parsed_json shape of a pytr "collector" draft: the single open draft per connection
@@ -281,8 +286,20 @@ export async function syncTrConnection(
     return true;
   });
   const { drafts: newDrafts, errors: newErrors } = mapTrEvents(newRaw);
+  // Account-level report documents (e.g. the annual tax report) — these events are
+  // intentionally excluded from newDrafts (SKIP_EVENTS in mapper.ts), so pull their
+  // documentRefs separately. Not gated by cashCounted/allowed(): a report isn't a cash
+  // movement, so it's always relevant regardless of the portfolio's boundary.
+  const reportRefs = extractReportDocuments(newRaw);
   log?.debug(
-    { connectionId, exported: events.length, new: newRaw.length, drafts: newDrafts.length, errors: newErrors.length },
+    {
+      connectionId,
+      exported: events.length,
+      new: newRaw.length,
+      drafts: newDrafts.length,
+      errors: newErrors.length,
+      reportRefs: reportRefs.length,
+    },
     "tr events mapped",
   );
 
@@ -382,6 +399,21 @@ export async function syncTrConnection(
   });
   const { requested: documentsRequested, stored: documentsStored, error: documentsError } = docResult;
 
+  // 6b-report. Fetch account-level report documents (e.g. the annual tax report) into the
+  // user's tax-reports inbox — best-effort, independent of importId/documentRetention (see
+  // fetchReportDocuments' doc comment). Never fails the sync.
+  const reportDocResult = await fetchReportDocuments({
+    db,
+    runner,
+    storage,
+    connection,
+    portfolioId,
+    reportRefs,
+    session: { phone, pin, sessionData: result.sessionData },
+    log,
+  });
+  const { requested: reportDocumentsRequested, stored: reportDocumentsStored } = reportDocResult;
+
   // 6c. Drafts are real transactions now, so link the just-downloaded postbox PDFs to them
   //     directly (by sourceEventId = tx.externalId) and retain them — the old confirm-time
   //     linkage no longer runs for sync. Only relevant when storage is present and the
@@ -446,5 +478,8 @@ export async function syncTrConnection(
     cancelled,
     reconciliation,
     ...(documentsRequested !== undefined ? { documentsRequested, documentsStored } : {}),
+    ...(reportDocumentsRequested !== undefined
+      ? { reportDocumentsRequested, reportDocumentsStored }
+      : {}),
   };
 }
