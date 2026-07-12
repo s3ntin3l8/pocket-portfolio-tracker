@@ -16,8 +16,17 @@ worth are all derived, never stored.
     <td><img src="apps/web/public/screenshots/holdings-dark-wide.png" alt="Holdings — dark" /></td>
   </tr>
   <tr>
-    <td><img src="apps/web/public/screenshots/insights-light-wide.png" alt="Insights — light" /></td>
+    <td><img src="apps/web/public/screenshots/activity-light-wide.png" alt="Activity — light" /></td>
     <td><img src="apps/web/public/screenshots/tax-dark-wide.png" alt="Tax — dark" /></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td><img src="apps/web/public/screenshots/holdings-dark-narrow.png" width="200" alt="Holdings — mobile, dark" /></td>
+    <td><img src="apps/web/public/screenshots/activity-light-narrow.png" width="200" alt="Activity — mobile, light" /></td>
+    <td><img src="apps/web/public/screenshots/insights-dark-narrow.png" width="200" alt="Insights — mobile, dark" /></td>
+    <td><img src="apps/web/public/screenshots/tax-light-narrow.png" width="200" alt="Tax — mobile, light" /></td>
   </tr>
 </table>
 
