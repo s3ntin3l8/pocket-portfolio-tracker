@@ -96,6 +96,10 @@ async function main() {
         for (const screen of SCREENS) {
           const url = `${WEB_URL}${screen.path}`;
           await page.goto(url, { waitUntil: "networkidle" });
+          // next/font uses display:"swap" (see layout.tsx) — text paints in a fallback
+          // system font first, then swaps once Plus Jakarta Sans/DM Mono finish loading.
+          // Without this, captures can race that swap and ship with the wrong font.
+          await page.evaluate(() => document.fonts.ready);
           // Let charts/animations settle (recharts entrance transitions, skeleton→data).
           await page.waitForTimeout(600);
 
