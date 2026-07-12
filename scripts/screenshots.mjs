@@ -125,7 +125,9 @@ async function main() {
       AUTH_URL: `http://localhost:${WEB_PORT}`,
       AUTHENTIK_ISSUER: "https://demo.invalid/application/o/pocket-demo/",
       AUTHENTIK_CLIENT_ID: "demo",
-      AUTHENTIK_CLIENT_SECRET: "demo",
+      // Never used — the PAT bypass (mint-session.mjs) short-circuits before any real
+      // OAuth exchange, so this dummy value only satisfies NextAuth's required option.
+      AUTHENTIK_CLIENT_SECRET: "demo", // pragma: allowlist secret
       API_URL: `http://localhost:${API_PORT}`,
       PORT: WEB_PORT,
     },
