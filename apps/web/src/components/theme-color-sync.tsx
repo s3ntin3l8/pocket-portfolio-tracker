@@ -14,7 +14,26 @@ const THEME_COLOR = { light: "#f4f7f5", dark: "#0e1512" } as const;
  * *applied* theme instead, once resolved on the client.
  */
 export function ThemeColorSync() {
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+
+  useEffect(() => {
+    // Auto-switch theme by device/OS preference on mobile if no manual theme preference has been saved
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+
+    const handleMediaQueryChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      const hasUserTheme = typeof window !== "undefined" && window.localStorage.getItem("theme") !== null;
+      if (e.matches && !hasUserTheme) {
+        setTheme("system");
+      }
+    };
+
+    // Check on mount
+    handleMediaQueryChange(mediaQuery);
+
+    // Listen for changes
+    mediaQuery.addEventListener("change", handleMediaQueryChange);
+    return () => mediaQuery.removeEventListener("change", handleMediaQueryChange);
+  }, [setTheme]);
 
   useEffect(() => {
     if (resolvedTheme !== "light" && resolvedTheme !== "dark") return;
