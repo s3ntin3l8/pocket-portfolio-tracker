@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import { useTranslations } from "next-intl";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -18,6 +18,7 @@ import { APP_VERSION } from "@/lib/version";
 import { MAIN_NAV, ADMIN_NAV, navActiveKey } from "@/components/nav-items";
 import { NavProgressProvider, LinkPendingSignal } from "@/components/nav-progress";
 import { RouteTransition } from "@/components/route-transition";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 export function AppShell({
   children,
@@ -44,6 +45,7 @@ export function AppShell({
   const t = useTranslations("Nav");
   const pathname = usePathname();
   const activeKey = navActiveKey(pathname);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const navItems = isAdmin ? [...MAIN_NAV, ADMIN_NAV] : MAIN_NAV;
 
@@ -141,7 +143,7 @@ export function AppShell({
 
         {/* overscroll-contain: stop rubber-band/scroll-chaining to the page behind it —
             matters most in the installed PWA, which has no browser chrome to absorb it. */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        <div ref={scrollContainerRef} className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps.
             Padding lives on the INNER wrapper (not the outer bar) so its cap/center
             matches <main>'s content edges exactly — see the widescreen note on <main>.
@@ -188,10 +190,12 @@ export function AppShell({
             wide/ultrawide monitors don't leave a large blank right margin. `@container`
             lets page grids key density tiers off this real content width rather than
             viewport width, which is otherwise skewed by the 236px sidebar offset. */}
-          <main className="@container mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-            <InstallPrompt />
-            <RouteTransition>{children}</RouteTransition>
-          </main>
+          <PullToRefresh scrollContainerRef={scrollContainerRef}>
+            <main className="@container mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+              <InstallPrompt />
+              <RouteTransition>{children}</RouteTransition>
+            </main>
+          </PullToRefresh>
         </div>
 
         <BottomNav anomalyCount={anomalyCount} anomalyError={anomalyError} />
