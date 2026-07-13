@@ -152,7 +152,7 @@ export function CorporateActionsManager({
                       {tc("exDate")}
                     </span>
                     <DatePicker
-                      aria-label={tc("exDate")}
+                      label={tc("exDate")}
                       className="w-40"
                       value={exDate}
                       onChange={(e) => setExDate(e.target.value)}

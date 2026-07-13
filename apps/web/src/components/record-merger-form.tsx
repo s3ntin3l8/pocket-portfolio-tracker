@@ -211,6 +211,7 @@ export function RecordMergerForm({
           <Label htmlFor="merger-date">{t("date")}</Label>
           <DatePicker
             id="merger-date"
+            label={t("date")}
             value={executedAt}
             onChange={(e) => setExecutedAt(e.target.value)}
             required

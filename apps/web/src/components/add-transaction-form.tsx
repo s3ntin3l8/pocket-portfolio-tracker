@@ -710,6 +710,7 @@ export function AddTransactionForm({
         <Field label={t("date")} htmlFor="tx-date">
           <DatePicker
             id="tx-date"
+            label={t("date")}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required

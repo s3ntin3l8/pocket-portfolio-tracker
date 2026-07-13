@@ -1004,6 +1004,7 @@ export function ImportReview({
               </Field>
               <Field label={t("fields.executedAt")}>
                 <DatePicker
+                  label={t("fields.executedAt")}
                   value={editingDraft.executedAt.slice(0, 10)}
                   onChange={(e) =>
                     onUpdate(editingDraft.uid, { executedAt: e.target.value })
@@ -1101,6 +1102,7 @@ export function ImportReview({
               </Field>
               <Field label={t("fields.executedAt")}>
                 <DatePicker
+                  label={t("fields.executedAt")}
                   value={mapForm.executedAt.slice(0, 10)}
                   onChange={(e) => setMapForm({ ...mapForm, executedAt: e.target.value })}
                 />

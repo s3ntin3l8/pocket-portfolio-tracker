@@ -7,10 +7,12 @@ import { cn } from "@/lib/utils";
 
 type DatePickerProps = Omit<
   React.ComponentProps<"input">,
-  "type" | "value" | "onChange"
+  "type" | "value" | "onChange" | "aria-label"
 > & {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Field label, announced as the button's accessible name prefix (e.g. "Ex-date, Feb 3, 2026"). */
+  label?: string;
 };
 
 /**
@@ -21,7 +23,7 @@ type DatePickerProps = Omit<
  */
 export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(
   function DatePicker(
-    { value, onChange, className, id, disabled, ...rest },
+    { value, onChange, className, id, disabled, label, ...rest },
     ref,
   ) {
     const t = useTranslations("Common");
@@ -53,12 +55,19 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(
       }
     }, []);
 
+    // The button is the sole tabbable element; its accessible name carries the
+    // field label (when provided) followed by the current value or placeholder,
+    // so screen-reader users hear the field name — not just the date.
+    const buttonAriaLabel =
+      label && formatted ? `${label}, ${formatted}`
+      : label ? label
+      : formatted ?? t("pickDate");
+
     return (
       <div className="relative">
         <button
           type="button"
-          aria-haspopup="dialog"
-          aria-label={formatted ?? t("pickDate")}
+          aria-label={buttonAriaLabel}
           disabled={disabled}
           onClick={open}
           className={cn(
@@ -80,6 +89,10 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(
             aria-hidden
           />
         </button>
+        {/* Real form field, intentionally out of the tab order but kept in the
+            a11y tree so a caller's <label htmlFor=id> (or implicit label
+            association) still announces the field name if this input is
+            focused programmatically (e.g. via the showPicker fallback). */}
         <input
           ref={setRefs}
           id={id}
@@ -88,8 +101,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(
           onChange={onChange}
           disabled={disabled}
           tabIndex={-1}
-          aria-hidden="true"
-          className="sr-only absolute inset-0"
+          className="sr-only"
           {...rest}
         />
       </div>

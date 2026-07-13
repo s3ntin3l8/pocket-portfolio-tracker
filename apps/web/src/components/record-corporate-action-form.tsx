@@ -263,6 +263,7 @@ export function RecordCorporateActionForm({
           <Label htmlFor="ca-date">{t("exDate")}</Label>
           <DatePicker
             id="ca-date"
+            label={t("exDate")}
             value={exDate}
             onChange={(e) => setExDate(e.target.value)}
             required
