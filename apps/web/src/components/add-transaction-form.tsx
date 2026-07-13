@@ -141,6 +141,25 @@ function goldSymbolFromLabel(label: string): string {
   return slug || "GOLD";
 }
 
+/** When the OS keyboard opens inside a bottom sheet, the focused input can end up
+ *  behind the keyboard despite `scroll-padding-bottom` on the scroll host (iOS Safari
+ *  sometimes skips auto-scroll for `fixed`-positioned sheets). This hook explicitly
+ *  scrolls the focused element into view whenever focus changes within the container. */
+function useFocusScroll(containerRef: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && el.contains(target)) {
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    };
+    el.addEventListener("focusin", handler);
+    return () => el.removeEventListener("focusin", handler);
+  }, [containerRef]);
+}
+
 export function AddTransactionForm({
   client,
   portfolioId,
@@ -401,8 +420,15 @@ export function AddTransactionForm({
     }
   }
 
+  // Scroll focused fields fully into view when the keyboard opens (#472).
+  // `scroll-margin-bottom` and `scroll-padding-bottom` (set on the scroll host via
+  // `--keyboard-height`) work together: the padding reserves space for the keyboard,
+  // the margin ensures individual elements don't sit flush against that boundary.
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusScroll(formRef);
+
   return (
-    <form onSubmit={submit} className="max-w-lg space-y-5">
+    <form ref={formRef} onSubmit={submit} className="max-w-lg space-y-5">
       {error && (
         <div
           role="alert"
@@ -846,7 +872,7 @@ export function AddTransactionForm({
       <div
         className={cn(
           stickyFooter &&
-            "sticky bottom-0 -mx-5 border-t border-border bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]",
+            "sticky bottom-0 -mx-5 border-t border-border bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] scroll-mb-24",
         )}
       >
         <Button

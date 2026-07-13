@@ -38,16 +38,18 @@ function Sheet({
   // Android hardware/gesture back closes the sheet instead of navigating the route.
   useBackToClose(open, onOpenChange);
 
-  // Synchronize visual viewport height to prevent keyboard occlusion (#472 Item 4)
+  // Synchronize visual viewport height to prevent keyboard occlusion (#472 Item 4).
+  // Also tracks the keyboard height for `scroll-padding-bottom` so the browser
+  // auto-scrolls focused fields fully into the visible area, not behind the OSK.
   React.useEffect(() => {
     if (!open || typeof window === "undefined" || !window.visualViewport) return;
 
     const vv = window.visualViewport;
+    const dh = document.documentElement;
     const updateViewport = () => {
-      document.documentElement.style.setProperty(
-        "--visual-viewport-height",
-        `${vv.height}px`,
-      );
+      dh.style.setProperty("--visual-viewport-height", `${vv.height}px`);
+      const keyboardPx = Math.max(0, window.innerHeight - vv.height);
+      dh.style.setProperty("--keyboard-height", `${keyboardPx}px`);
     };
 
     updateViewport();
@@ -57,7 +59,8 @@ function Sheet({
     return () => {
       vv.removeEventListener("resize", updateViewport);
       vv.removeEventListener("scroll", updateViewport);
-      document.documentElement.style.removeProperty("--visual-viewport-height");
+      dh.style.removeProperty("--visual-viewport-height");
+      dh.style.removeProperty("--keyboard-height");
     };
   }, [open]);
 
@@ -148,7 +151,7 @@ function SheetContent({
           // Centering uses margins, NOT -translate-x-1/2: vaul writes an inline `transform`
           // for the drag/slide and would clobber a Tailwind translateX on the same property.
           side === "bottom" &&
-            "bottom-0 left-0 right-0 mx-auto max-h-[90dvh] w-full max-w-[520px] overflow-y-auto overscroll-contain rounded-t-[28px] shadow-[0_-12px_44px_rgba(0,0,0,.22)]",
+            "bottom-0 left-0 right-0 mx-auto max-h-[90dvh] w-full max-w-[520px] overflow-y-auto overscroll-contain touch-pan-y scroll-pb-[var(--keyboard-height,0px)] rounded-t-[28px] shadow-[0_-12px_44px_rgba(0,0,0,.22)]",
           side === "full" &&
             "bottom-0 left-0 right-0 mx-auto h-[100dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-none bg-card shadow-xl",
           className,

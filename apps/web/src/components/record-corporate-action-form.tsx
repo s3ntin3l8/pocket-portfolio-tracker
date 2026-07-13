@@ -274,7 +274,7 @@ export function RecordCorporateActionForm({
       <div
         className={cn(
           stickyFooter &&
-            "sticky bottom-0 -mx-5 border-t border-border bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]",
+            "sticky bottom-0 -mx-5 border-t border-border bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] scroll-mb-24",
         )}
       >
         <Button

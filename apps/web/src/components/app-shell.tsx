@@ -133,13 +133,25 @@ export function AppShell({
 
         {/* overscroll-contain: stop rubber-band/scroll-chaining to the page behind it —
             matters most in the installed PWA, which has no browser chrome to absorb it. */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        <div className="flex w-full min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps.
             Padding lives on the INNER wrapper (not the outer bar) so its cap/center
             matches <main>'s content edges exactly — see the widescreen note on <main>.
             The outer bar stays edge-to-edge (bg-card, sticky, safe-area-top only) so it
             still reads as one continuous surface across the full width. */}
-          <header className="sticky top-0 z-30 flex min-h-[62px] items-center border-b border-border bg-card pt-[env(safe-area-inset-top)]">
+          {/* w-full + will-change-transform: workaround for an iOS Safari compositor
+              bug where `sticky` element backgrounds paint only ~60% across the scroll
+              container's content width instead of the element's full width (#472). */}
+          <header className="sticky top-0 z-30 flex w-full min-h-[62px] items-center border-b border-border bg-card pt-[env(safe-area-inset-top)] will-change-transform">
+            {/* Dark overlay behind the status bar area: with
+                `apple-mobile-web-app-status-bar-style: black-translucent` iOS uses
+                always-white status bar text — invisible against a light `bg-card`.
+                The overlay ensures enough contrast without affecting the themed
+                header surface below the status bar (#472). */}
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-[env(safe-area-inset-top)] bg-black/20"
+              aria-hidden="true"
+            />
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-6 md:pr-6">
               {/* Mobile brand (desktop shows it in the sidebar). */}
               <Link href="/holdings" className="md:hidden" aria-label="Pocket">

@@ -192,6 +192,16 @@
 }
 
 @layer base {
+  /* iOS PWA viewport height cascade (fix #472): `100dvh` is well-supported but
+     on some iOS versions in standalone PWA mode it can underreport by ~safe-area
+     height. `-webkit-fill-available` is the legacy iOS PWA full-viewport value;
+     `100vh` is the universal fallback. Stacking them ensures the shell container
+     always fills the physical screen, eliminating the "gap below the nav" bug. */
+  html {
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: 100dvh;
+  }
   * {
     border-color: var(--border);
   }
