@@ -17,7 +17,7 @@ export function ThemeSwitcher() {
 
   if (!mounted) {
     return (
-      <div className="flex w-full gap-[7px]">
+      <div role="group" aria-label={t("appearance")} className="flex w-full gap-[7px]">
         {THEMES.map((th) => (
           <div
             key={th}
@@ -31,7 +31,7 @@ export function ThemeSwitcher() {
   }
 
   return (
-    <div className="flex w-full gap-[7px]">
+    <div role="group" aria-label={t("appearance")} className="flex w-full gap-[7px]">
       {THEMES.map((th) => (
         <button
           key={th}

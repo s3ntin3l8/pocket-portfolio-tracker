@@ -146,6 +146,13 @@ describe("ThemeSwitcher", () => {
     expect(screen.getByRole("button", { name: "System" })).toBeInTheDocument();
   });
 
+  it("renders with a role='group' container and correct aria-label", () => {
+    wrap(<ThemeSwitcher />);
+
+    const group = screen.getByRole("group", { name: "Appearance" });
+    expect(group).toBeInTheDocument();
+  });
+
   it("marks current theme as selected using aria-pressed", () => {
     wrap(<ThemeSwitcher />);
 

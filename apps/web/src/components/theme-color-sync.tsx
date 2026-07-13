@@ -13,7 +13,7 @@ const THEME_COLOR = { light: "#f4f7f5", dark: "#0e1512" } as const;
  * status-bar/address-bar tint. This overwrites the tag's `content` to follow the actually
  * *applied* theme instead, once resolved on the client.
  */
-const STORAGE_KEY = "theme";
+export const STORAGE_KEY = "theme";
 
 export function ThemeColorSync() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -22,7 +22,7 @@ export function ThemeColorSync() {
     // Auto-switch theme by device/OS preference on mobile if no manual theme preference has been saved.
     // Evaluated once on mount (first-load viewport width) to avoid switching on resize (Finding #1).
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    const hasUserTheme = typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEY) !== null;
+    const hasUserTheme = window.localStorage.getItem(STORAGE_KEY) !== null;
     if (isMobile && !hasUserTheme) {
       setTheme("system");
     }
