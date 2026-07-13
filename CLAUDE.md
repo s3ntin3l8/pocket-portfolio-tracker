@@ -1,27 +1,36 @@
 # CLAUDE.md — Portfolio Tracker (monorepo)
 
 Personal portfolio tracker (English/Indonesian language support) that imports transactions
-from **screenshots** (LLM vision) and **CSV**, tracking **equities, gold, bonds, mutual
-funds (reksa dana), and cash** with live IDX prices and a real-time gold ticker. Built to
-expand to **Trade Republic / international** later. Full architecture: `.claude/plans/`.
+from **screenshots** (LLM vision), **CSV/PDF** (broker-specific parsers: DKB, IBKR, Trade
+Republic, Coinbase), and direct broker sync (**Trade Republic** push-approval, **Interactive
+Brokers** Flex token-pull), tracking **equities, gold, bonds, mutual funds (reksa dana), and
+cash** with live IDX prices and a real-time gold ticker.
 
 ## Stack & topology
 
 - **Monorepo:** npm workspaces + **Turborepo**. Node ≥26, ESM, TypeScript.
 - **`services/api`** — **Fastify 5 + Drizzle (Postgres)**. The only thing that touches
-  the DB; hosts auth, market-data jobs, screenshot parsing, future Trade Republic
-  (`pytr`). Started from `s3ntin3l8/node-backend-template`. **Auth:** Authentik OIDC —
-  `plugins/auth.ts` verifies Bearer JWTs (remote JWKS in prod, an injectable key in
-  tests via `buildApp({ authKey })`), upserts the user by `sub`, and exposes the
-  `app.authenticate` preHandler; every route scopes queries to `request.user`.
-  **Endpoints:** `/me`, `/portfolios` (list/create), `/portfolios/:id/transactions`
-  (list/create), `/portfolios/:id/holdings` (derived via `@portfolio/core`). Schema +
-  migrations come from `@portfolio/db`; the API applies them at startup.
+  the DB; hosts auth, market-data jobs, screenshot/CSV/PDF import parsing, and broker
+  sync (Trade Republic via vendored `pytr`, Interactive Brokers via Flex). Started from
+  `s3ntin3l8/node-backend-template`. **Auth:** Authentik OIDC — `plugins/auth.ts`
+  verifies Bearer JWTs (remote JWKS in prod, an injectable key in tests via
+  `buildApp({ authKey })`), or a long-lived personal access token (`pt_`-prefixed,
+  hashed at rest, `/me/tokens`, mutating methods blocked for read-scoped tokens);
+  upserts the user by `sub`, and exposes the `app.authenticate` preHandler — every
+  route scopes queries to `request.user`. **Routes** (`src/routes/*.ts`, one file per
+  domain): `me` (profile + PATs), `account-holders`, `portfolios`, `transactions`
+  (also holdings/trades/tax/income/allocation/forecasts/contributions — the largest
+  route file), `corporate-actions`, `mergers`, `imports` (+`imports/parse`,
+  `imports/confirm`), `documents`, `instruments`, `quotes`, `search`, `storage`,
+  `targets`, `tr`, `ibkr`, `preferences`, `admin`. Schema + migrations come from
+  `@portfolio/db`; the API applies them at startup.
 - **`apps/web`** — **Next.js (App Router) PWA**, Tailwind + shadcn/ui, **next-intl**
   (EN/ID). Talks to the API over HTTP (base URL is config-driven → Vercel-migratable).
-- **`packages/*`** — `schema` (zod + types), `core` (holdings, cost basis, XIRR,
-  corp-actions, FX), `db` (Drizzle schema/migrations), `market-data` (provider
-  abstraction), `api-client` (typed client for the PWA). _Most are stubs in phase 0._
+- **`packages/*`** — `schema` (zod + types), `core` (holdings, cost basis, XIRR/TWR,
+  contributions, tax DE/ID, trade-log, allocation/rebalancing, forecasting, corp-actions,
+  FX — the domain logic derived from transactions, the source of truth), `db` (Drizzle
+  schema/migrations), `market-data` (provider abstraction: IDX, gold spot/Antam,
+  EODHD/Yahoo/OpenFIGI), `api-client` (typed client for the PWA).
 - **Infra:** Supabase Cloud (Postgres + Storage) to start; **Authentik** (OIDC) for
   auth; self-host on Proxmox is the exit path. Local dev via `docker-compose.yml`
   (Postgres + MinIO + optional Ollama).
@@ -160,13 +169,3 @@ Caller jobs invoking reusable workflows with write scopes **must declare a
 `codeql` and `dependency-review` are gated on `github.event.repository.private == false`
 — they need GitHub Advanced Security on a private repo, so they **skip while private and
 auto-activate once the repo is made public** (both features are free on public repos).
-
-## Phased plan (see `.claude/plans/`)
-
-0. **Restructure** (this) — monorepo, API→Postgres, web skeleton, compose, CI.
-1. Foundation — Authentik OIDC, full schema (`packages/db`+`core`), design system +
-   screens (ui-ux-pro-max), manual transaction CRUD.
-2. Market data (IDX + gold spot + Antam + bonds/funds) via the provider abstraction.
-3. Screenshot ingest (Claude default, Ollama/LM Studio/Gemini/OpenRouter fallbacks) + CSV.
-4. v1 features — dividends, corporate actions, XIRR, net-worth dashboard.
-5. International — Trade Republic (`pytr`, EODHD/OpenFIGI), then native mobile.
