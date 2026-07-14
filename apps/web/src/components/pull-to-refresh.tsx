@@ -25,6 +25,13 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
   const MAX_PULL = 100;
   const RESISTANCE = 0.45;
 
+  const pullDistanceRef = useRef(0);
+
+  // Sync pullDistance to ref for event handlers to avoid re-binding listeners
+  useEffect(() => {
+    pullDistanceRef.current = pullDistance;
+  }, [pullDistance]);
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -60,7 +67,7 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
       activeRef.current = false;
       setIsDragging(false);
 
-      if (pullDistance >= TRIGGER_HEIGHT) {
+      if (pullDistanceRef.current >= TRIGGER_HEIGHT) {
         setPullDistance(REFRESH_HEIGHT);
         startTransition(() => {
           router.refresh();
@@ -79,7 +86,7 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
       container.removeEventListener("touchmove", handleTouchMove);
       container.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [scrollContainerRef, pullDistance, router]);
+  }, [scrollContainerRef, router]);
 
   // Once router transition completes, release the container height back to 0
   useEffect(() => {

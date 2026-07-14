@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, cleanup, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { createPortal } from "react-dom";
 import messages from "../messages/en.json";
-import { Sheet, SheetContent } from "../src/components/ui/sheet";
+import { Sheet, SheetContent, useSheetFooter } from "../src/components/ui/sheet";
 
 function wrap(ui: React.ReactNode) {
   return render(
@@ -85,4 +86,30 @@ describe("Sheet Visual Viewport Sync", () => {
 
     expect(document.documentElement.style.getPropertyValue("--visual-viewport-height")).toBe("");
   });
+
+  it("portals the submit button into the sheet footer region", () => {
+    const { getByTestId } = wrap(
+      <Sheet open={true}>
+        <SheetContent>
+          <TestPortalForm />
+        </SheetContent>
+      </Sheet>,
+    );
+
+    const submitBtn = getByTestId("submit-btn");
+    expect(submitBtn).toBeInTheDocument();
+
+    const form = getByTestId("form");
+    expect(form).not.toContainElement(submitBtn);
+  });
 });
+
+function TestPortalForm() {
+  const footerRef = useSheetFooter();
+  return (
+    <form data-testid="form">
+      <div>Form Fields</div>
+      {footerRef && createPortal(<button data-testid="submit-btn">Submit</button>, footerRef)}
+    </form>
+  );
+}
