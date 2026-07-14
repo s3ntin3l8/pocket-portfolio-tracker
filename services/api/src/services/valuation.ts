@@ -13,6 +13,8 @@ import type { DB } from "../db/client.js";
 import { getCachedQuotes } from "./price-cache.js";
 import { getFxRates, makeFxRateFn } from "./fx.js";
 import { toCoreTxns } from "./tx-core.js";
+import { logTiming } from "../lib/timing.js";
+import type { FastifyBaseLogger } from "fastify";
 
 /** Presentation metadata so the web app renders names without a second round-trip. */
 export interface InstrumentMeta {
@@ -63,11 +65,14 @@ export async function valuePortfolio(
   displayCurrency: string,
   costBasisMode?: CostBasisMode,
   cashCounted = true,
+  _log?: FastifyBaseLogger,
 ): Promise<Valuation> {
+  const t0 = performance.now();
   const rows = await db
     .select()
     .from(transactions)
     .where(eq(transactions.portfolioId, portfolioId));
+  const tSql = performance.now();
 
   const instrumentIds = [
     ...new Set(
@@ -109,7 +114,9 @@ export async function valuePortfolio(
       isin: i.isin ?? undefined,
     } satisfies InstrumentRef,
   }));
+  const tCacheStart = performance.now();
   const prices = await getCachedQuotes(db, marketData, refs, ttlMs);
+  const tPrices = performance.now();
 
   // Bonds without a live market price are valued at par (face value) — the v1
   // default; tradable ORI/SR market prices can override via a provider later.
@@ -127,9 +134,12 @@ export async function valuePortfolio(
   const currencies = new Set<string>();
   for (const p of Object.values(prices)) currencies.add(p.currency);
   for (const r of rows) currencies.add(r.currency);
+  const tFxStart = performance.now();
   const rates = await getFxRates(db, [...currencies], displayCurrency);
   const fx = makeFxRateFn(rates, displayCurrency);
+  const tFx = performance.now();
 
+  const tCorpStart = performance.now();
   const cas = await corporateActionsForInstruments(db, instrumentIds);
   const summary = summarizePortfolio({
     transactions: coreTxns,
@@ -148,6 +158,21 @@ export async function valuePortfolio(
   for (const h of summary.holdings) {
     h.lots = lotsByInstrument.get(h.instrumentId) ?? [];
   }
+  const tEnd = performance.now();
+
+  logTiming(undefined, "valuePortfolio", tEnd - t0, {
+    portfolioId,
+    displayCurrency,
+    costBasisMode,
+    cashCounted,
+    transactionCount: rows.length,
+    instrumentCount: instrumentIds.length,
+    sqlMs: Math.round((tSql - t0) * 100) / 100,
+    priceCacheMs: Math.round((tPrices - tCacheStart) * 100) / 100,
+    fxMs: Math.round((tFx - tFxStart) * 100) / 100,
+    corpActionsMs: Math.round((tCorpStart - tFx) * 100) / 100,
+    computationMs: Math.round((tEnd - tFx) * 100) / 100,
+  });
 
   return { coreTxns, summary, metaById, prices };
 }
@@ -169,8 +194,12 @@ export async function valuePortfolio(
 // financial figures with no bound on how stale. A short, fixed TTL instead bounds
 // staleness to a known, small window regardless of which write path touched the data —
 // safe by construction, at the cost of up to DERIVATION_CACHE_TTL_MS of staleness after
-// a write (accepted: the product decision here is "a few seconds stale is fine").
-const DERIVATION_CACHE_TTL_MS = 5000;
+// a write (accepted: the product decision here is "up to a minute stale is fine").
+// Increased from 5s to 60s after baseline timing showed the full valuation takes
+// ~1700ms — the 5s TTL was too short for tab-navigation patterns (by the time a user
+// navigates Tab A → Tab B, the 5s had typically expired). 60s keeps tab hops fast
+// while bounding write-staleness to at most one minute.
+const DERIVATION_CACHE_TTL_MS = 60_000;
 const derivationCache = new Map<string, { expiresAt: number; promise: Promise<Valuation> }>();
 
 function derivationCacheKey(
@@ -201,12 +230,15 @@ export async function valuePortfolioCached(
   /** Injectable clock for deterministic TTL tests (mirrors getCachedQuotes' `now` param) —
    *  defaults to the real clock in production. */
   now: number = Date.now(),
+  _log?: FastifyBaseLogger,
 ): Promise<Valuation> {
   const key = derivationCacheKey(portfolioId, displayCurrency, costBasisMode, cashCounted);
   const hit = derivationCache.get(key);
   if (hit && hit.expiresAt > now) {
+    logTiming(undefined, "valuePortfolioCached HIT", 0, { key, ttlRemaining: hit.expiresAt - now });
     return hit.promise;
   }
+  logTiming(undefined, "valuePortfolioCached MISS", 0, { key });
   const promise = valuePortfolio(
     db,
     marketData,
@@ -215,6 +247,7 @@ export async function valuePortfolioCached(
     displayCurrency,
     costBasisMode,
     cashCounted,
+    _log,
   );
   derivationCache.set(key, { expiresAt: now + DERIVATION_CACHE_TTL_MS, promise });
   // A failed computation must not poison the cache for the rest of the TTL window — drop
@@ -233,8 +266,10 @@ export async function valuePortfolioCached(
  * precisely (see valuePortfolioCached's doc comment) — also used directly by tests to
  * reset cache state between cases.
  */
-export function clearValuationCache(): void {
+export function clearValuationCache(_log?: FastifyBaseLogger): void {
+  const count = derivationCache.size;
   derivationCache.clear();
+  logTiming(undefined, "clearValuationCache", 0, { entriesCleared: count });
 }
 
 /** Corporate actions for the given instruments, shaped for @portfolio/core. */

@@ -1,7 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { z } from "zod";
 import { Decimal } from "decimal.js";
-import { and, asc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import {
   accountHolders,
   allocationTargets,
@@ -24,14 +24,11 @@ import {
 import {
   deleteReceiptsForTransactions,
   getDocumentForTransaction,
-  importIdsWithDocuments,
-  transactionIdsWithDocuments,
 } from "../storage/receipts.js";
 import { gatherDocumentNaming, buildDocumentName } from "../storage/naming.js";
 import {
-  txIdsWithFullTaxDetail,
-  txIdsNeedingReview,
-  sourcesForTransactions,
+  sourcesFromPreFetched,
+  txFlagsFromSourcesRows,
 } from "../services/enrichment.js";
 import { transactionInputSchema } from "@portfolio/schema";
 import {
@@ -61,6 +58,7 @@ import {
   mergeTradeLogs,
   allowanceUsageYTD,
   harvestSuggestions,
+  type Anomaly,
   type CoreTransaction,
   type CostBasisMode,
   type CorporateAction,
@@ -89,7 +87,14 @@ import { needsSectorEnrichment, needsNameEnrichment } from "../services/instrume
 import { loadSparklines } from "../services/sparklines.js";
 import { flattenJoinRow } from "../lib/portfolio.js";
 import { mapPool } from "../lib/promise-pool.js";
+import { logTiming } from "../lib/timing.js";
 import { netManualAdjustments } from "../services/pytr/reconcile.js";
+import { withDerivationCache, createStore } from "../lib/derivation-cache.js";
+
+const anomaliesCache = createStore<{ filtered: Anomaly[] }>();
+const transactionsCache = createStore<{ rows: unknown[]; total: number; summary?: { totalInvested: string; totalProceeds: string; totalIncome: string } }>();
+
+const ACTIVITY_INCOME_TYPES = ["dividend", "coupon", "interest", "bonus_cash"] as const;
 
 interface PortfolioParams {
   portfolioId: string;
@@ -168,6 +173,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     displayCurrency: string,
     costBasisMode?: CostBasisMode,
     cashCounted = true,
+    log?: FastifyBaseLogger,
   ) {
     return valuePortfolioCached(
       app.db,
@@ -177,6 +183,8 @@ export async function transactionsRoute(app: FastifyInstance) {
       displayCurrency,
       costBasisMode,
       cashCounted,
+      undefined,
+      log,
     );
   }
 
@@ -858,68 +866,259 @@ export async function transactionsRoute(app: FastifyInstance) {
   }
 
   // List a portfolio's transactions, each enriched with instrument metadata.
-  app.get<{ Params: PortfolioParams; Querystring: { convertTo?: string } }>(
+  // When `?page=` is present, returns `{ rows, total }` (paginated); when absent, returns
+  // a bare `Transaction[]` (all rows, backward-compatible for the aggregate path).
+  app.get<{
+    Params: PortfolioParams;
+    Querystring: { convertTo?: string; page?: string; pageSize?: string; type?: string; year?: string; q?: string };
+  }>(
     "/portfolios/:portfolioId/transactions",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
-      if (!(await ownedPortfolio(id, request.params.portfolioId))) {
+      const portfolio = await ownedPortfolio(id, request.params.portfolioId);
+      if (!portfolio) {
         return reply.code(404).send({ error: "portfolio_not_found" });
       }
+      const portfolioName = portfolio.name;
+      const paginate = request.query.page !== undefined;
+      const page = paginate ? Math.max(1, parseInt(request.query.page!, 10) || 1) : 1;
+      const pageSize = paginate
+        ? Math.min(100, Math.max(1, parseInt(request.query.pageSize ?? "25", 10) || 25))
+        : 0;
+
+      const convertTo = request.query.convertTo;
+      const typeFilter = request.query.type;
+      const yearFilter = request.query.year;
+      const searchQuery = request.query.q;
+
+      const conditions = [eq(transactions.portfolioId, request.params.portfolioId)];
+      if (typeFilter === "buy") conditions.push(inArray(transactions.type, ["buy", "savings_plan"]));
+      if (typeFilter === "sell") conditions.push(eq(transactions.type, "sell"));
+      if (typeFilter === "income") conditions.push(inArray(transactions.type, ACTIVITY_INCOME_TYPES));
+      if (yearFilter) {
+        const y = parseInt(yearFilter, 10);
+        if (!isNaN(y)) conditions.push(sql`EXTRACT(YEAR FROM ${transactions.executedAt}) = ${y}`);
+      }
+      if (searchQuery) {
+        conditions.push(sql`(
+    ${transactions.description}::text ILIKE '%' || ${searchQuery} || '%'
+    OR ${transactions.type}::text ILIKE '%' || ${searchQuery} || '%'
+    OR ${transactions.kind}::text ILIKE '%' || ${searchQuery} || '%'
+    OR ${transactions.source}::text ILIKE '%' || ${searchQuery} || '%'
+    OR ${transactions.currency}::text ILIKE '%' || ${searchQuery} || '%'
+    OR ${transactions.instrumentId} IN (SELECT id FROM instruments WHERE symbol::text ILIKE '%' || ${searchQuery} || '%' OR name::text ILIKE '%' || ${searchQuery} || '%')
+  )`);
+      }
+
+      // Shared enrichment + FX + mapping (called after the SELECT for both paths).
+      async function enrichRows(rows: typeof transactions.$inferSelect[], total: number, summary?: { totalInvested: string; totalProceeds: string; totalIncome: string }) {
+        const tB = performance.now();
+        const allImportIds = rows
+          .map((r) => r.importId)
+          .filter((x): x is string => x !== null);
+        const allTxIds = rows.map((r) => r.id);
+        const enrichStart = performance.now();
+        let instrMs = 0;
+        let sourcesMs = 0;
+        let docsTxMs = 0;
+        let docsImpMs = 0;
+        const [meta, sourcesRows, docsByTx, docsByImport] = await Promise.all([
+          (async () => {
+            const s = performance.now();
+            const r = await instrumentMeta(rows.map((r) => r.instrumentId));
+            instrMs = performance.now() - s;
+            return r;
+          })(),
+          (async () => {
+            const s = performance.now();
+            const r = await app.db
+              .select({
+                id: transactionSources.id,
+                transactionId: transactionSources.transactionId,
+                sourceType: transactionSources.sourceType,
+                externalId: transactionSources.externalId,
+                orderRef: transactionSources.orderRef,
+                documentId: transactionSources.documentId,
+                importId: transactionSources.importId,
+                taxComponents: transactionSources.taxComponents,
+                createdAt: transactionSources.createdAt,
+                confidence: transactionSources.confidence,
+              })
+              .from(transactionSources)
+              .where(inArray(transactionSources.transactionId, allTxIds));
+            sourcesMs = performance.now() - s;
+            return r;
+          })(),
+          (async () => {
+            const s = performance.now();
+            const r = await app.db
+              .select({
+                id: documents.id,
+                transactionId: documents.transactionId,
+                importId: documents.importId,
+                status: documents.status,
+                originalFilename: documents.originalFilename,
+                mimeType: documents.mimeType,
+                storedAt: documents.storedAt,
+              })
+              .from(documents)
+              .where(
+                and(
+                  eq(documents.status, "retained"),
+                  inArray(documents.transactionId, allTxIds),
+                ),
+              );
+            docsTxMs = performance.now() - s;
+            return r;
+          })(),
+          allImportIds.length > 0
+            ? (async () => {
+                const s = performance.now();
+                const r = await app.db
+                  .select({
+                    id: documents.id,
+                    transactionId: documents.transactionId,
+                    importId: documents.importId,
+                    status: documents.status,
+                    originalFilename: documents.originalFilename,
+                    mimeType: documents.mimeType,
+                    storedAt: documents.storedAt,
+                  })
+                  .from(documents)
+                  .where(
+                    and(
+                      eq(documents.status, "retained"),
+                      inArray(documents.importId, allImportIds),
+                    ),
+                  );
+                docsImpMs = performance.now() - s;
+                return r;
+              })()
+            : [],
+        ]);
+        const docsRows = docsByTx.concat(docsByImport);
+
+        // Phase 2: Pure JS enrichment — no DB queries.
+        const { needsReview, fullTaxDetail } = txFlagsFromSourcesRows(sourcesRows);
+        const importIdsWithDocs = new Set(
+          docsRows
+            .map((r) => r.importId)
+            .filter((x): x is string => x !== null),
+        );
+        const txIdsWithDocs = new Set(
+          docsRows
+            .map((r) => r.transactionId)
+            .filter((x): x is string => x !== null),
+        );
+        const sourcesMap = sourcesFromPreFetched(
+          sourcesRows,
+          docsRows,
+          rows,
+          meta,
+          portfolioName,
+        );
+        const tD = performance.now();
+
+        // Optional per-row FX conversion.
+        let ratesByDate: Map<string, Record<string, string>> | undefined;
+        if (convertTo) {
+          const currencies = [...new Set(rows.map((r) => r.currency))];
+          const dates = [...new Set(rows.map((r) => r.executedAt.toISOString().slice(0, 10)))];
+          ratesByDate = await getFxRatesForDates(app.db, currencies, convertTo, dates);
+        }
+        const tE = performance.now();
+
+        // Single pass over rows: merge FX rate lookup and response shape construction.
+        const responseRows = rows.map((r) => {
+          let displayRate: string | undefined;
+          if (ratesByDate && convertTo) {
+            const date = r.executedAt.toISOString().slice(0, 10);
+            const rates = ratesByDate.get(date) ?? {};
+            displayRate = r.currency === convertTo ? "1" : (rates[r.currency] ?? "1");
+          }
+          return {
+            ...r,
+            instrument: r.instrumentId ? (meta.get(r.instrumentId) ?? null) : null,
+            hasDocument:
+              txIdsWithDocs.has(r.id) ||
+              (r.importId ? importIdsWithDocs.has(r.importId) : false),
+            hasFullTaxDetail: fullTaxDetail.has(r.id),
+            needsReview: needsReview.has(r.id),
+            sources: sourcesMap.get(r.id) ?? [],
+            ...(displayRate
+              ? { displayCurrency: convertTo, displayRate }
+              : {}),
+          };
+        });
+
+        const durationMs = performance.now() - t0;
+        logTiming(request, "GET /portfolios/:id/transactions", durationMs, {
+          portfolioId: request.params.portfolioId,
+          transactionCount: responseRows.length,
+          total: paginate ? total : undefined,
+          page: paginate ? page : undefined,
+          hasFxConversion: !!convertTo,
+          authMs: tA - t0,
+          queryMs: tB - tA,
+          enrichMs: tD - enrichStart,
+          instrMs: Math.round(instrMs * 100) / 100,
+          sourcesMs: Math.round(sourcesMs * 100) / 100,
+          docsTxMs: Math.round(docsTxMs * 100) / 100,
+          docsImpMs: Math.round(docsImpMs * 100) / 100,
+          enrichPhase2Ms: Math.round((tD - enrichStart - Math.max(instrMs, sourcesMs, docsTxMs, docsImpMs)) * 100) / 100,
+          fxMs: tE - tD,
+          mapMs: performance.now() - tE,
+        });
+
+        return { rows: responseRows, total, summary };
+      }
+
+      const tA = performance.now();
+      if (paginate) {
+        const cacheKey = `transactions:${request.params.portfolioId}:${page}:${pageSize}:${convertTo || ''}:${typeFilter || ''}:${yearFilter || ''}:${searchQuery || ''}`;
+        const cached = await withDerivationCache(transactionsCache, cacheKey, async () => {
+          const [cnt, _rows, summaryRows] = await Promise.all([
+            app.db
+              .select({ count: count() })
+              .from(transactions)
+              .where(and(...conditions))
+              .then((r) => Number(r[0].count)),
+            app.db
+              .select()
+              .from(transactions)
+              .where(and(...conditions))
+              .orderBy(desc(transactions.executedAt))
+              .limit(pageSize)
+              .offset((page - 1) * pageSize),
+            app.db
+              .select({
+                totalInvested: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} IN ('buy','savings_plan') THEN ${transactions.price}::numeric * ${transactions.quantity}::numeric + ${transactions.fees}::numeric ELSE 0 END), '0')`,
+                totalProceeds: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'sell' THEN ${transactions.price}::numeric * ${transactions.quantity}::numeric - ${transactions.fees}::numeric ELSE 0 END), '0')`,
+                totalIncome: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} IN ('dividend','coupon','interest','bonus_cash') THEN ${transactions.price}::numeric * ${transactions.quantity}::numeric ELSE 0 END), '0')`,
+              })
+              .from(transactions)
+              .where(and(...conditions))
+              .then((r) => r[0]),
+          ]);
+          return enrichRows(_rows, cnt, summaryRows);
+        });
+        const years = await app.db
+          .select({ year: sql<number>`DISTINCT EXTRACT(YEAR FROM ${transactions.executedAt})` })
+          .from(transactions)
+          .where(eq(transactions.portfolioId, request.params.portfolioId))
+          .orderBy(sql`1 DESC`);
+        const yearList = years.map((r) => String(r.year));
+        return { rows: cached.rows, total: cached.total, summary: cached.summary, years: yearList };
+      }
+
       const rows = await app.db
         .select()
         .from(transactions)
-        .where(eq(transactions.portfolioId, request.params.portfolioId));
-      const meta = await instrumentMeta(rows.map((r) => r.instrumentId));
-      // Batch-check which transactions have a retained document.
-      // TR transactions carry per-tx docs (linked by transactionId); other sources use
-      // one doc per import (linked by importId). Check both, OR them together.
-      const allImportIds = rows
-        .map((r) => r.importId)
-        .filter((x): x is string => x !== null);
-      const allTxIds = rows.map((r) => r.id);
-      const [importIdsWithDocs, txIdsWithDocs, fullTaxDetail, needsReview, sourcesMap] =
-        await Promise.all([
-          importIdsWithDocuments(app, allImportIds),
-          transactionIdsWithDocuments(app, allTxIds),
-          txIdsWithFullTaxDetail(app, allTxIds),
-          txIdsNeedingReview(app, allTxIds),
-          sourcesForTransactions(app, allTxIds, request.params.portfolioId),
-        ]);
-
-      // Optional per-row FX conversion into a caller-chosen scope currency, at each
-      // transaction's own trade-date rate (stable — doesn't restate history at today's
-      // FX). Callers keep raw amounts and multiply by `displayRate` client-side, so both
-      // gross and net figures can be derived from the same row.
-      const convertTo = request.query.convertTo;
-      let rateByTxId: Map<string, string> | undefined;
-      if (convertTo) {
-        const currencies = [...new Set(rows.map((r) => r.currency))];
-        const dates = [...new Set(rows.map((r) => r.executedAt.toISOString().slice(0, 10)))];
-        const ratesByDate = await getFxRatesForDates(app.db, currencies, convertTo, dates);
-        rateByTxId = new Map(
-          rows.map((r) => {
-            const date = r.executedAt.toISOString().slice(0, 10);
-            const fx = makeFxRateFn(ratesByDate.get(date) ?? {}, convertTo);
-            return [r.id, fx(r.currency, convertTo)];
-          }),
-        );
-      }
-
-      return rows.map((r) => ({
-        ...r,
-        instrument: r.instrumentId ? (meta.get(r.instrumentId) ?? null) : null,
-        hasDocument:
-          txIdsWithDocs.has(r.id) ||
-          (r.importId ? importIdsWithDocs.has(r.importId) : false),
-        hasFullTaxDetail: fullTaxDetail.has(r.id),
-        // Low-confidence draft from a lossy parse — flag it for review in the table.
-        needsReview: needsReview.has(r.id),
-        sources: sourcesMap.get(r.id) ?? [],
-        ...(rateByTxId
-          ? { displayCurrency: convertTo, displayRate: rateByTxId.get(r.id) ?? "1" }
-          : {}),
-      }));
+        .where(and(...conditions));
+      const result = await enrichRows(rows, rows.length);
+      return result.rows;
     },
   );
 
@@ -1303,6 +1502,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/holdings",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(id, portfolioId);
@@ -1354,7 +1554,75 @@ export async function transactionsRoute(app: FastifyInstance) {
       const filtered = anomalies.filter(
         (a) => !(a.transactionId && dismissedSet.has(`${a.transactionId}:${a.code}`)),
       );
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/holdings", durationMs, {
+        portfolioId,
+        holdingCount: holdings.length,
+        anomalyCount: filtered.length,
+      });
       return { holdings, anomalies: filtered };
+    },
+  );
+
+  // Lightweight anomalies endpoint — skips the computeHoldings call that the full
+  // /holdings endpoint runs, making it faster when callers only need anomaly flags.
+  app.get<{ Params: PortfolioParams }>(
+    "/portfolios/:portfolioId/anomalies",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const t0 = performance.now();
+      const { id } = requireUser(request);
+      const { portfolioId } = request.params;
+      const portfolio = await ownedPortfolio(id, portfolioId);
+      if (!portfolio) {
+        return reply.code(404).send({ error: "portfolio_not_found" });
+      }
+      const { filtered } = await withDerivationCache(anomaliesCache, portfolioId, async () => {
+        const [rows, trConn, dismissed] = await Promise.all([
+          app.db
+            .select()
+            .from(transactions)
+            .where(eq(transactions.portfolioId, portfolioId)),
+          app.db
+            .select({ lastReconciliation: trConnections.lastReconciliation })
+            .from(trConnections)
+            .where(eq(trConnections.portfolioId, portfolioId))
+            .limit(1)
+            .then((r) => r[0] ?? null),
+          app.db
+            .select({
+              transactionId: dismissedAnomalies.transactionId,
+              code: dismissedAnomalies.code,
+            })
+            .from(dismissedAnomalies)
+            .where(eq(dismissedAnomalies.portfolioId, portfolioId)),
+        ]);
+        const coreTxns: CoreTransaction[] = toCoreTxns(rows);
+        const cas = await corporateActionsFor(rows.map((r) => r.instrumentId));
+        const rawReconciliation = trConn?.lastReconciliation as
+          | ReconciliationGap
+          | null
+          | undefined;
+        const reconciliation = rawReconciliation
+          ? netManualAdjustments(rawReconciliation, coreTxns)
+          : rawReconciliation;
+        const anomalies = detectAnomalies(coreTxns, cas, {
+          cashCounted: portfolio.cashCounted,
+          allowNegativeCash: portfolio.allowNegativeCash,
+          reconciliationGap: reconciliation ?? null,
+        });
+        const dismissedSet = new Set(dismissed.map((d) => `${d.transactionId}:${d.code}`));
+        const filtered = anomalies.filter(
+          (a) => !(a.transactionId && dismissedSet.has(`${a.transactionId}:${a.code}`)),
+        );
+        return { filtered };
+      });
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/anomalies", durationMs, {
+        portfolioId,
+        anomalyCount: filtered.length,
+      });
+      return { anomalies: filtered };
     },
   );
 
@@ -1363,6 +1631,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/summary",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(id, portfolioId);
@@ -1374,6 +1643,7 @@ export async function transactionsRoute(app: FastifyInstance) {
         portfolio.baseCurrency,
         costBasisFromQuery(request.query),
         portfolio.cashCounted,
+        request.log,
       );
       // Self-heal: enqueue a sector sweep if any held instrument hasn't been
       // enriched yet (or has a stale attempt). Debounced to once per 6h.
@@ -1389,6 +1659,11 @@ export async function transactionsRoute(app: FastifyInstance) {
         app.db,
         summary.holdings.map((h) => h.instrumentId),
       );
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/summary", durationMs, {
+        portfolioId,
+        holdingCount: summary.holdings.length,
+      });
       return {
         ...summary,
         holdings: summary.holdings.map((h) => ({
@@ -1407,6 +1682,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/history",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(id, portfolioId))) {
@@ -1429,6 +1705,12 @@ export async function transactionsRoute(app: FastifyInstance) {
             ),
           )
           .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
+        const intradayDurationMs = performance.now() - t0;
+        logTiming(request, "GET /portfolios/:id/history", intradayDurationMs, {
+          portfolioId,
+          range,
+          pointCount: rows.length,
+        });
         return rows.map((r) => ({
           at: r.capturedAt.toISOString(),
           netWorth: r.netWorth,
@@ -1454,13 +1736,20 @@ export async function transactionsRoute(app: FastifyInstance) {
       const indexed = chainIndex(series);
       const indexById = new Map(indexed.map((p) => [p.date, p]));
 
-      return rows.map((r) => ({
+      const result = rows.map((r) => ({
         date: r.date,
         netWorth: r.netWorth,
         marketValue: r.marketValue ?? "0",
         index: indexById.get(r.date)?.index ?? "100",
         pct: indexById.get(r.date)?.pct ?? "0",
       }));
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/history", durationMs, {
+        portfolioId,
+        range,
+        pointCount: rows.length,
+      });
+      return result;
     },
   );
 
@@ -1469,6 +1758,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/performance",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(id, portfolioId);
@@ -1488,6 +1778,10 @@ export async function transactionsRoute(app: FastifyInstance) {
       flows.push({ amount: Number(summary.netWorth), date: asOf });
 
       const rate = xirr(flows);
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/performance", durationMs, {
+        portfolioId,
+      });
       return {
         xirr: Number.isFinite(rate) ? rate : null,
         netWorth: summary.netWorth,
@@ -1501,6 +1795,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/contributions",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(id, portfolioId);
@@ -1513,7 +1808,7 @@ export async function transactionsRoute(app: FastifyInstance) {
         undefined,
         portfolio.cashCounted,
       );
-      return buildContributions(
+      const result = buildContributions(
         coreTxns,
         summary,
         portfolio.baseCurrency,
@@ -1521,6 +1816,11 @@ export async function transactionsRoute(app: FastifyInstance) {
         portfolio.portfolioType === "child" ? "child" : "standard",
         portfolio.cashCounted ? "inside" : "outside",
       );
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/contributions", durationMs, {
+        portfolioId,
+      });
+      return result;
     },
   );
 
@@ -1530,6 +1830,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/trades",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(id, portfolioId);
@@ -1552,6 +1853,12 @@ export async function transactionsRoute(app: FastifyInstance) {
         costBasisMode,
         metaById,
       );
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/trades", durationMs, {
+        portfolioId,
+        method,
+        costBasis: costBasisMode,
+      });
       return attachInstruments(log, metaById);
     },
   );
@@ -1562,6 +1869,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId } = request.query;
       const [u] = await app.db
@@ -1726,6 +2034,14 @@ export async function transactionsRoute(app: FastifyInstance) {
           ? String((currentNetWorth - startNav) / startNav)
           : null;
 
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth", durationMs, {
+        portfolioCount: pfs.length,
+        period,
+        holderId: holderId ?? null,
+        costBasisMode,
+      });
+
       return {
         ...aggregated,
         holdings,
@@ -1750,6 +2066,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth/income",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId } = request.query;
       const [u] = await app.db
@@ -1794,6 +2111,9 @@ export async function transactionsRoute(app: FastifyInstance) {
       }
       const aggregated = aggregatePortfolios(summaries, display);
 
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth/income", durationMs, { portfolioCount: pfs.length });
+
       return buildIncomeStats(allTxns, aggregated, display, (txId) => txPortfolioId.get(txId));
     },
   );
@@ -1805,6 +2125,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth/trades",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId } = request.query;
       const [u] = await app.db
@@ -1853,6 +2174,8 @@ export async function transactionsRoute(app: FastifyInstance) {
       for (const { metaById } of perPortfolio) {
         for (const [k, v] of metaById) meta.set(k, v);
       }
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth/trades", durationMs, { portfolioCount: pfs.length });
       return attachInstruments(mergeTradeLogs(logs, display, method), meta);
     },
   );
@@ -1862,6 +2185,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/income",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(id, portfolioId);
@@ -1874,7 +2198,12 @@ export async function transactionsRoute(app: FastifyInstance) {
         undefined,
         portfolio.cashCounted,
       );
-      return buildIncomeStats(coreTxns, summary, portfolio.baseCurrency, () => portfolioId);
+      const result = buildIncomeStats(coreTxns, summary, portfolio.baseCurrency, () => portfolioId);
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/income", durationMs, {
+        portfolioId,
+      });
+      return result;
     },
   );
 
@@ -1883,6 +2212,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/sparplan",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
       const includeSales = request.query.includeSales === "true";
@@ -1911,6 +2241,11 @@ export async function transactionsRoute(app: FastifyInstance) {
         );
 
       if (targetRows.length === 0) {
+        const durationMs = performance.now() - t0;
+        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+          portfolioId,
+          hasTargets: false,
+        });
         return stats;
       }
 
@@ -1955,6 +2290,12 @@ export async function transactionsRoute(app: FastifyInstance) {
 
       // Phase D: tax-aware trade recommendations when ?includeSales=true.
       if (!includeSales) {
+        const durationMs = performance.now() - t0;
+        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+          portfolioId,
+          hasTargets: true,
+          includeSales: false,
+        });
         return { ...stats, drift, contributionSplit: split };
       }
 
@@ -1979,6 +2320,13 @@ export async function transactionsRoute(app: FastifyInstance) {
         const tradeActions: TradeAction[] = rebalancingTrades(drift, String(targetedTotal), {
           mode: "trade",
         });
+        const durationMs = performance.now() - t0;
+        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+          portfolioId,
+          hasTargets: true,
+          includeSales: true,
+          taxRegime: "ID",
+        });
         return { ...stats, drift, contributionSplit: split, tradeActions, taxRegime };
       }
 
@@ -1997,7 +2345,14 @@ export async function transactionsRoute(app: FastifyInstance) {
       }
 
       if (!portfolio.taxAllowanceAnnual) {
-        // FSA not configured for this portfolio — return existing data with taxUnavailable flag.
+        const durationMs = performance.now() - t0;
+        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+          portfolioId,
+          hasTargets: true,
+          includeSales: true,
+          taxRegime: prefsRow?.taxRegime ?? "DE",
+          fsaConfigured: false,
+        });
         return { ...stats, drift, contributionSplit: split, taxUnavailable: true, taxRegime };
       }
 
@@ -2037,6 +2392,15 @@ export async function transactionsRoute(app: FastifyInstance) {
       const remainingNum = Number(usage.remaining);
       const allowanceUsed = String(Math.min(allowanceUsedNum, remainingNum).toFixed(2));
 
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+        portfolioId,
+        hasTargets: true,
+        includeSales: true,
+        taxRegime,
+        fsaConfigured: true,
+        hasSellActions: tradeActions.some((a) => a.side === "sell"),
+      });
       return {
         ...stats,
         drift,
@@ -2056,6 +2420,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth/sparplan",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId } = request.query;
       const [u] = await app.db
@@ -2101,6 +2466,8 @@ export async function transactionsRoute(app: FastifyInstance) {
 
       const merged = mergeSparplanStats(perPortfolio, display);
       const meta = await instrumentMeta([...allInstrumentIds]);
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth/sparplan", durationMs, { portfolioCount: pfs.length });
       // TODO Phase B: networth instrument drift — complex (multiple portfolios, base currencies).
       // Drift + contributionSplit are only wired on the portfolio-scoped endpoint for MVP.
       return {
@@ -2122,6 +2489,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth/contributions",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId } = request.query;
       const [u] = await app.db
@@ -2181,6 +2549,8 @@ export async function transactionsRoute(app: FastifyInstance) {
       );
       const flows: CashFlowPoint[] = flowsByPortfolio.flat();
       const aggregated = aggregatePortfolios(summaries, display);
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth/contributions", durationMs, { portfolioCount: pfs.length });
       return enrichContributions(
         mergeContributionStats(perPortfolio, display),
         aggregated.netWorth,
@@ -2197,6 +2567,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth/history",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId } = request.query;
       const [u] = await app.db
@@ -2326,6 +2697,13 @@ export async function transactionsRoute(app: FastifyInstance) {
         const nw = Number(convert(r.netWorth, r.currency, display, fx));
         nwByDate.set(r.date, (nwByDate.get(r.date) ?? 0) + nw);
       }
+
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth/history", durationMs, {
+        portfolioCount: pfs.length,
+        range,
+        resultCount: aggregated.length,
+      });
 
       return aggregated.map((p) => ({
         date: p.date,
@@ -2856,6 +3234,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/tax",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { portfolioId } = request.params;
 
@@ -2954,6 +3333,13 @@ export async function transactionsRoute(app: FastifyInstance) {
       });
       const suggestions = harvestSuggestions({ tradeLog, tfRates, allowanceAnnual, taxRate, year, usage });
 
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /portfolios/:id/tax", durationMs, {
+        portfolioId,
+        year,
+        hasHolder: holderId != null,
+        carryForwardApplied,
+      });
       return {
         year,
         currency: portfolio.baseCurrency,
@@ -2992,6 +3378,7 @@ export async function transactionsRoute(app: FastifyInstance) {
     "/networth/tax",
     { preHandler: app.authenticate },
     async (request, reply) => {
+      const t0 = performance.now();
       const { id } = requireUser(request);
       const { holderId: filterHolderId } = request.query;
       const year = request.query.year ? parseInt(request.query.year, 10) : new Date().getUTCFullYear();
@@ -3127,7 +3514,29 @@ export async function transactionsRoute(app: FastifyInstance) {
         });
       }
 
+      const durationMs = performance.now() - t0;
+      logTiming(request, "GET /networth/tax", durationMs, {
+        holderCount: holderRows.length,
+        year,
+      });
       return result;
+    },
+  );
+
+  // Lightweight FX rate lookup for the transaction detail sheet.
+  app.get<{
+    Querystring: { from: string; to: string; date: string };
+  }>(
+    "/fx-rate",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { from, to, date } = request.query;
+      if (!from || !to || !date) {
+        return reply.code(400).send({ error: "from, to, and date are required" });
+      }
+      const rates = await getFxRatesForDates(app.db, [from], to, [date]);
+      const rate = rates.get(date)?.[from] ?? null;
+      return { rate };
     },
   );
 }

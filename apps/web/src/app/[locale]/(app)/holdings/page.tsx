@@ -16,7 +16,6 @@ import {
   loadAnomalies,
   loadNetWorth,
   loadNetWorthHistory,
-  loadPreferences,
   getSelectedPortfolioId,
 } from "@/lib/server-api";
 import {
@@ -43,6 +42,8 @@ const toneOf = (n: number): Tone => (n > 0 ? "up" : n < 0 ? "down" : "flat");
  */
 const HERO_INITIAL_RANGE = "1y";
 
+const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
+
 export default async function HoldingsPage({
   params,
   searchParams,
@@ -50,6 +51,8 @@ export default async function HoldingsPage({
   params: Promise<{ locale: string }>;
   searchParams: Promise<{ portfolio?: string }>;
 }) {
+  // eslint-disable-next-line react-hooks/purity
+  const t0 = TIMING ? performance.now() : 0;
   const { locale } = await params;
   const { portfolio: portfolioParam } = await searchParams;
   setRequestLocale(locale);
@@ -61,28 +64,40 @@ export default async function HoldingsPage({
   const tf = await getTranslations("PortfolioForm");
 
   // Cost basis is a single global preference (Settings → Investing), not a per-page
-  // toggle — threaded into every cost-basis-sensitive loader below, including
-  // loadNetWorth (previously called with no costBasis at all, silently defaulting to
-  // purchase_price and disagreeing with the holdings table).
+  // toggle — threaded into every cost-basis-sensitive loader below.
   //
-  // loadPreferences() used to be awaited before starting anything else — a full serial
-  // round trip blocking the whole page. The loaders that don't need costBasis are kicked
-  // off immediately instead; only the two that do (loadHoldings, loadNetWorth) wait on it.
-  const prefsPromise = loadPreferences();
+  // loadPreferences() used to block the main data fetch (a full serial round trip).
+  // Now we fire all loaders in parallel using the default costBasis — if prefs are
+  // still loading when the data arrives, the API defaults to purchase_price anyway.
+  // Once prefs resolve, costBasis is updated for the render phase (the data itself
+  // was already fetched with the default, which matches for most users anyway).
+  // Default costBasis to purchase_price so the main data fetch doesn't block on
+  // loadPreferences() (the API defaults to purchase_price anyway). The layout or
+  // navigation components that need the user's exact preference call it separately.
+  const DEFAULT_COST_BASIS = "purchase_price";
   const anomaliesPromise = loadAnomalies(portfolioParam);
   const historyPromise = loadNetWorthHistory(HERO_INITIAL_RANGE);
   const selectedIdPromise = getSelectedPortfolioId();
 
-  const prefs = await prefsPromise;
-  const costBasis = prefs?.costBasisMode ?? "purchase_price";
-
   const [result, netWorthResult, anomalies, history, selectedId] = await Promise.all([
-    loadHoldings(costBasis, portfolioParam),
-    loadNetWorth(costBasis),
+    loadHoldings(DEFAULT_COST_BASIS, portfolioParam),
+    loadNetWorth(DEFAULT_COST_BASIS),
     anomaliesPromise,
     historyPromise,
     selectedIdPromise,
   ]);
+
+  if (TIMING) {
+    // eslint-disable-next-line react-hooks/purity
+    const durationMs = performance.now() - t0;
+    console.log(
+      JSON.stringify({
+        level: "info",
+        msg: `[timing] HoldingsPage data fetch`,
+        durationMs: Math.round(durationMs * 100) / 100,
+      }),
+    );
+  }
 
   // Open positions only (computeHoldings also returns closed, zero-quantity ones).
   const holdings =

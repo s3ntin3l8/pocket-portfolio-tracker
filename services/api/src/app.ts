@@ -40,6 +40,7 @@ import type { IbkrFlexClient } from "./services/ibkr/flex-client.js";
 import type { StorageProvider } from "./storage/types.js";
 import { storagePlugin } from "./plugins/storage.js";
 import { clearValuationCache } from "./services/valuation.js";
+import { clearDerivationCache } from "./lib/derivation-cache.js";
 
 export type BuildAppOptions = AuthPluginOptions & {
   // Injectable so tests can supply a mock parser instead of hitting Anthropic.
@@ -195,7 +196,8 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   // extra recompute per portfolio on the next read — never a staleness risk.
   app.addHook("onResponse", async (request) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
-      clearValuationCache();
+      clearValuationCache(request.log);
+      clearDerivationCache();
     }
   });
 

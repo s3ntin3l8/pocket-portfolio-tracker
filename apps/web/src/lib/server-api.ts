@@ -277,6 +277,21 @@ export interface PortfolioWithValue {
   netWorth: string;
 }
 
+/** Portfolio list only (no net-worth values — cheaper, for nav counts etc.). */
+export async function loadPortfoliosList(): Promise<{
+  status: "ok" | "unavailable";
+  portfolios: Portfolio[];
+}> {
+  const api = await getServerApi();
+  if (!api) return { status: "unavailable", portfolios: [] };
+  try {
+    const list = await listPortfoliosCached();
+    return { status: "ok", portfolios: list };
+  } catch {
+    return { status: "unavailable", portfolios: [] };
+  }
+}
+
 /** Every portfolio with its valued net worth (for the management screen). */
 export async function loadPortfolios(): Promise<{
   status: "ok" | "unavailable";
@@ -493,7 +508,7 @@ export async function loadAnomalies(portfolioOverride?: string): Promise<Anomaly
   const portfolioId = portfolioOverride ?? (await getSelectedPortfolioId());
   if (!portfolioId) return null;
   try {
-    const { anomalies } = await api.getHoldings(portfolioId);
+    const { anomalies } = await api.getAnomalies(portfolioId);
     return anomalies;
   } catch {
     return null;
@@ -869,6 +884,28 @@ export async function loadPortfolioList(): Promise<Portfolio[]> {
     return await listPortfoliosCached();
   } catch {
     return [];
+  }
+}
+
+export async function loadTransactionsPaginated(
+  portfolioId: string,
+  page: number,
+  pageSize = 25,
+  convertTo?: string,
+  type?: string,
+  year?: string,
+  q?: string,
+): Promise<
+  | { status: "ok"; rows: Transaction[]; total: number; summary?: { totalInvested: string; totalProceeds: string; totalIncome: string }; years?: string[] }
+  | { status: "unavailable"; rows: []; total: 0 }
+> {
+  const api = await getServerApi();
+  if (!api) return { status: "unavailable", rows: [], total: 0 };
+  try {
+    const data = await api.listTransactionsPaginated(portfolioId, page, pageSize, convertTo, type, year, q);
+    return { status: "ok", rows: data.rows, total: data.total, summary: data.summary, years: data.years };
+  } catch {
+    return { status: "unavailable", rows: [], total: 0 };
   }
 }
 

@@ -228,7 +228,7 @@ describe("loadAnomalies", () => {
 
   it("fetches anomalies for the selected portfolio", async () => {
     h.cookies = { pf: "p1" };
-    h.client.getHoldings = async () => ({
+    h.client.getAnomalies = async () => ({
       anomalies: [{ id: "a1", severity: "warning", message: "test" }],
     });
     const res = await api.loadAnomalies();
@@ -238,16 +238,16 @@ describe("loadAnomalies", () => {
 
   it("uses portfolioOverride instead of the cookie for anomalies", async () => {
     h.cookies = { pf: "p1" }; // cookie says p1
-    const getHoldings = vi.fn(async () => ({ anomalies: [] }));
-    h.client.getHoldings = getHoldings;
+    const getAnomalies = vi.fn(async () => ({ anomalies: [] }));
+    h.client.getAnomalies = getAnomalies;
 
     await api.loadAnomalies("p2"); // override says p2
-    expect(getHoldings).toHaveBeenCalledWith("p2");
+    expect(getAnomalies).toHaveBeenCalledWith("p2");
   });
 
   it("returns null on error", async () => {
     h.cookies = { pf: "p1" };
-    h.client.getHoldings = async () => {
+    h.client.getAnomalies = async () => {
       throw new Error("x");
     };
     expect(await api.loadAnomalies()).toBeNull();
