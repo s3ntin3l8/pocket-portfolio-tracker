@@ -1362,11 +1362,11 @@ export async function loadTaxYearDetail(
       if (pfs.length === 0) return;
 
       try {
-        const [tradeLog, txLists] = await Promise.all([
+        const [tradeLog, incomeLists] = await Promise.all([
           selected
             ? api.getTrades(selected.id, "fifo")
             : api.getNetWorthTrades("fifo", undefined, holderId),
-          Promise.all(pfs.map((p) => api.listTransactions(p.id))),
+          Promise.all(pfs.map((p) => api.listIncomeByYear(p.id, targetYear))),
         ]);
 
         // Disposals: FIFO legs closed in the target year, grouped into one aggregate
@@ -1458,7 +1458,7 @@ export async function loadTaxYearDetail(
         // grouped and rendered in ITS OWN currency rather than mislabeled with the
         // holder's display currency — see `TaxDividendRow.currency` and
         // `dividendTotalsByCurrency`.
-        const incomeTxns = txLists
+        const incomeTxns = incomeLists
           .flat()
           .filter(
             (t) =>

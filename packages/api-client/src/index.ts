@@ -1974,6 +1974,12 @@ export function createApiClient(config: ApiClientConfig) {
         `/portfolios/${portfolioId}/transactions?${params}`,
       );
     },
+    /** List income-only rows for a portfolio in the given tax year (lightweight, no instrument/sources enrichment). */
+    listIncomeByYear: (portfolioId: string, year: number) =>
+      request<Transaction[]>(
+        "GET",
+        `/portfolios/${portfolioId}/income-year?year=${year}`,
+      ),
     /** Look up a single FX rate for a given currency pair and date. Returns null when no
      *  rate is available for that pair/date (caller falls back to 1:1). */
     getFxRate: (from: string, to: string, date: string) =>
