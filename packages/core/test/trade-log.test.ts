@@ -150,6 +150,45 @@ describe("computeTrades — average vs FIFO", () => {
     const totalLegQty = legs.reduce((s, l) => s + Number(l.quantity), 0);
     expect(totalLegQty).toBe(20);
   });
+
+  it("prices the second episode's FIFO cost correctly after a full close and re-buy (regression: stale lotIdx)", () => {
+    // A persisted lotIdx that survives an episode close (lots reset to []) without
+    // being reset itself would point past the end of the fresh lots array on the next
+    // sell, so no lot would ever be consumed — costFifo would silently come out as 0
+    // and realizedPnL would equal the full proceeds instead of proceeds − cost.
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({ type: "sell", quantity: "10", price: "130", executedAt: new Date("2021-06-01") }),
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2022-01-01") }),
+      tx({ type: "sell", quantity: "10", price: "150", executedAt: new Date("2022-06-01") }),
+    ];
+    const { trades } = run(txns, { method: "fifo" });
+    expect(trades).toHaveLength(2);
+    // sortTrades puts the most-recent entryDate first among closed trades.
+    const [second, first] = trades;
+    expect(first.realizedPnL).toBe("300"); // 1300 − 1000
+    expect(second.realizedPnL).toBe("500"); // 1500 − 1000 (NOT 1500 − 0)
+    expect(second.legs[0]).toMatchObject({ quantity: "10", cost: "1000" });
+  });
+
+  it("keeps FIFO cost correct across a transfer_out that shrinks the lot ledger (regression: stale lotIdx)", () => {
+    // transfer_out drains lots via the same shared lotIdx as sell. If that index isn't
+    // kept in lockstep with the lots array, a subsequent sell either double-counts
+    // already-transferred lots or skips past real ones.
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({ type: "buy", quantity: "10", price: "200", executedAt: new Date("2021-06-01") }),
+      tx({ type: "transfer_out", quantity: "10", price: "0", fees: "0", executedAt: new Date("2021-09-01") }),
+      tx({ type: "sell", quantity: "10", price: "250", executedAt: new Date("2022-01-01") }),
+    ];
+    const { trades } = run(txns, { method: "fifo" });
+    expect(trades).toHaveLength(1);
+    // transfer_out drains the first (cheaper) lot; the sell must consume the second
+    // (100@200) lot, not re-consume the transferred one or fall through to zero cost.
+    expect(trades[0].legs).toHaveLength(1);
+    expect(trades[0].legs[0]).toMatchObject({ acqDate: "2021-06-01", quantity: "10", cost: "2000" });
+    expect(trades[0].realizedPnL).toBe("500"); // 2500 − 2000
+  });
 });
 
 describe("computeTrades — dividends folded into the holding window", () => {
