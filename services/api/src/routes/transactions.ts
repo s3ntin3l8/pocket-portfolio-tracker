@@ -1355,6 +1355,15 @@ export async function transactionsRoute(app: FastifyInstance) {
           const enriched = await enrichAggregateRows(rows);
           return { rows: enriched, total };
         });
+        // Type/year-filter-independent, like the single-portfolio version above — the
+        // dropdown itself must not be filtered by the currently-selected type/year, or
+        // switching to "buy" could hide years that only ever contain "sell" rows.
+        const years = await app.db
+          .select({ year: sql<number>`DISTINCT EXTRACT(YEAR FROM ${transactions.executedAt})` })
+          .from(transactions)
+          .where(inArray(transactions.portfolioId, pfIds))
+          .orderBy(sql`1 DESC`);
+        const yearList = years.map((r) => String(r.year));
         const durationMs = performance.now() - t0;
         logTiming(request, "GET /networth/transactions", durationMs, {
           page,
@@ -1362,7 +1371,7 @@ export async function transactionsRoute(app: FastifyInstance) {
           total: cached.total,
           portfolioCount: pfs.length,
         });
-        return cached;
+        return { rows: cached.rows, total: cached.total, years: yearList };
       }
 
       const rows = await app.db

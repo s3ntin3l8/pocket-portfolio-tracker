@@ -429,14 +429,14 @@ export async function loadNetworthTransactionsPaginated(
   year?: string,
   q?: string,
 ): Promise<
-  | { status: "ok"; rows: Transaction[]; total: number }
+  | { status: "ok"; rows: Transaction[]; total: number; years?: string[] }
   | { status: "unavailable"; rows: []; total: 0 }
 > {
   const api = await getServerApi();
   if (!api) return { status: "unavailable", rows: [], total: 0 };
   try {
     const data = await api.listNetworthTransactionsPaginated(page, pageSize, type, year, q);
-    return { status: "ok", rows: data.rows, total: data.total };
+    return { status: "ok", rows: data.rows, total: data.total, years: data.years };
   } catch {
     return { status: "unavailable", rows: [], total: 0 };
   }

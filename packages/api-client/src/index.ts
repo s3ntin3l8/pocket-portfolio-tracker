@@ -1994,7 +1994,7 @@ export function createApiClient(config: ApiClientConfig) {
       if (type) params.set("type", type);
       if (year) params.set("year", year);
       if (q) params.set("q", q);
-      return request<{ rows: Transaction[]; total: number }>(
+      return request<{ rows: Transaction[]; total: number; years?: string[] }>(
         "GET",
         `/networth/transactions?${params}`,
       );
