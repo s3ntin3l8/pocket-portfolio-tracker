@@ -854,7 +854,7 @@ export function TransactionsTable({
     () => sortedRows.slice(0, visibleCount),
     [sortedRows, visibleCount],
   );
-  const hasMore = sortedRows.length > windowedRows.length || (accumulatedRows.length < (total ?? 0) && portfolioId != null);
+  const hasMore = sortedRows.length > windowedRows.length || accumulatedRows.length < (total ?? 0);
   // The reference groups the ledger into month bands. That only reads coherently while the
   // list is in date order (the default, or an explicit Date sort); any other sort renders flat.
   const groupByMonth = sortKey === null || sortKey === "date";
@@ -1511,7 +1511,7 @@ export function TransactionsTable({
                 return;
               }
               // All loaded rows are visible; fetch the next server page.
-              if (accumulatedRows.length < (total ?? 0) && (portfolioId || true)) {
+              if (accumulatedRows.length < (total ?? 0)) {
                 setLoadingMore(true);
                 try {
                   const params = new URLSearchParams({ page: String(currentPage + 1), pageSize: "25" });

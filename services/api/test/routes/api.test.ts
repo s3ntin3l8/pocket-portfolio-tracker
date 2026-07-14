@@ -620,6 +620,66 @@ describe("auth + portfolios + transactions", () => {
     expect(page10.json().total).toBe(3);
   });
 
+  it("returns a type/year-filter-independent `years` list from /networth/transactions", async () => {
+    // Regression: the year filter chip on the Activity screen relies on `years` covering
+    // every year with transactions, not just the years present in the currently filtered
+    // page — otherwise the chip only shows up once a filter happens to span multiple years.
+    const t = await token("networth-years-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Networth years test", baseCurrency: "idr" },
+      })
+    ).json().id;
+    const [inst] = await app.db
+      .insert(instruments)
+      .values({ symbol: "BBNY", market: "IDX", assetClass: "equity", currency: "IDR", name: "Networth Years Test Co" })
+      .returning();
+
+    for (const executedAt of ["2022-06-01T00:00:00.000Z", "2024-06-01T00:00:00.000Z"]) {
+      const res = await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "buy",
+          instrumentId: inst.id,
+          quantity: "1",
+          price: "100",
+          currency: "IDR",
+          executedAt,
+        },
+      });
+      expect(res.statusCode).toBe(201);
+    }
+
+    // A type filter that matches neither transaction (both are "buy") — `rows`/`total`
+    // reflect the filter, but `years` must still list both years.
+    const byType = await app.inject({
+      method: "GET",
+      url: "/networth/transactions?page=1&pageSize=25&type=income",
+      headers: auth(t),
+    });
+    expect(byType.statusCode).toBe(200);
+    const byTypeBody = byType.json();
+    expect(byTypeBody.rows).toHaveLength(0);
+    expect(byTypeBody.years).toEqual(expect.arrayContaining(["2022", "2024"]));
+
+    // A year filter narrows `rows`, but `years` must still list both years so the
+    // dropdown itself isn't filtered by the currently-selected year.
+    const byYear = await app.inject({
+      method: "GET",
+      url: "/networth/transactions?page=1&pageSize=25&year=2022",
+      headers: auth(t),
+    });
+    expect(byYear.statusCode).toBe(200);
+    const byYearBody = byYear.json();
+    expect(byYearBody.rows).toHaveLength(1);
+    expect(byYearBody.years).toEqual(expect.arrayContaining(["2022", "2024"]));
+  });
+
   it("values the portfolio via /summary (priced by market data)", async () => {
     const t = await token("user-a");
     const portfolioId = (

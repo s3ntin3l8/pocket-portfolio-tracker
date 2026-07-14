@@ -68,6 +68,7 @@ export default async function TransactionsPage({
     status = result.status;
     rows = result.rows;
     total = result.total;
+    if (result.status === "ok") txYears = result.years ?? [];
     const me = await loadMe();
     scopeCurrency = me?.displayCurrency ?? "IDR";
   } else {
@@ -174,7 +175,7 @@ export default async function TransactionsPage({
 
   // Title + (icon-only) actions share the top line; the subtitle spans the full width
   // below it — so on narrow screens the count isn't squeezed against the buttons.
-  const displayCount = aggregate ? rows.length : total;
+  const displayCount = total;
   const heading = (action?: React.ReactNode) => (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-3">

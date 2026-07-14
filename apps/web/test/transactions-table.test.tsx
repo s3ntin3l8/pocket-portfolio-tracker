@@ -966,6 +966,70 @@ describe("TransactionsTable", () => {
       // 30 rows total, only 25 rendered — the count must reflect all 30, not the window.
       expect(screen.getByText("30 selected")).toBeInTheDocument();
     });
+
+    // Regression: aggregate ("All portfolios") mode has no `portfolioId` — `hasMore` used
+    // to be gated by `portfolioId != null`, so once the initially-loaded rows were all
+    // visible, "Load more" silently disappeared even though the server reported more rows
+    // (`total`) than were loaded. No `portfolioId` prop is passed below, matching the
+    // aggregate page.tsx call site.
+    it("shows Load more in aggregate mode when total exceeds the loaded rows", () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={manyRows(25)} total={60} />
+        </NextIntlClientProvider>,
+      );
+      // All 25 loaded rows are already visible (one page fits exactly) — the button must
+      // still show because `total` (60) says there's more to fetch from the server.
+      expect(screen.getByRole("button", { name: tb.loadMore })).toBeInTheDocument();
+    });
+
+    it("fetches the next page from the aggregate endpoint (no portfolioId) on Load more", async () => {
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: manyRows(5).map((r) => ({ ...r, id: `next-${r.id}` })), total: 60 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+      const fetchSpy = spy as unknown as ReturnType<typeof vi.fn>;
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={manyRows(25)} total={60} />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+
+      await waitFor(() =>
+        expect(fetchSpy).toHaveBeenCalledWith(
+          expect.stringContaining("/api/backend/networth/transactions?"),
+        ),
+      );
+      expect(fetchSpy.mock.calls[0][0]).not.toContain("/portfolios/");
+
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe("year filter chip", () => {
+    // Regression: the chip used to be gated on years *derived from the currently loaded
+    // page* (`yearOptions` falling back to `rows` when the server `years` prop was empty),
+    // so it only appeared once a filter (e.g. buy/sell) happened to span multiple years.
+    // The server-provided `years` prop must make it show in the unfiltered "All" view too.
+    it("shows the year chip in the default view when the server provides multiple years", () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={FILTER_ROWS} years={["2026", "2025"]} total={FILTER_ROWS.length} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.getByLabelText(messages.Transactions.filterYear)).toBeInTheDocument();
+    });
+
+    it("hides the year chip when the server reports only one year", () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={FILTER_ROWS} years={["2026"]} total={FILTER_ROWS.length} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.queryByLabelText(messages.Transactions.filterYear)).toBeNull();
+    });
   });
 
   describe("anomaly banner and flagged-rows filter", () => {
