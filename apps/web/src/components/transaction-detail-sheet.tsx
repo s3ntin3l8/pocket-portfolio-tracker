@@ -48,7 +48,6 @@ import { cn, formatMoney, formatSignedMoney, anomalyLabel, type AnomalyTranslato
 import {
   txAmount,
   txNetAmount,
-  txNetAmountDisplay,
   SOURCE_ICON,
 } from "@/components/transactions-table";
 import type { TxRow } from "@/components/transactions-table";
@@ -200,7 +199,6 @@ export function TransactionDetailSheet({
   const [deleting, setDeleting] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [clientRate, setClientRate] = useState<string | null>(null);
-  const [loadingRate, setLoadingRate] = useState(false);
 
   const m = (n: number, currency: string) => formatMoney(n, currency, locale);
   const df = useMemo(
@@ -209,32 +207,26 @@ export function TransactionDetailSheet({
   );
   const numFmt = useMemo(() => new Intl.NumberFormat(locale), [locale]);
 
-  if (!tx) return null;
-
-  const amount = txAmount(tx);
-  const netAmount = txNetAmount(tx);
-  // Secondary "≈ in {scope currency}" line (#465) — only when the row's own currency
-  // differs from the scope currency it was fetched against (else it's a redundant
-  // duplicate of the hero amount above it) AND there's an actual rate for the pair.
-  // Falls back to client-fetched rate when server didn't convert this row.
-
   // Client-side FX rate lookup: when the row wasn't converted server-side (displayRate is
   // null or "1"), try to fetch a rate for the pair so we can still show the "≈ in" line.
   useEffect(() => {
-    if (tx.displayRate != null && tx.displayRate !== "1") {
-      setClientRate(null);
-      return;
-    }
+    if (!tx) return;
+    if (tx.displayRate != null && tx.displayRate !== "1") return;
     if (!tx.currency || !scopeCurrency || tx.currency === scopeCurrency) return;
-    setLoadingRate(true);
+    let cancelled = false;
     fetch(
       `/api/backend/fx-rate?from=${encodeURIComponent(tx.currency)}&to=${encodeURIComponent(scopeCurrency)}&date=${tx.executedAt.slice(0, 10)}`,
     )
       .then((r) => r.json())
-      .then((data) => setClientRate(data.rate ?? null))
-      .catch(() => setClientRate(null))
-      .finally(() => setLoadingRate(false));
+      .then((data) => { if (!cancelled) setClientRate(data.rate ?? null); })
+      .catch(() => { if (!cancelled) setClientRate(null); });
+    return () => { cancelled = true; };
   }, [tx, scopeCurrency]);
+
+  if (!tx) return null;
+
+  const amount = txAmount(tx);
+  const netAmount = txNetAmount(tx);
 
   const effectiveDisplayRate = tx.displayRate != null && tx.displayRate !== "1" ? tx.displayRate : clientRate;
   const effectiveDisplayCurrency = tx.displayCurrency ?? scopeCurrency;
@@ -429,11 +421,7 @@ export function TransactionDetailSheet({
             </div>
             {showApproxDisplay && netAmountDisplay !== null && (
               <div className="tabular mt-0.5 text-[13px] font-medium text-text-2">
-                {loadingRate ? (
-                  <Loader2 className="inline size-3 animate-spin" />
-                ) : (
-                  t("approxDisplay", { amount: m(netAmountDisplay, effectiveDisplayCurrency!) })
-                )}
+                {t("approxDisplay", { amount: m(netAmountDisplay, effectiveDisplayCurrency!) })}
               </div>
             )}
             <div className="mt-2.5">

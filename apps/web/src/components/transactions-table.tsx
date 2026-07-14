@@ -86,7 +86,6 @@ import {
   computeAllBanner,
   computeIncomeBanner,
   computeTradeBanner,
-  ACTIVITY_INCOME_TYPES,
 } from "@/lib/transaction-banners";
 
 export const SOURCE_ICON: Record<string, LucideIcon> = {
