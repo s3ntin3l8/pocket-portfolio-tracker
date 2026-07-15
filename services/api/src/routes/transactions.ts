@@ -33,6 +33,8 @@ import {
 import { transactionInputSchema } from "@portfolio/schema";
 import {
   computeHoldings,
+  buildShareTimelines,
+  sharesHeldAt,
   detectAnomalies,
   aggregatePortfolios,
   allocationBreakdown,
@@ -160,6 +162,66 @@ export async function transactionsRoute(app: FastifyInstance) {
       ratio: r.ratio,
       exDate: new Date(r.exDate),
     }));
+  }
+
+  // Derived read-time fallback for dividend perShare/shares when the source data didn't
+  // carry them (#508 — pytr sync/TR CSV/IBKR dividends often only carry the net cash
+  // total). Never persisted: only fills nulls in the response, never overwrites an
+  // authoritative/manual value already on the row. Needs the FULL, unfiltered transaction
+  // history per portfolio (not just the visible page/type/year/search filter) to build an
+  // accurate share-count timeline — reusing the display `conditions` here would truncate
+  // history and derive the wrong shares-at-date. Scoped to `type === "dividend"` for now
+  // (a bond coupon's per-nominal rate is a different concept). See buildShareTimelines'
+  // doc comment for why this can't reuse computeHoldings(asOf).
+  //
+  // `rowsByPortfolio` lets the same function serve both the single-portfolio endpoints
+  // (one entry) and the networth aggregate (one entry per portfolio on the page) without
+  // duplicating the derivation logic; CA lookups stay instrument-scoped, not
+  // portfolio-scoped, matching corporateActionsFor's own usage elsewhere.
+  async function deriveIncomeShares(
+    rowsByPortfolio: Map<string, (typeof transactions.$inferSelect)[]>,
+  ): Promise<Map<string, { perShare: string | null; shares: string | null }>> {
+    const patch = new Map<string, { perShare: string | null; shares: string | null }>();
+
+    const isCandidate = (r: (typeof transactions.$inferSelect)) =>
+      r.type === "dividend" && r.instrumentId !== null && (r.perShare === null || r.shares === null);
+
+    const portfolioIdsNeeded = [...rowsByPortfolio.entries()]
+      .filter(([, rows]) => rows.some(isCandidate))
+      .map(([portfolioId]) => portfolioId);
+    if (portfolioIdsNeeded.length === 0) return patch;
+
+    const historyRows = await app.db
+      .select()
+      .from(transactions)
+      .where(inArray(transactions.portfolioId, portfolioIdsNeeded));
+    const historyByPortfolio = new Map<string, (typeof transactions.$inferSelect)[]>();
+    for (const r of historyRows) {
+      const list = historyByPortfolio.get(r.portfolioId) ?? [];
+      list.push(r);
+      historyByPortfolio.set(r.portfolioId, list);
+    }
+
+    for (const portfolioId of portfolioIdsNeeded) {
+      const coreTxns = toCoreTxns(historyByPortfolio.get(portfolioId) ?? []);
+      const cas = await corporateActionsFor(coreTxns.map((t) => t.instrumentId));
+      const timelines = buildShareTimelines(coreTxns, cas);
+
+      const candidates = (rowsByPortfolio.get(portfolioId) ?? []).filter(isCandidate);
+      for (const r of candidates) {
+        const sharesDec =
+          r.shares !== null ? new Decimal(r.shares) : sharesHeldAt(timelines, r.instrumentId!, r.executedAt);
+        if (!sharesDec || sharesDec.lte(0)) continue; // no positive holding — leave both null
+        let perShare = r.perShare;
+        if (perShare === null) {
+          const gross = new Decimal(r.price).plus(r.tax !== null ? new Decimal(r.tax) : 0);
+          perShare = gross.div(sharesDec).toString();
+        }
+        patch.set(r.id, { shares: r.shares ?? sharesDec.toString(), perShare });
+      }
+    }
+
+    return patch;
   }
 
   // Build an instrumentId → presentation-metadata lookup for the given ids.
@@ -1073,6 +1135,12 @@ export async function transactionsRoute(app: FastifyInstance) {
         }
         const tE = performance.now();
 
+        // #508 fallback: fill dividend perShare/shares still null after source parsing,
+        // derived from the portfolio's full holdings history (see deriveIncomeShares).
+        const incomeSharesPatch = await deriveIncomeShares(
+          new Map([[request.params.portfolioId, rows]]),
+        );
+
         // Single pass over rows: merge FX rate lookup and response shape construction.
         const responseRows = rows.map((r) => {
           let displayRate: string | undefined;
@@ -1090,6 +1158,7 @@ export async function transactionsRoute(app: FastifyInstance) {
             hasFullTaxDetail: fullTaxDetail.has(r.id),
             needsReview: needsReview.has(r.id),
             sources: sourcesMap.get(r.id) ?? [],
+            ...(incomeSharesPatch.get(r.id) ?? {}),
             ...(displayRate
               ? { displayCurrency: convertTo, displayRate }
               : {}),
@@ -1313,6 +1382,17 @@ export async function transactionsRoute(app: FastifyInstance) {
 
         const { needsReview, fullTaxDetail } = txFlagsFromSourcesRows(sourcesRows);
 
+        // #508 fallback: fill dividend perShare/shares still null after source parsing.
+        // Grouped by portfolioId — a shared instrument held in two portfolios has
+        // independent share counts, so each portfolio gets its own timeline.
+        const rowsByPortfolio = new Map<string, typeof transactions.$inferSelect[]>();
+        for (const r of rows) {
+          const list = rowsByPortfolio.get(r.portfolioId) ?? [];
+          list.push(r);
+          rowsByPortfolio.set(r.portfolioId, list);
+        }
+        const incomeSharesPatch = await deriveIncomeShares(rowsByPortfolio);
+
         return rows.map((r) => ({
           ...r,
           instrument: meta.get(r.instrumentId ?? "") ?? null,
@@ -1322,6 +1402,7 @@ export async function transactionsRoute(app: FastifyInstance) {
           fullTaxDetail: fullTaxDetail.has(r.id),
           documentRetained: txIdsWithDocs.has(r.id) || (r.importId != null && importIdsWithDocs.has(r.importId)),
           portfolioName: nameById.get(r.portfolioId) ?? "",
+          ...(incomeSharesPatch.get(r.id) ?? {}),
         }));
       }
 
@@ -1414,6 +1495,10 @@ export async function transactionsRoute(app: FastifyInstance) {
           fees: input.fees,
           tax: input.tax ?? null,
           fxRate: input.fxRate ?? null,
+          perShare: input.perShare ?? null,
+          shares: input.shares ?? null,
+          nativeCurrency: input.nativeCurrency ?? null,
+          grossNative: input.grossNative ?? null,
           description: input.description ?? null,
           tags: input.tags ?? null,
           currency: input.currency,
@@ -1509,6 +1594,10 @@ export async function transactionsRoute(app: FastifyInstance) {
           fees: input.fees,
           tax: input.tax ?? null,
           fxRate: input.fxRate ?? null,
+          perShare: input.perShare ?? null,
+          shares: input.shares ?? null,
+          nativeCurrency: input.nativeCurrency ?? null,
+          grossNative: input.grossNative ?? null,
           description: input.description ?? null,
           tags: input.tags ?? null,
           currency: input.currency,

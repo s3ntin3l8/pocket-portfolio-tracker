@@ -218,12 +218,16 @@ export function parseTrCsv(content: string): CsvParseResult {
         ...(economicDate ? { executedAt: economicDate } : {}),
         ...instrument,
         action: "dividend",
-        quantity: "0", // the CSV `shares` here is the holding/rate, not a traded quantity
+        quantity: "0", // the CSV `shares` here is the holding, not a traded quantity
         unit: assetClass ? "shares" : undefined,
         price: formatDecimal(net), // signed NET drives cashFlow/XIRR; negative for reversals
         total: formatDecimal(amount), // signed gross (display only; not persisted)
         tax: taxSigned !== 0 ? formatDecimal(-taxSigned) : undefined, // +withheld / −refund
         fees: "0",
+        // The CSV `shares` column IS the holding the dividend was paid on (#508) — unlike a
+        // BUY/SELL row, there's no separate per-share `price` column for a dividend, so
+        // `perShare` is left for the read-time derived fallback (gross/shares) to fill.
+        shares: shares != null ? formatDecimal(Math.abs(shares)) : undefined,
       };
     } else if (type === "INTEREST_PAYMENT") {
       if (amount == null) {

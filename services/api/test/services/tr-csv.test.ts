@@ -188,12 +188,19 @@ describe("parseTrCsv", () => {
       action: "dividend", isin: "US02209S1033", quantity: "0",
       price: "3.35", // 3.94 gross − 0.59 tax = net cash credited (drives cashFlow/XIRR)
       total: "3.94", tax: "0.59", fxRate: "1.103400", currency: "EUR",
+      // #508: the CSV `shares` column is the holding the dividend was paid on — carried
+      // through as the informational `shares` field. There's no per-share rate column for
+      // a dividend row (unlike BUY/SELL), so `perShare` stays unset here; the read-time
+      // derived fallback (packages/core) fills it from gross/shares downstream.
+      shares: "11",
     });
+    expect(draft(5)?.perShare).toBeUndefined();
   });
 
   it("maps a fund distribution with no tax and decodes the HTML-escaped name", () => {
     expect(draft(6)).toMatchObject({
       action: "dividend", assetClass: "equity", name: "Core S&P 500 USD (Dist)", price: "0.79", total: "0.79",
+      shares: "5.9857",
     });
     expect(draft(6)?.tax).toBeUndefined();
   });

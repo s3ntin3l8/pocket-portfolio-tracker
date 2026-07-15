@@ -22,6 +22,7 @@ import { applyCancellations, isCancelled } from "./cancellation.js";
 import { downloadNewDraftDocuments } from "./documents.js";
 import { fetchReportDocuments } from "./reports.js";
 import { materializeDrafts } from "../materialize-drafts.js";
+import { enrichTransactionsFromStoredDocuments } from "../enrichment.js";
 import { finalizeReceipts, linkTrReceiptsToTransactions } from "../../storage/receipts.js";
 import type { DB } from "../../db/client.js";
 import type { EncryptionService } from "../encryption.js";
@@ -425,6 +426,19 @@ export async function syncTrConnection(
       .map((r) => ({ sourceEventId: r.externalId, transactionId: r.id }));
     await linkTrReceiptsToTransactions(appLike, { importId, links });
     await finalizeReceipts(appLike, { importId, portfolioId, retain: true });
+
+    // Unlike the confirm/upload paths (imports/confirm.ts, routes/tr.ts), sync never goes
+    // through enrichTransactionsFromStoredDocuments — so a dividend/interest settlement PDF
+    // retained here never got parsed for perShare/shares/nativeCurrency/grossNative/tax
+    // detail (issue #508). Best-effort/idempotent (detectTrPdf + onConflictDoNothing), so
+    // safe to run on every sync; only re-parses the docs just linked above. Never let
+    // enrichment failure fail the sync itself.
+    try {
+      const enrichTxIds = [...new Set(links.map((l) => l.transactionId))];
+      await enrichTransactionsFromStoredDocuments(appLike, enrichTxIds);
+    } catch (err) {
+      log?.warn({ err, importId }, "tr sync: document enrichment failed (non-fatal)");
+    }
   }
 
   // 7. Reconcile cash + positions against TR's reported balances, then roll the session.

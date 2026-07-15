@@ -72,7 +72,7 @@ describe("Trade Republic CSV import path", () => {
     const { importId, drafts } = imp.json();
     expect(drafts).toHaveLength(4);
     const dividend = drafts.find((d: { action: string }) => d.action === "dividend");
-    expect(dividend).toMatchObject({ price: "3.35", total: "3.94", tax: "0.59", fxRate: "1.103400" });
+    expect(dividend).toMatchObject({ price: "3.35", total: "3.94", tax: "0.59", fxRate: "1.103400", shares: "11" });
     // Saveback is a reward-funded buy, not a contribution → bonus_cash (it would collapse into
     // its funding buy, but this fixture has no Core S&P 500 buy, so it stays a standalone row).
     const saveback = drafts.find((d: { kind?: string }) => d.kind === "bonus");
@@ -98,6 +98,10 @@ describe("Trade Republic CSV import path", () => {
     // The EU-broker path resolved the US ISIN to an instrument and persisted the enrichment.
     expect(persisted).toMatchObject({ type: "dividend", tax: "0.59", fxRate: "1.103400" });
     expect(persisted.instrumentId).toBeTruthy();
+    // #508: `shares` is carried through the fresh-insert confirm path (materialize-drafts.ts),
+    // not left to the settlement-PDF-only enrichment pass — a standalone CSV dividend has no
+    // PDF to enrich against.
+    expect(persisted.shares).toBe("11");
 
     // A TR account is the mixed-cash case → cash-outside (the default), so contribution is
     // the invested capital: the €241.52 buy (2 × 120.26 + €1 fee). The €500 deposit is

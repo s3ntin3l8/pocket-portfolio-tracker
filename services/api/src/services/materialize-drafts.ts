@@ -342,11 +342,17 @@ export async function writeResolvedDrafts(
         documentRefs: d.documentRefs ?? null,
         kind: d.kind ?? null,
         description: d.description ?? null,
-        // Unlike perShare/grossNative (pure display enrichment, only ever populated later via
-        // enrichTransactionFromDrafts' matched-draft path), a Vorabpauschale row never has a
-        // settlement PDF to enrich against — this fresh insert is the ONLY path it ever takes,
-        // so vorabBase must be carried through here or the feature silently never lands.
         vorabBase: d.vorabBase ?? null,
+        // Dividend/coupon per-share display fields (#508). A standalone import (TR CSV, DKB
+        // PDF, a solo TR settlement-PDF upload with no existing tx to match against) is the
+        // ONLY path its draft ever takes — there's no separate settlement PDF to later
+        // enrich against, so these must be carried through on the fresh insert too, not left
+        // to enrichTransactionFromDrafts' matched-draft path alone (which only fires for a
+        // CROSS-source match against an already-existing transaction).
+        perShare: d.perShare ?? null,
+        shares: d.shares ?? null,
+        nativeCurrency: d.nativeCurrency ?? null,
+        grossNative: d.grossNative ?? null,
         // The cash leg is always in the transaction's own currency, independent of where
         // the instrument is listed/priced.
         currency: d.currency,
@@ -375,6 +381,13 @@ export async function writeResolvedDrafts(
           fxRate: d.fxRate ?? null,
           venue: d.venue ?? null,
           vorabBase: d.vorabBase ?? null,
+          // #508 — see the matching comment on the transactions insert above. Kept in sync
+          // with the parent row here too so a later cross-source match (recomputeRollup)
+          // ranks this row's values correctly against a higher-priority source.
+          perShare: d.perShare ?? null,
+          shares: d.shares ?? null,
+          nativeCurrency: d.nativeCurrency ?? null,
+          grossNative: d.grossNative ?? null,
           taxComponents: d.taxComponents
             ? (d.taxComponents as Record<string, unknown>)
             : null,

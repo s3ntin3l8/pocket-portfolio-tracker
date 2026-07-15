@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Decimal } from "decimal.js";
 import crypto from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
@@ -16,6 +16,29 @@ import { EncryptionService } from "../../src/services/encryption.js";
 import { syncTrConnection } from "../../src/services/pytr/sync.js";
 import { PytrAuthError, type PytrRunner, type DocDownloadResult, type DownloadDocumentsResult } from "../../src/services/pytr/runner.js";
 import type { StorageProvider } from "../../src/storage/types.js";
+
+// Mock extractPdfText so the #508 enrichment test below doesn't need real PDF bytes.
+// Keyed off the buffer's own content so every OTHER test's opaque "%PDF-1.4 fake" (or
+// similar) stored bytes still resolve to non-TR text — detectTrPdf rejects it, matching
+// the real (unmocked) best-effort behavior for an unparseable/synthetic PDF: enrichment
+// silently no-ops rather than throwing. Only a buffer containing the marker below
+// resolves to a real, parseable Trade Republic dividend confirmation.
+const { MO_DIVIDEND_MARKER, mockExtractPdfText } = vi.hoisted(() => {
+  const marker = "MO_DIVIDEND_FIXTURE";
+  // Real (sanitised) Main Street Capital dividend confirmation text — same fixture used in
+  // tr-pdf.test.ts and independently verified against a live user PDF during the #508
+  // investigation (shares 28.876429, perShare 0.26 USD, net 5.51 EUR).
+  const text =
+    "Trade Republic Bank GmbH Brunnenstraße 19-21 10119 Berlin www.traderepublic.com Sitz der Gesellschaft: Berlin AG Charlottenburg HRB 244347 B Umsatzsteuer-ID DE307510626 Geschäftsführer Andreas Torner Gernot Mittendorfer Christian Hecker Thomas Pischke TRADE REPUBLIC BANK GMBH BRUNNENSTRASSE 19-21 10119 BERLIN SEITE 1 von 2 DATUM 16.06.2026 DEPOT 1234567890 DIVIDENDE ÜBERSICHT Dividende mit Ex-Datum 08.06.2026. POSITION ANZAHL ERTRAG BETRAG Main Street Capital US56035L1044 28.876429 Stücke 0.26 USD 7.51 USD GESAMT 7.51 USD ABRECHNUNG POSITION BETRAG Quellensteuer für US-Emittenten -1.13 USD Zwischensumme 6.38 USD Zwischensumme 1.1567 USD/EUR 5.51 EUR GESAMT 5.51 EUR BUCHUNG VERRECHNUNGSKONTO DATUM DER ZAHLUNG BETRAG DE00000000000000000000 15.06.2026 5.51 EUR US56035L1044 im Girosammelverwahrung in Deutschland Diese Abrechnung wird maschinell erstellt und daher nicht unterschrieben. Wird keine Umsatzsteuer ausgewiesen, handelt es sich um eine umsatzsteuerfreie Leistung gemäß § 4 Nr. 8 UStG Max Mustermann Musterstr. 1 12345 Musterstadt";
+  const fn = vi.fn(async (data: Buffer) =>
+    data.toString("utf8").includes(marker) ? text : "not a trade republic document",
+  );
+  return { MO_DIVIDEND_MARKER: marker, mockExtractPdfText: fn };
+});
+
+vi.mock("../../src/services/parsers/pdf-text.js", () => ({
+  extractPdfText: mockExtractPdfText,
+}));
 
 const enc = new EncryptionService({ key: crypto.randomBytes(32).toString("base64url") });
 
@@ -1235,5 +1258,73 @@ describe("syncTrConnection", () => {
     await syncTrConnection(db, enc, runner2, fresh, log);
 
     expect(warns.some((w) => w.msg === "tr cash reconciliation drift jumped")).toBe(true);
+  });
+
+  it("enriches a synced dividend with perShare/shares/nativeCurrency/grossNative from its retained settlement PDF (#508)", async () => {
+    // Regression for #508: the sync path used to link + retain the postbox PDF but never
+    // ran enrichTransactionsFromStoredDocuments, so a dividend synced directly (not via
+    // confirm/upload) never got its per-share detail parsed out — even though the PDF was
+    // sitting right there in storage.
+    const conn = await makeConnection("dividend-enrichment-508");
+    const db = getDb();
+    await db
+      .update(portfolios)
+      .set({ documentRetention: true })
+      .where(eq(portfolios.id, conn.portfolioId!));
+
+    const PDF = Buffer.from(MO_DIVIDEND_MARKER);
+    const runner = runnerWith(
+      async () => ({
+        events: [
+          {
+            id: "tr-div-508",
+            timestamp: "2026-06-16T10:00:00.000Z",
+            eventType: "SSP_CORPORATE_ACTION_CASH",
+            amount: 5.51,
+            isin: "US56035L1044",
+            currency: "EUR",
+            documentRefs: [{ id: "doc-mo-div", type: "CA_INCOME_INVOICE", date: "16.06.2026" }],
+          },
+        ],
+        sessionData: "JAR",
+      }),
+      async (_session, pairs) => {
+        const docs = new Map<string, DocDownloadResult>();
+        for (const { docId } of pairs) {
+          docs.set(docId, { buf: PDF, mimeType: "application/pdf" });
+        }
+        return { docs, failures: [] };
+      },
+    );
+
+    const storage = makeTrackingStorage();
+    const result = await syncTrConnection(db, enc, runner, conn, undefined, storage);
+
+    expect(result.status).toBe("connected");
+    expect(result.drafts).toBe(1);
+
+    const [tx] = await db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.portfolioId, conn.portfolioId!), eq(transactions.externalId, "tr-div-508")));
+    expect(tx).toBeDefined();
+    expect(tx.type).toBe("dividend");
+    // Populated purely from the re-parsed settlement PDF — pytr's own timeline event
+    // carries none of this (see mapper.ts's shared dividend draft shape).
+    expect(tx.shares).toBe("28.876429");
+    expect(tx.perShare).toBe("0.26");
+    expect(tx.nativeCurrency).toBe("USD");
+    expect(tx.grossNative).toBe("7.51");
+
+    // Idempotent: re-running enrichment on the same doc doesn't error or duplicate rows.
+    const rerun = await syncTrConnection(
+      db,
+      enc,
+      runnerWith(async () => ({ events: [], sessionData: "JAR" })),
+      (await db.select().from(trConnections).where(eq(trConnections.id, conn.id)))[0],
+      undefined,
+      storage,
+    );
+    expect(rerun.status).toBe("connected");
   });
 });
