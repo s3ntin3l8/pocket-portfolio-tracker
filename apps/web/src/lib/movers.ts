@@ -1,4 +1,4 @@
-import type { HoldingValuation } from "@portfolio/api-client";
+import type { HoldingValuation, PeriodMover } from "@portfolio/api-client";
 
 /** A single best/worst-performer row for the Insights "Best & worst" card. */
 export interface Mover {
@@ -28,6 +28,17 @@ function toMover(h: HoldingValuation): Mover {
  * Requires at least two holdings with a known day move; returns null otherwise (a
  * single mover can't sensibly be both "best" and "worst").
  */
+/** Convert a server-side `PeriodMover` (signed fraction, e.g. 0.05) into a client `Mover`. */
+export function periodToMover(p: PeriodMover): Mover {
+  return {
+    instrumentId: p.instrumentId,
+    symbol: p.symbol,
+    name: p.name ?? p.instrumentId,
+    assetClass: p.assetClass,
+    pct: p.pct,
+  };
+}
+
 export function bestAndWorst(holdings: HoldingValuation[]): { best: Mover; worst: Mover } | null {
   const withMove = holdings.filter(
     (h) => h.dayChangePct !== null && Number(h.quantity) !== 0,

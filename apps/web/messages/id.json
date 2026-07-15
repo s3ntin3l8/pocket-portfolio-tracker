@@ -193,7 +193,11 @@
       "timeframe": "24j",
       "best": "Kinerja terbaik",
       "worst": "Kinerja terburuk",
-      "empty": "Data perubahan harian belum cukup."
+      "empty": "Data perubahan harian belum cukup.",
+      "monthlyTitle": "Bulan ini",
+      "monthlyTimeframe": "MTD",
+      "yearlyTitle": "Tahun ini",
+      "yearlyTimeframe": "YTD"
     },
     "drawdown": {
       "title": "Penarikan Maks",

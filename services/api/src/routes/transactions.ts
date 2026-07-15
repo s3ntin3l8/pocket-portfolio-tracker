@@ -77,6 +77,7 @@ import {
   type TradeLog,
   type TradeMethod,
   contributionSplit,
+  splitAdjustmentFactor,
   type SparplanStats,
   type DriftRow,
   type TradeAction,
@@ -4068,6 +4069,8 @@ export async function transactionsRoute(app: FastifyInstance) {
           streaks: { bestStreak: null, worstStreak: null, bestMonth: null, worstMonth: null, bestYear: null, worstYear: null, positiveMonths: 0, negativeMonths: 0, totalMonths: 0 },
           benchmark: null,
           concentrationTrend: [],
+          bestWorstMonthly: { best: null, worst: null },
+          bestWorstYearly: { best: null, worst: null },
         });
       }
 
@@ -4097,6 +4100,8 @@ export async function transactionsRoute(app: FastifyInstance) {
             streaks: { bestStreak: null, worstStreak: null, bestMonth: null, worstMonth: null, bestYear: null, worstYear: null, positiveMonths: 0, negativeMonths: 0, totalMonths: 0 },
             benchmark: null,
             concentrationTrend: [],
+            bestWorstMonthly: { best: null, worst: null },
+            bestWorstYearly: { best: null, worst: null },
           } as const;
         }
 
@@ -4211,6 +4216,10 @@ export async function transactionsRoute(app: FastifyInstance) {
         const concentrationTrend: { date: string; hhi: number; top1Pct: number; classCount: number }[] = [];
         const months = [...new Set(dates.map((d) => d.slice(0, 7)))].slice(-60);
         const pfIds = pfs.map((p) => p.id);
+        type PeriodMoverResult = { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number };
+        type BestWorstPair = { best: PeriodMoverResult | null; worst: PeriodMoverResult | null };
+        let bestWorstMonthly: BestWorstPair = { best: null, worst: null };
+        let bestWorstYearly: BestWorstPair = { best: null, worst: null };
 
         if (months.length > 0) {
           const allTxRows = await app.db
@@ -4292,9 +4301,72 @@ export async function transactionsRoute(app: FastifyInstance) {
               });
             }
           }
+
+          // ── Period best/worst performers (MTD, YTD) ──────────────────────
+          const latestDate = dates[dates.length - 1];
+          const monthStart = latestDate.slice(0, 7) + "-01";
+          const yearStart = latestDate.slice(0, 4) + "-01-01";
+          const periodEnd = new Date(`${latestDate}T23:59:59.999Z`);
+
+          // Require the instrument to be held at both period start and period
+          // end — a recent buy or a partial exit shouldn't show the full period's
+          // price swing as "your return", since part of that move happened before
+          // the user owned the position (or happened on shares already sold).
+          const heldAtStart = new Set(
+            computeHoldings(coreTxns, corpActions, new Date(`${monthStart}T00:00:00.000Z`))
+              .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
+              .map((h) => h.instrumentId!),
+          );
+          const heldAtYearStart = new Set(
+            computeHoldings(coreTxns, corpActions, new Date(`${yearStart}T00:00:00.000Z`))
+              .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
+              .map((h) => h.instrumentId!),
+          );
+          const heldAtEnd = new Map(
+            computeHoldings(coreTxns, corpActions, periodEnd)
+              .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
+              .map((h) => [h.instrumentId!, h]),
+          );
+
+          const computePeriodMovers = (startDate: string, heldAtStartSet: Set<string>): BestWorstPair => {
+            const movers: PeriodMoverResult[] = [];
+            for (const instId of heldAtEnd.keys()) {
+              if (!heldAtStartSet.has(instId)) continue;
+              const rawStart = latestPriceBefore(instId, startDate);
+              const rawEnd = latestPriceBefore(instId, latestDate);
+              if (!rawStart || !rawEnd || Number(rawStart) <= 0) continue;
+
+              // Split-adjust both prices so a stock split or bonus inside the
+              // window doesn't manufacture a phantom gain/loss.  The adjustment
+              // factor is applied per-instrument per-date: each raw close is
+              // divided by the cumulative factor for future splits.
+              const saStart = splitAdjustmentFactor(corpActions, instId, startDate);
+              const saEnd = splitAdjustmentFactor(corpActions, instId, latestDate);
+              if (saStart.isZero() || saEnd.isZero()) continue;
+              const adjustedStart = new Decimal(rawStart).div(saStart);
+              const adjustedEnd = new Decimal(rawEnd).div(saEnd);
+              const pct = adjustedEnd.div(adjustedStart).toNumber() - 1;
+
+              const inst = instMap.get(instId);
+              if (!inst) continue;
+              movers.push({
+                instrumentId: instId,
+                symbol: inst.symbol ?? "—",
+                name: inst.name,
+                assetClass: inst.assetClass ?? "equity",
+                pct,
+              });
+            }
+            if (movers.length < 2) return { best: null, worst: null };
+            movers.sort((a, b) => b.pct - a.pct);
+            return { best: movers[0], worst: movers[movers.length - 1] };
+          };
+
+          bestWorstMonthly = computePeriodMovers(monthStart, heldAtStart);
+          bestWorstYearly = computePeriodMovers(yearStart, heldAtYearStart);
         }
 
-        return { drawdown, volatility, streaks, benchmark, concentrationTrend };
+        return { drawdown, volatility, streaks, benchmark, concentrationTrend, bestWorstMonthly, bestWorstYearly };
       });
 
       const durationMs = performance.now() - t0;
