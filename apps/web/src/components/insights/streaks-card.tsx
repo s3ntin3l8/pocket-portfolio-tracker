@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { formatPercent } from "@/lib/utils";
 import type { InsightsStreaks } from "@portfolio/api-client";
@@ -9,17 +10,18 @@ export function StreaksCard({
   streaks: InsightsStreaks;
   locale: string;
 }) {
+  const t = useTranslations("Insights.streaks");
   const winRate = streaks.totalMonths > 0 ? streaks.positiveMonths / streaks.totalMonths : 0;
   const bestReturn = streaks.bestStreak ? Number(streaks.bestStreak.totalReturnPct) : null;
   const worstReturn = streaks.worstStreak ? Number(streaks.worstStreak.totalReturnPct) : null;
 
   return (
     <Card className="rounded-[20px] bg-card p-4 shadow-card">
-      <p className="text-xs font-semibold text-text-2">Streaks</p>
+      <p className="text-xs font-semibold text-text-2">{t("title")}</p>
 
       <div className="mt-2 flex gap-4">
         <div className="flex-1">
-          <p className="text-xs text-text-2">Best run</p>
+          <p className="text-xs text-text-2">{t("bestRun")}</p>
           {streaks.bestStreak ? (
             <>
               <p className="text-lg font-extrabold text-success">
@@ -37,7 +39,7 @@ export function StreaksCard({
           )}
         </div>
         <div className="flex-1">
-          <p className="text-xs text-text-2">Worst run</p>
+          <p className="text-xs text-text-2">{t("worstRun")}</p>
           {streaks.worstStreak ? (
             <>
               <p className="text-lg font-extrabold text-destructive">
@@ -58,15 +60,15 @@ export function StreaksCard({
 
       {streaks.bestMonth && (
         <div className="mt-2 flex gap-3 text-[10px] text-text-2">
-          <span>Best mo: <span className="font-semibold text-success">{formatPercent(Number(streaks.bestMonth.returnPct), locale)}</span> ({streaks.bestMonth.date})</span>
+          <span>{t("bestMonth")}: <span className="font-semibold text-success">{formatPercent(Number(streaks.bestMonth.returnPct), locale)}</span> ({streaks.bestMonth.date})</span>
           {streaks.worstMonth && (
-            <span>Worst mo: <span className="font-semibold text-destructive">{formatPercent(Number(streaks.worstMonth.returnPct), locale)}</span> ({streaks.worstMonth.date})</span>
+            <span>{t("worstMonth")}: <span className="font-semibold text-destructive">{formatPercent(Number(streaks.worstMonth.returnPct), locale)}</span> ({streaks.worstMonth.date})</span>
           )}
         </div>
       )}
 
       <div className="mt-2 text-[10px] text-text-2">
-        <span>{Math.round(winRate * 100)}% positive months ({streaks.positiveMonths}/{streaks.totalMonths})</span>
+        <span>{t("positiveMonths", { pct: Math.round(winRate * 100), pos: streaks.positiveMonths, total: streaks.totalMonths })}</span>
       </div>
     </Card>
   );

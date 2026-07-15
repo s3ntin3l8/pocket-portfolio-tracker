@@ -3067,7 +3067,7 @@ export async function transactionsRoute(app: FastifyInstance) {
 
           // Benchmark comparison: fetch prices and compute parallel TWR index.
           const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
-          if (bmConfig && result.length > 0) {
+          if (result.length > 0) {
             const bmDates = result.map((p) => p.date);
             const existingBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
             const missingDates = bmDates.filter((d) => !existingBm.has(d));
@@ -4046,8 +4046,15 @@ export async function transactionsRoute(app: FastifyInstance) {
         // ── Volatility & Sharpe ────────────────────────────────────────
         const idxPoints = indexed.map((p) => ({ date: p.date, index: p.index }));
         const returns = dailyReturns(idxPoints);
-        const riskFreeRates: Record<string, number> = { EUR: 0.03, USD: 0.05, IDR: 0.06 };
-        const riskFreeRate = riskFreeRates[display] ?? 0.04;
+
+        // Read risk-free rate from preference first, fall back to currency-based auto-detect
+        const [rfrPref] = await app.db
+          .select({ rate: userPreferences.riskFreeRate })
+          .from(userPreferences)
+          .where(eq(userPreferences.userId, id))
+          .limit(1);
+        const autoRfr: Record<string, number> = { EUR: 0.03, USD: 0.05, IDR: 0.06 };
+        const riskFreeRate = Number(rfrPref?.rate ?? autoRfr[display] ?? 0.04);
         const volatility = {
           annualizedVolatility: returns.length >= 2 ? String(annualizedVolatility(returns)) : null,
           sharpeRatio: returns.length >= 2 ? String(sharpeRatio(returns, riskFreeRate)) : null,
@@ -4060,7 +4067,7 @@ export async function transactionsRoute(app: FastifyInstance) {
         // ── Benchmark comparison ───────────────────────────────────────
         const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
         let benchmark: { symbol: string; activeReturn: string; trackingError: string; correlation: string } | null = null;
-        if (bmConfig && indexed.length > 0) {
+        if (indexed.length > 0) {
           const bmDates = indexed.map((p) => p.date);
           const existingBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
           const missingDates = bmDates.filter((d) => !existingBm.has(d));
@@ -4134,13 +4141,13 @@ export async function transactionsRoute(app: FastifyInstance) {
             return null;
           };
 
+          const coreTxns = toCoreTxns(allTxRows);
           for (const month of months) {
             const monthDates = dates.filter((d) => d.startsWith(month));
             if (monthDates.length === 0) continue;
             const asOfDate = monthDates[monthDates.length - 1];
             const asOf = new Date(`${asOfDate}T23:59:59.999Z`);
 
-            const coreTxns = toCoreTxns(allTxRows);
             const holdings = computeHoldings(coreTxns, corpActions, asOf);
 
             // Compute market values using closest-known prices

@@ -75,10 +75,9 @@ describe("sortinoRatio", () => {
     expect(sortinoRatio([0.01], 0.02, 252)).toBeNull();
   });
 
-  it("returns positive for exclusively positive returns", () => {
+  it("returns null when there are no down-months (undefined Sortino)", () => {
     const returns = [0.01, 0.02, 0.015];
     const sr = sortinoRatio(returns, 0.02, 252);
-    expect(sr).not.toBeNull();
-    expect(sr!).toBeGreaterThan(0);
+    expect(sr).toBeNull();
   });
 });

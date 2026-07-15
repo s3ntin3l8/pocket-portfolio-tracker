@@ -18,22 +18,17 @@ export interface BenchmarkConfig {
 const DEFAULT_BENCHMARK_SYMBOL = "^GSPC";
 const DEFAULT_BENCHMARK_CURRENCY = "USD";
 
-export function getDefaultBenchmark(_displayCurrency: string): BenchmarkConfig {
-  return { symbol: DEFAULT_BENCHMARK_SYMBOL, currency: DEFAULT_BENCHMARK_CURRENCY };
-}
-
 export async function getUserBenchmarkConfig(
   db: DB,
   userId: string,
   _displayCurrency: string,
-): Promise<BenchmarkConfig | null> {
+): Promise<{ symbol: string; currency: string }> {
   const [prefs] = await db
     .select({ symbol: userPreferences.benchmarkSymbol })
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
     .limit(1);
-  const symbol = prefs?.symbol;
-  if (!symbol) return null;
+  const symbol = prefs?.symbol || DEFAULT_BENCHMARK_SYMBOL;
   return { symbol, currency: DEFAULT_BENCHMARK_CURRENCY };
 }
 

@@ -27,6 +27,9 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
   let maxDd = ZERO;
   let maxDdPeakDate = series[0].date;
   let maxDdTroughDate = series[0].date;
+  let peakAtMaxDd = peak; // value at the peak that produced max drawdown
+
+  const lastValue = D(series[series.length - 1].netWorth);
 
   for (const point of series) {
     const value = D(point.netWorth);
@@ -39,18 +42,11 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
       maxDd = dd;
       maxDdPeakDate = peakDate;
       maxDdTroughDate = point.date;
+      peakAtMaxDd = peak;
     }
   }
 
-  const lastValue = D(series[series.length - 1].netWorth);
-  let finalPeak = D(series[0].netWorth);
-  for (const point of series) {
-    const value = D(point.netWorth);
-    if (value.gt(finalPeak)) {
-      finalPeak = value;
-    }
-  }
-  const currentDrawdown = lastValue.div(finalPeak).sub(1);
+  const currentDrawdown = lastValue.div(peak).sub(1);
 
   if (maxDd.isZero()) {
     return {
@@ -61,7 +57,7 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
     };
   }
 
-  const peakValue = D(series.find((p) => p.date === maxDdPeakDate)?.netWorth ?? series[0].netWorth);
+  const peakValue = peakAtMaxDd;
   let recoveryDate: string | undefined;
   for (const point of series) {
     const value = D(point.netWorth);

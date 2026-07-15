@@ -68,6 +68,6 @@ export function sortinoRatio(
   if (returns.length < 2) return null;
   const annRet = annualizedReturn(returns, periodsPerYear);
   const dd = downsideDeviation(returns, periodsPerYear);
-  if (dd === 0) return annRet >= riskFreeRate ? Infinity : -Infinity;
+  if (dd === 0) return null;
   return (annRet - riskFreeRate) / dd;
 }

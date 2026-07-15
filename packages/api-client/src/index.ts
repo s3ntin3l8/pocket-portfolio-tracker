@@ -1970,6 +1970,8 @@ export function createApiClient(config: ApiClientConfig) {
         dashboardKpis: string[];
         costBasisMode: "purchase_price" | "total_paid";
         taxRegime: "DE" | "ID";
+        benchmarkSymbol: string | null;
+        riskFreeRate: number | null;
       }>,
     ) => request<UserPreferences>("PUT", "/me/preferences", prefs),
     getIncome: (holderId?: string) =>
