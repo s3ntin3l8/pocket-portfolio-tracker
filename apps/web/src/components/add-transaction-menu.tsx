@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, forwardRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, PenLine, FileSpreadsheet, Camera, ChevronLeft, Briefcase, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -161,6 +161,13 @@ export function AddTransactionMenu({
     }
   }
 
+  // Invalidates the local portfolio/holder cache after a dialog creates or edits one,
+  // so the next sheet interaction re-fetches fresh data.
+  function onDialogSuccess() {
+    setPortfolios(null);
+    setHasHolders(true);
+  }
+
   return (
     <>
       <Button
@@ -256,6 +263,7 @@ export function AddTransactionMenu({
                       tone="blue"
                     />
                   }
+                  onSuccess={onDialogSuccess}
                 />
                 {!hasHolders && (
                   <HolderFormDialog
@@ -268,6 +276,7 @@ export function AddTransactionMenu({
                         tone="orange"
                       />
                     }
+                    onSuccess={onDialogSuccess}
                   />
                 )}
               </div>
@@ -362,23 +371,24 @@ const TONES = {
  *  `onClick` is optional — when omitted, the card is intended as the trigger of
  *  a nested dialog (e.g. PortfolioFormDialog) which supplies its own click handler
  *  via asChild. */
-function MethodCard({
-  icon: Icon,
-  title,
-  description,
-  tone,
-  tag,
-  onClick,
-}: {
+const MethodCard = forwardRef<HTMLButtonElement, {
   icon: LucideIcon;
   title: string;
   description: string;
   tone: keyof typeof TONES;
   tag?: string;
   onClick?: () => void;
-}) {
+}>(function MethodCard({
+  icon: Icon,
+  title,
+  description,
+  tone,
+  tag,
+  onClick,
+}, ref) {
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       className="flex w-full items-center gap-3.5 rounded-[18px] border border-border bg-card p-4 text-left shadow-[0_1px_2px_rgba(15,27,20,.04)] transition-transform active:scale-[.97]"
@@ -402,4 +412,4 @@ function MethodCard({
       )}
     </button>
   );
-}
+});

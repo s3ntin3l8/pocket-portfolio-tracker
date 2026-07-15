@@ -179,6 +179,41 @@ describe("AddTransactionMenu", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  describe("portfolio and account-holder shortcuts", () => {
+    it("shows the Add portfolio card (always visible)", () => {
+      renderMenu();
+      openMenu();
+      expect(
+        screen.getByText(messages.Manage.addMenu.createPortfolio),
+      ).toBeInTheDocument();
+    });
+
+    it("shows the Add account holder card when no holders exist", async () => {
+      listAccountHolders.mockResolvedValue([]);
+      renderMenu();
+      openMenu();
+
+      // Initially hidden (hasHolders starts true), then appears after fetch.
+      await waitFor(() =>
+        expect(
+          screen.getByText(messages.Manage.addMenu.createAccountHolder),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("hides the Add account holder card when holders already exist", async () => {
+      listAccountHolders.mockResolvedValue([{ id: "h1", name: "Me" }]);
+      renderMenu();
+      openMenu();
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText(messages.Manage.addMenu.createAccountHolder),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
   // Deep-link params from the retired `/transactions/new` page's redirect + the tax
   // page's harvest CTA (#505 consolidation).
   describe("manual-entry deep links", () => {

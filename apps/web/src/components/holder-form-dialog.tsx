@@ -23,10 +23,12 @@ export function HolderFormDialog({
   mode,
   holder,
   trigger,
+  onSuccess,
 }: {
   mode: "create" | "edit";
   holder?: AccountHolder;
   trigger: React.ReactNode;
+  onSuccess?: () => void;
 }) {
   const t = useTranslations("AccountHolders");
   const tf = useTranslations("PortfolioForm");
@@ -102,6 +104,7 @@ export function HolderFormDialog({
         await api.createAccountHolder(input);
       }
       router.refresh();
+      onSuccess?.();
       setOpen(false);
     } catch {
       setError(true);
