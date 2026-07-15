@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -20,30 +20,74 @@ function isIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+/**
+ * Module-scope capture of `beforeinstallprompt`.
+ *
+ * Chrome fires this event once, early in the page lifecycle — often before any React
+ * component has mounted — and never re-fires it on a client-side (SPA) navigation.
+ * Capturing it from inside a component's `useEffect` races this and reliably loses:
+ * by the time e.g. a settings sub-page mounts, the event already fired and there's no
+ * way to get it back. Registering the listener here, at module load, catches it
+ * regardless of what's mounted at the time, and the deferred prompt survives
+ * navigation for the rest of the page's lifetime. Every `usePwaInstall()` instance
+ * subscribes to this single store via `useSyncExternalStore`.
+ */
+let capturedPrompt: BeforeInstallPromptEvent | null = null;
+const subscribers = new Set<() => void>();
+
+function notify() {
+  for (const fn of subscribers) fn();
+}
+
+function subscribe(onChange: () => void): () => void {
+  subscribers.add(onChange);
+  return () => {
+    subscribers.delete(onChange);
+  };
+}
+
+function getPromptSnapshot(): BeforeInstallPromptEvent | null {
+  return capturedPrompt;
+}
+
+function getServerPromptSnapshot(): null {
+  return null;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    capturedPrompt = e as BeforeInstallPromptEvent;
+    notify();
+  });
+  window.addEventListener("appinstalled", () => {
+    capturedPrompt = null;
+    notify();
+  });
+}
+
+/** Test-only: clears the module-level singleton between test cases. */
+export function resetPwaInstallStateForTests() {
+  capturedPrompt = null;
+  notify();
+}
+
 export function usePwaInstall() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const deferred = useSyncExternalStore(subscribe, getPromptSnapshot, getServerPromptSnapshot);
   const [eligible, setEligible] = useState<{ ios: boolean } | null>(null);
 
   useEffect(() => {
-    if (isStandalone()) return;
-
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", onPrompt);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEligible({ ios: isIos() });
-
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
 
   const install = useCallback(async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setDeferred(null);
-  }, [deferred]);
+    if (!capturedPrompt) return;
+    await capturedPrompt.prompt();
+    await capturedPrompt.userChoice;
+    capturedPrompt = null;
+    notify();
+  }, []);
 
   return { deferred, eligible, install, isStandalone: isStandalone() };
 }

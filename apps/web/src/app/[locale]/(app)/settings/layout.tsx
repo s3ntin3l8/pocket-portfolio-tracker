@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { UserRound, TrendingUp, Briefcase, KeyRound, ShieldCheck, Download } from "lucide-react";
+import { UserRound, TrendingUp, Briefcase, KeyRound, ShieldCheck } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
+import { SettingsInstallItem } from "@/components/settings-install-item";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AppVersion } from "@/components/app-version";
 import { Link } from "@/i18n/navigation";
@@ -70,18 +71,9 @@ export default async function SettingsLayout({
       color: "var(--gold-fg)",
       bg: "rgba(224,165,58,.16)",
     },
-    {
-      key: "install",
-      href: "/settings/install",
-      icon: <Download />,
-      title: t("navInstall"),
-      subtitle: t("navInstallSub"),
-      color: "#3B82F6",
-      bg: "rgba(59,130,246,.16)",
-    },
   ];
 
-  const groups = [[navItems[0], navItems[1]], [navItems[2], navItems[3]], [navItems[4]]];
+  const groups = [[navItems[0], navItems[1]], [navItems[2], navItems[3]]];
 
   if (me?.isAdmin) {
     navItems.push({
@@ -124,6 +116,8 @@ export default async function SettingsLayout({
         )
       }
       railBottom={<SignOutButton />}
+      railExtra={<SettingsInstallItem variant="rail" />}
+      landingExtra={<SettingsInstallItem variant="landing" />}
       landingBottom={
         // Mobile has no desktop rail, so surface sign-out here — with the auth/identity
         // line directly above it (matches the desktop account section's footer note).

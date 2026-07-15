@@ -38,8 +38,10 @@ export function SettingsShell({
   indexHref,
   railTop,
   railBottom,
+  railExtra,
   landingTop,
   landingBottom,
+  landingExtra,
   children,
 }: {
   navItems: ShellNavItem[];
@@ -48,9 +50,16 @@ export function SettingsShell({
   indexHref: string;
   railTop?: React.ReactNode;
   railBottom?: React.ReactNode;
+  /** Rendered inside the desktop rail's nav list, after every mapped `navItems` link
+   *  (including any pushed after the initial list, e.g. Admin) — for action rows that
+   *  aren't a plain link, such as the PWA install button. */
+  railExtra?: React.ReactNode;
   landingTop?: React.ReactNode;
   /** Rendered at the bottom of the mobile landing (the rail's `railBottom` is desktop-only). */
   landingBottom?: React.ReactNode;
+  /** Rendered as its own trailing group on the mobile landing, after every group in
+   *  `groups` — the landing counterpart to `railExtra`. */
+  landingExtra?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -95,6 +104,7 @@ export function SettingsShell({
               </Link>
             );
           })}
+          {railExtra}
         </nav>
         {railBottom}
       </div>
@@ -138,6 +148,11 @@ export function SettingsShell({
                 ))}
               </div>
             ))}
+            {landingExtra && (
+              <div className={cn("divide-y divide-line overflow-hidden rounded-[20px] bg-card", CARD_SHADOW)}>
+                {landingExtra}
+              </div>
+            )}
             {landingBottom}
           </div>
         )}
