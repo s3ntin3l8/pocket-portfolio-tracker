@@ -646,6 +646,8 @@ export const userPreferencesSchema = z.object({
   // costBasis param elsewhere) rather than redeclaring it.
   costBasisMode: costBasisModeSchema.optional(),
   taxRegime: taxRegimeSchema.optional(),
+  benchmarkSymbol: z.string().optional(),
+  riskFreeRate: z.number().min(0).max(30).optional(),
 });
 
 // --- Document inbox (account-level documents not tied to a single transaction) ------
