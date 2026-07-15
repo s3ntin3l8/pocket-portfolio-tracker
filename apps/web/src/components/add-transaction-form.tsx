@@ -44,6 +44,11 @@ export interface AddTransactionInitial {
   fees: string;
   tax?: string | null;
   fxRate?: string | null;
+  /** Dividend/coupon per-share rate + shares paid on (income rows only, #508). */
+  perShare?: string | null;
+  shares?: string | null;
+  nativeCurrency?: string | null;
+  grossNative?: string | null;
   description?: string | null;
   tags?: string[] | null;
   currency: string;
@@ -171,6 +176,12 @@ export function AddTransactionForm({
   const [fees, setFees] = useState(() => initial?.fees ?? "");
   const [tax, setTax] = useState(() => initial?.tax ?? "");
   const [fxRate, setFxRate] = useState(() => initial?.fxRate ?? "");
+  // Dividend/coupon per-share rate + shares paid on (income rows only, #508). Purely
+  // informational display fields — never fed into cashflow/holdings/XIRR.
+  const [shares, setShares] = useState(() => initial?.shares ?? "");
+  const [perShare, setPerShare] = useState(() => initial?.perShare ?? "");
+  const [nativeCurrency, setNativeCurrency] = useState(() => initial?.nativeCurrency ?? "");
+  const [grossNative, setGrossNative] = useState(() => initial?.grossNative ?? "");
   const [description, setDescription] = useState(() => initial?.description ?? "");
   // Tags stored as a comma-separated string in the UI; parsed to string[] on submit.
   const [tags, setTags] = useState(() => initial?.tags?.join(", ") ?? "");
@@ -363,6 +374,10 @@ export function AddTransactionForm({
         fees: showFees ? fees || "0" : "0",
         tax: showTax && tax ? tax : null,
         fxRate: fxRate || null,
+        perShare: isIncome && perShare ? perShare : null,
+        shares: isIncome && shares ? shares : null,
+        nativeCurrency: isIncome && nativeCurrency ? nativeCurrency : null,
+        grossNative: isIncome && grossNative ? grossNative : null,
         kind: kind || null,
         description: description.trim() || null,
         tags: parsedTags.length > 0 ? parsedTags : null,
@@ -698,6 +713,28 @@ export function AddTransactionForm({
             />
           </Field>
         )}
+        {isIncome && (
+          <Field label={t("shares")} htmlFor="tx-shares">
+            <Input
+              id="tx-shares"
+              inputMode="decimal"
+              value={shares}
+              onChange={(e) => setShares(e.target.value)}
+              placeholder={t("sharesPlaceholder")}
+            />
+          </Field>
+        )}
+        {isIncome && (
+          <Field label={t("perShare")} htmlFor="tx-per-share">
+            <Input
+              id="tx-per-share"
+              inputMode="decimal"
+              value={perShare}
+              onChange={(e) => setPerShare(e.target.value)}
+              placeholder={t("perSharePlaceholder")}
+            />
+          </Field>
+        )}
         <Field label={t("currency")} htmlFor="tx-currency">
           <Select id="tx-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
             {CURRENCIES.map((c) => (
@@ -761,6 +798,33 @@ export function AddTransactionForm({
               <option value="merger">{t("subTypeMerger")}</option>
             </Select>
           </Field>
+          {isIncome && (
+            <Field label={t("nativeCurrency")} htmlFor="tx-native-currency">
+              <Select
+                id="tx-native-currency"
+                value={nativeCurrency}
+                onChange={(e) => setNativeCurrency(e.target.value)}
+              >
+                <option value="">{t("subTypeNone")}</option>
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          {isIncome && (
+            <Field label={t("grossNative")} htmlFor="tx-gross-native">
+              <Input
+                id="tx-gross-native"
+                inputMode="decimal"
+                value={grossNative}
+                onChange={(e) => setGrossNative(e.target.value)}
+                placeholder={t("grossNativePlaceholder")}
+              />
+            </Field>
+          )}
         </div>
       </details>
 

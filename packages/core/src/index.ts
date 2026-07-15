@@ -1,5 +1,12 @@
 export * from "./types.js";
-export { computeHoldings, marketValue, unrealizedPnL } from "./holdings.js";
+export {
+  computeHoldings,
+  marketValue,
+  unrealizedPnL,
+  buildShareTimelines,
+  sharesHeldAt,
+  type ShareCheckpoint,
+} from "./holdings.js";
 export { cashFlow, cashBalances } from "./cash.js";
 export { xirr, type CashFlowPoint } from "./xirr.js";
 export { periodXirr } from "./period-xirr.js";

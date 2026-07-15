@@ -205,6 +205,29 @@ export function parseDkbPdf(rawText: string): DkbPdfResult {
     const fxRate = parseEuroDecimal(
       text.match(/Devisenkurs\s+[A-Z]{3}\s*\/\s*[A-Z]{3}\s+([\d.,]+)/)?.[1],
     );
+    // #508: "Dividende pro Stück <rate> <CCY>" (equities) / "Ausschüttung pro St. <rate>
+    // <CCY>" (funds — note the abbreviated "St.", not "Stück", verified against a real DKB
+    // Ertragsabrechnung Fonds PDF) — the per-share/unit rate, printed in the payment's
+    // native currency (EUR for a domestic dividend, foreign for e.g. a US/UK holding — same
+    // convention as the TR PDF parser). A fund distribution may print a second, partial-
+    // exemption-adjusted rate right after ("... mit Teilfreistellung ..."); this regex takes
+    // the FIRST (gross, pre-exemption) rate, matching `shares × perShare ≈ grossNative`.
+    // `shares` is the `Stück <qty>` already captured by extractSecurity above. Purely
+    // informational; `price`/`quantity` keep their existing net-cash / zero-quantity
+    // semantics. If the wording doesn't match some other phrasing, these stay unset and the
+    // read-time derived fallback (packages/core) fills perShare from gross/shares downstream.
+    const perShareM = text.match(
+      /(?:Dividende|Aussch(?:ü|ue)ttung)\s+pro\s+(?:St(?:ü|ue)ck|St\.|Anteil)\s+([\d.,]+)\s+([A-Z]{3})/,
+    );
+    const perShare = perShareM ? parseEuroDecimal(perShareM[1]) : null;
+    const nativeCcy = perShareM?.[2];
+    const isForeign = Boolean(nativeCcy) && nativeCcy !== "EUR";
+    // Gross payment in the native currency, before FX conversion and withholding tax:
+    // "Dividendengutschrift <amt> <CCY>" / "Ausschüttung <amt> <CCY>".
+    const grossNativeM = text.match(
+      /(?:Dividendengutschrift|Aussch(?:ü|ue)ttung)\s+([\d.,]+)\s+([A-Z]{3})/,
+    );
+    const grossNative = isForeign ? (parseEuroDecimal(grossNativeM?.[1]) ?? undefined) : undefined;
     const valueDate =
       parseDkbDate(text.match(/Wertstellung\s+(\d{2}\.\d{2}\.\d{4})/)?.[1]) ?? docDate;
     const belegnr = text.match(/Abrechnungsnr\.\s+(\d+)/)?.[1];
@@ -221,6 +244,10 @@ export function parseDkbPdf(rawText: string): DkbPdfResult {
         tax: Number(tax) > 0 ? tax : undefined,
         taxComponents: Object.keys(incomeTaxComponents).length > 0 ? incomeTaxComponents : undefined,
         fxRate: fxRate ?? undefined,
+        shares: quantity,
+        perShare: perShare ?? undefined,
+        nativeCurrency: isForeign ? nativeCcy : undefined,
+        grossNative,
         currency: "EUR",
         executedAt: valueDate ?? undefined,
         externalId: belegnr ? `dkb:${belegnr}` : undefined,

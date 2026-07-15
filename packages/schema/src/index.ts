@@ -297,6 +297,16 @@ export const transactionInputSchema = z.object({
   tax: decimalString.nullable().optional(),
   // FX rate at execution for cross-currency holdings (units of base currency per foreign).
   fxRate: decimalString.nullable().optional(),
+  // Dividend/coupon per-share rate + shares paid on (income rows only, manual entry —
+  // see parsedTransactionSchema for the same fields on the import path). Informational;
+  // `price`/`quantity` keep their existing net-cash / zero-quantity semantics.
+  perShare: decimalString.nullable().optional(),
+  shares: decimalString.nullable().optional(),
+  // The instrument's native currency for a foreign-currency income payment, when it
+  // differs from `currency` (which stays the cash actually credited).
+  nativeCurrency: currencyCode.nullable().optional(),
+  // Gross payment amount in `nativeCurrency`, before FX conversion and withholding tax.
+  grossNative: decimalString.nullable().optional(),
   // Free-text memo (e.g. counterparty name, card merchant, transfer IBAN).
   description: z.string().nullable().optional(),
   // User-defined labels for filtering/reporting.

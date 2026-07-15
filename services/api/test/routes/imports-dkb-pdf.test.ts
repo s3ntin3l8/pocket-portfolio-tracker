@@ -107,6 +107,11 @@ describe("DKB PDF deterministic import path", () => {
       fxRate: "1.1777",
       currency: "EUR",
       externalId: "dkb:11111111111",
+      // #508: "Stück 1 ... Dividende pro Stück 0,91 USD ... Dividendengutschrift 0,91 USD".
+      shares: "1",
+      perShare: "0.91",
+      nativeCurrency: "USD",
+      grossNative: "0.91",
     });
   });
 
@@ -188,6 +193,10 @@ describe("DKB PDF deterministic import path", () => {
     const list = txns.json();
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ type: "dividend", tax: "0.12", fxRate: "1.1777", source: "pdf" });
+    // #508: carried through the fresh-insert confirm path (materialize-drafts.ts) — a
+    // standalone DKB dividend PDF has no separate settlement PDF to enrich against later,
+    // so this is the only path these fields ever take.
+    expect(list[0]).toMatchObject({ shares: "1", perShare: "0.91", nativeCurrency: "USD", grossNative: "0.91" });
   });
 
   it("stores parser='dkb-pdf' on the import row and writes a pdf source row", async () => {
