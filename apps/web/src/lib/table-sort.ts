@@ -29,13 +29,8 @@ function compareValues(a: unknown, b: unknown, type: ColType): number {
       return TEXT_COLLATOR.compare(String(a ?? ""), String(b ?? ""));
     case "numeric":
       return Number(a) - Number(b);
-    case "date": {
-      const aNum = Date.parse(String(a ?? ""));
-      const bNum = Date.parse(String(b ?? ""));
-      if (isNaN(aNum)) return isNaN(bNum) ? 0 : 1;
-      if (isNaN(bNum)) return -1;
-      return aNum - bNum;
-    }
+    case "date":
+      return Date.parse(String(a ?? "")) - Date.parse(String(b ?? ""));
   }
 }
 
@@ -67,8 +62,18 @@ export function useTableSort<T>(cols: ColDef<T>[]): UseTableSortResult<T> {
       return [...rows].sort((a, b) => {
         const aVal = col.get(a);
         const bVal = col.get(b);
-        const aMissing = aVal == null || aVal === "";
-        const bMissing = bVal == null || bVal === "";
+        let aMissing = aVal == null || aVal === "";
+        let bMissing = bVal == null || bVal === "";
+        if (!aMissing && col.type !== "text") {
+          aMissing = isNaN(
+            col.type === "date" ? Date.parse(String(aVal)) : Number(aVal),
+          );
+        }
+        if (!bMissing && col.type !== "text") {
+          bMissing = isNaN(
+            col.type === "date" ? Date.parse(String(bVal)) : Number(bVal),
+          );
+        }
         if (aMissing && bMissing) return 0;
         if (aMissing) return 1;
         if (bMissing) return -1;

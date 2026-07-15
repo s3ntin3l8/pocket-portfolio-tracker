@@ -164,6 +164,31 @@ describe("useTableSort", () => {
     expect(sorted.map((r) => r.name)).toEqual(["A", "C", "B"]);
   });
 
+  it("places unparseable numeric values at end when sorting ascending", () => {
+    const rows: Row[] = [
+      { name: "A", amount: "N/A", date: "2026-01-01" },
+      { name: "B", amount: "10", date: "2026-01-01" },
+      { name: "C", amount: "5", date: "2026-01-01" },
+    ];
+    const { result } = renderHook(() => useTableSort<Row>(COLS));
+    act(() => result.current.toggle("amount"));
+    const sorted = result.current.sort(rows);
+    expect(sorted.map((r) => r.amount)).toEqual(["5", "10", "N/A"]);
+  });
+
+  it("places unparseable numeric values at end when sorting descending", () => {
+    const rows: Row[] = [
+      { name: "A", amount: "N/A", date: "2026-01-01" },
+      { name: "B", amount: "10", date: "2026-01-01" },
+      { name: "C", amount: "5", date: "2026-01-01" },
+    ];
+    const { result } = renderHook(() => useTableSort<Row>(COLS));
+    act(() => result.current.toggle("amount"));
+    act(() => result.current.toggle("amount")); // now desc
+    const sorted = result.current.sort(rows);
+    expect(sorted.map((r) => r.amount)).toEqual(["10", "5", "N/A"]);
+  });
+
   it("handles both-missing dates without reordering", () => {
     const rows: Row[] = [
       { name: "A", amount: "1", date: "2026-01-01" },
