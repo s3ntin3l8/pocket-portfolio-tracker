@@ -45,7 +45,8 @@ type TimelineGroup = {
  *
  * Year groups are collapsible (accordion-style). Current year + next-year forecast
  * start expanded; all others start collapsed. Older years without pre-loaded rows
- * are merged into the main list and lazy-fetched on first expand.
+ * are loaded on demand via a "Load {year}" button (like activity's load-more),
+ * then auto-expand.
  */
 export function IncomeTimeline({
   rows,
@@ -143,6 +144,7 @@ export function IncomeTimeline({
       if (!res.ok) return;
       const data = await res.json();
       setLoadedYears(prev => new Map(prev).set(year, data.events));
+      setExpanded((prev) => new Set(prev).add(year));
     } catch {
       // Ignore — user can retry by clicking again
     } finally {
@@ -174,11 +176,22 @@ export function IncomeTimeline({
     });
   }
 
-  // Merge lazy-load years into the main list (years not already present)
+  // Add already-loaded lazy years
   const existingYears = new Set(timelineGroups.map((g) => g.year));
-  for (const y of olderYears.filter((y) => !existingYears.has(y)).sort((a, b) => Number(b) - Number(a))) {
-    timelineGroups.push({ year: y });
+  for (const y of olderYears.filter((y) => loadedYears.has(y) && !existingYears.has(y)).sort((a, b) => Number(b) - Number(a))) {
+    const yr = loadedYears.get(y)!;
+    timelineGroups.push({ year: y, rows: yr, subtitle: yearSubtitle(yr), subtotal: subtotalOf(yr) });
   }
+
+  // If yearFilter targets a lazy year not yet loaded, add a placeholder so the
+  // user can see it and expand to trigger the fetch.
+  if (yearFilter !== "all" && olderYears.includes(yearFilter) && !loadedYears.has(yearFilter) && !existingYears.has(yearFilter)) {
+    timelineGroups.push({ year: yearFilter });
+  }
+
+  const hasActiveTextFilter = statusFilter !== "all" || query.trim() !== "";
+  const sortedOlder = olderYears.filter((y) => !loadedYears.has(y)).sort((a, b) => Number(b) - Number(a));
+  const nextOlder = yearFilter === "all" && !hasActiveTextFilter ? sortedOlder[0] : null;
 
   return (
     <div className="rounded-[20px] bg-card p-[22px] shadow-card">
@@ -280,14 +293,14 @@ export function IncomeTimeline({
         </div>
       </div>
 
-      {timelineGroups.length === 0 ? (
+      {timelineGroups.length === 0 && !nextOlder ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{t("noMatches")}</p>
       ) : (
         <>
-          <TimelineColumnHeader />
+          {timelineGroups.length > 0 && <TimelineColumnHeader />}
 
           {timelineGroups.map((g) => {
-            const isOpen = expanded.has(g.year);
+            const isOpen = expanded.has(g.year) || hasActiveTextFilter;
             const hasRows = Boolean(g.rows);
             const lazyRows = loadedYears.get(g.year);
             const displayRows = hasRows ? g.rows! : lazyRows;
@@ -296,6 +309,7 @@ export function IncomeTimeline({
               <div key={g.year} className="mt-3.5">
                 <button
                   type="button"
+                  aria-expanded={isOpen}
                   onClick={() => {
                     toggle(g.year);
                     if (!hasRows && !lazyRows && loadingYear !== g.year) loadYear(g.year);
@@ -335,6 +349,20 @@ export function IncomeTimeline({
               </div>
             );
           })}
+
+          {nextOlder && (
+            <button
+              type="button"
+              onClick={() => loadYear(nextOlder)}
+              className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold text-text-3 hover:text-foreground"
+            >
+              {loadingYear === nextOlder ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>{t("loadOlderYear", { year: nextOlder })} →</>
+              )}
+            </button>
+          )}
         </>
       )}
     </div>

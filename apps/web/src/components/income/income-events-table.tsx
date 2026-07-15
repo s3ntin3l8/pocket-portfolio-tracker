@@ -174,7 +174,7 @@ export function IncomeEventsTable({ rows, groupByMonth }: { rows: IncomeEventRow
                   : undefined
               }
               className={cn(
-                i > 0 && (!groupByMonth || rows[i - 1].date.slice(0, 7) !== mc) && "border-t border-line",
+                i > 0 && "border-t border-line",
                 clickable && "cursor-pointer transition-colors hover:bg-muted/40",
                 loadingId === e.transactionId && "opacity-60",
               )}
