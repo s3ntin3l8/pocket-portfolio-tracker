@@ -16,7 +16,7 @@ import {
   loadInsights,
   getSelectedPortfolioId,
 } from "@/lib/server-api";
-import { bestAndWorst } from "@/lib/movers";
+import { bestAndWorst, periodToMover } from "@/lib/movers";
 import { formatPercent } from "@/lib/utils";
 import { isIntradayPoint } from "@portfolio/api-client";
 
@@ -174,6 +174,30 @@ export default async function InsightsPage({
               worst={movers.worst}
               title={t("bestWorst.title")}
               timeframeLabel={t("bestWorst.timeframe")}
+              bestLabel={t("bestWorst.best")}
+              worstLabel={t("bestWorst.worst")}
+              locale={locale}
+            />
+          )}
+
+          {insightsData?.bestWorstMonthly.best && insightsData?.bestWorstMonthly.worst && (
+            <BestWorstCard
+              best={periodToMover(insightsData.bestWorstMonthly.best)}
+              worst={periodToMover(insightsData.bestWorstMonthly.worst)}
+              title={t("bestWorst.monthlyTitle")}
+              timeframeLabel={t("bestWorst.monthlyTimeframe")}
+              bestLabel={t("bestWorst.best")}
+              worstLabel={t("bestWorst.worst")}
+              locale={locale}
+            />
+          )}
+
+          {insightsData?.bestWorstYearly.best && insightsData?.bestWorstYearly.worst && (
+            <BestWorstCard
+              best={periodToMover(insightsData.bestWorstYearly.best)}
+              worst={periodToMover(insightsData.bestWorstYearly.worst)}
+              title={t("bestWorst.yearlyTitle")}
+              timeframeLabel={t("bestWorst.yearlyTimeframe")}
               bestLabel={t("bestWorst.best")}
               worstLabel={t("bestWorst.worst")}
               locale={locale}

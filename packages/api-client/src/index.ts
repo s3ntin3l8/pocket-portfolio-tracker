@@ -1008,12 +1008,22 @@ export interface ConcentrationPoint {
   classCount: number;
 }
 
+export interface PeriodMover {
+  instrumentId: string;
+  symbol: string;
+  name: string | null;
+  assetClass: string;
+  pct: number;
+}
+
 export interface InsightsResponse {
   drawdown: InsightsDrawdown;
   volatility: InsightsVolatility;
   streaks: InsightsStreaks;
   benchmark: InsightsBenchmark | null;
   concentrationTrend: ConcentrationPoint[];
+  bestWorstMonthly: { best: PeriodMover | null; worst: PeriodMover | null };
+  bestWorstYearly: { best: PeriodMover | null; worst: PeriodMover | null };
 }
 
 /** A projected future coupon payment for a held bond (instrument currency). */

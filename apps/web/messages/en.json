@@ -193,7 +193,11 @@
       "timeframe": "24h",
       "best": "Best performer",
       "worst": "Worst performer",
-      "empty": "Not enough day-change data yet."
+      "empty": "Not enough day-change data yet.",
+      "monthlyTitle": "This month",
+      "monthlyTimeframe": "MTD",
+      "yearlyTitle": "This year",
+      "yearlyTimeframe": "YTD"
     },
     "drawdown": {
       "title": "Max Drawdown",

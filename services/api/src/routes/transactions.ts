@@ -4068,6 +4068,8 @@ export async function transactionsRoute(app: FastifyInstance) {
           streaks: { bestStreak: null, worstStreak: null, bestMonth: null, worstMonth: null, bestYear: null, worstYear: null, positiveMonths: 0, negativeMonths: 0, totalMonths: 0 },
           benchmark: null,
           concentrationTrend: [],
+          bestWorstMonthly: { best: null, worst: null },
+          bestWorstYearly: { best: null, worst: null },
         });
       }
 
@@ -4097,6 +4099,8 @@ export async function transactionsRoute(app: FastifyInstance) {
             streaks: { bestStreak: null, worstStreak: null, bestMonth: null, worstMonth: null, bestYear: null, worstYear: null, positiveMonths: 0, negativeMonths: 0, totalMonths: 0 },
             benchmark: null,
             concentrationTrend: [],
+            bestWorstMonthly: { best: null, worst: null },
+            bestWorstYearly: { best: null, worst: null },
           } as const;
         }
 
@@ -4211,6 +4215,8 @@ export async function transactionsRoute(app: FastifyInstance) {
         const concentrationTrend: { date: string; hhi: number; top1Pct: number; classCount: number }[] = [];
         const months = [...new Set(dates.map((d) => d.slice(0, 7)))].slice(-60);
         const pfIds = pfs.map((p) => p.id);
+        let bestWorstMonthly: { best: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number } | null; worst: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number } | null } = { best: null, worst: null };
+        let bestWorstYearly: { best: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number } | null; worst: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number } | null } = { best: null, worst: null };
 
         if (months.length > 0) {
           const allTxRows = await app.db
@@ -4292,9 +4298,44 @@ export async function transactionsRoute(app: FastifyInstance) {
               });
             }
           }
+
+          // ── Period best/worst performers (MTD, YTD) ──────────────────────
+          const latestDate = dates[dates.length - 1];
+          const monthStart = latestDate.slice(0, 7) + "-01";
+          const yearStart = latestDate.slice(0, 4) + "-01-01";
+          const periodEnd = new Date(`${latestDate}T23:59:59.999Z`);
+
+          const heldInsts = computeHoldings(coreTxns, corpActions, periodEnd)
+            .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
+            .map((h) => h.instrumentId!);
+
+          const computePeriodMovers = (startDate: string): { best: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number } | null; worst: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number } | null } => {
+            const movers: { instrumentId: string; symbol: string; name: string | null; assetClass: string; pct: number }[] = [];
+            for (const instId of heldInsts) {
+              const startPrice = latestPriceBefore(instId, startDate);
+              const endPrice = latestPriceBefore(instId, latestDate);
+              if (!startPrice || !endPrice || Number(startPrice) <= 0) continue;
+              const pct = Number(endPrice) / Number(startPrice) - 1;
+              const inst = instMap.get(instId);
+              if (!inst) continue;
+              movers.push({
+                instrumentId: instId,
+                symbol: inst.symbol ?? "—",
+                name: inst.name,
+                assetClass: inst.assetClass ?? "equity",
+                pct,
+              });
+            }
+            if (movers.length < 2) return { best: null, worst: null };
+            movers.sort((a, b) => b.pct - a.pct);
+            return { best: movers[0], worst: movers[movers.length - 1] };
+          };
+
+          bestWorstMonthly = computePeriodMovers(monthStart);
+          bestWorstYearly = computePeriodMovers(yearStart);
         }
 
-        return { drawdown, volatility, streaks, benchmark, concentrationTrend };
+        return { drawdown, volatility, streaks, benchmark, concentrationTrend, bestWorstMonthly, bestWorstYearly };
       });
 
       const durationMs = performance.now() - t0;
