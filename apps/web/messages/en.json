@@ -1119,13 +1119,8 @@
     "dataSourceIbkr": "Interactive Brokers sync",
     "dataSourceOn": "On",
     "dataSourceOff": "Off",
-    "installApp": "Install App",
-    "installAppDesc": "Install Pocket as a standalone app on your device for quick access.",
-    "installAppCta": "Install Pocket",
     "installAppIosTitle": "Install on iOS",
-    "installAppIosHint": "Tap Share, then \"Add to Home Screen\".",
-    "installAppInstalled": "Pocket is already installed on this device.",
-    "installAppUnavailable": "Installation is not supported in your browser."
+    "installAppIosHint": "Tap Share, then \"Add to Home Screen\"."
   },
   "Holdings": {
     "title": "Holdings",

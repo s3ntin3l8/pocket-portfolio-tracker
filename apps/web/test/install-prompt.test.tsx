@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { InstallPrompt } from "../src/components/install-prompt";
+import { resetPwaInstallStateForTests } from "../src/lib/use-pwa-install";
 import messages from "../messages/en.json";
 
 function renderPrompt() {
@@ -55,6 +56,7 @@ function fireBeforeInstallPrompt() {
 
 describe("InstallPrompt", () => {
   beforeEach(() => {
+    resetPwaInstallStateForTests();
     installLocalStorage();
     localStorage.clear();
     mockMatchMedia(false);
