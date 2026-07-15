@@ -22,13 +22,31 @@ export interface StreakResult {
   totalMonths: number;
 }
 
+/**
+ * Resample a (possibly daily) index series down to one point per calendar month — the
+ * last point on or before each month's end. Callers may pass either genuinely monthly
+ * points (each already the sole point in its month — resampling is then a no-op pass-
+ * through) or a daily TWR index (the real-world case, e.g. from `chainIndex`); either
+ * way the streaks below are computed over true calendar months, not raw series points.
+ */
+function monthEndPoints(points: IndexPoint[]): IndexPoint[] {
+  const byMonth = new Map<string, IndexPoint>();
+  for (const p of points) {
+    byMonth.set(p.date.slice(0, 7), p); // points are date-ascending → last write wins
+  }
+  return [...byMonth.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([, p]) => p);
+}
+
 function monthlyReturns(points: IndexPoint[]): { date: string; returnPct: number }[] {
+  const months = monthEndPoints(points);
   const result: { date: string; returnPct: number }[] = [];
-  for (let i = 1; i < points.length; i++) {
-    const prev = Number(points[i - 1].index);
-    const curr = Number(points[i].index);
+  for (let i = 1; i < months.length; i++) {
+    const prev = Number(months[i - 1].index);
+    const curr = Number(months[i].index);
     const ret = prev !== 0 ? curr / prev - 1 : 0;
-    result.push({ date: points[i].date, returnPct: ret });
+    result.push({ date: months[i].date, returnPct: ret });
   }
   return result;
 }
