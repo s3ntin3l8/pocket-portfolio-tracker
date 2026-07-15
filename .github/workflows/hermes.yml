@@ -1,15 +1,19 @@
 name: Hermes (on-demand)
 
+# On-demand @mention ONLY. Trigger on issue_comment — PR-conversation comments AND
+# issue comments both arrive as issue_comment. Do NOT add pull_request_review_comment:
+# a submitted review fires that event (and review bodies contain "@<slug>"), which
+# re-triggers the bot with no human summon (the Claude->Hermes cascade, .github#527).
+# The mention substring itself is enforced inside the reusable workflow via
+# mention-trigger, so the slug lives in exactly one place (the with: below).
 on:
   issue_comment:
-    types: [created]
-  pull_request_review_comment:
     types: [created]
 
 jobs:
   hermes:
     # Only human comment events; the bot never re-triggers itself. The actual
-    # "@s3ntin3l8-hermes" mention check lives inside the reusable workflow.
+    # "@<slug>" mention check lives inside the reusable workflow.
     if: github.actor != 's3ntin3l8-hermes[bot]'
     permissions:
       contents: write
