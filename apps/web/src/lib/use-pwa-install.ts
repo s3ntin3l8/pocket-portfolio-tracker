@@ -32,7 +32,6 @@ export function usePwaInstall() {
       setDeferred(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
-    // Single intentional mount-time resolution (iOS has no beforeinstallprompt).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEligible({ ios: isIos() });
 
