@@ -60,7 +60,24 @@ export function useTableSort<T>(cols: ColDef<T>[]): UseTableSortResult<T> {
       const col = colsRef.current.find((c) => c.key === sortKey);
       if (!col) return rows;
       return [...rows].sort((a, b) => {
-        const cmp = compareValues(col.get(a), col.get(b), col.type);
+        const aVal = col.get(a);
+        const bVal = col.get(b);
+        let aMissing = aVal == null || aVal === "";
+        let bMissing = bVal == null || bVal === "";
+        if (!aMissing && col.type !== "text") {
+          aMissing = isNaN(
+            col.type === "date" ? Date.parse(String(aVal)) : Number(aVal),
+          );
+        }
+        if (!bMissing && col.type !== "text") {
+          bMissing = isNaN(
+            col.type === "date" ? Date.parse(String(bVal)) : Number(bVal),
+          );
+        }
+        if (aMissing && bMissing) return 0;
+        if (aMissing) return 1;
+        if (bMissing) return -1;
+        const cmp = compareValues(aVal, bVal, col.type);
         return sortDir === "asc" ? cmp : -cmp;
       });
     },
