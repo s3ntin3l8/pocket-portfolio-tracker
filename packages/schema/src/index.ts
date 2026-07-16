@@ -92,7 +92,7 @@ export const accountHolderInputSchema = z.object({
   // "self" | "child" | "other". A portfolio whose holder is "child" is treated as a
   // child/Kinderdepot (drives the "to age 18" forecast and the TR Kinderdepot guard).
   type: z.enum(["self", "child", "other"]).default("other"),
-  // Optional birth year — powers the "to age 18" forecast for a child.
+  // Optional birth year — powers the savings forecast target (age 18 for children, retirement for adults).
   birthYear: z.number().int().min(1900).max(2100).nullable().optional(),
   // German tax profile (all optional).
   taxAllowanceAnnual: decimalString.nullable().optional(),

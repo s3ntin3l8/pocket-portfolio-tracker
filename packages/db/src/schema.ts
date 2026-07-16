@@ -188,7 +188,7 @@ export const accountHolders = pgTable(
     // is "child" — the single source of child-ness (drives the "to age 18" forecast
     // target and the Trade Republic Kinderdepot guard).
     type: text("type").notNull().default("other"),
-    // Optional birth year — powers the "to age 18" savings forecast for a child.
+    // Optional birth year — powers the savings forecast target (age 18 for children, retirement for adults).
     birthYear: integer("birth_year"),
     // --- German tax profile (optional; null = not configured) ---
     // Per-person Sparerpauschbetrag CAP in EUR (default €1,000 single, €2,000 jointly
