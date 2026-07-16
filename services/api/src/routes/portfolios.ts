@@ -101,21 +101,10 @@ export async function portfoliosRoute(app: FastifyInstance) {
   // screenshot imports keep their history with portfolio_id set null.
   app.delete<{ Params: { portfolioId: string } }>(
     "/portfolios/:portfolioId",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId } = request.params;
-      // Ownership check FIRST: deleteReceiptsForPortfolio deletes storage objects for
-      // any portfolioId with no userId scope of its own, so it must never run before
-      // we've confirmed the caller owns this portfolio.
-      const [owned] = await app.db
-        .select({ id: portfolios.id })
-        .from(portfolios)
-        .where(and(eq(portfolios.id, portfolioId), eq(portfolios.userId, id)))
-        .limit(1);
-      if (!owned) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       // Pre-query and delete storage objects before the portfolio row is removed,
       // since DB cascade removes document rows but not the storage objects (#231).
       await deleteReceiptsForPortfolio(app, portfolioId);

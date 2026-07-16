@@ -5,6 +5,8 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import type { JWTVerifyGetKey, JWTVerifyOptions } from "jose";
 import { eq } from "drizzle-orm";
 import { users, apiTokens } from "@portfolio/db";
+import { ownedPortfolio } from "../routes/helpers.js";
+import type { PortfolioWithHolder } from "../lib/portfolio.js";
 
 // A key (local public key for tests) or a JWKS resolver function (remote, prod).
 export type AuthKey = CryptoKey | Uint8Array | JWTVerifyGetKey;
@@ -199,17 +201,29 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       return reply.code(403).send({ error: "forbidden" });
     }
   });
+
+  app.decorate(
+    "requirePortfolio",
+    async function (this: FastifyInstance, request: FastifyRequest, reply: FastifyReply) {
+      const { portfolioId } = request.params as { portfolioId?: string };
+      if (!portfolioId) return reply.code(400).send({ error: "portfolio_id_required" });
+      const portfolio = await ownedPortfolio(this, request.userId, portfolioId);
+      if (!portfolio) return reply.code(404).send({ error: "portfolio_not_found" });
+      request.portfolio = portfolio;
+    },
+  );
 });
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
     requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
+    requirePortfolio: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
   }
   interface FastifyRequest {
     user?: AuthedUser;
     userId: string;
-    portfolio: unknown;
+    portfolio: PortfolioWithHolder;
     timingMeta?: Record<string, unknown>;
   }
 }

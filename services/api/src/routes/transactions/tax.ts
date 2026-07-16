@@ -27,7 +27,7 @@ import {
 } from "../../services/valuation.js";
 import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
-import { ownedPortfolio } from "../helpers.js";
+
 import {
   loadValuation,
   buildTradeLog,
@@ -212,16 +212,12 @@ export function registerTaxRoutes(app: FastifyInstance) {
    */
   app.get<{ Params: PortfolioParams; Querystring: { year?: string } }>(
     "/portfolios/:portfolioId/tax",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
 
       if (!portfolio.taxAllowanceAnnual) {
         return reply.code(422).send({ error: "tax_allowance_not_configured" });

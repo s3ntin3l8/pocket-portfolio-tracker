@@ -15,13 +15,9 @@ import { bulkDeleteSchema } from "./shared.js";
 export function registerCrudRoutes(app: FastifyInstance) {
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/transactions",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const input = transactionInputSchema.parse({
         ...(request.body as Record<string, unknown>),
         portfolioId,
@@ -58,13 +54,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: PortfolioParams & { txId: string } }>(
     "/portfolios/:portfolioId/transactions/:txId",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId, txId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const [deleted] = await app.db
         .delete(transactions)
         .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
@@ -84,13 +76,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
 
   app.post<{ Params: PortfolioParams; Body: { ids?: unknown } }>(
     "/portfolios/:portfolioId/transactions/bulk-delete",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const { ids } = bulkDeleteSchema.parse(request.body);
       const deleted = await app.db
         .delete(transactions)
@@ -109,13 +97,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
 
   app.patch<{ Params: PortfolioParams & { txId: string } }>(
     "/portfolios/:portfolioId/transactions/:txId",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId, txId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const input = transactionInputSchema.parse({
         ...(request.body as Record<string, unknown>),
         portfolioId,
@@ -157,13 +141,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
   });
   app.patch<{ Params: PortfolioParams & { txId: string } }>(
     "/portfolios/:portfolioId/transactions/:txId/status",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId, txId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const { status } = statusBodySchema.parse(request.body);
       const [updated] = await app.db
         .update(transactions)
@@ -184,13 +164,10 @@ export function registerCrudRoutes(app: FastifyInstance) {
   });
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/anomalies/dismiss",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const { transactionId, code } = dismissAnomalySchema.parse(request.body);
       const [tx] = await app.db
         .select({ id: transactions.id })
@@ -209,13 +186,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
   );
   app.delete<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/anomalies/dismiss",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const { transactionId, code } = dismissAnomalySchema.parse(request.body);
       await app.db
         .delete(dismissedAnomalies)
@@ -236,13 +209,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
   });
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/transactions/resolve-drafts",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const { ids, action } = resolveDraftsSchema.parse(request.body);
       const nextStatus = action === "confirm" ? "normal" : "archived";
       const resolution = action === "confirm" ? "confirmed" : "discarded";
@@ -289,7 +258,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
   });
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/transactions/reassign",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId } = request.params;
@@ -297,10 +266,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
       if (portfolioId === targetPortfolioId) {
         return reply.code(400).send({ error: "same_portfolio" });
       }
-      if (
-        !(await ownedPortfolio(app, id, portfolioId)) ||
-        !(await ownedPortfolio(app, id, targetPortfolioId))
-      ) {
+      if (!(await ownedPortfolio(app, id, targetPortfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
       }
 
@@ -321,13 +287,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
 
   app.get<{ Params: PortfolioParams; Querystring: { survivorId?: string; absorbedId?: string } }>(
     "/portfolios/:portfolioId/transactions/merge-preview",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const query = z
         .object({ survivorId: z.uuid(), absorbedId: z.uuid() })
         .safeParse(request.query);
@@ -343,13 +305,9 @@ export function registerCrudRoutes(app: FastifyInstance) {
     .refine((v) => v.survivorId !== v.absorbedId, { message: "same_transaction" });
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/transactions/merge",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const parsed = mergeSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
 

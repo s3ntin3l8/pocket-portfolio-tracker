@@ -3,7 +3,7 @@ import { and, count, desc, eq, getTableColumns, gte, inArray, lt, sql } from "dr
 import { portfolios, transactions } from "@portfolio/db";
 import { logTiming } from "../../lib/timing.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
-import { ownedPortfolio, parsePagination, cacheKey } from "../helpers.js";
+import { parsePagination, cacheKey } from "../helpers.js";
 import {
   yearRange,
   ACTIVITY_INCOME_TYPES,
@@ -25,15 +25,11 @@ export function registerListRoutes(app: FastifyInstance) {
     };
   }>(
     "/portfolios/:portfolioId/transactions",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
-      const portfolio = await ownedPortfolio(app, id, request.params.portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
-      const portfolioName = portfolio.name;
+      const portfolioName = request.portfolio.name;
       const { page, pageSize } = parsePagination({
         page: request.query.page,
         pageSize: request.query.pageSize,

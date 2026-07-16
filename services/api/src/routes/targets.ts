@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { and, eq, isNull } from "drizzle-orm";
 import { allocationTargets } from "@portfolio/db";
 import { allocationTargetSetSchema } from "@portfolio/schema";
-import { ownedPortfolio } from "./helpers.js";
 
 /**
  * Allocation target routes.
@@ -109,16 +108,13 @@ export async function targetsRoute(app: FastifyInstance) {
 
   app.get<{ Params: { portfolioId: string }; Querystring: { dimension?: string } }>(
     "/portfolios/:portfolioId/targets",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId } = request.params;
       const dimension = request.query.dimension;
       if (!dimension) {
         return reply.code(400).send({ error: "dimension_required" });
-      }
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
       }
       const rows = await app.db
         .select()
@@ -136,13 +132,10 @@ export async function targetsRoute(app: FastifyInstance) {
 
   app.put<{ Params: { portfolioId: string } }>(
     "/portfolios/:portfolioId/targets",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const parsed = allocationTargetSetSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_input", issues: parsed.error.issues });

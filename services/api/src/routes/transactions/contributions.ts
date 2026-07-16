@@ -10,7 +10,7 @@ import {
   contributionStats,
   type CashFlowPoint,
 } from "@portfolio/core";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   buildContributions,
@@ -28,15 +28,12 @@ export function registerContributionsRoutes(app: FastifyInstance) {
   // Contribution analytics for a single portfolio (in its base currency).
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/contributions",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const [pref] = await app.db
         .select({ retirementAge: userPreferences.retirementAge })
         .from(userPreferences)

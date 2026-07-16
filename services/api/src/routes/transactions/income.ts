@@ -4,7 +4,7 @@ import { accountHolders, portfolios, transactions, users } from "@portfolio/db";
 import { toDateKey, type CoreTransaction, aggregatePortfolios } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
-import { ownedPortfolio } from "../helpers.js";
+
 import {
   instrumentMeta,
   ACTIVITY_INCOME_TYPES,
@@ -124,15 +124,12 @@ export function registerIncomeRoutes(app: FastifyInstance) {
 
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/income",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { coreTxns, summary } = await loadValuation(
         app,
         portfolioId,
@@ -160,11 +157,9 @@ export function registerIncomeRoutes(app: FastifyInstance) {
     Querystring: { year?: string };
   }>(
     "/portfolios/:portfolioId/income-year",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
-      const portfolio = await ownedPortfolio(app, id, request.params.portfolioId);
-      if (!portfolio) return reply.code(404).send({ error: "portfolio_not_found" });
 
       const year = parseInt(request.query.year ?? String(new Date().getUTCFullYear()), 10);
       const { start, end } = yearRange(year);

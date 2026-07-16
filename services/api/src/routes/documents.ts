@@ -255,13 +255,10 @@ export async function documentsRoute(app: FastifyInstance) {
   // Return a signed URL for the document linked to a transaction.
   app.get<{ Params: { portfolioId: string; txId: string } }>(
     "/portfolios/:portfolioId/transactions/:txId/document-url",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId, txId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
 
       const [tx] = await app.db
         .select({ id: transactions.id, importId: transactions.importId })
@@ -292,13 +289,10 @@ export async function documentsRoute(app: FastifyInstance) {
   // Return a signed URL for the document linked to a specific transaction_sources row.
   app.get<{ Params: { portfolioId: string; txId: string; sourceId: string } }>(
     "/portfolios/:portfolioId/transactions/:txId/sources/:sourceId/document-url",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId, txId, sourceId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
 
       const [tx] = await app.db
         .select({ id: transactions.id })
@@ -393,13 +387,10 @@ export async function documentsRoute(app: FastifyInstance) {
   // Bulk-export all retained documents for a portfolio as a zip archive.
   app.get<{ Params: { portfolioId: string } }>(
     "/portfolios/:portfolioId/documents/export",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
 
       const docs = await app.db
         .select({

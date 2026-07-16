@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Decimal } from "decimal.js";
-import { corporateActions, instruments, portfolios, transactions } from "@portfolio/db";
+import { corporateActions, instruments, transactions } from "@portfolio/db";
 import { mergerInputSchema } from "@portfolio/schema";
 import {
   computeHoldings,
@@ -21,17 +21,10 @@ export async function mergersRoute(app: FastifyInstance) {
   // `contributions.ts` special-cases `kind:"merger"` to stay contribution-neutral.
   app.post<{ Params: { portfolioId: string } }>(
     "/portfolios/:portfolioId/mergers",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const userId = request.userId;
       const { portfolioId } = request.params;
-
-      const [owned] = await app.db
-        .select({ id: portfolios.id })
-        .from(portfolios)
-        .where(and(eq(portfolios.id, portfolioId), eq(portfolios.userId, userId)))
-        .limit(1);
-      if (!owned) return reply.code(404).send({ error: "portfolio_not_found" });
 
       const input = mergerInputSchema.parse({
         ...(request.body as Record<string, unknown>),

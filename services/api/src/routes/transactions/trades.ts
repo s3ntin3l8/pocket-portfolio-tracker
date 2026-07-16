@@ -6,7 +6,7 @@ import { type TradeLog, mergeTradeLogs } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   costBasisFromQuery,
@@ -22,15 +22,12 @@ import {
 export function registerTradesRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams; Querystring: { method?: string; costBasis?: string } }>(
     "/portfolios/:portfolioId/trades",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const method = methodFromQuery(request.query);
       const costBasisMode = costBasisFromQuery(request.query);
       const cached = await withDerivationCache(

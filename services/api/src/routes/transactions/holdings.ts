@@ -17,7 +17,7 @@ import {
   type PortfolioSummary,
   type ReconciliationGap,
 } from "@portfolio/core";
-import { ownedPortfolio } from "../helpers.js";
+
 import type { PortfolioParams } from "./shared.js";
 import {
   corporateActionsFor,
@@ -30,15 +30,12 @@ import {
 export function registerHoldingsRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/holdings",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const [rows, trConn, dismissed] = await Promise.all([
         app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolioId)),
         app.db
@@ -86,15 +83,12 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
 
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/anomalies",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { filtered } = await withDerivationCache(anomaliesCache, portfolioId, async () => {
         const [rows, trConn, dismissed] = await Promise.all([
           app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolioId)),
@@ -144,15 +138,12 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
 
   app.get<{ Params: PortfolioParams; Querystring: { costBasis?: string } }>(
     "/portfolios/:portfolioId/summary",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { summary, metaById } = (await loadValuation(
         app,
         portfolioId,

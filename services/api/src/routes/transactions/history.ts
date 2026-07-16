@@ -11,7 +11,7 @@ import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../services/fx.
 import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
 import { aggregateValueFlows, xirr, chainIndex, convert } from "@portfolio/core";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import { loadValuation, historyCache, performanceCache, boundaryFlows } from "./shared.js";
 import { logTiming } from "../../lib/timing.js";
@@ -27,14 +27,11 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   // Net-worth-over-time for one portfolio, from the daily snapshots (base currency).
   app.get<{ Params: PortfolioParams; Querystring: { range?: string } }>(
     "/portfolios/:portfolioId/history",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const range = request.query.range ?? "1y";
 
       // 1D/7D: read the intraday (timestamped) table instead of the day-grained one.
@@ -103,15 +100,12 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   // Money-weighted return (XIRR) from external cash flows + current net worth.
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/performance",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const boundary = portfolio.cashCounted ? "inside" : "outside";
       const cached = await withDerivationCache(
         performanceCache,

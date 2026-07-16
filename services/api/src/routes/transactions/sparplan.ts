@@ -20,7 +20,7 @@ import {
   type DriftRow,
   type TradeAction,
 } from "@portfolio/core";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
@@ -39,16 +39,13 @@ export function registerSparplanRoutes(app: FastifyInstance) {
   // Sparplan detection for a single portfolio (in its base currency).
   app.get<{ Params: PortfolioParams; Querystring: { includeSales?: string } }>(
     "/portfolios/:portfolioId/sparplan",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const t0 = performance.now();
       const id = request.userId;
       const { portfolioId } = request.params;
       const includeSales = request.query.includeSales === "true";
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { coreTxns, summary, prices, metaById } = await loadValuation(
         app,
         portfolioId,
