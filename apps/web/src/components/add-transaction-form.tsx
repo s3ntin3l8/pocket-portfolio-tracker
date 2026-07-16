@@ -1,26 +1,24 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { AlertCircle, ChevronDown, Sparkles, X } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
+import { AlertCircle } from "lucide-react";
 import type {
   ApiClient,
   GoldSource,
   Instrument,
   InstrumentSearchResult,
 } from "@portfolio/api-client";
-import { Button } from "@/components/ui/button";
-import { InstrumentLogo } from "@/components/instrument-logo";
-import { TransactionSourcesSection } from "@/components/transaction-sources-section";
 import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { TransactionSourcesSection } from "@/components/transaction-sources-section";
 import { useFocusScroll } from "@/lib/use-focus-scroll";
 import { useSheetFooter } from "@/components/ui/sheet";
+import { TypeChipPicker } from "./add-transaction-form/type-chip-picker";
+import { InstrumentField } from "./add-transaction-form/instrument-field";
+import { PricingFields } from "./add-transaction-form/pricing-fields";
+import { AdvancedFields } from "./add-transaction-form/advanced-fields";
+import { SubmitButton } from "./add-transaction-form/submit-button";
+import { Field } from "./add-transaction-form/field";
 
 /** The slice of the API client this form needs (injectable for tests). */
 export type AddTransactionClient = Pick<
@@ -107,8 +105,6 @@ type SelectableType =
 /** All recognised types (superset; covers loan rows already in the DB). */
 type TxType = SelectableType | "loan_drawdown" | "loan_repayment";
 const ASSET_CLASSES = ["equity", "gold", "bond", "mutual_fund", "etf", "crypto"] as const;
-const UNITS = ["shares", "grams", "units"] as const;
-const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
 /** Gold → buyback market, crypto → CRYPTO, everything else IDX (mirrors the API). */
 function marketForAssetClass(assetClass: string): string {
@@ -125,7 +121,7 @@ function clampAssetClass(value: string): (typeof ASSET_CLASSES)[number] {
 }
 
 /** Default the unit from the asset class (gold by the gram, funds/crypto by the unit). */
-function unitForClass(assetClass: string): (typeof UNITS)[number] {
+function unitForClass(assetClass: string): "shares" | "grams" | "units" {
   if (assetClass === "gold") return "grams";
   if (assetClass === "mutual_fund" || assetClass === "crypto") return "units";
   return "shares";
@@ -213,7 +209,7 @@ export function AddTransactionForm({
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [assetClass, setAssetClass] = useState<(typeof ASSET_CLASSES)[number]>("equity");
-  const [unit, setUnit] = useState<(typeof UNITS)[number]>("shares");
+  const [unit, setUnit] = useState<"shares" | "grams" | "units">("shares");
   // Set when fields were auto-filled from a discovery match: carries the ISIN + WKN +
   // resolved market so they persist on create. Cleared once the user edits the symbol.
   const [isin, setIsin] = useState<string | null>(null);
@@ -247,10 +243,6 @@ export function AddTransactionForm({
     (CASH_TYPES as readonly string[]).includes(type) ||
     type === "loan_drawdown" ||
     type === "loan_repayment";
-  // Every other cash type's sign is derived from `type` (e.g. withdrawal is always an
-  // outflow); `adjustment` is the one exception — the user's entered amount IS the
-  // signed cash delta, so it gets its own hint instead of an unsigned "Amount" label.
-  const isAdjustment = type === "adjustment";
 
   /** Shows the instrument picker. */
   const hasInstrument = !isCash;
@@ -260,9 +252,6 @@ export function AddTransactionForm({
   const showFees = isAcquisition;
   /** Shows tax withheld (acquisitions + income). */
   const showTax = isAcquisition || isIncome;
-  /** Price is mandatory except for share receipts (bonus shares are commonly price 0).
-   *  Transfers show the price field as "Carried cost basis" — not required (0 = unknown). */
-  const priceRequired = !isShareReceipt && !isTransfer;
   // Gold gets a dedicated entry flow (source + label, no symbol/search). For an already
   // selected instrument (edit) trust its own class; otherwise the picked asset kind.
   const isGold = hasInstrument && (selected ? selected.assetClass : assetClass) === "gold";
@@ -415,14 +404,10 @@ export function AddTransactionForm({
   // `stickyFooter` sheet contexts portal the submit button into SheetContent's
   // persistent footer region instead of rendering it inline with `position: sticky`
   // (#472 — see `useSheetFooter`'s doc comment for why sticky doesn't reliably work
-  // nested this deep). The button still submits this exact form via `form={formId}`
-  // even though it's no longer a DOM descendant of it once portaled — a native,
-  // browser-supported association, no extra JS wiring needed. Outside a Sheet (e.g.
-  // the full `/transactions/new` page) `useSheetFooter` returns null and the button
-  // renders inline, unchanged from before.
+  // nested this deep). The button still references this form via `form={formId}` even
+  // though it's no longer a DOM descendant — a native, browser-supported association.
   const formId = useId();
   const footerEl = useSheetFooter();
-  const useFooterPortal = stickyFooter && footerEl;
 
   return (
     <>
@@ -437,353 +422,71 @@ export function AddTransactionForm({
           </div>
         )}
 
-        {/* Type — reference grouped chip palette, collapsed behind an input-styled trigger. */}
-        <div className="space-y-1.5">
-          <Label>{t("type")}</Label>
-          <button
-            type="button"
-            aria-label={t("type")}
-            aria-expanded={typePickerOpen}
-            onClick={() => setTypePickerOpen((o) => !o)}
-            className="flex w-full items-center justify-between rounded-[13px] border border-border bg-card px-3.5 py-[13px] text-sm font-semibold text-foreground transition-colors focus-visible:border-primary focus-visible:outline-none"
-          >
-            <span>{tt(type)}</span>
-            <ChevronDown
-              className={cn(
-                "size-4 text-chevron transition-transform",
-                typePickerOpen && "rotate-180",
-              )}
-            />
-          </button>
-          {typePickerOpen && (
-            <div className="mt-2.5 flex flex-col gap-3.5 rounded-[14px] border border-border bg-card p-[15px]">
-              {typeGroups.map((g) => (
-                <div key={g.label}>
-                  <p className="mb-2 ml-0.5 text-[10px] font-bold uppercase tracking-[.06em] text-text-3">
-                    {g.label}
-                  </p>
-                  <div className="flex flex-wrap gap-[7px]">
-                    {g.items.map((ty) => (
-                      <button
-                        key={ty}
-                        type="button"
-                        onClick={() => {
-                          setType(ty as TxType);
-                          setTypePickerOpen(false);
-                        }}
-                        className={cn(
-                          "rounded-[10px] px-[13px] py-[9px] text-[12px] transition-colors",
-                          ty === type
-                            ? "bg-primary font-bold text-primary-foreground"
-                            : "border border-border bg-card-2 font-semibold text-foreground hover:bg-secondary",
-                        )}
-                      >
-                        {tt(ty)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <TypeChipPicker
+          type={type}
+          typePickerOpen={typePickerOpen}
+          typeGroups={typeGroups}
+          onSelectType={(ty) => {
+            setType(ty as TxType);
+            setTypePickerOpen(false);
+          }}
+          onToggle={() => setTypePickerOpen((o) => !o)}
+          t={t}
+          tt={tt}
+        />
 
-        {hasInstrument && (
-          <Field label={t("instrument")}>
-            <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-              {selected ? (
-                <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm">
-                  <InstrumentLogo
-                    label={selected.symbol}
-                    symbol={selected.symbol}
-                    market={selected.market}
-                    assetClass={selected.assetClass}
-                    className="size-8 rounded-[9px]"
-                  />
-                  <span className="min-w-0 flex-1 truncate">
-                    <span className="font-medium">{selected.symbol}</span>
-                    <span className="ml-2 text-muted-foreground">{selected.name}</span>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t("back")}
-                    onClick={() => setSelected(null)}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Field label={t("kind")} htmlFor="tx-kind">
-                    <Select
-                      id="tx-kind"
-                      value={assetClass}
-                      onChange={(e) => {
-                        const ac = e.target.value as (typeof ASSET_CLASSES)[number];
-                        setAssetClass(ac);
-                        setUnit(unitForClass(ac));
-                      }}
-                    >
-                      {ASSET_CLASSES.map((c) => (
-                        <option key={c} value={c}>
-                          {tc(c)}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
+        <InstrumentField
+          hasInstrument={hasInstrument}
+          selected={selected}
+          setSelected={setSelected}
+          assetClass={assetClass}
+          setAssetClass={(v) => setAssetClass(v as (typeof ASSET_CLASSES)[number])}
+          unit={unit}
+          setUnit={(v) => setUnit(v as "shares" | "grams" | "units")}
+          query={query}
+          runSearch={runSearch}
+          results={results}
+          discovered={discovered}
+          onSelectSaved={(i) => {
+            setSelected(i);
+            setResults([]);
+            setDiscovered([]);
+          }}
+          prefillFrom={prefillFrom}
+          symbol={symbol}
+          setSymbol={setSymbol}
+          name={name}
+          setName={setName}
+          setIsin={setIsin}
+          setDiscoveredMarket={setDiscoveredMarket}
+          goldSourceList={goldSourceList}
+          goldMarket={goldMarket}
+          setGoldMarket={setGoldMarket}
+          t={t}
+          tc={tc}
+        />
 
-                  {assetClass === "gold" ? (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label={t("goldSource")} htmlFor="tx-gold-source">
-                        <Select
-                          id="tx-gold-source"
-                          value={goldMarket}
-                          onChange={(e) => setGoldMarket(e.target.value)}
-                        >
-                          {goldSourceList.map((s) => (
-                            <option key={s.market} value={s.market}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field label={t("goldLabel")} htmlFor="tx-gold-label">
-                        <Input
-                          id="tx-gold-label"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder={t("goldLabelPlaceholder")}
-                        />
-                      </Field>
-                      <p className="text-xs text-muted-foreground sm:col-span-2">{t("goldNote")}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Input
-                        value={query}
-                        onChange={(e) => runSearch(e.target.value)}
-                        placeholder={t("search")}
-                        aria-label={t("search")}
-                      />
-                      {results.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            {t("savedResults")}
-                          </p>
-                          <ul className="divide-y divide-border rounded-md border border-border">
-                            {results.map((i) => (
-                              <li key={i.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelected(i);
-                                    setResults([]);
-                                    setDiscovered([]);
-                                  }}
-                                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent"
-                                >
-                                  <InstrumentLogo
-                                    label={i.symbol}
-                                    symbol={i.symbol}
-                                    market={i.market}
-                                    assetClass={i.assetClass}
-                                    className="size-8 rounded-[9px]"
-                                  />
-                                  <span className="min-w-0 flex-1 truncate">
-                                    <span className="font-medium">{i.symbol}</span>
-                                    <span className="ml-2 text-muted-foreground">{i.name}</span>
-                                  </span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {discovered.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                            <Sparkles className="size-3" />
-                            {t("discoveredResults")}
-                          </p>
-                          <ul className="divide-y divide-border rounded-md border border-border">
-                            {discovered.map((i) => (
-                              <li key={`${i.market}:${i.symbol}:${i.source}`}>
-                                <button
-                                  type="button"
-                                  onClick={() => prefillFrom(i)}
-                                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent"
-                                >
-                                  <InstrumentLogo
-                                    label={i.symbol}
-                                    symbol={i.symbol}
-                                    market={i.market}
-                                    assetClass={i.assetClass}
-                                    className="size-8 rounded-[9px]"
-                                  />
-                                  <span className="min-w-0 flex-1 truncate">
-                                    <span className="font-medium">{i.symbol}</span>
-                                    <span className="ml-2 text-muted-foreground">{i.name}</span>
-                                  </span>
-                                  <span className="shrink-0 text-xs text-muted-foreground">
-                                    {i.currency}
-                                  </span>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      <p className="pt-1 text-xs font-medium text-muted-foreground">
-                        {t("newInstrument")}
-                      </p>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label={t("symbol")} htmlFor="tx-symbol">
-                          <Input
-                            id="tx-symbol"
-                            value={symbol}
-                            onChange={(e) => {
-                              setSymbol(e.target.value.toUpperCase());
-                              // Manual edits override a discovered identity.
-                              setIsin(null);
-                              setDiscoveredMarket(null);
-                            }}
-                          />
-                        </Field>
-                        <Field label={t("name")} htmlFor="tx-name">
-                          <Input
-                            id="tx-name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                          />
-                        </Field>
-                        <Field label={t("unit")} htmlFor="tx-unit">
-                          <Select
-                            id="tx-unit"
-                            value={unit}
-                            onChange={(e) => setUnit(e.target.value as (typeof UNITS)[number])}
-                          >
-                            {UNITS.map((u) => (
-                              <option key={u} value={u}>
-                                {t(`units.${u}`)}
-                              </option>
-                            ))}
-                          </Select>
-                        </Field>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          </Field>
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {showQuantity && (
-            <Field label={isGold ? t("grams") : t("quantity")} htmlFor="tx-qty">
-              <Input
-                id="tx-qty"
-                inputMode="decimal"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                required
-                min="0.000001"
-              />
-            </Field>
-          )}
-          <Field
-            label={
-              isTransfer
-                ? t("transferBasis")
-                : isGold && showQuantity
-                  ? t("pricePerGram")
-                  : showQuantity
-                    ? t("price")
-                    : t("amount")
-            }
-            htmlFor="tx-price"
-          >
-            <Input
-              id="tx-price"
-              inputMode="decimal"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              required={priceRequired}
-              placeholder={isTransfer ? t("transferBasisPlaceholder") : undefined}
-            />
-            {isTransfer && (
-              <p className="mt-1 text-xs text-muted-foreground">{t("transferBasisHint")}</p>
-            )}
-            {isAdjustment && (
-              <p className="mt-1 text-xs text-muted-foreground">{t("adjustmentHint")}</p>
-            )}
-          </Field>
-          {showFees && (
-            <Field label={t("fees")} htmlFor="tx-fees">
-              <Input
-                id="tx-fees"
-                inputMode="decimal"
-                value={fees}
-                onChange={(e) => setFees(e.target.value)}
-              />
-            </Field>
-          )}
-          {showTax && (
-            <Field label={t("tax")} htmlFor="tx-tax">
-              <Input
-                id="tx-tax"
-                inputMode="decimal"
-                value={tax}
-                onChange={(e) => setTax(e.target.value)}
-                placeholder="0"
-              />
-            </Field>
-          )}
-          {isIncome && (
-            <Field label={t("shares")} htmlFor="tx-shares">
-              <Input
-                id="tx-shares"
-                inputMode="decimal"
-                value={shares}
-                onChange={(e) => setShares(e.target.value)}
-                placeholder={t("sharesPlaceholder")}
-              />
-            </Field>
-          )}
-          {isIncome && (
-            <Field label={t("perShare")} htmlFor="tx-per-share">
-              <Input
-                id="tx-per-share"
-                inputMode="decimal"
-                value={perShare}
-                onChange={(e) => setPerShare(e.target.value)}
-                placeholder={t("perSharePlaceholder")}
-              />
-            </Field>
-          )}
-          <Field label={t("currency")} htmlFor="tx-currency">
-            <Select id="tx-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-              {CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("date")} htmlFor="tx-date">
-            <DatePicker
-              id="tx-date"
-              label={t("date")}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </Field>
-        </div>
+        <PricingFields
+          type={type}
+          isGold={isGold}
+          quantity={quantity}
+          setQuantity={setQuantity}
+          price={price}
+          setPrice={setPrice}
+          fees={fees}
+          setFees={setFees}
+          tax={tax}
+          setTax={setTax}
+          shares={shares}
+          setShares={setShares}
+          perShare={perShare}
+          setPerShare={setPerShare}
+          currency={currency}
+          setCurrency={setCurrency}
+          date={date}
+          setDate={setDate}
+          t={t}
+        />
 
         <Field label={t("notes")} htmlFor="tx-notes">
           <textarea
@@ -806,57 +509,18 @@ export function AddTransactionForm({
           />
         </Field>
 
-        <details className="group">
-          <summary className="cursor-pointer select-none text-sm text-muted-foreground hover:text-foreground">
-            {t("advanced")}
-          </summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field label={t("fxRate")} htmlFor="tx-fx-rate">
-              <Input
-                id="tx-fx-rate"
-                inputMode="decimal"
-                value={fxRate}
-                onChange={(e) => setFxRate(e.target.value)}
-                placeholder={t("fxRatePlaceholder")}
-              />
-            </Field>
-            <Field label={t("subType")} htmlFor="tx-sub-type">
-              <Select id="tx-sub-type" value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="">{t("subTypeNone")}</option>
-                <option value="saveback">{t("subTypeSaveback")}</option>
-                <option value="roundup">{t("subTypeRoundup")}</option>
-                <option value="merger">{t("subTypeMerger")}</option>
-              </Select>
-            </Field>
-            {isIncome && (
-              <Field label={t("nativeCurrency")} htmlFor="tx-native-currency">
-                <Select
-                  id="tx-native-currency"
-                  value={nativeCurrency}
-                  onChange={(e) => setNativeCurrency(e.target.value)}
-                >
-                  <option value="">{t("subTypeNone")}</option>
-                  {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
-            {isIncome && (
-              <Field label={t("grossNative")} htmlFor="tx-gross-native">
-                <Input
-                  id="tx-gross-native"
-                  inputMode="decimal"
-                  value={grossNative}
-                  onChange={(e) => setGrossNative(e.target.value)}
-                  placeholder={t("grossNativePlaceholder")}
-                />
-              </Field>
-            )}
-          </div>
-        </details>
+        <AdvancedFields
+          type={type}
+          fxRate={fxRate}
+          setFxRate={setFxRate}
+          kind={kind}
+          setKind={setKind}
+          nativeCurrency={nativeCurrency}
+          setNativeCurrency={setNativeCurrency}
+          grossNative={grossNative}
+          setGrossNative={setGrossNative}
+          t={t}
+        />
 
         {isEdit && (initial?.sources?.length ?? 0) > 0 && (
           <TransactionSourcesSection
@@ -869,63 +533,16 @@ export function AddTransactionForm({
         {isEdit && !(initial?.hasFullTaxDetail ?? false) && (
           <p className="text-sm text-muted-foreground">{t("enrichHint")}</p>
         )}
-
-        {/* Reference primary button: full-width green, rounded-15, 15px padding, 700/15px.
-          `stickyFooter` pins it above the fold instead of leaving it buried at the bottom
-          of the scrolling sheet (#472). Portaled into SheetContent's footer region when
-          available (see `useFooterPortal` above); rendered inline here otherwise. */}
-        {!useFooterPortal && (
-          <div
-            className={cn(
-              stickyFooter &&
-                "sticky bottom-0 -mx-5 border-t border-border bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] scroll-mb-24",
-            )}
-          >
-            <Button
-              type="submit"
-              disabled={busy}
-              className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
-            >
-              {busy && <Spinner size="sm" />}
-              {busy ? t("submitting") : isEdit ? t("save") : t("submit")}
-            </Button>
-          </div>
-        )}
       </form>
-      {useFooterPortal &&
-        createPortal(
-          <div className="border-t border-border bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <Button
-              type="submit"
-              form={formId}
-              disabled={busy}
-              className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
-            >
-              {busy && <Spinner size="sm" />}
-              {busy ? t("submitting") : isEdit ? t("save") : t("submit")}
-            </Button>
-          </div>,
-          footerEl,
-        )}
+
+      <SubmitButton
+        busy={busy}
+        isEdit={isEdit}
+        formId={formId}
+        stickyFooter={stickyFooter}
+        footerEl={footerEl}
+        t={t}
+      />
     </>
   );
 }
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-// TransactionSourcesSection is now in ./transaction-sources-section.tsx
