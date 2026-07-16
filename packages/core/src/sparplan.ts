@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js";
 import { convert, type FxRateFn } from "./networth.js";
-import { inferIntervalMonths } from "./income.js";
+import { inferIntervalMonths } from "./growth.js";
 import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction } from "./types.js";
 
