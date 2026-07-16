@@ -28,7 +28,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/contributions",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;

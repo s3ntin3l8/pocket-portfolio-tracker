@@ -27,9 +27,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams; Querystring: { range?: string } }>(
     "/portfolios/:portfolioId/history",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       request.timingName = "GET /portfolios/:id/history";
-      const id = request.userId;
       const { portfolioId } = request.params;
       const range = request.query.range ?? "1y";
 
@@ -98,8 +97,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/performance",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
-      const id = request.userId;
+    async (request) => {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const boundary = portfolio.cashCounted ? "inside" : "outside";

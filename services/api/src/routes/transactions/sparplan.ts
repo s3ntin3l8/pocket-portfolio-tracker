@@ -39,7 +39,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams; Querystring: { includeSales?: string } }>(
     "/portfolios/:portfolioId/sparplan",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       request.timingName = "GET /portfolios/:id/sparplan";
       const id = request.userId;
       const { portfolioId } = request.params;

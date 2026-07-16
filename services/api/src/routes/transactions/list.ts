@@ -25,9 +25,8 @@ export function registerListRoutes(app: FastifyInstance) {
   }>(
     "/portfolios/:portfolioId/transactions",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       const t0 = performance.now();
-      const id = request.userId;
       const portfolioName = request.portfolio.name;
       const { page, pageSize } = parsePagination({
         page: request.query.page,

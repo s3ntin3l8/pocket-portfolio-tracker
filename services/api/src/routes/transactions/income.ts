@@ -123,8 +123,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/income",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
-      const id = request.userId;
+    async (request) => {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const { coreTxns, summary } = await loadValuation(
@@ -155,9 +154,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
   }>(
     "/portfolios/:portfolioId/income-year",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
-      const id = request.userId;
-
+    async (request) => {
       const year = parseInt(request.query.year ?? String(new Date().getUTCFullYear()), 10);
       const { start, end } = yearRange(year);
       const rows = await app.db

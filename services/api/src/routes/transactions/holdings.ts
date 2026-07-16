@@ -30,8 +30,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/holdings",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
-      const id = request.userId;
+    async (request) => {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const [rows, trConn, dismissed] = await Promise.all([
@@ -82,8 +81,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/anomalies",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
-      const id = request.userId;
+    async (request) => {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const { filtered } = await withDerivationCache(anomaliesCache, portfolioId, async () => {
@@ -133,7 +131,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams; Querystring: { costBasis?: string } }>(
     "/portfolios/:portfolioId/summary",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;

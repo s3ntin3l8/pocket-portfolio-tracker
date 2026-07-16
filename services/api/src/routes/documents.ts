@@ -386,7 +386,6 @@ export async function documentsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/documents/export",
     { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const id = request.userId;
       const { portfolioId } = request.params;
 
       const docs = await app.db

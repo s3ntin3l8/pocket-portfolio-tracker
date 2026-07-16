@@ -77,7 +77,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
   app.post<{ Params: PortfolioParams; Body: { ids?: unknown } }>(
     "/portfolios/:portfolioId/transactions/bulk-delete",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       const { portfolioId } = request.params;
       const { ids } = bulkDeleteSchema.parse(request.body);
       const deleted = await app.db
@@ -210,7 +210,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/transactions/resolve-drafts",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
+    async (request) => {
       const { portfolioId } = request.params;
       const { ids, action } = resolveDraftsSchema.parse(request.body);
       const nextStatus = action === "confirm" ? "normal" : "archived";

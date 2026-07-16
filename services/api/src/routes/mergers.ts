@@ -23,7 +23,6 @@ export async function mergersRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/mergers",
     { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const userId = request.userId;
       const { portfolioId } = request.params;
 
       const input = mergerInputSchema.parse({

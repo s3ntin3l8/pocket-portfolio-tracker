@@ -22,8 +22,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams; Querystring: { method?: string; costBasis?: string } }>(
     "/portfolios/:portfolioId/trades",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request, reply) => {
-      const id = request.userId;
+    async (request) => {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const method = methodFromQuery(request.query);
