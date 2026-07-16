@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { transactions, trResolvedEvents, dismissedAnomalies } from "@portfolio/db";
 import { transactionInputSchema } from "@portfolio/schema";
 import { requireUser } from "../../plugins/auth.js";
+import { toDateKey } from "@portfolio/core";
 import { enqueueRecompute } from "../../services/scheduler.js";
 import { reassignTransactions } from "../../services/reassign.js";
 import { mergeTransactions, previewMerge, MergeBlockedError } from "../../services/merge.js";
@@ -49,7 +50,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
           kind: input.kind ?? null,
         })
         .returning();
-      await enqueueRecompute(portfolioId, new Date(input.executedAt).toISOString().slice(0, 10));
+      await enqueueRecompute(portfolioId, toDateKey(new Date(input.executedAt)));
       reply.code(201);
       return created;
     },
@@ -76,7 +77,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
         [deleted.id],
         deleted.importId ? [deleted.importId] : [],
       );
-      await enqueueRecompute(portfolioId, deleted.executedAt.toISOString().slice(0, 10));
+      await enqueueRecompute(portfolioId, toDateKey(deleted.executedAt));
       return reply.code(204).send();
     },
   );
@@ -146,7 +147,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
       if (!updated) {
         return reply.code(404).send({ error: "transaction_not_found" });
       }
-      await enqueueRecompute(portfolioId, updated.executedAt.toISOString().slice(0, 10));
+      await enqueueRecompute(portfolioId, toDateKey(updated.executedAt));
       return updated;
     },
   );
@@ -172,7 +173,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
       if (!updated) {
         return reply.code(404).send({ error: "transaction_not_found" });
       }
-      await enqueueRecompute(portfolioId, updated.executedAt.toISOString().slice(0, 10));
+      await enqueueRecompute(portfolioId, toDateKey(updated.executedAt));
       return updated;
     },
   );
@@ -275,7 +276,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
         await app.db.insert(trResolvedEvents).values(ledgerRows).onConflictDoNothing();
       }
 
-      const days = new Set(updated.map((r) => r.executedAt.toISOString().slice(0, 10)));
+      const days = new Set(updated.map((r) => toDateKey(r.executedAt)));
       for (const day of days) await enqueueRecompute(portfolioId, day);
 
       return { updated: updated.length };

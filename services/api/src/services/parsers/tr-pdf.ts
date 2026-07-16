@@ -46,6 +46,7 @@
  * bear tax/fee detail. Cost-information and order-confirmation docs return false.
  */
 
+import { toDateKey } from "@portfolio/core";
 import { Decimal } from "decimal.js";
 import {
   parsedTransactionSchema,
@@ -53,6 +54,7 @@ import {
   type TaxComponents,
 } from "@portfolio/schema";
 import { parseEuroDecimal, parseDkbDate } from "./dkb.js";
+import { collapse } from "./shared.js";
 
 export interface TrPdfResult {
   drafts: ParsedTransaction[];
@@ -128,11 +130,6 @@ export function detectTrPdf(text: string): boolean {
   // Tax-optimisation true-up (Steuerliche Optimierung — KapSt/Soli refund or charge).
   if (/STEUERLICHE OPTIMIERUNG/i.test(text)) return true;
   return false;
-}
-
-/** Collapse internal whitespace runs to single spaces and trim. */
-function collapse(s: string): string {
-  return s.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -513,7 +510,7 @@ function parseTrDividend(text: string): TrPdfResult {
 
   // For dividends we derive an idempotency key from available identifiers (no AUSFÜHRUNG).
   // "tr:div:<depot>:<isin>:<paydate>" — stable for same payer, instrument, and payment date.
-  const payDateStr = payDate ? payDate.toISOString().slice(0, 10) : undefined;
+  const payDateStr = payDate ? toDateKey(payDate) : undefined;
   const externalId =
     depot && isin && payDateStr ? `tr:div:${depot}:${isin}:${payDateStr}` : undefined;
 
@@ -575,7 +572,7 @@ function parseTrInterest(text: string): TrPdfResult {
   const besteuerung = parseGerman(text.match(/Besteuerungsgrundlage\s+([\d.,]+)\s+EUR/)?.[1]);
   const total = besteuerung ?? (net && tax ? addMoney(net, tax) : (net ?? undefined));
 
-  const payDateStr = payDate ? payDate.toISOString().slice(0, 10) : undefined;
+  const payDateStr = payDate ? toDateKey(payDate) : undefined;
   const externalId = account && payDateStr ? `tr:int:${account}:${payDateStr}` : undefined;
 
   pushDraft(
@@ -629,7 +626,7 @@ function parseTrTaxOptimization(text: string): TrPdfResult {
 
   // Refund (cash in) → deposit; charge (cash out) → withdrawal.
   const action = cashflow != null && Number(cashflow) < 0 ? "withdrawal" : "deposit";
-  const dateStr = date ? date.toISOString().slice(0, 10) : undefined;
+  const dateStr = date ? toDateKey(date) : undefined;
   const externalId = depot && dateStr ? `tr:taxopt:${depot}:${dateStr}` : undefined;
 
   pushDraft(

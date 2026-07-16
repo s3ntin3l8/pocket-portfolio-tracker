@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/api-client";
 import {
   Table,
@@ -669,7 +670,7 @@ export function ImportReview({
               disabled={busy}
               onClick={() => runConfirm("confirmSelected", selectedIds)}
             >
-              {pending === "confirmSelected" && <Loader2 className="size-3.5 animate-spin" />}
+              {pending === "confirmSelected" && <Spinner size="xs" />}
               {t("review.batch.confirmSelected")}
             </Button>
             {confirming ? (
@@ -951,11 +952,11 @@ export function ImportReview({
       {/* Footer — always rendered; the parent no longer provides a separate one. */}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={runDiscard} disabled={busy}>
-          {pending === "discard" && <Loader2 className="size-4 animate-spin" />}
+          {pending === "discard" && <Spinner size="sm" />}
           {t("discard")}
         </Button>
         <Button onClick={() => runConfirm("confirm")} disabled={busy || drafts.length === 0}>
-          {pending === "confirm" && <Loader2 className="size-4 animate-spin" />}
+          {pending === "confirm" && <Spinner size="sm" />}
           {t("confirm")}
         </Button>
       </div>

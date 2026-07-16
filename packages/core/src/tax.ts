@@ -32,10 +32,8 @@
  */
 
 import { Decimal } from "decimal.js";
+import { D, ZERO } from "./decimal.js";
 import type { TradeLog, Trade, YearTax } from "./trade-log.js";
-
-const D = (v: string | number) => new Decimal(v);
-const ZERO = new Decimal(0);
 
 // ---------------------------------------------------------------------------
 // Public types

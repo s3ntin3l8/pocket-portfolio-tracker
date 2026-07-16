@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Loader2, GitMerge } from "lucide-react";
+import { GitMerge } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -131,7 +132,7 @@ export function MergeDialog({
 
         {loadingPreview && (
           <div className="flex items-center justify-center py-4 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
+            <Spinner size="sm" />
           </div>
         )}
 
@@ -171,7 +172,7 @@ export function MergeDialog({
             {t("cancel")}
           </Button>
           <Button onClick={() => void submit()} disabled={busy || loadingPreview || !preview?.ok}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : t("confirm")}
+            {busy ? <Spinner size="sm" /> : t("confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

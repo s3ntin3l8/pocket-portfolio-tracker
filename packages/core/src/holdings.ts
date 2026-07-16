@@ -1,8 +1,6 @@
 import { Decimal } from "decimal.js";
+import { D, ZERO } from "./decimal.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
-
-const D = (v: string | number) => new Decimal(v);
-const ZERO = new Decimal(0);
 
 type Event =
   { kind: "tx"; at: Date; tx: CoreTransaction } | { kind: "ca"; at: Date; ca: CorporateAction };

@@ -8,7 +8,6 @@ import {
   PencilLine,
   Landmark,
   ListChecks,
-  Loader2,
   Trash2,
   Search,
   X,
@@ -33,6 +32,7 @@ import {
   Sparkles,
   RefreshCw,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -1118,7 +1118,7 @@ export function TransactionsTable({
               <span className="flex items-center gap-2">
                 <span className="text-muted-foreground">{tb("confirmPrompt")}</span>
                 <Button size="sm" variant="destructive" onClick={onBatchDelete} disabled={busy}>
-                  {busy && <Loader2 className="size-3.5 animate-spin" />}
+                  {busy && <Spinner size="xs" />}
                   {tb("confirm")}
                 </Button>
                 <Button
@@ -1140,7 +1140,7 @@ export function TransactionsTable({
                       onClick={() => onBatchResolve("confirm")}
                       disabled={busy}
                     >
-                      {busy && <Loader2 className="size-3.5 animate-spin" />}
+                      {busy && <Spinner size="xs" />}
                       <Check className="size-3.5" />
                       {tb("confirmDrafts")}
                     </Button>
@@ -1620,7 +1620,7 @@ export function TransactionsTable({
               }
             }}
           >
-            {loadingMore ? <Loader2 className="size-4 animate-spin" /> : null}
+            {loadingMore ? <Spinner size="sm" /> : null}
             {tb("loadMore")}
           </Button>
           <span className="text-xs text-muted-foreground">

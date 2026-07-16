@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
+import { toDateKey } from "@portfolio/core";
 import { corporateActions } from "@portfolio/db";
 import { corporateActionInputSchema } from "@portfolio/schema";
 
@@ -15,7 +16,7 @@ export async function corporateActionsRoute(app: FastifyInstance) {
         instrumentId: input.instrumentId,
         type: input.type,
         ratio: input.ratio,
-        exDate: input.exDate.toISOString().slice(0, 10),
+        exDate: toDateKey(input.exDate),
         terms: input.terms ?? null,
       })
       .returning();
@@ -34,7 +35,7 @@ export async function corporateActionsRoute(app: FastifyInstance) {
       const values: Partial<typeof corporateActions.$inferInsert> = {};
       if (input.type !== undefined) values.type = input.type;
       if (input.ratio !== undefined) values.ratio = input.ratio;
-      if (input.exDate !== undefined) values.exDate = input.exDate.toISOString().slice(0, 10);
+      if (input.exDate !== undefined) values.exDate = toDateKey(input.exDate);
       if (input.terms !== undefined) values.terms = input.terms ?? null;
       if (Object.keys(values).length === 0) {
         reply.code(400);

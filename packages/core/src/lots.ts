@@ -11,9 +11,9 @@
  * only needs the standing lots per instrument at the end of the replay.
  */
 import { Decimal } from "decimal.js";
+import { D } from "./decimal.js";
+import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction, CorporateAction } from "./types.js";
-
-const D = (v: string | number) => new Decimal(v);
 
 /** A FIFO lot: shares acquired together at a per-unit cost (fees included). */
 interface Lot {
@@ -32,10 +32,6 @@ export interface LotView {
 
 type Event =
   { kind: "tx"; at: Date; tx: CoreTransaction } | { kind: "ca"; at: Date; ca: CorporateAction };
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * Compute standing open FIFO lots per instrument. Pass `asOf` to replay only
@@ -121,7 +117,7 @@ export function openLots(
     result.set(
       instrumentId,
       openLotsForInstrument.map((l) => ({
-        acqDate: toDateStr(l.acqDate),
+        acqDate: toDateKey(l.acqDate),
         qty: l.qty.toString(),
         unitCost: l.unitCost.toString(),
         cost: l.qty.mul(l.unitCost).toString(),

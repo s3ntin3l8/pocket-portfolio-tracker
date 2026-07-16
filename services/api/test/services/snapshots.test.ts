@@ -9,6 +9,7 @@ import {
   transactions,
   users,
 } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { MarketDataService, FixtureProvider } from "@portfolio/market-data";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
@@ -150,7 +151,7 @@ describe("recordDailySnapshots", () => {
     twoDaysAgo.setUTCDate(twoDaysAgo.getUTCDate() - 2);
     await db.insert(prices).values({
       instrumentId: instB.id,
-      date: twoDaysAgo.toISOString().slice(0, 10),
+      date: toDateKey(twoDaysAgo),
       close: "2500",
       currency: "IDR",
     });
@@ -230,7 +231,7 @@ describe("recordDailySnapshots", () => {
     thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
     await db.insert(prices).values({
       instrumentId: instB.id,
-      date: thirtyDaysAgo.toISOString().slice(0, 10),
+      date: toDateKey(thirtyDaysAgo),
       close: "2500",
       currency: "IDR",
     });

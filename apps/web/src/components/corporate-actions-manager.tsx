@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { ChevronRight, Check, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { ChevronRight, Check, Pencil, Trash2, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { CorporateAction } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
@@ -201,11 +202,7 @@ export function CorporateActionsManager({
                           disabled={busy}
                           onClick={() => save(ca.id)}
                         >
-                          {busy ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Check className="size-4" />
-                          )}
+                          {busy ? <Spinner size="sm" /> : <Check className="size-4" />}
                         </Button>
                         <Button
                           size="icon"
@@ -239,7 +236,7 @@ export function CorporateActionsManager({
                             disabled={busy}
                             onClick={() => remove(ca.id)}
                           >
-                            {busy && <Loader2 className="size-3.5 animate-spin" />}
+                            {busy && <Spinner size="xs" />}
                             {tc("delete")}
                           </Button>
                           <Button
@@ -380,11 +377,7 @@ export function CorporateActionsManager({
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button disabled={busy} onClick={() => save(sheetCa.id)}>
-                    {busy ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Check className="size-4" />
-                    )}
+                    {busy ? <Spinner size="sm" /> : <Check className="size-4" />}
                     {tc("save")}
                   </Button>
                   <Button
@@ -408,7 +401,7 @@ export function CorporateActionsManager({
                           await remove(sheetCa.id);
                         }}
                       >
-                        {busy && <Loader2 className="size-3.5 animate-spin" />}
+                        {busy && <Spinner size="xs" />}
                         {tc("delete")}
                       </Button>
                       <Button variant="ghost" onClick={() => setConfirmDelete(false)}>

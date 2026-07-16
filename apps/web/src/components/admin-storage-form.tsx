@@ -9,10 +9,10 @@ import {
   Eye,
   EyeOff,
   HardDrive,
-  Loader2,
   Server,
   XCircle,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type {
   AdminStorageResponse,
   ApiClient,
@@ -164,7 +164,7 @@ function SecretCell({
               </p>
             )}
             <Button onClick={handleSave} disabled={busy || !apiKey.trim()} className="w-full">
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+              {busy ? <Spinner size="sm" /> : <Check className="size-4" />}
               {t("credentialSave")}
             </Button>
           </div>
@@ -378,7 +378,7 @@ export function AdminStorageForm({ initial }: Props) {
         <Button onClick={handleSave} disabled={busy}>
           {busy ? (
             <>
-              <Loader2 className="size-4 animate-spin mr-1" />
+              <Spinner size="sm" className="mr-1" />
               {t("saving")}
             </>
           ) : (
@@ -406,7 +406,7 @@ export function AdminStorageForm({ initial }: Props) {
           >
             {testState === "testing" ? (
               <>
-                <Loader2 className="size-4 animate-spin mr-1" />
+                <Spinner size="sm" className="mr-1" />
                 {t("storageTesting")}
               </>
             ) : (

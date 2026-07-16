@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { FileText, Upload, Download, Trash2, Loader2 } from "lucide-react";
+import { FileText, Upload, Download, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { InboxDocument } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +158,7 @@ export function TaxReportsInbox({
         }}
       />
       <Button size="sm" disabled={!canUpload} onClick={() => fileInputRef.current?.click()}>
-        {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
+        {uploading ? <Spinner size="sm" /> : <Upload />}
         {t("upload")}
       </Button>
       {portfolios.length === 0 && (
@@ -278,7 +279,7 @@ export function TaxReportsInbox({
                       disabled={busyId === doc.id}
                       onClick={() => void handleDelete(doc)}
                     >
-                      {busyId === doc.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                      {busyId === doc.id ? <Spinner size="sm" /> : <Trash2 />}
                     </Button>
                   </div>
                 </TableCell>
@@ -324,7 +325,7 @@ export function TaxReportsInbox({
                 disabled={busyId === doc.id}
                 onClick={() => void handleDelete(doc)}
               >
-                {busyId === doc.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                {busyId === doc.id ? <Spinner size="sm" /> : <Trash2 />}
               </Button>
             </div>
           </Card>

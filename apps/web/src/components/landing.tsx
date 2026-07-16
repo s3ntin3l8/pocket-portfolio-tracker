@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
-import { Wallet, Shield, Lock, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Wallet, Shield, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,7 +120,7 @@ export function Landing({ initialCurrency = "IDR" }: { initialCurrency?: string 
           </div>
 
           <Button onClick={start} disabled={busy} className="w-full gap-2" size="lg">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <Shield className="size-4" />}
+            {busy ? <Spinner size="sm" /> : <Shield className="size-4" />}
             {busy ? t("ssoBusy") : t("sso")}
           </Button>
 

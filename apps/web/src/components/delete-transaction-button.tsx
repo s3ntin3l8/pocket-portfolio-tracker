@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
@@ -43,7 +44,7 @@ export function DeleteTransactionButton({
     return (
       <span className="flex items-center justify-end gap-1">
         <Button size="sm" variant="destructive" onClick={onDelete} disabled={busy}>
-          {busy && <Loader2 className="size-3.5 animate-spin" />}
+          {busy && <Spinner size="xs" />}
           {t("confirm")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>

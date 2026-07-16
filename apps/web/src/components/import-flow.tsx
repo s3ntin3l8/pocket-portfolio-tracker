@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { CheckCircle2, Loader2, Upload, AlertCircle, ChevronDown, FileText } from "lucide-react";
+import { CheckCircle2, Upload, AlertCircle, ChevronDown, FileText } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -953,7 +954,7 @@ export function ImportFlow({
                 {fileStatuses.map((fs) => (
                   <li key={fs.filename} className="flex items-center gap-3 text-sm">
                     {fs.status === "parsing" && (
-                      <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+                      <Spinner size="sm" className="shrink-0 text-primary" />
                     )}
                     {fs.status === "done" && (
                       <CheckCircle2 className="size-4 shrink-0 text-success" />
@@ -983,7 +984,7 @@ export function ImportFlow({
               </ul>
             ) : (
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="size-6 animate-spin text-primary" />
+                <Spinner size="xl" className="text-primary" />
                 <p className="text-sm text-muted-foreground">{t("parsing")}</p>
               </div>
             )}
@@ -1031,7 +1032,7 @@ export function ImportFlow({
                 disabled={savingReport || !reportPortfolioId}
                 onClick={() => void handleSaveReport()}
               >
-                {savingReport ? <Loader2 className="animate-spin" /> : null}
+                {savingReport ? <Spinner size="sm" /> : null}
                 {t("report.save")}
               </Button>
             </div>
@@ -1201,7 +1202,7 @@ export function ImportFlow({
               )}
               <div className="flex items-center gap-2">
                 <Button onClick={() => void submitMaterialize()} disabled={submitting}>
-                  {submitting && <Loader2 className="size-4 animate-spin" />}
+                  {submitting && <Spinner size="sm" />}
                   {t("confirmPortfolio.confirm")}
                 </Button>
                 <Button variant="ghost" onClick={reset} disabled={submitting}>

@@ -2,7 +2,7 @@
 
 import { useState, useId } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { AccountHolder, AccountHolderType } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -218,7 +218,7 @@ export function HolderFormDialog({
               disabled={busy || !name.trim()}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {mode === "edit" ? tf("save") : t("add")}
             </Button>
 
@@ -233,7 +233,7 @@ export function HolderFormDialog({
                     disabled={busy}
                     className="mt-2.5 h-auto w-full rounded-[15px] bg-[#E5484D] py-[15px] text-[15px] font-bold text-white hover:bg-[#E5484D]/90"
                   >
-                    {busy && <Loader2 className="size-4 animate-spin" />}
+                    {busy && <Spinner size="sm" />}
                     {t("confirmDelete")}
                   </Button>
                   <p className="mt-1.5 text-center text-[11px] font-medium text-text-3">

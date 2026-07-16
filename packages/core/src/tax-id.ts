@@ -21,8 +21,7 @@
  */
 
 import { Decimal } from "decimal.js";
-
-const D = (v: string | number) => new Decimal(v);
+import { D } from "./decimal.js";
 
 export const ID_SALES_TAX_RATE = "0.001";
 export const ID_DIVIDEND_TAX_RATE = "0.10";

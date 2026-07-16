@@ -51,7 +51,6 @@ export function useTableSort<T>(cols: ColDef<T>[]): UseTableSortResult<T> {
   );
 
   const colsRef = useRef(cols);
-  // eslint-disable-next-line react-hooks/refs
   colsRef.current = cols;
 
   const sort = useCallback(

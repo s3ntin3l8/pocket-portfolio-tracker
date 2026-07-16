@@ -2,6 +2,7 @@ import { parsedTransactionSchema, type ParsedAction } from "@portfolio/schema";
 import type { CsvParseResult } from "./csv.js";
 import { splitCsvLine } from "./csv-line.js";
 import { shortHash } from "./hash.js";
+import { num } from "./numeric.js";
 
 // Coinbase "Transaction history" CSV. The real export carries a preamble before the
 // header row, which contains "Quantity Transacted" and a spot-price column. Only Buy
@@ -13,10 +14,6 @@ const ACTIONS: Record<string, ParsedAction> = {
   sell: "sell",
   "advanced trade sell": "sell",
 };
-
-function num(raw: string): string {
-  return raw.replace(/[^0-9.-]/g, "");
-}
 
 export function parseCoinbase(content: string): CsvParseResult {
   const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);

@@ -3,7 +3,8 @@
 import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Loader2, X } from "lucide-react";
+import { AlertCircle, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient, Instrument } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -270,7 +271,7 @@ export function RecordMergerForm({
               disabled={busy}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("submitting") : t("submit")}
             </Button>
           </div>
@@ -285,7 +286,7 @@ export function RecordMergerForm({
               disabled={busy}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("submitting") : t("submit")}
             </Button>
           </div>,

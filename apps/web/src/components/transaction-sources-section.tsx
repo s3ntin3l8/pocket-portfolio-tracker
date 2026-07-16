@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { SourceSummary } from "@portfolio/api-client";
 import { useApiClient } from "@/lib/api";
 import { SRC_STYLE, DEFAULT_SRC } from "@/lib/source-style";
@@ -112,7 +113,7 @@ export function TransactionSourcesSection({
                   className="flex size-9 shrink-0 items-center justify-center rounded-[11px] border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
                 >
                   {downloading === src.id ? (
-                    <Loader2 className="size-[17px] animate-spin" />
+                    <Spinner size="sm" />
                   ) : (
                     <Download className="size-[17px]" />
                   )}

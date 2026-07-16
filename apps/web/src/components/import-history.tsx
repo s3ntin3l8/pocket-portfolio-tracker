@@ -2,17 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import {
-  Download,
-  Eye,
-  EyeOff,
-  FolderInput,
-  ListChecks,
-  Loader2,
-  Trash2,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Download, Eye, EyeOff, FolderInput, ListChecks, Trash2, Undo2, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { ImportRecord } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
@@ -383,7 +374,7 @@ export function ImportHistory({
                 discard(imp.id);
               }}
             >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              {busy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
             </Button>
           </>
         )}
@@ -400,7 +391,7 @@ export function ImportHistory({
               clear(imp.id);
             }}
           >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+            {busy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
           </Button>
         )}
         {imp.status === "confirmed" &&
@@ -419,7 +410,7 @@ export function ImportHistory({
                   undo(imp.id);
                 }}
               >
-                {busy && <Loader2 className="size-3.5 animate-spin" />}
+                {busy && <Spinner size="xs" />}
                 {t("undo")}
               </Button>
               <Button
@@ -627,11 +618,7 @@ export function ImportHistory({
             )}
             {discardedIds.length > 0 && (
               <Button size="sm" variant="ghost" disabled={clearingAll} onClick={clearAllDiscarded}>
-                {clearingAll ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="size-3.5" />
-                )}
+                {clearingAll ? <Spinner size="xs" /> : <Trash2 className="size-3.5" />}
                 {t("clearAll")}
               </Button>
             )}
@@ -657,7 +644,7 @@ export function ImportHistory({
                 {t("bulkConfirmPrompt", { count: selectedConfirmedTx })}
               </span>
               <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete}>
-                {bulkBusy && <Loader2 className="size-3.5 animate-spin" />}
+                {bulkBusy && <Spinner size="xs" />}
                 {t("deleteSelected")}
               </Button>
               <Button
@@ -673,11 +660,7 @@ export function ImportHistory({
             <span className="flex items-center gap-1">
               {selected.size > 0 && (
                 <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete}>
-                  {bulkBusy ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-3.5" />
-                  )}
+                  {bulkBusy ? <Spinner size="xs" /> : <Trash2 className="size-3.5" />}
                   {t("deleteSelected")}
                 </Button>
               )}

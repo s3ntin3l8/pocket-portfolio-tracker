@@ -3,7 +3,8 @@
 import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Loader2, Sparkles, X } from "lucide-react";
+import { AlertCircle, Sparkles, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient, Instrument, InstrumentSearchResult } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -298,7 +299,7 @@ export function RecordCorporateActionForm({
               disabled={busy}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("submitting") : t("submit")}
             </Button>
           </div>
@@ -313,7 +314,7 @@ export function RecordCorporateActionForm({
               disabled={busy}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("submitting") : t("submit")}
             </Button>
           </div>,

@@ -1,7 +1,6 @@
 import { Decimal } from "decimal.js";
+import { D } from "./decimal.js";
 import type { CoreTransaction } from "./types.js";
-
-const D = (v: string | number) => new Decimal(v);
 
 /** Signed cash effect of a single transaction (positive = cash in). */
 export function cashFlow(tx: CoreTransaction): Decimal {

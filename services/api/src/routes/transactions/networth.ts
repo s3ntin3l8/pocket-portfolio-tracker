@@ -8,6 +8,7 @@ import {
   periodXirr,
   type CashFlowPoint,
   convert,
+  toDateKey,
 } from "@portfolio/core";
 import { requireUser } from "../../plugins/auth.js";
 import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
@@ -135,7 +136,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       let startNav: number | null = null;
       let anchorDate: Date | null = null; // actual snapshot date (may lag periodStart by a day or two)
       if (periodStart !== null && pfs.length > 0) {
-        const periodStartStr = periodStart.toISOString().slice(0, 10);
+        const periodStartStr = toDateKey(periodStart);
         // Per-portfolio snapshot + FX fetch is independent — bounded-concurrency instead
         // of a serial `for` await. The reduction below (sum, count, max-date) is
         // order-independent, so parallelizing the I/O doesn't change the result.

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, Eye, EyeOff, Loader2, Pencil, ShieldOff, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Eye, EyeOff, Pencil, ShieldOff, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
   DndContext,
   closestCenter,
@@ -189,7 +190,7 @@ function VisionCredentialCell({
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" disabled={busy || !apiKey.trim()}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : t("credentialSave")}
+                {busy ? <Spinner size="sm" /> : t("credentialSave")}
               </Button>
             </form>
           </DialogContent>
@@ -205,7 +206,7 @@ function VisionCredentialCell({
             onClick={handleClear}
             aria-label={t("credentialClear")}
           >
-            {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+            {busy ? <Spinner size="xs" /> : <Trash2 className="size-3" />}
           </Button>
         )}
       </div>
@@ -460,7 +461,7 @@ export function AdminVisionProvidersForm({
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={busy || !dirty}>
-          {busy && <Loader2 className="size-4 animate-spin" />}
+          {busy && <Spinner size="sm" />}
           {busy ? t("saving") : t("save")}
         </Button>
         {saved && !dirty && (

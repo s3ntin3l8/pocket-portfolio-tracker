@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
+import { toDateKey, toMonthKey } from "@portfolio/core";
 import { providerUsage } from "@portfolio/db";
 import {
   PROVIDER_REGISTRY,
@@ -247,7 +248,7 @@ describe("usage tracking", () => {
       .select()
       .from(providerUsage)
       .where(eq(providerUsage.provider, "fixture"));
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toDateKey(new Date());
     expect(row?.day).toBe(today);
     expect(row?.callsDay).toBe(2); // reset from the stale 999, then +2
     expect(row?.callsMonth).toBe(2);
@@ -257,8 +258,8 @@ describe("usage tracking", () => {
     process.env.ANTAM_BUYBACK_URL = "https://example.test/antam";
     try {
       const now = new Date();
-      const day = now.toISOString().slice(0, 10);
-      const month = now.toISOString().slice(0, 7);
+      const day = toDateKey(now);
+      const month = toMonthKey(now);
       await getDb()
         .insert(providerUsage)
         .values({ provider: "antam", day, callsDay: 5, month, callsMonth: 5 })

@@ -10,6 +10,8 @@ import {
   projectCoupons,
   projectDividends,
   projectNextYearDividends,
+  toDateKey,
+  toMonthKey,
   type CoreTransaction,
   type PortfolioSummary,
   convert,
@@ -49,7 +51,7 @@ export async function buildIncomeStats(
         displayName: im?.displayName ?? null,
         assetClass: im?.assetClass ?? null,
         type: t.type,
-        date: t.executedAt.toISOString().slice(0, 10),
+        date: toDateKey(t.executedAt),
         price: t.price,
         currency: t.currency,
         executedAt: t.executedAt,
@@ -175,10 +177,8 @@ export async function buildIncomeStats(
     applyGrowth: true,
   });
 
-  const todayStr = now.toISOString().slice(0, 10);
-  const nextYearEndStr = new Date(Date.UTC(now.getUTCFullYear() + 1, 11, 31))
-    .toISOString()
-    .slice(0, 10);
+  const todayStr = toDateKey(now);
+  const nextYearEndStr = toDateKey(new Date(Date.UTC(now.getUTCFullYear() + 1, 11, 31)));
   const announcedRows =
     heldIds.length > 0
       ? await app.db
@@ -214,7 +214,7 @@ export async function buildIncomeStats(
     futureAnnouncedByInstrument.set(row.instrumentId, list);
   }
 
-  const yearEndStr = new Date(Date.UTC(now.getUTCFullYear(), 11, 31)).toISOString().slice(0, 10);
+  const yearEndStr = toDateKey(new Date(Date.UTC(now.getUTCFullYear(), 11, 31)));
   const instrumentsWithAnnouncedRestOfYear = new Set(
     [...futureAnnouncedByInstrument.entries()]
       .filter(([_, rows]) => rows.some((r) => r.exDate > todayStr && r.exDate <= yearEndStr))
@@ -374,7 +374,7 @@ export async function buildIncomeStats(
     })),
   ].sort((a, b) => a.date.localeCompare(b.date));
 
-  const threeYearsAgoStr = threeYearsAgo.toISOString().slice(0, 7);
+  const threeYearsAgoStr = toMonthKey(threeYearsAgo);
   const monthly = stats.monthly.filter((m) => m.month >= threeYearsAgoStr);
 
   return { displayCurrency: display, ...stats, monthly, yields, upcoming, events, interest };

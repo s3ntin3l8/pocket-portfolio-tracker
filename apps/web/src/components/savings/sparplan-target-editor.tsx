@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -96,7 +96,7 @@ export function SparplanTargetEditor({
 
       {loading ? (
         <div className="flex justify-center py-4">
-          <Loader2 className="size-4 animate-spin text-text-3" />
+          <Spinner size="sm" className="text-text-3" />
         </div>
       ) : (
         <>
@@ -153,7 +153,7 @@ export function SparplanTargetEditor({
               style={{ opacity: sumOk ? 1 : 0.45 }}
               className="flex flex-1 items-center justify-center gap-1 rounded-[10px] bg-pill py-[9px] text-xs font-bold text-white transition-transform active:scale-95"
             >
-              {saving && <Loader2 className="size-3.5 animate-spin" />}
+              {saving && <Spinner size="xs" />}
               {t("targetSave")}
             </button>
           </div>

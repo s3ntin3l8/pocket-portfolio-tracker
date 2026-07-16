@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Coins, Loader2 } from "lucide-react";
+import { Coins } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +111,7 @@ export function ContractReview({ contracts, onUpdate, onConfirm, onDiscard }: Co
             </Button>
           )}
           <Button onClick={() => run(onConfirm)} disabled={busy}>
-            {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+            {busy && <Spinner size="sm" className="mr-2" />}
             {t("confirm")}
           </Button>
         </div>

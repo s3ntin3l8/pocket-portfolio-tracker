@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Target, Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { Target, TrendingDown, TrendingUp } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -297,7 +298,7 @@ export function RebalanceDialog({
 
         {loading ? (
           <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Spinner size="md" className="text-muted-foreground" />
           </div>
         ) : (
           <div className="space-y-3 py-2">
@@ -353,7 +354,7 @@ export function RebalanceDialog({
               >
                 {includeSales ? t("toggleSales") : t("toggleContributions")}
               </Label>
-              {salesLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+              {salesLoading && <Spinner size="xs" className="text-muted-foreground" />}
             </div>
             {toggleDisabled && (
               <p className="text-xs text-muted-foreground/70 mt-1">{t("toggleDisabled")}</p>
@@ -425,7 +426,7 @@ export function RebalanceDialog({
             {t("cancel")}
           </Button>
           <Button onClick={handleSave} disabled={!sumOk || saving || loading}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            {saving ? <Spinner size="sm" className="mr-1" /> : null}
             {t("save")}
           </Button>
         </DialogFooter>

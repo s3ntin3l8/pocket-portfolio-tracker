@@ -2,7 +2,7 @@ import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
 import { and, eq, inArray } from "drizzle-orm";
 import { documents, transactionSources, transactions } from "@portfolio/db";
-import { buildShareTimelines, sharesHeldAt } from "@portfolio/core";
+import { buildShareTimelines, sharesHeldAt, toDateKey } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
 import { getFxRatesForDates } from "../../services/fx.js";
 import { toCoreTxns } from "../../services/tx-core.js";
@@ -189,7 +189,7 @@ export async function enrichRows(
   let ratesByDate: Map<string, Record<string, string>> | undefined;
   if (convertTo) {
     const currencies = [...new Set(rows.map((r) => r.currency))];
-    const dates = [...new Set(rows.map((r) => r.executedAt.toISOString().slice(0, 10)))];
+    const dates = [...new Set(rows.map((r) => toDateKey(r.executedAt)))];
     ratesByDate = await getFxRatesForDates(app.db, currencies, convertTo, dates);
   }
   const tE = performance.now();
@@ -199,7 +199,7 @@ export async function enrichRows(
   const responseRows = rows.map((r) => {
     let displayRate: string | undefined;
     if (ratesByDate && convertTo) {
-      const date = r.executedAt.toISOString().slice(0, 10);
+      const date = toDateKey(r.executedAt);
       const rates = ratesByDate.get(date) ?? {};
       displayRate = r.currency === convertTo ? "1" : (rates[r.currency] ?? "1");
     }

@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Pencil, Info, Loader2 } from "lucide-react";
+import { Pencil, Info } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -157,7 +158,7 @@ export function RebalancingCard({
       {editing ? (
         loading ? (
           <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Spinner size="md" className="text-muted-foreground" />
           </div>
         ) : (
           <div className="mt-3 space-y-3">
@@ -207,7 +208,7 @@ export function RebalancingCard({
                 {td("cancel")}
               </Button>
               <Button size="sm" onClick={handleSave} disabled={!sumOk || saving}>
-                {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                {saving ? <Spinner size="sm" className="mr-1" /> : null}
                 {td("save")}
               </Button>
             </div>

@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Search, X, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Search, X, Sparkles, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import {
@@ -124,7 +125,10 @@ export function EditBenchmarkDialog({
               className="h-10 pl-9 pr-9 text-sm"
             />
             {loading && (
-              <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-text-3" />
+              <Spinner
+                size="sm"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-3"
+              />
             )}
           </div>
 

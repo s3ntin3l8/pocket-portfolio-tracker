@@ -2,6 +2,8 @@ import { Decimal } from "decimal.js";
 import { parsedTransactionSchema, type ParsedTransaction } from "@portfolio/schema";
 import type { CsvParseResult } from "./csv.js";
 import { shortHash } from "./hash.js";
+import { collapse } from "./shared.js";
+import { splitCsvLine } from "./csv-line.js";
 
 /**
  * Parser for DKB (Deutsche Kreditbank) CSV exports. DKB has no usable live-sync API, so
@@ -38,38 +40,9 @@ export function parseDkb(content: string): CsvParseResult {
 
 // --- shared helpers ------------------------------------------------------
 
-/**
- * Split one CSV line on `;`, honouring `"`-quoted fields (which may contain `;`, `,` or
- * runs of spaces) and `""` escapes. Each field is trimmed of surrounding whitespace.
- */
+/** Semicolon-delimited CSV line splitter (DKB format). */
 export function splitDkbLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        cur += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ";") {
-      out.push(cur.trim());
-      cur = "";
-    } else {
-      cur += ch;
-    }
-  }
-  out.push(cur.trim());
-  return out;
+  return splitCsvLine(line, ";");
 }
 
 /**
@@ -112,11 +85,6 @@ function assetClassFromAssetklasse(label: string): ParsedTransaction["assetClass
   if (l.includes("fonds")) return "mutual_fund";
   if (l.includes("krypto") || l.includes("crypto")) return "crypto";
   return "equity"; // "Aktien" and anything unrecognised
-}
-
-/** Collapse internal whitespace runs to single spaces and trim. */
-function collapse(s: string): string {
-  return s.replace(/\s+/g, " ").trim();
 }
 
 // Index a header row by lower-cased column name.

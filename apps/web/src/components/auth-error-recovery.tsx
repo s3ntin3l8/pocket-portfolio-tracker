@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { AlertTriangle, Ban, Loader2 } from "lucide-react";
+import { AlertTriangle, Ban } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
 
@@ -62,7 +63,7 @@ export function AuthErrorRecovery() {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 px-6 py-16 text-center">
         <span className="flex size-16 items-center justify-center rounded-[20px] bg-primary/10 text-primary">
-          <Loader2 className="size-7 animate-spin" />
+          <Spinner size="lg" />
         </span>
         <h1 className="text-balance text-2xl font-extrabold tracking-tight">{t("retrying")}</h1>
       </div>

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { toDateKey } from "@portfolio/core";
 import { instruments, prices } from "@portfolio/db";
 import { ensureDb } from "../../src/db/client.js";
 import { loadSparklines } from "../../src/services/sparklines.js";
@@ -24,7 +25,7 @@ describe("loadSparklines", () => {
     const rows: { instrumentId: string; date: string; close: string; currency: string }[] = [];
     // 35 ascending daily closes 100..134, one per day.
     for (let i = 0; i < 35; i++) {
-      const date = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+      const date = toDateKey(new Date(Date.UTC(2026, 0, 1 + i)));
       rows.push({ instrumentId: manyId, date, close: String(100 + i), currency: "IDR" });
     }
     rows.push({ instrumentId: oneId, date: "2026-02-01", close: "50", currency: "IDR" });

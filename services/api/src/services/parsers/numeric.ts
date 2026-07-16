@@ -13,6 +13,14 @@
  * `precision` caps the fractional digits before trimming (default 10 — enough for
  * reconstructed per-share prices without surfacing float noise).
  */
+/**
+ * Strip non-numeric characters (except `.` and `-`) from a raw string.
+ * Used by CSV parsers to clean broker-formatted numbers.
+ */
+export function num(raw: string): string {
+  return raw.replace(/[^0-9.-]/g, "");
+}
+
 export function formatDecimal(n: number, precision = 10): string {
   if (!Number.isFinite(n)) return "0";
   const s = n.toFixed(precision).replace(/\.?0+$/, "");

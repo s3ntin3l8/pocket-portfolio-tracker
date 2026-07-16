@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { Instrument } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
@@ -142,7 +142,7 @@ export function InstrumentEditDialog({
           </div>
           <div className="border-t border-border pt-4">
             <Button type="submit" disabled={busy} className="w-full">
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("saving") : t("save")}
             </Button>
           </div>

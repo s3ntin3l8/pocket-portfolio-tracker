@@ -5,6 +5,11 @@ import {
   type ParsedTransaction,
 } from "@portfolio/schema";
 
+/** Collapse internal whitespace runs to single spaces and trim. */
+export function collapse(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
 // One JSON-Schema description of the extraction shape, reused across every cloud
 // vision parser (Anthropic tool input_schema, OpenAI/OpenRouter function parameters,
 // Gemini responseSchema — all accept this OpenAPI-compatible subset). It mirrors

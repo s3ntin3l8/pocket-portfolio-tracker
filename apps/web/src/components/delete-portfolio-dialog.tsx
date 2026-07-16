@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useTranslations } from "next-intl";
 import type { EditablePortfolio } from "@/components/portfolio-form-dialog";
 import { Button } from "@/components/ui/button";
@@ -94,7 +95,7 @@ export function DeletePortfolioDialog({
             </Button>
           </DialogClose>
           <Button type="button" variant="destructive" onClick={handleDelete} disabled={busy}>
-            {busy && <Loader2 className="size-4 animate-spin" />}
+            {busy && <Spinner size="sm" />}
             {t("confirmDelete")}
           </Button>
         </DialogFooter>
