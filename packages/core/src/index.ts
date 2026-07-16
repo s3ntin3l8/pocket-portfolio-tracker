@@ -153,3 +153,18 @@ export {
   type IndexPoint as VolIndexPoint,
 } from "./volatility.js";
 export { streakAnalysis, type StreakResult, type Streak } from "./streaks.js";
+export {
+  ACQUISITION_TYPES,
+  DISPOSAL_TYPES,
+  INCOME_TYPES,
+  CASH_FLOW_TYPES,
+  SHARE_RECEIPT_TYPES,
+  TRANSFER_TYPES,
+  isTradeType,
+  isAcquisitionType,
+  isDisposalType,
+  isIncomeType,
+  isCashFlowType,
+  isShareReceiptType,
+  isTransferType,
+} from "./categorization.js";

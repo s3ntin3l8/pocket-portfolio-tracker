@@ -1,14 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { and, count, desc, eq, getTableColumns, gte, inArray, lt, sql } from "drizzle-orm";
 import { portfolios, transactions } from "@portfolio/db";
+import { ACQUISITION_TYPES, INCOME_TYPES } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import { parsePagination, cacheKey } from "../helpers.js";
-import {
-  yearRange,
-  ACTIVITY_INCOME_TYPES,
-  transactionsCache,
-  networthTransactionsCache,
-} from "./shared.js";
+import { yearRange, transactionsCache, networthTransactionsCache } from "./shared.js";
 import { enrichRows, enrichAggregateRows } from "./list-enrichment.js";
 
 export function registerListRoutes(app: FastifyInstance) {
@@ -40,11 +36,9 @@ export function registerListRoutes(app: FastifyInstance) {
       const searchQuery = request.query.q;
 
       const conditions = [eq(transactions.portfolioId, request.params.portfolioId)];
-      if (typeFilter === "buy")
-        conditions.push(inArray(transactions.type, ["buy", "savings_plan"]));
+      if (typeFilter === "buy") conditions.push(inArray(transactions.type, ACQUISITION_TYPES));
       if (typeFilter === "sell") conditions.push(eq(transactions.type, "sell"));
-      if (typeFilter === "income")
-        conditions.push(inArray(transactions.type, ACTIVITY_INCOME_TYPES));
+      if (typeFilter === "income") conditions.push(inArray(transactions.type, INCOME_TYPES));
       if (yearFilter) {
         const y = parseInt(yearFilter, 10);
         if (!isNaN(y)) {
@@ -191,9 +185,9 @@ export function registerListRoutes(app: FastifyInstance) {
     const nameById = new Map(pfs.map((p) => [p.id, p.name]));
 
     const conditions = [inArray(transactions.portfolioId, pfIds)];
-    if (typeFilter === "buy") conditions.push(inArray(transactions.type, ["buy", "savings_plan"]));
+    if (typeFilter === "buy") conditions.push(inArray(transactions.type, ACQUISITION_TYPES));
     if (typeFilter === "sell") conditions.push(eq(transactions.type, "sell"));
-    if (typeFilter === "income") conditions.push(inArray(transactions.type, ACTIVITY_INCOME_TYPES));
+    if (typeFilter === "income") conditions.push(inArray(transactions.type, INCOME_TYPES));
     if (yearFilter) {
       const y = parseInt(yearFilter, 10);
       if (!isNaN(y)) {

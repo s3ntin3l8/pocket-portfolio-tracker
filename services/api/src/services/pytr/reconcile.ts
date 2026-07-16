@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from "fastify";
 import {
   cashBalances,
   cashFlow,
+  isIncomeType,
   type CoreTransaction,
   type ReconciliationGap,
 } from "@portfolio/core";
@@ -140,11 +141,10 @@ export function netManualAdjustments(
   rec: ReconciliationGap,
   transactions: CoreTransaction[],
 ): ReconciliationGap {
-  const INCOME_TYPES = new Set(["dividend", "coupon", "interest", "bonus_cash"]);
   const adjustments = transactions.filter(
     (tx) =>
       tx.type === "adjustment" ||
-      (tx.source === "manual" && INCOME_TYPES.has(tx.type) && new Decimal(tx.price).isNegative()),
+      (tx.source === "manual" && isIncomeType(tx.type) && new Decimal(tx.price).isNegative()),
   );
   if (adjustments.length === 0) return rec;
 

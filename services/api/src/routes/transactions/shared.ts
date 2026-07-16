@@ -61,8 +61,6 @@ export const networthTransactionsCache = createStore<{
   total: number;
 }>();
 
-export const ACTIVITY_INCOME_TYPES = ["dividend", "coupon", "interest", "bonus_cash"] as const;
-
 export function yearRange(year: number): { start: Date; end: Date } {
   return {
     start: new Date(Date.UTC(year, 0, 1)),

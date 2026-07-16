@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { isIncomeType } from "@portfolio/core";
 import {
   computeAllBanner,
   computeIncomeBanner,
   computeTradeBanner,
-  ACTIVITY_INCOME_TYPES,
 } from "../src/lib/transaction-banners";
 import type { TxRow } from "../src/components/transactions-table";
 
@@ -46,14 +46,14 @@ const incomeLabels = {
   other: "Other income",
 };
 
-describe("ACTIVITY_INCOME_TYPES", () => {
+describe("isIncomeType", () => {
   it("classifies dividend, coupon, interest, and bonus_cash as income", () => {
-    expect(ACTIVITY_INCOME_TYPES.has("dividend")).toBe(true);
-    expect(ACTIVITY_INCOME_TYPES.has("coupon")).toBe(true);
-    expect(ACTIVITY_INCOME_TYPES.has("interest")).toBe(true);
-    expect(ACTIVITY_INCOME_TYPES.has("bonus_cash")).toBe(true);
-    expect(ACTIVITY_INCOME_TYPES.has("buy")).toBe(false);
-    expect(ACTIVITY_INCOME_TYPES.has("deposit")).toBe(false);
+    expect(isIncomeType("dividend")).toBe(true);
+    expect(isIncomeType("coupon")).toBe(true);
+    expect(isIncomeType("interest")).toBe(true);
+    expect(isIncomeType("bonus_cash")).toBe(true);
+    expect(isIncomeType("buy")).toBe(false);
+    expect(isIncomeType("deposit")).toBe(false);
   });
 });
 
