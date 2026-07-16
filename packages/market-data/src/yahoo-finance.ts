@@ -2,6 +2,7 @@ import type {
   AssetClass,
   Candle,
   DividendEvent,
+  InstrumentFundamentals,
   InstrumentProfile,
   InstrumentRef,
   InstrumentSearchResult,
@@ -17,6 +18,31 @@ import {
 import { isIsin } from "./types.js";
 
 const TROY_OUNCE_GRAMS = 31.1034768;
+
+/** Modules requested for the fundamentals detail-view snapshot (getFundamentals). */
+const FUNDAMENTALS_MODULES =
+  "price,summaryDetail,defaultKeyStatistics,financialData,calendarEvents,earnings,recommendationTrend,fundProfile";
+
+/**
+ * Without a timeout, a hung fetch could stall the fundamentals card indefinitely — Yahoo's
+ * unofficial endpoints have no SLA and getFundamentals runs on a live request path.
+ */
+const FUNDAMENTALS_TIMEOUT_MS = 8000;
+
+/** Unwrap Yahoo's `{ raw, fmt }` number wrapper (or a bare number/undefined/`{}`). */
+function unwrapNumber(v: unknown): number | null {
+  if (typeof v === "number") return v;
+  if (v && typeof v === "object" && "raw" in v && typeof (v as { raw: unknown }).raw === "number") {
+    return (v as { raw: number }).raw;
+  }
+  return null;
+}
+
+/** Unwrap a Yahoo unix-seconds `{ raw, fmt }` timestamp to a YYYY-MM-DD date string. */
+function unixToIsoDate(v: unknown): string | null {
+  const n = unwrapNumber(v);
+  return n ? new Date(n * 1000).toISOString().slice(0, 10) : null;
+}
 
 /**
  * Maps Yahoo Finance's lowercase `topHoldings.sectorWeightings` keys (e.g. `"realestate"`)
@@ -504,5 +530,168 @@ export class YahooFinanceProvider implements MarketDataProvider {
       });
     }
     return candles;
+  }
+
+  /** Parse a raw quoteSummary JSON response into an InstrumentFundamentals (or null). */
+  private parseFundamentals(
+    ref: InstrumentRef,
+    symbol: string,
+    data: unknown,
+  ): InstrumentFundamentals | null {
+    const typed = data as {
+      quoteSummary?: {
+        result?: Array<{
+          price?: Record<string, unknown>;
+          summaryDetail?: Record<string, unknown>;
+          defaultKeyStatistics?: Record<string, unknown>;
+          financialData?: Record<string, unknown>;
+          calendarEvents?: {
+            earnings?: { earningsDate?: unknown[] };
+            exDividendDate?: unknown;
+          };
+          earnings?: {
+            financialsChart?: {
+              yearly?: Array<{ date: number; revenue: unknown; earnings: unknown }>;
+            };
+          };
+          recommendationTrend?: { trend?: Array<Record<string, unknown>> };
+          fundProfile?: { feesExpensesInvestment?: { annualReportExpenseRatio?: unknown } };
+        }> | null;
+        error?: unknown;
+      };
+    };
+    const result = typed?.quoteSummary?.result?.[0];
+    if (!result) return null;
+
+    // Yahoo's per-share/price-scale fields (previousClose, day/52-week range, target price)
+    // come back in the same minor unit as the live quote, so a GBp/agorot-quoted line needs
+    // the same divisor `getQuote`/`getHistory` apply (resolveCurrency) to report GBP, not
+    // pence. Aggregate/valuation fields (marketCap, trailingEps, dividendRate) and the
+    // income-statement figures (financials[].revenue/earnings) are already in major-currency
+    // units on Yahoo's side — dividing those a second time is wrong. Verified empirically
+    // against live GBp lines: price/eps ≈ trailingPE only when eps is left undivided.
+    const { currency, divisor } = this.resolveCurrency(
+      ref,
+      typeof result.price?.currency === "string" ? result.price.currency : undefined,
+    );
+    const price = (v: unknown): string | null => {
+      const n = unwrapNumber(v);
+      return n === null ? null : String(n / divisor);
+    };
+    const major = (v: unknown): string | null => {
+      const n = unwrapNumber(v);
+      return n === null ? null : String(n);
+    };
+
+    const trend = result.recommendationTrend?.trend?.[0];
+    const analystTrend =
+      trend && unwrapNumber(trend.strongBuy) !== null
+        ? {
+            strongBuy: unwrapNumber(trend.strongBuy) ?? 0,
+            buy: unwrapNumber(trend.buy) ?? 0,
+            hold: unwrapNumber(trend.hold) ?? 0,
+            sell: unwrapNumber(trend.sell) ?? 0,
+            strongSell: unwrapNumber(trend.strongSell) ?? 0,
+          }
+        : null;
+
+    const financialCurrency =
+      typeof result.financialData?.financialCurrency === "string"
+        ? result.financialData.financialCurrency
+        : currency;
+
+    const financials = (result.earnings?.financialsChart?.yearly ?? [])
+      .map((y) => ({ year: y.date, revenue: major(y.revenue), earnings: major(y.earnings) }))
+      .filter(
+        (f): f is { year: number; revenue: string; earnings: string } =>
+          f.revenue !== null && f.earnings !== null,
+      );
+
+    const fundamentals: InstrumentFundamentals = {
+      currency,
+      asOf: new Date().toISOString(),
+      marketCap: major(result.price?.marketCap),
+      trailingPE: unwrapNumber(result.summaryDetail?.trailingPE),
+      forwardPE: unwrapNumber(result.summaryDetail?.forwardPE),
+      trailingEps: major(result.defaultKeyStatistics?.trailingEps),
+      dividendYield: unwrapNumber(result.summaryDetail?.dividendYield),
+      dividendRate: major(result.summaryDetail?.dividendRate),
+      beta:
+        unwrapNumber(result.summaryDetail?.beta) ?? unwrapNumber(result.defaultKeyStatistics?.beta),
+      fiftyTwoWeekLow: price(result.summaryDetail?.fiftyTwoWeekLow),
+      fiftyTwoWeekHigh: price(result.summaryDetail?.fiftyTwoWeekHigh),
+      previousClose: price(result.summaryDetail?.previousClose),
+      dayLow: price(result.summaryDetail?.dayLow),
+      dayHigh: price(result.summaryDetail?.dayHigh),
+      volume: unwrapNumber(result.summaryDetail?.volume),
+      averageVolume: unwrapNumber(result.summaryDetail?.averageVolume),
+      expenseRatio: unwrapNumber(
+        result.fundProfile?.feesExpensesInvestment?.annualReportExpenseRatio,
+      ),
+      targetMeanPrice: price(result.financialData?.targetMeanPrice),
+      recommendationKey:
+        typeof result.financialData?.recommendationKey === "string"
+          ? result.financialData.recommendationKey
+          : null,
+      numberOfAnalystOpinions: unwrapNumber(result.financialData?.numberOfAnalystOpinions),
+      analystTrend,
+      earningsDate: unixToIsoDate(result.calendarEvents?.earnings?.earningsDate?.[0]),
+      exDividendDate: unixToIsoDate(result.calendarEvents?.exDividendDate),
+      financials: financials.length > 0 ? financials : null,
+      financialCurrency,
+      externalUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`,
+    };
+
+    // Every field null/empty → treat as "no data" (mirrors getProfile's empty-guard).
+    // currency/asOf/externalUrl/financialCurrency are always set given a result, so they
+    // don't count (financialCurrency falls back to currency when Yahoo omits it).
+    const hasData = Object.entries(fundamentals).some(
+      ([k, v]) =>
+        !["currency", "asOf", "externalUrl", "financialCurrency"].includes(k) && v != null,
+    );
+    return hasData ? fundamentals : null;
+  }
+
+  /**
+   * Fetch fundamental/valuation data (market cap, PE, EPS, dividend yield, 52-week range,
+   * analyst recommendations, revenue-vs-earnings, next earnings date) for the instrument
+   * detail view. Equity/ETF only — ETFs get a reduced set (no PE/EPS/analyst modules).
+   * Reuses the same crumb+cookie session as `getProfile`. A timeout guards against a hung
+   * request stalling the fundamentals card indefinitely.
+   */
+  async getFundamentals(ref: InstrumentRef): Promise<InstrumentFundamentals | null> {
+    if (ref.assetClass !== "equity" && ref.assetClass !== "etf") return null;
+
+    const symbol = this.yahooSymbol(ref);
+    const buildUrl = (c: string) =>
+      `${this.baseUrl}/v10/finance/quoteSummary/${encodeURIComponent(
+        symbol,
+      )}?modules=${FUNDAMENTALS_MODULES}&crumb=${encodeURIComponent(c)}`;
+
+    try {
+      const auth = await this.getYahooCrumb();
+      if (!auth) return null;
+
+      const fetchWithTimeout = (url: string, cookies: string) =>
+        this.doFetch(url, {
+          headers: { ...this.defaultHeaders, Cookie: cookies },
+          signal: AbortSignal.timeout(FUNDAMENTALS_TIMEOUT_MS),
+        });
+
+      let res = await fetchWithTimeout(buildUrl(auth.crumb), auth.cookies);
+
+      // 401 means the crumb expired — clear and retry once (same as getProfile).
+      if (res.status === 401) {
+        this.crumbCache = null;
+        const auth2 = await this.getYahooCrumb();
+        if (!auth2) return null;
+        res = await fetchWithTimeout(buildUrl(auth2.crumb), auth2.cookies);
+      }
+
+      if (!res.ok) return null;
+      return this.parseFundamentals(ref, symbol, await res.json());
+    } catch {
+      return null;
+    }
   }
 }

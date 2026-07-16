@@ -543,6 +543,11 @@ export interface Instrument {
   unit: string;
   currency: string;
   name: string;
+  /** Bond-specific fields (null for non-bonds) — already present on the API row,
+   *  surfaced here for the instrument detail page's "upcoming income" line. */
+  couponRate?: string | null;
+  couponSchedule?: string | null;
+  maturityDate?: string | null;
 }
 
 /** An instrument result from the global search — extends the catalog record with
@@ -605,6 +610,51 @@ export interface Candle {
   close: string;
   /** Native quote currency; absent for gold/crypto whose currency is encoded in the symbol pair. */
   currency?: string;
+}
+
+/**
+ * Fundamental/valuation data for the instrument detail view (market cap, PE, EPS,
+ * dividend yield, 52-week range, analyst recommendations, revenue-vs-earnings, next
+ * earnings date, …). Mirrors `InstrumentFundamentals` in `@portfolio/market-data`.
+ * Monetary fields are decimal strings carrying `currency`'s denomination; equities get
+ * the full set, ETFs a reduced set (no PE/EPS/analyst fields).
+ */
+export interface InstrumentFundamentals {
+  currency: string;
+  asOf: string;
+  marketCap?: string | null;
+  trailingPE?: number | null;
+  forwardPE?: number | null;
+  trailingEps?: string | null;
+  dividendYield?: number | null; // fraction 0–1
+  dividendRate?: string | null;
+  beta?: number | null;
+  fiftyTwoWeekLow?: string | null;
+  fiftyTwoWeekHigh?: string | null;
+  previousClose?: string | null;
+  dayLow?: string | null;
+  dayHigh?: string | null;
+  volume?: number | null;
+  averageVolume?: number | null;
+  expenseRatio?: number | null; // fraction 0–1, ETFs
+  targetMeanPrice?: string | null;
+  recommendationKey?: string | null;
+  numberOfAnalystOpinions?: number | null;
+  analystTrend?: {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+  } | null;
+  earningsDate?: string | null; // YYYY-MM-DD
+  exDividendDate?: string | null; // YYYY-MM-DD
+  financials?: Array<{ year: number; revenue: string; earnings: string }> | null;
+  /** Currency of `financials[]` figures — can differ from `currency` (e.g. a GBp-quoted
+   *  line whose income statement is reported in USD or EUR). Falls back to `currency`. */
+  financialCurrency?: string | null;
+  /** Link to the instrument's page on the provider's site (e.g. Yahoo Finance). */
+  externalUrl?: string | null;
 }
 
 export interface QuoteRef {
@@ -2248,6 +2298,10 @@ export function createApiClient(config: ApiClientConfig) {
     getInstrument: (id: string) => request<Instrument>("GET", `/instruments/${id}`),
     getInstrumentHistory: (id: string, range = "1y") =>
       request<Candle[]>("GET", `/instruments/${id}/history?range=${encodeURIComponent(range)}`),
+    /** Fundamentals for the instrument detail view; null for unsupported asset classes
+     *  (gold, bond, mutual_fund, crypto, cash) or when the provider has no data. */
+    getInstrumentFundamentals: (id: string) =>
+      request<InstrumentFundamentals | null>("GET", `/instruments/${id}/fundamentals`),
     createInstrument: (input: InstrumentInput) =>
       request<Instrument>("POST", "/instruments", input),
     /** Update an instrument's identifiers (ISIN, WKN, symbol, name, assetClass, market). */
