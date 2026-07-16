@@ -42,7 +42,7 @@ import { HolderFormDialog } from "@/components/holder-form-dialog";
  */
 export function AddTransactionMenu({
   autoOpenFromParams = false,
-  isAdmin = true,
+  isAdmin = false,
 }: {
   autoOpenFromParams?: boolean;
   isAdmin?: boolean;

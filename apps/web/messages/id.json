@@ -999,6 +999,7 @@
       "1y": "1T",
       "all": "Semua"
     },
+    "edit": "Ubah",
     "editTitle": "Ubah instrumen",
     "isin": "ISIN",
     "wkn": "WKN",
@@ -1037,7 +1038,10 @@
     "notInPortfolios": "{symbol} ditemukan di data pasar tetapi belum ada di portofolio Anda. Import transaksi untuk instrumen ini terlebih dahulu.",
     "adminOnly": "Aksi korporasi hanya dapat dikelola oleh administrator.",
     "saveError": "Gagal menyimpan aksi korporasi.",
-    "deleteError": "Gagal menghapus aksi korporasi."
+    "deleteError": "Gagal menghapus aksi korporasi.",
+    "errors": {
+      "forbidden": "Anda tidak memiliki izin untuk mengelola aksi korporasi."
+    }
   },
   "Merger": {
     "link": "Merger",

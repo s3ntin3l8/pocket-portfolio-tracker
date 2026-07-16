@@ -27,7 +27,7 @@ export function RecordCorporateActionForm({
   client,
   onSuccess,
   stickyFooter = false,
-  isAdmin = true,
+  isAdmin = false,
 }: {
   client: RecordCorpActionClient;
   onSuccess?: () => void;

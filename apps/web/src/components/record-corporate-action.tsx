@@ -7,7 +7,7 @@ import { useRouter } from "@/i18n/navigation";
 /** Real-client wrapper: records the action, then returns to holdings. */
 export function RecordCorporateAction({
   stickyFooter = false,
-  isAdmin = true,
+  isAdmin = false,
 }: {
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;

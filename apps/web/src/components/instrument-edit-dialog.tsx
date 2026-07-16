@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import type { Instrument } from "@portfolio/api-client";
-import { ApiError } from "@portfolio/api-client";
+import { apiErrorCode } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,8 +71,8 @@ export function InstrumentEditDialog({
       toast.success(t("editSaved"));
       setOpen(false);
     } catch (err) {
-      const body = err instanceof ApiError ? err.body : "";
-      if (body.includes("conflict")) {
+      const code = apiErrorCode(err);
+      if (code === "identifier_conflict") {
         toast.error(t("editConflict"));
       } else {
         toast.error(t("editError"));

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { ChevronRight, Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import type { CorporateAction } from "@portfolio/api-client";
-import { ApiError } from "@portfolio/api-client";
+import { apiErrorCode } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -34,7 +34,7 @@ const TYPES = ["split", "bonus", "rights"] as const;
  */
 export function CorporateActionsManager({
   items: initial,
-  isAdmin = true,
+  isAdmin = false,
 }: {
   items: CorporateAction[];
   isAdmin?: boolean;
@@ -79,8 +79,12 @@ export function CorporateActionsManager({
       setSheetCa(null);
       router.refresh();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.body : tc("saveError");
-      toast.error(msg);
+      const code = apiErrorCode(err);
+      if (code && tc.has(`errors.${code}`)) {
+        toast.error(tc(`errors.${code}`));
+      } else {
+        toast.error(tc("saveError"));
+      }
     } finally {
       setBusy(false);
     }
@@ -93,8 +97,12 @@ export function CorporateActionsManager({
       setItems((prev) => prev.filter((c) => c.id !== id));
       router.refresh();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.body : tc("deleteError");
-      toast.error(msg);
+      const code = apiErrorCode(err);
+      if (code && tc.has(`errors.${code}`)) {
+        toast.error(tc(`errors.${code}`));
+      } else {
+        toast.error(tc("deleteError"));
+      }
     } finally {
       setBusy(false);
       setConfirmId(null);

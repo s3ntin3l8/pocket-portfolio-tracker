@@ -29,7 +29,7 @@ export function NewEntryTabs({
   defaultTab = "transaction",
   initialTransaction,
   stickyFooter = false,
-  isAdmin = true,
+  isAdmin = false,
 }: {
   portfolios: PickablePortfolio[];
   initialPortfolioId: string;
