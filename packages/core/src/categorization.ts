@@ -17,9 +17,6 @@ export function isDisposalType(type: string): boolean {
 export function isIncomeType(type: string): boolean {
   return (INCOME_TYPES as readonly string[]).includes(type);
 }
-export function isCashFlowType(type: string): boolean {
-  return (CASH_FLOW_TYPES as readonly string[]).includes(type);
-}
 export function isShareReceiptType(type: string): boolean {
   return (SHARE_RECEIPT_TYPES as readonly string[]).includes(type);
 }

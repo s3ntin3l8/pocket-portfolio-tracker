@@ -1,5 +1,4 @@
 import { Decimal } from "decimal.js";
-import { isIncomeType } from "./categorization.js";
 import { computeHoldings, marketValue } from "./holdings.js";
 import { cashBalances, cashFlow } from "./cash.js";
 import { netWorth, convert, type FxRateFn } from "./networth.js";
@@ -250,7 +249,8 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
 
   let totalIncome = new Decimal(0);
   for (const tx of input.transactions) {
-    if (isIncomeType(tx.type)) {
+    const isDivOrCoup = tx.type === "dividend" || tx.type === "coupon" || tx.type === "interest";
+    if (isDivOrCoup) {
       totalIncome = totalIncome.add(
         convert(cashFlow(tx).toString(), tx.currency, input.displayCurrency, fx),
       );
