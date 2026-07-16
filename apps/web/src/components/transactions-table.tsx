@@ -1,372 +1,51 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  ScanLine,
-  FileSpreadsheet,
-  PencilLine,
-  Landmark,
-  ListChecks,
-  Trash2,
-  Search,
-  X,
-  AlertTriangle,
-  AlertCircle,
-  Check,
-  FolderInput,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  ArrowRightLeft,
-  ArrowLeftRight,
-  Coins,
-  Gem,
-  Split,
-  GitMerge,
-  ChevronDown,
-  Scale,
-  Gift,
-  PiggyBank,
-  Sparkles,
-  RefreshCw,
-} from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
-import { toast } from "sonner";
-import type { LucideIcon } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
-import { EditTransactionSheet } from "@/components/edit-transaction-sheet";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useApiClient } from "@/lib/api";
-import { haptics } from "@/lib/haptics";
-import { cashFlow } from "@portfolio/core";
-import {
-  formatMoney,
-  formatMoneyCompact,
-  anomalyLabel,
-  cn,
-  type AnomalyTranslator,
-  rowAnomalyCounts,
-  bannerAnomalies,
-} from "@/lib/utils";
-import { Input } from "@/components/ui/input";
+import { formatMoneyCompact, bannerAnomalies } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
-import type { ColDef } from "@/lib/table-sort";
-import type { CoreTransaction } from "@portfolio/core";
-import type { SourceSummary, Anomaly, TransactionStatus } from "@portfolio/api-client";
+import { useLongPressSelect } from "@/lib/use-long-press-select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ReassignDialog } from "@/components/reassign-dialog";
-import { MergeDialog } from "@/components/merge-dialog";
-import type { PickablePortfolio } from "@/components/portfolio-picker";
+  computeAllBanner,
+  computeIncomeBanner,
+  computeTradeBanner,
+} from "@/lib/transaction-banners";
+import { toast } from "sonner";
+import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
+import { EditTransactionSheet } from "@/components/edit-transaction-sheet";
 import {
   AllFilterBanner,
   IncomeFilterBanner,
   TradeFilterBanner,
   ReconciliationBanner,
 } from "@/components/transactions/activity-banners";
-import {
-  computeAllBanner,
-  computeIncomeBanner,
-  computeTradeBanner,
-} from "@/lib/transaction-banners";
+import type { Anomaly } from "@portfolio/api-client";
+import type { PickablePortfolio } from "@/components/portfolio-picker";
 
-export const SOURCE_ICON: Record<string, LucideIcon> = {
-  screenshot: ScanLine,
-  csv: FileSpreadsheet,
-  manual: PencilLine,
-  pytr: Landmark,
-  pdf: FileSpreadsheet,
-  ibkr: Landmark,
-};
+import type { TxRow } from "./transactions-table/types";
+import { TX_COLS } from "./transactions-table/utils";
+import { AnomalyBanner } from "./transactions-table/banners";
+import { FilterBar } from "./transactions-table/filter-bar";
+import { SelectionBar } from "./transactions-table/selection-bar";
+import { ReassignMergeDialogs } from "./transactions-table/reassign-merge";
+import { DesktopTable } from "./transactions-table/desktop";
+import { MobileView } from "./transactions-table/mobile";
+import { LoadMoreSection } from "./transactions-table/load-more";
+import { anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 
-/** Per-kind icon + tint, matching the reference's `TYPE` map (buy/sell arrows, a coin for
- *  dividend/coupon, cash in/out arrows, a gem for share events, teal for transfers/merger).
- *  `loan_drawdown`/`loan_repayment` (gold cicilan) have no reference equivalent — grouped
- *  with cash in/out by cashflow direction. */
-const TYPE_ICON: Record<
-  string,
-  { icon: LucideIcon; tone: "success" | "destructive" | "warning" | "violet" | "teal" }
-> = {
-  buy: { icon: ArrowDownToLine, tone: "success" },
-  savings_plan: { icon: ArrowDownToLine, tone: "success" },
-  sell: { icon: ArrowUpFromLine, tone: "destructive" },
-  dividend: { icon: Coins, tone: "warning" },
-  coupon: { icon: Coins, tone: "warning" },
-  deposit: { icon: ArrowDownCircle, tone: "success" },
-  interest: { icon: ArrowDownCircle, tone: "success" },
-  bonus_cash: { icon: ArrowDownCircle, tone: "success" },
-  loan_drawdown: { icon: ArrowDownCircle, tone: "success" },
-  withdrawal: { icon: ArrowUpCircle, tone: "destructive" },
-  fee: { icon: ArrowUpCircle, tone: "destructive" },
-  tax: { icon: ArrowUpCircle, tone: "destructive" },
-  loan_repayment: { icon: ArrowUpCircle, tone: "destructive" },
-  bonus: { icon: Gem, tone: "violet" },
-  rights: { icon: Gem, tone: "violet" },
-  split: { icon: Split, tone: "violet" },
-  transfer_in: { icon: ArrowRightLeft, tone: "teal" },
-  transfer_out: { icon: ArrowLeftRight, tone: "teal" },
-  merger: { icon: GitMerge, tone: "teal" },
-  // Manual signed cash true-up — a structural correction, not organic activity, so it
-  // groups tonally with transfers/merger rather than a real cash in/out flow.
-  adjustment: { icon: Scale, tone: "teal" },
-};
+export type { TxRow } from "./transactions-table/types";
+export { SOURCE_ICON } from "./transactions-table/types";
+export {
+  txAmount,
+  txNetAmount,
+  txAmountDisplay,
+  txNetAmountDisplay,
+} from "./transactions-table/utils";
 
-/** Perk/reward `kind` sub-types that all collapse to a generic `buy`/`savings_plan` `type` and
- *  would otherwise be indistinguishable in the list (e.g. TR saveback vs round-up vs crypto
- *  bonus). Keyed by `kind`, takes precedence over {@link TYPE_ICON} when present — see
- *  {@link TypeIconChip} and the row label in the Transaction column. */
-const KIND_ICON: Record<
-  string,
-  { icon: LucideIcon; tone: "success" | "destructive" | "warning" | "violet" | "teal" }
-> = {
-  // Real cash bonus from TR, reinvested cash-neutral — distinct from a round-up's real spend.
-  saveback: { icon: Gift, tone: "violet" },
-  // Spare-change purchase funded by the user's own money — a real cash-out, unlike saveback.
-  roundup: { icon: PiggyBank, tone: "success" },
-  // TR's "1% crypto bonus" reward-funded buy — cash-neutral, like saveback.
-  crypto_bonus: { icon: Sparkles, tone: "violet" },
-  // Dividend reinvestment funded by the payout itself, not external capital.
-  reinvestment: { icon: RefreshCw, tone: "success" },
-};
-
-const TYPE_TONE_CLASSES = {
-  success: "bg-success/15 text-success",
-  destructive: "bg-destructive/15 text-destructive",
-  warning: "bg-warning/15 text-warning",
-  violet: "bg-[#7C5CFC]/15 text-[#7C5CFC]",
-  teal: "bg-[#0D9488]/15 text-[#0D9488]",
-} as const;
-
-// Reference SRCTYPE provenance tags: tinted 700 9px pills per source.
-const SRC_TONES: Record<string, React.CSSProperties> = {
-  csv: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
-  pdf: { background: "rgba(229,72,77,.13)", color: "#E5484D" },
-  screenshot: { background: "rgba(124,92,252,.16)", color: "#7C5CFC" },
-  pytr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
-  ibkr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
-  manual: { background: "var(--border)", color: "var(--text-mute)" },
-};
-
-/** Distinct source types backing a row's provenance chips — one chip per source (e.g. a
- *  CSV row later enriched by a PDF shows both), falling back to the single legacy `source`
- *  field when there's no `sources[]` breakdown (manual entries, or pre-provenance data). */
-function sourceTypesFor(tx: TxRow): string[] {
-  const types = (tx.sources ?? []).map((s) => s.sourceType).filter(Boolean);
-  return types.length > 0 ? [...new Set(types)] : [tx.source];
-}
-
-/** One tinted pill per distinct source type on a row (see {@link sourceTypesFor}). */
-function SourceChips({
-  tx,
-  t,
-  chipClassName,
-}: {
-  tx: TxRow;
-  t: (key: `sources.${string}`) => string;
-  chipClassName: string;
-}) {
-  return (
-    <>
-      {sourceTypesFor(tx).map((type) => (
-        <span key={type} className={chipClassName} style={SRC_TONES[type] ?? SRC_TONES.manual}>
-          {t(`sources.${type}`)}
-        </span>
-      ))}
-    </>
-  );
-}
-
-function TypeIconChip({
-  type,
-  kind,
-  className,
-}: {
-  type: string;
-  kind?: string | null;
-  className?: string;
-}) {
-  const entry = (kind && KIND_ICON[kind]) ?? TYPE_ICON[type];
-  if (!entry) return null;
-  const Icon = entry.icon;
-  return (
-    <span
-      className={cn(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]",
-        TYPE_TONE_CLASSES[entry.tone],
-        className,
-      )}
-      aria-hidden
-    >
-      <Icon className="size-[18px]" strokeWidth={2.2} />
-    </span>
-  );
-}
-
-export interface TxRow {
-  id: string;
-  portfolioId: string;
-  portfolioName?: string;
-  type: string;
-  quantity: string;
-  price: string;
-  fees: string;
-  tax?: string | null;
-  fxRate?: string | null;
-  /** Dividend/coupon per-share rate, in the instrument's native currency (income rows only).
-   *  `price`/`quantity` keep their existing net-cash/zero-quantity semantics unchanged. */
-  perShare?: string | null;
-  /** Shares the per-share rate above was paid on — NOT the same field as `quantity`. */
-  shares?: string | null;
-  /** The instrument's native currency for a foreign-currency income payment, when it differs
-   *  from `currency` (the cash actually credited). */
-  nativeCurrency?: string | null;
-  /** Gross payment amount in `nativeCurrency`, before FX conversion and withholding tax. */
-  grossNative?: string | null;
-  /** True when `shares`/`perShare` were derived read-time from holdings history (#508)
-   *  rather than parsed from the source — an approximation, may disagree with a later
-   *  authoritative value for the same payment. */
-  sharesEstimated?: boolean;
-  currency: string;
-  /** Present only when the list was fetched with a scope currency (#465): the rate to
-   *  multiply an amount in `currency` by to land in `displayCurrency`, at this row's own
-   *  trade date. `"1"` for same-currency rows and unknown FX pairs (unconverted). */
-  displayRate?: string | null;
-  /** The scope currency `displayRate` converts into; present alongside `displayRate`. */
-  displayCurrency?: string | null;
-  executedAt: string;
-  source: string;
-  instrument: {
-    symbol?: string | null;
-    name?: string | null;
-    /** Clean human-readable name from provider enrichment; prefer over `name` for display. */
-    displayName?: string | null;
-    /** Present at runtime (from listTransactions) — needed to prefill the edit form. */
-    assetClass?: string | null;
-    unit?: string | null;
-  } | null;
-  /** Fields carried at runtime (listTransactions) that the edit form prefills from. */
-  instrumentId?: string | null;
-  description?: string | null;
-  tags?: string[] | null;
-  kind?: string | null;
-  /** True when the parent import has a retained source document (#231). */
-  hasDocument?: boolean;
-  /** Import dedup key; null for manually-entered transactions. */
-  externalId?: string | null;
-  /** True when at least one source row has per-component taxComponents. */
-  hasFullTaxDetail?: boolean;
-  /** Source-provenance rows — empty for manual transactions. */
-  sources?: SourceSummary[];
-  /** Visibility status; undefined ⇒ "normal". archived = ignored everywhere. */
-  status?: TransactionStatus;
-  /** Low-confidence parse — draft rows flagged for review get an extra marker. */
-  needsReview?: boolean;
-}
-
-/** Compute the signed cash-flow (actual cash movement) for a TxRow via core, for DISPLAY.
- * A `draft` previews the cash it will move once confirmed (drafts already carry an amber row
- * + "Draft" badge) — real balances are derived in @portfolio/core, which excludes drafts, so
- * showing the face value here never affects a computed total. `cash_neutral` (reward-funded,
- * genuinely ~0 cash) and `archived` (voided → 0) keep their real net. */
-export function txNetAmount(tx: TxRow): number {
-  const status = tx.status === "draft" ? "normal" : tx.status;
-  return cashFlow({
-    instrumentId: null,
-    type: tx.type as CoreTransaction["type"],
-    quantity: tx.quantity,
-    price: tx.price,
-    fees: tx.fees,
-    currency: tx.currency,
-    executedAt: new Date(tx.executedAt),
-    status,
-  }).toNumber();
-}
-
-/**
- * Compute the gross amount for display: notional (qty×price) for trades,
- * or gross income (price + tax) for dividends/cash flows.
- */
-export function txAmount(tx: TxRow): number {
-  const qty = Number(tx.quantity);
-  const price = Number(tx.price);
-  return qty > 0
-    ? qty * price // trade: notional
-    : price + (tx.tax ? Number(tx.tax) : 0); // income/cash: gross
-}
-
-/** `tx.displayRate` as a number, or `1` when absent (row currency === scope currency, or
- *  the list wasn't fetched with a scope currency at all). See {@link TxRow.displayRate}. */
-export function displayRate(tx: TxRow): number {
-  return tx.displayRate ? Number(tx.displayRate) : 1;
-}
-
-/** {@link txAmount}, converted into the row's `displayCurrency` (the scope currency) at its
- *  own trade-date rate — used by cross-row aggregators (the Activity banners) so every row
- *  contributes, never dropped for being in a non-dominant currency (#465). */
-export function txAmountDisplay(tx: TxRow): number {
-  return txAmount(tx) * displayRate(tx);
-}
-
-/** {@link txNetAmount}, converted the same way as {@link txAmountDisplay}. */
-export function txNetAmountDisplay(tx: TxRow): number {
-  return txNetAmount(tx) * displayRate(tx);
-}
-
-/**
- * Quantity/price cells fall back to "—" for income rows because `quantity` is always "0" by
- * convention (see TxRow doc comments) — but a dividend/coupon parsed from a settlement PDF may
- * still carry an informational `shares`/`perShare` pair. When present, show THOSE instead of a
- * bare dash: shares under the Quantity column, per-share rate (in its native currency when the
- * payment was foreign) under Price. Purely a display fallback — never affects `txNetAmount`/
- * `txAmount`, which keep reading `tx.price`/`tx.quantity` unchanged.
- */
-export function rowQuantityDisplay(tx: TxRow): string | null {
-  if (Number(tx.quantity) > 0) return null; // real trade row — caller uses tx.quantity as-is
-  return tx.shares ?? null;
-}
-
-export function rowPerShareDisplay(
-  tx: TxRow,
-  m: (n: number, currency: string) => string,
-): string | null {
-  if (Number(tx.quantity) > 0) return null; // real trade row — caller uses tx.price as-is
-  if (tx.perShare == null) return null;
-  return m(Number(tx.perShare), tx.nativeCurrency ?? tx.currency);
-}
-
-/**
- * Transactions table with row selection and batch delete. When `showPortfolio` is set
- * (the aggregate "All portfolios" view) a Portfolio column is shown and a batch delete
- * is fanned out per portfolio, since the delete endpoint is portfolio-scoped.
- */
-const TX_COLS: ColDef<TxRow>[] = [
-  { key: "date", get: (r) => r.executedAt, type: "date" },
-  { key: "instrument", get: (r) => r.instrument?.symbol ?? r.type, type: "text" },
-  { key: "portfolio", get: (r) => r.portfolioName ?? "", type: "text" },
-  { key: "quantity", get: (r) => r.quantity, type: "numeric" },
-  { key: "price", get: (r) => Number(r.price), type: "numeric" },
-  { key: "tax", get: (r) => (r.tax != null ? Number(r.tax) : 0), type: "numeric" },
-  { key: "netAmount", get: (r) => txNetAmount(r), type: "numeric" },
-  { key: "source", get: (r) => r.source, type: "text" },
-];
+const PAGE_SIZE = 25;
 
 export function TransactionsTable({
   rows,
@@ -385,49 +64,27 @@ export function TransactionsTable({
 }: {
   rows: TxRow[];
   showPortfolio?: boolean;
-  /** Per-transaction anomalies keyed by transactionId; shows a flag icon on the row. */
   anomalies?: Anomaly[];
-  /** All of the user's portfolios — enables the "Reassign…" action (hidden when fewer
-   *  than two are available, since there's nowhere to move rows to). */
   portfolios?: PickablePortfolio[];
-  /** The Activity screen's filter-scoped summary banners (All/Income/Buys/Sells + the
-   *  reconciliation banner). Only the top-level `/transactions` list wants these; the
-   *  Instrument-detail page embeds this same table for its own "Transactions" section,
-   *  which the design shows as a plain list with no banners. */
   showFilterBanners?: boolean;
-  /** The active scope's currency (#465): a portfolio's `baseCurrency` when one is selected,
-   *  else the aggregate/holder display-currency selector. Drives the banner totals (each
-   *  row is pre-converted via `displayRate`) and the detail sheet's secondary amount. */
   scopeCurrency?: string;
-  /** Server-computed summary aggregates for the current filter (all pages). Present when
-   *  a single portfolio is selected (not the aggregate view). */
   summary?: {
     totalInvested: string | null;
     totalProceeds: string | null;
     totalIncome: string | null;
   } | null;
-  /** Available years for the year filter dropdown, derived server-side from the full
-   *  (unpaginated) transaction set. */
   years?: string[];
-  /** Active transaction-type filter from the URL (buy/sell/income). */
   typeFilter?: string;
-  /** Active year filter from the URL. Renamed to avoid shadowing the local variable. */
   yearFilter?: string;
-  /** Active search query from the URL. */
   searchQuery?: string;
-  /** Portfolio ID for server-side "Load more" fetching. Absent in aggregate view. */
   portfolioId?: string;
-  /** Total matching transactions (all pages), used by "Load more" to know when to stop. */
   total?: number;
 }) {
-  const t = useTranslations("Transactions");
-  const tt = useTranslations("TxType");
-  const tm = useTranslations("Manage");
   const ta = useTranslations("Anomalies");
-  const tb = useTranslations("Transactions.batch");
   const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { sortKey, sortDir, toggle: toggleSort, sort } = useTableSort<TxRow>(TX_COLS);
 
@@ -437,7 +94,6 @@ export function TransactionsTable({
     for (const a of anomalies) {
       if (!a.transactionId) continue;
       const existing = m.get(a.transactionId);
-      // Prefer error over warning.
       if (!existing || (existing.severity === "warning" && a.severity === "error")) {
         m.set(a.transactionId, a);
       }
@@ -445,30 +101,13 @@ export function TransactionsTable({
     return m;
   }, [anomalies]);
 
-  // Number of rows that actually carry a transaction-scoped anomaly (portfolio-scoped
-  // anomalies like reconciliation_gap have no transactionId, so they don't filter to a row).
   const flaggedCount = anomalyByTxId.size;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Batch-select is off by default: checkboxes stay hidden until a long-press (long-click
-  // on desktop / touch-and-hold on mobile) enters selection mode. Exiting clears both.
-  const [selectionMode, setSelectionMode] = useState(false);
-  const clearSelection = () => {
-    setSelected(new Set());
-    setSelectionMode(false);
-  };
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [showFlagged, setShowFlagged] = useState(false);
-  const [localQuery, setLocalQuery] = useState(searchQuery ?? "");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const searchParams = useSearchParams();
-  // How many of the (already filtered+sorted) rows to render — the ledger can grow long
-  // for old/frequent portfolios, pushing "Recent imports" far below the fold. Capped with
-  // an explicit "Load more" button rather than infinite-scroll: scroll-triggered loading
-  // never bottoms out, which would make Recent imports permanently unreachable by scroll.
-  const PAGE_SIZE = 25;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [detailTx, setDetailTx] = useState<TxRow | null>(null);
   const [editTx, setEditTx] = useState<TxRow | null>(null);
@@ -477,7 +116,6 @@ export function TransactionsTable({
   const [accumulatedRows, setAccumulatedRows] = useState<TxRow[]>(rows);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
-  // Detect rows prop change (new filter / SSR re-fetch) and reset accumulated state.
   const [prevRows, setPrevRows] = useState(rows);
   if (prevRows !== rows) {
     setPrevRows(rows);
@@ -485,29 +123,34 @@ export function TransactionsTable({
     setCurrentPage(1);
   }
 
-  // When the last flagged transaction is dismissed (router.refresh re-feeds an empty
-  // anomalies list), clear the filter so the user isn't stranded on an empty list.
-  // Adjusting state during render is React's recommended pattern over a setState-in-effect.
-  if (showFlagged && flaggedCount === 0) {
-    setShowFlagged(false);
-  }
-  // Id of a single row currently being confirmed/discarded (shows a spinner on that row).
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const [reassignRows, setReassignRows] = useState<TxRow[] | null>(null);
+  const [mergeRows, setMergeRows] = useState<[TxRow, TxRow] | null>(null);
+
+  const tr = useTranslations("Transactions.reassign");
+
+  const clearSelection = () => {
+    setSelected(new Set());
+    setSelectionMode(false);
+  };
+
+  // Long-press selection using the shared hook.
+  const { selectionMode, setSelectionMode, longPressHandlers, consumeLongPress } =
+    useLongPressSelect((id) => {
+      setSelected((prev) => new Set(prev).add(id));
+    });
 
   const draftCount = useMemo(() => rows.filter((r) => r.status === "draft").length, [rows]);
 
-  // When the last draft is confirmed/discarded (router.refresh re-feeds rows with no
-  // drafts), clear the filter so the user isn't stranded on an empty list. Adjusting
-  // state during render is React's recommended pattern over a setState-in-effect.
+  if (showFlagged && flaggedCount === 0) {
+    setShowFlagged(false);
+  }
+
   if (draftFilter === "drafts" && draftCount === 0) {
     setDraftFilter("all");
   }
 
-  // Keep the open detail sheet in sync with `rows`: it's opened from a snapshot (onRowActivate
-  // below), so once router.refresh() re-feeds updated rows (e.g. after confirming/discarding
-  // the very row the sheet is showing), re-point it at the fresh copy instead of freezing on
-  // the pre-refresh draft. Closes the sheet if the row no longer appears at all (e.g. deleted
-  // elsewhere). Adjusting state during render, same pattern as the filters above.
   if (detailTx) {
     const freshDetailTx = accumulatedRows.find((r) => r.id === detailTx.id) ?? null;
     if (freshDetailTx !== detailTx) {
@@ -515,10 +158,6 @@ export function TransactionsTable({
     }
   }
 
-  // Re-cap the visible window whenever the effective view changes, so a newly narrowed
-  // filter/search/sort starts short instead of inheriting a stale "loaded 200" from the
-  // previous view. Tracks the prior signature in state (not a ref) per React's documented
-  // "adjusting state when a value changes during render" pattern.
   const viewSignature = `${draftFilter}|${showFlagged}|${sortKey}`;
   const [prevViewSignature, setPrevViewSignature] = useState(viewSignature);
   if (viewSignature !== prevViewSignature) {
@@ -526,7 +165,6 @@ export function TransactionsTable({
     setVisibleCount(PAGE_SIZE);
   }
 
-  // Year options from the server (full unpaginated set) or derived from rows as fallback.
   const yearOptions = useMemo(
     () =>
       years.length > 0
@@ -537,8 +175,6 @@ export function TransactionsTable({
     [years, rows],
   );
 
-  // Client-side filters only: draft visibility and flagged-only toggle. All other
-  // filtering (type, year, search) is handled server-side via URL params.
   const visibleRows = useMemo(() => {
     return accumulatedRows.filter(
       (r) =>
@@ -547,8 +183,6 @@ export function TransactionsTable({
     );
   }, [accumulatedRows, showFlagged, anomalyByTxId, draftFilter]);
 
-  // Whether any picker/search is narrowing the view, so the empty state can distinguish
-  // "no transactions at all" from "no transactions match the current filter".
   const hasActiveFilter =
     (searchQuery != null && searchQuery.length > 0) ||
     showFlagged ||
@@ -556,16 +190,10 @@ export function TransactionsTable({
     yearFilterProp != null ||
     draftFilter !== "all";
 
-  // Which filter-scoped summary banner (if any) to show above the list — keyed off the
-  // URL type param. The "all" banner is the default when no type filter is active.
   const tBanner = useTranslations("Transactions.banners");
   const activeBannerMode: "all" | "income" | "buy" | "sell" | null =
     typeFilter == null ? "all" : (typeFilter as "all" | "income" | "buy" | "sell");
 
-  // Banners are computed from the full (unfiltered-by-other-pickers) `rows` — they answer
-  // "how much have I invested/received, all time / YTD", not "how much is in the current
-  // table view" — mirroring the source design, whose equivalent aggregates ignore the other
-  // filters too.
   const allBanner = useMemo(() => {
     if (activeBannerMode !== "all") return null;
     if (summary) {
@@ -614,8 +242,6 @@ export function TransactionsTable({
   }, [activeBannerMode, summary, rows, scopeCurrency, locale, tBanner]);
   const incomeBanner = useMemo(() => {
     if (activeBannerMode !== "income") return null;
-    // Can't compute a full income banner from just the summary (missing YTD breakdown).
-    // Fall back to rows data when summary is unavailable (aggregate view).
     return computeIncomeBanner(rows, scopeCurrency, locale, {
       vsLastYear: (pct) => tBanner("vsLastYear", { pct }),
       new: tBanner("newIncome"),
@@ -642,7 +268,6 @@ export function TransactionsTable({
     return computeTradeBanner(rows, activeBannerMode, scopeCurrency, locale);
   }, [activeBannerMode, summary, rows, scopeCurrency, locale]);
 
-  // Navigate with a URL param update (type/year/q). Resets to page 1 on filter change.
   const navigateWithParam = useCallback(
     (key: string, value: string | undefined) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -657,34 +282,8 @@ export function TransactionsTable({
     [router, searchParams],
   );
 
-  // Cleanup debounce on unmount.
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    },
-    [],
-  );
-
-  // Anomalies with no transactionId (reconciliation_gap, position_gap, …) never drive the
-  // row-level "Show flagged" toggle above — surfaced here instead, independent of any
-  // filter. There can be more than one (e.g. a position_gap per ISIN), so every one is
-  // rendered — not just the first. Partitioned by `isRowAnomaly` (via bannerAnomalies), not
-  // a hardcoded code list, so any anomaly that can't attach to a row (including an edge-case
-  // negative_cash with no matching transactionId) always ends up shown somewhere.
   const portfolioAnomalies = useMemo(() => bannerAnomalies(anomalies), [anomalies]);
 
-  const m = (n: number, currency: string) => formatMoney(n, currency, locale);
-  // Reference row date cell: short, day-first "5 Jun" (`d + " " + SHORT[mo]`), regardless
-  // of locale ordering; month-band label: "June 2026". UTC throughout so the day never
-  // drifts against the ISO date used for month grouping.
-  const monthShort = useMemo(
-    () => new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }),
-    [locale],
-  );
-  const rowDate = (iso: string) => {
-    const d = new Date(iso);
-    return `${d.getUTCDate()} ${monthShort.format(d)}`;
-  };
   const monthFmt = useMemo(
     () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }),
     [locale],
@@ -697,7 +296,6 @@ export function TransactionsTable({
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
-    // Deselecting the last row leaves selection mode (hides the checkboxes again).
     if (next.size === 0) setSelectionMode(false);
   }
 
@@ -705,57 +303,15 @@ export function TransactionsTable({
     setSelected(allSelected ? new Set() : new Set(visibleRows.map((r) => r.id)));
   }
 
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressFired = useRef(false);
-  const pressStart = useRef<{ x: number; y: number } | null>(null);
-  const clearLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-  const startLongPress = (id: string, e: React.PointerEvent) => {
-    longPressFired.current = false;
-    pressStart.current = { x: e.clientX, y: e.clientY };
-    clearLongPress();
-    longPressTimer.current = setTimeout(() => {
-      longPressFired.current = true;
-      setSelectionMode(true);
-      haptics.selectionStart();
-      setSelected((prev) => new Set(prev).add(id));
-    }, 450);
-  };
-  // Cancel the hold only on real movement (a scroll), not the sub-pixel finger jitter that
-  // touch browsers report while holding still — a bare "cancel on any move" never fires on
-  // touch. 10px threshold distinguishes a hold from a scroll/drag.
-  const onPressMove = (e: React.PointerEvent) => {
-    const start = pressStart.current;
-    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) {
-      clearLongPress();
-    }
-  };
-  // Row tap: swallow the click that follows a long-press; in selection mode toggle the row;
-  // otherwise open the detail sheet.
   const onRowActivate = (tx: TxRow) => {
-    if (longPressFired.current) {
-      longPressFired.current = false;
-      return;
-    }
+    if (consumeLongPress()) return;
     if (selectionMode) toggle(tx.id);
     else setDetailTx(tx);
   };
-  const longPressHandlers = (id: string) => ({
-    onPointerDown: (e: React.PointerEvent) => startLongPress(id, e),
-    onPointerUp: clearLongPress,
-    onPointerLeave: clearLongPress,
-    onPointerMove: onPressMove,
-  });
 
   async function onBatchDelete() {
-    haptics.destructiveConfirm();
     setBusy(true);
     try {
-      // Group by portfolio — the delete endpoint is scoped to one portfolio.
       const byPortfolio = new Map<string, string[]>();
       for (const r of rows) {
         if (!selected.has(r.id)) continue;
@@ -776,7 +332,6 @@ export function TransactionsTable({
     }
   }
 
-  // Ids of the currently-selected DRAFT rows (the only ones confirm/discard act on).
   const selectedDraftIds = useMemo(
     () => rows.filter((r) => selected.has(r.id) && r.status === "draft").map((r) => r.id),
     [rows, selected],
@@ -785,7 +340,6 @@ export function TransactionsTable({
   async function onBatchResolve(action: "confirm" | "discard") {
     setBusy(true);
     try {
-      // Group by portfolio — the resolve endpoint is scoped to one portfolio.
       const byPortfolio = new Map<string, string[]>();
       for (const r of rows) {
         if (!selected.has(r.id) || r.status !== "draft") continue;
@@ -815,24 +369,13 @@ export function TransactionsTable({
     }
   }
 
-  // Reassignment: the rows queued for a move (a single row, or the current selection). The
-  // dialog is open whenever this is non-null; reassignable only when ≥2 portfolios exist.
   const canReassign = portfolios.length > 1;
-  const [reassignRows, setReassignRows] = useState<TxRow[] | null>(null);
-  const tr = useTranslations("Transactions.reassign");
-
-  // Merge: only offered for exactly two selected rows in the SAME portfolio (a cross-portfolio
-  // merge doesn't correspond to any real economic event — each portfolio is its own boundary).
-  // The dialog itself re-validates server-side (same instrument, compatible type, no loan legs)
-  // via the preview endpoint and surfaces a blocked reason when those guardrails fail.
   const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
   const canMerge =
     selectedRows.length === 2 && selectedRows[0].portfolioId === selectedRows[1].portfolioId;
-  const [mergeRows, setMergeRows] = useState<[TxRow, TxRow] | null>(null);
 
   async function doReassign(targetPortfolioId: string) {
     const queued = reassignRows ?? [];
-    // Group by source portfolio — the reassign endpoint is scoped to one source portfolio.
     const byPortfolio = new Map<string, string[]>();
     for (const r of queued) {
       if (r.portfolioId === targetPortfolioId) continue;
@@ -859,22 +402,13 @@ export function TransactionsTable({
     router.refresh();
   }
 
-  // checkbox + date + transaction + [portfolio] + quantity + price + source + amount.
   const colSpan = showPortfolio ? 9 : 8;
 
   const sortedRows = sort(visibleRows);
-  // Cap how many of the (filtered+sorted) rows actually render — see PAGE_SIZE/visibleCount
-  // above. Select-all and the empty-state check deliberately keep reading `visibleRows` (the
-  // full filtered set), not this window, so "select all" still covers everything filtered,
-  // not just what's currently rendered. Memoized (unlike `sortedRows`, a bare re-sort call)
-  // so it has a stable identity for `dayGroups`' dependency array below.
   const windowedRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount]);
   const hasMore = sortedRows.length > windowedRows.length || accumulatedRows.length < (total ?? 0);
-  // The reference groups the ledger into month bands. That only reads coherently while the
-  // list is in date order (the default, or an explicit Date sort); any other sort renders flat.
   const groupByMonth = sortKey === null || sortKey === "date";
 
-  // Mobile (reference): a card per DAY rather than a table. Same ordered source list.
   const dayFmt = useMemo(
     () =>
       new Intl.DateTimeFormat(locale, {
@@ -896,56 +430,56 @@ export function TransactionsTable({
     return groups;
   }, [windowedRows, dayFmt]);
 
-  // Anomaly banner — only when anomalies exist (only passed in single-portfolio view).
-  // Counts must match what the page can actually surface, or "N warnings" promises rows
-  // that "Show flagged only" can never show — so this counts ONLY row-attached anomalies
-  // (rowAnomalyCounts, same dedup as anomalyByTxId: two anomalies on one transaction count
-  // once, worst severity wins). Every anomaly that can't attach to a row instead renders its
-  // own ReconciliationBanner below (see portfolioAnomalies) and is deliberately excluded
-  // from this count.
-  const { errors: anomalyErrorsCount, warnings: anomalyWarningsCount } =
-    rowAnomalyCounts(anomalies);
-  const anomalyBanner =
-    anomalyErrorsCount > 0 || anomalyWarningsCount > 0 ? (
-      <div
-        role="alert"
-        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm ${
-          anomalyErrorsCount > 0
-            ? "border-destructive/40 bg-destructive/5 text-destructive"
-            : "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-        }`}
-      >
-        {anomalyErrorsCount > 0 ? (
-          <AlertCircle className="size-4 shrink-0" />
-        ) : (
-          <AlertTriangle className="size-4 shrink-0" />
-        )}
-        <span className="flex-1">
-          {anomalyErrorsCount > 0 && anomalyWarningsCount > 0
-            ? ta("bannerBoth", { errors: anomalyErrorsCount, warnings: anomalyWarningsCount })
-            : anomalyErrorsCount > 0
-              ? ta("bannerError", { count: anomalyErrorsCount })
-              : ta("bannerWarning", { count: anomalyWarningsCount })}
-        </span>
-        {flaggedCount > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant={showFlagged ? "secondary" : "outline"}
-            aria-pressed={showFlagged}
-            onClick={() => setShowFlagged((v) => !v)}
-          >
-            {ta("showFlagged")}
-          </Button>
-        )}
-      </div>
-    ) : null;
+  const handleLoadMore = useCallback(async () => {
+    if (visibleCount < sortedRows.length) {
+      setVisibleCount((n) => n + PAGE_SIZE);
+      return;
+    }
+    if (accumulatedRows.length < (total ?? 0)) {
+      setLoadingMore(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(currentPage + 1),
+          pageSize: "25",
+        });
+        if (typeFilter) params.set("type", typeFilter);
+        if (yearFilterProp) params.set("year", yearFilterProp);
+        if (searchQuery) params.set("q", searchQuery);
+        const basePath = portfolioId
+          ? `/api/backend/portfolios/${portfolioId}/transactions`
+          : "/api/backend/networth/transactions";
+        const res = await fetch(`${basePath}?${params}`);
+        const data = await res.json();
+        setAccumulatedRows((prev) => [...prev, ...data.rows]);
+        setCurrentPage((p) => p + 1);
+        setVisibleCount((n) => n + data.rows.length);
+      } finally {
+        setLoadingMore(false);
+      }
+    }
+  }, [
+    visibleCount,
+    sortedRows.length,
+    accumulatedRows.length,
+    total,
+    currentPage,
+    typeFilter,
+    yearFilterProp,
+    searchQuery,
+    portfolioId,
+  ]);
+
+  const showEmpty = visibleRows.length === 0;
 
   return (
     <div className="space-y-3">
-      {anomalyBanner}
+      <AnomalyBanner
+        anomalies={anomalies}
+        flaggedCount={flaggedCount}
+        showFlagged={showFlagged}
+        onToggleFlagged={() => setShowFlagged((v) => !v)}
+      />
 
-      {/* Hero filter banner sits above the chips/search + table (chips below drive it). */}
       {showFilterBanners && allBanner && (
         <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
       )}
@@ -981,656 +515,104 @@ export function TransactionsTable({
           />
         ))}
 
-      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
-        {/* Chips scroll horizontally on mobile (no awkward multi-line wrap); wrap on desktop. */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
-          {/* Reference tChips: rounded-full pills, active = white on var(--pill),
-            inactive = 600 on card bg with a border. Navigational — update the URL,
-            server re-fetches with the new filter. "Needs review · N" is local state. */}
-          {(
-            [
-              ["all", t("filterAll")],
-              ["buy", tBanner("chipBuys")],
-              ["sell", tBanner("chipSells")],
-              ["income", tBanner("chipIncome")],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => navigateWithParam("type", key === "all" ? undefined : key)}
-              aria-pressed={key === "all" ? !typeFilter : typeFilter === key}
-              className={cn(
-                "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
-                (key === "all" ? !typeFilter : typeFilter === key)
-                  ? "bg-pill font-bold text-white"
-                  : "border border-border bg-card font-semibold text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-          {anomalyByTxId.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowFlagged((v) => !v)}
-              aria-pressed={showFlagged}
-              className={cn(
-                "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
-                showFlagged
-                  ? "border-[var(--gold-fg)] bg-[var(--gold-fg)] text-white"
-                  : "border-[rgba(224,165,58,.34)] bg-[rgba(224,165,58,.12)] text-[var(--gold-fg)]",
-              )}
-            >
-              {tBanner("chipIssues", { count: anomalyByTxId.size })}
-            </button>
-          )}
-          {yearOptions.length > 1 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={t("filterYear")}
-                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {yearFilterProp ?? t("allYears")}
-                  <ChevronDown className="size-3.5 shrink-0 text-text-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[9rem]">
-                {["all", ...yearOptions].map((y) => (
-                  <DropdownMenuItem
-                    key={y}
-                    onSelect={() => navigateWithParam("year", y === "all" ? undefined : y)}
-                    className="justify-between gap-3"
-                  >
-                    {y === "all" ? t("allYears") : y}
-                    {(y === "all" ? !yearFilterProp : yearFilterProp === y) && (
-                      <Check className="size-4 text-primary" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {draftCount > 0 && (
-            <select
-              aria-label={t("filterDraftLabel")}
-              value={draftFilter}
-              onChange={(e) => setDraftFilter(e.target.value as "all" | "drafts")}
-              className="h-8 rounded-full border border-border bg-card px-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="all">{t("draftShowAll")}</option>
-              <option value="drafts">{t("draftOnly", { count: draftCount })}</option>
-            </select>
-          )}
-        </div>
-        <div className="relative flex items-center sm:ml-auto">
-          <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder={t("searchPlaceholder")}
-            value={localQuery}
-            onChange={(e) => {
-              const v = e.target.value;
-              setLocalQuery(v);
-              if (debounceRef.current) clearTimeout(debounceRef.current);
-              debounceRef.current = setTimeout(() => {
-                navigateWithParam("q", v || undefined);
-              }, 300);
-            }}
-            className="h-8 w-full pl-7 pr-7 text-xs sm:w-44"
-          />
-          {localQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setLocalQuery("");
-                if (debounceRef.current) clearTimeout(debounceRef.current);
-                navigateWithParam("q", undefined);
-              }}
-              aria-label={t("searchClear")}
-              className="absolute right-2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {selectionMode && (
-        <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
-          <span className="flex items-center gap-2 text-muted-foreground">
-            {/* Exit selection mode (clearing the set also hides the checkboxes again). */}
-            <button
-              type="button"
-              onClick={clearSelection}
-              aria-label={tb("cancel")}
-              title={tb("cancel")}
-              className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
-            {selected.size > 0 ? tb("selected", { count: selected.size }) : tb("selectPrompt")}
-          </span>
-          {selected.size > 0 &&
-            (confirming ? (
-              <span className="flex items-center gap-2">
-                <span className="text-muted-foreground">{tb("confirmPrompt")}</span>
-                <Button size="sm" variant="destructive" onClick={onBatchDelete} disabled={busy}>
-                  {busy && <Spinner size="xs" />}
-                  {tb("confirm")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirming(false)}
-                  disabled={busy}
-                >
-                  {tb("cancel")}
-                </Button>
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                {selectedDraftIds.length > 0 && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => onBatchResolve("confirm")}
-                      disabled={busy}
-                    >
-                      {busy && <Spinner size="xs" />}
-                      <Check className="size-3.5" />
-                      {tb("confirmDrafts")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onBatchResolve("discard")}
-                      disabled={busy}
-                    >
-                      {tb("discardDrafts")}
-                    </Button>
-                  </>
-                )}
-                {canReassign && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
-                    disabled={busy}
-                  >
-                    <FolderInput className="size-3.5" />
-                    {tb("reassign")}
-                  </Button>
-                )}
-                {canMerge && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setMergeRows([selectedRows[0], selectedRows[1]])}
-                    disabled={busy}
-                  >
-                    <GitMerge className="size-3.5" />
-                    {tb("merge")}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setConfirming(true)}
-                  disabled={busy}
-                >
-                  <Trash2 className="size-3.5" />
-                  {tb("delete")}
-                </Button>
-              </span>
-            ))}
-        </div>
-      )}
-
-      {reassignRows && (
-        <ReassignDialog
-          open
-          onOpenChange={(o) => {
-            if (!o) setReassignRows(null);
-          }}
-          portfolios={portfolios}
-          excludePortfolioId={
-            // When every queued row shares one source portfolio, hide it from the targets.
-            new Set(reassignRows.map((r) => r.portfolioId)).size === 1
-              ? reassignRows[0]?.portfolioId
-              : undefined
+      <FilterBar
+        typeFilter={typeFilter}
+        showFlagged={showFlagged}
+        flaggedCount={flaggedCount}
+        onToggleFlagged={() => setShowFlagged((v) => !v)}
+        yearOptions={yearOptions}
+        yearFilterProp={yearFilterProp}
+        onNavigateWithParam={navigateWithParam}
+        draftCount={draftCount}
+        draftFilter={draftFilter}
+        onDraftFilterChange={(v) => setDraftFilter(v)}
+        searchQuery={searchQuery}
+        onSearchChange={(v) => {
+          const params = new URLSearchParams(searchParams.toString());
+          if (v) {
+            params.set("q", v);
+          } else {
+            params.delete("q");
           }
-          onConfirm={doReassign}
-        />
-      )}
+          params.set("page", "1");
+          router.push(`/transactions?${params.toString()}`);
+        }}
+      />
 
-      {mergeRows && (
-        <MergeDialog
-          open
-          onOpenChange={(o) => {
-            if (!o) setMergeRows(null);
-          }}
-          rowA={mergeRows[0]}
-          rowB={mergeRows[1]}
-          onMerged={() => {
-            setMergeRows(null);
-            clearSelection();
-            router.refresh();
-          }}
-        />
-      )}
+      <SelectionBar
+        selectionMode={selectionMode}
+        selectedCount={selected.size}
+        selectedDraftCount={selectedDraftIds.length}
+        canReassign={canReassign}
+        canMerge={canMerge}
+        busy={busy}
+        confirming={confirming}
+        onClearSelection={clearSelection}
+        onBatchConfirmDrafts={() => onBatchResolve("confirm")}
+        onBatchDiscardDrafts={() => onBatchResolve("discard")}
+        onReassign={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
+        onMerge={() => setMergeRows([selectedRows[0], selectedRows[1]])}
+        onRequestDelete={() => setConfirming(true)}
+        onConfirmDelete={onBatchDelete}
+        onCancelDelete={() => setConfirming(false)}
+      />
 
-      {/* ── Desktop table (md+) ── */}
-      <div className="hidden overflow-x-auto rounded-xl bg-card shadow-card md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {/* Checkbox column: a select-rows toggle until selection mode is entered, then
-                  the "select all" checkbox. Fixed wide enough that both the toggle button and
-                  the checkbox fit without the column ever needing to grow (table-layout:auto
-                  otherwise resizes it per the widest content-box actually rendered, which
-                  visibly shifted every column after it when swapping between the two). */}
-              <TableHead className="w-16">
-                {selectionMode ? (
-                  <input
-                    type="checkbox"
-                    className="size-4 align-middle accent-primary"
-                    aria-label={tb("selectAll")}
-                    checked={allSelected}
-                    onChange={toggleAll}
-                  />
-                ) : (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6"
-                    title={tb("selectRows")}
-                    aria-label={tb("selectRows")}
-                    onClick={() => setSelectionMode(true)}
-                  >
-                    <ListChecks className="size-4" />
-                  </Button>
-                )}
-              </TableHead>
-              <SortableTableHead
-                colKey="date"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
-                {t("date")}
-              </SortableTableHead>
-              <SortableTableHead
-                colKey="instrument"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
-                {t("transactionCol")}
-              </SortableTableHead>
-              {showPortfolio && (
-                <SortableTableHead
-                  colKey="portfolio"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onToggle={toggleSort}
-                >
-                  {t("portfolio")}
-                </SortableTableHead>
-              )}
-              <SortableTableHead
-                colKey="quantity"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-                align="right"
-              >
-                {t("quantity")}
-              </SortableTableHead>
-              <SortableTableHead
-                colKey="price"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-                align="right"
-              >
-                {t("price")}
-              </SortableTableHead>
-              <SortableTableHead
-                colKey="tax"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-                align="right"
-                className="hidden lg:table-cell"
-              >
-                {t("tax")}
-              </SortableTableHead>
-              <SortableTableHead
-                colKey="source"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-                className="hidden sm:table-cell"
-              >
-                {t("source")}
-              </SortableTableHead>
-              <SortableTableHead
-                colKey="netAmount"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-                align="right"
-              >
-                {t("amount")}
-              </SortableTableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {windowedRows.map((tx, i) => {
-              const netAmount = txNetAmount(tx);
-              const isSelected = selected.has(tx.id);
-              const anomaly = anomalyByTxId.get(tx.id);
-              const status = tx.status ?? "normal";
-              // Emit a month-separator band whenever the month changes (reference `txMonths`).
-              // The band uses role="presentation" so it stays out of row counts/queries.
-              const monthKey = tx.executedAt.slice(0, 7);
-              const showBand =
-                groupByMonth &&
-                (i === 0 || windowedRows[i - 1].executedAt.slice(0, 7) !== monthKey);
-              return (
-                <Fragment key={tx.id}>
-                  {showBand && (
-                    <tr role="presentation">
-                      <td
-                        colSpan={colSpan}
-                        className="bg-card-2 px-[22px] py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3"
-                      >
-                        {monthFmt.format(new Date(tx.executedAt))}
-                      </td>
-                    </tr>
-                  )}
-                  <TableRow
-                    data-state={isSelected ? "selected" : undefined}
-                    className={`cursor-pointer select-none ${status === "archived" ? "opacity-50" : ""} ${
-                      status === "draft" ? "bg-amber-50/40 dark:bg-amber-950/10" : ""
-                    }`}
-                    onClick={() => onRowActivate(tx)}
-                    {...longPressHandlers(tx.id)}
-                  >
-                    <TableCell className="w-16">
-                      {selectionMode && (
-                        <span onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            className="size-4 align-middle accent-primary"
-                            aria-label={tb("selectRow")}
-                            checked={isSelected}
-                            onChange={() => toggle(tx.id)}
-                          />
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
-                      {rowDate(tx.executedAt)}
-                    </TableCell>
-                    {/* Reference "Transaction" column: 36px kind chip + "Buy · SYM"
-                      700 14px title + instrument name 500 12px text-2; status badges
-                      and anomaly tags ride inline next to the title. */}
-                    <TableCell>
-                      <div className="flex min-w-0 items-center gap-3">
-                        <TypeIconChip type={tx.type} kind={tx.kind} />
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-[7px]">
-                            <span className="truncate text-sm font-bold">
-                              {tx.kind && KIND_ICON[tx.kind] ? tt(tx.kind) : tt(tx.type)}
-                              {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
-                            </span>
-                            {anomaly && (
-                              <span
-                                title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                                aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                              >
-                                {anomaly.severity === "error" ? (
-                                  <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                                ) : (
-                                  <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                                )}
-                              </span>
-                            )}
-                            {status === "draft" && (
-                              <Badge
-                                variant="outline"
-                                className="border-amber-400/50 text-amber-600 dark:text-amber-400"
-                              >
-                                {tm("status.badgeDraft")}
-                              </Badge>
-                            )}
-                            {status === "draft" && tx.needsReview && (
-                              <span
-                                className="inline-flex items-center"
-                                title={tm("status.needsReview")}
-                                aria-label={tm("status.needsReview")}
-                              >
-                                <AlertTriangle className="size-3.5 text-amber-500" />
-                              </span>
-                            )}
-                            {status === "archived" && (
-                              <Badge variant="outline">{tm("status.badgeArchived")}</Badge>
-                            )}
-                            {status === "cash_neutral" && (
-                              <Badge variant="outline">{tm("status.badgeCashNeutral")}</Badge>
-                            )}
-                          </div>
-                          <div className="truncate text-xs font-medium text-text-2">
-                            {tx.instrument?.displayName ?? tx.instrument?.name ?? t("cashLabel")}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    {showPortfolio && (
-                      <TableCell className="text-xs font-medium text-text-2">
-                        {tx.portfolioName ?? "—"}
-                      </TableCell>
-                    )}
-                    <TableCell className="tabular text-right text-[13px] font-semibold text-text-2">
-                      {Number(tx.quantity) || rowQuantityDisplay(tx) || "—"}
-                    </TableCell>
-                    <TableCell className="tabular text-right text-[13px] font-semibold">
-                      {Number(tx.quantity) > 0
-                        ? m(Number(tx.price), tx.currency)
-                        : (rowPerShareDisplay(tx, m) ?? "—")}
-                    </TableCell>
-                    <TableCell className="tabular hidden text-right text-[13px] font-semibold text-text-2 lg:table-cell">
-                      {tx.tax != null && Number(tx.tax) !== 0
-                        ? m(Number(tx.tax), tx.currency)
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <SourceChips
-                          tx={tx}
-                          t={t}
-                          chipClassName="inline-flex items-center whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[9px] font-bold uppercase"
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
-                    >
-                      {m(netAmount, tx.currency)}
-                    </TableCell>
-                  </TableRow>
-                </Fragment>
-              );
-            })}
-            {visibleRows.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={colSpan}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
-                  {hasActiveFilter ? t("noResults") : t("empty")}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <ReassignMergeDialogs
+        reassignRows={reassignRows}
+        onCloseReassign={() => setReassignRows(null)}
+        portfolios={portfolios}
+        onConfirmReassign={doReassign}
+        mergeRows={mergeRows}
+        onCloseMerge={() => setMergeRows(null)}
+        onMerged={() => {
+          setMergeRows(null);
+          clearSelection();
+          router.refresh();
+        }}
+      />
 
-      {/* ── Mobile list (< md): a card per day, reference "Activity" ledger. No date
-          column (the day is the group header), no qty/price/portfolio columns. ── */}
-      <div className="space-y-4 md:hidden">
-        {dayGroups.map((group) => (
-          <div key={group.day}>
-            <div className="mb-2 ml-1 text-[12px] font-bold uppercase tracking-[0.04em] text-text-3">
-              {group.label}
-            </div>
-            <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
-              {group.rows.map((tx, i) => {
-                const netAmount = txNetAmount(tx);
-                const isSelected = selected.has(tx.id);
-                const anomaly = anomalyByTxId.get(tx.id);
-                const status = tx.status ?? "normal";
-                const perShareDisplay = rowPerShareDisplay(tx, m);
-                const sub =
-                  Number(tx.quantity) > 0
-                    ? `${Number(tx.quantity)} @ ${m(Number(tx.price), tx.currency)}`
-                    : tx.shares && perShareDisplay
-                      ? `${tx.shares} @ ${perShareDisplay}`
-                      : (tx.instrument?.displayName ?? tx.instrument?.name ?? t("cashLabel"));
-                return (
-                  <div
-                    key={tx.id}
-                    data-state={isSelected ? "selected" : undefined}
-                    onClick={() => onRowActivate(tx)}
-                    {...longPressHandlers(tx.id)}
-                    className={cn(
-                      "flex cursor-pointer select-none items-center gap-3 px-[15px] py-[14px]",
-                      i > 0 && "border-t border-line",
-                      status === "archived" && "opacity-50",
-                      status === "draft" && "bg-amber-50/40 dark:bg-amber-950/10",
-                      isSelected && "bg-primary/10",
-                    )}
-                  >
-                    {selectionMode && (
-                      <input
-                        type="checkbox"
-                        readOnly
-                        aria-label={tb("selectRow")}
-                        checked={isSelected}
-                        className="size-4 shrink-0 accent-primary"
-                      />
-                    )}
-                    <TypeIconChip
-                      type={tx.type}
-                      kind={tx.kind}
-                      className="size-10 rounded-[12px]"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-[7px]">
-                        <span className="truncate text-sm font-bold">
-                          {tx.kind && KIND_ICON[tx.kind] ? tt(tx.kind) : tt(tx.type)}
-                          {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
-                        </span>
-                        {anomaly && (
-                          <span
-                            title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                            aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                          >
-                            {anomaly.severity === "error" ? (
-                              <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                            ) : (
-                              <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-text-2">
-                        <span className="truncate">{sub}</span>
-                        <span className="flex shrink-0 flex-wrap items-center gap-1">
-                          <SourceChips
-                            tx={tx}
-                            t={t}
-                            chipClassName="inline-flex shrink-0 items-center whitespace-nowrap rounded-[6px] px-1.5 py-[2px] text-[9px] font-bold uppercase"
-                          />
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      className={cn(
-                        "tabular shrink-0 text-sm font-bold",
-                        netAmount > 0 && "text-success",
-                      )}
-                    >
-                      {m(netAmount, tx.currency)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {visibleRows.length === 0 && (
-          <div className="rounded-[20px] bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
-            {hasActiveFilter ? t("noResults") : t("empty")}
-          </div>
-        )}
-      </div>
+      <DesktopTable
+        rows={windowedRows}
+        selectionMode={selectionMode}
+        selected={selected}
+        anomalyByTxId={anomalyByTxId}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onToggleSort={toggleSort}
+        showPortfolio={showPortfolio}
+        groupByMonth={groupByMonth}
+        colSpan={colSpan}
+        monthFmt={monthFmt}
+        longPressHandlers={longPressHandlers}
+        onRowActivate={onRowActivate}
+        onToggle={toggle}
+        onToggleAll={toggleAll}
+        allSelected={allSelected}
+        onEnterSelectionMode={() => setSelectionMode(true)}
+        hasActiveFilter={hasActiveFilter}
+        showEmpty={showEmpty}
+      />
 
-      {/* "Load more": first reveals already-loaded rows (client-side), then fetches the
-          next server page and appends. This replaces the old page-number navigation. */}
-      {visibleRows.length > 0 && hasMore && (
-        <div className="flex flex-col items-center gap-2 py-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loadingMore}
-            onClick={async () => {
-              // If there are already-loaded rows not yet visible, just reveal them.
-              if (visibleCount < sortedRows.length) {
-                setVisibleCount((n) => n + PAGE_SIZE);
-                return;
-              }
-              // All loaded rows are visible; fetch the next server page.
-              if (accumulatedRows.length < (total ?? 0)) {
-                setLoadingMore(true);
-                try {
-                  const params = new URLSearchParams({
-                    page: String(currentPage + 1),
-                    pageSize: "25",
-                  });
-                  if (typeFilter) params.set("type", typeFilter);
-                  if (yearFilterProp) params.set("year", yearFilterProp);
-                  if (searchQuery) params.set("q", searchQuery);
-                  const basePath = portfolioId
-                    ? `/api/backend/portfolios/${portfolioId}/transactions`
-                    : "/api/backend/networth/transactions";
-                  const res = await fetch(`${basePath}?${params}`);
-                  const data = await res.json();
-                  setAccumulatedRows((prev) => [...prev, ...data.rows]);
-                  setCurrentPage((p) => p + 1);
-                  setVisibleCount((n) => n + data.rows.length);
-                } finally {
-                  setLoadingMore(false);
-                }
-              }
-            }}
-          >
-            {loadingMore ? <Spinner size="sm" /> : null}
-            {tb("loadMore")}
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {tb("showingCount", {
-              shown: windowedRows.length,
-              total: Math.max(sortedRows.length, total ?? 0),
-            })}
-          </span>
-        </div>
-      )}
+      <MobileView
+        dayGroups={dayGroups}
+        selectionMode={selectionMode}
+        selected={selected}
+        anomalyByTxId={anomalyByTxId}
+        longPressHandlers={longPressHandlers}
+        onRowActivate={onRowActivate}
+        hasActiveFilter={hasActiveFilter}
+        showEmpty={showEmpty}
+      />
+
+      <LoadMoreSection
+        hasVisibleRows={visibleRows.length > 0}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        windowedCount={windowedRows.length}
+        sortedTotal={sortedRows.length}
+        total={total}
+        onLoadMore={handleLoadMore}
+      />
 
       <TransactionDetailSheet
         tx={detailTx}
