@@ -10,7 +10,6 @@ import {
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { parsedGoldContractSchema, parsedTransactionSchema } from "@portfolio/schema";
-import { requireUser } from "../../plugins/auth.js";
 import { accountMismatchVerdict } from "./helpers.js";
 import { ownedPortfolio } from "../helpers.js";
 import {
@@ -59,7 +58,7 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
     "/imports/:importId/confirm",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const [imp] = await app.db
         .select()
         .from(screenshotImports)

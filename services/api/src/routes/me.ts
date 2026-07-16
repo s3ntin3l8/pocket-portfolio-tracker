@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { users, apiTokens } from "@portfolio/db";
 import { userUpdateSchema, apiTokenCreateSchema } from "@portfolio/schema";
 import { requireUser, PAT_PREFIX, hashToken } from "../plugins/auth.js";
+import { deleteOwnedOr404 } from "./helpers.js";
 
 // Columns safe to return to the client — never the hash.
 const tokenColumns = {
@@ -27,7 +28,7 @@ export async function meRoute(app: FastifyInstance) {
 
   // Update the authenticated user's editable profile fields (name, display currency).
   app.patch("/me", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const input = userUpdateSchema.parse(request.body);
     // An empty patch is a no-op (Drizzle rejects an empty SET) — just echo the row.
     if (Object.keys(input).length === 0) {
@@ -41,7 +42,7 @@ export async function meRoute(app: FastifyInstance) {
   // List the caller's personal access tokens (metadata only — the secret is shown
   // exactly once, at creation).
   app.get("/me/tokens", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     return app.db
       .select(tokenColumns)
       .from(apiTokens)
@@ -81,13 +82,13 @@ export async function meRoute(app: FastifyInstance) {
     "/me/tokens/:id",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id: userId } = requireUser(request);
-      const [row] = await app.db
-        .delete(apiTokens)
-        .where(and(eq(apiTokens.id, request.params.id), eq(apiTokens.userId, userId)))
-        .returning({ id: apiTokens.id });
-      if (!row) return reply.code(404).send({ error: "not_found" });
-      return reply.code(204).send();
+      return deleteOwnedOr404(
+        reply,
+        app.db,
+        apiTokens,
+        and(eq(apiTokens.id, request.params.id), eq(apiTokens.userId, request.userId)),
+        "not_found",
+      );
     },
   );
 }

@@ -2,13 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { and, eq, sql } from "drizzle-orm";
 import { accountHolders, portfolios, transactions } from "@portfolio/db";
 import { portfolioInputSchema, portfolioPatchSchema } from "@portfolio/schema";
-import { requireUser } from "../plugins/auth.js";
 import { flattenPortfolio } from "../lib/portfolio.js";
 import { mapPool } from "../lib/promise-pool.js";
 import { deleteReceiptsForPortfolio } from "../storage/receipts.js";
 import { valuePortfolioCached } from "../services/valuation.js";
 import { getMarketData } from "../services/market-data.js";
-import { logTiming } from "../lib/timing.js";
 
 export async function portfoliosRoute(app: FastifyInstance) {
   // Confirm an account holder (if one is given) exists and belongs to the user, so a
@@ -27,8 +25,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
   // Each row carries `transactionCount` (a cheap correlated count over the indexed
   // portfolioId) so the delete-confirm UI can state how much data it will remove.
   app.get("/portfolios", { preHandler: app.authenticate }, async (request) => {
-    const t0 = performance.now();
-    const { id } = requireUser(request);
+    const id = request.userId;
     const rows = await app.db
       .select({
         portfolio: portfolios,
@@ -39,8 +36,8 @@ export async function portfoliosRoute(app: FastifyInstance) {
       .from(portfolios)
       .leftJoin(accountHolders, eq(portfolios.accountHolderId, accountHolders.id))
       .where(eq(portfolios.userId, id));
-    const durationMs = performance.now() - t0;
-    logTiming(request, "GET /portfolios", durationMs, { portfolioCount: rows.length });
+    request.timingName = "GET /portfolios";
+    request.timingMeta = { portfolioCount: rows.length };
     return rows.map((r) => ({
       ...flattenPortfolio(r.portfolio, r.holder),
       transactionCount: Number(r.transactionCount),
@@ -49,7 +46,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
 
   // Create a portfolio for the authenticated user.
   app.post("/portfolios", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const input = portfolioInputSchema.parse(request.body);
     if (!(await holderOwnedOrNull(id, input.accountHolderId))) {
       return reply.code(404).send({ error: "account_holder_not_found" });
@@ -80,7 +77,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const input = portfolioPatchSchema.parse(request.body);
       if (!(await holderOwnedOrNull(id, input.accountHolderId))) {
@@ -102,21 +99,10 @@ export async function portfoliosRoute(app: FastifyInstance) {
   // screenshot imports keep their history with portfolio_id set null.
   app.delete<{ Params: { portfolioId: string } }>(
     "/portfolios/:portfolioId",
-    { preHandler: app.authenticate },
+    { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
-      // Ownership check FIRST: deleteReceiptsForPortfolio deletes storage objects for
-      // any portfolioId with no userId scope of its own, so it must never run before
-      // we've confirmed the caller owns this portfolio.
-      const [owned] = await app.db
-        .select({ id: portfolios.id })
-        .from(portfolios)
-        .where(and(eq(portfolios.id, portfolioId), eq(portfolios.userId, id)))
-        .limit(1);
-      if (!owned) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       // Pre-query and delete storage objects before the portfolio row is removed,
       // since DB cascade removes document rows but not the storage objects (#231).
       await deleteReceiptsForPortfolio(app, portfolioId);
@@ -130,8 +116,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
   // Live net-worth for every portfolio the user owns — one request instead of N summary calls.
   // Each portfolio is valued against its own base currency so no FX conversion is needed.
   app.get("/portfolios/values", { preHandler: app.authenticate }, async (request) => {
-    const t0 = performance.now();
-    const { id } = requireUser(request);
+    const id = request.userId;
     const pfs = await app.db
       .select({
         id: portfolios.id,
@@ -145,7 +130,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
     // Each portfolio's valuation is independent — bounded-concurrency instead of a
     // serial `for` await (a user with many portfolios paid one full valuation's worth
     // of DB round trips per portfolio, one at a time). Capped at 4 in flight to stay
-    // well under the postgres-js pool (`max: 10` in db/client.ts, shared with pg-boss's
+    // well under the postgres-js pool (`max: 10` in db/client.js, shared with pg-boss's
     // own `max: 5`) rather than an unbounded Promise.all that could saturate it.
     const results = await mapPool(pfs, 4, async (p) => {
       const { summary } = await valuePortfolioCached(
@@ -159,8 +144,8 @@ export async function portfoliosRoute(app: FastifyInstance) {
       );
       return { id: p.id, netWorth: summary.netWorth };
     });
-    const durationMs = performance.now() - t0;
-    logTiming(request, "GET /portfolios/values", durationMs, { portfolioCount: pfs.length });
+    request.timingName = "GET /portfolios/values";
+    request.timingMeta = { portfolioCount: pfs.length };
     return results;
   });
 

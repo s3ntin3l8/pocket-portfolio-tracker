@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { transactions, dismissedAnomalies, trConnections } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { toCoreTxns } from "../../services/tx-core.js";
 import { netManualAdjustments } from "../../services/pytr/reconcile.js";
 import { loadSparklines } from "../../services/sparklines.js";
@@ -9,7 +8,6 @@ import type { InstrumentMeta } from "../../services/valuation.js";
 import { needsSectorEnrichment, needsNameEnrichment } from "../../services/instrument-metadata.js";
 import { enqueueInstrumentMetadata } from "../../services/scheduler.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
-import { logTiming } from "../../lib/timing.js";
 import {
   computeHoldings,
   detectAnomalies,
@@ -18,7 +16,7 @@ import {
   type PortfolioSummary,
   type ReconciliationGap,
 } from "@portfolio/core";
-import { ownedPortfolio } from "../helpers.js";
+
 import type { PortfolioParams } from "./shared.js";
 import {
   corporateActionsFor,
@@ -31,15 +29,10 @@ import {
 export function registerHoldingsRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/holdings",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const [rows, trConn, dismissed] = await Promise.all([
         app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolioId)),
         app.db
@@ -75,27 +68,22 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
       const filtered = anomalies.filter(
         (a) => !(a.transactionId && dismissedSet.has(`${a.transactionId}:${a.code}`)),
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/holdings", durationMs, {
+      request.timingName = "GET /portfolios/:id/holdings";
+      request.timingMeta = {
         portfolioId,
         holdingCount: holdings.length,
         anomalyCount: filtered.length,
-      });
+      };
       return { holdings, anomalies: filtered };
     },
   );
 
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/anomalies",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { filtered } = await withDerivationCache(anomaliesCache, portfolioId, async () => {
         const [rows, trConn, dismissed] = await Promise.all([
           app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolioId)),
@@ -134,26 +122,19 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
         );
         return { filtered };
       });
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/anomalies", durationMs, {
-        portfolioId,
-        anomalyCount: filtered.length,
-      });
+      request.timingName = "GET /portfolios/:id/anomalies";
+      request.timingMeta = { portfolioId, anomalyCount: filtered.length };
       return { anomalies: filtered };
     },
   );
 
   app.get<{ Params: PortfolioParams; Querystring: { costBasis?: string } }>(
     "/portfolios/:portfolioId/summary",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
+      const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { summary, metaById } = (await loadValuation(
         app,
         portfolioId,
@@ -174,11 +155,8 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
         app.db,
         summary.holdings.map((h) => h.instrumentId),
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/summary", durationMs, {
-        portfolioId,
-        holdingCount: summary.holdings.length,
-      });
+      request.timingName = "GET /portfolios/:id/summary";
+      request.timingMeta = { portfolioId, holdingCount: summary.holdings.length };
       return {
         ...summary,
         holdings: summary.holdings.map((h) => ({

@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { accountHolders, portfolios, users, userPreferences } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import {
   type CoreTransaction,
@@ -11,7 +10,7 @@ import {
   contributionStats,
   type CashFlowPoint,
 } from "@portfolio/core";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   buildContributions,
@@ -21,7 +20,6 @@ import {
   enrichContributions,
   PORTFOLIO_VALUATION_CONCURRENCY,
 } from "./shared.js";
-import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 
@@ -29,15 +27,11 @@ export function registerContributionsRoutes(app: FastifyInstance) {
   // Contribution analytics for a single portfolio (in its base currency).
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/contributions",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
+      const id = request.userId;
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const [pref] = await app.db
         .select({ retirementAge: userPreferences.retirementAge })
         .from(userPreferences)
@@ -60,10 +54,8 @@ export function registerContributionsRoutes(app: FastifyInstance) {
         portfolio.cashCounted ? "inside" : "outside",
         pref?.retirementAge ?? null,
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/contributions", durationMs, {
-        portfolioId,
-      });
+      request.timingName = "GET /portfolios/:id/contributions";
+      request.timingMeta = { portfolioId };
       return result;
     },
   );
@@ -76,8 +68,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
     "/networth/contributions",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const [u] = await app.db
         .select({ displayCurrency: users.displayCurrency })
@@ -173,8 +164,8 @@ export function registerContributionsRoutes(app: FastifyInstance) {
           );
         },
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /networth/contributions", durationMs, { portfolioCount: pfs.length });
+      request.timingName = "GET /networth/contributions";
+      request.timingMeta = { portfolioCount: pfs.length };
       return result;
     },
   );

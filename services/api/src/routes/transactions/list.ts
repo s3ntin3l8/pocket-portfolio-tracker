@@ -1,10 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { and, count, desc, eq, getTableColumns, gte, inArray, lt, sql } from "drizzle-orm";
 import { portfolios, transactions } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
-import { logTiming } from "../../lib/timing.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
-import { ownedPortfolio, parsePagination, cacheKey } from "../helpers.js";
+import { parsePagination, cacheKey } from "../helpers.js";
 import {
   yearRange,
   ACTIVITY_INCOME_TYPES,
@@ -26,15 +24,10 @@ export function registerListRoutes(app: FastifyInstance) {
     };
   }>(
     "/portfolios/:portfolioId/transactions",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
-      const portfolio = await ownedPortfolio(app, id, request.params.portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
-      const portfolioName = portfolio.name;
+      const portfolioName = request.portfolio.name;
       const { page, pageSize } = parsePagination({
         page: request.query.page,
         pageSize: request.query.pageSize,
@@ -177,8 +170,8 @@ export function registerListRoutes(app: FastifyInstance) {
   app.get<{
     Querystring: { page?: string; pageSize?: string; type?: string; year?: string; q?: string };
   }>("/networth/transactions", { preHandler: app.authenticate }, async (request, _reply) => {
-    const t0 = performance.now();
-    const { id } = requireUser(request);
+    request.timingName = "GET /networth/transactions";
+    const id = request.userId;
     const { page, pageSize } = parsePagination({
       page: request.query.page,
       pageSize: request.query.pageSize,
@@ -260,13 +253,12 @@ export function registerListRoutes(app: FastifyInstance) {
         .where(inArray(transactions.portfolioId, pfIds))
         .orderBy(sql`1 DESC`);
       const yearList = years.map((r) => String(r.year));
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /networth/transactions", durationMs, {
+      request.timingMeta = {
         page,
         pageSize,
         total: cached.total,
         portfolioCount: pfs.length,
-      });
+      };
       return { rows: cached.rows, total: cached.total, years: yearList };
     }
 
@@ -276,11 +268,10 @@ export function registerListRoutes(app: FastifyInstance) {
       .where(and(...conditions))
       .orderBy(desc(transactions.executedAt));
     const enriched = await enrichAggregateRows(app, rows, nameById, request.log);
-    const durationMs = performance.now() - t0;
-    logTiming(request, "GET /networth/transactions", durationMs, {
+    request.timingMeta = {
       rowCount: rows.length,
       portfolioCount: pfs.length,
-    });
+    };
     return enriched;
   });
 }

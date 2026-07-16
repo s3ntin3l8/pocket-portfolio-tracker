@@ -10,12 +10,10 @@ import {
   convert,
   toDateKey,
 } from "@portfolio/core";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { loadSparklines } from "../../services/sparklines.js";
 import { enqueueInstrumentMetadata } from "../../services/scheduler.js";
 import { needsSectorEnrichment, needsNameEnrichment } from "../../services/instrument-metadata.js";
-import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import {
   instrumentMeta,
@@ -31,8 +29,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
     "/networth",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const [u] = await app.db
         .select({ displayCurrency: users.displayCurrency })
@@ -204,13 +201,13 @@ export function registerNetworthRoutes(app: FastifyInstance) {
           ? String((currentNetWorth - startNav) / startNav)
           : null;
 
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /networth", durationMs, {
+      request.timingName = "GET /networth";
+      request.timingMeta = {
         portfolioCount: pfs.length,
         period,
         holderId: holderId ?? null,
         costBasisMode,
-      });
+      };
 
       return {
         ...aggregated,

@@ -8,7 +8,6 @@ import {
   transactions,
   trResolvedEvents,
 } from "@portfolio/db";
-import { requireUser } from "../plugins/auth.js";
 import { IbkrFlexError } from "../services/ibkr/flex-client.js";
 import { syncIbkrConnection } from "../services/ibkr/sync.js";
 import { enqueueIbkrSync, SYNC_CLAIM_LEASE_MS } from "../services/scheduler.js";
@@ -48,14 +47,14 @@ export async function ibkrRoute(app: FastifyInstance) {
 
   // Current connection state (no secrets).
   app.get("/ibkr/connection", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     return serialize(await getConnection(id));
   });
 
   // Connect: store encrypted token + queryId. Optionally runs a test-fetch to validate
   // the token before persisting, surfacing expired/invalid errors immediately.
   app.post("/ibkr/connection", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     if (!app.encryption.isEnabled) {
       return reply.code(503).send({ error: "encryption_required" });
     }
@@ -113,7 +112,7 @@ export async function ibkrRoute(app: FastifyInstance) {
 
   // Disconnect: wipe the connection row.
   app.delete("/ibkr/connection", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     await app.db.delete(ibkrConnections).where(eq(ibkrConnections.userId, id));
     reply.code(204);
     return null;
@@ -121,7 +120,7 @@ export async function ibkrRoute(app: FastifyInstance) {
 
   // Sync now: enqueue a background pg-boss job, with inline fallback.
   app.post("/ibkr/connection/sync", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const conn = await getConnection(id);
     if (!conn || conn.status !== "connected") {
       return reply.code(409).send({ error: "not_connected" });
@@ -194,7 +193,7 @@ export async function ibkrRoute(app: FastifyInstance) {
     "/ibkr/connection/reimport",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const conn = await getConnection(id);
       if (!conn || !conn.portfolioId) {
         return reply.code(409).send({ error: "not_connected" });

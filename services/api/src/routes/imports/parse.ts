@@ -10,7 +10,6 @@ import {
 } from "@portfolio/db";
 import type { ParsedTransaction } from "@portfolio/schema";
 import { parsedTransactionSchema } from "@portfolio/schema";
-import { requireUser } from "../../plugins/auth.js";
 import { parseCsv } from "../../services/parsers/csv.js";
 import { parseDkb } from "../../services/parsers/dkb.js";
 import { detectDkbPdf, parseDkbPdf } from "../../services/parsers/dkb-pdf.js";
@@ -426,7 +425,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
     // message — full transaction-history CSVs can be large, and the body is plain text.
     { preHandler: app.authenticate, bodyLimit: 25 * 1024 * 1024 },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { content, filename, format } = csvBodySchema.parse(request.body);
       const force = forceFromQuery(request.query);
       const contentHash = shortHash(content);
@@ -573,7 +572,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
   // The raw file is read from a multipart upload, parsed, then discarded (never persisted)
   // — privacy by default. Portfolio is NOT required at upload time; supplied at confirm time.
   app.post("/imports/screenshot", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     if (!app.screenshotParser.isConfigured()) {
       request.log.warn({ provider: app.screenshotParser.name }, "screenshot parser not configured");
       return reply.code(503).send({ error: "screenshot_parser_not_configured" });
@@ -867,7 +866,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
     "/imports/:importId/materialize",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId, acknowledgeAccountMismatch } = materializeBodySchema.parse(request.body);
 
       const [imp] = await app.db
@@ -947,7 +946,7 @@ export function registerParseImportRoutes(app: FastifyInstance) {
   // can keep itself open and show the warning before handing the write to the background runner.
   // Writes nothing. pytr imports are exempt (sync is always bound to its connection's portfolio).
   app.post("/imports/account-check", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const { units } = accountCheckBodySchema.parse(request.body);
 
     const mismatches: Array<

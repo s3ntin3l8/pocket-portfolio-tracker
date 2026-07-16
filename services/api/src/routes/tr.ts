@@ -10,7 +10,6 @@ import {
   trConnections,
   trResolvedEvents,
 } from "@portfolio/db";
-import { requireUser } from "../plugins/auth.js";
 import {
   PytrApprovalError,
   PytrAuthError,
@@ -79,7 +78,7 @@ export async function trRoute(app: FastifyInstance) {
 
   // Current connection state (no secrets).
   app.get("/tr/connection", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     return serialize(await getConnection(id));
   });
 
@@ -89,7 +88,7 @@ export async function trRoute(app: FastifyInstance) {
   // Begin pairing: store encrypted creds and kick off the v2 web-login (sends an approval
   // push to the user's Trade Republic mobile app).
   app.post("/tr/connection", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     // Refuse to store Trade Republic credentials without encryption at rest.
     if (!app.encryption.isEnabled) {
       return reply.code(503).send({ error: "encryption_required" });
@@ -160,7 +159,7 @@ export async function trRoute(app: FastifyInstance) {
   // then persist the encrypted session. Takes no body — there is no code in the v2 flow.
   // The request hangs until approval, rejection, or the approval window expires (~180s).
   app.post("/tr/connection/verify", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
 
     const conn = await getConnection(id);
     if (!conn || conn.status !== "awaiting_2fa" || !app.pytr.hasPendingPairing(id)) {
@@ -205,7 +204,7 @@ export async function trRoute(app: FastifyInstance) {
   // `syncing` + `lastSyncAt` to know when it's done. Falls back to inline sync when
   // pg-boss is unavailable (PGlite / tests).
   app.post("/tr/connection/sync", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const conn = await getConnection(id);
     if (!conn || conn.status !== "connected") {
       return reply.code(409).send({ error: "not_connected" });
@@ -290,7 +289,7 @@ export async function trRoute(app: FastifyInstance) {
   // ledger, and discard any open pytr draft. The next sync then re-stages the full timeline
   // fresh (enriched) for the user to confirm — the user-driven backfill/refresh path.
   app.post("/tr/connection/reimport", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const conn = await getConnection(id);
     if (!conn || !conn.portfolioId) {
       return reply.code(409).send({ error: "not_connected" });
@@ -361,7 +360,7 @@ export async function trRoute(app: FastifyInstance) {
     "/tr/connection/reprocess-documents",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const conn = await getConnection(id);
       if (!conn || !conn.portfolioId) {
         return reply.code(409).send({ error: "not_connected" });
@@ -399,7 +398,7 @@ export async function trRoute(app: FastifyInstance) {
     "/tr/connection/diagnose-documents",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const conn = await getConnection(id);
       if (!conn || conn.status !== "connected") {
         return reply.code(409).send({ error: "not_connected" });
@@ -573,7 +572,7 @@ export async function trRoute(app: FastifyInstance) {
     "/tr/connection/backfill-documents",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const conn = await getConnection(id);
       if (!conn || conn.status !== "connected") {
         return reply.code(409).send({ error: "not_connected" });
@@ -751,7 +750,7 @@ export async function trRoute(app: FastifyInstance) {
 
   // Disconnect: wipe the stored connection (and any pending pairing).
   app.delete("/tr/connection", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     app.pytr.cancelPairing(id);
     await app.db.delete(trConnections).where(eq(trConnections.userId, id));
     request.log.info({ userId: id }, "tr disconnected");

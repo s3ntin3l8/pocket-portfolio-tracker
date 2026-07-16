@@ -7,15 +7,13 @@ import {
   portfolioIntradaySnapshots,
   portfolioSnapshots,
 } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
 import { aggregateValueFlows, xirr, chainIndex, convert } from "@portfolio/core";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import { loadValuation, historyCache, performanceCache, boundaryFlows } from "./shared.js";
-import { logTiming } from "../../lib/timing.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import {
   getUserBenchmarkConfig,
@@ -28,14 +26,10 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   // Net-worth-over-time for one portfolio, from the daily snapshots (base currency).
   app.get<{ Params: PortfolioParams; Querystring: { range?: string } }>(
     "/portfolios/:portfolioId/history",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
+      request.timingName = "GET /portfolios/:id/history";
       const { portfolioId } = request.params;
-      if (!(await ownedPortfolio(app, id, portfolioId))) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
       const range = request.query.range ?? "1y";
 
       // 1D/7D: read the intraday (timestamped) table instead of the day-grained one.
@@ -53,12 +47,11 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             ),
           )
           .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
-        const intradayDurationMs = performance.now() - t0;
-        logTiming(request, "GET /portfolios/:id/history", intradayDurationMs, {
+        request.timingMeta = {
           portfolioId,
           range,
           pointCount: rows.length,
-        });
+        };
         return rows.map((r) => ({
           at: r.capturedAt.toISOString(),
           netWorth: r.netWorth,
@@ -91,12 +84,11 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         index: indexById.get(r.date)?.index ?? "100",
         pct: indexById.get(r.date)?.pct ?? "0",
       }));
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/history", durationMs, {
+      request.timingMeta = {
         portfolioId,
         range,
         pointCount: rows.length,
-      });
+      };
       return result;
     },
   );
@@ -104,15 +96,10 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   // Money-weighted return (XIRR) from external cash flows + current net worth.
   app.get<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/performance",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const boundary = portfolio.cashCounted ? "inside" : "outside";
       const cached = await withDerivationCache(
         performanceCache,
@@ -138,10 +125,10 @@ export function registerHistoryRoutes(app: FastifyInstance) {
           };
         },
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/performance", durationMs, {
+      request.timingName = "GET /portfolios/:id/performance";
+      request.timingMeta = {
         portfolioId,
-      });
+      };
       return cached;
     },
   );
@@ -151,8 +138,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   app.get<{
     Querystring: { range?: string; include?: string; exclude?: string; holderId?: string };
   }>("/networth/history", { preHandler: app.authenticate }, async (request, reply) => {
-    const t0 = performance.now();
-    const { id } = requireUser(request);
+    const id = request.userId;
     const { holderId } = request.query;
     const range = request.query.range ?? "1y";
     const includeParam = request.query.include ?? "";
@@ -326,12 +312,12 @@ export function registerHistoryRoutes(app: FastifyInstance) {
 
       return result;
     });
-    const durationMs = performance.now() - t0;
-    logTiming(request, "GET /networth/history", durationMs, {
+    request.timingName = "GET /networth/history";
+    request.timingMeta = {
       portfolioCount: cached.length,
       range,
       resultCount: cached.length,
-    });
+    };
     return cached;
   });
 }

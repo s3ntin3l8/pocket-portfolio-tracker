@@ -1,13 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { accountHolders, portfolios, users } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { type InstrumentMeta } from "../../services/valuation.js";
 import { type TradeLog, mergeTradeLogs } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
-import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   costBasisFromQuery,
@@ -23,15 +21,10 @@ import {
 export function registerTradesRoutes(app: FastifyInstance) {
   app.get<{ Params: PortfolioParams; Querystring: { method?: string; costBasis?: string } }>(
     "/portfolios/:portfolioId/trades",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
       const { portfolioId } = request.params;
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const method = methodFromQuery(request.query);
       const costBasisMode = costBasisFromQuery(request.query);
       const cached = await withDerivationCache(
@@ -57,12 +50,12 @@ export function registerTradesRoutes(app: FastifyInstance) {
           return attachInstruments(log, metaById);
         },
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/trades", durationMs, {
+      request.timingName = "GET /portfolios/:id/trades";
+      request.timingMeta = {
         portfolioId,
         method,
         costBasis: costBasisMode,
-      });
+      };
       return cached;
     },
   );
@@ -71,8 +64,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
     "/networth/trades",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const method = methodFromQuery(request.query);
       const costBasisMode = costBasisFromQuery(request.query);
@@ -133,8 +125,8 @@ export function registerTradesRoutes(app: FastifyInstance) {
           return attachInstruments(mergeTradeLogs(logs, display, method), meta);
         },
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /networth/trades", durationMs, { portfolioCount: pfs.length });
+      request.timingName = "GET /networth/trades";
+      request.timingMeta = { portfolioCount: pfs.length };
       return result;
     },
   );

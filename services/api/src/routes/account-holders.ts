@@ -1,12 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { accountHolders, lossCarryforward } from "@portfolio/db";
+import { createAndReturn, deleteOwnedOr404 } from "./helpers.js";
 import {
   accountHolderInputSchema,
   accountHolderPatchSchema,
   lossCarryforwardSetSchema,
 } from "@portfolio/schema";
-import { requireUser } from "../plugins/auth.js";
 
 // People an investment account can belong to (the user, a child, a spouse, …).
 // Defined once per user and linked from any number of portfolios so birth year and
@@ -14,29 +14,24 @@ import { requireUser } from "../plugins/auth.js";
 export async function accountHoldersRoute(app: FastifyInstance) {
   // List the authenticated user's holders.
   app.get("/account-holders", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     return app.db.select().from(accountHolders).where(eq(accountHolders.userId, id));
   });
 
   // Create a holder for the authenticated user.
   app.post("/account-holders", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const input = accountHolderInputSchema.parse(request.body);
-    const [created] = await app.db
-      .insert(accountHolders)
-      .values({
-        userId: id,
-        name: input.name,
-        type: input.type,
-        birthYear: input.birthYear ?? null,
-        taxAllowanceAnnual: input.taxAllowanceAnnual ?? null,
-        capitalGainsTaxRate: input.capitalGainsTaxRate ?? null,
-        churchTax: input.churchTax ?? false,
-        taxResidence: input.taxResidence ?? null,
-      })
-      .returning();
-    reply.code(201);
-    return created;
+    return createAndReturn(app.db, reply, accountHolders, {
+      userId: id,
+      name: input.name,
+      type: input.type,
+      birthYear: input.birthYear ?? null,
+      taxAllowanceAnnual: input.taxAllowanceAnnual ?? null,
+      capitalGainsTaxRate: input.capitalGainsTaxRate ?? null,
+      churchTax: input.churchTax ?? false,
+      taxResidence: input.taxResidence ?? null,
+    });
   });
 
   // Update a holder (owner only). Empty body is a no-op update.
@@ -44,7 +39,7 @@ export async function accountHoldersRoute(app: FastifyInstance) {
     "/account-holders/:holderId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.params;
       const input = accountHolderPatchSchema.parse(request.body);
       const [updated] = await app.db
@@ -65,16 +60,14 @@ export async function accountHoldersRoute(app: FastifyInstance) {
     "/account-holders/:holderId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
       const { holderId } = request.params;
-      const [deleted] = await app.db
-        .delete(accountHolders)
-        .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
-        .returning();
-      if (!deleted) {
-        return reply.code(404).send({ error: "account_holder_not_found" });
-      }
-      return reply.code(204).send();
+      return deleteOwnedOr404(
+        reply,
+        app.db,
+        accountHolders,
+        and(eq(accountHolders.id, holderId), eq(accountHolders.userId, request.userId)),
+        "account_holder_not_found",
+      );
     },
   );
 
@@ -102,7 +95,7 @@ export async function accountHoldersRoute(app: FastifyInstance) {
     "/account-holders/:holderId/loss-carryforward",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.params;
       const taxYear = request.query.taxYear ? parseInt(request.query.taxYear, 10) : undefined;
       if (!taxYear || !Number.isFinite(taxYear)) {
@@ -123,7 +116,7 @@ export async function accountHoldersRoute(app: FastifyInstance) {
     "/account-holders/:holderId/loss-carryforward",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.params;
       if (!(await ownedHolder(id, holderId))) {
         return reply.code(404).send({ error: "account_holder_not_found" });

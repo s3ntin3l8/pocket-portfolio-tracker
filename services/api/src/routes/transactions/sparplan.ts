@@ -7,7 +7,6 @@ import {
   userPreferences,
   users,
 } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import {
   type SparplanStats,
@@ -21,7 +20,7 @@ import {
   type DriftRow,
   type TradeAction,
 } from "@portfolio/core";
-import { ownedPortfolio, cacheKey } from "../helpers.js";
+import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
@@ -32,7 +31,6 @@ import {
   networthSparplanCache,
   PORTFOLIO_VALUATION_CONCURRENCY,
 } from "./shared.js";
-import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 
@@ -40,16 +38,13 @@ export function registerSparplanRoutes(app: FastifyInstance) {
   // Sparplan detection for a single portfolio (in its base currency).
   app.get<{ Params: PortfolioParams; Querystring: { includeSales?: string } }>(
     "/portfolios/:portfolioId/sparplan",
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+    { preHandler: [app.authenticate, app.requirePortfolio] },
+    async (request) => {
+      request.timingName = "GET /portfolios/:id/sparplan";
+      const id = request.userId;
       const { portfolioId } = request.params;
       const includeSales = request.query.includeSales === "true";
-      const portfolio = await ownedPortfolio(app, id, portfolioId);
-      if (!portfolio) {
-        return reply.code(404).send({ error: "portfolio_not_found" });
-      }
+      const portfolio = request.portfolio;
       const { coreTxns, summary, prices, metaById } = await loadValuation(
         app,
         portfolioId,
@@ -76,11 +71,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
         );
 
       if (targetRows.length === 0) {
-        const durationMs = performance.now() - t0;
-        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
-          portfolioId,
-          hasTargets: false,
-        });
+        request.timingMeta = { portfolioId, hasTargets: false };
         return stats;
       }
 
@@ -125,12 +116,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
 
       // Phase D: tax-aware trade recommendations when ?includeSales=true.
       if (!includeSales) {
-        const durationMs = performance.now() - t0;
-        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
-          portfolioId,
-          hasTargets: true,
-          includeSales: false,
-        });
+        request.timingMeta = { portfolioId, hasTargets: true, includeSales: false };
         return { ...stats, drift, contributionSplit: split };
       }
 
@@ -155,13 +141,12 @@ export function registerSparplanRoutes(app: FastifyInstance) {
         const tradeActions: TradeAction[] = rebalancingTrades(drift, String(targetedTotal), {
           mode: "trade",
         });
-        const durationMs = performance.now() - t0;
-        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+        request.timingMeta = {
           portfolioId,
           hasTargets: true,
           includeSales: true,
           taxRegime: "ID",
-        });
+        };
         return { ...stats, drift, contributionSplit: split, tradeActions, taxRegime };
       }
 
@@ -180,14 +165,13 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       }
 
       if (!portfolio.taxAllowanceAnnual) {
-        const durationMs = performance.now() - t0;
-        logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+        request.timingMeta = {
           portfolioId,
           hasTargets: true,
           includeSales: true,
           taxRegime: prefsRow?.taxRegime ?? "DE",
           fsaConfigured: false,
-        });
+        };
         return { ...stats, drift, contributionSplit: split, taxUnavailable: true, taxRegime };
       }
 
@@ -252,15 +236,14 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       const remainingNum = Number(usage.remaining);
       const allowanceUsed = String(Math.min(allowanceUsedNum, remainingNum).toFixed(2));
 
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /portfolios/:id/sparplan", durationMs, {
+      request.timingMeta = {
         portfolioId,
         hasTargets: true,
         includeSales: true,
         taxRegime,
         fsaConfigured: true,
         hasSellActions: tradeActions.some((a) => a.side === "sell"),
-      });
+      };
       return {
         ...stats,
         drift,
@@ -280,8 +263,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
     "/networth/sparplan",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const [u] = await app.db
         .select({ displayCurrency: users.displayCurrency })
@@ -356,8 +338,8 @@ export function registerSparplanRoutes(app: FastifyInstance) {
           };
         },
       );
-      const durationMs = performance.now() - t0;
-      logTiming(request, "GET /networth/sparplan", durationMs, { portfolioCount: pfs.length });
+      request.timingName = "GET /networth/sparplan";
+      request.timingMeta = { portfolioCount: pfs.length };
       return result;
     },
   );
