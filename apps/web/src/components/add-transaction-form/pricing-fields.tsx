@@ -1,13 +1,11 @@
 "use client";
 
+import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { Field } from "./field";
 
-const ACQUISITION_TYPES = ["buy", "sell", "savings_plan"] as const;
-const SHARE_RECEIPT_TYPES = ["bonus", "split", "rights"] as const;
-const TRANSFER_TYPES = ["transfer_in", "transfer_out"] as const;
 const INCOME_TYPES = ["dividend", "coupon"] as const;
 const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
@@ -54,9 +52,9 @@ export function PricingFields({
   setDate,
   t,
 }: PricingFieldsProps) {
-  const isAcquisition = (ACQUISITION_TYPES as readonly string[]).includes(type);
-  const isShareReceipt = (SHARE_RECEIPT_TYPES as readonly string[]).includes(type);
-  const isTransfer = (TRANSFER_TYPES as readonly string[]).includes(type);
+  const isAcquisition = isTradeType(type);
+  const isShareReceipt = isShareReceiptType(type);
+  const isTransfer = isTransferType(type);
   const isIncome = (INCOME_TYPES as readonly string[]).includes(type);
   const isAdjustment = type === "adjustment";
 

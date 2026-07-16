@@ -19,6 +19,7 @@ import { PricingFields } from "./add-transaction-form/pricing-fields";
 import { AdvancedFields } from "./add-transaction-form/advanced-fields";
 import { SubmitButton } from "./add-transaction-form/submit-button";
 import { Field } from "./add-transaction-form/field";
+import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
 
 /** The slice of the API client this form needs (injectable for tests). */
 export type AddTransactionClient = Pick<
@@ -234,10 +235,10 @@ export function AddTransactionForm({
   ];
 
   // Per-type field groups — drive which fields are shown and validated.
-  const isAcquisition = (ACQUISITION_TYPES as readonly string[]).includes(type);
-  const isShareReceipt = (SHARE_RECEIPT_TYPES as readonly string[]).includes(type);
+  const isAcquisition = isTradeType(type);
+  const isShareReceipt = isShareReceiptType(type);
   // Transfers: instrument + quantity + carried-cost-basis price. Cash-neutral, no fees/tax.
-  const isTransfer = (TRANSFER_TYPES as readonly string[]).includes(type);
+  const isTransfer = isTransferType(type);
   const isIncome = (INCOME_TYPES as readonly string[]).includes(type);
   const isCash =
     (CASH_TYPES as readonly string[]).includes(type) ||

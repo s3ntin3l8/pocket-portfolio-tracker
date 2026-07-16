@@ -1,3 +1,4 @@
+import { isIncomeType, INCOME_TYPES as INCOME_TYPE_VALUES } from "@portfolio/core";
 import { txAmountDisplay, txNetAmountDisplay, type TxRow } from "@/components/transactions-table";
 import { formatMoneyCompact, formatPercent } from "@/lib/utils";
 
@@ -5,8 +6,7 @@ import { formatMoneyCompact, formatPercent } from "@/lib/utils";
  *  bond coupons, cash interest, and broker cash bonuses (same set the Income screen treats
  *  as recurring income, minus corporate-action share bonuses which carry no cash). Exported
  *  so `TransactionsTable` can classify its `typeFilter` selection the same way. */
-export const ACTIVITY_INCOME_TYPES = new Set(["dividend", "coupon", "interest", "bonus_cash"]);
-const INCOME_TYPES = ACTIVITY_INCOME_TYPES;
+export const ACTIVITY_INCOME_TYPES = new Set(INCOME_TYPE_VALUES);
 
 /** A single "dot + label + mini progress bar + right-aligned value" breakdown row, shared by
  *  all three Activity filter banners. */
@@ -87,7 +87,7 @@ export function computeAllBanner(
   if (rows.length === 0) return null;
   const buys = rows.filter((r) => r.type === "buy");
   const sells = rows.filter((r) => r.type === "sell");
-  const incomeRows = rows.filter((r) => INCOME_TYPES.has(r.type));
+  const incomeRows = rows.filter((r) => isIncomeType(r.type));
 
   const investedTotal = sumBy(buys, txAmountDisplay);
   const proceedsTotal = sumBy(sells, txAmountDisplay);
@@ -171,7 +171,7 @@ export function computeIncomeBanner(
   },
   now: Date = new Date(),
 ): IncomeBannerData | null {
-  const incomeRows = rows.filter((r) => INCOME_TYPES.has(r.type));
+  const incomeRows = rows.filter((r) => isIncomeType(r.type));
   if (incomeRows.length === 0) return null;
   const money = (n: number) => formatMoneyCompact(n, scopeCurrency, locale);
 

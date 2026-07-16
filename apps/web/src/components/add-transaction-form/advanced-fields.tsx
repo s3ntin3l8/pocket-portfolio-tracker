@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Field } from "./field";
 
+// Form-specific: narrower than isIncomeType (excludes interest/bonus_cash shown as Cash)
 const INCOME_TYPES = ["dividend", "coupon"] as const;
 const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 

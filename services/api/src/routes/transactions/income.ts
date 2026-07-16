@@ -1,12 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { accountHolders, portfolios, transactions, users } from "@portfolio/db";
-import { toDateKey, type CoreTransaction, aggregatePortfolios } from "@portfolio/core";
+import {
+  toDateKey,
+  type CoreTransaction,
+  aggregatePortfolios,
+  INCOME_TYPES,
+} from "@portfolio/core";
 import { mapPool } from "../../lib/promise-pool.js";
 
 import {
   instrumentMeta,
-  ACTIVITY_INCOME_TYPES,
   yearRange,
   PORTFOLIO_VALUATION_CONCURRENCY,
   loadValuation,
@@ -163,7 +167,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
         .where(
           and(
             eq(transactions.portfolioId, request.params.portfolioId),
-            inArray(transactions.type, ACTIVITY_INCOME_TYPES),
+            inArray(transactions.type, INCOME_TYPES),
             gte(transactions.executedAt, start),
             lt(transactions.executedAt, end),
           ),
