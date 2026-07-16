@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useApiCall } from "@/lib/use-api-call";
 import {
   AlertCircle,
   Check,
@@ -81,39 +82,37 @@ function SecretCell({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const [saveState, save] = useApiCall(
+    useCallback(async () => {
+      if (!apiKey.trim()) return;
+      await onSet({ apiKey: apiKey.trim() });
+      setDialogOpen(false);
+    }, [apiKey, onSet]),
+  );
+  const [clearState, clear] = useApiCall(
+    useCallback(async () => {
+      await onClear();
+    }, [onClear]),
+  );
+
+  const busy = saveState.busy || clearState.busy;
+  const error = saveState.error || clearState.error;
 
   function handleDialogChange(open: boolean) {
     setDialogOpen(open);
     if (!open) {
       setApiKey("");
-      setError(null);
       setShowKey(false);
     }
   }
 
   async function handleSave() {
-    if (!apiKey.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await onSet({ apiKey: apiKey.trim() });
-      setDialogOpen(false);
-    } catch {
-      setError(t("credentialError"));
-    } finally {
-      setBusy(false);
-    }
+    void save();
   }
 
   async function handleClear() {
-    setBusy(true);
-    try {
-      await onClear();
-    } finally {
-      setBusy(false);
-    }
+    void clear();
   }
 
   if (!encryptionEnabled) {

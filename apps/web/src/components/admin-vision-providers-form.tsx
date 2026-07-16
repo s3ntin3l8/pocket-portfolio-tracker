@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useApiCall } from "@/lib/use-api-call";
 import { AlertCircle, Check, Eye, EyeOff, Pencil, ShieldOff, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -61,50 +62,40 @@ function VisionCredentialCell({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Ollama is a URL-based provider — edit a URL, not an API key.
   const isUrlProvider = provider.id === "ollama";
   const hasCredential = isUrlProvider ? provider.hasUrl : provider.hasKey;
 
+  const [setState, handleSet] = useApiCall(
+    useCallback(
+      async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!apiKey.trim()) return;
+        const body: ProviderCredentialInput = isUrlProvider
+          ? { urlOverride: apiKey.trim() }
+          : { apiKey: apiKey.trim() };
+        await onSet(provider.id, body);
+        setApiKey("");
+        setDialogOpen(false);
+      },
+      [apiKey, isUrlProvider, provider.id, onSet],
+    ),
+  );
+  const [clearState, handleClear] = useApiCall(
+    useCallback(async () => {
+      await onClear(provider.id);
+    }, [provider.id, onClear]),
+  );
+
+  const busy = setState.busy || clearState.busy;
+  const error = setState.error || clearState.error;
+
   function handleDialogChange(open: boolean) {
     setDialogOpen(open);
     if (!open) {
       setApiKey("");
-      setError(null);
       setShowKey(false);
-    }
-  }
-
-  async function handleSet(e: React.FormEvent) {
-    e.preventDefault();
-    if (!apiKey.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const body: ProviderCredentialInput = isUrlProvider
-        ? { urlOverride: apiKey.trim() }
-        : { apiKey: apiKey.trim() };
-      await onSet(provider.id, body);
-      setApiKey("");
-      setDialogOpen(false);
-    } catch {
-      setError(t("credentialError"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleClear() {
-    setBusy(true);
-    setError(null);
-    try {
-      await onClear(provider.id);
-    } catch {
-      setError(t("credentialError"));
-    } finally {
-      setBusy(false);
     }
   }
 
