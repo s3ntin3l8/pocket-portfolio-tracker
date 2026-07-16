@@ -11,7 +11,7 @@ import type {
   InstrumentSearchResult,
 } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
-import { MonogramBadge } from "@/components/monogram-badge";
+import { InstrumentLogo } from "@/components/instrument-logo";
 import { TransactionSourcesSection } from "@/components/transaction-sources-section";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -492,8 +492,10 @@ export function AddTransactionForm({
             <div className="space-y-3 rounded-lg border border-border bg-card p-4">
               {selected ? (
                 <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-sm">
-                  <MonogramBadge
+                  <InstrumentLogo
                     label={selected.symbol}
+                    symbol={selected.symbol}
+                    market={selected.market}
                     assetClass={selected.assetClass}
                     className="size-8 rounded-[9px]"
                   />
@@ -581,8 +583,10 @@ export function AddTransactionForm({
                                   }}
                                   className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent"
                                 >
-                                  <MonogramBadge
+                                  <InstrumentLogo
                                     label={i.symbol}
+                                    symbol={i.symbol}
+                                    market={i.market}
                                     assetClass={i.assetClass}
                                     className="size-8 rounded-[9px]"
                                   />
@@ -611,8 +615,10 @@ export function AddTransactionForm({
                                   onClick={() => prefillFrom(i)}
                                   className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent"
                                 >
-                                  <MonogramBadge
+                                  <InstrumentLogo
                                     label={i.symbol}
+                                    symbol={i.symbol}
+                                    market={i.market}
                                     assetClass={i.assetClass}
                                     className="size-8 rounded-[9px]"
                                   />

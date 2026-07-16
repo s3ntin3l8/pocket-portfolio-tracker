@@ -14,7 +14,7 @@ import {
   TABLE_VALUE_STRONG,
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { MonogramBadge } from "@/components/monogram-badge";
+import { InstrumentLogo } from "@/components/instrument-logo";
 import { Link } from "@/i18n/navigation";
 import { formatMoney, formatPercent, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
@@ -92,7 +92,12 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
               <TableRow key={y.instrumentId}>
                 <TableCell>
                   <div className="flex items-center gap-3 min-w-0">
-                    <MonogramBadge label={y.symbol ?? "—"} assetClass={y.assetClass} />
+                    <InstrumentLogo
+                      label={y.symbol ?? "—"}
+                      symbol={y.symbol}
+                      market={y.market}
+                      assetClass={y.assetClass}
+                    />
                     <div className="min-w-0">
                       <Link
                         href={`/instruments/${y.instrumentId}`}
