@@ -8,7 +8,6 @@ import {
   portfolios,
   users,
 } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import type { CoreTransaction, PortfolioSummary, IncomeEntry, TradeLog } from "@portfolio/core";
 import {
   cashFlow,
@@ -216,7 +215,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
 
       const portfolio = await ownedPortfolio(app, id, portfolioId);
@@ -380,7 +379,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId: filterHolderId } = request.query;
       const year = request.query.year
         ? parseInt(request.query.year, 10)

@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { accountHolders, instruments, portfolios, transactions } from "@portfolio/db";
 import { searchQuerySchema } from "@portfolio/schema";
-import { requireUser } from "../plugins/auth.js";
 
 /**
  * Global user-scoped search — two cheap ILIKE queries, no valuation computation.
@@ -20,7 +19,7 @@ import { requireUser } from "../plugins/auth.js";
 export async function searchRoute(app: FastifyInstance) {
   app.get("/search", { preHandler: app.authenticate }, async (request, reply) => {
     const { q, types, holderId, limit } = searchQuerySchema.parse(request.query);
-    const { id: userId } = requireUser(request);
+    const userId = request.userId;
 
     // Validate holder ownership (mirrors /networth holder guard).
     if (holderId != null) {

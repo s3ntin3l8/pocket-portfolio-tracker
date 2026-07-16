@@ -10,7 +10,6 @@ import {
   convert,
   toDateKey,
 } from "@portfolio/core";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { loadSparklines } from "../../services/sparklines.js";
 import { enqueueInstrumentMetadata } from "../../services/scheduler.js";
@@ -32,7 +31,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const [u] = await app.db
         .select({ displayCurrency: users.displayCurrency })

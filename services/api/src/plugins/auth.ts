@@ -145,6 +145,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         authMethod: "pat",
         scope,
       };
+      request.userId = u.id;
       return;
     }
 
@@ -185,6 +186,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       authMethod: "jwt",
       scope: "write",
     };
+    request.userId = user.id;
   });
 
   // Admin-only guard: authenticate, then require the Authentik admin group. Used by
@@ -206,5 +208,8 @@ declare module "fastify" {
   }
   interface FastifyRequest {
     user?: AuthedUser;
+    userId: string;
+    portfolio: unknown;
+    timingMeta?: Record<string, unknown>;
   }
 }

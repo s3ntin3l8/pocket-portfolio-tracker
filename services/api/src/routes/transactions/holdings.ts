@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { transactions, dismissedAnomalies, trConnections } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { toCoreTxns } from "../../services/tx-core.js";
 import { netManualAdjustments } from "../../services/pytr/reconcile.js";
 import { loadSparklines } from "../../services/sparklines.js";
@@ -34,7 +33,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(app, id, portfolioId);
       if (!portfolio) {
@@ -90,7 +89,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(app, id, portfolioId);
       if (!portfolio) {
@@ -148,7 +147,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(app, id, portfolioId);
       if (!portfolio) {

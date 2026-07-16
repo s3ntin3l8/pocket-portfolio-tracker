@@ -9,7 +9,6 @@ import {
   type CoreTransaction,
   type CorporateAction,
 } from "@portfolio/core";
-import { requireUser } from "../plugins/auth.js";
 import { enqueueRecompute } from "../services/scheduler.js";
 import { toCoreTxns } from "../services/tx-core.js";
 
@@ -24,7 +23,7 @@ export async function mergersRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/mergers",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id: userId } = requireUser(request);
+      const userId = request.userId;
       const { portfolioId } = request.params;
 
       const [owned] = await app.db

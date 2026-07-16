@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { accountHolders, portfolios, users } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { type InstrumentMeta } from "../../services/valuation.js";
 import { type TradeLog, mergeTradeLogs } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
@@ -26,7 +25,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(app, id, portfolioId);
       if (!portfolio) {
@@ -72,7 +71,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const method = methodFromQuery(request.query);
       const costBasisMode = costBasisFromQuery(request.query);

@@ -7,7 +7,6 @@ import {
   userPreferences,
   users,
 } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import {
   type SparplanStats,
@@ -43,7 +42,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const includeSales = request.query.includeSales === "true";
       const portfolio = await ownedPortfolio(app, id, portfolioId);
@@ -281,7 +280,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId } = request.query;
       const [u] = await app.db
         .select({ displayCurrency: users.displayCurrency })

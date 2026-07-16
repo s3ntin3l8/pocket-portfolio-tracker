@@ -36,7 +36,6 @@ import {
   computeActiveReturn,
 } from "../../services/benchmark.js";
 import { rangeStart } from "../../services/snapshots.js";
-import { requireUser } from "../../plugins/auth.js";
 import { cacheKey } from "../helpers.js";
 import { insightsCache } from "./shared.js";
 import { logTiming } from "../../lib/timing.js";
@@ -48,7 +47,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId, portfolioId } = request.query;
       const range = request.query.range ?? "all";
 

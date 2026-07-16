@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { accountHolders, portfolios, transactions, users } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { toDateKey, type CoreTransaction, aggregatePortfolios } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
@@ -22,7 +21,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { holderId, eventsYear } = request.query;
       const [u] = await app.db
         .select({ displayCurrency: users.displayCurrency })
@@ -128,7 +127,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(app, id, portfolioId);
       if (!portfolio) {
@@ -163,7 +162,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/income-year",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const portfolio = await ownedPortfolio(app, id, request.params.portfolioId);
       if (!portfolio) return reply.code(404).send({ error: "portfolio_not_found" });
 

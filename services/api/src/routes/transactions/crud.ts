@@ -3,7 +3,6 @@ import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { transactions, trResolvedEvents, dismissedAnomalies } from "@portfolio/db";
 import { transactionInputSchema } from "@portfolio/schema";
-import { requireUser } from "../../plugins/auth.js";
 import { toDateKey } from "@portfolio/core";
 import { enqueueRecompute } from "../../services/scheduler.js";
 import { reassignTransactions } from "../../services/reassign.js";
@@ -18,7 +17,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -61,7 +60,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/:txId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId, txId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -87,7 +86,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/bulk-delete",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -112,7 +111,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/:txId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId, txId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -160,7 +159,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/:txId/status",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId, txId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -187,7 +186,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/anomalies/dismiss",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -212,7 +211,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/anomalies/dismiss",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -239,7 +238,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/resolve-drafts",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -292,7 +291,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/reassign",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const { ids, targetPortfolioId } = reassignSchema.parse(request.body);
       if (portfolioId === targetPortfolioId) {
@@ -324,7 +323,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/merge-preview",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -346,7 +345,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/merge",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });

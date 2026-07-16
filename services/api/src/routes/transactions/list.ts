@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { and, count, desc, eq, getTableColumns, gte, inArray, lt, sql } from "drizzle-orm";
 import { portfolios, transactions } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { logTiming } from "../../lib/timing.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import { ownedPortfolio, parsePagination, cacheKey } from "../helpers.js";
@@ -29,7 +28,7 @@ export function registerListRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const portfolio = await ownedPortfolio(app, id, request.params.portfolioId);
       if (!portfolio) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -178,7 +177,7 @@ export function registerListRoutes(app: FastifyInstance) {
     Querystring: { page?: string; pageSize?: string; type?: string; year?: string; q?: string };
   }>("/networth/transactions", { preHandler: app.authenticate }, async (request, _reply) => {
     const t0 = performance.now();
-    const { id } = requireUser(request);
+    const id = request.userId;
     const { page, pageSize } = parsePagination({
       page: request.query.page,
       pageSize: request.query.pageSize,

@@ -7,7 +7,6 @@ import {
   portfolioIntradaySnapshots,
   portfolioSnapshots,
 } from "@portfolio/db";
-import { requireUser } from "../../plugins/auth.js";
 import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
@@ -31,7 +30,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -107,7 +106,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = await ownedPortfolio(app, id, portfolioId);
       if (!portfolio) {
@@ -152,7 +151,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
     Querystring: { range?: string; include?: string; exclude?: string; holderId?: string };
   }>("/networth/history", { preHandler: app.authenticate }, async (request, reply) => {
     const t0 = performance.now();
-    const { id } = requireUser(request);
+    const id = request.userId;
     const { holderId } = request.query;
     const range = request.query.range ?? "1y";
     const includeParam = request.query.include ?? "";

@@ -3,7 +3,6 @@ import type { Multipart } from "@fastify/multipart";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { documents, portfolios, transactions, transactionSources } from "@portfolio/db";
 import { documentUploadFieldsSchema, documentListQuerySchema } from "@portfolio/schema";
-import { requireUser } from "../plugins/auth.js";
 import { withDerivationCache, createStore } from "../lib/derivation-cache.js";
 import { logTiming } from "../lib/timing.js";
 import {
@@ -37,7 +36,7 @@ export async function documentsRoute(app: FastifyInstance) {
   // List the current user's inbox documents, newest first. Defaults to category=tax_report
   // (the only category today) — see listInboxDocuments.
   app.get("/documents", { preHandler: app.authenticate }, async (request) => {
-    const { id: userId } = requireUser(request);
+    const id = request.userId;
     const {
       category,
       portfolioId,
@@ -77,12 +76,12 @@ export async function documentsRoute(app: FastifyInstance) {
 
     if (hasPagination) {
       const conditions = [
-        eq(documents.userId, userId),
+        eq(documents.userId, id),
         eq(documents.category, category ?? "tax_report"),
       ];
       if (portfolioId) conditions.push(eq(documents.portfolioId, portfolioId));
 
-      const ck = cacheKey(userId, page, pageSize, category ?? "", portfolioId ?? "");
+      const ck = cacheKey(id, page, pageSize, category ?? "", portfolioId ?? "");
       const cached = await withDerivationCache(documentsCache, ck, async () => {
         const [cnt, rows] = await Promise.all([
           app.db
@@ -119,7 +118,7 @@ export async function documentsRoute(app: FastifyInstance) {
       return cached;
     }
 
-    const docs = await listInboxDocuments(app, { userId, category, portfolioId });
+    const docs = await listInboxDocuments(app, { userId: id, category, portfolioId });
 
     const portfolioIds = [
       ...new Set(docs.map((d) => d.portfolioId).filter((x): x is string => Boolean(x))),
@@ -143,7 +142,7 @@ export async function documentsRoute(app: FastifyInstance) {
   // covers. Mirrors POST /imports/screenshot's multipart handling
   // (routes/imports/parse.ts), scoped to PDF only.
   app.post("/documents", { preHandler: app.authenticate }, async (request, reply) => {
-    const { id: userId } = requireUser(request);
+    const id = request.userId;
 
     let part;
     try {
@@ -180,7 +179,7 @@ export async function documentsRoute(app: FastifyInstance) {
     const { category, taxYear, portfolioId: requestedPortfolioId } = parsedFields.data;
 
     // IDOR guard: the portfolio must belong to the uploading user.
-    const portfolio = await ownedPortfolio(app, userId, requestedPortfolioId);
+    const portfolio = await ownedPortfolio(app, id, requestedPortfolioId);
     if (!portfolio) return reply.code(404).send({ error: "portfolio_not_found" });
     const portfolioId = portfolio.id;
 
@@ -189,7 +188,7 @@ export async function documentsRoute(app: FastifyInstance) {
     // sourceEventId idempotency machinery — no separate content-hash column needed.
     const contentHash = shortHash(buf.toString("base64"));
     const result = await storeInboxDocument(app, {
-      userId,
+      userId: id,
       portfolioId,
       category,
       taxYear: taxYear ?? null,
@@ -223,10 +222,10 @@ export async function documentsRoute(app: FastifyInstance) {
     "/documents/:documentId/url",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id: userId } = requireUser(request);
+      const id = request.userId;
       const doc = await getInboxDocument(app, request.params.documentId);
       if (!doc) return reply.code(404).send({ error: "document_not_found" });
-      if (doc.userId !== userId) return reply.code(403).send({ error: "forbidden" });
+      if (doc.userId !== id) return reply.code(403).send({ error: "forbidden" });
 
       const url = await app.storage.getSignedUrl(doc.storageKey, undefined, {
         downloadName: doc.originalFilename ?? undefined,
@@ -240,10 +239,10 @@ export async function documentsRoute(app: FastifyInstance) {
     "/documents/:documentId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id: userId } = requireUser(request);
+      const id = request.userId;
       const doc = await getInboxDocument(app, request.params.documentId);
       if (!doc) return reply.code(404).send({ error: "document_not_found" });
-      if (doc.userId !== userId) return reply.code(403).send({ error: "forbidden" });
+      if (doc.userId !== id) return reply.code(403).send({ error: "forbidden" });
 
       await deleteInboxDocument(app, { documentId: doc.id, storageKey: doc.storageKey });
       request.log.info({ documentId: doc.id }, "inbox document deleted");
@@ -258,7 +257,7 @@ export async function documentsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/:txId/document-url",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId, txId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -295,7 +294,7 @@ export async function documentsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/transactions/:txId/sources/:sourceId/document-url",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId, txId, sourceId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });
@@ -396,7 +395,7 @@ export async function documentsRoute(app: FastifyInstance) {
     "/portfolios/:portfolioId/documents/export",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { portfolioId } = request.params;
       if (!(await ownedPortfolio(app, id, portfolioId))) {
         return reply.code(404).send({ error: "portfolio_not_found" });

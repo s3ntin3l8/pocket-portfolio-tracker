@@ -14,7 +14,6 @@ import {
   type ImportIssue,
   type ParsedTransaction,
 } from "@portfolio/schema";
-import { requireUser } from "../plugins/auth.js";
 import { enrichTransactionFromDrafts } from "../services/enrichment.js";
 import { classifyMatch, parserToTxSource } from "../services/parsers/dedup.js";
 import { findCommittedDuplicates } from "../services/parsers/likely-duplicates.js";
@@ -142,7 +141,7 @@ export async function importsRoute(app: FastifyInstance) {
   // and document summary if one has been retained (#231).
   app.get("/imports", { preHandler: app.authenticate }, async (request) => {
     const t0 = performance.now();
-    const { id } = requireUser(request);
+    const id = request.userId;
     const { rows, importCount } = await withDerivationCache(importsCache, id, async () => {
       const rows = await app.db
         .select({
@@ -211,7 +210,7 @@ export async function importsRoute(app: FastifyInstance) {
   // by event type (falling back to the message for the null-eventType / unparseable case),
   // scoped to the user's non-discarded imports, most-frequent first.
   app.get("/imports/unmapped-types", { preHandler: app.authenticate }, async (request) => {
-    const { id } = requireUser(request);
+    const id = request.userId;
     const rows = await app.db
       .select()
       .from(screenshotImports)
@@ -258,7 +257,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId/discard",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
       if (imp.status === "confirmed") {
@@ -279,7 +278,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
       const removed = await undoImportRow(imp);
@@ -295,7 +294,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId/reassign",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
       const { targetPortfolioId } = z
@@ -329,7 +328,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/bulk-clear",
     { preHandler: app.authenticate },
     async (request) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { ids } = bulkClearSchema.parse(request.body);
       const cleared = await app.db
         .delete(screenshotImports)
@@ -357,7 +356,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/bulk-delete",
     { preHandler: app.authenticate },
     async (request) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { ids } = bulkClearSchema.parse(request.body);
       const owned = await app.db
         .select()
@@ -396,7 +395,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId/clear",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
       if (imp.status !== "discarded") {
@@ -416,7 +415,7 @@ export async function importsRoute(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const t0 = performance.now();
-      const { id } = requireUser(request);
+      const id = request.userId;
       const { importId } = request.params;
       const result = await withDerivationCache(importDetailCache, importId, async () => {
         const imp = await ownedImport(id, importId);
@@ -451,7 +450,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId/duplicates",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
 
@@ -530,7 +529,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId/enrich",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
 
@@ -641,7 +640,7 @@ export async function importsRoute(app: FastifyInstance) {
     "/imports/:importId/document-url",
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = requireUser(request);
+      const id = request.userId;
       const imp = await ownedImport(id, request.params.importId);
       if (!imp) return reply.code(404).send({ error: "import_not_found" });
 
