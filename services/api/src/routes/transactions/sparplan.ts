@@ -21,9 +21,9 @@ import {
   type DriftRow,
   type TradeAction,
 } from "@portfolio/core";
+import { ownedPortfolio, cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
-  ownedPortfolio,
   loadValuation,
   buildSparplanStats,
   buildTradeLog,
@@ -59,7 +59,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       );
       const stats = await withDerivationCache(
         sparplanCache,
-        `${portfolioId}:${portfolio.cashCounted ? "inside" : "outside"}`,
+        cacheKey(portfolioId, portfolio.cashCounted ? "inside" : "outside"),
         () => buildSparplanStats(app, coreTxns, portfolio.baseCurrency),
       );
 
@@ -314,7 +314,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
 
       const result = await withDerivationCache(
         networthSparplanCache,
-        `${id}:${display}:${holderId ?? ""}`,
+        cacheKey(id, display, holderId ?? ""),
         async () => {
           // Detect per portfolio in the display currency, then merge (not concatenate).
           // Independent per portfolio — bounded-concurrency instead of a serial `for` await

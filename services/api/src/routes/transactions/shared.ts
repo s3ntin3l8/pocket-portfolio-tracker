@@ -1,13 +1,7 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import {
-  accountHolders,
-  allocationTargets,
-  corporateActions,
-  instruments,
-  portfolios,
-} from "@portfolio/db";
+import { allocationTargets, corporateActions, instruments } from "@portfolio/db";
 import {
   type Anomaly,
   type CoreTransaction,
@@ -31,7 +25,6 @@ import {
 import { getMarketData } from "../../services/market-data.js";
 import { valuePortfolioCached, type InstrumentMeta } from "../../services/valuation.js";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
-import { flattenJoinRow } from "../../lib/portfolio.js";
 import { createStore, type CacheEntry } from "../../lib/derivation-cache.js";
 
 export type { CacheEntry };
@@ -86,16 +79,6 @@ export const PORTFOLIO_VALUATION_CONCURRENCY = 4;
 export const bulkDeleteSchema = z.object({
   ids: z.array(z.guid()).min(1),
 });
-
-export async function ownedPortfolio(app: FastifyInstance, userId: string, portfolioId: string) {
-  const [row] = await app.db
-    .select()
-    .from(portfolios)
-    .leftJoin(accountHolders, eq(portfolios.accountHolderId, accountHolders.id))
-    .where(and(eq(portfolios.id, portfolioId), eq(portfolios.userId, userId)))
-    .limit(1);
-  return row ? flattenJoinRow(row) : null;
-}
 
 export async function corporateActionsFor(
   app: FastifyInstance,

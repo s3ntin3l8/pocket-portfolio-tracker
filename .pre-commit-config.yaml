@@ -18,9 +18,8 @@ repos:
     hooks:
       - id: prettier
         name: prettier
-        entry: npx --no-install prettier --write
+        entry: npx --no-install pretty-quick --staged
         language: system
-        types: [text]
         stages: [pre-commit]
 
   - repo: local

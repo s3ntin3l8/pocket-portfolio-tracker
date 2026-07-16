@@ -12,14 +12,9 @@ import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../services/fx.
 import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
 import { aggregateValueFlows, xirr, chainIndex, convert } from "@portfolio/core";
+import { ownedPortfolio, cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
-import {
-  ownedPortfolio,
-  loadValuation,
-  historyCache,
-  performanceCache,
-  boundaryFlows,
-} from "./shared.js";
+import { loadValuation, historyCache, performanceCache, boundaryFlows } from "./shared.js";
 import { logTiming } from "../../lib/timing.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import {
@@ -169,7 +164,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         .from(accountHolders)
         .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
         .limit(1);
-      if (!holder) return reply.status(404).send({ code: "holder_not_found" });
+      if (!holder) return reply.status(404).send({ error: "holder_not_found" });
     }
 
     const pfs = await app.db
@@ -199,8 +194,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       .limit(1);
     const display = u?.displayCurrency ?? "IDR";
 
-    const cacheKey = `${id}:${range}:${holderId ?? ""}:${includeParam}:${excludeParam}`;
-    const cached = await withDerivationCache(historyCache, cacheKey, async () => {
+    const ck = cacheKey(id, range, holderId ?? "", includeParam, excludeParam);
+    const cached = await withDerivationCache(historyCache, ck, async () => {
       // 1D/7D: aggregate the intraday (timestamped) table instead of the day-grained one.
       if (range === "1d" || range === "7d") {
         const since = new Date(Date.now() - (range === "1d" ? 1 : 7) * 86_400_000);
