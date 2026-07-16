@@ -13,7 +13,7 @@ import {
   type TaxCurrencyTotal,
   type TaxYearRow,
   type TaxYearDetail,
-} from "./_shared.js";
+} from "./_shared";
 
 export async function loadNetworthTax(
   year?: number,

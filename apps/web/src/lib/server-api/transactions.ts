@@ -4,8 +4,8 @@ import {
   listPortfoliosCached,
   resolveHolderScope,
   type TransactionWithPortfolio,
-} from "./_shared.js";
-import { loadMe } from "./user.js";
+} from "./_shared";
+import { loadMe } from "./user";
 
 export async function loadTransactionsAcrossPortfolios(): Promise<{
   status: "ok" | "empty" | "unavailable";

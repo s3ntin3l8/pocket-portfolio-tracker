@@ -4,7 +4,7 @@ import {
   getSelectedPortfolioId,
   resolveHolderScope,
   type InsightsView,
-} from "./_shared.js";
+} from "./_shared";
 
 export async function loadInsights(
   range = "all",

@@ -7,9 +7,9 @@ import {
   type InstrumentDetail,
   type InstrumentScope,
   type TransactionWithPortfolio,
-} from "./_shared.js";
-import { loadTransactionsAcrossPortfolios } from "./transactions.js";
-import { loadPortfolio } from "./portfolios.js";
+} from "./_shared";
+import { loadTransactionsAcrossPortfolios } from "./transactions";
+import { loadPortfolio } from "./portfolios";
 
 export async function loadInstrument(
   id: string,

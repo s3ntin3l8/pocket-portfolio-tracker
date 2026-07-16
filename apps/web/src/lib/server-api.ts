@@ -1,15 +1,15 @@
 // Barrel re-exports
-export * from "./server-api/account-holders.js";
-export * from "./server-api/admin.js";
-export * from "./server-api/connections.js";
-export * from "./server-api/documents.js";
-export * from "./server-api/insights.js";
-export * from "./server-api/instruments.js";
-export * from "./server-api/networth.js";
-export * from "./server-api/portfolios.js";
-export * from "./server-api/tax.js";
-export * from "./server-api/transactions.js";
-export * from "./server-api/user.js";
+export * from "./server-api/account-holders";
+export * from "./server-api/admin";
+export * from "./server-api/connections";
+export * from "./server-api/documents";
+export * from "./server-api/insights";
+export * from "./server-api/instruments";
+export * from "./server-api/networth";
+export * from "./server-api/portfolios";
+export * from "./server-api/tax";
+export * from "./server-api/transactions";
+export * from "./server-api/user";
 
 // Re-export shared types/helpers used directly by consumers
 export {
@@ -32,7 +32,7 @@ export {
   type TaxYearRow,
   type TaxYearDetail,
   loadHoldings,
-} from "./server-api/_shared.js";
+} from "./server-api/_shared";
 
 // Remaining functions not extracted into domain modules
 import type {
@@ -49,7 +49,7 @@ import {
   listPortfoliosCached,
   getSelectedPortfolioId,
   resolveHolderScope,
-} from "./server-api/_shared.js";
+} from "./server-api/_shared";
 
 export async function loadAnomalies(portfolioOverride?: string): Promise<Anomaly[] | null> {
   const api = await getServerApi();

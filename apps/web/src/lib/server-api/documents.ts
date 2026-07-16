@@ -5,7 +5,7 @@ import type {
   ImportDetail,
   UnmappedEventType,
 } from "@portfolio/api-client";
-import { getServerApi, getSelectedPortfolioId } from "./_shared.js";
+import { getServerApi, getSelectedPortfolioId } from "./_shared";
 
 export async function loadDocuments(category?: DocumentCategory): Promise<InboxDocument[]> {
   const api = await getServerApi();

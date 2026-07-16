@@ -7,7 +7,7 @@ import type {
   ImportStrategy,
   AdminStorageResponse,
 } from "@portfolio/api-client";
-import { getServerApi } from "./_shared.js";
+import { getServerApi } from "./_shared";
 
 export async function loadAdminProviders(): Promise<
   | { status: "ok"; providers: AdminProvider[]; encryptionEnabled: boolean }

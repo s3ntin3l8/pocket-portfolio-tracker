@@ -1,5 +1,5 @@
 import type { AccountHolder } from "@portfolio/api-client";
-import { getServerApi, listAccountHoldersCached } from "./_shared.js";
+import { getServerApi, listAccountHoldersCached } from "./_shared";
 
 export async function loadAccountHolders(): Promise<AccountHolder[]> {
   const api = await getServerApi();

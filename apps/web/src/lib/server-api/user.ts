@@ -1,5 +1,5 @@
 import type { User, UserPreferences, ApiToken } from "@portfolio/api-client";
-import { getServerApi, meCached } from "./_shared.js";
+import { getServerApi, meCached } from "./_shared";
 
 export async function loadPreferences(): Promise<UserPreferences | null> {
   const api = await getServerApi();

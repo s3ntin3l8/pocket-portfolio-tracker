@@ -9,7 +9,7 @@ import {
   getNetWorthCached,
   resolveHolderScope,
   type NetWorthResult,
-} from "./_shared.js";
+} from "./_shared";
 
 export async function loadNetWorth(
   costBasis?: "purchase_price" | "total_paid",

@@ -1,5 +1,5 @@
 import type { TrConnection, IbkrConnection } from "@portfolio/api-client";
-import { getServerApi } from "./_shared.js";
+import { getServerApi } from "./_shared";
 
 export async function loadTrConnection(): Promise<TrConnection | null> {
   const api = await getServerApi();

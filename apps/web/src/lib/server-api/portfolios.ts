@@ -5,7 +5,7 @@ import {
   getSelectedPortfolioId,
   type PortfolioWithValue,
   type PortfolioResult,
-} from "./_shared.js";
+} from "./_shared";
 
 export async function loadPortfoliosList(): Promise<{
   status: "ok" | "unavailable";
