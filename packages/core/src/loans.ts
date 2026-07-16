@@ -1,8 +1,7 @@
 import { Decimal } from "decimal.js";
+import { D } from "./decimal.js";
 import { convert, type FxRateFn } from "./networth.js";
 import type { CoreTransaction } from "./types.js";
-
-const D = (v: string | number) => new Decimal(v);
 
 /**
  * Outstanding principal per loan, derived from the financing legs:

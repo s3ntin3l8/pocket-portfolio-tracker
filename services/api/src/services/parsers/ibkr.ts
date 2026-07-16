@@ -2,6 +2,7 @@ import { parsedTransactionSchema, type AssetClass, type ParsedAction } from "@po
 import type { CsvParseResult } from "./csv.js";
 import { splitCsvLine } from "./csv-line.js";
 import { shortHash } from "./hash.js";
+import { num } from "./numeric.js";
 
 // Interactive Brokers Flex Query "Trades" CSV (with header). Columns vary by query,
 // so we look them up by name. Quantity is signed (buy positive, sell negative);
@@ -28,10 +29,6 @@ function parseDateTime(raw: string): string | null {
   const compact = s.match(/^(\d{4})(\d{2})(\d{2})/);
   if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
   return null;
-}
-
-function num(raw: string): string {
-  return raw.replace(/[^0-9.-]/g, "");
 }
 
 export function parseIbkr(content: string): CsvParseResult {

@@ -1,12 +1,8 @@
 import { Decimal } from "decimal.js";
+import { D, ZERO } from "./decimal.js";
 import type { CoreTransaction, CorporateAction } from "./types.js";
 import { cashFlow } from "./cash.js";
-
-const D = (v: string) => new Decimal(v);
-const ZERO = new Decimal(0);
-
-/** UTC year-month-day bucket key, e.g. "2026-06-28" (mirrors contributions.ts). */
-const dayKey = (d: Date): string => d.toISOString().slice(0, 10);
+import { toDateKey as dayKey } from "./date-utils.js";
 
 export type AnomalyCode =
   | "oversell"

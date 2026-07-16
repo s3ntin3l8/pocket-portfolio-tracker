@@ -18,6 +18,7 @@ import {
   projectDividends,
   convert,
   mergeTradeLogs,
+  toDateKey,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import {
@@ -109,8 +110,8 @@ async function restOfYearForecastGross(
 
   const projectedDivs = projectDividends(pastDivEvents, heldQtyMap, qtyAt, now);
 
-  const todayStr = now.toISOString().slice(0, 10);
-  const yearEndStr = new Date(Date.UTC(now.getUTCFullYear(), 11, 31)).toISOString().slice(0, 10);
+  const todayStr = toDateKey(now);
+  const yearEndStr = toDateKey(new Date(Date.UTC(now.getUTCFullYear(), 11, 31)));
 
   const announcedRows =
     heldIds.length > 0

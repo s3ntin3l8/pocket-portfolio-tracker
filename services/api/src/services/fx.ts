@@ -1,7 +1,7 @@
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { fxRates } from "@portfolio/db";
-import type { FxRateFn } from "@portfolio/core";
+import { toDateKey, type FxRateFn } from "@portfolio/core";
 import type { DB } from "../db/client.js";
 
 /** Live FX source: returns the rate to convert 1 `from` into `to`, or null. */
@@ -151,7 +151,7 @@ export async function getFxRates(
   const foreign = [...new Set(currencies)].filter((c) => c && c !== base);
   if (foreign.length === 0) return out;
 
-  const today = now.toISOString().slice(0, 10);
+  const today = toDateKey(now);
   const cached = await db
     .select()
     .from(fxRates)

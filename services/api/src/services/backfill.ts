@@ -27,6 +27,7 @@ import {
   computeHoldings,
   netWorth,
   splitAdjustmentFactor,
+  toDateKey,
   type PriceSeriesKind,
 } from "@portfolio/core";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
@@ -75,9 +76,9 @@ export async function backfillPortfolioHistory(
 
   // Inception = earliest transaction date, unless fromDate narrows it.
   const inceptionMs = Math.min(...txRows.map((r) => r.executedAt.getTime()));
-  const inceptionDate = new Date(inceptionMs).toISOString().slice(0, 10);
+  const inceptionDate = toDateKey(new Date(inceptionMs));
   const startDate = opts.fromDate && opts.fromDate > inceptionDate ? opts.fromDate : inceptionDate;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateKey(new Date());
 
   if (startDate > today) return { instruments: 0, days: 0, truncated: [] };
 
@@ -146,7 +147,7 @@ export async function backfillPortfolioHistory(
     const firstHeld = txRows
       .filter((r) => r.instrumentId === instr.id)
       .reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt);
-    const firstHeldDate = firstHeld.toISOString().slice(0, 10);
+    const firstHeldDate = toDateKey(firstHeld);
     const fetchFrom = firstHeldDate < startDate ? startDate : firstHeldDate;
 
     const instrPrices = new Map<string, { close: string; currency: string }>();
@@ -158,7 +159,7 @@ export async function backfillPortfolioHistory(
         const d = new Date(fetchFrom);
         const end = new Date(today);
         while (d <= end) {
-          const ds = d.toISOString().slice(0, 10);
+          const ds = toDateKey(d);
           instrPrices.set(ds, { close: instr.faceValue, currency: instr.currency });
           d.setUTCDate(d.getUTCDate() + 1);
         }
@@ -179,7 +180,7 @@ export async function backfillPortfolioHistory(
         const d = new Date(fetchFrom);
         const end = new Date(today);
         while (d <= end) {
-          const ds = d.toISOString().slice(0, 10);
+          const ds = toDateKey(d);
           instrPrices.set(ds, { close: nav, currency: instr.currency });
           d.setUTCDate(d.getUTCDate() + 1);
         }
@@ -279,7 +280,7 @@ export async function backfillPortfolioHistory(
     price: string;
     executedAt: Date;
   }): string {
-    const payDate = tx.executedAt.toISOString().slice(0, 10);
+    const payDate = toDateKey(tx.executedAt);
     if ((tx.type === "dividend" || tx.type === "coupon") && tx.instrumentId) {
       const events = divEventsByInstr.get(tx.instrumentId) ?? [];
       // Match by nearest payDate ≈ executedAt (within 7 days), then by amountPerShare
@@ -321,7 +322,7 @@ export async function backfillPortfolioHistory(
   const d = new Date(startDate);
   const endDate = new Date(today);
   while (d <= endDate) {
-    dateGrid.push(d.toISOString().slice(0, 10));
+    dateGrid.push(toDateKey(d));
     d.setUTCDate(d.getUTCDate() + 1);
   }
 
@@ -513,7 +514,7 @@ export async function backfillStalePortfolios(
     ? rows.filter((r) => r.portfolioId && r.inception)
     : rows.filter((r) => {
         if (!r.portfolioId || !r.inception) return false;
-        const inceptionDate = r.inception.toISOString().slice(0, 10);
+        const inceptionDate = toDateKey(r.inception);
         // No snapshots at all → stale
         if (!r.earliestSnapshot) return true;
         // Earliest snapshot is later than inception → incomplete history

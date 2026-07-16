@@ -1,9 +1,12 @@
 /**
  * Split one CSV line into fields, honouring double-quoted values (which may contain
- * commas and doubled `""` quotes). Broker exports (IBKR, Coinbase) quote free-text
+ * the delimiter and doubled `""` quotes). Broker exports (IBKR, Coinbase) quote free-text
  * columns, so the generic comma-split isn't safe for them.
+ *
+ * @param delimiter - The field separator (default `,` for comma-CSV, use `;` for
+ *                    semicolon-delimited formats like DKB).
  */
-export function splitCsvLine(line: string): string[] {
+export function splitCsvLine(line: string, delimiter = ","): string[] {
   const out: string[] = [];
   let field = "";
   let inQuotes = false;
@@ -22,7 +25,7 @@ export function splitCsvLine(line: string): string[] {
       }
     } else if (c === '"') {
       inQuotes = true;
-    } else if (c === ",") {
+    } else if (c === delimiter) {
       out.push(field);
       field = "";
     } else {

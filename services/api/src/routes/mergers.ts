@@ -3,7 +3,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { corporateActions, instruments, portfolios, transactions } from "@portfolio/db";
 import { mergerInputSchema } from "@portfolio/schema";
-import { computeHoldings, type CoreTransaction, type CorporateAction } from "@portfolio/core";
+import {
+  computeHoldings,
+  toDateKey,
+  type CoreTransaction,
+  type CorporateAction,
+} from "@portfolio/core";
 import { requireUser } from "../plugins/auth.js";
 import { enqueueRecompute } from "../services/scheduler.js";
 import { toCoreTxns } from "../services/tx-core.js";
@@ -88,7 +93,7 @@ export async function mergersRoute(app: FastifyInstance) {
       const buyTotal = input.taxable ? new Decimal(input.marketValue!) : avgCost.mul(outQty);
       const buyPrice = buyTotal.div(inQty);
 
-      const dateStr = input.executedAt.toISOString().slice(0, 10);
+      const dateStr = toDateKey(input.executedAt);
       const legs = [
         {
           portfolioId,

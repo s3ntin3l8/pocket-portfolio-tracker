@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Archive, ArchiveRestore, CircleSlash, Loader2, MoreVertical } from "lucide-react";
+import { Archive, ArchiveRestore, CircleSlash, MoreVertical } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -63,7 +64,7 @@ export function TransactionStatusButton({
           disabled={busy}
           className={className}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <MoreVertical className="size-4" />}
+          {busy ? <Spinner size="sm" /> : <MoreVertical className="size-4" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

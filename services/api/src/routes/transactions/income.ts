@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { accountHolders, portfolios, transactions, users } from "@portfolio/db";
 import { requireUser } from "../../plugins/auth.js";
-import { type CoreTransaction, aggregatePortfolios } from "@portfolio/core";
+import { toDateKey, type CoreTransaction, aggregatePortfolios } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import {
@@ -95,7 +95,7 @@ export function registerIncomeRoutes(app: FastifyInstance) {
               name: im?.name ?? null,
               displayName: im?.displayName ?? null,
               type: t.type,
-              date: t.executedAt.toISOString().slice(0, 10),
+              date: toDateKey(t.executedAt),
               amount: t.price,
               currency: t.currency,
               perShare: null as string | null,

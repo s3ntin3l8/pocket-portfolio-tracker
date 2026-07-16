@@ -3,7 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { AlertCircle, ChevronDown, Loader2, Sparkles, X } from "lucide-react";
+import { AlertCircle, ChevronDown, Sparkles, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type {
   ApiClient,
   GoldSource,
@@ -885,7 +886,7 @@ export function AddTransactionForm({
               disabled={busy}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("submitting") : isEdit ? t("save") : t("submit")}
             </Button>
           </div>
@@ -900,7 +901,7 @@ export function AddTransactionForm({
               disabled={busy}
               className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
+              {busy && <Spinner size="sm" />}
               {busy ? t("submitting") : isEdit ? t("save") : t("submit")}
             </Button>
           </div>,

@@ -1,7 +1,4 @@
-import { Decimal } from "decimal.js";
-
-const D = (v: string | number) => new Decimal(v);
-const ZERO = new Decimal(0);
+import { D, ZERO } from "./decimal.js";
 
 export interface NetWorthPoint {
   date: string;

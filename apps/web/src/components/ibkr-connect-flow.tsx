@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Loader2, RefreshCw, Plug, Unplug } from "lucide-react";
+import { AlertCircle, RefreshCw, Plug, Unplug } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { apiErrorCode } from "@portfolio/api-client";
 import type { ApiClient, IbkrConnection } from "@portfolio/api-client";
@@ -138,7 +139,7 @@ export function IbkrConnectFlow({
 
           <div className="flex justify-end">
             <Button type="submit" disabled={busy || !token || !queryId || !portfolioId}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Plug className="size-4" />}
+              {busy ? <Spinner size="sm" /> : <Plug className="size-4" />}
               {t("connect")}
             </Button>
           </div>
@@ -190,11 +191,7 @@ export function IbkrConnectFlow({
 
           <div className="flex items-center justify-end gap-3">
             <Button onClick={doSync} disabled={busy}>
-              {busy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
+              {busy ? <Spinner size="sm" /> : <RefreshCw className="size-4" />}
               {t("syncNow")}
             </Button>
             <Button variant="outline" onClick={disconnect} disabled={busy}>
@@ -208,7 +205,7 @@ export function IbkrConnectFlow({
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="text-muted-foreground">{t("reimport.warning")}</span>
                 <Button variant="destructive" size="sm" onClick={reimport} disabled={busy}>
-                  {busy && <Loader2 className="size-3.5 animate-spin" />}
+                  {busy && <Spinner size="xs" />}
                   {t("reimport.confirm")}
                 </Button>
                 <Button

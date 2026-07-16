@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useId } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, ChevronDown, Loader2, TriangleAlert } from "lucide-react";
+import { AlertCircle, ChevronDown, TriangleAlert } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type {
   AccountHolder,
   AccountHolderType,
@@ -623,7 +624,7 @@ export function PortfolioFormDialog({
                 disabled={busy || !name.trim()}
                 className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
               >
-                {busy && <Loader2 className="size-4 animate-spin" />}
+                {busy && <Spinner size="sm" />}
                 {busy
                   ? mode === "edit"
                     ? t("saving")
@@ -645,7 +646,7 @@ export function PortfolioFormDialog({
                     disabled={busy}
                     className="mt-2.5 h-auto w-full rounded-[15px] bg-[#E5484D] py-[15px] text-[15px] font-bold text-white hover:bg-[#E5484D]/90"
                   >
-                    {busy && <Loader2 className="size-4 animate-spin" />}
+                    {busy && <Spinner size="sm" />}
                     {t("confirmDelete")}
                   </Button>
                   <p className="mt-1.5 text-center text-[11px] font-medium text-text-3">
@@ -673,7 +674,7 @@ export function PortfolioFormDialog({
             <p className="mb-3 text-sm font-medium">{t("trSectionTitle")}</p>
             {trConnection === null ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
+                <Spinner size="sm" />
                 <span>{t("trLoading")}</span>
               </div>
             ) : trConnection === false ? (
@@ -709,7 +710,7 @@ export function PortfolioFormDialog({
             <p className="mb-3 text-sm font-medium">{tibkr("sectionTitle")}</p>
             {ibkrConnection === null ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
+                <Spinner size="sm" />
                 <span>{t("trLoading")}</span>
               </div>
             ) : ibkrConnection === false ? (

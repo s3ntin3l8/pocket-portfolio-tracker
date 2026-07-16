@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { instruments } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
@@ -65,7 +66,7 @@ function recentMonths(count: number): string[] {
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   return Array.from({ length: count }, (_, i) =>
-    new Date(Date.UTC(y, m - (count - 1 - i), 1)).toISOString().slice(0, 10),
+    toDateKey(new Date(Date.UTC(y, m - (count - 1 - i), 1))),
   );
 }
 

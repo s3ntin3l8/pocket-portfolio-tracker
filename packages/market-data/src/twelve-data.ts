@@ -1,3 +1,4 @@
+import { toDateKey } from "@portfolio/core";
 import type {
   AssetClass,
   Candle,
@@ -145,8 +146,7 @@ export class TwelveDataProvider implements MarketDataProvider {
   async getDividends(ref: InstrumentRef, fromDate?: string): Promise<DividendEvent[]> {
     // Twelve Data's `/dividends` endpoint covers IDX + US equities/ETFs.
     if (ref.assetClass === "gold") return [];
-    const start =
-      fromDate ?? new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const start = fromDate ?? toDateKey(new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000));
     const res = await this.doFetch(
       `${this.baseUrl}/dividends?${this.query(ref)}&start_date=${start}&apikey=${this.apiKey}`,
     );

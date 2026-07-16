@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { toDateKey } from "@portfolio/core";
 import { and, eq } from "drizzle-orm";
 import { fxRates } from "@portfolio/db";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
@@ -77,7 +78,7 @@ describe("getFxRates", () => {
     await closeDb();
   });
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateKey(new Date());
   const provider = (rate: number): FxProvider => ({
     getRate: async () => rate,
   });

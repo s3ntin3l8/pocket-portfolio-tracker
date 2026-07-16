@@ -1,5 +1,5 @@
 import { inArray, isNotNull, lt } from "drizzle-orm";
-import { cashFlow, convert, type FxRateFn, type PriceSeriesKind } from "@portfolio/core";
+import { cashFlow, convert, toDateKey, type FxRateFn, type PriceSeriesKind } from "@portfolio/core";
 import {
   instruments,
   portfolioIntradaySnapshots,
@@ -32,7 +32,7 @@ export async function recordDailySnapshots(
   ttlMs: number,
   now: Date = new Date(),
 ): Promise<number> {
-  const date = now.toISOString().slice(0, 10);
+  const date = toDateKey(now);
   const pfs = await db.select().from(portfolios);
   let count = 0;
   for (const p of pfs) {
@@ -217,7 +217,7 @@ export function rangeStart(range: string, now: Date = new Date()): string | null
   if (!span) return null;
   const d = new Date(now);
   d.setUTCDate(d.getUTCDate() - span);
-  return d.toISOString().slice(0, 10);
+  return toDateKey(d);
 }
 
 /**

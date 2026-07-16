@@ -14,6 +14,7 @@
  * recompute — BOTH the source and the target change on each affected day.
  */
 import { and, eq, inArray } from "drizzle-orm";
+import { toDateKey } from "@portfolio/core";
 import { transactions } from "@portfolio/db";
 import type { DB } from "../db/client.js";
 
@@ -91,7 +92,7 @@ export async function reassignTransactions(
   // Both the source and the target change on each affected day.
   const pairs = new Map<string, { portfolioId: string; day: string }>();
   for (const r of toMove) {
-    const day = r.executedAt.toISOString().slice(0, 10);
+    const day = toDateKey(r.executedAt);
     for (const pid of [r.portfolioId, toPortfolioId]) {
       pairs.set(`${pid}|${day}`, { portfolioId: pid, day });
     }

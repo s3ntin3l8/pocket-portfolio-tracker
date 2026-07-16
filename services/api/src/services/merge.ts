@@ -26,6 +26,7 @@
  *     survivor already holds an equivalent source; those rows are dropped (not re-parented)
  *     instead of letting the UPDATE throw.
  */
+import { toDateKey } from "@portfolio/core";
 import { and, eq, inArray } from "drizzle-orm";
 import { transactions, transactionSources, documents, trResolvedEvents } from "@portfolio/db";
 import type { DB } from "../db/client.js";
@@ -292,10 +293,7 @@ export async function mergeTransactions(
 
     await tx.delete(transactions).where(eq(transactions.id, absorbedId));
 
-    const days = new Set([
-      survivor.executedAt.toISOString().slice(0, 10),
-      absorbed.executedAt.toISOString().slice(0, 10),
-    ]);
+    const days = new Set([toDateKey(survivor.executedAt), toDateKey(absorbed.executedAt)]);
     return {
       survivorId,
       recompute: [...days].map((day) => ({ portfolioId, day })),

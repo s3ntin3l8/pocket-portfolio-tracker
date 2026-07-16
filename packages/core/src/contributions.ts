@@ -1,8 +1,8 @@
 import { Decimal } from "decimal.js";
+import { D } from "./decimal.js";
 import { convert, type FxRateFn } from "./networth.js";
+import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction } from "./types.js";
-
-const D = (v: string | number) => new Decimal(v);
 
 /**
  * Acquisition `kind`s that are NOT the user's own external money and therefore
@@ -67,9 +67,7 @@ interface FlowAgg {
 
 /** UTC year-month-day bucket key, e.g. "2026-06-28". Day resolution so the contributed
  * step aligns with the daily value series (`portfolioSnapshots.date` is likewise UTC). */
-function dayKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+const dayKey = toDateKey;
 
 /**
  * Count of inclusive calendar months from `firstKey` ("YYYY-MM") through the

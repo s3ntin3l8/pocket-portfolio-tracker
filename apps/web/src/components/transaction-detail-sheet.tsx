@@ -17,7 +17,6 @@ import {
   Coins,
   Download,
   FolderInput,
-  Loader2,
   MoreHorizontal,
   Pencil,
   Receipt,
@@ -27,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -586,11 +586,7 @@ export function TransactionDetailSheet({
                 disabled={resolving}
                 onClick={() => onResolve(tx, "confirm")}
               >
-                {resolving ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Check className="size-4" />
-                )}
+                {resolving ? <Spinner size="sm" /> : <Check className="size-4" />}
                 {tm("status.confirmDraft")}
               </Button>
               <Button
@@ -614,7 +610,7 @@ export function TransactionDetailSheet({
                 disabled={deleting}
                 onClick={onDelete}
               >
-                {deleting && <Loader2 className="size-4 animate-spin" />}
+                {deleting && <Spinner size="sm" />}
                 {td("confirm")}
               </Button>
               <Button

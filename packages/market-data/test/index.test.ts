@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { toDateKey } from "@portfolio/core";
 import {
   ASSET_CLASSES,
   isAssetClass,
@@ -2162,11 +2163,11 @@ describe("YahooFinanceProvider gold spot", () => {
     const candles = await provider.getHistory(xauIdr, "1mo");
     expect(candles).toEqual([
       {
-        date: new Date(1738972800 * 1000).toISOString().slice(0, 10),
+        date: toDateKey(new Date(1738972800 * 1000)),
         close: String(40_000_000 / TROY_OUNCE_GRAMS),
       },
       {
-        date: new Date(1739059200 * 1000).toISOString().slice(0, 10),
+        date: toDateKey(new Date(1739059200 * 1000)),
         close: String(41_000_000 / TROY_OUNCE_GRAMS),
       },
     ]);
@@ -2270,7 +2271,7 @@ describe("CoinGeckoProvider", () => {
     expect(historyUrl).toContain("days=365");
     expect(candles).toHaveLength(2);
     expect(candles[0]).toMatchObject({
-      date: new Date(1738972800000).toISOString().slice(0, 10),
+      date: toDateKey(new Date(1738972800000)),
       close: "64000",
     });
   });
@@ -2711,7 +2712,7 @@ describe("YahooFinanceProvider.getDividends", () => {
       fetch: mockFetch(() => ({ body: divBody })),
     });
     // fromDate after the Dec 2024 event but before the Jul 2025 one
-    const from = new Date(1752624000 * 1000 - 1000).toISOString().slice(0, 10);
+    const from = toDateKey(new Date(1752624000 * 1000 - 1000));
     const events = await provider.getDividends(bbca, from);
     expect(events).toHaveLength(1);
     expect(events[0].amountPerShare).toBe("1.25");

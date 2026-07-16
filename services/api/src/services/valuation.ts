@@ -8,6 +8,7 @@ import {
   type CorporateAction,
   type CostBasisMode,
   type PortfolioSummary,
+  toDateKey,
   type TradeLog,
 } from "@portfolio/core";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
@@ -141,7 +142,7 @@ export async function valuePortfolio(
   // ensures a genuinely delisted instrument eventually reverts to unpriced
   // rather than being carried forever at a stale value.
   {
-    const today = now.toISOString().slice(0, 10);
+    const today = toDateKey(now);
     const missingIds = instrumentIds.filter((id) => !prices[id]);
     if (missingIds.length > 0) {
       const historical = await db

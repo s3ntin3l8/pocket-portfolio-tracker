@@ -28,6 +28,7 @@ import {
   getScrapedQuote,
   navKey,
 } from "./scrapers/store.js";
+import { toDateKey, toMonthKey } from "@portfolio/core";
 import type { AssetClass, InstrumentRef, Quote } from "@portfolio/market-data";
 
 /**
@@ -409,13 +410,8 @@ export interface ProviderUsageView extends ProviderUsage {
   source: "provider" | "local";
 }
 
-function todayKey(now: Date): string {
-  return now.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
-function monthKey(now: Date): string {
-  return now.toISOString().slice(0, 7); // YYYY-MM
-}
+const todayKey = toDateKey;
+const monthKey = toMonthKey;
 
 /**
  * Drain the in-process call tally into `provider_usage`, rolling the day/month windows

@@ -1,3 +1,4 @@
+import { toDateKey } from "@portfolio/core";
 import type {
   AssetClass,
   Candle,
@@ -153,7 +154,7 @@ export class CoinGeckoProvider implements MarketDataProvider {
     return (data.prices ?? [])
       .filter(([, close]) => close !== null && close !== undefined)
       .map(([ms, close]) => ({
-        date: new Date(ms).toISOString().slice(0, 10),
+        date: toDateKey(new Date(ms)),
         // PAXG quotes per troy ounce; convert to per-gram like quote path.
         close: isGold ? String(close / TROY_OUNCE_GRAMS) : String(close),
       }));

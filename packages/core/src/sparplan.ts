@@ -1,6 +1,7 @@
 import { Decimal } from "decimal.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { inferIntervalMonths } from "./income.js";
+import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -134,7 +135,7 @@ interface Execution {
 function collapseByDay(rows: CoreTransaction[]): Execution[] {
   const byDay = new Map<string, Execution>();
   for (const r of rows) {
-    const dateStr = r.executedAt.toISOString().slice(0, 10);
+    const dateStr = toDateKey(r.executedAt);
     const gross = new Decimal(r.quantity).mul(new Decimal(r.price)).abs();
     const existing = byDay.get(dateStr);
     if (existing) {

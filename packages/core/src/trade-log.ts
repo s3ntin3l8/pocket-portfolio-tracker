@@ -23,15 +23,14 @@
  * (gold cicilan) into the OPEN episode's cost, same as summarizePortfolio.
  */
 import { Decimal } from "decimal.js";
+import { D, ZERO } from "./decimal.js";
 import { cashFlow } from "./cash.js";
 import { financingByInstrument } from "./loans.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { xirr, type CashFlowPoint } from "./xirr.js";
 import type { CoreTransaction, CorporateAction } from "./types.js";
+import { toDateKey } from "./date-utils.js";
 import type { CostBasisMode } from "./valuation.js";
-
-const D = (v: string | number) => new Decimal(v);
-const ZERO = new Decimal(0);
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 /** Default §23-EStG-style threshold: gold/other private-sale gains are tax-free after a 1-year hold. */
 const LONG_TERM_DAYS = 365;
@@ -135,10 +134,6 @@ export interface ComputeTradesInput {
   dustEpsilon?: string;
   /** Instrument metadata (specifically assetClass) keyed by instrument id. */
   instruments?: Map<string, { assetClass: string }> | Record<string, { assetClass: string }>;
-}
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -351,8 +346,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         // what the user actually paid per share — use costCcy so the label is correct.
         currency: costCcy,
         status,
-        entryDate: toDateStr(entryDate),
-        exitDate: exitDate ? toDateStr(exitDate) : null,
+        entryDate: toDateKey(entryDate),
+        exitDate: exitDate ? toDateKey(exitDate) : null,
         holdingDays,
         avgHoldingDays,
         longTerm: holdingDays >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
@@ -480,8 +475,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
             const days = daysBetween(s.acqDate, sellDate);
             const sliceVorabCredit = sellQty.gt(0) ? vorabCreditThis.mul(s.qty).div(sellQty) : ZERO;
             episode.legs.push({
-              acqDate: toDateStr(s.acqDate),
-              sellDate: toDateStr(sellDate),
+              acqDate: toDateKey(s.acqDate),
+              sellDate: toDateKey(sellDate),
               quantity: s.qty.toString(),
               cost: conv(s.cost, costCcy).toString(),
               proceeds: conv(sliceProceeds, costCcy).toString(),
@@ -495,8 +490,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         } else {
           const days = daysBetween(episode.entryDate, sellDate);
           episode.legs.push({
-            acqDate: toDateStr(episode.entryDate),
-            sellDate: toDateStr(sellDate),
+            acqDate: toDateKey(episode.entryDate),
+            sellDate: toDateKey(sellDate),
             quantity: sellQty.toString(),
             cost: conv(costAvg, costCcy).toString(),
             proceeds: conv(proceeds, costCcy).toString(),

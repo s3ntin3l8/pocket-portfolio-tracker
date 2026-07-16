@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, Copy, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, Check, Copy, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient, ApiToken } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -200,7 +201,7 @@ export function ApiTokensManager({
           />
         </div>
         <Button type="submit" disabled={busy || !name.trim()}>
-          {busy && <Loader2 className="size-4 animate-spin" />}
+          {busy && <Spinner size="sm" />}
           {t("tokensCreate")}
         </Button>
       </form>

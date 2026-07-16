@@ -38,10 +38,12 @@ function unwrapNumber(v: unknown): number | null {
   return null;
 }
 
+import { toDateKey } from "@portfolio/core";
+
 /** Unwrap a Yahoo unix-seconds `{ raw, fmt }` timestamp to a YYYY-MM-DD date string. */
 function unixToIsoDate(v: unknown): string | null {
   const n = unwrapNumber(v);
-  return n ? new Date(n * 1000).toISOString().slice(0, 10) : null;
+  return n ? toDateKey(new Date(n * 1000)) : null;
 }
 
 /**
@@ -349,7 +351,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
       const ts = d.date * 1000;
       if (ts < fromMs) continue;
       out.push({
-        exDate: new Date(ts).toISOString().slice(0, 10),
+        exDate: toDateKey(new Date(ts)),
         amountPerShare: String(d.amount),
         currency: ref.currency,
       });
@@ -375,7 +377,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
       if (close === null || close === undefined) continue;
       const adjusted = gramFactor === 1 ? close / divisor : close / gramFactor;
       candles.push({
-        date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10),
+        date: toDateKey(new Date(timestamps[i] * 1000)),
         close: String(adjusted),
         ...(stampCurrency !== undefined ? { currency: stampCurrency } : {}),
       });
@@ -524,7 +526,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
       if (close === null || close === undefined) continue;
       const adjusted = gramFactor === 1 ? close / divisor : close / gramFactor;
       candles.push({
-        date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10),
+        date: toDateKey(new Date(timestamps[i] * 1000)),
         close: String(adjusted),
         ...(stampCurrency !== undefined ? { currency: stampCurrency } : {}),
       });

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +78,7 @@ export function UpdateProfileForm({
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={busy || !dirty}>
-          {busy && <Loader2 className="size-4 animate-spin" />}
+          {busy && <Spinner size="sm" />}
           {busy ? t("saving") : t("save")}
         </Button>
         {saved && !dirty && (

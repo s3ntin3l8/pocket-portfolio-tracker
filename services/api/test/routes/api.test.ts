@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT, exportJWK, type JWK } from "jose";
 import { eq } from "drizzle-orm";
 import { instruments, prices } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
@@ -1522,7 +1523,7 @@ describe("auth + portfolios + transactions", () => {
       base: "USD",
       quote: "IDR",
       rate: "16000",
-      date: new Date().toISOString().slice(0, 10),
+      date: toDateKey(new Date()),
     });
 
     await app.inject({
@@ -1828,7 +1829,7 @@ describe("auth + portfolios + transactions", () => {
 
     // A bond maturing in ~100 days (so its maturity coupon is the only one inside
     // the 12-month horizon), valued at par since no live quote exists.
-    const maturity = new Date(Date.now() + 100 * 86_400_000).toISOString().slice(0, 10);
+    const maturity = toDateKey(new Date(Date.now() + 100 * 86_400_000));
     const recentCoupon = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const [bond] = await app.db
       .insert(instruments)
@@ -1951,7 +1952,7 @@ describe("auth + portfolios + transactions", () => {
       })
     ).json().id;
 
-    const maturity = new Date(Date.now() + 100 * 86_400_000).toISOString().slice(0, 10);
+    const maturity = toDateKey(new Date(Date.now() + 100 * 86_400_000));
     const recentCoupon = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const [bond] = await app.db
       .insert(instruments)
@@ -2103,7 +2104,7 @@ describe("auth + portfolios + transactions", () => {
         base: "USD",
         quote: "EUR",
         rate: "0.9",
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
       })
       .onConflictDoNothing();
     await post({
@@ -2171,7 +2172,7 @@ describe("auth + portfolios + transactions", () => {
         base: "USD",
         quote: "IDR",
         rate: "16000",
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
       })
       .onConflictDoNothing();
 
@@ -2251,7 +2252,7 @@ describe("auth + portfolios + transactions", () => {
         base: "USD",
         quote: "IDR",
         rate: "16000",
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
       })
       .onConflictDoNothing();
 
@@ -2448,7 +2449,7 @@ describe("auth + portfolios + transactions", () => {
         base: "USD",
         quote: "IDR",
         rate: "16000",
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
       })
       .onConflictDoNothing();
 
@@ -2588,7 +2589,7 @@ describe("auth + portfolios + transactions", () => {
         base: "USD",
         quote: "IDR",
         rate: "16000",
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
       })
       .onConflictDoNothing();
 
@@ -2648,7 +2649,7 @@ describe("auth + portfolios + transactions", () => {
         base: "USD",
         quote: "IDR",
         rate: "16000",
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
       })
       .onConflictDoNothing();
 

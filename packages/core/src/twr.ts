@@ -13,14 +13,13 @@
  *   adjustedClose(d) = rawClose(d) / splitAdjustmentFactor(cas, id, d)
  * where the factor is the product of ratios for CAs with exDate > d.
  */
-import { Decimal } from "decimal.js";
+import type { Decimal } from "decimal.js";
+import { D, ZERO } from "./decimal.js";
 import { computeHoldings, marketValue } from "./holdings.js";
 import { cashFlow } from "./cash.js";
 import { convert, type FxRateFn } from "./networth.js";
+import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction, CorporateAction } from "./types.js";
-
-const D = (v: string | number) => new Decimal(v);
-const ZERO = new Decimal(0);
 
 /** Classification of an instrument's price series for income-netting decisions. */
 export type PriceSeriesKind =
@@ -69,8 +68,7 @@ export function splitAdjustmentFactor(
   let factor = D(1);
   for (const ca of cas) {
     if (ca.instrumentId !== instrumentId) continue;
-    const caDate =
-      ca.exDate instanceof Date ? ca.exDate.toISOString().slice(0, 10) : String(ca.exDate);
+    const caDate = ca.exDate instanceof Date ? toDateKey(ca.exDate) : String(ca.exDate);
     if (caDate > date) {
       if (ca.type === "split") {
         factor = factor.mul(D(ca.ratio));
@@ -81,10 +79,6 @@ export function splitAdjustmentFactor(
     }
   }
   return factor;
-}
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 export interface BuildDailyValueFlowsInput {
@@ -123,7 +117,7 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     fxAt,
     baseCurrency,
     kindOf,
-    flowDateOf = (tx) => toDateStr(tx.executedAt),
+    flowDateOf = (tx) => toDateKey(tx.executedAt),
   } = input;
 
   // Pre-build a date → transactions map using the (possibly remapped) flow date.

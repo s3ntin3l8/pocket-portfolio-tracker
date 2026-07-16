@@ -2,7 +2,8 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Search, X, ChevronDown, ChevronRight, Check, Loader2 } from "lucide-react";
+import { Search, X, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -332,7 +333,7 @@ export function IncomeTimeline({
                 >
                   <div className="flex items-baseline gap-2.5 min-w-0">
                     {loadingYear === g.year && !lazyRows ? (
-                      <Loader2 className="size-4 shrink-0 animate-spin text-text-3" />
+                      <Spinner size="sm" className="shrink-0 text-text-3" />
                     ) : isOpen ? (
                       <ChevronDown className="size-4 shrink-0 text-text-3" />
                     ) : (
@@ -357,7 +358,7 @@ export function IncomeTimeline({
                     {g.assumptions && <p className="pt-2 text-xs text-text-2">{g.assumptions}</p>}
                     {loadingYear === g.year && !lazyRows ? (
                       <div className="flex justify-center py-6">
-                        <Loader2 className="size-5 animate-spin text-text-3" />
+                        <Spinner size="md" className="text-text-3" />
                       </div>
                     ) : displayRows ? (
                       <IncomeEventsTable rows={displayRows} groupByMonth />
@@ -375,7 +376,7 @@ export function IncomeTimeline({
               className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold text-text-3 hover:text-foreground"
             >
               {loadingYear === nextOlder ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Spinner size="sm" />
               ) : (
                 <>{t("loadOlderYear", { year: nextOlder })} →</>
               )}

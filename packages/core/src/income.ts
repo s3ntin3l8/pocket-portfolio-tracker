@@ -1,5 +1,6 @@
 import { Decimal } from "decimal.js";
 import { convert, type FxRateFn } from "./networth.js";
+import { toDateKey, toMonthKey } from "./date-utils.js";
 
 // ---------------------------------------------------------------------------
 // Internal date helpers
@@ -181,7 +182,7 @@ export function projectCoupons(
           instrumentId: p.instrumentId,
           symbol: p.symbol,
           name: p.name,
-          date: d.toISOString().slice(0, 10),
+          date: toDateKey(d),
           amount,
           currency: p.currency,
         });
@@ -243,7 +244,7 @@ export interface ProjectedDividend {
 function bucketMonthly(entries: IncomeEntry[]): IncomeEntry[] {
   const buckets = new Map<string, IncomeEntry[]>();
   for (const e of entries) {
-    const yearMonth = e.executedAt.toISOString().slice(0, 7); // YYYY-MM (UTC)
+    const yearMonth = toMonthKey(e.executedAt); // YYYY-MM (UTC)
     const key = `${e.instrumentId ?? ""}|${e.type}|${yearMonth}`;
     const list = buckets.get(key);
     if (list) list.push(e);
@@ -294,7 +295,7 @@ export function projectDividends(
   const pastStart = new Date(now);
   pastStart.setUTCFullYear(pastStart.getUTCFullYear() - 1);
 
-  const nowStr = now.toISOString().slice(0, 10);
+  const nowStr = toDateKey(now);
 
   const out: ProjectedDividend[] = [];
   const bucketed = bucketMonthly(pastDividends);
@@ -316,7 +317,7 @@ export function projectDividends(
     // Shift date one year forward.
     const projected = new Date(e.executedAt);
     projected.setUTCFullYear(projected.getUTCFullYear() + 1);
-    const dateStr = projected.toISOString().slice(0, 10);
+    const dateStr = toDateKey(projected);
 
     // Skip projected dates that aren't strictly in the future.
     if (dateStr <= nowStr) continue;
@@ -526,7 +527,7 @@ export function projectNextYearDividends(
         instrumentId,
         symbol: entries[0].symbol ?? null,
         name: entries[0].name ?? null,
-        date: d.toISOString().slice(0, 10),
+        date: toDateKey(d),
         amount: amount.toString(),
         currency: entries[0].currency,
         basisYear: currentYear,
@@ -715,7 +716,7 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
   for (const e of events) {
     const amount = new Decimal(convert(e.price, e.currency, displayCurrency, fx));
     const year = String(e.executedAt.getUTCFullYear());
-    const month = e.executedAt.toISOString().slice(0, 7);
+    const month = toMonthKey(e.executedAt);
 
     lifetime = lifetime.add(amount);
 

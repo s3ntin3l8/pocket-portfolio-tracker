@@ -1,3 +1,4 @@
+import { toDateKey } from "@portfolio/core";
 import type {
   AssetClass,
   DividendEvent,
@@ -160,8 +161,7 @@ export class EodhdProvider implements MarketDataProvider {
   async getDividends(ref: InstrumentRef, fromDate?: string): Promise<DividendEvent[]> {
     const ticker = this.directTicker(ref) ?? (await this.resolveIsinTicker(ref));
     if (!ticker) return [];
-    const from =
-      fromDate ?? new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const from = fromDate ?? toDateKey(new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000));
     const res = await this.doFetch(
       `${this.baseUrl}/div/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json&from=${from}`,
     );

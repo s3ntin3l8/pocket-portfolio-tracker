@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   Table,
@@ -35,6 +35,10 @@ export interface ImportFilesTableProps {
  * checking one or more rows reveals a bulk-assign control that sets the chosen portfolio for just
  * the checked files — so a 90-file batch is assignable in a couple of clicks while individual
  * rows can still be re-fixed.
+ *
+ * Note: `useTableSort` stores column definitions in a ref so its `sort` callback always reads
+ * the latest `cols` (including closures like `countByImport`) even though the callback itself
+ * is memoized on `[sortKey, sortDir]` only — no stale-closure risk.
  */
 export function ImportFilesTable({
   groups,
@@ -49,14 +53,6 @@ export function ImportFilesTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const multiPortfolio = portfolios.length > 1;
 
-  // The `count` col's `get` closes over the per-render `countByImport` prop, so this
-  // `COLS` array is rebuilt every render. That's fine for `useTableSort`'s state
-  // (sortKey/sortDir/toggle), but the hook's `sort` callback is memoized on
-  // `[sortKey, sortDir]` only and reads `cols` from its closure — using the hook's
-  // `sort` here would close over a stale `countByImport` and lag behind the displayed
-  // counts whenever the parent re-renders. Compute the sort in a local `useMemo`
-  // below instead, depending on `countByImport` directly so the row order recomputes
-  // when the underlying data changes.
   const COLS: ColDef<{ importId: string; filename: string }>[] = [
     { key: "file", get: (g) => g.filename, type: "text" },
     { key: "count", get: (g) => countByImport(g.importId), type: "numeric" },
@@ -65,30 +61,12 @@ export function ImportFilesTable({
     sortKey,
     sortDir,
     toggle: toggleSort,
+    sort,
   } = useTableSort<{
     importId: string;
     filename: string;
   }>(COLS);
-  const sortedGroups = useMemo(() => {
-    if (sortKey === null) return groups;
-    const sign = sortDir === "asc" ? 1 : -1;
-    const cmp = (
-      a: { importId: string; filename: string },
-      b: { importId: string; filename: string },
-    ): number => {
-      if (sortKey === "file") {
-        return (
-          sign *
-          a.filename.localeCompare(b.filename, undefined, {
-            sensitivity: "base",
-            numeric: true,
-          })
-        );
-      }
-      return sign * (countByImport(a.importId) - countByImport(b.importId));
-    };
-    return [...groups].sort(cmp);
-  }, [groups, countByImport, sortKey, sortDir]);
+  const sortedGroups = sort(groups);
 
   const allSelected = groups.length > 0 && selected.size === groups.length;
   const toggleAll = () =>

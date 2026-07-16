@@ -8,6 +8,7 @@ import {
   transactionSources,
   trResolvedEvents,
 } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import {
   parsedTransactionSchema,
   type ImportIssue,
@@ -128,7 +129,7 @@ export async function importsRoute(app: FastifyInstance) {
     // single-transaction delete, which the per-import undo historically skipped).
     const days = new Set<string>();
     for (const t of removed) {
-      days.add(`${t.portfolioId}|${t.executedAt.toISOString().slice(0, 10)}`);
+      days.add(`${t.portfolioId}|${toDateKey(t.executedAt)}`);
     }
     for (const key of days) {
       const [pid, day] = key.split("|");

@@ -1,3 +1,4 @@
+import { toDateKey } from "@portfolio/core";
 import { isNotNull, inArray, sql } from "drizzle-orm";
 import { instruments, dividendEvents, transactions } from "@portfolio/db";
 import type { MarketDataService } from "@portfolio/market-data";
@@ -28,8 +29,8 @@ export async function refreshDividends(
 
   const twoYearsAgo = new Date(now);
   twoYearsAgo.setUTCFullYear(twoYearsAgo.getUTCFullYear() - 2);
-  const fromDate = twoYearsAgo.toISOString().slice(0, 10);
-  const todayStr = now.toISOString().slice(0, 10);
+  const fromDate = toDateKey(twoYearsAgo);
+  const todayStr = toDateKey(now);
 
   let count = 0;
   for (const inst of rows) {

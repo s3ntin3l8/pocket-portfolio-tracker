@@ -8,6 +8,7 @@ import {
   transactionSources,
   trResolvedEvents,
 } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { parsedGoldContractSchema, parsedTransactionSchema } from "@portfolio/schema";
 import { requireUser } from "../../plugins/auth.js";
 import { accountMismatchVerdict, ownedPortfolio } from "./helpers.js";
@@ -302,10 +303,10 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
               marginTotal: c.marginTotal,
               tenorMonths: c.tenorMonths,
               monthlyInstallment: c.monthlyInstallment,
-              startDate: c.startDate.toISOString().slice(0, 10),
+              startDate: toDateKey(c.startDate),
               schedule: c.schedule.map((r) => ({
                 n: r.n,
-                dueDate: r.dueDate.toISOString().slice(0, 10),
+                dueDate: toDateKey(r.dueDate),
                 pokok: r.pokok,
                 sewaModal: r.sewaModal,
                 angsuran: r.angsuran,

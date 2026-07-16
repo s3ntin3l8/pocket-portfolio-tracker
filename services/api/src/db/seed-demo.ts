@@ -13,6 +13,7 @@ import {
   portfolioSnapshots,
   allocationTargets,
 } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { PAT_PREFIX, hashToken } from "../plugins/auth.js";
 import { ensureDb, getDb, closeDb } from "./client.js";
 
@@ -50,9 +51,7 @@ function daysAgo(n: number, hour = 10): Date {
   return d;
 }
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+const isoDate = toDateKey;
 
 function dec(n: number, digits = 2): string {
   return n.toFixed(digits);

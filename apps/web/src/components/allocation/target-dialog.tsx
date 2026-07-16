@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Target, Loader2 } from "lucide-react";
+import { Target } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,7 +163,7 @@ export function TargetDialog({ portfolioId, dimension, dimensionLabel, slices, t
 
         {loading ? (
           <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Spinner size="md" className="text-muted-foreground" />
           </div>
         ) : (
           <div className="space-y-3 py-2">
@@ -205,7 +206,7 @@ export function TargetDialog({ portfolioId, dimension, dimensionLabel, slices, t
             {t("cancel")}
           </Button>
           <Button onClick={handleSave} disabled={!sumOk || saving || loading}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            {saving ? <Spinner size="sm" className="mr-1" /> : null}
             {t("save")}
           </Button>
         </DialogFooter>
