@@ -686,14 +686,12 @@ describe("admin provider config", () => {
       currency: "USD",
       executedAt: new Date(),
     });
-    await app.db
-      .insert(documents)
-      .values({
-        userId: idA,
-        storageKey: "test/a.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 2048,
-      });
+    await app.db.insert(documents).values({
+      userId: idA,
+      storageKey: "test/a.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 2048,
+    });
 
     const res = await app.inject({
       method: "GET",
@@ -807,24 +805,20 @@ describe("admin provider config", () => {
     const id = await ensureUser("revoke-test");
 
     const hash = (v: string) => crypto.createHash("sha256").update(v).digest("hex");
-    await app.db
-      .insert(apiTokens)
-      .values({
-        userId: id,
-        name: "t1",
-        tokenHash: hash("t1"),
-        tokenPrefix: "pt_t1_",
-        scope: "read",
-      });
-    await app.db
-      .insert(apiTokens)
-      .values({
-        userId: id,
-        name: "t2",
-        tokenHash: hash("t2"),
-        tokenPrefix: "pt_t2_",
-        scope: "write",
-      });
+    await app.db.insert(apiTokens).values({
+      userId: id,
+      name: "t1",
+      tokenHash: hash("t1"),
+      tokenPrefix: "pt_t1_",
+      scope: "read",
+    });
+    await app.db.insert(apiTokens).values({
+      userId: id,
+      name: "t2",
+      tokenHash: hash("t2"),
+      tokenPrefix: "pt_t2_",
+      scope: "write",
+    });
 
     const res = await app.inject({
       method: "POST",
@@ -858,14 +852,12 @@ describe("admin provider config", () => {
       currency: "EUR",
       executedAt: new Date(),
     });
-    await app.db
-      .insert(documents)
-      .values({
-        userId: id,
-        storageKey: "test/delete-me.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 4096,
-      });
+    await app.db.insert(documents).values({
+      userId: id,
+      storageKey: "test/delete-me.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4096,
+    });
 
     const res = await app.inject({
       method: "POST",

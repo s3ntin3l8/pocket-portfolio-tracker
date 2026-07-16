@@ -75,12 +75,10 @@ export async function ibkrRoute(app: FastifyInstance) {
       await app.ibkrFlex.fetchFlexStatement(body.token, body.queryId);
     } catch (err) {
       if (err instanceof IbkrFlexError) {
-        return reply
-          .code(422)
-          .send({
-            error: err.code === "expired" ? "token_expired" : "token_invalid",
-            detail: err.message,
-          });
+        return reply.code(422).send({
+          error: err.code === "expired" ? "token_expired" : "token_invalid",
+          detail: err.message,
+        });
       }
       // Network / unexpected error — don't block the connection, just log it.
       request.log.warn({ err }, "ibkr test-fetch failed (non-fatal)");

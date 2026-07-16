@@ -285,28 +285,24 @@ describe("GET /insights", () => {
         .returning({ id: instruments.id });
 
       // Both bought before Jan 2026 — held at period start (Jan 1) → qualifies as continuously-held.
-      await app.db
-        .insert(transactions)
-        .values({
-          portfolioId,
-          instrumentId: instA.id,
-          type: "buy",
-          quantity: "10",
-          price: "100",
-          currency: "IDR",
-          executedAt: new Date("2025-12-15"),
-        });
-      await app.db
-        .insert(transactions)
-        .values({
-          portfolioId,
-          instrumentId: instB.id,
-          type: "buy",
-          quantity: "20",
-          price: "50",
-          currency: "IDR",
-          executedAt: new Date("2025-12-15"),
-        });
+      await app.db.insert(transactions).values({
+        portfolioId,
+        instrumentId: instA.id,
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        currency: "IDR",
+        executedAt: new Date("2025-12-15"),
+      });
+      await app.db.insert(transactions).values({
+        portfolioId,
+        instrumentId: instB.id,
+        type: "buy",
+        quantity: "20",
+        price: "50",
+        currency: "IDR",
+        executedAt: new Date("2025-12-15"),
+      });
 
       // Prices at period start and period end: A goes up 50%, B goes down 40%.
       await app.db.insert(prices).values([
@@ -397,28 +393,24 @@ describe("GET /insights", () => {
         })
         .returning({ id: instruments.id });
 
-      await app.db
-        .insert(transactions)
-        .values({
-          portfolioId,
-          instrumentId: instA.id,
-          type: "buy",
-          quantity: "10",
-          price: "100",
-          currency: "IDR",
-          executedAt: new Date("2025-12-15"),
-        });
-      await app.db
-        .insert(transactions)
-        .values({
-          portfolioId,
-          instrumentId: instB.id,
-          type: "buy",
-          quantity: "10",
-          price: "50",
-          currency: "IDR",
-          executedAt: new Date("2025-12-15"),
-        });
+      await app.db.insert(transactions).values({
+        portfolioId,
+        instrumentId: instA.id,
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        currency: "IDR",
+        executedAt: new Date("2025-12-15"),
+      });
+      await app.db.insert(transactions).values({
+        portfolioId,
+        instrumentId: instB.id,
+        type: "buy",
+        quantity: "10",
+        price: "50",
+        currency: "IDR",
+        executedAt: new Date("2025-12-15"),
+      });
 
       // Inst A has a 2:1 split on Jan 15 — raw close on Jan 31 is half the start.
       await app.db.insert(corporateActions).values({
@@ -501,17 +493,15 @@ describe("GET /insights", () => {
         })
         .returning({ id: instruments.id });
 
-      await app.db
-        .insert(transactions)
-        .values({
-          portfolioId,
-          instrumentId: inst.id,
-          type: "buy",
-          quantity: "10",
-          price: "100",
-          currency: "IDR",
-          executedAt: new Date("2026-01-02"),
-        });
+      await app.db.insert(transactions).values({
+        portfolioId,
+        instrumentId: inst.id,
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        currency: "IDR",
+        executedAt: new Date("2026-01-02"),
+      });
 
       await app.db.insert(prices).values([
         { instrumentId: inst.id, date: "2026-01-01", close: "100", currency: "IDR" },

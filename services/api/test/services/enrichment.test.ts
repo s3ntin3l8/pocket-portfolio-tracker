@@ -788,14 +788,12 @@ describe("sourcesForTransactions", () => {
       status: "retained",
     });
     // txNoDoc has no document of its own, only a pytr row sharing the collector importId.
-    await db
-      .insert(transactionSources)
-      .values({
-        transactionId: txNoDoc.id,
-        sourceType: "pytr",
-        importId: imp.id,
-        documentId: null,
-      });
+    await db.insert(transactionSources).values({
+      transactionId: txNoDoc.id,
+      sourceType: "pytr",
+      importId: imp.id,
+      documentId: null,
+    });
 
     const app = { db, log: { warn: vi.fn(), info: vi.fn() } };
     const [row] =
