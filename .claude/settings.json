@@ -1,4 +1,28 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest run *)",
+      "mcp__github__pull_request_read",
+      "Bash(npm run typecheck *)",
+      "Bash(npm run lint *)",
+      "mcp__github__get_file_contents",
+      "Bash(git fetch *)",
+      "Bash(npm test *)",
+      "Bash(npx eslint *)",
+      "Bash(npx turbo run typecheck *)",
+      "Bash(npx tsc --noEmit *)",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "Bash(make test *)",
+      "Bash(npm run build *)",
+      "Bash(npx turbo run lint *)",
+      "Bash(make lint *)",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-design__list_files",
+      "mcp__claude-design__read_file",
+      "mcp__github__get_job_logs"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

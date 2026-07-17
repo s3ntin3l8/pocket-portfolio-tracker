@@ -1,0 +1,430 @@
+import { Decimal } from "decimal.js";
+import { D, ZERO } from "../decimal.js";
+import { isTradeType, isAcquisitionType } from "../categorization.js";
+import { cashFlow } from "../cash.js";
+import { financingByInstrument } from "../loans.js";
+import { convert, type FxRateFn } from "../networth.js";
+import { xirr } from "../xirr.js";
+import type { CoreTransaction } from "../types.js";
+import { toDateKey, daysBetween } from "../date-utils.js";
+import type {
+  Trade,
+  TradeLog,
+  YearAmount,
+  YearTax,
+  ComputeTradesInput,
+  Lot,
+  Episode,
+  Event,
+} from "./types.js";
+import { LONG_TERM_DAYS, DEFAULT_DUST, makeEpisode, calcAvgHoldingDays } from "./helpers.js";
+import { finalizeLog } from "./finalize.js";
+
+/**
+ * Compute the trade log for a set of transactions. Pure — the caller injects current
+ * prices and an FX snapshot. Multi-currency realized/dividends are converted at the
+ * single provided fx rate (not per-transaction-date) — the UI carries an "indicative,
+ * not your official tax figure" disclaimer for that reason.
+ */
+export function computeTrades(input: ComputeTradesInput): TradeLog {
+  const fx: FxRateFn = input.fx ?? (() => "1");
+  const method = input.method ?? "average";
+  const now = input.now ?? new Date();
+  const dust = D(input.dustEpsilon ?? DEFAULT_DUST);
+  const display = input.displayCurrency;
+  const cas = input.corporateActions ?? [];
+  const conv = (amount: Decimal | string, from: string): Decimal =>
+    D(convert(amount.toString(), from, display, fx));
+
+  const TAX_FREE_ELIGIBLE_CLASSES = new Set(["gold", "crypto"]);
+  const isTaxFreeEligible = (id: string): boolean => {
+    if (!input.instruments) return true;
+    const assetClass =
+      input.instruments instanceof Map
+        ? input.instruments.get(id)?.assetClass
+        : (input.instruments as Record<string, { assetClass: string }>)[id]?.assetClass;
+    return assetClass ? TAX_FREE_ELIGIBLE_CLASSES.has(assetClass) : true;
+  };
+
+  // Financing capitalized into the open episode's cost basis under "total_paid".
+  const financing =
+    input.costBasisMode === "total_paid" ? financingByInstrument(input.transactions) : {};
+
+  // Group price-bearing transactions + corporate actions per instrument.
+  const byInstrument = new Map<string, Event[]>();
+  for (const tx of input.transactions) {
+    if (!tx.instrumentId) continue;
+    if (tx.status === "archived" || tx.status === "draft") continue; // excluded from every derivation
+
+    const list = byInstrument.get(tx.instrumentId) ?? [];
+    list.push({ kind: "tx", at: tx.executedAt, tx });
+    byInstrument.set(tx.instrumentId, list);
+  }
+  for (const ca of cas) {
+    if (!byInstrument.has(ca.instrumentId)) continue;
+    byInstrument.get(ca.instrumentId)!.push({ kind: "ca", at: ca.exDate, ca });
+  }
+
+  const trades: Trade[] = [];
+
+  for (const [instrumentId, events] of byInstrument) {
+    events.sort((a, b) => a.at.getTime() - b.at.getTime());
+
+    // instrumentCcy — quote currency for market-value conversions (terminal MV, exposure).
+    // costCcy      — trade currency of the actual buy/sell txns; used for cost basis,
+    //                realized P&L, and leg amounts. Often equal to instrumentCcy, but
+    //                diverges for cross-currency holdings (e.g. US stock bought in EUR).
+    const firstPriceTx = events.find(
+      (e): e is Extract<Event, { kind: "tx" }> => e.kind === "tx" && isTradeType(e.tx.type),
+    );
+    const instrumentCcy =
+      input.prices[instrumentId]?.currency ?? firstPriceTx?.tx.currency ?? display;
+    const costCcy = firstPriceTx?.tx.currency ?? instrumentCcy;
+
+    // Income (dividend/coupon) events for this instrument, for window-folding.
+    const incomeEvents = events
+      .filter((e) => e.kind === "tx" && (e.tx.type === "dividend" || e.tx.type === "coupon"))
+      .map((e) => (e as { tx: CoreTransaction }).tx);
+
+    // --- per-episode accumulators ---
+    let lots: Lot[] = []; // FIFO ledger
+    let avgQty = ZERO; // average-method running quantity
+    let avgCost = ZERO; // average-method running cost (fees incl.)
+    let episode: Episode | null = null;
+    // Vorabpauschale accrual pool (display currency), gross — drawn down proportionally on
+    // each sell (see the "tax"/vorabpauschale branch and the sell branch below). Persists
+    // across episode boundaries within an instrument (a full close naturally drains it to
+    // ~0, since a full-close sell's ratio is 1); reset defensively at the dust-close snap.
+    let vorabPool = ZERO;
+
+    const finalizeTrade = (ep: Episode, status: "open" | "closed", exitAt: Date | null) => {
+      const currentQty = avgQty; // remaining units (0 when closed)
+      const entryDate = ep.entryDate;
+      const exitDate = status === "closed" ? exitAt : null;
+      const periodEnd = exitDate ?? now;
+      const holdingDays = daysBetween(entryDate, periodEnd);
+
+      // Dividends in the holding window [entry, end].
+      let dividends = ZERO;
+      const flows = [...ep.flows];
+      for (const inc of incomeEvents) {
+        if (inc.executedAt >= entryDate && inc.executedAt <= periodEnd) {
+          const amt = conv(cashFlow(inc), inc.currency);
+          dividends = dividends.add(amt);
+          flows.push({ amount: amt.toNumber(), date: inc.executedAt });
+        }
+      }
+
+      // Remaining cost basis of the OPEN portion (method-aware), + financing.
+      const fin = status === "open" ? D(financing[instrumentId] ?? "0") : ZERO;
+      const remainingCost =
+        method === "fifo" ? lots.reduce((s, l) => s.add(l.qty.mul(l.unitCost)), ZERO) : avgCost;
+      const remainingCostFin = remainingCost.add(fin);
+
+      // Open-position unrealized + terminal XIRR flow.
+      // Market value uses the quote currency (instrumentCcy); cost basis uses the trade
+      // currency (costCcy). Both are converted to display before subtracting so the
+      // subtraction is always in a common (display) unit — necessary when the two
+      // currencies differ (e.g. USD quote, EUR cost).
+      let unrealized = ZERO;
+      const quote = input.prices[instrumentId];
+      if (status === "open" && quote && currentQty.gt(0)) {
+        const mvDisplay = conv(currentQty.mul(quote.price), instrumentCcy);
+        unrealized = mvDisplay.sub(conv(remainingCostFin, costCcy));
+        flows.push({ amount: mvDisplay.toNumber(), date: periodEnd });
+      }
+
+      const realizedDisplay = conv(ep.realized, costCcy);
+      const investedDisplay = conv(ep.acqCost.add(fin), costCcy);
+      const totalReturn = realizedDisplay.add(unrealized).add(dividends);
+      const totalReturnPct = investedDisplay.isZero()
+        ? null
+        : totalReturn.div(investedDisplay).toNumber();
+      const ann = xirr(flows);
+      const annualizedPct = Number.isFinite(ann) ? ann : null;
+
+      // Capital-weighted average holding period (in days).
+      // Derived from the same `flows` array that feeds XIRR, so it is always
+      // consistent with the money-weighted return.  The formula mirrors XIRR's
+      // own time-axis: t0 = earliest flow date, tᵢ = (flowDate − t0) / MS_PER_YEAR.
+      //   avgT(side) = Σ(|amount| · tᵢ) / Σ|amount|
+      //   avgHoldingYears = avgT(inflows) − avgT(outflows)
+      // For a single buy + single sell: avgHoldingYears == calendar years exactly.
+      // For a savings plan: shorter, because later tranches were invested less time.
+      // Falls back to holdingDays when avgHoldingYears ≤ 0 (e.g. open position with
+      // no price quote, so the only inflow is dividends-only or the side is empty).
+      const avgHoldingDays = calcAvgHoldingDays(flows, holdingDays);
+
+      const qtyShown = status === "open" ? currentQty : ep.acqQty;
+      const avgEntryPrice = ep.acqQty.gt(0) ? ep.acqQtyPrice.div(ep.acqQty).toString() : "0";
+      const avgExitPrice = ep.soldQty.gt(0) ? ep.sellQtyPrice.div(ep.soldQty).toString() : null;
+
+      trades.push({
+        instrumentId,
+        // avgEntryPrice / avgExitPrice are in the trade (cost) currency, which is
+        // what the user actually paid per share — use costCcy so the label is correct.
+        currency: costCcy,
+        status,
+        entryDate: toDateKey(entryDate),
+        exitDate: exitDate ? toDateKey(exitDate) : null,
+        holdingDays,
+        avgHoldingDays,
+        longTerm: holdingDays >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+        quantity: qtyShown.toString(),
+        avgEntryPrice,
+        avgExitPrice,
+        invested: investedDisplay.toString(),
+        realizedPnL: realizedDisplay.toString(),
+        unrealizedPnL: unrealized.toString(),
+        dividends: dividends.toString(),
+        totalReturn: totalReturn.toString(),
+        totalReturnPct,
+        annualizedPct,
+        legs: ep.legs,
+        vorabByYear: [...ep.vorabByYear.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([year, amount]) => ({ year, amount: amount.toString() })),
+      });
+    };
+
+    // FIFO consumption pointer into `lots`, shared by the sell and transfer_out branches
+    // below. Persists across transactions *within one episode* so consumed lots are never
+    // re-scanned (O(n) amortized over the episode, not O(n) per sell) — but MUST be reset
+    // to 0 everywhere `lots` itself is reset to `[]` (episode close), since a stale index
+    // into a fresh array would skip straight past the end and silently price the next
+    // disposal at zero cost.
+    let lotIdx = 0;
+    for (const ev of events) {
+      if (ev.kind === "ca") {
+        // Lot-level corporate actions: keep total cost fixed, scale quantities.
+        const ratio = D(ev.ca.ratio);
+        const factor =
+          ev.ca.type === "split" ? ratio : ev.ca.type === "bonus" ? D(1).add(ratio) : null; // rights: no-op
+        if (factor && avgQty.gt(0)) {
+          avgQty = avgQty.mul(factor);
+          for (const l of lots) {
+            l.qty = l.qty.mul(factor);
+            l.unitCost = l.unitCost.div(factor);
+          }
+          // Restate acquired units in current-share terms so the per-share
+          // avgEntryPrice (= acqQtyPrice / acqQty) and the "quantity traded" shown
+          // for a closed split position stay comparable to post-split sells. Money
+          // (acqQtyPrice / acqCost) is split-invariant and left untouched.
+          if (episode) episode.acqQty = episode.acqQty.mul(factor);
+        }
+        continue;
+      }
+
+      const tx = ev.tx;
+      const q = D(tx.quantity);
+      const p = D(tx.price);
+      const f = D(tx.fees);
+
+      if (isAcquisitionType(tx.type) || tx.type === "transfer_in" || tx.type === "bonus") {
+        // `bonus` = free-share receipt (TR perk / FREE_RECEIPT grant): opens/extends an
+        // episode at its recorded basis (price 0 → zero-cost lot, full gain on exit).
+        if (q.lte(0)) continue;
+        if (!episode) episode = makeEpisode(tx.executedAt);
+        const cost = q.mul(p).add(f);
+        lots.push({ acqDate: tx.executedAt, qty: q, unitCost: cost.div(q) });
+        avgQty = avgQty.add(q);
+        avgCost = avgCost.add(cost);
+        episode.acqQty = episode.acqQty.add(q);
+        episode.acqQtyPrice = episode.acqQtyPrice.add(q.mul(p));
+        episode.acqCost = episode.acqCost.add(cost);
+        episode.flows.push({
+          amount: conv(cost, tx.currency).neg().toNumber(),
+          date: tx.executedAt,
+        });
+      } else if (tx.type === "sell") {
+        if (!episode || avgQty.lte(0)) continue;
+        const qtyBeforeSale = avgQty;
+        const sellQty = Decimal.min(q, avgQty);
+        const proceeds = sellQty.mul(p).sub(f); // instrument ccy
+        const sellDate = tx.executedAt;
+        const taxYear = sellDate.getUTCFullYear();
+
+        // Vorabpauschale disposal credit (§18(3) InvStG): draw the accrual pool down
+        // proportional to the fraction of currently-held shares this sell disposes, before
+        // any lot/quantity mutation below. Already display currency (accrued that way —
+        // see the "tax"/vorabpauschale branch), so no further conv() needed here. Stays
+        // gross; tax.ts applies Teilfreistellung when netting it against the FSA.
+        const vorabCreditThis = qtyBeforeSale.gt(0)
+          ? vorabPool.mul(sellQty).div(qtyBeforeSale)
+          : ZERO;
+        vorabPool = vorabPool.sub(vorabCreditThis);
+
+        // --- average method realized ---
+        const avgUnit = avgCost.div(avgQty);
+        const costAvg = avgUnit.mul(sellQty);
+
+        // --- FIFO method: consume oldest lots ---
+        // Skip-ahead guards against a lot left at qty 0 by a still-open leading position
+        // (defensive; lotIdx should already point past fully-consumed lots).
+        let remaining = sellQty;
+        let costFifo = ZERO;
+        const fifoSlices: { acqDate: Date; qty: Decimal; cost: Decimal }[] = [];
+        while (lotIdx < lots.length && lots[lotIdx].qty.lte(0)) lotIdx++;
+        while (remaining.gt(0) && lotIdx < lots.length) {
+          const lot = lots[lotIdx];
+          const take = Decimal.min(lot.qty, remaining);
+          const sliceCost = take.mul(lot.unitCost);
+          costFifo = costFifo.add(sliceCost);
+          fifoSlices.push({ acqDate: lot.acqDate, qty: take, cost: sliceCost });
+          lot.qty = lot.qty.sub(take);
+          remaining = remaining.sub(take);
+          if (lot.qty.lte(0)) lotIdx++;
+        }
+
+        const costMethod = method === "fifo" ? costFifo : costAvg;
+        const realizedSlice = proceeds.sub(costMethod);
+        episode.realized = episode.realized.add(realizedSlice);
+
+        // Legs for the chosen method (display currency).
+        // Leg cost/proceeds/gain are all in costCcy (the trade currency of buys/sells).
+        if (method === "fifo") {
+          const proceedsPerUnit = sellQty.gt(0) ? proceeds.div(sellQty) : ZERO;
+          for (const s of fifoSlices) {
+            const sliceProceeds = s.qty.mul(proceedsPerUnit);
+            const days = daysBetween(s.acqDate, sellDate);
+            const sliceVorabCredit = sellQty.gt(0) ? vorabCreditThis.mul(s.qty).div(sellQty) : ZERO;
+            episode.legs.push({
+              acqDate: toDateKey(s.acqDate),
+              sellDate: toDateKey(sellDate),
+              quantity: s.qty.toString(),
+              cost: conv(s.cost, costCcy).toString(),
+              proceeds: conv(sliceProceeds, costCcy).toString(),
+              gain: conv(sliceProceeds.sub(s.cost), costCcy).toString(),
+              holdingDays: days,
+              longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+              taxYear,
+              vorabCredit: sliceVorabCredit.toString(),
+            });
+          }
+        } else {
+          const days = daysBetween(episode.entryDate, sellDate);
+          episode.legs.push({
+            acqDate: toDateKey(episode.entryDate),
+            sellDate: toDateKey(sellDate),
+            quantity: sellQty.toString(),
+            cost: conv(costAvg, costCcy).toString(),
+            proceeds: conv(proceeds, costCcy).toString(),
+            gain: conv(realizedSlice, costCcy).toString(),
+            holdingDays: days,
+            longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+            taxYear,
+            vorabCredit: vorabCreditThis.toString(),
+          });
+        }
+
+        // Update average trackers + episode stats.
+        avgCost = avgCost.sub(costAvg);
+        avgQty = avgQty.sub(sellQty);
+        episode.soldQty = episode.soldQty.add(sellQty);
+        episode.sellQtyPrice = episode.sellQtyPrice.add(sellQty.mul(p));
+        episode.flows.push({
+          amount: conv(proceeds, tx.currency).toNumber(),
+          date: sellDate,
+        });
+
+        // Dust tolerance: snap to closed (discard negligible residual + its cost).
+        if (avgQty.lte(dust)) {
+          finalizeTrade(episode, "closed", sellDate);
+          episode = null;
+          lots = [];
+          lotIdx = 0;
+          avgQty = ZERO;
+          avgCost = ZERO;
+          vorabPool = ZERO;
+        }
+      } else if (tx.type === "transfer_out") {
+        // Outbound depot transfer: shares leave at average cost, no realized P&L.
+        // Drain the lot ledger (same shared lotIdx as the sell branch — never `.shift()`,
+        // which would invalidate the index other transactions rely on) so future sells
+        // don't over-count the removed shares.
+        if (!episode || avgQty.lte(0)) continue;
+        let remaining = Decimal.min(q, avgQty);
+        while (lotIdx < lots.length && lots[lotIdx].qty.lte(0)) lotIdx++;
+        while (remaining.gt(0) && lotIdx < lots.length) {
+          const lot = lots[lotIdx];
+          const take = Decimal.min(lot.qty, remaining);
+          lot.qty = lot.qty.sub(take);
+          remaining = remaining.sub(take);
+          if (lot.qty.lte(0)) lotIdx++;
+        }
+        const transferQty = Decimal.min(q, avgQty);
+        const avg = avgQty.gt(0) ? avgCost.div(avgQty) : ZERO;
+        avgCost = avgCost.sub(avg.mul(transferQty));
+        avgQty = avgQty.sub(transferQty);
+        // Don't close the episode — remaining shares may still be held.
+      } else if (tx.type === "tax" && tx.kind === "vorabpauschale") {
+        // Vorabpauschale accrual (§18(3) InvStG): a non-cash advance lump-sum fund tax
+        // base, gross (Teilfreistellung is applied by tax.ts, not here — see the file
+        // header's ownership split). Requires an open episode (shares held) and a parsed
+        // base; either being absent degrades silently to today's zero-effect booking
+        // rather than guessing.
+        if (!episode || avgQty.lte(0)) continue;
+        const base = tx.vorabBase != null ? D(tx.vorabBase) : ZERO;
+        if (base.lte(0)) continue;
+        const baseDisplay = conv(base, tx.currency);
+        vorabPool = vorabPool.add(baseDisplay);
+        const year = tx.executedAt.getUTCFullYear();
+        episode.vorabByYear.set(year, (episode.vorabByYear.get(year) ?? ZERO).add(baseDisplay));
+      }
+      // dividend/coupon/interest/fee/deposit/withdrawal/loan_*/bonus|split|rights TYPE:
+      // no effect on the lot ledger (income is folded by window; CAs handled above).
+    }
+
+    // Any still-open episode.
+    if (episode) finalizeTrade(episode, "open", null);
+  }
+
+  // dividendsByYear — all income (dividend/coupon/interest), net amount + withholding.
+  const divMap = new Map<number, { amount: Decimal; tax: Decimal }>();
+  for (const tx of input.transactions) {
+    if (tx.type !== "dividend" && tx.type !== "coupon" && tx.type !== "interest") {
+      continue;
+    }
+    const year = tx.executedAt.getUTCFullYear();
+    const entry = divMap.get(year) ?? { amount: ZERO, tax: ZERO };
+    entry.amount = entry.amount.add(conv(cashFlow(tx), tx.currency));
+    entry.tax = entry.tax.add(conv(tx.tax ?? "0", tx.currency));
+    divMap.set(year, entry);
+  }
+  const dividendsByYear: YearTax[] = [...divMap.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([year, { amount, tax }]) => ({
+      year,
+      amount: amount.toString(),
+      tax: tax.toString(),
+    }));
+
+  // bonusesByYear — broker-credited rewards, purely informational, NOT in totalReturn.
+  //   • bonus_cash (e.g. Kindergeld, promo cash) — cash flow as lump sum income.
+  //   • buy / savings_plan with kind="saveback" — reinvested cashback (notional cost).
+  //   • bonus with kind="transfer_in" — legacy rows before PR #309 (kept for compat).
+  // roundup is excluded: it is the user's own spare change, not broker-credited.
+  // transfer_in/out are NOT included here — they're capital, not broker-credited rewards.
+  const bonusMap = new Map<number, Decimal>();
+  for (const tx of input.transactions) {
+    let bonusAmount: Decimal | null = null;
+    if (tx.type === "bonus_cash") {
+      bonusAmount = conv(cashFlow(tx), tx.currency);
+    } else if (isAcquisitionType(tx.type) && tx.kind === "saveback") {
+      bonusAmount = conv(D(tx.quantity).mul(D(tx.price)).add(D(tx.fees)), tx.currency);
+    } else if (tx.type === "bonus" && tx.kind === "transfer_in") {
+      // Legacy: pre-PR#309 rows tagged bonus+kind:transfer_in. Still handle until
+      // the data migration converts them to type:transfer_in.
+      bonusAmount = conv(D(tx.quantity).mul(D(tx.price)), tx.currency);
+    }
+    if (bonusAmount !== null) {
+      const year = tx.executedAt.getUTCFullYear();
+      bonusMap.set(year, (bonusMap.get(year) ?? ZERO).add(bonusAmount));
+    }
+  }
+  const bonusesByYear: YearAmount[] = [...bonusMap.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([year, amount]) => ({ year, amount: amount.toString() }));
+
+  return finalizeLog(trades, dividendsByYear, bonusesByYear, method, display);
+}

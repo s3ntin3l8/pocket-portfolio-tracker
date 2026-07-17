@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { formatMoneyCompact } from "@/lib/utils";
+import { useApiClient } from "@/lib/api";
 import {
   computeAllBanner,
   computeIncomeBanner,
@@ -149,6 +150,7 @@ export function useTransactionPagination(
   yearFilterProp: string | undefined,
   searchQuery: string | undefined,
   portfolioId: string | undefined,
+  showFlagged: boolean,
 ) {
   const [accumulatedRows, setAccumulatedRows] = useState<TxRow[]>(rows);
   const [currentPage, setCurrentPage] = useState(1);
@@ -168,6 +170,7 @@ export function useTransactionPagination(
         setVisibleCount((n) => n + PAGE_SIZE);
         return;
       }
+      if (showFlagged) return;
       if (accumulatedRows.length < (total ?? 0)) {
         setLoadingMore(true);
         try {
@@ -200,6 +203,7 @@ export function useTransactionPagination(
       yearFilterProp,
       searchQuery,
       portfolioId,
+      showFlagged,
     ],
   );
 
@@ -262,4 +266,40 @@ export function useTransactionViewState(
     draftCount,
     viewSignature,
   };
+}
+
+export function useFlaggedRows(
+  showFlagged: boolean,
+  anomalyByTxId: Map<string, Anomaly>,
+  portfolioId: string | undefined,
+) {
+  const api = useApiClient();
+  const flaggedIds = useMemo(() => [...anomalyByTxId.keys()], [anomalyByTxId]);
+  const flaggedIdsKey = `${portfolioId ?? ""}:${flaggedIds.join(",")}`;
+  const [flaggedRows, setFlaggedRows] = useState<TxRow[] | null>(null);
+  const [flaggedLoading, setFlaggedLoading] = useState(false);
+  const [loadedFlaggedKey, setLoadedFlaggedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showFlagged || flaggedIds.length === 0 || loadedFlaggedKey === flaggedIdsKey) return;
+    let cancelled = false;
+    (async () => {
+      setFlaggedLoading(true);
+      try {
+        const fetched = portfolioId
+          ? await api.listTransactionsByIds(portfolioId, flaggedIds)
+          : await api.listNetworthTransactionsByIds(flaggedIds);
+        if (cancelled) return;
+        setFlaggedRows(fetched);
+        setLoadedFlaggedKey(flaggedIdsKey);
+      } finally {
+        if (!cancelled) setFlaggedLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showFlagged, flaggedIds, flaggedIdsKey, loadedFlaggedKey, portfolioId, api]);
+
+  return { flaggedRows, flaggedLoading, flaggedIds };
 }
