@@ -132,7 +132,7 @@ export function useImportFlow({
   const activeIndex = step === "parsing" || step === "report" ? 0 : STEPS.indexOf(step);
 
   function notifyMaterializedFn(count: number) {
-    notifyMaterialized(count, router.refresh.bind(router), router.push.bind(router), t);
+    notifyMaterialized(count, router, t);
   }
 
   async function handleSaveReport() {

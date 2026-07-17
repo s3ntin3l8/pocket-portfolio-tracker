@@ -22,15 +22,14 @@ export function taskLabel(groups: GroupMap, t: TFunction): string {
 
 export function notifyMaterialized(
   count: number,
-  refresh: () => void,
-  push: (href: string) => void,
+  router: { refresh: () => void; push: (href: string) => void },
   t: TFunction,
 ) {
-  refresh();
+  router.refresh();
   toast.success(t("toast.success", { count }), {
     action: {
       label: t("toast.viewTransactions"),
-      onClick: () => push("/transactions"),
+      onClick: () => router.push("/transactions"),
     },
   });
 }
