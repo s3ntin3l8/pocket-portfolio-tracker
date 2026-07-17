@@ -2,7 +2,6 @@ import { Decimal } from "decimal.js";
 import type { PortfolioSummary } from "../valuation.js";
 import type {
   AllocationInstrumentMeta,
-  AllocationSlice,
   TopHolding,
   ConcentrationInfo,
   AllocationBreakdown,
