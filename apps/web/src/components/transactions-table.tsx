@@ -1,17 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useApiClient } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  formatMoneyCompact,
-  bannerAnomalies,
-  anomalyLabel,
-  type AnomalyTranslator,
-} from "@/lib/utils";
+import { bannerAnomalies, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import { useLongPressSelect } from "@/lib/use-long-press-select";
 import { toast } from "sonner";
@@ -35,12 +30,13 @@ import { ReassignMergeDialogs } from "./transactions-table/reassign-merge";
 import { DesktopTable } from "./transactions-table/desktop";
 import { MobileView } from "./transactions-table/mobile";
 import { LoadMoreSection } from "./transactions-table/load-more";
-import { useAnomalyMap } from "./transactions-table/hooks";
 import {
-  computeAllBanner,
-  computeIncomeBanner,
-  computeTradeBanner,
-} from "@/lib/transaction-banners";
+  useAnomalyMap,
+  useTransactionUrlNav,
+  useTransactionBanners,
+  useTransactionPagination,
+  useFlaggedRows,
+} from "./transactions-table/hooks";
 
 export type { TxRow } from "./transactions-table/types";
 export { SOURCE_ICON } from "./transactions-table/types";
@@ -103,57 +99,21 @@ export function TransactionsTable({
   const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [showFlagged, setShowFlagged] = useState(false);
 
-  // "Show flagged only" / "Needs review" (#562): the count comes from a whole-scope
-  // anomalies fetch (unpaginated, unfiltered), so a flagged transaction can sit well past
-  // whatever page is currently loaded into `accumulatedRows`. Rather than filtering only
-  // what's already loaded, fetch exactly the flagged transactions by id — the ids are
-  // already known from `anomalyByTxId` — so the toggle surfaces every flagged row
-  // regardless of pagination/type/year/search scope.
-  const flaggedIds = useMemo(() => [...anomalyByTxId.keys()], [anomalyByTxId]);
-  // Scoped by `portfolioId` too (not just the id set) so switching portfolios while flagged
-  // mode stays on always refetches — an id-set collision across portfolios is practically
-  // impossible (UUIDs), but keying on scope + ids rather than ids alone removes the
-  // possibility outright instead of relying on that.
-  const flaggedIdsKey = `${portfolioId ?? ""}:${flaggedIds.join(",")}`;
-  const [flaggedRows, setFlaggedRows] = useState<TxRow[] | null>(null);
-  const [flaggedLoading, setFlaggedLoading] = useState(false);
-  const [loadedFlaggedKey, setLoadedFlaggedKey] = useState<string | null>(null);
+  const { flaggedRows, flaggedLoading } = useFlaggedRows(showFlagged, anomalyByTxId, portfolioId);
 
-  useEffect(() => {
-    if (!showFlagged || flaggedIds.length === 0 || loadedFlaggedKey === flaggedIdsKey) return;
-    let cancelled = false;
-    (async () => {
-      setFlaggedLoading(true);
-      try {
-        const fetched = portfolioId
-          ? await api.listTransactionsByIds(portfolioId, flaggedIds)
-          : await api.listNetworthTransactionsByIds(flaggedIds);
-        if (cancelled) return;
-        setFlaggedRows(fetched);
-        setLoadedFlaggedKey(flaggedIdsKey);
-      } finally {
-        if (!cancelled) setFlaggedLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [showFlagged, flaggedIds, flaggedIdsKey, loadedFlaggedKey, portfolioId, api]);
-
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [detailTx, setDetailTx] = useState<TxRow | null>(null);
   const [editTx, setEditTx] = useState<TxRow | null>(null);
 
-  // Server-side "Load more": accumulate pages from the API as the user clicks "Load more".
-  const [accumulatedRows, setAccumulatedRows] = useState<TxRow[]>(rows);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [prevRows, setPrevRows] = useState(rows);
-  if (prevRows !== rows) {
-    setPrevRows(rows);
-    setAccumulatedRows(rows);
-    setCurrentPage(1);
-  }
+  const { accumulatedRows, loadingMore, handleLoadMore, visibleCount, setVisibleCount } =
+    useTransactionPagination(
+      rows,
+      total,
+      typeFilter,
+      yearFilterProp,
+      searchQuery,
+      portfolioId,
+      showFlagged,
+    );
 
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [reassignRows, setReassignRows] = useState<TxRow[] | null>(null);
@@ -195,99 +155,20 @@ export function TransactionsTable({
     setVisibleCount(PAGE_SIZE);
   }
 
-  const navigateWithParam = useCallback(
-    (key: string, value: string | undefined) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
-      params.set("page", "1");
-      router.push(`/transactions?${params.toString()}`);
-    },
-    [router, searchParams],
-  );
+  const navigateWithParam = useTransactionUrlNav();
 
   const tBanner = useTranslations("Transactions.banners");
   const activeBannerMode: "all" | "income" | "buy" | "sell" | null =
     typeFilter == null ? "all" : (typeFilter as "all" | "income" | "buy" | "sell");
 
-  const allBanner = useMemo(() => {
-    if (activeBannerMode !== "all") return null;
-    if (summary) {
-      return {
-        currency: scopeCurrency,
-        tiles: [
-          {
-            label: tBanner("invested"),
-            value: summary.totalInvested
-              ? formatMoneyCompact(Number(summary.totalInvested), scopeCurrency, locale)
-              : "—",
-            sub: "",
-            tone: "neutral" as const,
-          },
-          {
-            label: tBanner("proceeds"),
-            value: summary.totalProceeds
-              ? formatMoneyCompact(Number(summary.totalProceeds), scopeCurrency, locale)
-              : "—",
-            sub: "",
-            tone: "neutral" as const,
-          },
-          {
-            label: tBanner("incomeYtd"),
-            value: summary.totalIncome
-              ? formatMoneyCompact(Number(summary.totalIncome), scopeCurrency, locale)
-              : "—",
-            sub: "",
-            tone: "neutral" as const,
-          },
-        ],
-        mix: [],
-      };
-    }
-    return computeAllBanner(rows, scopeCurrency, locale, {
-      invested: tBanner("invested"),
-      proceeds: tBanner("proceeds"),
-      incomeYtd: tBanner("incomeYtd"),
-      buysCount: (n: number) => tBanner("buysCount", { count: n }),
-      sellsCount: (n: number) => tBanner("sellsCount", { count: n }),
-      vsLastYear: (pct: string) => tBanner("vsLastYear", { pct }),
-      buys: tBanner("buys"),
-      sells: tBanner("sells"),
-      income: tBanner("income"),
-    });
-  }, [activeBannerMode, summary, rows, scopeCurrency, locale, tBanner]);
-
-  const incomeBanner = useMemo(() => {
-    if (activeBannerMode !== "income") return null;
-    return computeIncomeBanner(rows, scopeCurrency, locale, {
-      vsLastYear: (pct: string) => tBanner("vsLastYear", { pct }),
-      new: tBanner("newIncome"),
-      perMonth: (amount: string) => tBanner("perMonth", { amount }),
-      dividends: tBanner("dividends"),
-      couponsInterest: tBanner("couponsInterest"),
-      other: tBanner("otherIncome"),
-    });
-  }, [activeBannerMode, rows, scopeCurrency, locale, tBanner]);
-
-  const tradeBanner = useMemo(() => {
-    if (activeBannerMode !== "buy" && activeBannerMode !== "sell") return null;
-    if (summary) {
-      const total = activeBannerMode === "buy" ? summary.totalInvested : summary.totalProceeds;
-      if (!total) return null;
-      const money = (n: number) => formatMoneyCompact(n, scopeCurrency, locale);
-      return {
-        currency: scopeCurrency,
-        total: money(Number(total)),
-        count: rows.filter((r) => r.type === activeBannerMode).length,
-        avg: "—",
-        bySymbol: [],
-      };
-    }
-    return computeTradeBanner(rows, activeBannerMode, scopeCurrency, locale);
-  }, [activeBannerMode, summary, rows, scopeCurrency, locale]);
+  const { allBanner, incomeBanner, tradeBanner } = useTransactionBanners(
+    activeBannerMode,
+    summary,
+    rows,
+    scopeCurrency,
+    locale,
+    tBanner,
+  );
 
   const yearOptions = useMemo(
     () =>
@@ -466,47 +347,6 @@ export function TransactionsTable({
     return groups;
   }, [windowedRows, dayFmt]);
 
-  const handleLoadMore = useCallback(async () => {
-    if (visibleCount < sortedRows.length) {
-      setVisibleCount((n) => n + PAGE_SIZE);
-      return;
-    }
-    if (showFlagged) return;
-    if (accumulatedRows.length < (total ?? 0)) {
-      setLoadingMore(true);
-      try {
-        const params = new URLSearchParams({
-          page: String(currentPage + 1),
-          pageSize: "25",
-        });
-        if (typeFilter) params.set("type", typeFilter);
-        if (yearFilterProp) params.set("year", yearFilterProp);
-        if (searchQuery) params.set("q", searchQuery);
-        const basePath = portfolioId
-          ? `/api/backend/portfolios/${portfolioId}/transactions`
-          : "/api/backend/networth/transactions";
-        const res = await fetch(`${basePath}?${params}`);
-        const data = await res.json();
-        setAccumulatedRows((prev) => [...prev, ...data.rows]);
-        setCurrentPage((p) => p + 1);
-        setVisibleCount((n) => n + data.rows.length);
-      } finally {
-        setLoadingMore(false);
-      }
-    }
-  }, [
-    visibleCount,
-    sortedRows.length,
-    accumulatedRows.length,
-    total,
-    currentPage,
-    typeFilter,
-    yearFilterProp,
-    searchQuery,
-    portfolioId,
-    showFlagged,
-  ]);
-
   const showEmpty = visibleRows.length === 0;
 
   return (
@@ -657,7 +497,7 @@ export function TransactionsTable({
         windowedCount={windowedRows.length}
         sortedTotal={sortedRows.length}
         total={showFlagged ? undefined : total}
-        onLoadMore={handleLoadMore}
+        onLoadMore={() => handleLoadMore(sortedRows.length)}
       />
 
       <TransactionDetailSheet
