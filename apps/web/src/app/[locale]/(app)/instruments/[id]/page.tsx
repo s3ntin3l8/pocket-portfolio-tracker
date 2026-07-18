@@ -56,9 +56,9 @@ export default async function InstrumentPage({
 
   const sp = await searchParams;
   const page = Math.max(1, Number(sp?.page ?? "1"));
-  const typeFilter = (sp?.type as string) ?? undefined;
-  const yearFilter = (sp?.year as string) ?? undefined;
-  const searchQuery = (sp?.q as string) ?? undefined;
+  const typeFilter = sp?.type ?? undefined;
+  const yearFilter = sp?.year ?? undefined;
+  const searchQuery = sp?.q ?? undefined;
 
   // Cost basis is a single global preference — thread it into loadInstrumentScope,
   // which previously silently defaulted to purchase_price regardless of the user's
