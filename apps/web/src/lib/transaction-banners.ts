@@ -18,7 +18,7 @@ export interface FlowMixRow {
   color: string;
 }
 
-const PALETTE = ["#0E9F6E", "#0D9488", "#7C5CFC", "#E0A53A", "#64748B"];
+export const BANNER_PALETTE = ["#0E9F6E", "#0D9488", "#7C5CFC", "#E0A53A", "#64748B"];
 
 /** Sum is display-only (a banner footer, not a ledger figure) so it reuses the same plain-
  *  number `txAmountDisplay`/`txNetAmountDisplay` helpers the table's own Amount/Net Amount
@@ -31,7 +31,7 @@ function sumBy(rows: TxRow[], amount: (r: TxRow) => number): number {
   return rows.reduce((s, r) => s + amount(r), 0);
 }
 
-function barPct(value: number, max: number): number {
+export function barPct(value: number, max: number): number {
   if (max <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
 }
@@ -123,19 +123,19 @@ export function computeAllBanner(
         label: labels.buys,
         value: money(investedTotal),
         pct: barPct(investedTotal, max),
-        color: PALETTE[0],
+        color: BANNER_PALETTE[0],
       },
       {
         label: labels.sells,
         value: money(proceedsTotal),
         pct: barPct(proceedsTotal, max),
-        color: PALETTE[1],
+        color: BANNER_PALETTE[1],
       },
       {
         label: labels.income,
         value: money(incomeYtdTotal),
         pct: barPct(incomeYtdTotal, max),
-        color: PALETTE[3],
+        color: BANNER_PALETTE[3],
       },
     ],
   };
@@ -206,19 +206,19 @@ export function computeIncomeBanner(
         label: labels.dividends,
         value: money(dividends),
         pct: barPct(dividends, sourceMax),
-        color: PALETTE[0],
+        color: BANNER_PALETTE[0],
       },
       coupons > 0 && {
         label: labels.couponsInterest,
         value: money(coupons),
         pct: barPct(coupons, sourceMax),
-        color: PALETTE[1],
+        color: BANNER_PALETTE[1],
       },
       other > 0 && {
         label: labels.other,
         value: money(other),
         pct: barPct(other, sourceMax),
-        color: PALETTE[3],
+        color: BANNER_PALETTE[3],
       },
     ] as const
   ).filter((v): v is FlowMixRow => v !== false);
@@ -277,7 +277,7 @@ export function computeTradeBanner(
       label: sym,
       value: money(value),
       pct: barPct(value, max),
-      color: PALETTE[i % PALETTE.length],
+      color: BANNER_PALETTE[i % BANNER_PALETTE.length],
     })),
   };
 }

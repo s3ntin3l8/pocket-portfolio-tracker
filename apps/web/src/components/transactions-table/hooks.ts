@@ -9,6 +9,8 @@ import {
   computeAllBanner,
   computeIncomeBanner,
   computeTradeBanner,
+  barPct,
+  BANNER_PALETTE,
 } from "@/lib/transaction-banners";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
 import type { Anomaly } from "@portfolio/api-client";
@@ -67,35 +69,53 @@ export function useTransactionBanners(
   const allBanner = useMemo(() => {
     if (activeBannerMode !== "all") return null;
     if (summary) {
+      const money = (n: number) => formatMoneyCompact(n, scopeCurrency, locale);
+      const investedTotal = Number(summary.totalInvested ?? 0);
+      const proceedsTotal = Number(summary.totalProceeds ?? 0);
+      const incomeTotal = Number(summary.totalIncome ?? 0);
+      const max = Math.max(investedTotal, proceedsTotal, incomeTotal, 1);
       return {
         currency: scopeCurrency,
         tiles: [
           {
             label: tBanner("invested"),
-            value: summary.totalInvested
-              ? formatMoneyCompact(Number(summary.totalInvested), scopeCurrency, locale)
-              : "—",
+            value: summary.totalInvested ? money(investedTotal) : "—",
             sub: "",
             tone: "neutral" as const,
           },
           {
             label: tBanner("proceeds"),
-            value: summary.totalProceeds
-              ? formatMoneyCompact(Number(summary.totalProceeds), scopeCurrency, locale)
-              : "—",
+            value: summary.totalProceeds ? money(proceedsTotal) : "—",
             sub: "",
             tone: "neutral" as const,
           },
           {
             label: tBanner("incomeYtd"),
-            value: summary.totalIncome
-              ? formatMoneyCompact(Number(summary.totalIncome), scopeCurrency, locale)
-              : "—",
+            value: summary.totalIncome ? money(incomeTotal) : "—",
             sub: "",
             tone: "neutral" as const,
           },
         ],
-        mix: [],
+        mix: [
+          {
+            label: tBanner("buys"),
+            value: money(investedTotal),
+            pct: barPct(investedTotal, max),
+            color: BANNER_PALETTE[0],
+          },
+          {
+            label: tBanner("sells"),
+            value: money(proceedsTotal),
+            pct: barPct(proceedsTotal, max),
+            color: BANNER_PALETTE[1],
+          },
+          {
+            label: tBanner("income"),
+            value: money(incomeTotal),
+            pct: barPct(incomeTotal, max),
+            color: BANNER_PALETTE[3],
+          },
+        ],
       };
     }
     return computeAllBanner(rows, scopeCurrency, locale, {
@@ -129,10 +149,14 @@ export function useTransactionBanners(
       const total = activeBannerMode === "buy" ? summary.totalInvested : summary.totalProceeds;
       if (!total) return null;
       const money = (n: number) => formatMoneyCompact(n, scopeCurrency, locale);
+      const fromRows = computeTradeBanner(rows, activeBannerMode, scopeCurrency, locale);
+      if (fromRows) {
+        return { ...fromRows, total: money(Number(total)) };
+      }
       return {
         currency: scopeCurrency,
         total: money(Number(total)),
-        count: rows.filter((r) => r.type === activeBannerMode).length,
+        count: 0,
         avg: "—",
         bySymbol: [],
       };
