@@ -1,192 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useApiCall } from "@/lib/use-api-call";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle,
-  Eye,
-  EyeOff,
-  HardDrive,
-  Server,
-  XCircle,
-} from "lucide-react";
+import { AlertCircle, Check, CheckCircle, HardDrive, Server, XCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import type {
-  AdminStorageResponse,
-  ApiClient,
-  StorageSettingsUpdate,
-  StorageSecretInput,
-} from "@portfolio/api-client";
+import type { StorageSettingsUpdate } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
+import type { AdminStorageClient, AdminStorageFormProps, Provider } from "./admin-storage/types";
+import { SourceBadge } from "./admin-storage/source-badge";
+import { SecretCell } from "./admin-storage/secret-cell";
+import { Field } from "./admin-storage/field";
 
-/** The slice of the API client this form needs (injectable for tests). */
-export type AdminStorageClient = Pick<
-  ApiClient,
-  | "updateAdminStorageProviders"
-  | "setAdminStorageS3Secret"
-  | "clearAdminStorageS3Secret"
-  | "testAdminStorageProvider"
->;
-
-type Provider = "s3" | "folder";
-
-interface Props {
-  initial: AdminStorageResponse;
-}
-
-function SourceBadge({ source }: { source: "db" | "env" }) {
-  const t = useTranslations("Admin");
-  return (
-    <span
-      className={`ml-1 rounded px-1 py-0.5 text-[10px] font-mono leading-none ${
-        source === "db"
-          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-          : "bg-muted text-muted-foreground"
-      }`}
-      title={source === "db" ? t("storageFromDbHint") : t("storageFromEnvHint")}
-    >
-      {source === "db" ? t("storageFromDb") : t("storageFromEnv")}
-    </span>
-  );
-}
-
-/** Dialog for setting/rotating the S3 secret access key. */
-function SecretCell({
-  encryptionEnabled,
-  hasSecret,
-  secretHint,
-  onSet,
-  onClear,
-}: {
-  encryptionEnabled: boolean;
-  hasSecret: boolean;
-  secretHint: string;
-  onSet: (body: StorageSecretInput) => Promise<void>;
-  onClear: () => Promise<void>;
-}) {
-  const t = useTranslations("Admin");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [apiKey, setApiKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
-
-  const [saveState, save] = useApiCall(
-    useCallback(async () => {
-      if (!apiKey.trim()) return;
-      await onSet({ apiKey: apiKey.trim() });
-      setDialogOpen(false);
-    }, [apiKey, onSet]),
-    { fallbackMessage: t("credentialError") },
-  );
-  const [clearState, clear] = useApiCall(
-    useCallback(async () => {
-      await onClear();
-    }, [onClear]),
-    { fallbackMessage: t("credentialError") },
-  );
-
-  const busy = saveState.busy || clearState.busy;
-  const error = saveState.error || clearState.error;
-
-  function handleDialogChange(open: boolean) {
-    setDialogOpen(open);
-    if (!open) {
-      setApiKey("");
-      setShowKey(false);
-    }
-  }
-
-  async function handleSave() {
-    void save();
-  }
-
-  async function handleClear() {
-    void clear();
-  }
-
-  if (!encryptionEnabled) {
-    return (
-      <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-        <AlertCircle className="size-3" />
-        {t("storageEncryptionRequired")}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground font-mono">
-        {hasSecret ? secretHint : t("storageSecretNone")}
-      </span>
-      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="h-6 text-xs">
-            {hasSecret ? t("credentialRotate") : t("credentialSet")}
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("storageSecretKey")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div className="relative">
-              <Input
-                type={showKey ? "text" : "password"}
-                placeholder={t("credentialPlaceholder")}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="pr-9"
-              />
-              <button
-                type="button"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowKey((v) => !v)}
-              >
-                {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            {error && (
-              <p className="flex items-center gap-1 text-xs text-destructive">
-                <AlertCircle className="size-3" />
-                {error}
-              </p>
-            )}
-            <Button onClick={handleSave} disabled={busy || !apiKey.trim()} className="w-full">
-              {busy ? <Spinner size="sm" /> : <Check className="size-4" />}
-              {t("credentialSave")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {hasSecret && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-xs text-destructive hover:text-destructive"
-          onClick={handleClear}
-          disabled={busy}
-        >
-          {t("credentialClear")}
-        </Button>
-      )}
-    </div>
-  );
-}
-
-export function AdminStorageForm({ initial }: Props) {
+export function AdminStorageForm({ initial }: AdminStorageFormProps) {
   const t = useTranslations("Admin");
   const router = useRouter();
   const api = useApiClient() as AdminStorageClient;
@@ -429,39 +257,6 @@ export function AdminStorageForm({ initial }: Props) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-/** A simple labeled text input with a source badge. */
-function Field({
-  label,
-  value,
-  placeholder,
-  source,
-  type = "text",
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder?: string;
-  source: "db" | "env";
-  type?: "text" | "number";
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1">
-        <label className="text-sm">{label}</label>
-        <SourceBadge source={source} />
-      </div>
-      <Input
-        type={type}
-        value={value ?? ""}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="font-mono text-sm"
-      />
     </div>
   );
 }

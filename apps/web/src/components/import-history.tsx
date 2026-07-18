@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Eye, EyeOff, ListChecks, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, ListChecks, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { ImportRecord } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { useImportActions } from "./import-history/actions";
 import { useImportSelection } from "./import-history/selection";
 import { useBatchGroups } from "./import-history/batch";
 import { RowActions, DesktopRow, MobileRow } from "./import-history/rows";
+import { SelectionBar } from "./import-history/selection-bar";
 
 /**
  * The user's import history with per-row actions: discard a draft, or undo a
@@ -158,52 +159,19 @@ export function ImportHistory({
           {actionError}
         </div>
       )}
-      {selectionMode && (
-        <div className="mx-6 mb-3 flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
-          <span className="text-muted-foreground">
-            {selected.size > 0 ? t("selectedCount", { count: selected.size }) : t("selectPrompt")}
-          </span>
-          {confirmingBulk ? (
-            <span className="flex items-center gap-2">
-              <span className="text-muted-foreground">
-                {t("bulkConfirmPrompt", { count: selectedConfirmedTx })}
-              </span>
-              <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete}>
-                {bulkBusy && <Spinner size="xs" />}
-                {t("deleteSelected")}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={bulkBusy}
-                onClick={() => setConfirmingBulk(false)}
-              >
-                {t("cancel")}
-              </Button>
-            </span>
-          ) : (
-            <span className="flex items-center gap-1">
-              {selected.size > 0 && (
-                <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={bulkDelete}>
-                  {bulkBusy ? <Spinner size="xs" /> : <Trash2 className="size-3.5" />}
-                  {t("deleteSelected")}
-                </Button>
-              )}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-8"
-                title={t("cancelSelection")}
-                aria-label={t("cancelSelection")}
-                disabled={bulkBusy}
-                onClick={exitSelection}
-              >
-                <X className="size-4" />
-              </Button>
-            </span>
-          )}
-        </div>
-      )}
+      <SelectionBar
+        selectionMode={selectionMode}
+        selected={selected}
+        confirmingBulk={confirmingBulk}
+        bulkBusy={bulkBusy}
+        selectedConfirmedTx={selectedConfirmedTx}
+        allSelected={allSelected}
+        onToggleAllVisible={toggleAllVisible}
+        onSetSelectionMode={setSelectionMode}
+        onBulkDelete={bulkDelete}
+        onSetConfirmingBulk={setConfirmingBulk}
+        onExitSelection={exitSelection}
+      />
       <CardContent className="p-0">
         <div className="hidden md:block">
           <Table>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, forwardRef } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import {
@@ -13,8 +13,6 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { LucideIcon } from "lucide-react";
-import type { ApiClient } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImportFlowClient } from "@/components/import-flow-client";
@@ -25,6 +23,8 @@ import { useApiClient } from "@/lib/api";
 import type { ImportTargetPortfolio } from "@/components/import-flow/types";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HolderFormDialog } from "@/components/holder-form-dialog";
+import { MethodCard } from "@/components/add-transaction-menu/method-card";
+import { loadHarvestPrefill } from "@/components/add-transaction-menu/helpers";
 
 /**
  * The unified add-entry launcher, transcribed from `Pocket Prototype.dc.html`'s
@@ -333,100 +333,3 @@ export function AddTransactionMenu({
     </>
   );
 }
-
-/**
- * Client-side counterpart of the retired `/transactions/new` page's server-side
- * `loadHarvestPrefill` (`lib/server-api.ts`) — a Sell draft for a tax-loss-harvest
- * suggestion (`/tax`'s harvest rows → `?harvestInstrument=<id>`). Pure lookup, no new
- * backend: instrument metadata from the catalog, quantity seeded from the target
- * portfolio's standing open FIFO lots (`PortfolioSummary.holdings[].lots`, PR #386) when
- * the instrument is held there, else left blank for manual entry. `null` on any lookup
- * failure (instrument deleted, API unreachable, ...) — the caller falls back to no
- * prefill rather than blocking the sheet from opening.
- */
-async function loadHarvestPrefill(
-  api: ApiClient,
-  instrumentId: string,
-  portfolioId: string,
-): Promise<AddTransactionInitial | null> {
-  try {
-    const [instrument, summary] = await Promise.all([
-      api.getInstrument(instrumentId),
-      portfolioId ? api.getSummary(portfolioId) : Promise.resolve(null),
-    ]);
-    const lots = summary?.holdings.find((h) => h.instrumentId === instrumentId)?.lots ?? [];
-    const quantity =
-      lots.length > 0 ? lots.reduce((sum, l) => sum + Number(l.qty), 0).toString() : "";
-    return {
-      type: "sell",
-      instrumentId,
-      instrument: {
-        symbol: instrument.symbol,
-        name: instrument.name,
-        assetClass: instrument.assetClass,
-        unit: instrument.unit,
-      },
-      quantity,
-      price: "",
-      fees: "",
-      currency: instrument.currency,
-      executedAt: new Date().toISOString().slice(0, 10),
-    };
-  } catch {
-    return null;
-  }
-}
-
-// Reference `methodCards` tones: screenshot green, CSV violet, manual gold,
-// portfolio blue, account-holder orange.
-const TONES = {
-  green: { bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  violet: { bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  gold: { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" },
-  blue: { bg: "rgba(59,130,246,.16)", fg: "#3B82F6" },
-  orange: { bg: "rgba(249,115,22,.16)", fg: "#F97316" },
-} as const;
-
-/** One step-1 method card — icon chip 46px r14, title 700 15px, desc 500 12px,
- *  optional 700 9px "Recommended" tag; card r18 p16 bg-card + border.
- *  `onClick` is optional — when omitted, the card is intended as the trigger of
- *  a nested dialog (e.g. PortfolioFormDialog) which supplies its own click handler
- *  via asChild. */
-const MethodCard = forwardRef<
-  HTMLButtonElement,
-  {
-    icon: LucideIcon;
-    title: string;
-    description: string;
-    tone: keyof typeof TONES;
-    tag?: string;
-    onClick?: () => void;
-  }
->(function MethodCard({ icon: Icon, title, description, tone, tag, onClick }, ref) {
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3.5 rounded-[18px] border border-border bg-card p-4 text-left shadow-[0_1px_2px_rgba(15,27,20,.04)] transition-transform active:scale-[.97]"
-    >
-      <span
-        className="flex size-[46px] shrink-0 items-center justify-center rounded-[14px]"
-        style={{ background: TONES[tone].bg, color: TONES[tone].fg }}
-      >
-        <Icon className="size-[23px]" strokeWidth={1.9} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold">{title}</span>
-        <span className="mt-[3px] block text-xs font-medium leading-[1.4] text-text-2">
-          {description}
-        </span>
-      </span>
-      {tag && (
-        <span className="shrink-0 rounded-[7px] bg-[rgba(16,163,114,.14)] px-2 py-1 text-[9px] font-bold text-[#0E9F6E]">
-          {tag}
-        </span>
-      )}
-    </button>
-  );
-});
