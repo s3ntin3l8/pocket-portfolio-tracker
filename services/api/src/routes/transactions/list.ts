@@ -105,6 +105,9 @@ export function registerListRoutes(app: FastifyInstance) {
               .orderBy(desc(transactions.executedAt))
               .limit(pageSize)
               .offset((page - 1) * pageSize),
+            // The summary always folds to the portfolio's own baseCurrency, independent of
+            // `convertTo` (which only tags rows with a client-side display rate, #465) —
+            // no current caller requests the summary in a different currency.
             computeConvertedSummary(app, conditions, request.portfolio.baseCurrency, request.log),
           ]);
 
