@@ -25,9 +25,17 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({
   children,
+  modal,
   params,
 }: {
   children: React.ReactNode;
+  /** The `@modal` parallel-route slot (`(app)/@modal/`) — renders the intercepted
+   *  centered-Dialog/full-screen-takeover version of `/settings/*` and `/admin/*` when
+   *  reached via in-app client navigation (`<Link>`); empty (`@modal/default.tsx`)
+   *  otherwise. A direct URL load / hard refresh always renders the real full-page route
+   *  in `children` instead — Next's route interception only applies to soft navigation.
+   *  See issue #588. */
+  modal: React.ReactNode;
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
@@ -120,6 +128,7 @@ export default async function AppLayout({
         >
           {children}
         </AppShell>
+        {modal}
       </ImportTasksProvider>
     </>
   );
