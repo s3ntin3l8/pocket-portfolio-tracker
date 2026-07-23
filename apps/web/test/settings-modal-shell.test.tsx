@@ -55,4 +55,36 @@ describe("SettingsModalShell", () => {
     fireEvent.keyDown(window, { key: "Enter" });
     expect(back).not.toHaveBeenCalled();
   });
+
+  it("closes when the scrim (outside the panel) is clicked", () => {
+    render(
+      <SettingsModalShell title="Settings">
+        <p>section content</p>
+      </SettingsModalShell>,
+    );
+    fireEvent.click(screen.getByRole("dialog", { name: "Settings" }).parentElement!);
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not close when clicking inside the panel", () => {
+    render(
+      <SettingsModalShell title="Settings">
+        <p>section content</p>
+      </SettingsModalShell>,
+    );
+    fireEvent.click(screen.getByText("section content"));
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it("locks and restores background scroll while mounted", () => {
+    document.body.style.overflow = "auto";
+    const { unmount } = render(
+      <SettingsModalShell title="Settings">
+        <p>section content</p>
+      </SettingsModalShell>,
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+    unmount();
+    expect(document.body.style.overflow).toBe("auto");
+  });
 });
