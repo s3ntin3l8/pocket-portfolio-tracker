@@ -713,6 +713,39 @@ describe("AddTransactionForm", () => {
     expect(screen.getByLabelText(m.notes)).toHaveValue("import note");
     expect(screen.getByLabelText(m.tags)).toHaveValue("tax-loss, idx");
   });
+
+  it("preserves a legacy buy's existing nonzero tax on an unrelated edit, even though the field is hidden (review regression)", async () => {
+    // A buy never shows a tax field (only sell/income withhold tax — v2 design), but a
+    // transaction from before this change (or written directly via the API/an import) can
+    // still carry one. Editing it — e.g. just fixing the quantity — must not silently wipe
+    // that stored tax value out from under the user just because the field isn't rendered.
+    const client = makeClient();
+    const onSuccess = vi.fn();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AddTransactionForm
+          client={client}
+          portfolioId="p1"
+          transactionId="t-legacy-tax"
+          initial={{ ...EDIT_INITIAL, type: "buy", tax: "50" }}
+          onSuccess={onSuccess}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    // The tax field is genuinely absent for a buy — this isn't a hidden-but-present input.
+    expect(screen.queryByLabelText(m.tax)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "150" } });
+    fireEvent.click(screen.getByRole("button", { name: m.save }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(client.updateTransaction).toHaveBeenCalledWith(
+      "p1",
+      "t-legacy-tax",
+      expect.objectContaining({ quantity: "150", tax: "50" }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -165,7 +165,7 @@ export function useTransactionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isAcquisition = isTradeType(type);
+  const isTrade = isTradeType(type);
   const isShareReceipt = isShareReceiptType(type);
   const isTransfer = isTransferType(type);
   const isIncome = (INCOME_TYPES as readonly string[]).includes(type);
@@ -175,8 +175,8 @@ export function useTransactionForm({
     type === "loan_repayment";
 
   const hasInstrument = !isCash;
-  const showQuantity = isAcquisition || isShareReceipt || isTransfer;
-  const showFees = isAcquisition;
+  const showQuantity = isTrade || isShareReceipt || isTransfer;
+  const showFees = isTrade;
   // Only a sale or an income event ever withholds tax — a buy never does (v2 design).
   const showTax = type === "sell" || isIncome;
   const isGold = hasInstrument && (selected ? selected.assetClass : assetClass) === "gold";
@@ -184,7 +184,7 @@ export function useTransactionForm({
   // Income tax sits inline in the Amount group; an acquisition's fees/tax sit behind the
   // "Add fees / tax" collapsible (only relevant — i.e. rendered at all — for a trade).
   const showInlineTax = isIncome;
-  const relevantExtras = isAcquisition;
+  const relevantExtras = isTrade;
   const showExtrasFields = relevantExtras && extrasOpen;
   const showExtrasBtn = relevantExtras && !extrasOpen;
   const extrasLabelKey = showTax ? "extrasFeesTax" : "extrasFees";
@@ -324,7 +324,14 @@ export function useTransactionForm({
         quantity: showQuantity ? quantity || "0" : "0",
         price: price || "0",
         fees: showFees ? fees || "0" : "0",
-        tax: showTax && tax ? tax : null,
+        // NOT gated on `showTax`: hiding the tax field for a buy only removes the UI
+        // affordance to *set* it — `tax` state is still whatever was loaded from `initial`
+        // (untouched, since there's no control to change it while hidden). Gating this on
+        // `showTax` would silently null out a legacy buy's already-stored tax value on any
+        // unrelated edit (e.g. just changing the quantity) — a real data-loss bug flagged in
+        // review. A brand-new transaction's `tax` state starts at `""` regardless, so this
+        // still correctly submits `null` for it.
+        tax: tax || null,
         fxRate: fxRate || null,
         perShare: isIncome && perShare ? perShare : null,
         shares: isIncome && shares ? shares : null,
@@ -413,7 +420,7 @@ export function useTransactionForm({
     setGoldMarket,
     busy,
     error,
-    isAcquisition,
+    isTrade,
     isShareReceipt,
     isTransfer,
     isIncome,

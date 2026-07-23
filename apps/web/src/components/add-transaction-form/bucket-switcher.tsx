@@ -25,7 +25,11 @@ export function BucketSwitcher({
       {activeIndex >= 0 && (
         <div
           aria-hidden
-          className="absolute top-1 z-0 h-[calc(100%-8px)] rounded-[10px] bg-card shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-[left] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          // `left` AND `width` are both in the transition list, not just `left` — `BUCKETS`
+          // is a fixed 4-entry tuple today so `width` never actually changes, but keeping
+          // both animatable means this doesn't quietly break if the bucket list ever became
+          // dynamic (per review).
+          className="absolute top-1 z-0 h-[calc(100%-8px)] rounded-[10px] bg-card shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-[left,width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
           style={{
             width: `calc((100% - 8px) / ${BUCKETS.length})`,
             left: `calc(4px + ${activeIndex} * ((100% - 8px) / ${BUCKETS.length}))`,
