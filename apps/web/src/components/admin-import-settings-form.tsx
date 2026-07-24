@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient, ImportStrategy } from "@portfolio/api-client";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +17,11 @@ const STRATEGIES: ImportStrategy[] = ["parser_first", "vision_only"];
  * Picks the first-choice extraction strategy for the unstructured import path
  * (screenshots + PDFs). "parser_first" runs the deterministic broker parser before the
  * vision-LLM; "vision_only" always uses the vision-LLM. CSV imports are unaffected.
+ *
+ * Design (`Admin Settings.dc.html`): one `rounded-[20px]` card holding both options as
+ * radio rows — selecting a row saves immediately (no separate Save button). Optimistic:
+ * the selection flips right away and rolls back on a failed save, rather than waiting on
+ * the request before reflecting the choice.
  */
 export function AdminImportSettingsForm({
   client,
@@ -30,27 +34,21 @@ export function AdminImportSettingsForm({
 }) {
   const t = useTranslations("Admin");
   const [strategy, setStrategy] = useState<ImportStrategy>(initialStrategy);
-  // Baseline the form diffs against; advances on a successful save.
-  const [baseStrategy, setBaseStrategy] = useState<ImportStrategy>(initialStrategy);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  const dirty = strategy !== baseStrategy;
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!dirty || busy) return;
+  async function select(next: ImportStrategy) {
+    if (next === strategy || busy) return;
+    const previous = strategy;
+    setStrategy(next);
     setBusy(true);
     setError(false);
-    setSaved(false);
     try {
-      const { strategy: next } = await client.updateAdminImportSettings({ strategy });
-      setStrategy(next);
-      setBaseStrategy(next);
-      setSaved(true);
+      const { strategy: saved } = await client.updateAdminImportSettings({ strategy: next });
+      setStrategy(saved);
       onSuccess?.();
     } catch {
+      setStrategy(previous);
       setError(true);
     } finally {
       setBusy(false);
@@ -58,7 +56,7 @@ export function AdminImportSettingsForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <div className="space-y-2">
       {error && (
         <div
           role="alert"
@@ -69,61 +67,50 @@ export function AdminImportSettingsForm({
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label id="import-strategy-label">{t("importStrategyLabel")}</Label>
-        <div role="radiogroup" aria-labelledby="import-strategy-label" className="space-y-2">
-          {STRATEGIES.map((s) => {
-            const active = strategy === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => {
-                  setStrategy(s);
-                  setSaved(false);
-                }}
+      <Label id="import-strategy-label" className="block px-0.5">
+        {t("importStrategyLabel")}
+      </Label>
+      <div
+        role="radiogroup"
+        aria-labelledby="import-strategy-label"
+        className="overflow-hidden rounded-[20px] bg-card shadow-card"
+      >
+        {STRATEGIES.map((s, i) => {
+          const active = strategy === s;
+          return (
+            <button
+              key={s}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={busy}
+              onClick={() => select(s)}
+              className={cn(
+                "flex w-full items-start gap-[13px] px-[15px] py-4 text-left transition-colors disabled:cursor-default",
+                i > 0 && "border-t border-line",
+                !busy && "hover:bg-background/40",
+              )}
+            >
+              <span
+                aria-hidden
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-[14px] border p-3.5 text-left transition-colors",
-                  active
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card hover:bg-background/60",
+                  "mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                  active ? "border-primary" : "border-border",
                 )}
               >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                    active ? "border-primary" : "border-border",
-                  )}
-                >
-                  {active && <span className="size-2 rounded-full bg-primary" />}
+                {active && <span className="size-[11px] rounded-full bg-primary" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold">{t(`importStrategyOption_${s}`)}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t(`importStrategyHint_${s}`)}
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold">{t(`importStrategyOption_${s}`)}</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {t(`importStrategyHint_${s}`)}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+              </span>
+              {busy && active && <Spinner size="sm" className="mt-0.5 shrink-0" />}
+            </button>
+          );
+        })}
       </div>
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={busy || !dirty}>
-          {busy && <Spinner size="sm" />}
-          {busy ? t("importStrategySaving") : t("importStrategySave")}
-        </Button>
-        {saved && !dirty && (
-          <span className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Check className="size-4" />
-            {t("importStrategySaved")}
-          </span>
-        )}
-      </div>
-    </form>
+    </div>
   );
 }

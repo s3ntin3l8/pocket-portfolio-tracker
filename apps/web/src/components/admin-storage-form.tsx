@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, CheckCircle, HardDrive, Server, XCircle } from "lucide-react";
+import { AlertCircle, Check, CheckCircle, XCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { StorageSettingsUpdate } from "@portfolio/api-client";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { AdminStorageClient, AdminStorageFormProps, Provider } from "./admin-storage/types";
 import { SourceBadge } from "./admin-storage/source-badge";
 import { SecretCell } from "./admin-storage/secret-cell";
 import { Field } from "./admin-storage/field";
+
+const PROVIDER_OPTIONS: { value: Provider; labelKey: "storageFolder" | "storageS3" }[] = [
+  { value: "folder", labelKey: "storageFolder" },
+  { value: "s3", labelKey: "storageS3" },
+];
 
 export function AdminStorageForm({ initial }: AdminStorageFormProps) {
   const t = useTranslations("Admin");
@@ -74,54 +79,64 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Provider selection */}
-      <div>
-        <div className="text-sm font-medium mb-2">{t("storageProvider")}</div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setActiveProvider("s3")}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm transition-colors ${
-              activeProvider === "s3"
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-border bg-card hover:bg-muted/50"
-            }`}
-          >
-            <Server className="size-4" />
-            {t("storageS3")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveProvider("folder")}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm transition-colors ${
-              activeProvider === "folder"
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-border bg-card hover:bg-muted/50"
-            }`}
-          >
-            <HardDrive className="size-4" />
-            {t("storageFolder")}
-          </button>
-        </div>
+    <div className="rounded-[20px] bg-card p-4 shadow-card">
+      <div className="mb-3.5 space-y-1.5">
+        <label
+          htmlFor="storage-provider"
+          className="block px-0.5 text-xs font-semibold text-text-2"
+        >
+          {t("storageProvider")}
+        </label>
+        <select
+          id="storage-provider"
+          value={activeProvider}
+          onChange={(e) => setActiveProvider(e.target.value as Provider)}
+          className="w-full appearance-none rounded-[12px] border border-border bg-background px-3.5 py-3 text-sm font-semibold outline-none"
+        >
+          {PROVIDER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {t(o.labelKey)}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* S3 config fields */}
+      {activeProvider === "folder" && (
+        <div className="space-y-1.5">
+          <Field
+            label={t("storageFolderPath")}
+            value={folder.path}
+            placeholder={t("storageFolderPathPlaceholder")}
+            source={folder.pathSource}
+            monospace
+            onChange={(v) => setFolder((p) => ({ ...p, path: v, pathSource: "db" }))}
+          />
+          {!initial.encryptionEnabled && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertCircle className="size-3 shrink-0" />
+              {t("storageEncryptionRequired")}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeProvider === "s3" && (
-        <div className="space-y-3 rounded-lg border border-border p-4">
-          <Field
-            label={t("storageEndpoint")}
-            value={s3.endpoint}
-            placeholder={t("storageEndpointPlaceholder")}
-            source={s3.endpointSource}
-            onChange={(v) => setS3((p) => ({ ...p, endpoint: v, endpointSource: "db" }))}
-          />
-          <Field
-            label={t("storageRegion")}
-            value={s3.region}
-            source={s3.regionSource}
-            onChange={(v) => setS3((p) => ({ ...p, region: v, regionSource: "db" }))}
-          />
+        <div className="space-y-3.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_130px]">
+            <Field
+              label={t("storageEndpoint")}
+              value={s3.endpoint}
+              placeholder={t("storageEndpointPlaceholder")}
+              source={s3.endpointSource}
+              onChange={(v) => setS3((p) => ({ ...p, endpoint: v, endpointSource: "db" }))}
+            />
+            <Field
+              label={t("storageRegion")}
+              value={s3.region}
+              source={s3.regionSource}
+              onChange={(v) => setS3((p) => ({ ...p, region: v, regionSource: "db" }))}
+            />
+          </div>
           <Field
             label={t("storageBucket")}
             value={s3.bucket}
@@ -132,11 +147,30 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
             label={t("storageAccessKeyId")}
             value={s3.accessKeyId}
             source={s3.accessKeyIdSource}
+            monospace
             onChange={(v) => setS3((p) => ({ ...p, accessKeyId: v, accessKeyIdSource: "db" }))}
           />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <span className="text-sm">{t("storageForcePathStyle")}</span>
+          <SecretCell
+            encryptionEnabled={initial.encryptionEnabled}
+            hasSecret={s3.hasSecret}
+            secretHint={s3.secretHint}
+            secretSource={s3.secretSource}
+            onSet={async (body) => {
+              const updated = await api.setAdminStorageS3Secret(body);
+              setS3(updated.s3);
+              router.refresh();
+            }}
+            onClear={async () => {
+              const updated = await api.clearAdminStorageS3Secret();
+              setS3(updated.s3);
+              router.refresh();
+            }}
+          />
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-text-2">
+                {t("storageForcePathStyle")}
+              </span>
               <SourceBadge source={s3.forcePathStyleSource} />
             </div>
             <Switch
@@ -159,103 +193,60 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
               }))
             }
           />
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <span className="text-sm">{t("storageSecretKey")}</span>
-              <SourceBadge source={s3.secretSource} />
-            </div>
-            <SecretCell
-              encryptionEnabled={initial.encryptionEnabled}
-              hasSecret={s3.hasSecret}
-              secretHint={s3.secretHint}
-              onSet={async (body) => {
-                const updated = await api.setAdminStorageS3Secret(body);
-                setS3(updated.s3);
-                router.refresh();
-              }}
-              onClear={async () => {
-                const updated = await api.clearAdminStorageS3Secret();
-                setS3(updated.s3);
-                router.refresh();
-              }}
-            />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={testState === "testing"}
+              className="flex items-center gap-1.5 rounded-[12px] border border-border bg-background px-4 py-2.5 text-[13px] font-bold disabled:cursor-default disabled:opacity-60"
+            >
+              {testState === "testing" && <Spinner size="sm" />}
+              {testState === "testing" ? t("storageTesting") : t("storageTestConnection")}
+            </button>
+            {testState === "ok" && (
+              <span className="flex items-center gap-1 text-xs font-bold text-primary">
+                <CheckCircle className="size-[15px]" />
+                {t("storageTestOk")}
+              </span>
+            )}
+            {testState === "failed" && (
+              <span className="flex items-center gap-1 text-xs font-bold text-destructive">
+                <XCircle className="size-[15px]" />
+                {t("storageTestFailed")}
+                {testError && <span className="font-mono font-normal">{testError}</span>}
+              </span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Folder config fields */}
-      {activeProvider === "folder" && (
-        <div className="space-y-3 rounded-lg border border-border p-4">
-          <Field
-            label={t("storageFolderPath")}
-            value={folder.path}
-            placeholder={t("storageFolderPathPlaceholder")}
-            source={folder.pathSource}
-            onChange={(v) => setFolder((p) => ({ ...p, path: v, pathSource: "db" }))}
-          />
-          {!initial.encryptionEnabled && (
-            <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-              <AlertCircle className="size-3" />
-              {t("storageEncryptionRequired")}
-            </div>
-          )}
-        </div>
-      )}
+      <div className="my-4 h-px bg-line" />
 
-      {/* Actions */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button onClick={handleSave} disabled={busy}>
-          {busy ? (
-            <>
-              <Spinner size="sm" className="mr-1" />
-              {t("saving")}
-            </>
-          ) : (
-            t("storageSave")
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={busy}
+          className={cn(
+            "flex items-center gap-1.5 rounded-[12px] bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground",
+            busy && "cursor-default opacity-70",
           )}
-        </Button>
+        >
+          {busy && <Spinner size="sm" />}
+          {busy ? t("saving") : t("storageSave")}
+        </button>
         {saved && !saveError && (
-          <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
+          <span className="flex items-center gap-1 text-sm text-primary">
             <Check className="size-4" />
             {t("saved")}
           </span>
         )}
         {saveError && (
-          <span className="flex items-center gap-1 text-sm text-destructive">
+          <span role="alert" className="flex items-center gap-1 text-sm text-destructive">
             <AlertCircle className="size-4" />
             {saveError}
           </span>
         )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleTestConnection}
-            disabled={testState === "testing"}
-          >
-            {testState === "testing" ? (
-              <>
-                <Spinner size="sm" className="mr-1" />
-                {t("storageTesting")}
-              </>
-            ) : (
-              t("storageTestConnection")
-            )}
-          </Button>
-          {testState === "ok" && (
-            <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-              <CheckCircle className="size-4" />
-              {t("storageTestOk")}
-            </span>
-          )}
-          {testState === "failed" && (
-            <span className="flex items-center gap-1 text-sm text-destructive">
-              <XCircle className="size-4" />
-              {t("storageTestFailed")}
-              {testError && <span className="text-xs ml-1 font-mono">{testError}</span>}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   );
