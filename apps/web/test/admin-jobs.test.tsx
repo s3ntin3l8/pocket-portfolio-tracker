@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act, within } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { AdminJobs } from "../src/components/admin-jobs";
 import messages from "../messages/en.json";
@@ -54,13 +54,24 @@ describe("AdminJobs", () => {
     vi.useRealTimers();
   });
 
-  it("renders job rows with label, schedule and last-run", () => {
+  it("renders job rows with label, schedule and last-run — a card list, not a table", () => {
     const job = makeJob({ label: "Price refresh", cron: "*/5 * * * *", lastRunAt: null });
     renderJobs([job]);
-    const table = within(screen.getByRole("table"));
-    expect(table.getByText("Price refresh")).toBeInTheDocument();
-    expect(table.getByText("*/5 * * * *")).toBeInTheDocument();
-    expect(table.getByRole("button", { name: messages.Admin.jobRunNow })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Price refresh")).toBeInTheDocument();
+    expect(screen.getByText("*/5 * * * *")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: messages.Admin.jobRunNow })).toBeInTheDocument();
+  });
+
+  it("capitalizes the last-status badge (design: Completed/Failed, not raw lowercase)", () => {
+    renderJobs([
+      makeJob({ name: "a", label: "Completed job", lastStatus: "completed" }),
+      makeJob({ name: "b", label: "Failed job", lastStatus: "failed" }),
+    ]);
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText("Failed")).toBeInTheDocument();
+    expect(screen.queryByText("completed")).toBeNull();
+    expect(screen.queryByText("failed")).toBeNull();
   });
 
   it("shows scheduler unavailable message when schedulerAvailable is false", () => {
@@ -81,14 +92,12 @@ describe("AdminJobs", () => {
     });
     renderJobs([job]);
 
-    const table = within(screen.getByRole("table"));
-
     // Wrap in act() so the async trigger + setPending state updates flush.
     await act(async () => {
-      fireEvent.click(table.getByRole("button", { name: messages.Admin.jobRunNow }));
+      fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobRunNow }));
     });
 
-    expect(table.getByText(messages.Admin.jobQueued)).toBeInTheDocument();
+    expect(screen.getByText(messages.Admin.jobQueued)).toBeInTheDocument();
   });
 
   it("clears 'Queued' and shows fresh lastRunAt when poll detects a change", async () => {
@@ -104,14 +113,12 @@ describe("AdminJobs", () => {
     });
     renderJobs([job]);
 
-    const table = within(screen.getByRole("table"));
-
     // Trigger; act() flushes the resolved promise + onTriggered → setPending.
     await act(async () => {
-      fireEvent.click(table.getByRole("button", { name: messages.Admin.jobRunNow }));
+      fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobRunNow }));
     });
 
-    expect(table.getByText(messages.Admin.jobQueued)).toBeInTheDocument();
+    expect(screen.getByText(messages.Admin.jobQueued)).toBeInTheDocument();
 
     // advanceTimersByTimeAsync fires the interval callback AND awaits its async body.
     await act(async () => {
@@ -119,7 +126,7 @@ describe("AdminJobs", () => {
     });
 
     // "Queued ✓" should be gone; poll saw the changed lastRunAt.
-    expect(table.queryByText(messages.Admin.jobQueued)).toBeNull();
+    expect(screen.queryByText(messages.Admin.jobQueued)).toBeNull();
   });
 
   it("shows jobPollTimedOut after MAX_POLLS with no lastRunAt change", async () => {
@@ -133,10 +140,8 @@ describe("AdminJobs", () => {
     });
     renderJobs([job]);
 
-    const table = within(screen.getByRole("table"));
-
     await act(async () => {
-      fireEvent.click(table.getByRole("button", { name: messages.Admin.jobRunNow }));
+      fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobRunNow }));
     });
 
     // Advance through MAX_POLLS (10) polls.  Each advanceTimersByTimeAsync fires
@@ -147,7 +152,7 @@ describe("AdminJobs", () => {
       }
     });
 
-    expect(table.getByText(messages.Admin.jobPollTimedOut)).toBeInTheDocument();
+    expect(screen.getByText(messages.Admin.jobPollTimedOut)).toBeInTheDocument();
   });
 
   it("shows error when trigger fails", async () => {
@@ -155,14 +160,11 @@ describe("AdminJobs", () => {
     const job = makeJob();
     renderJobs([job]);
 
-    const table = within(screen.getByRole("table"));
-
     await act(async () => {
-      fireEvent.click(table.getByRole("button", { name: messages.Admin.jobRunNow }));
+      fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobRunNow }));
     });
 
-    // Error appears only in the clicked button's branch — use getAllByText across both.
-    expect(screen.getAllByText(messages.Admin.jobTriggerFailed).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(messages.Admin.jobTriggerFailed)).toBeInTheDocument();
     // Should NOT show Queued on failure.
     expect(screen.queryByText(messages.Admin.jobQueued)).toBeNull();
   });
@@ -176,9 +178,7 @@ describe("AdminJobs", () => {
     });
     renderJobs([normalJob, forceJob]);
 
-    const table = within(screen.getByRole("table"));
-    const forceButtons = table.getAllByRole("button", { name: messages.Admin.jobForce });
-    // Desktop table has one Force button — for the force-capable job.
+    const forceButtons = screen.getAllByRole("button", { name: messages.Admin.jobForce });
     expect(forceButtons).toHaveLength(1);
   });
 
@@ -196,10 +196,8 @@ describe("AdminJobs", () => {
     });
     renderJobs([job]);
 
-    const table = within(screen.getByRole("table"));
-
     await act(async () => {
-      fireEvent.click(table.getByRole("button", { name: messages.Admin.jobForce }));
+      fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobForce }));
     });
 
     expect(mockTriggerAdminJob).toHaveBeenCalledWith("refresh-instrument-metadata", {

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useApiClient } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
 import type { AdminJob } from "@portfolio/api-client";
 
 function formatRelative(iso: string | null): string {
@@ -19,12 +19,20 @@ function formatRelative(iso: string | null): string {
   return `${days}d ago`;
 }
 
+/** Design: capitalized "Completed"/"Failed" pills, distinct from the generic shadcn
+ *  `Badge` (which showed the raw lowercase status in the old table layout). */
 function StatusBadge({ status }: { status: AdminJob["lastStatus"] }) {
-  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  if (!status) return <span className="text-xs text-text-3">—</span>;
+  const failed = status === "failed";
   return (
-    <Badge variant={status === "completed" ? "default" : "destructive"} className="text-xs">
-      {status}
-    </Badge>
+    <span
+      className={cn(
+        "shrink-0 rounded-[8px] px-2.5 py-1 text-[10px] font-bold tracking-wide",
+        failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+      )}
+    >
+      {failed ? "Failed" : "Completed"}
+    </span>
   );
 }
 
@@ -58,31 +66,29 @@ function TriggerButton({ name, supportsForce, onTriggered, currentLastRunAt }: T
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-1">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            void trigger(false);
-          }}
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void trigger(false)}
           disabled={pending || forcePending}
+          className="flex items-center gap-1 rounded-[10px] bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
         >
+          {pending && <Spinner size="sm" />}
           {pending ? t("jobRunning") : t("jobRunNow")}
-        </Button>
+        </button>
         {supportsForce && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              void trigger(true);
-            }}
+          <button
+            type="button"
+            onClick={() => void trigger(true)}
             disabled={pending || forcePending}
             aria-label={t("jobForce")}
             title={t("jobForce")}
+            className="flex items-center gap-1 rounded-[10px] border border-border bg-card px-3.5 py-1.5 text-xs font-bold disabled:opacity-60"
           >
+            {forcePending && <Spinner size="sm" />}
             {forcePending ? t("jobRunning") : t("jobForce")}
-          </Button>
+          </button>
         )}
       </div>
       {error && <span className="text-xs text-destructive">{error}</span>}
@@ -103,6 +109,12 @@ interface AdminJobsProps {
   schedulerAvailable: boolean;
 }
 
+/**
+ * Design (`Admin Settings.dc.html`, JOBS section): one `rounded-[20px]` card-row list —
+ * replacing the old desktop `<table>` / mobile-card split — with capitalized status
+ * pills and a green "Run now" / white-bordered "Force re-run". The poll-for-completion
+ * state machine (queued/timed-out) is unchanged from the old layout, just restyled.
+ */
 export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
   const t = useTranslations("Admin");
   const api = useApiClient();
@@ -154,126 +166,62 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
   }, [hasPending, api]);
 
   if (!schedulerAvailable) {
-    return <p className="text-sm text-muted-foreground italic">{t("schedulerUnavailable")}</p>;
+    return <p className="text-sm italic text-muted-foreground">{t("schedulerUnavailable")}</p>;
   }
 
   return (
-    <>
-      <div className="hidden overflow-x-auto rounded-md border border-border md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                {t("jobName")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">
-                {t("jobSchedule")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                {t("jobLastRun")}
-              </th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">
-                {t("jobStatus")}
-              </th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground">
-                {t("jobAction")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => {
-              const entry = pending[job.name];
-              const isPending = Boolean(entry) && !entry?.timedOut;
-              const timedOut = Boolean(entry?.timedOut);
-              return (
-                <tr key={job.name} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2">
-                    <div className="font-medium">{job.label}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
-                      {job.description}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
-                    <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                      {job.cron ?? "on-demand"}
-                    </code>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground" aria-live="polite">
-                    {isPending ? (
-                      <span className="text-xs text-green-600">{t("jobQueued")}</span>
-                    ) : timedOut ? (
-                      <span className="text-xs text-amber-600">{t("jobPollTimedOut")}</span>
-                    ) : (
-                      <span className="text-xs">{formatRelative(job.lastRunAt)}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
-                    <StatusBadge status={job.lastStatus} />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <TriggerButton
-                      name={job.name}
-                      supportsForce={job.supportsForce}
-                      currentLastRunAt={job.lastRunAt}
-                      onTriggered={(priorLastRunAt) => {
-                        pollCounts.current[job.name] = 0;
-                        setPending((prev) => ({
-                          ...prev,
-                          [job.name]: { priorLastRunAt },
-                        }));
-                      }}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="space-y-3 md:hidden">
-        {jobs.map((job) => {
-          const entry = pending[job.name];
-          const isPending = Boolean(entry) && !entry?.timedOut;
-          const timedOut = Boolean(entry?.timedOut);
-          return (
-            <div key={job.name} className="rounded-[14px] border border-border bg-card p-3.5">
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-bold">{job.label}</span>
-                <StatusBadge status={job.lastStatus} />
-              </div>
-              {job.description && (
-                <div className="mt-0.5 text-xs text-muted-foreground">{job.description}</div>
-              )}
-              <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                <code className="rounded bg-muted px-1 py-0.5">{job.cron ?? "on-demand"}</code>
-                <span>·</span>
-                {isPending ? (
-                  <span className="text-green-600">{t("jobQueued")}</span>
-                ) : timedOut ? (
-                  <span className="text-amber-600">{t("jobPollTimedOut")}</span>
-                ) : (
-                  <span>{formatRelative(job.lastRunAt)}</span>
+    <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+      {jobs.map((job, i) => {
+        const entry = pending[job.name];
+        const isPending = Boolean(entry) && !entry?.timedOut;
+        const timedOut = Boolean(entry?.timedOut);
+        return (
+          <div
+            key={job.name}
+            className={i > 0 ? "border-t border-line px-4 py-3.5" : "px-4 py-3.5"}
+          >
+            <div className="flex items-start gap-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-bold">{job.label}</div>
+                {job.description && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">{job.description}</div>
                 )}
               </div>
-              <div className="mt-2">
-                <TriggerButton
-                  name={job.name}
-                  supportsForce={job.supportsForce}
-                  currentLastRunAt={job.lastRunAt}
-                  onTriggered={(priorLastRunAt) => {
-                    pollCounts.current[job.name] = 0;
-                    setPending((prev) => ({
-                      ...prev,
-                      [job.name]: { priorLastRunAt },
-                    }));
-                  }}
-                />
-              </div>
+              <StatusBadge status={job.lastStatus} />
             </div>
-          );
-        })}
-      </div>
-    </>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <code className="rounded-[7px] bg-background px-2 py-1 font-mono text-[11px] text-text-2">
+                {job.cron ?? "on-demand"}
+              </code>
+              <span className="text-xs text-text-3">·</span>
+              <span aria-live="polite">
+                {isPending ? (
+                  <span className="text-xs font-bold text-primary">{t("jobQueued")}</span>
+                ) : timedOut ? (
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                    {t("jobPollTimedOut")}
+                  </span>
+                ) : (
+                  <span className="text-xs text-text-3">{formatRelative(job.lastRunAt)}</span>
+                )}
+              </span>
+              <span className="flex-1" />
+              <TriggerButton
+                name={job.name}
+                supportsForce={job.supportsForce}
+                currentLastRunAt={job.lastRunAt}
+                onTriggered={(priorLastRunAt) => {
+                  pollCounts.current[job.name] = 0;
+                  setPending((prev) => ({
+                    ...prev,
+                    [job.name]: { priorLastRunAt },
+                  }));
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

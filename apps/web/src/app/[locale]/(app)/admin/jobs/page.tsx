@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Card, CardContent } from "@/components/ui/card";
 import { AdminJobs } from "@/components/admin-jobs";
 import { UnmappedTypesAlert } from "@/components/unmapped-types-alert";
 import { SectionHeader } from "@/components/section-header";
@@ -23,15 +22,13 @@ export default async function AdminJobsPage({ params }: { params: Promise<{ loca
 
       <UnmappedTypesAlert types={unmappedTypes} />
 
-      <Card className="mt-4">
-        <CardContent className="p-5">
-          {result.status === "ok" ? (
-            <AdminJobs initialJobs={result.jobs} schedulerAvailable={result.schedulerAvailable} />
-          ) : (
-            <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="mt-4">
+        {result.status === "ok" ? (
+          <AdminJobs initialJobs={result.jobs} schedulerAvailable={result.schedulerAvailable} />
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+        )}
+      </div>
     </>
   );
 }

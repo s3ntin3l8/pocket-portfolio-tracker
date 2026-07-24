@@ -24,9 +24,19 @@ import {
  * When `requiresTyping` is true the user must type the word "Delete" before the
  * confirm button is enabled. The `entityLabel` is shown prominently in the
  * description so the user knows exactly what they're acting on.
+ *
+ * Two ways to open it:
+ * - **Uncontrolled** (`trigger` only): the dialog owns its own open state and renders
+ *   `trigger` as the `DialogTrigger` — the original, self-contained usage.
+ * - **Controlled** (`open`/`onOpenChange`, no `trigger`): the caller owns open state
+ *   instead — needed when the thing that opens it isn't a plain button but a
+ *   `DropdownMenuItem` (e.g. the admin users kebab menu), where nesting a
+ *   `DialogTrigger` inside a menu item fights Radix's own focus/dismiss handling.
  */
 export function ConfirmActionDialog({
   trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
   title,
   description,
   entityLabel,
@@ -35,7 +45,9 @@ export function ConfirmActionDialog({
   requiresTyping = false,
   onConfirm,
 }: {
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description: string;
   entityLabel: string;
@@ -45,7 +57,8 @@ export function ConfirmActionDialog({
   onConfirm: () => Promise<void>;
 }) {
   const t = useTranslations("Admin");
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [typed, setTyped] = useState("");
@@ -56,7 +69,7 @@ export function ConfirmActionDialog({
       setBusy(false);
       setTyped("");
     }
-    setOpen(next);
+    (controlledOnOpenChange ?? setInternalOpen)(next);
   }
 
   async function handleConfirm() {
@@ -64,7 +77,7 @@ export function ConfirmActionDialog({
     setError(false);
     try {
       await onConfirm();
-      setOpen(false);
+      onOpenChange(false);
     } catch {
       setError(true);
       setBusy(false);
@@ -75,7 +88,7 @@ export function ConfirmActionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
