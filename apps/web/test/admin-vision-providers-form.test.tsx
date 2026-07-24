@@ -100,12 +100,14 @@ describe("AdminVisionProvidersForm", () => {
     ]);
   });
 
-  it("shows 'encryption disabled' and suppresses the editor for key-based providers, but not for the URL-based one", () => {
+  it("shows 'encryption disabled' and suppresses every editor — including the URL-based Ollama one", () => {
+    // PUT /admin/vision-providers/:id/credential requires encryption.isEnabled
+    // unconditionally server-side, even for a URL-only write — so the UI can't offer an
+    // editor for Ollama either just because it's not an API key.
     renderForm(STUB_CLIENT, vi.fn(), { encryptionEnabled: false });
-    // claude (key-based) shows the amber warning; ollama (URL-based) doesn't need encryption.
-    expect(screen.getAllByText(messages.Admin.encryptionDisabled).length).toBeGreaterThan(0);
-    // Only ollama's pill survives — claude/openai's editors are suppressed without encryption.
-    expect(screen.getAllByRole("button", { name: messages.Admin.credentialSet })).toHaveLength(1);
+    expect(screen.getAllByText(messages.Admin.encryptionDisabled)).toHaveLength(PROVIDERS.length);
+    expect(screen.queryByRole("button", { name: messages.Admin.credentialSet })).toBeNull();
+    expect(screen.queryByRole("button", { name: messages.Admin.editCredential })).toBeNull();
   });
 
   it("opens the URL editor for the ollama provider and saves via urlOverride", async () => {
@@ -114,15 +116,19 @@ describe("AdminVisionProvidersForm", () => {
       ...STUB_CLIENT,
       setAdminVisionProviderCredential,
     };
-    renderForm(client, vi.fn(), { encryptionEnabled: false });
+    renderForm(client, vi.fn(), { encryptionEnabled: true });
 
-    fireEvent.click(screen.getByRole("button", { name: messages.Admin.credentialSet }));
+    const pills = screen.getAllByRole("button", { name: messages.Admin.credentialSet });
+    // openai + ollama are both unconfigured; ollama is the last row.
+    fireEvent.click(pills[pills.length - 1]!);
     await waitFor(() => expect(screen.getByText("API key · Ollama (local)")).toBeInTheDocument());
 
-    // URL providers get a `type="url"` input with no show/hide eye toggle.
+    // URL providers get a `type="url"` input with no show/hide eye toggle, and the editor
+    // doesn't claim the value is encrypted at rest (it's stored as plain text).
     const input = screen.getByPlaceholderText(messages.Admin.visionUrlPlaceholder);
     expect(input).toHaveAttribute("type", "url");
     expect(screen.queryByLabelText(messages.Admin.credentialShow)).toBeNull();
+    expect(screen.queryByText(messages.Admin.credentialStoredEncrypted)).toBeNull();
 
     fireEvent.change(input, { target: { value: "http://localhost:11434" } });
     fireEvent.click(screen.getByRole("button", { name: messages.Admin.credentialSave }));
@@ -155,6 +161,8 @@ describe("AdminVisionProvidersForm", () => {
     fireEvent.click(screen.getByRole("button", { name: messages.Admin.editCredential }));
     await waitFor(() => expect(screen.getByText("API key · Anthropic")).toBeInTheDocument());
     expect(screen.getByText("••••abcd")).toBeInTheDocument();
+    // Unlike Ollama's URL editor, an API-key editor does claim encryption at rest.
+    expect(screen.getByText(messages.Admin.credentialStoredEncrypted)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: messages.Admin.credentialClear }));
 

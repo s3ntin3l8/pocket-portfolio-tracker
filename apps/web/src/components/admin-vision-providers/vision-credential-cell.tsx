@@ -4,7 +4,7 @@ import { ShieldOff } from "lucide-react";
 import type { AdminVisionProvider } from "@portfolio/api-client";
 
 /** Ollama (and any future local/self-hosted provider) is URL-based — edits a URL, not an
- *  API key; encryption isn't required to store a bare URL. */
+ *  API key. */
 export function isUrlProvider(provider: Pick<AdminVisionProvider, "id">) {
   return provider.id === "ollama";
 }
@@ -14,9 +14,12 @@ export function hasVisionCredential(provider: AdminVisionProvider) {
 }
 
 /** Unlike data providers, every vision provider needs *some* credential (key or URL) —
- *  there's no keyless state — so this only gates on encryption (waived for URL providers). */
-export function canEditVisionCredential(provider: AdminVisionProvider, encryptionEnabled: boolean) {
-  return encryptionEnabled || isUrlProvider(provider);
+ *  there's no keyless state. Also unlike the old assumption here, `PUT
+ *  /admin/vision-providers/:id/credential` requires `encryption.isEnabled` unconditionally
+ *  server-side (`services/api/src/routes/admin/vision-providers.ts`) — it 503s on a URL-only
+ *  write too, not just an API-key one — so this can't waive the check for URL providers. */
+export function canEditVisionCredential(encryptionEnabled: boolean) {
+  return encryptionEnabled;
 }
 
 /**
@@ -35,7 +38,7 @@ export function VisionKeySubline({
 }) {
   const isUrl = isUrlProvider(provider);
 
-  if (!encryptionEnabled && !isUrl) {
+  if (!encryptionEnabled) {
     return (
       <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
         {provider.keySource === "env" && <span className="font-mono">{t("keyFromEnv")}</span>}

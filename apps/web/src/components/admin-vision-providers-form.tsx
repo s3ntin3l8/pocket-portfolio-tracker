@@ -145,7 +145,7 @@ export function AdminVisionProvidersForm({
         <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
           <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
             {rows.map((p, i) => {
-              const editable = canEditVisionCredential(p, encryptionEnabled);
+              const editable = canEditVisionCredential(encryptionEnabled);
               const editing = editingId === p.id;
               const isUrl = isUrlProvider(p);
               return (

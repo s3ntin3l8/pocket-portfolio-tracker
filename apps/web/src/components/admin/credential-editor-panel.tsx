@@ -117,10 +117,16 @@ export function CredentialEditorPanel({
             {error}
           </p>
         )}
-        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-text-3">
-          <Lock className="size-[13px] shrink-0 text-primary" strokeWidth={2} />
-          {t("credentialStoredEncrypted")}
-        </p>
+        {/* Only true for API keys — a URL override (e.g. Ollama's) is saved as plain text
+            even though writing it still requires encryption to be enabled server-side
+            (services/api/src/routes/admin/vision-providers.ts gates the whole route on
+            `encryption.isEnabled`, not just the key case), so don't claim it's encrypted. */}
+        {!isUrl && (
+          <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-text-3">
+            <Lock className="size-[13px] shrink-0 text-primary" strokeWidth={2} />
+            {t("credentialStoredEncrypted")}
+          </p>
+        )}
       </div>
     </div>
   );
