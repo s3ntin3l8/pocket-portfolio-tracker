@@ -77,6 +77,30 @@ describe("AdminStorageForm", () => {
     expect(screen.queryByText(m.storageFolderPath)).toBeNull();
   });
 
+  it("preserves edited S3 field state across folder→S3→folder→S3 switches (s3/folder state lives in the parent, not the conditionally-rendered block)", () => {
+    renderForm(initial());
+    const select = screen.getByLabelText(m.storageProvider);
+
+    fireEvent.change(select, { target: { value: "s3" } });
+    fireEvent.change(screen.getByPlaceholderText(m.storageEndpointPlaceholder), {
+      target: { value: "https://s3.eu-central-1.amazonaws.com" },
+    });
+
+    fireEvent.change(select, { target: { value: "folder" } });
+    expect(screen.queryByDisplayValue("https://s3.eu-central-1.amazonaws.com")).toBeNull();
+
+    fireEvent.change(select, { target: { value: "s3" } });
+    expect(screen.getByDisplayValue("https://s3.eu-central-1.amazonaws.com")).toBeInTheDocument();
+  });
+
+  it("ignores an out-of-range provider value rather than casting it blindly", () => {
+    renderForm(initial());
+    const select = screen.getByLabelText(m.storageProvider) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "not-a-real-provider" } });
+    // Falls back to whatever was already selected — the folder field is still shown.
+    expect(screen.getByDisplayValue("/data/storage")).toBeInTheDocument();
+  });
+
   it("warns when saving to a folder without encryption configured", () => {
     renderForm(initial({ encryptionEnabled: false }));
     expect(screen.getByText(m.storageEncryptionRequired)).toBeInTheDocument();

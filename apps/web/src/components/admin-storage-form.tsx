@@ -90,7 +90,10 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
         <select
           id="storage-provider"
           value={activeProvider}
-          onChange={(e) => setActiveProvider(e.target.value as Provider)}
+          onChange={(e) => {
+            const next = PROVIDER_OPTIONS.find((o) => o.value === e.target.value)?.value;
+            if (next) setActiveProvider(next);
+          }}
           className="w-full appearance-none rounded-[12px] border border-border bg-background px-3.5 py-3 text-sm font-semibold outline-none"
         >
           {PROVIDER_OPTIONS.map((o) => (
