@@ -23,8 +23,8 @@ describe("SettingsModalShell", () => {
       </SettingsModalShell>,
     );
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
-    expect(screen.getByText("section content")).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("section content")).toBeInTheDocument();
   });
 
   it("calls router.back() when the close button is clicked", () => {
