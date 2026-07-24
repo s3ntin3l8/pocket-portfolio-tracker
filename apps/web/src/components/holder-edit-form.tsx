@@ -48,8 +48,7 @@ export function HolderEditForm({
   // in `portfolio-edit-form.tsx`.
   useEffect(() => {
     if (deleting && !f.busy && !f.error) router.push("/settings/portfolios");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deleting, f.busy, f.error]);
+  }, [deleting, f.busy, f.error, router]);
 
   function handleDelete() {
     setDeleting(true);

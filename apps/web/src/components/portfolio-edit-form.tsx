@@ -69,8 +69,7 @@ export function PortfolioEditForm({
   // and re-triggers this effect correctly either way.
   useEffect(() => {
     if (deleting && !f.busy && !f.error) router.push("/settings/portfolios");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deleting, f.busy, f.error]);
+  }, [deleting, f.busy, f.error, router]);
 
   function handleDelete() {
     setDeleting(true);
