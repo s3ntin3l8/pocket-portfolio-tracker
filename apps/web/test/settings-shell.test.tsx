@@ -101,4 +101,51 @@ describe("SettingsShell", () => {
     expect(screen.getByText("rail-bottom-slot")).toBeInTheDocument();
     expect(screen.getByText("landing-top-slot")).toBeInTheDocument();
   });
+
+  it("defaults to the 'cards' rail — no chevron/card change when railVariant is omitted", () => {
+    render(
+      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings">
+        <div>content</div>
+      </SettingsShell>,
+    );
+    // The "cards" rail wraps its links in a <nav> card (ProfileSettings.dc.html); the
+    // "flush" rail (tested below) has no such wrapper.
+    const nav = screen.getAllByRole("link")[0]!.closest("nav");
+    expect(nav).toHaveClass("bg-card");
+  });
+
+  it("renders the 'flush' rail variant (Admin Settings.dc.html): no nav <nav> card wrapper", () => {
+    render(
+      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings" railVariant="flush">
+        <div>content</div>
+      </SettingsShell>,
+    );
+    // The flush rail has no `<nav>` card wrapper — links sit directly in the sidebar.
+    expect(screen.getAllByRole("link")[0]!.closest("nav")).toBeNull();
+  });
+
+  it("renders mainHeader above children on every route, not just the bare index", () => {
+    mockPathname = "/settings/portfolios";
+    render(
+      <SettingsShell
+        navItems={NAV_ITEMS}
+        indexHref="/settings"
+        railVariant="flush"
+        mainHeader={<div>main-header-slot</div>}
+      >
+        <div>portfolios content</div>
+      </SettingsShell>,
+    );
+    expect(screen.getByText("main-header-slot")).toBeInTheDocument();
+    expect(screen.getByText("portfolios content")).toBeInTheDocument();
+  });
+
+  it("omits mainHeader entirely when not provided", () => {
+    render(
+      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings">
+        <div>content</div>
+      </SettingsShell>,
+    );
+    expect(screen.queryByText("main-header-slot")).toBeNull();
+  });
 });

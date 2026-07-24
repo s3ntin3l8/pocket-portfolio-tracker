@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check } from "lucide-react";
+import { AlertCircle, Check, GripVertical, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DndContext,
@@ -27,8 +27,14 @@ import type {
 import type { AdminVisionProvidersClient } from "./admin-vision-providers/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { SortableRow, SortableCard } from "@/components/sortable-utils";
-import { VisionCredentialCell } from "./admin-vision-providers/vision-credential-cell";
+import { SortableAdminRow } from "@/components/sortable-utils";
+import { CredentialEditorPanel } from "@/components/admin/credential-editor-panel";
+import {
+  canEditVisionCredential,
+  hasVisionCredential,
+  isUrlProvider,
+  VisionKeySubline,
+} from "./admin-vision-providers/vision-credential-cell";
 
 const signature = (rows: AdminVisionProvider[]) =>
   rows.map((r) => `${r.id}:${r.enabled ? 1 : 0}`).join(",");
@@ -51,6 +57,7 @@ export function AdminVisionProvidersForm({
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -123,155 +130,115 @@ export function AdminVisionProvidersForm({
         </div>
       )}
 
-      {/* Desktop: separate DndContext so useSortable ids don't collide with mobile */}
+      <div className="flex items-center justify-end md:hidden">
+        <Button type="button" variant="outline" size="sm" onClick={() => setReorderMode((v) => !v)}>
+          {reorderMode ? t("done") : t("reorder")}
+        </Button>
+      </div>
+
       <DndContext
-        id="admin-vision-providers-desktop"
+        id="admin-vision-providers"
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
-        <div className="hidden overflow-x-auto rounded-md border border-border md:block">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="w-8 px-3 py-2" aria-label={t("dragHandle")} />
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">
-                  #
-                </th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                  {t("providerName")}
-                </th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                  {t("enabledHeader")}
-                </th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                  {t("apiKey")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-                {rows.map((p, i) => (
-                  <SortableRow key={p.id} id={p.id} dragHandleLabel={t("dragHandle")}>
-                    {(handle) => (
-                      <>
-                        <td className="px-3 py-2">{handle}</td>
-                        <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground hidden sm:table-cell">
+        <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+          <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+            {rows.map((p, i) => {
+              const editable = canEditVisionCredential(p, encryptionEnabled);
+              const editing = editingId === p.id;
+              const isUrl = isUrlProvider(p);
+              return (
+                <SortableAdminRow
+                  key={p.id}
+                  id={p.id}
+                  className={i > 0 ? "border-t border-line" : ""}
+                >
+                  {({ handleProps }) => (
+                    <>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <button
+                          type="button"
+                          {...handleProps.attrs}
+                          {...handleProps.listeners}
+                          aria-label={t("dragHandle")}
+                          className="hidden shrink-0 cursor-grab items-center justify-center text-text-3 hover:text-text-2 active:cursor-grabbing md:flex"
+                        >
+                          <GripVertical className="size-4" />
+                        </button>
+                        {reorderMode && (
+                          <button
+                            type="button"
+                            {...handleProps.attrs}
+                            {...handleProps.listeners}
+                            aria-label={t("dragHandle")}
+                            className="flex size-8 shrink-0 cursor-grab items-center justify-center text-text-3 active:cursor-grabbing md:hidden"
+                          >
+                            <GripVertical className="size-5" />
+                          </button>
+                        )}
+                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-[11px] font-extrabold text-text-2">
                           {i + 1}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="font-medium">{p.label}</div>
-                          {!p.configured && (
-                            <div className="text-xs text-muted-foreground">
-                              {t("notConfigured")}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-bold">{p.label}</div>
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                            <VisionKeySubline
+                              provider={p}
+                              encryptionEnabled={encryptionEnabled}
+                              t={t}
+                            />
+                          </div>
+                        </div>
+                        {p.configured && (
                           <Switch
                             checked={p.enabled}
-                            disabled={!p.configured}
                             onCheckedChange={() => toggle(p.id)}
                             aria-label={p.enabled ? t("enabled") : t("disabled")}
                           />
-                        </td>
-                        <td className="px-3 py-2">
-                          <VisionCredentialCell
-                            provider={p}
-                            encryptionEnabled={encryptionEnabled}
-                            onSet={handleSetCredential}
-                            onClear={handleClearCredential}
-                          />
-                        </td>
-                      </>
-                    )}
-                  </SortableRow>
-                ))}
-              </SortableContext>
-            </tbody>
-          </table>
-        </div>
-      </DndContext>
-
-      {/* Mobile: reorder toggle + cards. Separate DndContext to avoid useSortable
-          id collisions with the always-mounted desktop SortableRows. */}
-      <DndContext
-        id="admin-vision-providers-mobile"
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="md:hidden">
-          <div className="mb-3 flex items-center justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setReorderMode((v) => !v)}
-            >
-              {reorderMode ? t("done") : t("reorder")}
-            </Button>
-          </div>
-
-          <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
-              {rows.map((p, i) => {
-                if (reorderMode) {
-                  return (
-                    <SortableCard
-                      key={p.id}
-                      id={p.id}
-                      disabled={false}
-                      dragHandleLabel={t("dragHandle")}
-                    >
-                      {(handle) => (
-                        <div className="flex items-center gap-3">
-                          {handle}
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-bold">{p.label}</div>
-                            {!p.configured && (
-                              <div className="text-xs text-muted-foreground">
-                                {t("notConfigured")}
-                              </div>
-                            )}
-                          </div>
-                          <span className="tabular-nums text-xs text-muted-foreground">
-                            #{i + 1}
-                          </span>
-                        </div>
+                        )}
+                        {!p.configured && editable && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(p.id)}
+                            className="shrink-0 whitespace-nowrap rounded-[9px] bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary"
+                          >
+                            {t("credentialSet")}
+                          </button>
+                        )}
+                        {editable && p.configured && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(editing ? null : p.id)}
+                            aria-label={t("editCredential")}
+                            className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-background text-text-2 hover:text-foreground"
+                          >
+                            <Pencil className="size-[15px]" />
+                          </button>
+                        )}
+                      </div>
+                      {editing && (
+                        <CredentialEditorPanel
+                          label={p.label}
+                          isUrl={isUrl}
+                          hasCredential={hasVisionCredential(p)}
+                          onSave={(value) =>
+                            handleSetCredential(
+                              p.id,
+                              isUrl ? { urlOverride: value } : { apiKey: value },
+                            )
+                          }
+                          onClear={() => handleClearCredential(p.id)}
+                          onClose={() => setEditingId(null)}
+                        />
                       )}
-                    </SortableCard>
-                  );
-                }
-
-                return (
-                  <div key={p.id} className="rounded-[14px] border border-border bg-card p-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-bold">{p.label}</span>
-                      <Switch
-                        checked={p.enabled}
-                        disabled={!p.configured}
-                        onCheckedChange={() => toggle(p.id)}
-                        aria-label={p.enabled ? t("enabled") : t("disabled")}
-                      />
-                    </div>
-                    {!p.configured && (
-                      <div className="mt-1 text-xs text-muted-foreground">{t("notConfigured")}</div>
-                    )}
-                    <div className="mt-2">
-                      <VisionCredentialCell
-                        provider={p}
-                        encryptionEnabled={encryptionEnabled}
-                        onSet={handleSetCredential}
-                        onClear={handleClearCredential}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </SortableContext>
-        </div>
+                    </>
+                  )}
+                </SortableAdminRow>
+              );
+            })}
+          </div>
+        </SortableContext>
       </DndContext>
 
       <div className="flex items-center gap-3">

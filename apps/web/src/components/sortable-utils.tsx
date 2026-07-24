@@ -1,101 +1,52 @@
 "use client";
 
-import { GripVertical } from "lucide-react";
+import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
 
-/**
- * Drag-sortable `<tr>` wrapper. Render-prop receives a scoped handle `<button>`.
- * Desktop uses this; mobile sortable cards use `SortableCard` instead.
- */
-export function SortableRow({
-  id,
-  dragHandleLabel,
-  children,
-}: {
-  id: string;
-  dragHandleLabel: string;
-  children: (handle: React.ReactNode) => React.ReactNode;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const handle = (
-    <button
-      type="button"
-      {...attributes}
-      {...listeners}
-      aria-label={dragHandleLabel}
-      className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-    >
-      <GripVertical className="size-4" />
-    </button>
-  );
-
-  return (
-    <tr
-      ref={setNodeRef}
-      style={style}
-      className={`border-b border-border last:border-0${isDragging ? " opacity-50" : ""}`}
-    >
-      {children(handle)}
-    </tr>
-  );
+/** dnd-kit's `attributes` + `listeners`, spread as two separate prop groups (`{...attrs}
+ *  {...listeners}`) directly onto whichever grip button is visible at the current
+ *  breakpoint (see `SortableAdminRow` below) — kept apart rather than merged into one
+ *  object since their types don't intersect cleanly (`listeners` is index-signatured). */
+export interface SortableHandleProps {
+  attrs: DraggableAttributes;
+  listeners: DraggableSyntheticListeners;
 }
 
 /**
- * Drag-sortable `<div>` card for mobile (iOS reorder mode).
- * Render-prop receives a scoped handle `<button>` — the card body itself is not a
- * drag surface so vertical scrolling works normally.
- * `disabled` gates `useSortable` registration so cards outside reorder mode don't
- * participate in drag-and-drop at all.
+ * Drag-sortable `<div>` row for a single unified card-row list (desktop + mobile share
+ * one `DndContext`/`SortableContext`, unlike the old split desktop-table/mobile-cards
+ * layout). The render-prop hands back raw `handleProps` rather than a pre-built handle
+ * element — callers render their own grip icon(s) (the design shows a different grip per
+ * breakpoint: a lead 6-dot grip on desktop, a trailing grip on mobile only while in
+ * reorder mode), all spreading the same `handleProps` onto whichever grip is visible.
  */
-export function SortableCard({
+export function SortableAdminRow({
   id,
-  disabled,
-  dragHandleLabel,
+  className,
   children,
 }: {
   id: string;
-  disabled: boolean;
-  dragHandleLabel: string;
-  children: (handle: React.ReactNode) => React.ReactNode;
+  className?: string;
+  children: (args: { handleProps: SortableHandleProps; isDragging: boolean }) => React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
-    disabled,
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
-
-  const handle = (
-    <button
-      type="button"
-      {...attributes}
-      {...listeners}
-      aria-label={dragHandleLabel}
-      className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-    >
-      <GripVertical className="size-5" />
-    </button>
-  );
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-[14px] border border-border bg-card p-3.5${isDragging ? " opacity-50" : ""}`}
+      className={cn(className, isDragging && "z-10 opacity-90 shadow-lg")}
     >
-      {children(handle)}
+      {children({ handleProps: { attrs: attributes, listeners }, isDragging })}
     </div>
   );
 }
