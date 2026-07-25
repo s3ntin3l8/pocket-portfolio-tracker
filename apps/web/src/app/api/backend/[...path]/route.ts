@@ -53,9 +53,12 @@ function resolvedClientIp(request: NextRequest): string | null {
 }
 
 async function proxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  const devToken = process.env.DEV_AUTH_TOKEN;
-  const accessToken =
-    devToken ?? (await accessTokenFromCookieHeader(request.headers.get("cookie") ?? ""));
+  // DEV_AUTH_TOKEN is a dev-only bypass — never active in production (same NODE_ENV
+  // guard pattern as isAllowedHost in apps/web/src/proxy.ts).
+  const devToken = process.env.NODE_ENV !== "production" ? process.env.DEV_AUTH_TOKEN : undefined;
+  const accessToken = devToken
+    ? devToken
+    : await accessTokenFromCookieHeader(request.headers.get("cookie") ?? "");
   if (!accessToken) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

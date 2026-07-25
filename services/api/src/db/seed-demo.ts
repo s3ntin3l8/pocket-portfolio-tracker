@@ -83,11 +83,14 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     .returning();
 
   // pt_ + 43 url-safe chars (32 bytes) — same shape routes/me.ts mints for a real PAT.
-  // When no output path is given (dev mode), use a deterministic secret so the value can
-  // be hardcoded in the dev environment config (DEV_AUTH_TOKEN in .env).
-  const secret = patOutPath
-    ? `${PAT_PREFIX}${randomBytes(32).toString("base64url")}`
-    : `${PAT_PREFIX}dev-pat-for-local-development-only`;
+  // When no output path is given AND the target is a PGlite dev database, use a
+  // deterministic secret so the value can be hardcoded in the dev environment config
+  // (DEV_AUTH_TOKEN in .env). A random secret is used for any real Postgres database
+  // to prevent planting a known backdoor credential in a shared/staging environment.
+  const isDevPglite = !patOutPath && process.env.DATABASE_URL?.startsWith("pglite://");
+  const secret = isDevPglite
+    ? `${PAT_PREFIX}dev-pat-for-local-development-only`
+    : `${PAT_PREFIX}${randomBytes(32).toString("base64url")}`;
   await db.insert(apiTokens).values({
     userId: user.id,
     name: "screenshot-pipeline",
