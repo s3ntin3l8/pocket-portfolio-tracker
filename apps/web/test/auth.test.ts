@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { type JWT } from "next-auth/jwt";
 import { type Account, type User } from "next-auth";
 
+// Set required env vars before importing auth.ts. Must be in the hoisted block, not a
+// plain top-level statement below the imports — ES module imports are linked (and
+// ../src/auth's module-level `authentikAvailable` computed) before the importing
+// module's OWN top-level statements run, regardless of textual order in the file.
+vi.hoisted(() => {
+  process.env.AUTH_SECRET = "test-secret-1234567890-test-secret-12345"; // pragma: allowlist secret
+  process.env.AUTHENTIK_ISSUER = "https://authentik.test";
+});
+
 // Mock next-auth and providers so auth.ts imports cleanly
 vi.mock("next-auth", () => ({
   default: vi.fn((config) => config),
@@ -9,10 +18,6 @@ vi.mock("next-auth", () => ({
 vi.mock("next-auth/providers/authentik", () => ({
   default: vi.fn(() => ({})),
 }));
-
-// Set required env vars before importing auth.ts
-process.env.AUTH_SECRET = "test-secret-1234567890-test-secret-12345"; // pragma: allowlist secret
-process.env.AUTHENTIK_ISSUER = "https://authentik.test";
 
 import { authConfig } from "../src/auth";
 

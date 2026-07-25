@@ -255,6 +255,21 @@ export const authConfig: NextAuthConfig = {
         return token;
       }
 
+      // A refresh is only possible while Authentik is actually configured — without
+      // this, a stale cookie carrying a refreshToken from a PRIOR Authentik session
+      // (e.g. toggling AUTHENTIK_ISSUER off for local dev after logging in for real)
+      // would call tokenEndpoint(), which builds a URL from an empty issuer and
+      // throws "Invalid URL" — caught, but mislogged as a network error every poll.
+      if (!authentikAvailable) {
+        token.error = "RefreshTokenMissing";
+        console.warn(
+          "[auth] access token expired but Authentik isn't configured (AUTHENTIK_ISSUER " +
+            "unset) — can't refresh; re-login required. Clear the stale session cookie if " +
+            "this is a dev environment that recently disabled Authentik.",
+        );
+        return token;
+      }
+
       // Expired: rotate the access token using the refresh token. Single-flighted (see
       // rotateRefreshTokenOnce) so concurrent callers sharing this same refresh token
       // — the 60s poll, a focus refetch, another tab — converge on one rotation instead
