@@ -170,9 +170,11 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     const token = header.slice(7);
 
     // Personal access token: our own long-lived credential, looked up by hash on a
-    // unique index (no timing-unsafe secret comparison). PATs never grant admin and
-    // carry their own scope; the secret is never logged. This check runs before the
-    // JWT guards below so PATs work independently of any OIDC or local auth config.
+    // unique index (no timing-unsafe secret comparison). PATs carry their own scope;
+    // the secret is never logged. This check runs before the JWT guards below so PATs
+    // work independently of any OIDC or local auth config. PATs never grant admin
+    // outside local development — a leaked PAT must not be an admin credential in any
+    // real deployment (test included, so this stays covered by the "never" tests).
     if (token.startsWith(PAT_PREFIX)) {
       const [row] = await app.db
         .select()
@@ -196,7 +198,9 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       request.user = {
         id: u.id,
         authSub: u.authSub,
-        isAdmin: false,
+        // DEV_AUTH_TOKEN (see seed-demo.ts) is a PAT, so this is the only way the
+        // local dev bypass can ever see admin-only screens (storage/providers/etc.).
+        isAdmin: app.config.NODE_ENV === "development",
         authMethod: "pat",
         scope,
       };
