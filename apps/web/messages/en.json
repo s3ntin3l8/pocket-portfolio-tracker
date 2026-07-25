@@ -39,7 +39,9 @@
     "passwordLabel": "Password",
     "forgot": "Forgot?",
     "signIn": "Sign in",
-    "trust": "Encrypted in transit · Read-only by default"
+    "trust": "Encrypted in transit · Read-only by default",
+    "devEnter": "Enter demo (dev mode)",
+    "devEnterHint": "DEV_AUTH_TOKEN is set — no login required in this environment"
   },
   "AuthError": {
     "retrying": "Signing you back in…",

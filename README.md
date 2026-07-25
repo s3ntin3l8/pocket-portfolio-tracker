@@ -68,14 +68,22 @@ See [`CLAUDE.md`](CLAUDE.md) for the full architecture and the phased plan in
 ## Quick start
 
 ```bash
-npm install                 # install all workspace deps (single root lockfile)
-cp .env.example .env        # configure environment
-docker compose up -d postgres minio   # local Postgres + object storage
-npm run dev                 # API watch (:3000) + Next dev (:3005)
+npm install            # install all workspace deps (single root lockfile)
+cp .env.example .env   # configure environment (defaults to PGlite + local storage)
+make dev-setup          # link .env into apps/web, seed the demo dataset
+make dev                # API watch (:3000) + Next dev (:3005)
 ```
 
-The web app serves on `:3005` and the API on `:3000`. For tests and driverless local
-runs, an embedded PGlite Postgres is used automatically (no external DB needed).
+The web app serves on `:3005` and the API on `:3000`. No Docker and no Authentik are
+needed for this path — `DATABASE_URL` defaults to an embedded PGlite database and
+`DEV_AUTH_TOKEN` bypasses the Authentik login (see `.env.example`'s Auth section, and
+`make dev-reset` to wipe the dev database). If you'd rather run against real Postgres +
+MinIO instead (Postgres-parity dev), `make services` starts them via docker-compose and
+you point `DATABASE_URL`/`STORAGE_*` at them (see the comments in `.env.example`).
+
+`npm run dev` also works directly once `.env` and the `apps/web/.env.local` symlink
+(`make web-env`) are in place — `make dev`/`make dev-web` just add that symlink step and
+free up stale dev ports first.
 
 ## Commands
 
@@ -114,11 +122,16 @@ Requires Playwright's Chromium binary once: `npx playwright install chromium`.
 All config is read from `app.config` (typed in `services/api/src/plugins/env.ts`) — see
 [`.env.example`](.env.example) for the full annotated list. Highlights:
 
-- **Database** — `DATABASE_URL` (Postgres; `pglite://` for embedded local/test).
+- **Database** — `DATABASE_URL` (Postgres; `pglite://` for embedded local/test — the dev
+  default).
 - **Auth** — `AUTHENTIK_ISSUER`, `AUTHENTIK_CLIENT_ID/SECRET`, `AUTH_SECRET`, `AUTH_URL`,
   `API_URL` (server-only — the browser reaches the API through the web app's same-origin
   proxy, never directly); `AUTHENTIK_ADMIN_GROUP` gates the provider-admin UI.
-- **Storage** — `STORAGE_*` (Supabase Storage or local MinIO) for screenshots.
+  `AUTH_LOCAL_SECRET` enables password-based login without Authentik. `DEV_AUTH_TOKEN`
+  (dev/non-production only) bypasses login entirely — the dev default, paired with
+  `make seed-demo`'s deterministic PAT.
+- **Storage** — `STORAGE_PROVIDER` (`folder`, the dev default — no bucket required — or
+  `s3` for Supabase Storage/MinIO/S3-compatible) and the matching `STORAGE_*` fields.
 - **Screenshot parsing** — `SCREENSHOT_PARSER` + per-provider keys (Claude / Gemini /
   OpenRouter / Ollama).
 - **Market data** — provider keys (`TWELVEDATA_API_KEY`, `GOLDAPI_KEY`, `EODHD_API_KEY`,

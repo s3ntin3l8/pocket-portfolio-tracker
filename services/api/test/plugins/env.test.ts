@@ -29,6 +29,7 @@ describe("env plugin", () => {
     expect(app.config.TRUSTED_PROXY_CIDRS).toBe("");
     expect(app.config.MARKET_DATA_TTL_MS).toBe(900000);
     // Storage defaults
+    expect(app.config.STORAGE_PROVIDER).toBe("s3");
     expect(app.config.STORAGE_ENDPOINT).toBe("");
     expect(app.config.STORAGE_REGION).toBe("us-east-1");
     expect(app.config.STORAGE_BUCKET).toBe("screenshots");

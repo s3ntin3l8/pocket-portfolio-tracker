@@ -81,12 +81,12 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
   return (
     <div className="rounded-[20px] bg-card p-4 shadow-card">
       <div className="mb-3.5 space-y-1.5">
-        <label
-          htmlFor="storage-provider"
-          className="block px-0.5 text-xs font-semibold text-text-2"
-        >
-          {t("storageProvider")}
-        </label>
+        <div className="flex items-center gap-1 px-0.5">
+          <label htmlFor="storage-provider" className="text-xs font-semibold text-text-2">
+            {t("storageProvider")}
+          </label>
+          <SourceBadge source={initial.activeProviderSource} />
+        </div>
         <select
           id="storage-provider"
           value={activeProvider}

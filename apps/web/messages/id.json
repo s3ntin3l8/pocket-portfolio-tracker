@@ -39,7 +39,9 @@
     "passwordLabel": "Kata sandi",
     "forgot": "Lupa?",
     "signIn": "Masuk",
-    "trust": "Terenkripsi saat transit · Hanya-baca secara bawaan"
+    "trust": "Terenkripsi saat transit · Hanya-baca secara bawaan",
+    "devEnter": "Masuk demo (mode dev)",
+    "devEnterHint": "DEV_AUTH_TOKEN diatur — tidak perlu masuk di lingkungan ini"
   },
   "AuthError": {
     "retrying": "Menandatangani Anda kembali…",

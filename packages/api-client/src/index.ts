@@ -219,6 +219,7 @@ export interface AdminStorageS3Config {
 
 export interface AdminStorageResponse {
   activeProvider: "s3" | "folder";
+  activeProviderSource: "db" | "env";
   s3: AdminStorageS3Config;
   folder: {
     path: string;

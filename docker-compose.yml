@@ -1,14 +1,18 @@
-# Local-dev parity for the Supabase-Cloud stack.
+# Optional local Postgres + MinIO — NOT needed for the default dev flow, which uses
+# embedded PGlite (DATABASE_URL=pglite://…) and local-folder storage
+# (STORAGE_PROVIDER=folder), both configured by `cp .env.example .env`. Use this compose
+# file only if you want Postgres-parity dev instead (real Postgres/MinIO in containers):
 #
-#   docker compose up -d postgres minio   # usual local backing services
-#   npm run dev                           # run API + web with hot reload
+#   docker compose up -d postgres minio   # then point DATABASE_URL/STORAGE_* at them
+#   make dev                              # run API + web with hot reload
 #
 # Optional profiles:
 #   docker compose --profile full up      # also build + run the API container
 #   docker compose --profile ollama up -d ollama   # local vision-model fallback
 #
 # Authentik is NOT run here — point the API at your existing self-hosted instance
-# via AUTHENTIK_ISSUER (see .env.example).
+# via AUTHENTIK_ISSUER (see .env.example), or use DEV_AUTH_TOKEN/AUTH_LOCAL_SECRET to
+# skip it entirely in dev.
 
 services:
   postgres:

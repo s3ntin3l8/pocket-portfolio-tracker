@@ -32,6 +32,7 @@ const m = messages.Admin;
 function initial(overrides: Partial<AdminStorageResponse> = {}): AdminStorageResponse {
   return {
     activeProvider: "folder",
+    activeProviderSource: "db",
     s3: {
       endpoint: "",
       endpointSource: "db",

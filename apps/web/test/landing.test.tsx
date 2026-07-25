@@ -72,4 +72,20 @@ describe("Landing (Pocket split-hero sign-in)", () => {
     );
     expect(screen.getByText("IDR 40,650,000")).toBeInTheDocument();
   });
+
+  // DEV_AUTH_TOKEN (PR #627) bypasses both the Authentik session cookie and the local-auth
+  // form — with it active, the SSO button/email form are dead ends, so devBypass swaps them
+  // for a plain entry link instead.
+  it("renders a dev-entry link to /holdings instead of sign-in when devBypass is set", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Landing devBypass />
+      </NextIntlClientProvider>,
+    );
+
+    const link = screen.getByRole("link", { name: messages.Landing.devEnter });
+    expect(link).toHaveAttribute("href", "/holdings");
+    expect(screen.queryByRole("button", { name: messages.Landing.sso })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: messages.Landing.signIn })).not.toBeInTheDocument();
+  });
 });

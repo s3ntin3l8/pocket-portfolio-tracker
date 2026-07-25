@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Link } from "@/i18n/navigation";
 
 // Representative "portfolio glance" amount per demo currency — keeps the figure realistic
 // per currency rather than converting one hardcoded number. Same +18.2% delta throughout;
@@ -27,9 +28,15 @@ const DEMO_GAIN = 0.182;
 export function Landing({
   initialCurrency = "IDR",
   localAuthAvailable = false,
+  devBypass = false,
 }: {
   initialCurrency?: string;
   localAuthAvailable?: boolean;
+  /** DEV_AUTH_TOKEN is set and NODE_ENV isn't "production" — Authentik/local auth may
+   *  not be configured at all, so the sign-in forms above would be dead ends. Show a
+   *  plain entry link instead (see apps/web/src/app/[locale]/(app)/layout.tsx, which
+   *  stands its session-cookie gate down under the same condition). */
+  devBypass?: boolean;
 }) {
   const t = useTranslations("Landing");
   const locale = useLocale();
@@ -142,70 +149,81 @@ export function Landing({
             <p className="text-sm text-muted-foreground">{t("signInSub")}</p>
           </div>
 
-          {!localAuthAvailable && (
-            <Button onClick={startSso} disabled={busy} className="w-full gap-2" size="lg">
-              {busy ? <Spinner size="sm" /> : <Shield className="size-4" />}
-              {busy ? t("ssoBusy") : t("sso")}
+          {devBypass ? (
+            <Button asChild className="w-full gap-2" size="lg">
+              <Link href="/holdings">
+                {t("devEnter")}
+                <ArrowRight className="size-4" />
+              </Link>
             </Button>
+          ) : (
+            <>
+              {!localAuthAvailable && (
+                <Button onClick={startSso} disabled={busy} className="w-full gap-2" size="lg">
+                  {busy ? <Spinner size="sm" /> : <Shield className="size-4" />}
+                  {busy ? t("ssoBusy") : t("sso")}
+                </Button>
+              )}
+
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                {t("orEmail")}
+                <span className="h-px flex-1 bg-border" />
+              </div>
+
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">{t("emailLabel")}</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder={t("emailPlaceholder")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">{t("passwordLabel")}</Label>
+                    <button
+                      type="button"
+                      onClick={startSso}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      {t("forgot")}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPw ? "text" : "password"}
+                      autoComplete="current-password"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((v) => !v)}
+                      aria-label={showPw ? "Hide password" : "Show password"}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full gap-2 bg-foreground text-background hover:bg-foreground/90"
+                >
+                  {t("signIn")}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </form>
+            </>
           )}
-
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            {t("orEmail")}
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">{t("emailLabel")}</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder={t("emailPlaceholder")}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">{t("passwordLabel")}</Label>
-                <button
-                  type="button"
-                  onClick={startSso}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  {t("forgot")}
-                </button>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPw ? "text" : "password"}
-                  autoComplete="current-password"
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Hide password" : "Show password"}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                >
-                  {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-            <Button
-              type="submit"
-              disabled={busy}
-              className="w-full gap-2 bg-foreground text-background hover:bg-foreground/90"
-            >
-              {t("signIn")}
-              <ArrowRight className="size-4" />
-            </Button>
-          </form>
 
           <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
             <Lock className="size-3.5" />
-            {t("trust")}
+            {devBypass ? t("devEnterHint") : t("trust")}
           </div>
         </div>
       </section>

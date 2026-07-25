@@ -11,6 +11,7 @@ import {
 } from "../../src/services/storage-settings.js";
 
 const ENV_DEFAULTS = {
+  STORAGE_PROVIDER: "s3",
   STORAGE_ENDPOINT: "http://localhost:9000",
   STORAGE_REGION: "us-east-1",
   STORAGE_BUCKET: "screenshots",
@@ -42,6 +43,16 @@ describe("resolveStorageSettings", () => {
     expect(settings.s3.bucket).toBe("screenshots");
     expect(settings.s3.secretAccessKey).toBe("minioadmin");
     expect(settings.folder.folderPath).toBe("./.storage");
+  });
+
+  it("falls back to STORAGE_PROVIDER when no DB row exists", async () => {
+    const db = getDb();
+    const settings = await resolveStorageSettings(
+      db,
+      { ...ENV_DEFAULTS, STORAGE_PROVIDER: "folder" },
+      encryptionDisabled,
+    );
+    expect(settings.activeProvider).toBe("folder");
   });
 
   it("DB values override env defaults", async () => {
@@ -83,6 +94,17 @@ describe("resolveStorageSettings", () => {
     expect(settings.activeProvider).toBe("folder");
     expect(settings.folder.folderPath).toBe("/tmp/test-storage");
   });
+
+  it("a DB row still wins over STORAGE_PROVIDER", async () => {
+    const db = getDb();
+    await updateStorageSettings(db, { activeProvider: "folder" });
+    const settings = await resolveStorageSettings(
+      db,
+      { ...ENV_DEFAULTS, STORAGE_PROVIDER: "s3" },
+      encryptionDisabled,
+    );
+    expect(settings.activeProvider).toBe("folder");
+  });
 });
 
 describe("getStorageSettingsResponse", () => {
@@ -117,6 +139,7 @@ describe("getStorageSettingsResponse", () => {
     const resp = await getStorageSettingsResponse(db, ENV_DEFAULTS, encryptionEnabled);
     expect(resp.s3.bucketSource).toBe("db");
     expect(resp.s3.regionSource).toBe("env");
+    expect(resp.activeProviderSource).toBe("db");
   });
 
   it("returns encryptionEnabled = true when the service has a key", async () => {

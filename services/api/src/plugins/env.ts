@@ -109,6 +109,13 @@ const schema = {
       default: "0 2 * * *", // daily 02:00 UTC (~09:00 WIB)
     },
     // --- Object storage (S3-compatible: MinIO, AWS, Supabase /storage/v1/s3, R2) ---
+    // Env-level default active provider ("s3" | "folder") when the storage_settings table
+    // has no row yet (first boot) — see resolveStorageSettings/getStorageSettingsResponse
+    // in services/storage-settings.ts. A DB row always overrides this.
+    STORAGE_PROVIDER: {
+      type: "string",
+      default: "s3",
+    },
     // Endpoint URL for S3-compatible backends. Leave blank to use AWS's default endpoint.
     // MinIO (local): http://localhost:9000
     // Supabase Storage: https://<project>.supabase.co/storage/v1/s3
@@ -198,6 +205,7 @@ declare module "fastify" {
       IBKR_FLEX_ENABLED: boolean;
       IBKR_FLEX_BASE_URL: string;
       IBKR_SYNC_CRON: string;
+      STORAGE_PROVIDER: string;
       STORAGE_ENDPOINT: string;
       STORAGE_REGION: string;
       STORAGE_BUCKET: string;

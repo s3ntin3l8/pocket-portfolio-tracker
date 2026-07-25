@@ -28,6 +28,7 @@ export interface ResolvedStorageSettings {
 
 /** Env fallbacks — supplied by the caller (app.config). */
 export interface StorageEnvFallback {
+  STORAGE_PROVIDER: string;
   STORAGE_ENDPOINT: string;
   STORAGE_REGION: string;
   STORAGE_BUCKET: string;
@@ -36,6 +37,11 @@ export interface StorageEnvFallback {
   STORAGE_FORCE_PATH_STYLE: boolean;
   STORAGE_SIGNED_URL_TTL: number;
   STORAGE_FOLDER_PATH: string;
+}
+
+/** Validates STORAGE_PROVIDER against the supported set, defaulting to "s3" otherwise. */
+function envProvider(env: StorageEnvFallback): StorageProvider {
+  return env.STORAGE_PROVIDER === "folder" ? "folder" : "s3";
 }
 
 /**
@@ -50,7 +56,7 @@ export async function resolveStorageSettings(
 ): Promise<ResolvedStorageSettings> {
   const [row] = await db.select().from(storageSettings).limit(1);
 
-  const activeProvider = (row?.activeProvider ?? "s3") as StorageProvider;
+  const activeProvider = (row?.activeProvider as StorageProvider | undefined) ?? envProvider(env);
 
   // S3 — each field: DB row value ?? env fallback
   let secretAccessKey = env.STORAGE_SECRET_KEY;
@@ -86,6 +92,7 @@ export async function resolveStorageSettings(
  */
 export interface StorageSettingsResponse {
   activeProvider: StorageProvider;
+  activeProviderSource: "db" | "env";
   s3: {
     endpoint: string;
     endpointSource: "db" | "env";
@@ -121,7 +128,7 @@ export async function getStorageSettingsResponse(
 ): Promise<StorageSettingsResponse> {
   const [row] = await db.select().from(storageSettings).limit(1);
 
-  const activeProvider = (row?.activeProvider ?? "s3") as StorageProvider;
+  const activeProvider = (row?.activeProvider as StorageProvider | undefined) ?? envProvider(env);
 
   // Secret hint: ••••<last 4 chars of the decrypted key>
   let hasSecret = false;
@@ -143,6 +150,7 @@ export async function getStorageSettingsResponse(
 
   return {
     activeProvider,
+    activeProviderSource: row?.activeProvider != null ? "db" : "env",
     s3: {
       endpoint: row?.s3Endpoint ?? env.STORAGE_ENDPOINT ?? "",
       endpointSource: row?.s3Endpoint != null ? "db" : "env",

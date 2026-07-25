@@ -53,7 +53,14 @@ Target one workspace with `--workspace @portfolio/<name>` (e.g.
 `npm run dev --workspace @portfolio/api`). DB: `npm run db:generate` /
 `npm run db:seed` inside `services/api` after editing the schema.
 
-Local backing services: `docker compose up -d postgres minio` (then `npm run dev`).
+**Dev via `make`** (wraps the npm scripts above, plus dev-only setup): `cp .env.example
+.env` defaults `DATABASE_URL` to embedded PGlite and `STORAGE_PROVIDER` to local-folder
+storage — no Docker, no Authentik (`DEV_AUTH_TOKEN` bypasses login). `make dev-setup`
+(symlinks `.env` into `apps/web/`, then seeds the demo dataset) once, then `make dev`.
+`make dev-reset` wipes the PGlite dev DB + local storage; `make seed-demo` refuses to run
+against a non-`pglite://` `DATABASE_URL` unless `FORCE=1` (it deletes/reinserts rows by
+email plus global instrument rows by symbol). `make services` starts real local Postgres +
+MinIO instead, for Postgres-parity dev.
 
 > **Known dev flake:** on `npm run dev` the API (`tsx watch`) can crash once at
 > startup with `SyntaxError: … does not provide an export named …` from a

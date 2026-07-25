@@ -5,6 +5,12 @@ coverage/
 data/
 *.db
 
+# PGlite dev database + local-folder storage (see DATABASE_URL/STORAGE_FOLDER_PATH in
+# .env.example) — unanchored so both the repo-root and services/api/ cwd variants match.
+.pglite-dev/
+.pglite/
+.storage/
+
 # Next.js / Turborepo build output
 .next/
 .turbo/
