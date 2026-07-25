@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.7...v0.1.8) (2026-07-25)
+
+
+### Features
+
+* **api,web:** local password auth + PAT-first auth (issue [#82](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/82)) ([bd3a9f4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bd3a9f49a180bce8e489a7a2b17182a0216c2fdf))
+* dev server tweaks — PGlite, DEV_AUTH_TOKEN, Makefile targets ([65e5f7f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/65e5f7fa1f98370151da6c31f6c04bd3e519278f))
+
 ## [0.1.7](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.6...v0.1.7) (2026-07-25)
 
 
