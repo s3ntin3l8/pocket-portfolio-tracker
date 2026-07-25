@@ -56,42 +56,48 @@ export const authRoute = fp(async (app) => {
    * POST /auth/local/login
    * Authenticate with email + password. Returns a signed JWT and user profile.
    * Same error for missing user vs wrong password to prevent email enumeration.
+   * Rate-limited to prevent brute-force attacks (10 req/min per IP).
    */
-  app.post("/auth/local/login", async (request, reply) => {
-    const parsed = loginSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "validation_error", issues: parsed.error.issues });
-    }
+  app.post(
+    "/auth/local/login",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "validation_error", issues: parsed.error.issues });
+      }
 
-    const { email, password } = parsed.data;
-    const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
+      const { email, password } = parsed.data;
+      const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
 
-    if (!user?.passwordHash) {
-      return reply.code(401).send({ error: "Invalid email or password" });
-    }
+      if (!user?.passwordHash) {
+        return reply.code(401).send({ error: "Invalid email or password" });
+      }
 
-    if (!verifyPassword(password, user.passwordHash)) {
-      return reply.code(401).send({ error: "Invalid email or password" });
-    }
+      if (!verifyPassword(password, user.passwordHash)) {
+        return reply.code(401).send({ error: "Invalid email or password" });
+      }
 
-    const token = await signLocalJwt(`local|${email}`, email);
+      const token = await signLocalJwt(`local|${email}`, email);
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      accessToken: token,
-      expiresAt: Math.floor(Date.now() / 1000) + 7 * 86_400,
-    };
-  });
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        accessToken: token,
+        expiresAt: Math.floor(Date.now() / 1000) + 7 * 86_400,
+      };
+    },
+  );
 
   /**
    * POST /auth/local/change-password
    * Authenticated user changes their password. Requires current password verification.
+   * Rate-limited to prevent guessing attacks (5 req/min per IP).
    */
   app.post(
     "/auth/local/change-password",
-    { preHandler: app.authenticate },
+    { config: { rateLimit: { max: 5, timeWindow: "1 minute" } }, preHandler: app.authenticate },
     async (request, reply) => {
       const parsed = changePasswordSchema.safeParse(request.body);
       if (!parsed.success) {
