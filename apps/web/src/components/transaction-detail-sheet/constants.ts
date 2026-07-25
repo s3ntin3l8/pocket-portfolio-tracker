@@ -49,3 +49,7 @@ export const SOURCE_PILL: Record<string, { bg: string; fg: string }> = {
 };
 
 export const DEFAULT_PILL = { bg: "var(--border)", fg: "var(--text-mute)" };
+
+/** Hero "Draft" pill — shown alongside (not instead of) the source pill for a draft
+ *  transaction. Gold, matching the app's other draft/pending accents. */
+export const DRAFT_PILL = { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" };

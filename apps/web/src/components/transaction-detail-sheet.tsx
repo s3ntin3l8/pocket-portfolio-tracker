@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { AlertCircle, AlertTriangle, Check, MoreHorizontal, Pencil, Trash2, X } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  Download,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -13,11 +22,16 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
-import { txAmount, txNetAmount } from "@/components/transactions-table";
+import { txAmount, txNetAmount, SOURCE_ICON } from "@/components/transactions-table";
 import type { TxRow } from "@/components/transactions-table";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
 import type { Anomaly } from "@portfolio/api-client";
-import { TYPE_BADGE, DEFAULT_BADGE } from "./transaction-detail-sheet/constants";
+import {
+  TYPE_BADGE,
+  DEFAULT_BADGE,
+  SOURCE_PILL,
+  DEFAULT_PILL,
+} from "./transaction-detail-sheet/constants";
 import {
   SectionHeading,
   HeroAmount,
@@ -73,7 +87,10 @@ export function TransactionDetailSheet({
   const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
-  const isDesktop = useMediaQuery("(min-width: 860px)");
+  // 760px, not the app's usual 860 — the detail panel is a narrower 480px-max Dialog,
+  // not the wide two-column Add/Edit modal, so it switches to desktop chrome sooner
+  // (design: Transaction Detail v2.dc.html, `isDesktop = S.w >= 760`).
+  const isDesktop = useMediaQuery("(min-width: 760px)");
   const [clientRate, setClientRate] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -184,6 +201,7 @@ export function TransactionDetailSheet({
           netAmount={netAmount}
           currency={tx.currency}
           source={tx.source}
+          isDraft={status === "draft"}
           showApproxDisplay={showApproxDisplay}
           netAmountDisplay={netAmountDisplay}
           effectiveDisplayCurrency={effectiveDisplayCurrency}
@@ -241,6 +259,46 @@ export function TransactionDetailSheet({
 
         {hasSources && !tx.hasDocument && !tx.sources?.some((s) => s.hasDocument) && (
           <p className="mt-2 text-xs text-muted-foreground">{t("sourcesSection.notRetained")}</p>
+        )}
+
+        {/* v2 design: a "Source document" card — the whole-transaction receipt (no
+            per-source attribution) gets the same visible card the per-source list does,
+            rather than being buried in the overflow menu's "Download receipt" item. */}
+        {showReceipt && (
+          <div className="mt-5">
+            <SectionHeading>{t("sourcesSection.documentTitle")}</SectionHeading>
+            <div className="flex items-center gap-3 rounded-[18px] border border-border bg-card p-[14px]">
+              <span
+                className="flex size-[42px] shrink-0 items-center justify-center rounded-[11px]"
+                style={{
+                  background: (SOURCE_PILL[tx.source] ?? DEFAULT_PILL).bg,
+                  color: (SOURCE_PILL[tx.source] ?? DEFAULT_PILL).fg,
+                }}
+              >
+                {(() => {
+                  const SourceIcon = SOURCE_ICON[tx.source] ?? null;
+                  return SourceIcon && <SourceIcon className="size-5" strokeWidth={1.9} />;
+                })()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-foreground">
+                  {t(`sources.${tx.source}`)}
+                </p>
+                <p className="mt-0.5 text-[12px] font-medium text-text-2">
+                  {t("sourcesSection.autoParsedRetained")}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label={t("sourcesSection.download")}
+                title={t("sourcesSection.download")}
+                onClick={() => void downloadReceipt()}
+                className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-background text-foreground transition-colors hover:bg-secondary"
+              >
+                <Download className="size-4" />
+              </button>
+            </div>
+          </div>
         )}
 
         {anomaly && (

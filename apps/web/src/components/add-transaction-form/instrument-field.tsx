@@ -14,6 +14,9 @@ const ASSET_CLASSES = ["equity", "gold", "bond", "mutual_fund", "etf", "crypto"]
 const UNITS = ["shares", "grams", "units"] as const;
 
 interface InstrumentFieldProps {
+  /** Edit mode only (v2 design): wraps the field in a `bg-card-2` inset box instead of
+   *  the plain border-top separator every other section uses. Add mode leaves this off. */
+  boxed?: boolean;
   hasInstrument: boolean;
   selected: Instrument | null;
   setSelected: (i: Instrument | null) => void;
@@ -42,11 +45,13 @@ interface InstrumentFieldProps {
   tc: (key: string) => string;
 }
 
-/** The v2 design's "Instrument" section — no enclosing card (just a border-top
- *  separator, matching every other form section); the custom-entry fields (Kind/Source/
- *  Symbol/Name/Unit) sit behind a "Can't find it? Add a custom instrument" collapsible
- *  instead of always showing once nothing is selected. */
+/** The v2 design's "Instrument" section. In Add mode there's no enclosing card (just a
+ *  border-top separator, matching every other form section); Edit mode additionally
+ *  wraps the field in a `bg-card-2` inset box (`boxed` prop) — the two mocks genuinely
+ *  differ here, not a style nudge. The custom-entry fields (Kind/Source/Symbol/Name/Unit)
+ *  sit behind a "Can't find it? Add a custom instrument" collapsible either way. */
 export function InstrumentField({
+  boxed = false,
   hasInstrument,
   selected,
   setSelected,
@@ -79,7 +84,12 @@ export function InstrumentField({
   return (
     <div className="border-t border-line pt-[18px]">
       <Label>{t("instrument")}</Label>
-      <div className="mt-1.5 flex flex-col gap-[13px]">
+      <div
+        className={cn(
+          "mt-1.5 flex flex-col gap-[13px]",
+          boxed && "rounded-[16px] border border-border bg-card-2 p-[14px]",
+        )}
+      >
         {selected ? (
           <div className="flex items-center gap-2.5 rounded-[12px] border border-border bg-card px-[11px] py-[9px] text-sm">
             <InstrumentLogo

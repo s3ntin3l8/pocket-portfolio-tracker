@@ -177,8 +177,12 @@ export function useTransactionForm({
   const hasInstrument = !isCash;
   const showQuantity = isTrade || isShareReceipt || isTransfer;
   const showFees = isTrade;
-  // Only a sale or an income event ever withholds tax — a buy never does (v2 design).
-  const showTax = type === "sell" || isIncome;
+  // Add: only a sale or an income event ever withholds tax — a buy never does (v2 design,
+  // Add Transaction v2.dc.html: `showTax = type === "sell" || isIncome`). Edit differs —
+  // its mock (Edit Transaction v2.dc.html) uses `showTax = isAcq || isIncome`, i.e. a buy
+  // being *edited* can also carry a tax value (e.g. correcting an import), so the field
+  // shows for any trade, not just a sale.
+  const showTax = isEdit ? isTrade || isIncome : type === "sell" || isIncome;
   const isGold = hasInstrument && (selected ? selected.assetClass : assetClass) === "gold";
 
   // Income tax sits inline in the Amount group; an acquisition's fees/tax sit behind the

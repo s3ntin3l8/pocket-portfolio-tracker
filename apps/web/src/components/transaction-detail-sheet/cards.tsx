@@ -5,7 +5,7 @@ import { cn, formatSignedMoney } from "@/lib/utils";
 import { BrokerageIcon } from "@/components/brokerage-icon";
 import { SOURCE_ICON } from "@/components/transactions-table";
 import { TAX_COMPONENT_LABELS } from "@/components/transaction-sources-section";
-import { SOURCE_PILL, DEFAULT_PILL, INCOME_BREAKDOWN_TYPES } from "./constants";
+import { SOURCE_PILL, DEFAULT_PILL, DRAFT_PILL, INCOME_BREAKDOWN_TYPES } from "./constants";
 
 export function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -61,6 +61,7 @@ export function HeroAmount({
   netAmount,
   currency,
   source,
+  isDraft = false,
   showApproxDisplay,
   netAmountDisplay,
   effectiveDisplayCurrency,
@@ -70,6 +71,8 @@ export function HeroAmount({
   netAmount: number;
   currency: string;
   source: string;
+  /** v2 design: a gold "Draft" pill shown alongside — not instead of — the source pill. */
+  isDraft?: boolean;
   showApproxDisplay: boolean;
   netAmountDisplay: number | null;
   effectiveDisplayCurrency: string | null;
@@ -77,6 +80,7 @@ export function HeroAmount({
   locale: string;
 }) {
   const t = useTranslations("Transactions");
+  const tm = useTranslations("Manage");
   const pill = SOURCE_PILL[source] ?? DEFAULT_PILL;
   const SourceIcon = SOURCE_ICON[source] ?? null;
 
@@ -103,6 +107,14 @@ export function HeroAmount({
           {SourceIcon && <SourceIcon className="size-3" />}
           {t(`sources.${source}`)}
         </span>
+        {isDraft && (
+          <span
+            className="ml-1.5 inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.04em]"
+            style={{ background: DRAFT_PILL.bg, color: DRAFT_PILL.fg }}
+          >
+            {tm("status.badgeDraft")}
+          </span>
+        )}
       </div>
     </div>
   );

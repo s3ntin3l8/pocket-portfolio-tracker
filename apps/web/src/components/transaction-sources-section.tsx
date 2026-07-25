@@ -86,7 +86,7 @@ export function TransactionSourcesSection({
           return (
             <div key={src.id} className="flex items-center gap-3 px-[15px] py-[13px]">
               <span
-                className="flex size-10 shrink-0 items-center justify-center rounded-[12px]"
+                className="flex size-[42px] shrink-0 items-center justify-center rounded-[11px]"
                 style={{ background: style.bg, color: style.fg }}
               >
                 <Icon className="size-5" strokeWidth={1.9} />

@@ -25,6 +25,7 @@ export function AddTransactionForm({
   client,
   portfolioId,
   portfolio,
+  portfolioPicker,
   initial,
   transactionId,
   onSuccess,
@@ -35,6 +36,11 @@ export function AddTransactionForm({
   portfolioId: string;
   /** The full selected-portfolio object — desktop Summary rail only (see `AddTransaction`). */
   portfolio?: PickablePortfolio;
+  /** Rendered between the bucket switcher and the instrument field (v2 design), Add mode
+   *  only — Edit never reassigns a portfolio (that's the detail sheet's "Reassign…"
+   *  action instead). The caller (`AddTransaction`/`new-entry-tabs.tsx`) owns the picker's
+   *  own state/markup; this only controls where it renders. */
+  portfolioPicker?: React.ReactNode;
   initial?: AddTransactionInitial;
   transactionId?: string;
   onSuccess?: () => void;
@@ -51,6 +57,51 @@ export function AddTransactionForm({
 
   const formId = useId();
   const footerEl = useSheetFooter();
+
+  const instrumentFieldEl = (
+    <InstrumentField
+      boxed={form.isEdit}
+      hasInstrument={form.hasInstrument}
+      selected={form.selected}
+      setSelected={form.setSelected}
+      assetClass={form.assetClass}
+      setAssetClass={(v) =>
+        form.setAssetClass(v as "equity" | "gold" | "bond" | "mutual_fund" | "etf" | "crypto")
+      }
+      unit={form.unit}
+      setUnit={(v) => form.setUnit(v as "shares" | "grams" | "units")}
+      query={form.query}
+      runSearch={form.runSearch}
+      results={form.results}
+      discovered={form.discovered}
+      onSelectSaved={form.handleSelectSaved}
+      prefillFrom={form.prefillFrom}
+      symbol={form.symbol}
+      setSymbol={form.setSymbol}
+      name={form.name}
+      setName={form.setName}
+      setIsin={form.setIsin}
+      setDiscoveredMarket={form.setDiscoveredMarket}
+      goldSourceList={form.goldSourceList}
+      goldMarket={form.goldMarket}
+      setGoldMarket={form.setGoldMarket}
+      customOpen={form.customOpen}
+      onToggleCustom={() => form.setCustomOpen((o) => !o)}
+      t={form.t}
+      tc={form.tc}
+    />
+  );
+
+  const subTypeToggleEl = (
+    <SubTypeToggle
+      type={form.type}
+      subTypes={form.subTypes}
+      labelKey={form.subTypeLabelKey}
+      onSelect={(ty) => form.setType(ty as typeof form.type)}
+      t={form.t}
+      tt={form.tt}
+    />
+  );
 
   const formEl = (
     <form
@@ -71,45 +122,23 @@ export function AddTransactionForm({
 
       <BucketSwitcher bucket={form.bucket} onSelect={form.setBucket} t={form.t} />
 
-      <InstrumentField
-        hasInstrument={form.hasInstrument}
-        selected={form.selected}
-        setSelected={form.setSelected}
-        assetClass={form.assetClass}
-        setAssetClass={(v) =>
-          form.setAssetClass(v as "equity" | "gold" | "bond" | "mutual_fund" | "etf" | "crypto")
-        }
-        unit={form.unit}
-        setUnit={(v) => form.setUnit(v as "shares" | "grams" | "units")}
-        query={form.query}
-        runSearch={form.runSearch}
-        results={form.results}
-        discovered={form.discovered}
-        onSelectSaved={form.handleSelectSaved}
-        prefillFrom={form.prefillFrom}
-        symbol={form.symbol}
-        setSymbol={form.setSymbol}
-        name={form.name}
-        setName={form.setName}
-        setIsin={form.setIsin}
-        setDiscoveredMarket={form.setDiscoveredMarket}
-        goldSourceList={form.goldSourceList}
-        goldMarket={form.goldMarket}
-        setGoldMarket={form.setGoldMarket}
-        customOpen={form.customOpen}
-        onToggleCustom={() => form.setCustomOpen((o) => !o)}
-        t={form.t}
-        tc={form.tc}
-      />
+      {!form.isEdit && portfolioPicker}
 
-      <SubTypeToggle
-        type={form.type}
-        subTypes={form.subTypes}
-        labelKey={form.subTypeLabelKey}
-        onSelect={(ty) => form.setType(ty as typeof form.type)}
-        t={form.t}
-        tt={form.tt}
-      />
+      {/* Edit's mock swaps this order (Sub-type before Instrument, Instrument boxed);
+          Add keeps Instrument first, unboxed. Genuinely different designs, not a style
+          nudge — see `InstrumentField`'s and `use-transaction-form.ts`'s `showTax` doc
+          comments for the same Add-vs-Edit divergence elsewhere in this form. */}
+      {form.isEdit ? (
+        <>
+          {subTypeToggleEl}
+          {instrumentFieldEl}
+        </>
+      ) : (
+        <>
+          {instrumentFieldEl}
+          {subTypeToggleEl}
+        </>
+      )}
 
       <PricingFields
         type={form.type}

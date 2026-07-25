@@ -506,16 +506,20 @@ describe("TransactionDetailSheet — v2 design fidelity", () => {
     expect(subtitle).toBeInTheDocument();
   });
 
-  it("renders as a centered Dialog on desktop (≥860px) instead of a bottom Sheet", () => {
-    window.matchMedia = vi.fn().mockReturnValue({
+  it("renders as a centered Dialog on desktop (≥760px, not the app's usual 860 — a narrower panel) instead of a bottom Sheet", () => {
+    const matchMedia = vi.fn().mockReturnValue({
       matches: true,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     });
+    window.matchMedia = matchMedia;
     renderSheet();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     // The desktop close button has no drag handle — the mobile Sheet's shows one.
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    // Locks in the specific breakpoint — the detail panel's own 480px-max Dialog switches
+    // to desktop chrome sooner than the app's usual 860px (Add/Edit's wider modal).
+    expect(matchMedia).toHaveBeenCalledWith("(min-width: 760px)");
   });
 
   it("labels a dividend's breakdown rows Shares/Per share/Gross/Net income (not Quantity/Price/Amount/Net Amount)", () => {
@@ -545,5 +549,65 @@ describe("TransactionDetailSheet — v2 design fidelity", () => {
     expect(screen.getByText(messages.Transactions.priceUnit)).toBeInTheDocument();
     expect(screen.getByText(messages.Transactions.amount)).toBeInTheDocument();
     expect(screen.getByText(messages.Transactions.netAmount)).toBeInTheDocument();
+  });
+
+  it("shows a gold Draft pill alongside the source pill for a draft transaction", () => {
+    renderSheet({ tx: { ...TX, status: "draft" } });
+    expect(screen.getByText(messages.Manage.status.badgeDraft)).toBeInTheDocument();
+    // Alongside, not instead of — the source pill ("Manual") is still there too. (The
+    // default TX fixture also shows the Source document card, so "Manual" appears twice —
+    // just confirm it's still present, not that it's unique.)
+    expect(screen.getAllByText(messages.Transactions.sources.manual).length).toBeGreaterThan(0);
+  });
+
+  it("shows no Draft pill for a normal (non-draft) transaction", () => {
+    renderSheet();
+    expect(screen.queryByText(messages.Manage.status.badgeDraft)).toBeNull();
+  });
+
+  it("shows a Source document card for a whole-transaction receipt with no per-source attribution", async () => {
+    // hasDocument true, no `sources` array at all → the showReceipt-only case.
+    renderSheet({ tx: { ...TX, hasDocument: true, sources: undefined } });
+    expect(
+      screen.getByText(messages.Transactions.sourcesSection.documentTitle),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(messages.Transactions.sourcesSection.autoParsedRetained),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: messages.Transactions.sourcesSection.download }),
+    );
+    await waitFor(() => expect(getTransactionDocumentUrl).toHaveBeenCalledWith("p-1", "tx-1"));
+  });
+
+  it("shows no Source document card when there's nothing to download", () => {
+    renderSheet({ tx: { ...TX, hasDocument: false, sources: undefined } });
+    expect(screen.queryByText(messages.Transactions.sourcesSection.documentTitle)).toBeNull();
+  });
+
+  it("shows no Source document card when the document is already attributed to a source", () => {
+    // hasDocument true, but a source itself carries the document — the per-source list
+    // (TransactionSourcesSection) covers it instead of the whole-transaction card.
+    renderSheet({
+      tx: {
+        ...TX,
+        hasDocument: true,
+        sources: [
+          {
+            id: "src-1",
+            sourceType: "pdf",
+            externalId: "tr:exec:abc",
+            orderRef: null,
+            documentId: "doc-1",
+            taxComponents: null,
+            createdAt: "2026-03-15T00:00:00.000Z",
+            filename: "settlement.pdf",
+            hasDocument: true,
+          },
+        ],
+      },
+    });
+    expect(screen.queryByText(messages.Transactions.sourcesSection.documentTitle)).toBeNull();
   });
 });

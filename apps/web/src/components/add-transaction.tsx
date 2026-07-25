@@ -9,6 +9,7 @@ import { useRouter } from "@/i18n/navigation";
 export function AddTransaction({
   portfolioId,
   portfolio,
+  portfolioPicker,
   initial,
   stickyFooter = false,
   isDesktop = false,
@@ -17,6 +18,8 @@ export function AddTransaction({
   /** The full selected-portfolio object (name/brokerage/holder) — only needed for the
    *  desktop Summary rail's portfolio row; the form itself still submits by `portfolioId`. */
   portfolio?: PickablePortfolio;
+  /** See `AddTransactionForm` — rendered between the bucket switcher and instrument field. */
+  portfolioPicker?: React.ReactNode;
   /** Prefill (e.g. a harvest-suggestion sell draft, #harvestInstrument). Not an edit —
    *  no `transactionId` is passed, so the form still creates a new transaction. */
   initial?: AddTransactionInitial;
@@ -31,6 +34,7 @@ export function AddTransaction({
       client={api}
       portfolioId={portfolioId}
       portfolio={portfolio}
+      portfolioPicker={portfolioPicker}
       initial={initial}
       stickyFooter={stickyFooter}
       isDesktop={isDesktop}

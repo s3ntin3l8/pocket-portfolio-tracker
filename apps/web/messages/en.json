@@ -1334,7 +1334,9 @@
       "download": "Download source file",
       "importedAt": "Imported {date}",
       "fullDetailBadge": "Full tax breakdown available from settlement PDF.",
-      "notRetained": "The original document was not stored. To keep imported files, enable document retention in the portfolio settings."
+      "notRetained": "The original document was not stored. To keep imported files, enable document retention in the portfolio settings.",
+      "documentTitle": "Source document",
+      "autoParsedRetained": "Auto-parsed · retained"
     },
     "batch": {
       "selectRows": "Select rows",

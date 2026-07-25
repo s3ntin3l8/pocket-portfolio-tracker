@@ -714,11 +714,12 @@ describe("AddTransactionForm", () => {
     expect(screen.getByLabelText(m.tags)).toHaveValue("tax-loss, idx");
   });
 
-  it("preserves a legacy buy's existing nonzero tax on an unrelated edit, even though the field is hidden (review regression)", async () => {
-    // A buy never shows a tax field (only sell/income withhold tax — v2 design), but a
-    // transaction from before this change (or written directly via the API/an import) can
-    // still carry one. Editing it — e.g. just fixing the quantity — must not silently wipe
-    // that stored tax value out from under the user just because the field isn't rendered.
+  it("preserves a legacy transfer's existing nonzero tax on an unrelated edit, even though the field is hidden (review regression)", async () => {
+    // A transfer never shows a tax field (neither a trade nor an income event — v2
+    // design), but a transaction from before this change (or written directly via the
+    // API/an import) can still carry one. Editing it — e.g. just fixing the quantity —
+    // must not silently wipe that stored tax value out from under the user just because
+    // the field isn't rendered.
     const client = makeClient();
     const onSuccess = vi.fn();
     render(
@@ -727,14 +728,16 @@ describe("AddTransactionForm", () => {
           client={client}
           portfolioId="p1"
           transactionId="t-legacy-tax"
-          initial={{ ...EDIT_INITIAL, type: "buy", tax: "50" }}
+          initial={{ ...EDIT_INITIAL, type: "transfer_in", tax: "50" }}
           onSuccess={onSuccess}
         />
       </NextIntlClientProvider>,
     );
 
-    // The tax field is genuinely absent for a buy — this isn't a hidden-but-present input.
+    // The tax field is genuinely absent for a transfer — this isn't a hidden-but-present
+    // input (and there's no "Add fees / tax" collapsible either — transfers don't get one).
     expect(screen.queryByLabelText(m.tax)).toBeNull();
+    expect(screen.queryByRole("button", { name: m.extrasFeesTax })).toBeNull();
 
     fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "150" } });
     fireEvent.click(screen.getByRole("button", { name: m.save }));
@@ -745,6 +748,64 @@ describe("AddTransactionForm", () => {
       "t-legacy-tax",
       expect.objectContaining({ quantity: "150", tax: "50" }),
     );
+  });
+
+  it("shows the tax field for a buy in edit mode (Edit mock: showTax = isAcq || isIncome, unlike Add's sell-only rule)", () => {
+    const client = makeClient();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AddTransactionForm
+          client={client}
+          portfolioId="p1"
+          transactionId="t-buy-tax"
+          initial={{ ...EDIT_INITIAL, type: "buy", tax: "12" }}
+        />
+      </NextIntlClientProvider>,
+    );
+    // Nonzero tax auto-opens the extras collapsible in edit mode — the field is visible
+    // immediately, not just reachable behind a click.
+    expect(screen.getByLabelText(m.tax)).toHaveValue("12");
+  });
+
+  it("does not show the tax field for a fresh (non-edit) buy — Add keeps its sell-only rule", () => {
+    const client = makeClient();
+    renderForm(client);
+    selectSubType(messages.TxType.buy);
+    expect(screen.queryByLabelText(m.tax)).toBeNull();
+  });
+
+  it("orders Instrument before Sub-type in Add mode (unchanged from before this PR)", () => {
+    const client = makeClient();
+    renderForm(client);
+    const instrumentLabel = screen.getByText(m.instrument);
+    const buyChip = screen.getByRole("button", { name: messages.TxType.buy });
+    expect(
+      instrumentLabel.compareDocumentPosition(buyChip) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("orders Sub-type before Instrument in Edit mode, and boxes the instrument field (v2 Edit-only deviations)", () => {
+    const client = makeClient();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AddTransactionForm
+          client={client}
+          portfolioId="p1"
+          transactionId="t-order"
+          initial={EDIT_INITIAL}
+        />
+      </NextIntlClientProvider>,
+    );
+    const instrumentLabel = screen.getByText(m.instrument);
+    const buyChip = screen.getByRole("button", { name: messages.TxType.buy });
+    // Sub-type chip now comes *before* the Instrument label in document order.
+    expect(
+      buyChip.compareDocumentPosition(instrumentLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // The instrument field's content wraps in the card-2 inset box only in Edit mode.
+    const instrumentBox = instrumentLabel.parentElement!.querySelector(".bg-card-2");
+    expect(instrumentBox).not.toBeNull();
   });
 });
 

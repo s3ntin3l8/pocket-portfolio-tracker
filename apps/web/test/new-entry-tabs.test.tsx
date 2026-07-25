@@ -97,6 +97,24 @@ describe("NewEntryTabs", () => {
     expect(screen.getByRole("menuitem", { name: /DKB · DKB/ })).toBeInTheDocument();
   });
 
+  it("places the transaction tab's picker between the bucket switcher and instrument field (v2 design)", () => {
+    renderTabs("transaction", [
+      { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+      { id: "p2", name: "DKB", brokerage: "DKB", accountHolder: null },
+    ]);
+    const bucketButton = screen.getByRole("button", { name: tx.bucketTrade });
+    const picker = screen.getByRole("button", { name: tx.portfolioPicker });
+    const instrumentLabel = screen.getByText(tx.instrument);
+
+    // Bucket switcher, then picker, then instrument field — in that document order.
+    expect(
+      bucketButton.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      picker.compareDocumentPosition(instrumentLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("shares the rich portfolio picker with the merger tab", () => {
     renderTabs("merger", [
       { id: "p1", name: "Main", brokerage: null, accountHolder: null },

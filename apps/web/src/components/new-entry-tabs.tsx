@@ -113,11 +113,14 @@ export function NewEntryTabs({
         </TabsList>
       )}
       {visibleTabs.includes("transaction") && (
-        <TabsContent value="transaction" className="space-y-4">
-          {picker}
+        <TabsContent value="transaction">
+          {/* v2 design: the picker sits inside the form, between the bucket switcher and
+              the instrument field — not above it (unlike the merger tab below, which
+              doesn't go through AddTransactionForm and keeps its own copy above). */}
           <AddTransaction
             portfolioId={portfolioId}
             portfolio={activePortfolio}
+            portfolioPicker={picker}
             initial={initialTransaction}
             stickyFooter={stickyFooter}
             isDesktop={isDesktop}
