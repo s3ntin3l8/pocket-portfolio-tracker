@@ -26,6 +26,7 @@ import {
   formatSignedMoney,
   rowAnomalyCounts,
   bannerAnomalies,
+  anomalyLabel,
   type AnomalyTranslator,
 } from "@/lib/utils";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
@@ -364,9 +365,12 @@ export default async function HoldingsPage({
         <div className="space-y-5">
           {anomalyBanner}
           <ReconciliationBannerGroup
-            anomalies={standaloneAnomalies}
-            ta={ta as AnomalyTranslator}
-            locale={locale}
+            items={standaloneAnomalies.map((a, i) => ({
+              key: `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`,
+              title: ta("reconciliationTitle"),
+              detail: anomalyLabel(a, ta as AnomalyTranslator, locale),
+              tag: ta("portfolioTag"),
+            }))}
           />
 
           <div className="space-y-3">
