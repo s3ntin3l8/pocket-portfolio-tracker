@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:seed-demo": "tsx --env-file=../../.env src/db/seed-demo.ts",
     "scrape": "tsx --env-file=../../.env src/db/scrape.ts",
     "repair:instruments": "tsx --env-file=../../.env src/db/repair-eu-instruments.ts"
   },

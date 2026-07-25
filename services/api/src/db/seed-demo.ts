@@ -83,7 +83,11 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     .returning();
 
   // pt_ + 43 url-safe chars (32 bytes) — same shape routes/me.ts mints for a real PAT.
-  const secret = `${PAT_PREFIX}${randomBytes(32).toString("base64url")}`;
+  // When no output path is given (dev mode), use a deterministic secret so the value can
+  // be hardcoded in the dev environment config (DEV_AUTH_TOKEN in .env).
+  const secret = patOutPath
+    ? `${PAT_PREFIX}${randomBytes(32).toString("base64url")}`
+    : `${PAT_PREFIX}dev-pat-for-local-development-only`;
   await db.insert(apiTokens).values({
     userId: user.id,
     name: "screenshot-pipeline",

@@ -47,14 +47,19 @@ export async function getSelectedPortfolioId(): Promise<string | null> {
 
 const apiBaseUrl = process.env.API_URL ?? "";
 const authConfigured = Boolean(process.env.AUTH_SECRET && process.env.AUTHENTIK_ISSUER);
+const devToken = process.env.DEV_AUTH_TOKEN;
 
 const getServerApi = cache(async (): Promise<ApiClient | null> => {
-  if (!authConfigured) return null;
-  const cookieHeader = (await cookies())
-    .getAll()
-    .map((c) => `${c.name}=${c.value}`)
-    .join("; ");
-  const token = await accessTokenFromCookieHeader(cookieHeader);
+  let token: string | null = null;
+  if (devToken) {
+    token = devToken;
+  } else if (authConfigured) {
+    const cookieHeader = (await cookies())
+      .getAll()
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; ");
+    token = await accessTokenFromCookieHeader(cookieHeader);
+  }
   if (!token) return null;
   return createApiClient({ baseUrl: apiBaseUrl, getToken: () => token });
 });

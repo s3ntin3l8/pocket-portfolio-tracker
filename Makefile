@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web test test-coverage lint typecheck format build clean prod prod-down prod-logs
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web seed-demo dev-reset test test-coverage lint typecheck format build clean prod prod-down prod-logs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -44,6 +44,12 @@ dev: ## Start all dev servers (API + web via Turbo)
 dev-web: ## Start only the web app dev server (mock data, no API needed)
 	fuser -k 3005/tcp 2>/dev/null || true
 	npm run dev --workspace @portfolio/web
+
+seed-demo: ## Seed the rich demo dataset into the current database (deterministic dev PAT)
+	npm run db:seed-demo --workspace @portfolio/api
+
+dev-reset: ## Delete the PGlite dev database (next make dev re-creates + auto-migrates)
+	rm -f .pglite-dev
 
 test: ## Run tests
 	npm run test
