@@ -101,6 +101,8 @@ export function TransactionsTable({
   const [busy, setBusy] = useState(false);
   const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [showFlagged, setShowFlagged] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
 
   const { flaggedRows, flaggedLoading } = useFlaggedRows(showFlagged, anomalyByTxId, portfolioId);
 
@@ -359,12 +361,15 @@ export function TransactionsTable({
     <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
       {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
       <div className="space-y-3 @xl:sticky @xl:top-4 @xl:order-last">
-        <AnomalyBanner
-          anomalies={anomalies}
-          flaggedCount={flaggedCount}
-          showFlagged={showFlagged}
-          onToggleFlagged={() => setShowFlagged((v) => !v)}
-        />
+        {!bannerDismissed && (
+          <AnomalyBanner
+            anomalies={anomalies}
+            flaggedCount={flaggedCount}
+            showFlagged={showFlagged}
+            onToggleFlagged={() => setShowFlagged((v) => !v)}
+            onDismiss={() => setBannerDismissed(true)}
+          />
+        )}
 
         {showFilterBanners && allBanner && (
           <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
@@ -389,14 +394,20 @@ export function TransactionsTable({
             />
           )}
         {showFilterBanners &&
-          portfolioAnomalies.map((a, i) => (
-            <ReconciliationBanner
-              key={`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`}
-              title={ta("reconciliationTitle")}
-              detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-              tag={ta("portfolioTag")}
-            />
-          ))}
+          portfolioAnomalies
+            .filter((a) => !dismissedRecon.has(`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`))
+            .map((a) => {
+              const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
+              return (
+                <ReconciliationBanner
+                  key={key}
+                  title={ta("reconciliationTitle")}
+                  detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
+                  tag={ta("portfolioTag")}
+                  onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(key))}
+                />
+              );
+            })}
       </div>
 
       {/* ── Main column: controls + table ── */}

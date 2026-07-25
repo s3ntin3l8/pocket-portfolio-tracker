@@ -24,13 +24,12 @@ import {
   formatMoney,
   formatPercent,
   formatSignedMoney,
-  anomalyLabel,
   rowAnomalyCounts,
   bannerAnomalies,
   type AnomalyTranslator,
 } from "@/lib/utils";
-import { ReconciliationBanner } from "@/components/transactions/activity-banners";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
 
 const CLASS_TABS = [
   "all",
@@ -364,14 +363,11 @@ export default async function HoldingsPage({
         {/* ── Main column: anomaly banners + tabs + table ── */}
         <div className="space-y-5">
           {anomalyBanner}
-          {standaloneAnomalies.map((a, i) => (
-            <ReconciliationBanner
-              key={`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`}
-              title={ta("reconciliationTitle")}
-              detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-              tag={ta("portfolioTag")}
-            />
-          ))}
+          <ReconciliationBannerGroup
+            anomalies={standaloneAnomalies}
+            ta={ta as AnomalyTranslator}
+            locale={locale}
+          />
 
           <div className="space-y-3">
             <Tabs defaultValue="all">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Search, X, ChevronDown, Check } from "lucide-react";
+import { Search, X, ChevronDown, Check, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 export function FilterBar({
@@ -43,6 +44,7 @@ export function FilterBar({
   const tBanner = useTranslations("Transactions.banners");
 
   const [localQuery, setLocalQuery] = useState(searchQuery ?? "");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(
@@ -52,47 +54,69 @@ export function FilterBar({
     [],
   );
 
+  const hasActiveFilter =
+    (searchQuery && searchQuery.length > 0) ||
+    showFlagged ||
+    typeFilter != null ||
+    yearFilterProp != null ||
+    draftFilter !== "all";
+
+  const activeFilterCount = [
+    typeFilter != null,
+    showFlagged,
+    yearFilterProp != null,
+    draftFilter !== "all",
+    searchQuery != null && searchQuery.length > 0,
+  ].filter(Boolean).length;
+
+  const typeChips = (
+    <>
+      {(
+        [
+          ["all", t("filterAll")],
+          ["buy", tBanner("chipBuys")],
+          ["sell", tBanner("chipSells")],
+          ["income", tBanner("chipIncome")],
+        ] as const
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onNavigateWithParam("type", key === "all" ? undefined : key)}
+          aria-pressed={key === "all" ? !typeFilter : typeFilter === key}
+          className={cn(
+            "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
+            (key === "all" ? !typeFilter : typeFilter === key)
+              ? "bg-pill font-bold text-white"
+              : "border border-border bg-card font-semibold text-foreground",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+      {flaggedCount > 0 && (
+        <button
+          type="button"
+          onClick={onToggleFlagged}
+          aria-pressed={showFlagged}
+          className={cn(
+            "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
+            showFlagged
+              ? "border-[var(--gold-fg)] bg-[var(--gold-fg)] text-white"
+              : "border-[rgba(224,165,58,.34)] bg-[rgba(224,165,58,.12)] text-[var(--gold-fg)]",
+          )}
+        >
+          {tBanner("chipIssues", { count: flaggedCount })}
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
-        {(
-          [
-            ["all", t("filterAll")],
-            ["buy", tBanner("chipBuys")],
-            ["sell", tBanner("chipSells")],
-            ["income", tBanner("chipIncome")],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onNavigateWithParam("type", key === "all" ? undefined : key)}
-            aria-pressed={key === "all" ? !typeFilter : typeFilter === key}
-            className={cn(
-              "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
-              (key === "all" ? !typeFilter : typeFilter === key)
-                ? "bg-pill font-bold text-white"
-                : "border border-border bg-card font-semibold text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-        {flaggedCount > 0 && (
-          <button
-            type="button"
-            onClick={onToggleFlagged}
-            aria-pressed={showFlagged}
-            className={cn(
-              "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
-              showFlagged
-                ? "border-[var(--gold-fg)] bg-[var(--gold-fg)] text-white"
-                : "border-[rgba(224,165,58,.34)] bg-[rgba(224,165,58,.12)] text-[var(--gold-fg)]",
-            )}
-          >
-            {tBanner("chipIssues", { count: flaggedCount })}
-          </button>
-        )}
+      {/* Desktop: inline chips */}
+      <div className="hidden flex-wrap items-center gap-2 sm:flex">
+        {typeChips}
         {yearOptions.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -133,7 +157,139 @@ export function FilterBar({
           </select>
         )}
       </div>
-      <div className="relative flex items-center sm:ml-auto">
+
+      {/* Mobile: filter button + search */}
+      <div className="flex items-center gap-2 sm:hidden">
+        <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("filterLabel")}
+              className={cn(
+                "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                hasActiveFilter
+                  ? "border-pill bg-pill text-white"
+                  : "border-border bg-card text-foreground",
+              )}
+            >
+              <SlidersHorizontal className="size-3.5" />
+              {t("filterLabel")}
+              {activeFilterCount > 0 && (
+                <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-white/20 text-[9px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </SheetTrigger>
+          <SheetContent
+            side="bottom"
+            className="rounded-t-[20px] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          >
+            <SheetHeader className="pb-3 pt-1">
+              <SheetTitle className="text-left text-base">{t("filterLabel")}</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-4">
+              <div className="relative flex items-center">
+                <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={t("searchPlaceholder")}
+                  value={localQuery}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setLocalQuery(v);
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => {
+                      onSearchChange(v || undefined);
+                    }, 300);
+                  }}
+                  className="h-9 w-full pl-7 pr-7 text-xs"
+                />
+                {localQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalQuery("");
+                      if (debounceRef.current) clearTimeout(debounceRef.current);
+                      onSearchChange(undefined);
+                    }}
+                    aria-label={t("searchClear")}
+                    className="absolute right-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+                  {t("filterType")}
+                </p>
+                <div className="flex flex-wrap gap-2">{typeChips}</div>
+              </div>
+
+              {yearOptions.length > 1 && (
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+                    {t("filterYear")}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {["all", ...yearOptions].map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => {
+                          onNavigateWithParam("year", y === "all" ? undefined : y);
+                          setMobileFilterOpen(false);
+                        }}
+                        className={cn(
+                          "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
+                          (y === "all" ? !yearFilterProp : yearFilterProp === y)
+                            ? "bg-pill font-bold text-white"
+                            : "border border-border bg-card font-semibold text-foreground",
+                        )}
+                      >
+                        {y === "all" ? t("allYears") : y}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {draftCount > 0 && (
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+                    {t("filterDraftLabel")}
+                  </p>
+                  <div className="flex gap-2">
+                    {(["all", "drafts"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => {
+                          onDraftFilterChange(v);
+                          setMobileFilterOpen(false);
+                        }}
+                        className={cn(
+                          "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
+                          draftFilter === v
+                            ? "bg-pill font-bold text-white"
+                            : "border border-border bg-card font-semibold text-foreground",
+                        )}
+                      >
+                        {v === "all" ? t("draftShowAll") : t("draftOnly", { count: draftCount })}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Desktop search */}
+      <div className="relative hidden items-center sm:flex sm:ml-auto">
         <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
         <Input
           type="text"
