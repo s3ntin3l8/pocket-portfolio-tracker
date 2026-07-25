@@ -161,11 +161,12 @@ describe("computeActiveReturn", () => {
 
 describe("getUserBenchmarkConfig", () => {
   async function seedUser(app: Awaited<ReturnType<typeof buildApp>>, symbol?: string) {
+    const authSub = crypto.randomUUID();
     const [u] = await app.db
       .insert(users)
       .values({
-        authSub: crypto.randomUUID(),
-        email: "bm@example.com",
+        authSub,
+        email: `${authSub}@example.com`,
       })
       .returning();
     if (symbol) {
