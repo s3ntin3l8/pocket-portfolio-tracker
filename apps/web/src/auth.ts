@@ -138,6 +138,7 @@ function rotateRefreshTokenOnce(refreshToken: string): Promise<RefreshResult> {
 }
 
 const localAuthAvailable = Boolean(process.env.AUTH_LOCAL_SECRET);
+const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);
 
 export const authConfig: NextAuthConfig = {
   // Self-hosted behind a reverse proxy (Proxmox / same origin as Authentik): trust
@@ -151,13 +152,22 @@ export const authConfig: NextAuthConfig = {
   // next-intl localizes the path (→ /<locale>/auth-error). See auth-error-recovery.tsx.
   pages: { error: "/auth-error" },
   providers: [
-    Authentik({
-      clientId: process.env.AUTHENTIK_CLIENT_ID,
-      clientSecret: process.env.AUTHENTIK_CLIENT_SECRET,
-      issuer: process.env.AUTHENTIK_ISSUER,
-      // `offline_access` makes Authentik issue a refresh token we can rotate with.
-      authorization: { params: { scope: "openid profile email offline_access" } },
-    }),
+    // Only register Authentik when it's actually configured (AUTHENTIK_ISSUER set) —
+    // Auth.js validates every provider's config on each request (assertConfig), so an
+    // unconditionally-registered Authentik provider with an empty issuer throws
+    // InvalidEndpoints on every /api/auth/* call, including AuthSessionProvider's 60s
+    // poll (session-provider.tsx) — which fires regardless of DEV_AUTH_TOKEN/local auth.
+    ...(authentikAvailable
+      ? [
+          Authentik({
+            clientId: process.env.AUTHENTIK_CLIENT_ID,
+            clientSecret: process.env.AUTHENTIK_CLIENT_SECRET,
+            issuer: process.env.AUTHENTIK_ISSUER,
+            // `offline_access` makes Authentik issue a refresh token we can rotate with.
+            authorization: { params: { scope: "openid profile email offline_access" } },
+          }),
+        ]
+      : []),
     // Local password auth (optional — requires AUTH_LOCAL_SECRET in env).
     ...(localAuthAvailable
       ? [

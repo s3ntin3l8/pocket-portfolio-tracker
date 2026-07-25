@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   users,
   apiTokens,
@@ -718,11 +718,21 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // most portfolios' own baseCurrency; EUR is Trade Republic's own baseCurrency.
 
   const today = isoDate(NOW);
-  await db.insert(fxRates).values([
-    { base: "EUR", quote: "IDR", rate: "17450", date: today },
-    { base: "USD", quote: "IDR", rate: "16100", date: today },
-    { base: "USD", quote: "EUR", rate: "0.923", date: today },
-  ]);
+  const fxPairs: { base: string; quote: string; rate: string }[] = [
+    { base: "EUR", quote: "IDR", rate: "17450" },
+    { base: "USD", quote: "IDR", rate: "16100" },
+    { base: "USD", quote: "EUR", rate: "0.923" },
+  ];
+  // Clean up any prior demo run's rates for today (global reference data, not owned by
+  // the demo user, so the cascading delete above doesn't touch it — same rationale as
+  // the instruments-by-symbol cleanup). Without this, re-running seed-demo on the same
+  // dev DB later the same day hits fx_rates_base_quote_date_idx.
+  for (const { base, quote } of fxPairs) {
+    await db
+      .delete(fxRates)
+      .where(and(eq(fxRates.base, base), eq(fxRates.quote, quote), eq(fxRates.date, today)));
+  }
+  await db.insert(fxRates).values(fxPairs.map((pair) => ({ ...pair, date: today })));
 
   // --- Portfolio snapshots (daily net-worth history → dashboard/savings charts). ---
   // A deterministic upward-drift-plus-noise walk from a small starting value to
