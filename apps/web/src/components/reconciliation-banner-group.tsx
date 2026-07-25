@@ -2,41 +2,32 @@
 
 import { useState } from "react";
 import { ReconciliationBanner } from "@/components/transactions/activity-banners";
-import { anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
-import type { Anomaly } from "@portfolio/api-client";
 
-export function ReconciliationBannerGroup({
-  anomalies,
-  ta,
-  locale,
-}: {
-  anomalies: Anomaly[];
-  ta: AnomalyTranslator;
-  locale: string;
-}) {
+export interface BannerItem {
+  key: string;
+  title: string;
+  detail: string;
+  tag: string;
+}
+
+export function ReconciliationBannerGroup({ items }: { items: BannerItem[] }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  if (anomalies.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <>
-      {anomalies
-        .filter((a) => {
-          const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
-          return !dismissed.has(key);
-        })
-        .map((a, i) => {
-          const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`;
-          return (
-            <ReconciliationBanner
-              key={key}
-              title={ta("reconciliationTitle")}
-              detail={anomalyLabel(a, ta, locale)}
-              tag={ta("portfolioTag")}
-              onDismiss={() => setDismissed((prev) => new Set(prev).add(key))}
-            />
-          );
-        })}
+      {items
+        .filter((item) => !dismissed.has(item.key))
+        .map((item) => (
+          <ReconciliationBanner
+            key={item.key}
+            title={item.title}
+            detail={item.detail}
+            tag={item.tag}
+            onDismiss={() => setDismissed((prev) => new Set(prev).add(item.key))}
+          />
+        ))}
     </>
   );
 }
