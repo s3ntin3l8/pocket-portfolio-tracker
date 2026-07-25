@@ -7,6 +7,8 @@ import { Landing } from "@/components/landing";
 const DEFAULT_CURRENCY_BY_LOCALE: Record<string, string> = { id: "IDR", en: "EUR" };
 const SUPPORTED_DEMO_CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
+const localAuthAvailable = Boolean(process.env.AUTH_LOCAL_SECRET);
+
 export default async function LandingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -18,5 +20,5 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
       ? cookieCurrency
       : (DEFAULT_CURRENCY_BY_LOCALE[locale] ?? "EUR");
 
-  return <Landing initialCurrency={currency} />;
+  return <Landing initialCurrency={currency} localAuthAvailable={localAuthAvailable} />;
 }

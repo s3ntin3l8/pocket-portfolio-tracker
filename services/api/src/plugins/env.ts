@@ -45,6 +45,14 @@ const schema = {
       type: "string",
       default: "",
     },
+    // Local password auth fallback (no Authentik needed). When set, the API accepts JWTs
+    // signed with this key (HS256) from /auth/local/login and the web app uses a
+    // credentials-based login form instead of Authentik OIDC. Must be a strong random
+    // secret — use the same value in both API and web env configs.
+    AUTH_LOCAL_SECRET: {
+      type: "string",
+      default: "",
+    },
     CORS_ORIGIN: {
       type: "string",
       default: "",
@@ -178,6 +186,7 @@ declare module "fastify" {
       AUTHENTIK_AUDIENCE: string;
       AUTHENTIK_JWKS_URL: string;
       AUTHENTIK_ADMIN_GROUP: string;
+      AUTH_LOCAL_SECRET: string;
       CORS_ORIGIN: string;
       RATE_LIMIT_MAX: number;
       RATE_LIMIT_WINDOW: string;

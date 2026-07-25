@@ -14,7 +14,7 @@ import {
   allocationTargets,
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
-import { PAT_PREFIX, hashToken } from "../plugins/auth.js";
+import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
 import { ensureDb, getDb, closeDb } from "./client.js";
 
 /**
@@ -37,7 +37,9 @@ import { ensureDb, getDb, closeDb } from "./client.js";
  * later stay looking current rather than visibly stale.
  */
 
-const DEMO_AUTH_SUB = "demo|pocket";
+const SEED_EMAIL = process.env.SEED_DEMO_EMAIL || "demo@pocket.invalid";
+const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || "";
+const DEMO_AUTH_SUB = SEED_PASSWORD ? `local|${SEED_EMAIL}` : "demo|pocket";
 
 // --- date/number helpers --------------------------------------------------
 
@@ -75,11 +77,18 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // api_tokens, etc. down to every row this script owns. Instruments are global
   // reference data (not user-owned) — cleaned up separately by symbol below so a
   // re-run doesn't violate the (market, symbol) unique index.
-  await db.delete(users).where(eq(users.authSub, DEMO_AUTH_SUB));
+  // Delete by email to handle authSub changes (e.g. PAT mode → local auth mode).
+  await db.delete(users).where(eq(users.email, SEED_EMAIL));
 
+  const passwordHash = SEED_PASSWORD ? hashPassword(SEED_PASSWORD) : undefined;
   const [user] = await db
     .insert(users)
-    .values({ authSub: DEMO_AUTH_SUB, email: "demo@pocket.invalid", name: "Demo" })
+    .values({
+      authSub: DEMO_AUTH_SUB,
+      email: SEED_EMAIL,
+      name: "Demo",
+      passwordHash,
+    })
     .returning();
 
   // pt_ + 43 url-safe chars (32 bytes) — same shape routes/me.ts mints for a real PAT.

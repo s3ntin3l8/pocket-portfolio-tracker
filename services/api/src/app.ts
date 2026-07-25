@@ -32,6 +32,7 @@ import { searchRoute } from "./routes/search.js";
 import { storageRoute } from "./routes/storage.js";
 import { targetsRoute } from "./routes/targets.js";
 import { preferencesRoute } from "./routes/preferences.js";
+import { authRoute } from "./routes/auth.js";
 import type { ScreenshotParser } from "./services/parsers/types.js";
 import { getScreenshotParser } from "./services/screenshot-parser.js";
 import { getPytrRunner } from "./services/pytr/runner.js";
@@ -252,6 +253,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
 
   await app.register(rootRoute);
   await app.register(healthRoute);
+  await app.register(authRoute);
   await app.register(meRoute);
   await app.register(portfoliosRoute);
   await app.register(accountHoldersRoute);

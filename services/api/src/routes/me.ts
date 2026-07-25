@@ -63,12 +63,12 @@ export async function meRoute(app: FastifyInstance) {
       .orderBy(desc(apiTokens.createdAt));
   });
 
-  // Mint a new personal access token. Only from an interactive Authentik session —
-  // you can't mint a PAT with a PAT (no credential self-perpetuation). Returns the
-  // plaintext token ONCE; only its hash is stored.
+  // Mint a new personal access token. Only from an interactive session (Authentik JWT
+  // or local password login) — you can't mint a PAT with a PAT (no credential self-
+  // perpetuation). Returns the plaintext token ONCE; only its hash is stored.
   app.post("/me/tokens", { preHandler: app.authenticate }, async (request, reply) => {
     const { id, authMethod } = requireUser(request);
-    if (authMethod !== "jwt") {
+    if (authMethod === "pat") {
       return reply.code(403).send({ error: "interactive_session_required" });
     }
     const { name, scope, expiresInDays } = apiTokenCreateSchema.parse(request.body);

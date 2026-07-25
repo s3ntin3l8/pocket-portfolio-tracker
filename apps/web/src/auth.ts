@@ -1,5 +1,14 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Authentik from "next-auth/providers/authentik";
+import Credentials from "next-auth/providers/credentials";
+
+// Extend the User type so the Credentials provider can return accessToken + expiresAt.
+declare module "next-auth" {
+  interface User {
+    accessToken?: string;
+    expiresAt?: number;
+  }
+}
 
 /**
  * Auth.js (NextAuth v5) wired to Authentik via OIDC (Authorization Code + PKCE).
@@ -128,6 +137,8 @@ function rotateRefreshTokenOnce(refreshToken: string): Promise<RefreshResult> {
   return promise;
 }
 
+const localAuthAvailable = Boolean(process.env.AUTH_LOCAL_SECRET);
+
 export const authConfig: NextAuthConfig = {
   // Self-hosted behind a reverse proxy (Proxmox / same origin as Authentik): trust
   // the forwarded host so Auth.js derives the right callback origin and cookie
@@ -147,18 +158,58 @@ export const authConfig: NextAuthConfig = {
       // `offline_access` makes Authentik issue a refresh token we can rotate with.
       authorization: { params: { scope: "openid profile email offline_access" } },
     }),
+    // Local password auth (optional — requires AUTH_LOCAL_SECRET in env).
+    ...(localAuthAvailable
+      ? [
+          Credentials({
+            name: "credentials",
+            credentials: {
+              email: { label: "Email", type: "email" },
+              password: { label: "Password", type: "password" },
+            },
+            async authorize(credentials) {
+              const apiUrl = process.env.API_URL;
+              if (!apiUrl || !credentials?.email || !credentials?.password) return null;
+              try {
+                const res = await fetch(`${apiUrl}/auth/local/login`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    email: credentials.email,
+                    password: credentials.password,
+                  }),
+                });
+                if (!res.ok) return null;
+                const data = (await res.json()) as {
+                  id: string;
+                  email: string;
+                  name?: string;
+                  accessToken: string;
+                  expiresAt: number;
+                };
+                return {
+                  id: data.id,
+                  email: data.email,
+                  name: data.name ?? null,
+                  accessToken: data.accessToken,
+                  expiresAt: data.expiresAt,
+                };
+              } catch {
+                return null;
+              }
+            },
+          }),
+        ]
+      : []),
   ],
   callbacks: {
-    async jwt({ token, account }) {
-      // Initial sign-in: stash the access + refresh tokens and the absolute expiry.
+    async jwt({ token, account, user, trigger }) {
+      // OIDC sign-in: account is available with access_token + refresh_token.
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at; // unix seconds
         delete token.error;
-        // Diagnostic (no secrets): a refresh token only arrives if Authentik's
-        // provider grants `offline_access`. Without one the session can't outlive the
-        // ~5-min access token, no matter what the client does — flag it loudly.
         if (!account.refresh_token) {
           console.warn(
             "[auth] sign-in returned NO refresh_token — the Authentik provider is " +
@@ -166,6 +217,14 @@ export const authConfig: NextAuthConfig = {
               "access-token expiry (~5 min).",
           );
         }
+        return token;
+      }
+
+      // Local auth (Credentials provider) sign-in: user is available from authorize().
+      if (trigger === "signIn" && user?.accessToken) {
+        token.accessToken = user.accessToken;
+        token.expiresAt = user.expiresAt;
+        delete token.error;
         return token;
       }
 
@@ -177,7 +236,8 @@ export const authConfig: NextAuthConfig = {
         return token;
       }
 
-      // Expired and unrefreshable — surface an error so the UI can prompt re-login.
+      // Expired and unrefreshable (no refresh token, e.g. local auth) — surface an
+      // error so the UI can prompt re-login.
       const refreshToken = token.refreshToken as string | undefined;
       if (!refreshToken) {
         token.error = "RefreshTokenMissing";

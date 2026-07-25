@@ -21,9 +21,16 @@ const DEMO_AMOUNT_BY_CURRENCY: Record<string, number> = {
 const DEMO_GAIN = 0.182;
 
 // Pocket "1A — Split Hero" sign-in (the chosen login concept). Brand panel + auth panel;
-// stacks to a compact brand band above the form on mobile. Authentik OIDC is the only real
-// auth, so both the SSO button and the email form route through it.
-export function Landing({ initialCurrency = "IDR" }: { initialCurrency?: string }) {
+// stacks to a compact brand band above the form on mobile. Authentik OIDC is the primary
+// auth; when localAuthAvailable is true, the email/password form uses a credentials-
+// based login against the API instead of routing through Authentik.
+export function Landing({
+  initialCurrency = "IDR",
+  localAuthAvailable = false,
+}: {
+  initialCurrency?: string;
+  localAuthAvailable?: boolean;
+}) {
   const t = useTranslations("Landing");
   const locale = useLocale();
   const [busy, setBusy] = useState(false);
@@ -42,9 +49,25 @@ export function Landing({ initialCurrency = "IDR" }: { initialCurrency?: string 
     maximumFractionDigits: 1,
   }).format(DEMO_GAIN);
 
-  const start = () => {
+  const startSso = () => {
     setBusy(true);
     void signIn("authentik", { callbackUrl: "/holdings" });
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setBusy(true);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    if (localAuthAvailable) {
+      void signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        callbackUrl: "/holdings",
+      });
+    } else {
+      void signIn("authentik", { callbackUrl: "/holdings" });
+    }
   };
 
   return (
@@ -119,10 +142,12 @@ export function Landing({ initialCurrency = "IDR" }: { initialCurrency?: string 
             <p className="text-sm text-muted-foreground">{t("signInSub")}</p>
           </div>
 
-          <Button onClick={start} disabled={busy} className="w-full gap-2" size="lg">
-            {busy ? <Spinner size="sm" /> : <Shield className="size-4" />}
-            {busy ? t("ssoBusy") : t("sso")}
-          </Button>
+          {!localAuthAvailable && (
+            <Button onClick={startSso} disabled={busy} className="w-full gap-2" size="lg">
+              {busy ? <Spinner size="sm" /> : <Shield className="size-4" />}
+              {busy ? t("ssoBusy") : t("sso")}
+            </Button>
+          )}
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
@@ -130,13 +155,7 @@ export function Landing({ initialCurrency = "IDR" }: { initialCurrency?: string 
             <span className="h-px flex-1 bg-border" />
           </div>
 
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              start();
-            }}
-          >
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-1.5">
               <Label htmlFor="email">{t("emailLabel")}</Label>
               <Input
@@ -151,7 +170,7 @@ export function Landing({ initialCurrency = "IDR" }: { initialCurrency?: string 
                 <Label htmlFor="password">{t("passwordLabel")}</Label>
                 <button
                   type="button"
-                  onClick={start}
+                  onClick={startSso}
                   className="text-xs font-medium text-primary hover:underline"
                 >
                   {t("forgot")}

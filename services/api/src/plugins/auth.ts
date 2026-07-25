@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { jwtVerify, createRemoteJWKSet } from "jose";
@@ -21,6 +21,29 @@ export function hashToken(token: string): string {
 
 // Methods a read-scoped PAT may not use. GET/HEAD/OPTIONS are always allowed.
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+// --- Local password auth helpers ------------------------------------------------
+
+const HASH_ALGO = "scrypt";
+const HASH_KEYLEN = 64;
+const HASH_SALT_BYTES = 16;
+
+/** Hash a password with a random salt: `"scrypt:salt:hash"`. */
+export function hashPassword(password: string): string {
+  const salt = randomBytes(HASH_SALT_BYTES).toString("hex");
+  const derived = scryptSync(password, salt, HASH_KEYLEN).toString("hex");
+  return `${HASH_ALGO}:${salt}:${derived}`;
+}
+
+/** Verify a password against a stored hash produced by `hashPassword`. */
+export function verifyPassword(password: string, stored: string): boolean {
+  const parts = stored.split(":");
+  if (parts.length !== 3 || parts[0] !== HASH_ALGO) return false;
+  const [, salt, hash] = parts;
+  const derived = scryptSync(password, salt, HASH_KEYLEN).toString("hex");
+  // Constant-time comparison to prevent timing attacks.
+  return timingSafeEqual(Buffer.from(derived), Buffer.from(hash));
+}
 
 /**
  * A lazy JWKS resolver that discovers the signing keys from the issuer via OIDC
@@ -58,9 +81,10 @@ export interface AuthedUser {
   authSub: string;
   // Derived from the Authentik `groups` claim each request — not stored on the row.
   isAdmin: boolean;
-  // How this request authenticated: an interactive Authentik session ("jwt") or a
-  // personal access token ("pat"). Minting a new PAT requires "jwt".
-  authMethod: "jwt" | "pat";
+  // How this request authenticated: an interactive Authentik session ("jwt"), a local
+  // password login ("local"), or a personal access token ("pat"). Minting a new PAT
+  // requires an interactive session ("jwt" or "local").
+  authMethod: "jwt" | "local" | "pat";
   // "write" for interactive sessions; a PAT carries its own (read-only by default).
   scope: "read" | "write";
 }
@@ -79,6 +103,8 @@ export function requireUser(request: FastifyRequest): AuthedUser {
 export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opts) => {
   // Prefer an injected key (tests); else an explicit JWKS URL; else derive the JWKS
   // from the issuer via OIDC discovery so AUTHENTIK_JWKS_URL is optional.
+  // When neither OIDC path is configured, check for local password auth (AUTH_LOCAL_SECRET)
+  // which uses a symmetric HMAC key instead of a remote JWKS.
   const usingInjectedKey = opts.authKey != null;
   const keyResolver: AuthKey | null =
     opts.authKey ??
@@ -88,11 +114,15 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         ? createIssuerJwks(app.config.AUTHENTIK_ISSUER)
         : null);
 
-  // Fail closed: a real deployment (no injected test key) must bind every token to THIS
-  // service via both issuer and audience. With either unset, `verifyOpts` passes
-  // `undefined` and jose validates the signature only — so a token Authentik minted for a
-  // *different* client (different audience) would authenticate here. Refuse to boot rather
-  // than silently run signature-only. Injected-key tests are exempt (they opt in explicitly).
+  // Local auth symmetric key — used alongside OIDC or as standalone fallback.
+  const usingLocalAuth = app.config.AUTH_LOCAL_SECRET !== "";
+  const localJwtKey: Uint8Array | null = usingLocalAuth
+    ? new TextEncoder().encode(app.config.AUTH_LOCAL_SECRET)
+    : null;
+
+  // Fail closed for OIDC: a real deployment (no injected test key) must bind every token
+  // to THIS service via both issuer and audience to prevent cross-client token reuse.
+  // Local auth uses a private symmetric key so this check doesn't apply.
   if (keyResolver && !usingInjectedKey) {
     const missing = [
       !app.config.AUTHENTIK_ISSUER && "AUTHENTIK_ISSUER",
@@ -106,11 +136,9 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     }
   }
 
-  app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!keyResolver) {
-      return reply.code(503).send({ error: "auth_not_configured" });
-    }
+  const anyAuthConfigured = keyResolver != null || localJwtKey != null;
 
+  app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
     const header = request.headers.authorization;
     if (!header?.startsWith("Bearer ")) {
       return reply.code(401).send({ error: "missing_token" });
@@ -119,7 +147,8 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
 
     // Personal access token: our own long-lived credential, looked up by hash on a
     // unique index (no timing-unsafe secret comparison). PATs never grant admin and
-    // carry their own scope; the secret is never logged.
+    // carry their own scope; the secret is never logged. This check runs before the
+    // JWT guards below so PATs work independently of any OIDC or local auth config.
     if (token.startsWith(PAT_PREFIX)) {
       const [row] = await app.db
         .select()
@@ -151,41 +180,71 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       return;
     }
 
-    let sub: string;
-    let email: string;
-    let isAdmin: boolean;
-    try {
-      const verifyOpts: JWTVerifyOptions = {
-        issuer: app.config.AUTHENTIK_ISSUER || undefined,
-        audience: app.config.AUTHENTIK_AUDIENCE || undefined,
-      };
-      // Narrow the union so the right jwtVerify overload is selected.
-      const { payload } =
-        typeof keyResolver === "function"
-          ? await jwtVerify(token, keyResolver, verifyOpts)
-          : await jwtVerify(token, keyResolver, verifyOpts);
-      if (!payload.sub) throw new Error("missing sub");
-      sub = payload.sub;
-      email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
-      // Admin = membership in the configured Authentik group (empty config ⇒ no admins).
-      const groups = Array.isArray(payload.groups) ? payload.groups : [];
-      const adminGroup = app.config.AUTHENTIK_ADMIN_GROUP;
-      isAdmin = adminGroup !== "" && groups.includes(adminGroup);
-    } catch {
+    // JWT verification — try OIDC first, then local auth, in case both are configured.
+    let sub: string | undefined;
+    let email: string | undefined;
+    let isAdmin = false;
+    let authMethod: AuthedUser["authMethod"] | undefined;
+
+    // Try OIDC (remote JWKS / issuer OIDC discovery)
+    if (keyResolver) {
+      try {
+        const verifyOpts: JWTVerifyOptions = {
+          issuer: app.config.AUTHENTIK_ISSUER || undefined,
+          audience: app.config.AUTHENTIK_AUDIENCE || undefined,
+        };
+        const { payload } =
+          typeof keyResolver === "function"
+            ? await jwtVerify(token, keyResolver, verifyOpts)
+            : await jwtVerify(token, keyResolver, verifyOpts);
+        if (payload.sub) {
+          sub = payload.sub;
+          email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
+          const groups = Array.isArray(payload.groups) ? payload.groups : [];
+          const adminGroup = app.config.AUTHENTIK_ADMIN_GROUP;
+          isAdmin = adminGroup !== "" && groups.includes(adminGroup);
+          authMethod = "jwt";
+        }
+      } catch {
+        // OIDC verification failed — fall through to local auth if configured
+      }
+    }
+
+    // Try local auth (symmetric HS256 JWT signed by /auth/local/login)
+    if (!authMethod && localJwtKey) {
+      try {
+        const { payload } = await jwtVerify(token, localJwtKey);
+        if (payload.sub) {
+          sub = payload.sub;
+          email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
+          authMethod = "local";
+        }
+      } catch {
+        // Local verification failed — fall through to error
+      }
+    }
+
+    if (!sub || !authMethod) {
+      if (!anyAuthConfigured) {
+        return reply.code(503).send({ error: "auth_not_configured" });
+      }
       return reply.code(401).send({ error: "invalid_token" });
     }
 
-    const found = await app.db.select().from(users).where(eq(users.authSub, sub)).limit(1);
-    let user = found[0];
+    const [found] = await app.db.select().from(users).where(eq(users.authSub, sub!)).limit(1);
+    let user = found;
     if (!user) {
-      const [created] = await app.db.insert(users).values({ authSub: sub, email }).returning();
+      const [created] = await app.db
+        .insert(users)
+        .values({ authSub: sub!, email: email! })
+        .returning();
       user = created;
     }
     request.user = {
       id: user.id,
       authSub: user.authSub,
       isAdmin,
-      authMethod: "jwt",
+      authMethod,
       scope: "write",
     };
     request.userId = user.id;

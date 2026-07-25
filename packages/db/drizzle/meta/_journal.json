@@ -512,6 +512,13 @@
       "when": 1784330732438,
       "tag": "0072_add_onboarding_completed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1784983639796,
+      "tag": "0073_serious_bullseye",
+      "breakpoints": true
     }
   ]
 }
