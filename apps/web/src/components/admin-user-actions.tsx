@@ -25,11 +25,14 @@ import { toast } from "sonner";
 export function AdminUserActions({
   userId,
   email,
-  onboardingCompleted = true,
+  onboardingCompleted = false,
 }: {
   userId: string;
   email: string;
-  /** Only offer the reset when onboarding has actually been completed/skipped. */
+  /** Only offer the reset when onboarding has actually been completed/skipped. Defaults
+   *  to false (hiding the option) — every real caller passes it explicitly; this default
+   *  only matters for a hypothetical future caller that omits it, and hiding is the
+   *  safer failure mode than exposing a reset action that shouldn't be offered yet. */
   onboardingCompleted?: boolean;
 }) {
   const t = useTranslations("Admin");
