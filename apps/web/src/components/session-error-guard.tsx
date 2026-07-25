@@ -14,16 +14,30 @@ const UNRECOVERABLE = new Set(["RefreshAccessTokenError", "RefreshTokenMissing"]
  * "Can't reach the API" state on every screen forever (the API 401s, and
  * `server-api.ts` folds that into `unavailable`). Renders nothing.
  */
-export function SessionErrorGuard({ serverSessionExpired }: { serverSessionExpired?: boolean }) {
+export function SessionErrorGuard({
+  serverSessionExpired,
+  authentikAvailable = true,
+}: {
+  serverSessionExpired?: boolean;
+  /** False when AUTHENTIK_ISSUER is unset (e.g. DEV_AUTH_TOKEN dev workflows) — there's
+   *  no Authentik provider registered to sign in through (see auth.ts's
+   *  `authentikAvailable`), so `signIn("authentik")` would 404/land on Auth.js's bare,
+   *  provider-less /api/auth/signin page. Route back to the landing page instead, which
+   *  picks the right entry point (SSO, local-auth form, or the dev bypass link). */
+  authentikAvailable?: boolean;
+}) {
   const { data: session, status } = useSession();
   const error = session?.error;
   const router = useRouter();
 
   useEffect(() => {
-    if (error && UNRECOVERABLE.has(error)) {
+    if (!error || !UNRECOVERABLE.has(error)) return;
+    if (authentikAvailable) {
       void signIn("authentik");
+    } else {
+      router.push("/");
     }
-  }, [error]);
+  }, [error, authentikAvailable, router]);
 
   useEffect(() => {
     if (serverSessionExpired && status === "authenticated") {

@@ -12,9 +12,11 @@ vi.mock("next-auth/react", () => ({
 }));
 
 const refreshMock = vi.fn();
+const pushMock = vi.fn();
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({
     refresh: refreshMock,
+    push: pushMock,
   }),
 }));
 
@@ -24,6 +26,7 @@ beforeEach(() => {
   signInMock.mockReset();
   useSessionMock.mockReset();
   refreshMock.mockReset();
+  pushMock.mockReset();
 });
 
 describe("SessionErrorGuard", () => {
@@ -43,6 +46,19 @@ describe("SessionErrorGuard", () => {
     });
     render(<SessionErrorGuard />);
     expect(signInMock).toHaveBeenCalledWith("authentik");
+  });
+
+  // Dev workflows (DEV_AUTH_TOKEN, AUTHENTIK_ISSUER unset) don't register an Authentik
+  // provider (see auth.ts) — signIn("authentik") would land on Auth.js's bare,
+  // provider-less /api/auth/signin page instead of anywhere useful.
+  it("routes to the landing page instead of signIn(authentik) when Authentik isn't configured", () => {
+    useSessionMock.mockReturnValue({
+      data: { error: "RefreshTokenMissing" },
+      status: "authenticated",
+    });
+    render(<SessionErrorGuard authentikAvailable={false} />);
+    expect(signInMock).not.toHaveBeenCalled();
+    expect(pushMock).toHaveBeenCalledWith("/");
   });
 
   it("does nothing for a healthy session", () => {

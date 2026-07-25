@@ -14,6 +14,9 @@ import { getSessionState } from "@/lib/session-token";
 // Auth is enforced only once it's configured, so the design-system screens stay
 // viewable in local dev before Authentik is wired. Configured = AUTH_SECRET + issuer.
 const authConfigured = Boolean(process.env.AUTH_SECRET && process.env.AUTHENTIK_ISSUER);
+// Mirrors auth.ts's own gate on registering the Authentik provider — passed to
+// SessionErrorGuard so it doesn't try to sign in through a provider that isn't there.
+const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);
 
 // Force every route under this layout to render per-request. Without this, `next build`
 // runs with no auth env / no request cookie, so `authConfigured` is false at build time,
@@ -101,7 +104,10 @@ export default async function AppLayout({
 
   return (
     <>
-      <SessionErrorGuard serverSessionExpired={serverSessionExpired} />
+      <SessionErrorGuard
+        serverSessionExpired={serverSessionExpired}
+        authentikAvailable={authentikAvailable}
+      />
       {/* mobileOffset clears the fixed bottom nav on mobile (where sonner forces
           full-width bottom placement) so a persistent toast never overlaps its tap
           targets — a real latent overlap, though not the cause of #451 (confirmed via
