@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.7](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.6...v0.1.7) (2026-07-25)
+
+
+### Features
+
+* **web:** admin import strategy/storage/stats (PR B2/3) ([#621](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/621)) ([c62fbec](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c62fbecba9bbfce94fafc1607355260c4d01378a))
+* **web:** admin providers/vision card-row lists (PR B1/3) ([#620](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/620)) ([4934da3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4934da353a5382c99a95757b7e7a848e26d710ab))
+* **web:** admin users/jobs card lists (PR B3/3) ([#622](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/622)) ([b6eac0f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b6eac0f8a5b6cba8e91c13ad350a90df71b3ebe3))
+* **web:** faithful Add/Edit/Detail transaction flows matching v2 design ([#623](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/623)) ([c3d923f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c3d923f992a50e0199e7d504fb40957afac38834))
+
+
+### Bug Fixes
+
+* **web:** disable Zod JIT to suppress CSP unsafe-eval violation ([463aac3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/463aac3bd7ce47ddbd7aa6412445e07f420e9415))
+* **web:** settings/profile UI bugs from the v2 redesign ([#618](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/618)) ([47a365e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/47a365e1dd98f5724badd8315d0814e6b99201aa))
+
 ## [0.1.6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.5...v0.1.6) (2026-07-24)
 
 
