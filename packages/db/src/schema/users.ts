@@ -3,7 +3,7 @@ import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   authSub: text("auth_sub").notNull().unique(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   name: text("name"),
   // Optional bcrypt-style scrypt hash ("salt:hash") for local password auth.
   // Null for OIDC-authenticated users; set by local registration or seed.

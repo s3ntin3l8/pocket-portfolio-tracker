@@ -45,6 +45,30 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(Buffer.from(derived), Buffer.from(hash));
 }
 
+// Fixed dummy hash used by `timingSafeVerifyPassword` when the user doesn't exist or
+// has no password set — ensures the "no account" and "wrong password" code paths take
+// the same time (scrypt) so a timing attacker cannot distinguish registered emails.
+const DUMMY_SALT = "0000000000000000";
+const DUMMY_HASH = scryptSync("dummy-password", DUMMY_SALT, HASH_KEYLEN).toString("hex");
+const DUMMY_PASSWORD_HASH = `${HASH_ALGO}:${DUMMY_SALT}:${DUMMY_HASH}`;
+
+/**
+ * Verify a password, or run a dummy scrypt round to mask whether the user exists.
+ * Returns false when the user/passwordHash is missing (after paying the scrypt cost),
+ * so the caller cannot distinguish "no such user" from "wrong password" by timing.
+ */
+export function timingSafeVerifyPassword(
+  password: string,
+  stored: string | null | undefined,
+): boolean {
+  if (!stored) {
+    // Pay the scrypt cost against the dummy hash so both paths take ~same time.
+    verifyPassword(password, DUMMY_PASSWORD_HASH);
+    return false;
+  }
+  return verifyPassword(password, stored);
+}
+
 /**
  * A lazy JWKS resolver that discovers the signing keys from the issuer via OIDC
  * discovery (`<issuer>/.well-known/openid-configuration` → `jwks_uri`). Lets the API
