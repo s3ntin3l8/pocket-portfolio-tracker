@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.8...v0.1.9) (2026-07-26)
+
+
+### Bug Fixes
+
+* **api:** let PATs carry admin in local development only ([#631](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/631)) ([a48c21b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a48c21b09b85f308a76a9f00e5557b9ad0a86497))
+* **dev:** wire up the PGlite dev workflow PR [#627](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/627) shipped but never configured ([092656a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/092656ac08d1912e2ecd93a5db8eec7c44e5991a))
+
 ## [0.1.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.7...v0.1.8) (2026-07-25)
 
 
