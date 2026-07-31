@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { OnboardingTheme } from "../theme";
 import styles from "../onboarding.module.css";
 
@@ -9,9 +11,6 @@ export interface HolderCopy {
   birthYearHelper: string;
 }
 
-/** Step 1 — Account holder: holder name (required) + birth year (optional, but must
- *  be a sane year if entered). Both are controlled — the design's stubs are wired to
- *  real state here. */
 export function HolderStep({
   th,
   copy,
@@ -44,8 +43,11 @@ export function HolderStep({
         >
           {copy.nameLabel}
         </label>
-        <input
-          className={`${styles[th.inputClass]} ${holderNameError ? styles.inputError : ""}`}
+        <Input
+          className={cn(
+            th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
+            holderNameError && styles.inputError,
+          )}
           placeholder={copy.namePlaceholder}
           value={holderName}
           onChange={(e) => onHolderNameChange(e.target.value)}
@@ -63,8 +65,11 @@ export function HolderStep({
         >
           {copy.birthYearLabel}
         </label>
-        <input
-          className={`${styles[th.inputClass]} ${birthYearError ? styles.inputError : ""}`}
+        <Input
+          className={cn(
+            th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
+            birthYearError && styles.inputError,
+          )}
           placeholder={copy.birthYearPlaceholder}
           inputMode="numeric"
           value={birthYear}
