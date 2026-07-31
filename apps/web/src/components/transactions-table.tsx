@@ -101,6 +101,8 @@ export function TransactionsTable({
   const [busy, setBusy] = useState(false);
   const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [showFlagged, setShowFlagged] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
 
   const { flaggedRows, flaggedLoading } = useFlaggedRows(showFlagged, anomalyByTxId, portfolioId);
 
@@ -357,12 +359,15 @@ export function TransactionsTable({
 
   return (
     <div className="space-y-3">
-      <AnomalyBanner
-        anomalies={anomalies}
-        flaggedCount={flaggedCount}
-        showFlagged={showFlagged}
-        onToggleFlagged={() => setShowFlagged((v) => !v)}
-      />
+      {!bannerDismissed && (
+        <AnomalyBanner
+          anomalies={anomalies}
+          flaggedCount={flaggedCount}
+          showFlagged={showFlagged}
+          onToggleFlagged={() => setShowFlagged((v) => !v)}
+          onDismiss={() => setBannerDismissed(true)}
+        />
+      )}
 
       {showFilterBanners && allBanner && (
         <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
@@ -387,14 +392,23 @@ export function TransactionsTable({
           />
         )}
       {showFilterBanners &&
-        portfolioAnomalies.map((a, i) => (
-          <ReconciliationBanner
-            key={`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`}
-            title={ta("reconciliationTitle")}
-            detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-            tag={ta("portfolioTag")}
-          />
-        ))}
+        portfolioAnomalies
+          .filter((a) => {
+            const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
+            return !dismissedRecon.has(key);
+          })
+          .map((a, i) => {
+            const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`;
+            return (
+              <ReconciliationBanner
+                key={key}
+                title={ta("reconciliationTitle")}
+                detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
+                tag={ta("portfolioTag")}
+                onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(key))}
+              />
+            );
+          })}
 
       <FilterBar
         typeFilter={typeFilter}

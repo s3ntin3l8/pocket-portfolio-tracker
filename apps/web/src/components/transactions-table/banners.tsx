@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { AlertCircle, AlertTriangle } from "lucide-react";
+import { AlertCircle, AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Anomaly } from "@portfolio/api-client";
 import { cn, rowAnomalyCounts } from "@/lib/utils";
@@ -11,11 +11,13 @@ export function AnomalyBanner({
   flaggedCount,
   showFlagged,
   onToggleFlagged,
+  onDismiss,
 }: {
   anomalies: Anomaly[];
   flaggedCount: number;
   showFlagged: boolean;
   onToggleFlagged: () => void;
+  onDismiss?: () => void;
 }) {
   const ta = useTranslations("Anomalies");
   const { errors: anomalyErrorsCount, warnings: anomalyWarningsCount } =
@@ -55,6 +57,17 @@ export function AnomalyBanner({
         >
           {ta("showFlagged")}
         </Button>
+      )}
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label={ta("dismiss")}
+          title={ta("dismiss")}
+          className="flex size-6 shrink-0 items-center justify-center rounded-full text-current/50 hover:text-current"
+        >
+          <X className="size-4" />
+        </button>
       )}
     </div>
   );

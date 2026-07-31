@@ -24,12 +24,12 @@ import {
   formatMoney,
   formatPercent,
   formatSignedMoney,
-  anomalyLabel,
   rowAnomalyCounts,
   bannerAnomalies,
+  anomalyLabel,
   type AnomalyTranslator,
 } from "@/lib/utils";
-import { ReconciliationBanner } from "@/components/transactions/activity-banners";
+import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
 
 const CLASS_TABS = [
   "all",
@@ -358,14 +358,14 @@ export default async function HoldingsPage({
     <div className="space-y-5">
       {Heading}
       {anomalyBanner}
-      {standaloneAnomalies.map((a, i) => (
-        <ReconciliationBanner
-          key={`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`}
-          title={ta("reconciliationTitle")}
-          detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-          tag={ta("portfolioTag")}
-        />
-      ))}
+      <ReconciliationBannerGroup
+        items={standaloneAnomalies.map((a, i) => ({
+          key: `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`,
+          title: ta("reconciliationTitle"),
+          detail: anomalyLabel(a, ta as AnomalyTranslator, locale),
+          tag: ta("portfolioTag"),
+        }))}
+      />
       {/* Reference stacks the glance cards 14px apart (each card: margin-bottom:14px). */}
       <div className="space-y-3.5">{glanceSection}</div>
 
