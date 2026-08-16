@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "drizzle-kit": "^0.31.1"
   }
 }
