@@ -1189,7 +1189,8 @@
     "changePasswordErrors": {
       "generic": "Couldn't change the password. Please try again.",
       "Invalid password": "Current password is incorrect.",
-      "no_local_password_set": "This account doesn't have a password set yet — sign in via Authentik, or ask an admin to set one."
+      "no_local_password_set": "This account doesn't have a password set yet — sign in via Authentik, or ask an admin to set one.",
+      "reauthFailed": "Password changed, but signing you back in failed — please sign in again with your new password."
     },
     "tokens": "API access tokens",
     "tokensHint": "Personal access tokens let scripts and tools call the API as you. Read-only by default; keep them secret and revoke any you no longer use.",

@@ -1187,7 +1187,8 @@
     "changePasswordErrors": {
       "generic": "Gagal mengubah kata sandi. Silakan coba lagi.",
       "Invalid password": "Kata sandi saat ini salah.",
-      "no_local_password_set": "Akun ini belum memiliki kata sandi — masuk melalui Authentik, atau minta admin untuk mengaturnya."
+      "no_local_password_set": "Akun ini belum memiliki kata sandi — masuk melalui Authentik, atau minta admin untuk mengaturnya.",
+      "reauthFailed": "Kata sandi diubah, tetapi gagal masuk kembali secara otomatis — silakan masuk lagi dengan kata sandi baru Anda."
     },
     "tokens": "Token akses API",
     "tokensHint": "Token akses pribadi memungkinkan skrip dan alat memanggil API sebagai Anda. Hanya-baca secara bawaan; jaga kerahasiaannya dan cabut yang tidak lagi digunakan.",

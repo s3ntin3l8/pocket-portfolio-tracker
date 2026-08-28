@@ -92,16 +92,31 @@ export function registerUsersRoutes(app: FastifyInstance) {
       const { email, name, isAdmin } = parsed.data;
 
       const tempPassword = generateTempPassword();
-      const [created] = await app.db
-        .insert(users)
-        .values({
-          authSub: `local|${email}`,
-          email,
-          name: name ?? null,
-          passwordHash: hashPassword(tempPassword),
-          isAdmin,
-        })
-        .returning({ id: users.id, email: users.email, isAdmin: users.isAdmin });
+      let created;
+      try {
+        [created] = await app.db
+          .insert(users)
+          .values({
+            authSub: `local|${email}`,
+            email,
+            name: name ?? null,
+            passwordHash: hashPassword(tempPassword),
+            isAdmin,
+          })
+          .returning({ id: users.id, email: users.email, isAdmin: users.isAdmin });
+      } catch (err) {
+        // An existing OIDC or seeded user with the same email trips users_email_unique —
+        // surface as a friendly 409 rather than a 500 (same pattern as mergers.ts).
+        const e = err as { code?: string; cause?: { code?: string }; message?: string };
+        if (
+          e.code === "23505" ||
+          e.cause?.code === "23505" ||
+          /duplicate key|unique constraint/i.test(e.message ?? "")
+        ) {
+          return reply.code(409).send({ error: "email_already_exists" });
+        }
+        throw err;
+      }
 
       await app.db.insert(adminAuditLog).values({
         actorSub: request.user!.authSub,

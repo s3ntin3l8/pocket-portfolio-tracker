@@ -71,12 +71,12 @@ export async function AccountSection({
         </Card>
       </div>
 
-      {localAuthAvailable && (
+      {localAuthAvailable && me && (
         <div>
           <SectionLabel>{t("password")}</SectionLabel>
           <Card>
             <CardContent className="p-5">
-              <ChangePassword />
+              <ChangePassword email={me.email} />
             </CardContent>
           </Card>
         </div>

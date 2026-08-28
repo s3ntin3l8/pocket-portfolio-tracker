@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { signIn } from "next-auth/react";
 import { AlertCircle, Check } from "lucide-react";
 import { apiErrorCode } from "@portfolio/api-client";
 import type { ApiClient } from "@portfolio/api-client";
@@ -20,7 +21,16 @@ export type ChangePasswordClient = Pick<ApiClient, "changeLocalPassword">;
  * already existed API-side, tested and rate-limited, but had no UI anywhere in the app
  * until this). Only rendered when local auth is configured — see AccountSection.
  */
-export function ChangePasswordForm({ client }: { client: ChangePasswordClient }) {
+export function ChangePasswordForm({
+  client,
+  email,
+}: {
+  client: ChangePasswordClient;
+  /** The signed-in user's own email — used to silently re-authenticate after a
+   *  successful change (see submit()) so the caller isn't bounced to sign-in by their
+   *  own "sign out everywhere" revocation. */
+  email: string;
+}) {
   const t = useTranslations("Settings");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -57,10 +67,25 @@ export function ChangePasswordForm({ client }: { client: ChangePasswordClient })
     setBusy(true);
     try {
       await client.changeLocalPassword({ currentPassword, newPassword });
+      // The change just stamped passwordChangedAt, which invalidates the local JWT this
+      // very request authenticated with (see plugins/auth.ts) — without this, the next
+      // API call 401s and the user is silently bounced to sign-in right after a
+      // successful "Password changed". Re-authenticate with the new password (same
+      // redirect:false pattern the login form uses) to mint a fresh, valid session
+      // before reporting success.
+      const result = await signIn("credentials", {
+        email,
+        password: newPassword,
+        redirect: false,
+      });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setSaved(true);
+      if (result?.error) {
+        setError(t("changePasswordErrors.reauthFailed"));
+      } else {
+        setSaved(true);
+      }
     } catch (err) {
       setError(messageForError(err));
     } finally {

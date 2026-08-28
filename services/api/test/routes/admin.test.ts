@@ -963,6 +963,25 @@ describe("admin provider config", () => {
     await app.db.delete(users).where(eq(users.id, body.id));
   });
 
+  it("returns 409 instead of 500 when the email already exists", async () => {
+    const id = await ensureUser("existing-email-target", false);
+    const [existing] = await app.db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, id));
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users",
+      headers: auth(await token("admin-create-dupe", [ADMIN_GROUP])),
+      payload: { email: existing.email },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ error: "email_already_exists" });
+
+    await app.db.delete(users).where(eq(users.id, id));
+  });
+
   it("resets a user's password and revokes their existing local session", async () => {
     const id = await ensureUser("set-password-target", false);
 
