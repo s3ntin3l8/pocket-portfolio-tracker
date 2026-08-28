@@ -47,6 +47,31 @@ describe("Landing (Pocket split-hero sign-in)", () => {
     });
   });
 
+  it("submits what was typed when local auth is on", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Landing localAuthAvailable />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText(messages.Landing.emailLabel), {
+      target: { value: "owner@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(messages.Landing.passwordLabel), {
+      target: { value: "correct horse battery" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: messages.Landing.signIn }));
+
+    // handleSubmit reads the fields through FormData, which keys off `name` — not `id`.
+    // Without it both values arrive as null and every sign-in fails as CredentialsSignin
+    // no matter what the user typed.
+    expect(signInMock).toHaveBeenCalledWith("credentials", {
+      email: "owner@example.com",
+      password: "correct horse battery", // pragma: allowlist secret
+      callbackUrl: "/holdings",
+    });
+  });
+
   // Regression tests for #487: the demo "portfolio glance" figure was hardcoded to
   // Indonesian Rupiah/punctuation regardless of locale or the returning user's currency.
   it("defaults the demo figure to an Indonesian Rupiah example, formatted for the locale", () => {

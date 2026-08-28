@@ -215,7 +215,13 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, account, user, trigger }) {
       // OIDC sign-in: account is available with access_token + refresh_token.
-      if (account) {
+      //
+      // The Credentials provider ALSO yields an `account` on sign-in, but one of
+      // `type: "credentials"` carrying no tokens at all — taking this branch for it
+      // would blank out accessToken/expiresAt and return before the local-auth branch
+      // below ever runs, leaving a session that 401s and then reports
+      // RefreshTokenMissing on the next poll. Its tokens arrive on `user` instead.
+      if (account && account.type !== "credentials") {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at; // unix seconds

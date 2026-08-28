@@ -47,6 +47,31 @@ describe("authConfig.callbacks.jwt", () => {
     expect(res?.error).toBeUndefined();
   });
 
+  it("stashes the local-auth token when the Credentials provider signs in", async () => {
+    const token = {} as JWT;
+    // Auth.js hands the Credentials provider an `account` too — same shape minus every
+    // token field. The OIDC branch must not claim it, or the accessToken from
+    // authorize() is dropped and the session dies on the next poll.
+    const account = {
+      provider: "credentials",
+      type: "credentials",
+      providerAccountId: "local",
+    } as Account;
+    const expiresAt = Math.floor(Date.now() / 1000) + 7 * 86_400;
+
+    const res = await jwt({
+      token,
+      account,
+      user: { accessToken: "local-jwt-123", expiresAt } as User,
+      trigger: "signIn",
+    });
+
+    expect(res?.accessToken).toBe("local-jwt-123");
+    expect(res?.expiresAt).toBe(expiresAt);
+    expect(res?.refreshToken).toBeUndefined();
+    expect(res?.error).toBeUndefined();
+  });
+
   it("reuses token when it is comfortable before expiry", async () => {
     const token = {
       accessToken: "access-123",

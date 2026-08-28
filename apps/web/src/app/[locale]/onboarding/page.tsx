@@ -5,9 +5,11 @@ import { getSessionState } from "@/lib/session-token";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 
 // Same authConfigured gate as the `(app)` layout — auth is only enforced once
-// AUTH_SECRET + issuer are set, so the design-system screens stay viewable in local
-// dev before Authentik is wired.
-const authConfigured = Boolean(process.env.AUTH_SECRET && process.env.AUTHENTIK_ISSUER);
+// AUTH_SECRET plus a login method (Authentik's issuer or local password auth) are set,
+// so the design-system screens stay viewable in local dev before either is wired.
+const authConfigured = Boolean(
+  process.env.AUTH_SECRET && (process.env.AUTHENTIK_ISSUER || process.env.AUTH_LOCAL_SECRET),
+);
 
 // Onboarding is a sibling of `(app)`, not inside it — full-screen, no AppShell — so
 // it needs its own auth gate (the `(app)` layout's redirect doesn't cover this route).

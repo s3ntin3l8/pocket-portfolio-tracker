@@ -12,8 +12,13 @@ import { formatMoney, formatPercent } from "@/lib/utils";
 import { getSessionState } from "@/lib/session-token";
 
 // Auth is enforced only once it's configured, so the design-system screens stay
-// viewable in local dev before Authentik is wired. Configured = AUTH_SECRET + issuer.
-const authConfigured = Boolean(process.env.AUTH_SECRET && process.env.AUTHENTIK_ISSUER);
+// viewable in local dev before Authentik is wired. Configured = AUTH_SECRET plus an
+// actual login method — Authentik's issuer OR local password auth. Without the local
+// arm, an AUTH_LOCAL_SECRET deployment never gated this layout and never bounced a new
+// user into onboarding.
+const authConfigured = Boolean(
+  process.env.AUTH_SECRET && (process.env.AUTHENTIK_ISSUER || process.env.AUTH_LOCAL_SECRET),
+);
 // Mirrors auth.ts's own gate on registering the Authentik provider — passed to
 // SessionErrorGuard so it doesn't try to sign in through a provider that isn't there.
 const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);

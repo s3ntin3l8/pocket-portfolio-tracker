@@ -46,7 +46,13 @@ export async function getSelectedPortfolioId(): Promise<string | null> {
 }
 
 const apiBaseUrl = process.env.API_URL ?? "";
-const authConfigured = Boolean(process.env.AUTH_SECRET && process.env.AUTHENTIK_ISSUER);
+// AUTH_LOCAL_SECRET counts as configured auth too: local password login mints the same
+// session cookie, and gating on AUTHENTIK_ISSUER alone left every RSC read tokenless —
+// each one degraded to "unavailable" ("Can't reach the API") while the same-origin proxy,
+// which reads the cookie ungated, happily served the identical data client-side.
+const authConfigured = Boolean(
+  process.env.AUTH_SECRET && (process.env.AUTHENTIK_ISSUER || process.env.AUTH_LOCAL_SECRET),
+);
 // DEV_AUTH_TOKEN is a dev-only bypass — never active in production (same NODE_ENV
 // guard pattern as isAllowedHost in apps/web/src/proxy.ts).
 const devToken = process.env.NODE_ENV !== "production" ? process.env.DEV_AUTH_TOKEN : undefined;

@@ -176,6 +176,10 @@ export function Landing({
                   <Label htmlFor="email">{t("emailLabel")}</Label>
                   <Input
                     id="email"
+                    // `name` is what handleSubmit's FormData reads — without it
+                    // formData.get("email") is null and the credentials POST carries
+                    // "email=null" regardless of what was typed.
+                    name="email"
                     type="email"
                     autoComplete="email"
                     placeholder={t("emailPlaceholder")}
@@ -195,6 +199,7 @@ export function Landing({
                   <div className="relative">
                     <Input
                       id="password"
+                      name="password"
                       type={showPw ? "text" : "password"}
                       autoComplete="current-password"
                       className="pr-10"
