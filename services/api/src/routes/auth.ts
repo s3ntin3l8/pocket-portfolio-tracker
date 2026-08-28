@@ -16,8 +16,14 @@ const MIN_PASSWORD_LENGTH = 8;
 /** Zod schemas for request validation. */
 import { z } from "zod";
 
+// Normalize email at every entry point (login, setup, seeding) so "Demo@x.com" and
+// "demo@x.com" are the same account instead of a case-sensitive 401.
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform(normalizeEmail),
   password: z.string().min(1),
 });
 
@@ -80,7 +86,12 @@ export const authRoute = fp(async (app) => {
         return reply.code(401).send({ error: "Invalid email or password" });
       }
 
-      const token = await signLocalJwt(`local|${email}`, email);
+      // Sign the token with the row's OWN authSub, not a synthetic `local|${email}` —
+      // `authenticate` resolves users by authSub (plugins/auth.ts), and a user that didn't
+      // originate from local auth (an OIDC user, an admin seeded via seed.ts) has some other
+      // authSub. Signing a mismatched sub here would make every later request 500 on
+      // `users_email_unique` when `authenticate`'s JIT-insert collides with this row's email.
+      const token = await signLocalJwt(user.authSub, email);
 
       return {
         id: user.id,
@@ -107,7 +118,13 @@ export const authRoute = fp(async (app) => {
       }
 
       const { currentPassword, newPassword } = parsed.data;
-      const { id } = requireUser(request);
+      const { id, authMethod } = requireUser(request);
+      // Only from an interactive session — a leaked PAT must not be able to change the
+      // password it was minted under (mirrors /me/tokens' "no credential self-
+      // perpetuation" guard in me.ts).
+      if (authMethod === "pat") {
+        return reply.code(403).send({ error: "interactive_session_required" });
+      }
 
       const [user] = await app.db.select().from(users).where(eq(users.id, id)).limit(1);
       if (!user?.passwordHash) {
@@ -144,7 +161,13 @@ export const authRoute = fp(async (app) => {
       }
 
       const { newPassword } = parsed.data;
-      const { id } = requireUser(request);
+      const { id, authMethod } = requireUser(request);
+      // Same guard as change-password: a PAT cannot plant a password on the account it
+      // was minted under. Without this, a leaked read/write PAT for an OIDC-only user
+      // (passwordHash always null) could grant itself interactive email/password access.
+      if (authMethod === "pat") {
+        return reply.code(403).send({ error: "interactive_session_required" });
+      }
 
       const [user] = await app.db.select().from(users).where(eq(users.id, id)).limit(1);
       if (user?.passwordHash) {

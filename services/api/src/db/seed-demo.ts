@@ -15,6 +15,7 @@ import {
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
+import { normalizeEmail } from "../routes/auth.js";
 import { ensureDb, getDb, closeDb } from "./client.js";
 
 /**
@@ -37,7 +38,7 @@ import { ensureDb, getDb, closeDb } from "./client.js";
  * later stay looking current rather than visibly stale.
  */
 
-const SEED_EMAIL = process.env.SEED_DEMO_EMAIL || "demo@pocket.invalid";
+const SEED_EMAIL = normalizeEmail(process.env.SEED_DEMO_EMAIL || "demo@pocket.invalid");
 const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || "";
 const DEMO_AUTH_SUB = SEED_PASSWORD ? `local|${SEED_EMAIL}` : "demo|pocket";
 

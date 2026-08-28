@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
+import { generateKeyPair, SignJWT } from "jose";
 import { users, apiTokens } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
@@ -13,6 +14,8 @@ import {
 import { randomBytes } from "node:crypto";
 
 const LOCAL_SECRET = "test-local-secret-for-tests-only"; // pragma: allowlist secret
+const ISSUER = "https://auth.test/application/o/portfolio/";
+const AUDIENCE = "portfolio-tracker";
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 let app: App;
@@ -99,11 +102,45 @@ async function patForUser(userId: string): Promise<string> {
   return secret;
 }
 
+/** Log in via the real route to get an interactive local-auth JWT (authMethod: "local"). */
+async function localJwtFor(email: string, password: string): Promise<string> {
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/local/login",
+    payload: { email, password },
+  });
+  expect(res.statusCode).toBe(200);
+  return res.json().accessToken as string;
+}
+
+/** Mint an OIDC-style JWT (authMethod: "jwt") against the injected test key, simulating
+ *  an interactive Authentik session — used for the "OIDC user attaching a local password"
+ *  scenario, which set-password is explicitly meant to support. */
+async function oidcJwtFor(sub: string, key: CryptoKey): Promise<string> {
+  return new SignJWT({ email: `${sub}@example.com` })
+    .setProtectedHeader({ alg: "ES256" })
+    .setSubject(sub)
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(key);
+}
+
 describe("local auth routes", () => {
+  let oidcKey: CryptoKey;
+
   beforeAll(async () => {
     process.env.AUTH_LOCAL_SECRET = LOCAL_SECRET;
+    // Both auth methods configured at once — set-password's advertised use case is an
+    // OIDC user attaching a local password, so tests need a way to authenticate as an
+    // interactive OIDC session too.
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
     process.env.RATE_LIMIT_MAX = "10000";
-    app = await buildApp();
+    const kp = await generateKeyPair("ES256");
+    oidcKey = kp.privateKey;
+    app = await buildApp({ authKey: kp.publicKey });
     testUserId = await seedUser("local-test@example.com", "secure-password");
   });
 
@@ -112,6 +149,8 @@ describe("local auth routes", () => {
     await app.close();
     await closeDb();
     delete process.env.AUTH_LOCAL_SECRET;
+    delete process.env.AUTHENTIK_ISSUER;
+    delete process.env.AUTHENTIK_AUDIENCE;
     delete process.env.RATE_LIMIT_MAX;
   });
 
@@ -161,27 +200,27 @@ describe("local auth routes", () => {
   });
 
   describe("POST /auth/local/set-password", () => {
-    it("sets a password for a user with no existing password", async () => {
-      const [fresh] = await app.db
-        .insert(users)
-        .values({
-          authSub: "local|nopwd@example.com",
-          email: "nopwd@example.com",
-          name: "No Password",
-        })
-        .returning();
+    it("sets a password for a user with no existing password (OIDC user attaching a local password)", async () => {
+      const sub = "oidc-nopwd-user";
+      await app.db.insert(users).values({
+        authSub: sub,
+        email: "nopwd@example.com",
+        name: "No Password",
+      });
 
-      const pat = await patForUser(fresh.id);
+      const oidcJwt = await oidcJwtFor(sub, oidcKey);
       const res = await app.inject({
         method: "POST",
         url: "/auth/local/set-password",
-        headers: auth(pat),
+        headers: auth(oidcJwt),
         payload: { newPassword: "new-strong-password" },
       });
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual({ ok: true });
 
-      // Verify login works with the new password
+      // Verify login works with the new password, and that the resulting token round-trips
+      // through an authenticated request instead of colliding on users_email_unique —
+      // the login route must sign the row's own authSub, not a synthetic local|<email>.
       const loginRes = await app.inject({
         method: "POST",
         url: "/auth/local/login",
@@ -189,28 +228,48 @@ describe("local auth routes", () => {
       });
       expect(loginRes.statusCode).toBe(200);
 
+      const meRes = await app.inject({
+        method: "GET",
+        url: "/me",
+        headers: auth(loginRes.json().accessToken),
+      });
+      expect(meRes.statusCode).toBe(200);
+      expect(meRes.json().email).toBe("nopwd@example.com");
+
       await app.db.delete(users).where(eq(users.email, "nopwd@example.com"));
     });
 
     it("rejects if user already has a password", async () => {
+      const oidcJwt = await oidcJwtFor("local|local-test@example.com", oidcKey);
+      const res = await app.inject({
+        method: "POST",
+        url: "/auth/local/set-password",
+        headers: auth(oidcJwt),
+        payload: { newPassword: "another-password" },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("password_already_set");
+    });
+
+    it("rejects a PAT — set-password requires an interactive session", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/auth/local/set-password",
         headers: auth(await patForUser(testUserId)),
         payload: { newPassword: "another-password" },
       });
-      expect(res.statusCode).toBe(400);
-      expect(res.json().error).toBe("password_already_set");
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("interactive_session_required");
     });
   });
 
   describe("POST /auth/local/change-password", () => {
     it("changes password with valid current password", async () => {
-      const pat = await patForUser(testUserId);
+      const sessionJwt = await localJwtFor("local-test@example.com", "secure-password");
       const res = await app.inject({
         method: "POST",
         url: "/auth/local/change-password",
-        headers: auth(pat),
+        headers: auth(sessionJwt),
         payload: { currentPassword: "secure-password", newPassword: "updated-password" },
       });
       expect(res.statusCode).toBe(200);
@@ -232,14 +291,37 @@ describe("local auth routes", () => {
     });
 
     it("rejects wrong current password", async () => {
-      const pat = await patForUser(testUserId);
+      const sessionJwt = await localJwtFor("local-test@example.com", "secure-password");
       const res = await app.inject({
         method: "POST",
         url: "/auth/local/change-password",
-        headers: auth(pat),
+        headers: auth(sessionJwt),
         payload: { currentPassword: "wrong", newPassword: "anything" },
       });
       expect(res.statusCode).toBe(401);
+    });
+
+    it("rejects a PAT — change-password requires an interactive session", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/auth/local/change-password",
+        headers: auth(await patForUser(testUserId)),
+        payload: { currentPassword: "secure-password", newPassword: "anything" },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("interactive_session_required");
+    });
+  });
+
+  describe("email case handling", () => {
+    it("logs in with a different-case email than what was stored", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/auth/local/login",
+        payload: { email: "Local-Test@Example.com", password: "secure-password" },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().email).toBe("local-test@example.com");
     });
   });
 });
