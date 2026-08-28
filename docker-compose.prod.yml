@@ -25,6 +25,19 @@
 # shared by both containers — `web` has no business holding DB_ENCRYPTION_KEY/
 # STORAGE_SECRET_KEY/provider API keys, and `api` has no business holding AUTH_SECRET/
 # AUTHENTIK_CLIENT_SECRET.
+#
+# Explicit project name, pinned to the value compose already derives from this
+# directory. Without it, docker-compose.yml (the dev stack) resolves to the same
+# project when run from the same checkout, so `docker compose ps`/`down` in the repo
+# root can see and touch these containers, and `docker compose --profile full up`
+# there recreates the `api` container with dev config. DO NOT change this string —
+# it must keep matching the running containers' existing project label
+# ("pocket-portfolio-tracker") or compose will treat them as a different project and
+# try to recreate the stack (with fresh, empty volumes) instead of adopting it. It also
+# makes `make prod` safe to run from a `.worktrees/<slug>` checkout, which would
+# otherwise get its own directory-derived project name and spin up a second parallel
+# stack (duplicate Traefik router, same WEB_HOST).
+name: pocket-portfolio-tracker
 
 services:
   api:

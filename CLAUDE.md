@@ -33,7 +33,12 @@ cash** with live IDX prices and a real-time gold ticker.
   EODHD/Yahoo/OpenFIGI), `api-client` (typed client for the PWA).
 - **Infra:** Supabase Cloud (Postgres + Storage) to start; **Authentik** (OIDC) for
   auth; self-host on Proxmox is the exit path. Local dev via `docker-compose.yml`
-  (Postgres + MinIO + optional Ollama).
+  (Postgres + MinIO + optional Ollama, project `pocket-dev`) — deliberately a separate
+  compose project from `docker-compose.prod.yml` (project `pocket-portfolio-tracker`,
+  the deployed `api`+`web` stack), so a bare `docker compose` in the repo root can never
+  see or touch a live deployment. Always invoke the prod stack via `-f
+docker-compose.prod.yml --env-file .env.prod` (or `make prod`/`prod-down`/`prod-logs`/
+  `prod-ps`) — never add a `name:` to either file without checking both together.
 
 ## Commands
 
@@ -137,9 +142,10 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   out to a `pino-roll` rotating file (daily rotation, 20 MB cap, 14-day retention) —
   `resolveLogDestination()` in `services/api/src/app.ts`. Same secret redaction (auth
   headers, cookies, TR phone/pin, `DB_ENCRYPTION_KEY`, …) applies to both sinks. Leave
-  unset for Docker/prod setups that already capture stdout via journald/CloudWatch; the
-  `docker-compose.yml` `api` service passes `LOG_DIR` through opt-in (unset by default)
-  and mounts an `apilogs` volume for it.
+  unset for Docker/prod setups that already capture stdout via journald/CloudWatch; both
+  `docker-compose.yml`'s (profile `full`) and `docker-compose.prod.yml`'s `api` service
+  pass `LOG_DIR` through opt-in (unset by default) and mount their own project-scoped
+  `apilogs` volume for it.
 - **Conventional Commits** (Release Please cuts versions). `detect-secrets` runs in
   pre-commit/CI against `.secrets.baseline`.
 - **PR descriptions (and commit messages) stay generic.** No personal/account-holder

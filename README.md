@@ -81,6 +81,17 @@ needed for this path — `DATABASE_URL` defaults to an embedded PGlite database 
 MinIO instead (Postgres-parity dev), `make services` starts them via docker-compose and
 you point `DATABASE_URL`/`STORAGE_*` at them (see the comments in `.env.example`).
 
+### Compose files
+
+| File                         | Project                    | What it's for                                                                                                                                                                      |
+| ---------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker-compose.yml`         | `pocket-dev`               | Optional Postgres-parity dev backing services (`make services`). Picked up by a bare `docker compose` in the repo root.                                                            |
+| `docker-compose.prod.yml`    | `pocket-portfolio-tracker` | The deployed stack (`api` + `web`). Always needs `-f docker-compose.prod.yml --env-file .env.prod` — use `make prod`/`prod-down`/`prod-logs`/`prod-ps` instead of typing that out. |
+| `docker-compose.traefik.yml` | —                          | Reference only. Documents how this should slot into an existing Traefik; never `docker compose up` it directly.                                                                    |
+
+Each file pins an explicit `name:`, so a bare `docker compose ps`/`down` in the repo
+root only ever sees the dev project — it can't see or touch a deployed prod stack.
+
 `npm run dev` also works directly once `.env` and the `apps/web/.env.local` symlink
 (`make web-env`) are in place — `make dev`/`make dev-web` just add that symlink step and
 free up stale dev ports first.

@@ -1,6 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-down prod-logs
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-down prod-logs prod-ps
+
+# Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
+# docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
+# share a project — see the header comments in each file for why. Kept as variables here
+# so all three prod targets stay in lockstep instead of repeating the flags.
+COMPOSE_DEV := docker compose -f docker-compose.yml
+COMPOSE_PROD := docker compose -f docker-compose.prod.yml --env-file .env.prod
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -22,19 +29,22 @@ pytr-venv: ## Create local pytr venv for Trade Republic sync (then set PYTR_PYTH
 	@echo "Add to .env:  PYTR_PYTHON_BIN=$(CURDIR)/.venv-pytr/bin/python"
 
 services: ## Start local Postgres + MinIO (optional — dev defaults to PGlite + local folder storage; use for Postgres-parity dev)
-	docker compose up -d postgres minio
+	$(COMPOSE_DEV) up -d postgres minio
 
 services-down: ## Stop local backing services
-	docker compose down
+	$(COMPOSE_DEV) down
 
 prod: ## Build and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
-	docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+	$(COMPOSE_PROD) up -d --build
 
 prod-down: ## Stop the production stack
-	docker compose -f docker-compose.prod.yml --env-file .env.prod down
+	$(COMPOSE_PROD) down
 
 prod-logs: ## Follow logs from the production stack
-	docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f
+	$(COMPOSE_PROD) logs -f
+
+prod-ps: ## Show production stack container status (plain `docker compose ps` here only shows the dev stack)
+	$(COMPOSE_PROD) ps
 
 dev: web-env ## Start all dev servers (API + web via Turbo)
 	fuser -k 3005/tcp 2>/dev/null || true

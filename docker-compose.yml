@@ -13,6 +13,17 @@
 # Authentik is NOT run here — point the API at your existing self-hosted instance
 # via AUTHENTIK_ISSUER (see .env.example), or use DEV_AUTH_TOKEN/AUTH_LOCAL_SECRET to
 # skip it entirely in dev.
+#
+# Explicit project name: without one, compose derives the project name from the
+# directory ("pocket-portfolio-tracker"), which is also what docker-compose.prod.yml
+# resolves to when it's deployed from this same checkout. That collision means a bare
+# `docker compose ps`/`down`/`--profile full up` here could see or touch the live prod
+# containers. Pinning a distinct name keeps this dev stack in its own project,
+# regardless of directory. If you already have local Postgres-parity volumes from
+# before this change, they're now orphaned under the old "pocket-portfolio-tracker_*"
+# names — safe to remove: `docker volume rm pocket-portfolio-tracker_pgdata
+# pocket-portfolio-tracker_miniodata`.
+name: pocket-dev
 
 services:
   postgres:
