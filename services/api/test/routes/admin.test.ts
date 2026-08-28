@@ -641,14 +641,19 @@ describe("admin provider config", () => {
     return (res.json() as { id: string }).id;
   }
 
+  const userEndpoints: { method: "GET" | "POST" | "PATCH"; url: string }[] = [
+    { method: "GET", url: "/admin/users" },
+    { method: "POST", url: "/admin/users" },
+    { method: "POST", url: "/admin/users/00000000-0000-0000-0000-000000000000/revoke-tokens" },
+    { method: "POST", url: "/admin/users/00000000-0000-0000-0000-000000000000/reset-onboarding" },
+    { method: "POST", url: "/admin/users/00000000-0000-0000-0000-000000000000/set-password" },
+    { method: "PATCH", url: "/admin/users/00000000-0000-0000-0000-000000000000/admin" },
+    { method: "POST", url: "/admin/users/00000000-0000-0000-0000-000000000000/delete" },
+  ];
+
   it("rejects unauthenticated requests with 401 on all user endpoints", async () => {
-    for (const url of [
-      "/admin/users",
-      "/admin/users/00000000-0000-0000-0000-000000000000/revoke-tokens",
-      "/admin/users/00000000-0000-0000-0000-000000000000/reset-onboarding",
-      "/admin/users/00000000-0000-0000-0000-000000000000/delete",
-    ]) {
-      const res = await app.inject({ method: url === "/admin/users" ? "GET" : "POST", url });
+    for (const { method, url } of userEndpoints) {
+      const res = await app.inject({ method, url });
       expect(res.statusCode).toBe(401);
     }
   });
@@ -656,17 +661,8 @@ describe("admin provider config", () => {
   it("rejects non-admin requests with 403", async () => {
     const id = await ensureUser("plain-user-admin-test", false);
     const t = await token("plain-user-admin-test");
-    for (const url of [
-      "/admin/users",
-      "/admin/users/00000000-0000-0000-0000-000000000000/revoke-tokens",
-      "/admin/users/00000000-0000-0000-0000-000000000000/reset-onboarding",
-      "/admin/users/00000000-0000-0000-0000-000000000000/delete",
-    ]) {
-      const res = await app.inject({
-        method: url === "/admin/users" ? "GET" : "POST",
-        url,
-        headers: auth(t),
-      });
+    for (const { method, url } of userEndpoints) {
+      const res = await app.inject({ method, url, headers: auth(t) });
       expect(res.statusCode).toBe(403);
     }
     await app.db.delete(users).where(eq(users.id, id));
@@ -936,5 +932,123 @@ describe("admin provider config", () => {
     expect(res.json()).toMatchObject({ error: "cannot_delete_self" });
 
     await app.db.delete(users).where(eq(users.id, myId));
+  });
+
+  it("creates a local-password user with a temp password that can log in", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users",
+      headers: auth(await token("admin-create-user", [ADMIN_GROUP])),
+      payload: { email: "New.Hire@Example.com", name: "New Hire" },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json() as {
+      id: string;
+      email: string;
+      isAdmin: boolean;
+      tempPassword: string;
+    };
+    expect(body.email).toBe("new.hire@example.com"); // normalized
+    expect(body.isAdmin).toBe(false);
+    expect(body.tempPassword).toMatch(/^pw_/);
+
+    const log = await app.db
+      .select()
+      .from(adminAuditLog)
+      .where(eq(adminAuditLog.action, "create_user"))
+      .orderBy(sql`${adminAuditLog.at} desc`)
+      .limit(1);
+    expect(log[0]?.target).toBe(body.id);
+
+    await app.db.delete(users).where(eq(users.id, body.id));
+  });
+
+  it("resets a user's password and revokes their existing local session", async () => {
+    const id = await ensureUser("set-password-target", false);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/admin/users/${id}/set-password`,
+      headers: auth(await token("admin-set-password", [ADMIN_GROUP])),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { id: string; tempPassword: string };
+    expect(body.id).toBe(id);
+    expect(body.tempPassword).toMatch(/^pw_/);
+
+    const [row] = await app.db
+      .select({ passwordChangedAt: users.passwordChangedAt })
+      .from(users)
+      .where(eq(users.id, id));
+    expect(row.passwordChangedAt).not.toBeNull();
+
+    await app.db.delete(users).where(eq(users.id, id));
+  });
+
+  it("set-password 404s for an unknown user", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/00000000-0000-0000-0000-000000000000/set-password",
+      headers: auth(await token("admin-set-password-404", [ADMIN_GROUP])),
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("promotes and demotes a user's local-auth admin flag", async () => {
+    // A baseline admin so demoting the target isn't blocked as "the last admin" —
+    // that guard is exercised separately below. OIDC test users never touch
+    // users.isAdmin (it defaults false), so this is the only other "true" row.
+    const baselineId = await ensureUser("promote-baseline", false);
+    const id = await ensureUser("promote-target", false);
+    try {
+      await app.db.update(users).set({ isAdmin: true }).where(eq(users.id, baselineId));
+
+      const promote = await app.inject({
+        method: "PATCH",
+        url: `/admin/users/${id}/admin`,
+        headers: auth(await token("admin-promote", [ADMIN_GROUP])),
+        payload: { isAdmin: true },
+      });
+      expect(promote.statusCode).toBe(200);
+      expect(promote.json()).toMatchObject({ id, isAdmin: true });
+
+      const demote = await app.inject({
+        method: "PATCH",
+        url: `/admin/users/${id}/admin`,
+        headers: auth(await token("admin-demote", [ADMIN_GROUP])),
+        payload: { isAdmin: false },
+      });
+      expect(demote.statusCode).toBe(200);
+      expect(demote.json()).toMatchObject({ id, isAdmin: false });
+
+      const log = await app.db
+        .select()
+        .from(adminAuditLog)
+        .where(eq(adminAuditLog.action, "revoke_admin"))
+        .orderBy(sql`${adminAuditLog.at} desc`)
+        .limit(1);
+      expect(log[0]?.target).toBe(id);
+    } finally {
+      await app.db.delete(users).where(eq(users.id, id));
+      await app.db.delete(users).where(eq(users.id, baselineId));
+    }
+  });
+
+  it("refuses to demote the last remaining local-auth admin", async () => {
+    const id = await ensureUser("last-admin-target", false);
+    try {
+      await app.db.update(users).set({ isAdmin: true }).where(eq(users.id, id));
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/admin/users/${id}/admin`,
+        headers: auth(await token("admin-last-admin-check", [ADMIN_GROUP])),
+        payload: { isAdmin: false },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({ error: "cannot_demote_last_admin" });
+    } finally {
+      await app.db.delete(users).where(eq(users.id, id));
+    }
   });
 });

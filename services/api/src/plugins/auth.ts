@@ -213,6 +213,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     let email: string | undefined;
     let isAdmin = false;
     let authMethod: AuthedUser["authMethod"] | undefined;
+    let tokenIssuedAt: number | undefined;
 
     // Try OIDC (remote JWKS / issuer OIDC discovery)
     if (keyResolver) {
@@ -246,6 +247,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
           sub = payload.sub;
           email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
           authMethod = "local";
+          tokenIssuedAt = payload.iat;
         }
       } catch {
         // Local verification failed — fall through to error
@@ -262,12 +264,37 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     const [found] = await app.db.select().from(users).where(eq(users.authSub, sub!)).limit(1);
     let user = found;
     if (!user) {
+      // Local tokens are never JIT-inserted: a local sub always names a pre-existing row
+      // (login/setup only sign a row's own authSub), so a miss here means the user was
+      // deleted while their 7-day token was still live. Inserting would resurrect them as
+      // a brand-new, empty, non-admin account under the same credentials.
+      if (authMethod === "local") {
+        return reply.code(401).send({ error: "invalid_token" });
+      }
       const [created] = await app.db
         .insert(users)
         .values({ authSub: sub!, email: email! })
         .returning();
       user = created;
     }
+
+    if (authMethod === "local") {
+      isAdmin = user.isAdmin;
+      // Reject tokens issued before the password last changed — the closest thing to
+      // "sign out everywhere" a stateless JWT allows, since changing the password
+      // otherwise leaves any already-issued token valid for the rest of its 7-day life.
+      // Second-resolution (JWT `iat` is whole seconds): a token minted in the same
+      // wall-clock second as the change is let through rather than risk bouncing a
+      // legitimate re-login that lands in that same second. A ~1s revocation window is
+      // an acceptable trade against a stolen token otherwise surviving up to 7 days.
+      if (user.passwordChangedAt && tokenIssuedAt !== undefined) {
+        const changedAtSeconds = Math.floor(user.passwordChangedAt.getTime() / 1000);
+        if (tokenIssuedAt < changedAtSeconds) {
+          return reply.code(401).send({ error: "invalid_token" });
+        }
+      }
+    }
+
     request.user = {
       id: user.id,
       authSub: user.authSub,

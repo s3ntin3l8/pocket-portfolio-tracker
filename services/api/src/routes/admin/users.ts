@@ -1,5 +1,7 @@
+import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, ne, and } from "drizzle-orm";
+import { z } from "zod";
 import {
   users,
   portfolios,
@@ -9,6 +11,23 @@ import {
   adminAuditLog,
 } from "@portfolio/db";
 import { deleteStorageObjectsByKey } from "../../storage/receipts.js";
+import { hashPassword } from "../../plugins/auth.js";
+import { normalizeEmail } from "../auth.js";
+
+const createUserSchema = z.object({
+  email: z.string().email().transform(normalizeEmail),
+  name: z.string().trim().min(1).optional(),
+  isAdmin: z.boolean().optional().default(false),
+});
+
+const setAdminSchema = z.object({
+  isAdmin: z.boolean(),
+});
+
+/** pw_ + 24 url-safe chars (~144 bits) — shown once, same shape as a PAT secret. */
+function generateTempPassword(): string {
+  return `pw_${randomBytes(18).toString("base64url")}`;
+}
 
 export function registerUsersRoutes(app: FastifyInstance) {
   app.get(
@@ -48,6 +67,139 @@ export function registerUsersRoutes(app: FastifyInstance) {
         storageBytes: Number(r.storageBytes),
         tokenCount: Number(r.tokenCount),
       }));
+    },
+  );
+
+  /**
+   * POST /admin/users
+   * Admin-created user for local password auth — the second-and-later-user path once
+   * POST /auth/local/setup has bootstrapped the first admin. Returns a generated temp
+   * password ONCE (never stored in plaintext, never logged); the admin communicates it
+   * to the new user out of band. This is also the recovery path in place of a
+   * self-service forgot-password flow (there is no mailer in this project).
+   */
+  app.post(
+    "/admin/users",
+    {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      preHandler: app.requireAdmin,
+    },
+    async (request, reply) => {
+      const parsed = createUserSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "validation_error", issues: parsed.error.issues });
+      }
+      const { email, name, isAdmin } = parsed.data;
+
+      const tempPassword = generateTempPassword();
+      const [created] = await app.db
+        .insert(users)
+        .values({
+          authSub: `local|${email}`,
+          email,
+          name: name ?? null,
+          passwordHash: hashPassword(tempPassword),
+          isAdmin,
+        })
+        .returning({ id: users.id, email: users.email, isAdmin: users.isAdmin });
+
+      await app.db.insert(adminAuditLog).values({
+        actorSub: request.user!.authSub,
+        action: "create_user",
+        target: created.id,
+        meta: { email, isAdmin },
+      });
+
+      return reply.code(201).send({ ...created, tempPassword });
+    },
+  );
+
+  /**
+   * POST /admin/users/:id/set-password
+   * Admin resets another user's password — the recovery path for a locked-out local
+   * user, standing in for a self-service forgot-password flow. Returns a generated temp
+   * password ONCE and stamps passwordChangedAt so any of the user's existing local JWTs
+   * (up to 7 days old) stop working immediately, not just future logins.
+   */
+  app.post(
+    "/admin/users/:id/set-password",
+    {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      preHandler: app.requireAdmin,
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const tempPassword = generateTempPassword();
+
+      const [updated] = await app.db
+        .update(users)
+        .set({ passwordHash: hashPassword(tempPassword), passwordChangedAt: new Date() })
+        .where(eq(users.id, id))
+        .returning({ id: users.id, email: users.email });
+
+      if (!updated) {
+        return reply.code(404).send({ error: "user_not_found" });
+      }
+
+      await app.db.insert(adminAuditLog).values({
+        actorSub: request.user!.authSub,
+        action: "admin_set_password",
+        target: id,
+        meta: {},
+      });
+
+      return { ...updated, tempPassword };
+    },
+  );
+
+  /**
+   * PATCH /admin/users/:id/admin
+   * Promote/demote local-auth admin status (users.isAdmin — OIDC admins derive theirs
+   * from the Authentik group claim per-request and never read this column). Refuses to
+   * demote the last remaining admin so a deployment can't lock itself out of /admin/*.
+   */
+  app.patch(
+    "/admin/users/:id/admin",
+    {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      preHandler: app.requireAdmin,
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const parsed = setAdminSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "validation_error", issues: parsed.error.issues });
+      }
+      const { isAdmin } = parsed.data;
+
+      if (!isAdmin) {
+        const [{ count }] = await app.db
+          .select({ count: sql<number>`count(*)` })
+          .from(users)
+          .where(and(eq(users.isAdmin, true), ne(users.id, id)));
+        if (Number(count) === 0) {
+          return reply.code(400).send({ error: "cannot_demote_last_admin" });
+        }
+      }
+
+      const [updated] = await app.db
+        .update(users)
+        .set({ isAdmin })
+        .where(eq(users.id, id))
+        .returning({ id: users.id, email: users.email, isAdmin: users.isAdmin });
+
+      if (!updated) {
+        return reply.code(404).send({ error: "user_not_found" });
+      }
+
+      await app.db.insert(adminAuditLog).values({
+        actorSub: request.user!.authSub,
+        action: isAdmin ? "grant_admin" : "revoke_admin",
+        target: id,
+        meta: {},
+      });
+
+      return updated;
     },
   );
 

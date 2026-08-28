@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { SignJWT } from "jose";
 import { users } from "@portfolio/db";
 import {
@@ -49,6 +49,10 @@ export const authRoute = fp(async (app) => {
     app.post("/auth/local/login", notConfigured);
     app.post("/auth/local/change-password", { preHandler: app.authenticate }, notConfigured);
     app.post("/auth/local/set-password", { preHandler: app.authenticate }, notConfigured);
+    app.post("/auth/local/setup", notConfigured);
+    // Always resolves — never 404/503 — so this endpoint can't be used to fingerprint
+    // which auth mode a deployment runs. "Not local auth" reads the same as "already set up".
+    app.get("/auth/local/setup-status", async () => ({ needsSetup: false }));
     return;
   }
 
@@ -138,7 +142,7 @@ export const authRoute = fp(async (app) => {
 
       await app.db
         .update(users)
-        .set({ passwordHash: hashPassword(newPassword) })
+        .set({ passwordHash: hashPassword(newPassword), passwordChangedAt: new Date() })
         .where(eq(users.id, id));
 
       return { ok: true };
@@ -176,10 +180,89 @@ export const authRoute = fp(async (app) => {
 
       await app.db
         .update(users)
-        .set({ passwordHash: hashPassword(newPassword) })
+        .set({ passwordHash: hashPassword(newPassword), passwordChangedAt: new Date() })
         .where(eq(users.id, id));
 
       return { ok: true };
+    },
+  );
+
+  /**
+   * GET /auth/local/setup-status
+   * Whether the first-run admin bootstrap (POST /auth/local/setup) is still available.
+   * Unauthenticated by design — the login screen needs it before anyone can sign in.
+   * `needsSetup` is "zero rows in `users`", so it closes itself the moment a user exists
+   * via any path (seed, OIDC login, or setup itself). Always resolves for this deployment
+   * shape (never 404/503) so the response can't be used to fingerprint auth mode.
+   */
+  app.get(
+    "/auth/local/setup-status",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async () => {
+      const [{ count }] = await app.db.select({ count: sql<number>`count(*)` }).from(users);
+      return { needsSetup: Number(count) === 0 };
+    },
+  );
+
+  // Arbitrary fixed key for the setup-bootstrap advisory lock (see below) — any int8
+  // works as long as nothing else in the app claims it; nothing else does.
+  const SETUP_LOCK_KEY = 8_224_601;
+
+  /**
+   * POST /auth/local/setup
+   * Create the first user — as an admin — when the deployment has none yet. This is the
+   * self-host bootstrap for a deployment with no Authentik and no seeded database: without
+   * it the only way to get a local-password user is the destructive `make seed-demo-login`
+   * script. Closes itself permanently once any user exists.
+   *
+   * Atomic against concurrent callers via a transaction-scoped Postgres advisory lock
+   * (released automatically at commit/rollback) wrapping a check-then-insert — plain
+   * Drizzle `insert().select()` can't express "insert these literal values only if the
+   * table is empty" because it requires the select's column set to exactly match the
+   * target table's full column list, not the subset this insert needs.
+   */
+  app.post(
+    "/auth/local/setup",
+    { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "validation_error", issues: parsed.error.issues });
+      }
+      const { email, password } = parsed.data;
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        return reply.code(400).send({
+          error: "validation_error",
+          issues: [{ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }],
+        });
+      }
+
+      const authSub = `local|${email}`;
+      const passwordHash = hashPassword(password);
+
+      const created = await app.db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(${SETUP_LOCK_KEY})`);
+        const [{ count }] = await tx.select({ count: sql<number>`count(*)` }).from(users);
+        if (Number(count) > 0) return null;
+        const [row] = await tx
+          .insert(users)
+          .values({ authSub, email, name: "Admin", passwordHash, isAdmin: true })
+          .returning();
+        return row;
+      });
+
+      if (!created) {
+        return reply.code(409).send({ error: "setup_already_done" });
+      }
+
+      const token = await signLocalJwt(created.authSub, created.email);
+      return {
+        id: created.id,
+        email: created.email,
+        name: created.name,
+        accessToken: token,
+        expiresAt: Math.floor(Date.now() / 1000) + 7 * 86_400,
+      };
     },
   );
 });
