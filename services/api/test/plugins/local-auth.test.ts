@@ -443,6 +443,13 @@ describe("authMethod: local edge cases", () => {
     expect(freshRes.statusCode).toBe(200);
     expect(freshRes.json().id).toBe(edgeUserId);
   });
+
+  it("GET /me never returns the password hash", async () => {
+    const jwt = await loginFor("edge-test@example.com", "secure-password");
+    const res = await edgeApp.inject({ method: "GET", url: "/me", headers: auth(jwt) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).not.toHaveProperty("passwordHash");
+  });
 });
 
 describe("POST /auth/local/setup (first-run bootstrap)", () => {

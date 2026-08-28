@@ -26,7 +26,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export async function AccountSection({
   me,
 }: {
-  me: { name: string | null; displayCurrency: string; email: string } | null;
+  me: { name: string | null; displayCurrency: string; email: string; authSub: string } | null;
 }) {
   const t = await getTranslations("Settings");
 
@@ -67,7 +67,15 @@ export async function AccountSection({
 
       <div className="flex items-center gap-2.5 rounded-xl bg-card px-4 py-3 text-xs text-muted-foreground shadow-card">
         <Lock className="size-4 shrink-0" />
-        <span>{t("authVia", { email: me?.email ?? "" })}</span>
+        <span>
+          {/* authSub's shape (see routes/auth.ts) is the only signal the client has for
+              which auth mode this account actually uses — this string used to say
+              "via Authentik" unconditionally, which was simply false for every local
+              password user. */}
+          {me?.authSub.startsWith("local|")
+            ? t("authViaLocal", { email: me?.email ?? "" })
+            : t("authVia", { email: me?.email ?? "" })}
+        </span>
       </div>
       <AppVersion
         ariaLabel={t("version", { version: APP_VERSION })}

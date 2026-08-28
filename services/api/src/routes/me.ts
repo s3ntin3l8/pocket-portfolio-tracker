@@ -17,11 +17,24 @@ const tokenColumns = {
   createdAt: apiTokens.createdAt,
 };
 
+// Columns safe to return to the client — never passwordHash (scrypt hash + salt for
+// local auth) or the local-auth-only isAdmin/passwordChangedAt columns (isAdmin is
+// re-derived below from the token; passwordChangedAt is an internal revocation stamp).
+const userColumns = {
+  id: users.id,
+  authSub: users.authSub,
+  email: users.email,
+  name: users.name,
+  displayCurrency: users.displayCurrency,
+  onboardingCompletedAt: users.onboardingCompletedAt,
+  createdAt: users.createdAt,
+};
+
 export async function meRoute(app: FastifyInstance) {
   // The authenticated user's profile (created on first login).
   app.get("/me", { preHandler: app.authenticate }, async (request) => {
     const { id, isAdmin } = requireUser(request);
-    const [row] = await app.db.select().from(users).where(eq(users.id, id)).limit(1);
+    const [row] = await app.db.select(userColumns).from(users).where(eq(users.id, id)).limit(1);
     // isAdmin is derived from the token's group claim, not a stored column.
     return { ...row, isAdmin };
   });
@@ -32,10 +45,14 @@ export async function meRoute(app: FastifyInstance) {
     const input = userUpdateSchema.parse(request.body);
     // An empty patch is a no-op (Drizzle rejects an empty SET) — just echo the row.
     if (Object.keys(input).length === 0) {
-      const [row] = await app.db.select().from(users).where(eq(users.id, id)).limit(1);
+      const [row] = await app.db.select(userColumns).from(users).where(eq(users.id, id)).limit(1);
       return row;
     }
-    const [row] = await app.db.update(users).set(input).where(eq(users.id, id)).returning();
+    const [row] = await app.db
+      .update(users)
+      .set(input)
+      .where(eq(users.id, id))
+      .returning(userColumns);
     return row;
   });
 
@@ -48,7 +65,7 @@ export async function meRoute(app: FastifyInstance) {
       .update(users)
       .set({ onboardingCompletedAt: new Date() })
       .where(eq(users.id, id))
-      .returning();
+      .returning(userColumns);
     return row;
   });
 
