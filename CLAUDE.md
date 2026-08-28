@@ -50,8 +50,9 @@ Run from the repo root (Turborepo fans out across workspaces):
 | `npm run format`    | Prettier write.                                    |
 
 Target one workspace with `--workspace @portfolio/<name>` (e.g.
-`npm run dev --workspace @portfolio/api`). DB: `npm run db:generate` /
-`npm run db:seed` inside `services/api` after editing the schema.
+`npm run dev --workspace @portfolio/api`). DB: `npm run db:generate --workspace
+@portfolio/db` after editing the schema (`packages/db/src/schema/*.ts`); `npm run
+db:seed --workspace @portfolio/api` to seed.
 
 **Dev via `make`** (wraps the npm scripts above, plus dev-only setup): `cp .env.example
 .env` defaults `DATABASE_URL` to embedded PGlite and `STORAGE_PROVIDER` to local-folder
@@ -124,8 +125,9 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
 - **Tests** live in each workspace's `test/`. The API uses an embedded **PGlite**
   Postgres (`pglite://` URLs) so tests need no external DB; `app.inject()` for routes.
 - Config is read from `app.config` (typed in `services/api/src/plugins/env.ts`), not
-  `process.env` directly. After editing `services/api/src/db/schema.ts`, run
-  `npm run db:generate` and commit the migration.
+  `process.env` directly. After editing the Drizzle schema (`packages/db/src/schema/*.ts`),
+  run `npm run db:generate --workspace @portfolio/db` and commit the migration under
+  `packages/db/drizzle/`.
 - **Logging:** pino to stdout by default. Set `LOG_DIR` (see `.env.example`) to also fan
   out to a `pino-roll` rotating file (daily rotation, 20 MB cap, 14-day retention) —
   `resolveLogDestination()` in `services/api/src/app.ts`. Same secret redaction (auth
@@ -139,7 +141,12 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   names and no private account specifics (depot/account numbers, exact balances); keep
   them concise and high-level — describe the change and the class of problem, not the
   individual account that surfaced it.
-- **Before committing:** `npm run lint && npm run typecheck && npm test`.
+- **Before committing:**
+  `npm run lint && npm run typecheck && npm test && npm run format:check`.
+- **Issues and PRs use the repo templates**
+  (`.github/ISSUE_TEMPLATE/issue-blueprint.md`, `.github/pull_request_template.md`) — fill
+  them in rather than skipping them. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full
+  pre-PR checklist.
 
 ## Testing & coverage
 
