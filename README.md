@@ -142,6 +142,18 @@ All config is read from `app.config` (typed in `services/api/src/plugins/env.ts`
   config, just a Flex token pasted per-portfolio (see
   [docs/interactive_brokers.md](docs/interactive_brokers.md)).
 
+### Self-hosting without Authentik
+
+Set `AUTH_LOCAL_SECRET` (leave `AUTHENTIK_ISSUER` unset) and start the app as usual. With
+no users in the database yet, the root page shows a one-time "create your admin account"
+form instead of a login form — that request (`POST /auth/local/setup`) is only ever
+accepted while the `users` table is empty, so the flow closes itself permanently the
+moment it's used. From there, sign in with those credentials and change your password
+from `/settings`. An admin can create further users, reset a locked-out user's password,
+and promote/demote admin via `POST`/`PATCH /admin/users/*` (API-only for now — no UI yet
+for those three; there's also no self-service password reset, since this project has no
+mailer). `docker-compose.prod.yml` forwards `AUTH_LOCAL_SECRET` to both `api` and `web`.
+
 ## Conventions
 
 - **ESM throughout** (`"type": "module"`); `.ts` sources import with `.js` specifiers

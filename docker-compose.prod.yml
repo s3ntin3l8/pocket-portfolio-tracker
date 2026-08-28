@@ -41,6 +41,9 @@ services:
       AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
       AUTHENTIK_AUDIENCE: ${AUTHENTIK_AUDIENCE}
       AUTHENTIK_ADMIN_GROUP: ${AUTHENTIK_ADMIN_GROUP}
+      # Alternative to Authentik (or alongside it) — see .env.example. Previously dropped
+      # here entirely, which made local password auth impossible to enable in this stack.
+      AUTH_LOCAL_SECRET: ${AUTH_LOCAL_SECRET:-}
       # No CORS_ORIGIN: after Part B the browser never calls the API directly — deny all
       # cross-origin by default. Only set this if the API is ever also exposed publicly
       # (see the plan's "Also expose the API publicly" alternative, not used here).
@@ -100,6 +103,9 @@ services:
       AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_URL: ${AUTH_URL}
+      # Must match `api`'s AUTH_LOCAL_SECRET above — enables the Credentials provider
+      # (see auth.ts) and the Landing email/password form.
+      AUTH_LOCAL_SECRET: ${AUTH_LOCAL_SECRET:-}
       WEB_ALLOWED_HOSTS: ${WEB_ALLOWED_HOSTS}
     labels:
       - traefik.enable=true
