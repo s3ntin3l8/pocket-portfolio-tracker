@@ -21,8 +21,7 @@
 # containers. Pinning a distinct name keeps this dev stack in its own project,
 # regardless of directory. If you already have local Postgres-parity volumes from
 # before this change, they're now orphaned under the old "pocket-portfolio-tracker_*"
-# names — safe to remove: `docker volume rm pocket-portfolio-tracker_pgdata
-# pocket-portfolio-tracker_miniodata`.
+# names — safe to remove: `make dev-clean-legacy-volumes`.
 name: pocket-dev
 
 services:

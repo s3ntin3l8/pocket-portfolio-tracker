@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-down prod-logs prod-ps
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-down prod-logs prod-ps dev-clean-legacy-volumes
 
 # Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
 # docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
@@ -35,6 +35,13 @@ services-down: ## Stop local backing services
 	$(COMPOSE_DEV) down
 
 prod: ## Build and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
+	@if [ -z "$$($(COMPOSE_PROD) ps -aq 2>/dev/null)" ]; then \
+		echo "warning: no existing 'pocket-portfolio-tracker' project containers found."; \
+		echo "If you expected this to adopt a running deployment, double-check the project"; \
+		echo "name in docker-compose.prod.yml and that you're on the right host — otherwise"; \
+		echo "this creates a fresh stack with empty volumes. Ctrl-C within 5s to abort."; \
+		sleep 5; \
+	fi
 	$(COMPOSE_PROD) up -d --build
 
 prod-down: ## Stop the production stack
@@ -81,6 +88,9 @@ seed-demo-login: ## Seed demo data with local-password login instead of DEV_AUTH
 
 dev-reset: ## Delete the PGlite dev database + local folder storage (next make dev re-creates + auto-migrates)
 	rm -rf .pglite-dev services/api/.pglite-dev .storage services/api/.storage
+
+dev-clean-legacy-volumes: ## One-time cleanup: remove dev Postgres/MinIO volumes orphaned by #658's compose project split
+	docker volume rm pocket-portfolio-tracker_pgdata pocket-portfolio-tracker_miniodata
 
 test: ## Run tests
 	npm run test
