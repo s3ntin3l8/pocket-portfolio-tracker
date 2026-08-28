@@ -547,6 +547,20 @@ describe("createApiClient request methods", () => {
       method: "GET",
       url: "/networth/anomalies",
     },
+    {
+      name: "changeLocalPassword",
+      call: (c) => c.changeLocalPassword({ currentPassword: "old-pw", newPassword: "new-pw" }), // pragma: allowlist secret
+      method: "POST",
+      url: "/auth/local/change-password",
+      body: { currentPassword: "old-pw", newPassword: "new-pw" }, // pragma: allowlist secret
+    },
+    {
+      name: "setLocalPassword",
+      call: (c) => c.setLocalPassword({ newPassword: "new-pw" }), // pragma: allowlist secret
+      method: "POST",
+      url: "/auth/local/set-password",
+      body: { newPassword: "new-pw" }, // pragma: allowlist secret
+    },
   ];
 
   it.each(cases)("$name → $method $url", async ({ call, method, url, body }) => {

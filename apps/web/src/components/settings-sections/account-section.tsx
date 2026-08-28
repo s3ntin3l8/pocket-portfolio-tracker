@@ -5,6 +5,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { DisplayCurrency } from "@/components/display-currency";
 import { UpdateProfile } from "@/components/update-profile";
+import { ChangePassword } from "@/components/change-password";
 import { AppVersion } from "@/components/app-version";
 import { APP_VERSION } from "@/lib/version";
 
@@ -25,8 +26,13 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
  */
 export async function AccountSection({
   me,
+  localAuthAvailable = false,
 }: {
   me: { name: string | null; displayCurrency: string; email: string; authSub: string } | null;
+  /** AUTH_LOCAL_SECRET is configured — gates the Password card. Not gated on whether
+   *  *this* user already has a local password set (the API has no such flag on /me):
+   *  an OIDC-only user submitting it gets changePasswordErrors.no_local_password_set. */
+  localAuthAvailable?: boolean;
 }) {
   const t = await getTranslations("Settings");
 
@@ -64,6 +70,17 @@ export async function AccountSection({
           </CardContent>
         </Card>
       </div>
+
+      {localAuthAvailable && (
+        <div>
+          <SectionLabel>{t("password")}</SectionLabel>
+          <Card>
+            <CardContent className="p-5">
+              <ChangePassword />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="flex items-center gap-2.5 rounded-xl bg-card px-4 py-3 text-xs text-muted-foreground shadow-card">
         <Lock className="size-4 shrink-0" />

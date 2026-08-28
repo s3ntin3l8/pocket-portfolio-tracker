@@ -12,5 +12,5 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const { locale } = await params;
   setRequestLocale(locale);
   const me = await loadMe();
-  return <AccountSection me={me} />;
+  return <AccountSection me={me} localAuthAvailable={Boolean(process.env.AUTH_LOCAL_SECRET)} />;
 }

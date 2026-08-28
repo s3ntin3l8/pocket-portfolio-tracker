@@ -16,7 +16,7 @@ export default async function SettingsAccountPage({
   return (
     <>
       <SectionHeader title={t("navAccount")} backHref="/settings" />
-      <AccountSection me={me} />
+      <AccountSection me={me} localAuthAvailable={Boolean(process.env.AUTH_LOCAL_SECRET)} />
     </>
   );
 }
