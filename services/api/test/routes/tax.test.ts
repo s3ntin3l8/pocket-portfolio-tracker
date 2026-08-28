@@ -634,8 +634,8 @@ describe("tax routes", () => {
     const currentYear = new Date().getUTCFullYear();
     const lastYear = currentYear - 1;
 
-    // A date in last year's rest-of-year window (Aug 15 of last year).
-    const lastYearDivDate = `${lastYear}-08-15T00:00:00.000Z`;
+    // A date in last year's rest-of-year window (Nov 15 of last year ensures it is strictly after pastStart and before lastYearEnd).
+    const lastYearDivDate = `${lastYear}-11-15T00:00:00.000Z`;
     // A buy date well before the dividend.
     const buyDate = `${lastYear}-01-01T00:00:00.000Z`;
 
