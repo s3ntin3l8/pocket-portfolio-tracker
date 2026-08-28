@@ -107,9 +107,16 @@ export async function warmPool(count = WARM_POOL_SIZE): Promise<void> {
 // the new value: Postgres requires the ALTER TYPE to be committed first (PG error
 // 55P04). Run each file in its own BEGIN/COMMIT so the constraint is satisfied.
 //
+// The same constraint applies *within* a file (0042 adds 'pdf' to transaction_source
+// and then UPDATEs rows to it), so a file carrying an `ALTER TYPE … ADD VALUE` runs
+// statement-by-statement, unwrapped — each statement auto-commits, which is the only
+// way Postgres lets a later statement see the new label.
+//
 // Tracks by hash (not timestamp watermark) to survive migration file regeneration
 // during development, where the same schema change gets a new folderMillis after a
 // `db:generate` re-run.
+const ADDS_ENUM_VALUE = /\bALTER\s+TYPE\b[\s\S]*?\bADD\s+VALUE\b/i;
+
 async function migrateOneByOne(folder: string): Promise<void> {
   const { readMigrationFiles } = await import("drizzle-orm/migrator");
   const migrations = readMigrationFiles({ migrationsFolder: folder });
@@ -131,6 +138,17 @@ async function migrateOneByOne(folder: string): Promise<void> {
 
   for (const migration of migrations) {
     if (appliedHashes.has(migration.hash)) continue;
+
+    if (migration.sql.some((stmt) => ADDS_ENUM_VALUE.test(stmt))) {
+      for (const stmt of migration.sql) {
+        await conn.unsafe(stmt);
+      }
+      await conn`
+        INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+        VALUES (${migration.hash}, ${migration.folderMillis})
+      `;
+      continue;
+    }
 
     await conn.begin(async (tx) => {
       for (const stmt of migration.sql) {
