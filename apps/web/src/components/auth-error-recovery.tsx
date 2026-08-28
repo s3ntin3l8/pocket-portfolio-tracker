@@ -8,6 +8,7 @@ import { AlertTriangle, Ban } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "@/i18n/navigation";
 
 /**
  * Auth.js `pages.error` target. A failed OAuth callback (the classic one: a single-use
@@ -31,12 +32,20 @@ const RETRY_WINDOW_MS = 30_000;
 // Anything not explicitly non-recoverable is treated as a stale-code case worth one retry.
 const NON_RECOVERABLE = new Set(["AccessDenied", "Verification"]);
 
-function startSignIn() {
-  void signIn("authentik", { callbackUrl: "/holdings" });
-}
-
-export function AuthErrorRecovery() {
+export function AuthErrorRecovery({
+  authentikAvailable = true,
+}: {
+  /** False when AUTHENTIK_ISSUER is unset — this page is Auth.js's `pages.error`
+   *  target, reached only from a failed OAuth callback, so in the ordinary case
+   *  Authentik is by definition configured. The exception: a stale error-page cookie
+   *  from a PRIOR Authentik session outliving AUTHENTIK_ISSUER being disabled since
+   *  (e.g. toggling it off for local dev — see auth.ts's own `authentikAvailable`
+   *  comment). `signIn("authentik")` would then 404/land on Auth.js's bare,
+   *  provider-less /api/auth/signin page — route back to the landing page instead. */
+  authentikAvailable?: boolean;
+}) {
   const t = useTranslations("AuthError");
+  const router = useRouter();
   const error = useSearchParams().get("error") ?? "";
   // Decide "retrying" (bounce to Authentik) vs "manual" (show a button) during render,
   // not in an effect. Recoverable + not-just-retried → retry; a retry inside the window
@@ -48,6 +57,14 @@ export function AuthErrorRecovery() {
     const last = Number(sessionStorage.getItem(RETRY_KEY) ?? "0");
     return Date.now() - last < RETRY_WINDOW_MS ? "manual" : "retrying";
   });
+  const startSignIn = () => {
+    if (authentikAvailable) {
+      void signIn("authentik", { callbackUrl: "/holdings" });
+    } else {
+      router.push("/");
+    }
+  };
+
   // Guard the auto-retry against React StrictMode's double-invoked effects (dev) so we
   // don't fire signIn twice.
   const started = useRef(false);
@@ -57,6 +74,7 @@ export function AuthErrorRecovery() {
     started.current = true;
     sessionStorage.setItem(RETRY_KEY, String(Date.now()));
     startSignIn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   if (phase === "retrying") {

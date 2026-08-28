@@ -526,6 +526,13 @@
       "when": 1784991322457,
       "tag": "0074_wakeful_baron_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1787901713030,
+      "tag": "0075_ordinary_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }

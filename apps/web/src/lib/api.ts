@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { signIn } from "next-auth/react";
 import { createApiClient, type ApiClient } from "@portfolio/api-client";
 
 /**
@@ -23,7 +22,13 @@ export function useApiClient(): ApiClient {
       fetch: async (input, init) => {
         const res = await fetch(input, init);
         if (res.status === 401) {
-          void signIn("authentik");
+          // Not gated on which auth mode is configured (unlike session-error-guard.tsx,
+          // this hook has no component tree to thread that flag through) — routing to
+          // the login page itself, which already renders the right form for whichever
+          // mode is active, needs no flag at all. Was: `signIn("authentik")` here,
+          // which 404/lands on Auth.js's bare, provider-less signin page whenever
+          // Authentik isn't the configured auth mode (e.g. local-auth-only).
+          window.location.assign("/");
         }
         return res;
       },

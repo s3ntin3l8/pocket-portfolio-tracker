@@ -61,7 +61,12 @@ storage — no Docker, no Authentik (`DEV_AUTH_TOKEN` bypasses login). `make dev
 `make dev-reset` wipes the PGlite dev DB + local storage; `make seed-demo` refuses to run
 against a non-`pglite://` `DATABASE_URL` unless `FORCE=1` (it deletes/reinserts rows by
 email plus global instrument rows by symbol). `make services` starts real local Postgres +
-MinIO instead, for Postgres-parity dev.
+MinIO instead, for Postgres-parity dev. To exercise local email/password auth instead of
+the `DEV_AUTH_TOKEN` bypass: set `AUTH_LOCAL_SECRET`, comment out `DEV_AUTH_TOKEN`, then
+either `make seed-demo-login SEED_DEMO_PASSWORD=changeme` or just visit `/` — with zero
+users in the database it shows a first-run "create your admin account" form
+(`POST /auth/local/setup`, closes itself once any user exists). See README's
+"Self-hosting without Authentik" for the self-host-focused version of this.
 
 > **Known dev flake:** on `npm run dev` the API (`tsx watch`) can crash once at
 > startup with `SyntaxError: … does not provide an export named …` from a

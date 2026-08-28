@@ -15,6 +15,7 @@ import {
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
+import { normalizeEmail } from "../routes/auth.js";
 import { ensureDb, getDb, closeDb } from "./client.js";
 
 /**
@@ -37,7 +38,7 @@ import { ensureDb, getDb, closeDb } from "./client.js";
  * later stay looking current rather than visibly stale.
  */
 
-const SEED_EMAIL = process.env.SEED_DEMO_EMAIL || "demo@pocket.invalid";
+const SEED_EMAIL = normalizeEmail(process.env.SEED_DEMO_EMAIL || "demo@pocket.invalid");
 const SEED_PASSWORD = process.env.SEED_DEMO_PASSWORD || "";
 const DEMO_AUTH_SUB = SEED_PASSWORD ? `local|${SEED_EMAIL}` : "demo|pocket";
 
@@ -88,6 +89,15 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       email: SEED_EMAIL,
       name: "Demo",
       passwordHash,
+      // In local-password mode this is the documented alternative to
+      // POST /auth/local/setup for bootstrapping a self-host (README, .env.example) —
+      // it must produce an admin for the same reason that route does: GET
+      // /auth/local/setup-status closes the bootstrap the moment ANY user row exists,
+      // and only an existing admin can promote one via PATCH /admin/users/:id/admin.
+      // A non-admin first user here would permanently lock the deployment out of
+      // /admin/*. Not set in PAT/dev-bypass mode (no password) — that path already gets
+      // isAdmin from NODE_ENV === "development" (plugins/auth.ts), not this column.
+      isAdmin: Boolean(SEED_PASSWORD),
     })
     .returning();
 

@@ -1960,6 +1960,15 @@ export function createApiClient(config: ApiClientConfig) {
       request<ApiTokenWithSecret>("POST", "/me/tokens", input),
     deleteApiToken: (id: string) => request<void>("DELETE", `/me/tokens/${encodeURIComponent(id)}`),
 
+    // Local password auth — 503s (auth_not_configured) when AUTH_LOCAL_SECRET isn't
+    // set. Both require an interactive session; a PAT gets 403 interactive_session_required.
+    changeLocalPassword: (input: { currentPassword: string; newPassword: string }) =>
+      request<{ ok: true }>("POST", "/auth/local/change-password", input),
+    // Only succeeds once, for an account with no existing password (e.g. an OIDC user
+    // attaching a local one) — 400 password_already_set otherwise.
+    setLocalPassword: (input: { newPassword: string }) =>
+      request<{ ok: true }>("POST", "/auth/local/set-password", input),
+
     // Admin: market-data provider config (enable/disable + fallback priority + credentials).
     getAdminProviders: () => request<AdminProvidersResponse>("GET", "/admin/providers"),
     updateAdminProviders: (input: ProviderSettingUpdate[]) =>
