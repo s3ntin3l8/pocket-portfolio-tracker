@@ -108,14 +108,25 @@ export async function warmPool(count = WARM_POOL_SIZE): Promise<void> {
 // 55P04). Run each file in its own BEGIN/COMMIT so the constraint is satisfied.
 //
 // The same constraint applies *within* a file (0042 adds 'pdf' to transaction_source
-// and then UPDATEs rows to it), so a file carrying an `ALTER TYPE … ADD VALUE` runs
-// statement-by-statement, unwrapped — each statement auto-commits, which is the only
-// way Postgres lets a later statement see the new label.
+// and then UPDATEs rows to it), so the `ALTER TYPE … ADD VALUE` statements in a file
+// run unwrapped, each auto-committing — the only way Postgres lets a later statement
+// see the new label. Only those statements lose the transaction; everything else in
+// the file (e.g. 0018's CREATE TABLE + FKs alongside its two enum adds) still runs
+// atomically, so an unrelated failure there rolls back cleanly instead of leaving
+// half-applied DDL that then re-fails the enum add on retry.
 //
 // Tracks by hash (not timestamp watermark) to survive migration file regeneration
 // during development, where the same schema change gets a new folderMillis after a
 // `db:generate` re-run.
 const ADDS_ENUM_VALUE = /\bALTER\s+TYPE\b[\s\S]*?\bADD\s+VALUE\b/i;
+
+// Drizzle keeps `--` line comments inside the statement text it returns, so testing
+// ADDS_ENUM_VALUE against the raw statement would misclassify a statement whose
+// comment merely mentions "ALTER TYPE ... ADD VALUE" without executing one.
+// Exported for testing against the real migrationsDir contents.
+export function addsEnumValue(stmt: string): boolean {
+  return ADDS_ENUM_VALUE.test(stmt.replace(/--[^\n]*/g, ""));
+}
 
 async function migrateOneByOne(folder: string): Promise<void> {
   const { readMigrationFiles } = await import("drizzle-orm/migrator");
@@ -139,19 +150,12 @@ async function migrateOneByOne(folder: string): Promise<void> {
   for (const migration of migrations) {
     if (appliedHashes.has(migration.hash)) continue;
 
-    if (migration.sql.some((stmt) => ADDS_ENUM_VALUE.test(stmt))) {
-      for (const stmt of migration.sql) {
-        await conn.unsafe(stmt);
-      }
-      await conn`
-        INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-        VALUES (${migration.hash}, ${migration.folderMillis})
-      `;
-      continue;
+    for (const stmt of migration.sql.filter(addsEnumValue)) {
+      await conn.unsafe(stmt);
     }
 
     await conn.begin(async (tx) => {
-      for (const stmt of migration.sql) {
+      for (const stmt of migration.sql.filter((stmt) => !addsEnumValue(stmt))) {
         await tx.unsafe(stmt);
       }
       await tx`
