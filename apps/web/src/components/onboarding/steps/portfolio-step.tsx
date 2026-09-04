@@ -1,9 +1,9 @@
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { Icon, ICONS } from "../icon";
 import { cardStyle, type OnboardingTheme } from "../theme";
 import styles from "../onboarding.module.css";
 
-// Verbatim from the design's `brokerageList` — kept as-is (not swapped for the app's
-// real `KNOWN_BROKERAGES`) since the design's exact copy/list is authoritative here.
 const BROKERAGE_LIST = [
   "Trade Republic",
   "Interactive Brokers",
@@ -31,7 +31,6 @@ export interface PortfolioCopy {
   cashHelper: string;
 }
 
-/** Step 3 — Create portfolio: name, brokerage autocomplete, base currency, cash-counting choice. */
 export function PortfolioStep({
   th,
   isDark,
@@ -89,8 +88,11 @@ export function PortfolioStep({
         >
           {copy.nameLabel}
         </label>
-        <input
-          className={`${styles[th.inputClass]} ${portfolioNameError ? styles.inputError : ""}`}
+        <Input
+          className={cn(
+            th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
+            portfolioNameError && styles.inputError,
+          )}
           placeholder={copy.namePlaceholder}
           value={portfolioName}
           onChange={(e) => onPortfolioNameChange(e.target.value)}
@@ -111,8 +113,8 @@ export function PortfolioStep({
           <span style={{ fontWeight: 500, color: th.dividerText }}>{copy.brokerageOptional}</span>
         </label>
         <div style={{ position: "relative" }}>
-          <input
-            className={styles[th.inputClass]}
+          <Input
+            className={cn(th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14")}
             style={{ paddingRight: 40 }}
             placeholder={copy.brokeragePlaceholder}
             value={brokerageValue}
@@ -175,9 +177,6 @@ export function PortfolioStep({
               <button
                 key={name}
                 type="button"
-                // preventDefault so the input's blur (and its close-dropdown timeout)
-                // doesn't fire before this click is registered — matches the design's
-                // onMouseDown + e.preventDefault() pattern.
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onSelectBrokerage(name);

@@ -1322,6 +1322,7 @@
     "filterInvestments": "Investments only",
     "filterType": "Type",
     "filterInstrument": "Instrument",
+    "filterLabel": "Filters",
     "filterYear": "Year",
     "allTypes": "All types",
     "allInstruments": "All instruments",
@@ -1435,7 +1436,6 @@
       "dividends": "Dividends",
       "couponsInterest": "Coupons & interest",
       "otherIncome": "Other income",
-
       "averageOrder": "Average order",
       "capitalDeployed": "capital deployed",
       "capitalReturned": "capital returned",

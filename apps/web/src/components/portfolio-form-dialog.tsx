@@ -5,17 +5,10 @@ import { useTranslations } from "next-intl";
 import { AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Eyebrow } from "@/components/ui/eyebrow";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { KNOWN_BROKERAGES } from "@/lib/brokerages";
-import { BrokerageIcon } from "@/components/brokerage-icon";
 import type { EditablePortfolio } from "./portfolio-form-dialog/constants";
 export type { EditablePortfolio } from "./portfolio-form-dialog/constants";
-import { OwnershipSection } from "./portfolio-form-dialog/sections/ownership-section";
-import { AccountSection } from "./portfolio-form-dialog/sections/account-section";
-import { AdvancedSection } from "./portfolio-form-dialog/sections/advanced-section";
+import { PortfolioFormSections } from "./portfolio-form-dialog/sections/form-sections";
 import {
   TrConnectionSection,
   IbkrConnectionSection,
@@ -63,62 +56,17 @@ export function PortfolioFormDialog({
             </div>
           )}
 
-          <Eyebrow>{t("sectionBasics")}</Eyebrow>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="portfolio-name">{t("name")}</Label>
-            <Input
-              id="portfolio-name"
-              value={f.name}
-              onChange={(e) => f.setName(e.target.value)}
-              placeholder={t("namePlaceholder")}
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="portfolio-brokerage">{t("brokerage")}</Label>
-            <div className="flex items-center gap-2">
-              <BrokerageIcon brokerage={f.brokerage} />
-              <Input
-                id="portfolio-brokerage"
-                value={f.brokerage}
-                onChange={(e) => f.setBrokerage(e.target.value)}
-                placeholder={t("brokeragePlaceholder")}
-                list="brokerage-suggestions"
-                autoComplete="off"
-              />
-            </div>
-            <datalist id="brokerage-suggestions">
-              {KNOWN_BROKERAGES.map((b) => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
-            {f.isTr && !f.effectivePortfolio && !f.showTrChildNote && (
-              <p className="text-xs text-muted-foreground">{t("trConnectAfterSave")}</p>
-            )}
-            {f.showTrChildNote && (
-              <p className="text-xs text-muted-foreground">{t("trChildUnsupported")}</p>
-            )}
-          </div>
-
-          <Eyebrow>{t("sectionOwnership")}</Eyebrow>
-
-          <OwnershipSection
-            holders={f.holders}
+          <PortfolioFormSections
+            name={f.name}
+            brokerage={f.brokerage}
             accountHolderId={f.accountHolderId}
+            holders={f.holders}
             newHolderName={f.newHolderName}
             newHolderType={f.newHolderType}
             newHolderBirthYear={f.newHolderBirthYear}
-            onAccountHolderChange={f.setAccountHolderId}
-            onNewHolderNameChange={f.setNewHolderName}
-            onNewHolderTypeChange={f.setNewHolderType}
-            onNewHolderBirthYearChange={f.setNewHolderBirthYear}
-          />
-
-          <Eyebrow>{t("sectionAccount")}</Eyebrow>
-
-          <AccountSection
+            isTr={f.isTr}
+            showTrChildNote={f.showTrChildNote}
+            effectivePortfolio={f.effectivePortfolio}
             accountNumber={f.accountNumber}
             iban={f.iban}
             currency={f.currency}
@@ -129,19 +77,20 @@ export function PortfolioFormDialog({
             holderAllowanceCap={f.holderAllowanceCap}
             fsaRemainingForHolder={f.fsaRemainingForHolder}
             selectedHolderName={f.selectedHolderObj?.name ?? null}
+            cashCounted={f.cashCounted}
+            documentRetention={f.documentRetention}
+            includeInAggregate={f.includeInAggregate}
+            onNameChange={f.setName}
+            onBrokerageChange={f.setBrokerage}
+            onAccountHolderChange={f.setAccountHolderId}
+            onNewHolderNameChange={f.setNewHolderName}
+            onNewHolderTypeChange={f.setNewHolderType}
+            onNewHolderBirthYearChange={f.setNewHolderBirthYear}
             onAccountNumberChange={f.setAccountNumber}
             onIbanChange={f.setIban}
             onCurrencyChange={f.setCurrency}
             onTaxAllowanceChange={f.setTaxAllowanceAnnual}
-          />
-
-          <AdvancedSection
-            cashCounted={f.cashCounted}
-            allowNegativeCash={f.allowNegativeCash}
-            documentRetention={f.documentRetention}
-            includeInAggregate={f.includeInAggregate}
             onCashCountedChange={f.setCashCounted}
-            onAllowNegativeCashChange={f.setAllowNegativeCash}
             onDocumentRetentionChange={f.setDocumentRetention}
             onIncludeInAggregateChange={f.setIncludeInAggregate}
           />
