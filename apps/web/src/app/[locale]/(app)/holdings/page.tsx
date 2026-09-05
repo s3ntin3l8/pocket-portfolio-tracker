@@ -30,6 +30,7 @@ import {
   type AnomalyTranslator,
 } from "@/lib/utils";
 import { ReconciliationBanner } from "@/components/transactions/activity-banners";
+import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 
 const CLASS_TABS = [
   "all",
@@ -159,11 +160,12 @@ export default async function HoldingsPage({
   // it — same pattern as the Activity page header.
   const Heading = (
     <div className="space-y-1">
+      <PageHeaderSetter title={t("title")} />
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">
+        <PageTitle>
           <span className="sm:hidden">{t("titleMobile")}</span>
           <span className="hidden sm:inline">{t("title")}</span>
-        </h1>
+        </PageTitle>
         {result.status === "ok" && holdings.length > 0 && (
           <ExportCsvButton
             filename="holdings.csv"

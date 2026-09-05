@@ -6,6 +6,7 @@ import { ExportCsvButton } from "@/components/export-csv-button";
 import { ExportDocumentsButton } from "@/components/export-documents-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { RecentImportsSection } from "@/components/recent-imports-section";
+import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
   getSelectedPortfolioId,
   loadImports,
@@ -188,8 +189,9 @@ export default async function TransactionsPage({
   const displayCount = total;
   const heading = (action?: React.ReactNode) => (
     <div className="space-y-1">
+      <PageHeaderSetter title={t("title")} />
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <PageTitle>{t("title")}</PageTitle>
         {action}
       </div>
       <p className="text-sm font-medium text-text-2">
