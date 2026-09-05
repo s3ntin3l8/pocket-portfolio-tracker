@@ -531,11 +531,11 @@ describe("getDrillDownInstruments — region with countryWeights", () => {
         marketValueDisplay: "10000",
       }),
     ];
-    // 80% US → North America; remainder attributed to listing venue (EU)
+    // 80% US → North America; remainder (20%) attributed to listing venue (EU)
     const euResult = getDrillDownInstruments(holdings, "region", "EU");
     expect(euResult).toHaveLength(1);
-    // remainder = 1 - 0 (regionTotal for EU) = 1, so contribution = 10000
-    expect(euResult[0].value).toBeCloseTo(10000);
+    // remainder = 1 - 0.8 = 0.2, so contribution = 10000 * 0.2 = 2000
+    expect(euResult[0].value).toBeCloseTo(2000);
 
     // 80% US → North America
     const naResult = getDrillDownInstruments(holdings, "region", "North America");

@@ -151,7 +151,7 @@ function DimensionDrillDown({
 // ---------------------------------------------------------------------------
 
 /**
- * Tabbed allocation breakdown card: Class | Currency | Region | Sector.
+ * Tabbed allocation breakdown card: Class | Currency | Region | Country | Sector | Industry.
  * Each tab renders an AllocationDonut. The concentration badge sits in the
  * card header, supplied by the parent.
  *
