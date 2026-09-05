@@ -47,6 +47,8 @@ const CLOSED: Trade = {
     sector: null,
     sectorWeights: null,
     countryWeights: null,
+    country: null,
+    industry: null,
   },
 };
 
@@ -84,6 +86,8 @@ const LOSER: Trade = {
     sector: null,
     sectorWeights: null,
     countryWeights: null,
+    country: null,
+    industry: null,
   },
 };
 

@@ -8,6 +8,7 @@ import { VolatilityCard } from "@/components/insights/volatility-card";
 import { StreaksCard } from "@/components/insights/streaks-card";
 import { BenchmarkCard } from "@/components/insights/benchmark-card";
 import { ConcentrationTrendCard } from "@/components/insights/concentration-trend-card";
+import { CompositionCard } from "@/components/insights/composition-card";
 import {
   loadNetWorth,
   loadNetWorthHistory,
@@ -212,6 +213,14 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
           )}
         </div>
       </div>
+
+      {allocation && (
+        <CompositionCard
+          allocation={allocation}
+          currency={summary.displayCurrency}
+          holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
+        />
+      )}
 
       {insightsData && (
         <section className="space-y-4">

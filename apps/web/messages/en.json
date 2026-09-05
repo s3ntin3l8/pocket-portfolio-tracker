@@ -177,6 +177,9 @@
       "title": "Allocation & concentration",
       "desc": "How your capital is spread across asset classes, regions and currencies."
     },
+    "composition": {
+      "title": "Composition"
+    },
     "rebalancing": {
       "title": "Rebalancing & targets",
       "desc": "Drift from your target mix and where to direct your next top-up."
@@ -949,6 +952,8 @@
     "allocationTabCurrency": "Currency",
     "allocationTabRegion": "Region",
     "allocationTabSector": "Sector",
+    "allocationTabCountry": "Country",
+    "allocationTabIndustry": "Industry",
     "concentrationLabel": "Concentration",
     "concentrationDiversified": "Diversified",
     "concentrationModerate": "Moderate",

@@ -219,6 +219,8 @@ export async function instrumentMeta(
         countryWeights: (i.countryWeights as Record<string, number> | null) ?? null,
         sectorCheckedAt: i.sectorCheckedAt ? new Date(i.sectorCheckedAt) : null,
         partialExemptionRate: i.partialExemptionRate ?? null,
+        country: i.country ?? null,
+        industry: i.industry ?? null,
       },
     ]),
   );

@@ -55,6 +55,8 @@ const makeHolding = (
     sector: null,
     sectorWeights: null,
     countryWeights: null,
+    country: null,
+    industry: null,
   },
 });
 

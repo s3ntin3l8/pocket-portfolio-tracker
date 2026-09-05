@@ -1,7 +1,8 @@
 import type { HoldingValuation } from "@portfolio/api-client";
 import { marketToRegion, normalizeSector } from "@portfolio/core";
 
-export type DrillDownDimension = "sector" | "region" | "currency" | "asset_class";
+export type DrillDownDimension =
+  "sector" | "region" | "country" | "currency" | "asset_class" | "industry";
 
 export interface DrillDownInstrument {
   key: string;
@@ -127,6 +128,22 @@ export function getDrillDownInstruments(
         break;
       case "asset_class":
         if (h.instrument.assetClass === selectedKey) {
+          contribution = mv;
+        }
+        break;
+      case "country":
+        if (h.instrument.assetClass === "etf" && h.instrument.countryWeights) {
+          for (const [country, w] of Object.entries(h.instrument.countryWeights)) {
+            if (country === selectedKey && typeof w === "number" && w > 0) {
+              contribution = mv * w;
+            }
+          }
+        } else if (h.instrument.country === selectedKey) {
+          contribution = mv;
+        }
+        break;
+      case "industry":
+        if (h.instrument.industry === selectedKey) {
           contribution = mv;
         }
         break;

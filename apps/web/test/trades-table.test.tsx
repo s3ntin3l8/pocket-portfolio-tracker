@@ -55,6 +55,8 @@ const closed: Trade = {
     sector: null,
     sectorWeights: null,
     countryWeights: null,
+    country: null,
+    industry: null,
   },
 };
 
@@ -102,6 +104,8 @@ const open: Trade = {
     sector: null,
     sectorWeights: null,
     countryWeights: null,
+    country: null,
+    industry: null,
   },
 };
 

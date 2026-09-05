@@ -23,7 +23,9 @@ export function allocationBreakdown(
 
   const byAssetClass = new Map<string, Decimal>();
   const byRegion = new Map<string, Decimal>();
+  const byCountry = new Map<string, Decimal>();
   const bySector = new Map<string, Decimal>();
+  const byIndustry = new Map<string, Decimal>();
   const holdingsByCcy = new Map<string, Decimal>();
 
   let holdingsTotal = new Decimal(0);
@@ -47,14 +49,17 @@ export function allocationBreakdown(
       for (const [country, w] of Object.entries(m.countryWeights)) {
         if (w > 0) {
           add(byRegion, countryToRegion(country), mv.mul(w));
+          add(byCountry, country, mv.mul(w));
           sumW += w;
         }
       }
       if (sumW < 0.9999) {
         add(byRegion, marketToRegion(m?.market ?? ""), mv.mul(1 - sumW));
+        add(byCountry, m?.country ?? m?.market ?? "Other", mv.mul(1 - sumW));
       }
     } else {
       add(byRegion, marketToRegion(m?.market ?? ""), mv);
+      add(byCountry, m?.country ?? m?.market ?? "Other", mv);
     }
 
     if (m?.sectorWeights && Object.keys(m.sectorWeights).length > 0) {
@@ -68,10 +73,13 @@ export function allocationBreakdown(
       if (sumW < 0.9999) {
         add(bySector, "Other", mv.mul(1 - sumW));
       }
+      add(byIndustry, "uncategorized", mv);
     } else if (m?.sector) {
       add(bySector, normalizeSector(m.sector), mv);
+      add(byIndustry, m?.industry ?? "uncategorized", mv);
     } else {
       add(bySector, "uncategorized", mv);
+      add(byIndustry, m?.industry ?? "uncategorized", mv);
     }
 
     if (h.currency != null) {
@@ -124,7 +132,9 @@ export function allocationBreakdown(
     byAssetClass: sortedSlices(byAssetClass, total),
     byCurrency: sortedSlices(byCurrencyMap, total),
     byRegion: sortedSlices(byRegion, total),
+    byCountry: sortedSlices(byCountry, total),
     bySector: sortedSlices(bySector, total),
+    byIndustry: sortedSlices(byIndustry, total),
     topHoldings,
     concentration: concentration(topHoldings),
   };

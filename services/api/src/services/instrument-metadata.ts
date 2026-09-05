@@ -184,7 +184,12 @@ export async function refreshInstrumentMetadata(
         // Stock/equity: write single GICS sector.
         await db
           .update(instruments)
-          .set({ sector: profile.sector, sectorCheckedAt: now })
+          .set({
+            sector: profile.sector,
+            industry: profile.industry ?? null,
+            country: profile.country ?? null,
+            sectorCheckedAt: now,
+          })
           .where(eq(instruments.id, inst.id));
         enriched++;
       } else {
