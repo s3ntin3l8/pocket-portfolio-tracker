@@ -22,6 +22,7 @@ import { CorporateActionsManager } from "@/components/corporate-actions-manager"
 import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 import { TransactionsTable, type TxRow } from "@/components/transactions-table";
 import { InstrumentLotsTable } from "@/components/instrument-lots-table";
+import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
   loadInstrument,
   loadInstrumentScope,
@@ -195,6 +196,7 @@ export default async function InstrumentPage({
 
   return (
     <div className="space-y-6">
+      <PageHeaderSetter title={instrument.symbol} backHref="/holdings" />
       <div className="flex items-center gap-3">
         {back}
         {/* Reference detail header: instrument logo/monogram chip + symbol + class badge. */}
@@ -207,7 +209,7 @@ export default async function InstrumentPage({
         />
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">{instrument.symbol}</h1>
+            <PageTitle>{instrument.symbol}</PageTitle>
             <Badge variant="outline">{tc(instrument.assetClass)}</Badge>
             {isAdmin && (
               <InstrumentEditDialog instrument={instrument}>
