@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.8...v0.1.9) (2026-09-05)
+
+
+### Features
+
+* **income:** group timeline events by instrument ([#663](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/663)) ([d6237c8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d6237c83e0aa11a9e7e4f00bd2a042d7005b6fbb))
+* **insights:** add composition card with allocation drill-downs ([d17defd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d17defda52e9de595cc40685dada407265915d0c)), closes [#599](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/599)
+* **web:** show page title and back-nav in desktop topbar ([#598](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/598)) ([#662](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/662)) ([c02548a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c02548ac841b5b539f59ea0b7052aaf54fd4ec23))
+* widescreen sidepanel layout for Activity page ([#665](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/665)) ([8668653](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8668653aa5cdef804b21edfecedbee7cfc2628e8))
+* widescreen sidepanel layout for Trades page ([#666](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/666)) ([53615d9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/53615d9be6a00d6c0101d7fdcca6016d1090d949))
+
+
+### Bug Fixes
+
+* **api,web:** local auth correctness bugs, first-run admin bootstrap, and change-password UI ([#657](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/657)) ([dd4c241](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/dd4c2419d952c58a11d64bb32e32e88f883378a4))
+* **api:** let PATs carry admin in local development only ([#631](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/631)) ([a48c21b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a48c21b09b85f308a76a9f00e5557b9ad0a86497))
+* **db:** keep non-enum statements transactional in enum-adding migrations ([#655](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/655)) ([ca455c9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ca455c9589fe5833c1b3e1ea254f50df08eda616)), closes [#654](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/654)
+* **db:** run enum-adding migrations outside a transaction ([#645](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/645)) ([6e37e8b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6e37e8b84389b49c334a385863772b18cdc2e239))
+* **dev:** wire up the PGlite dev workflow PR [#627](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/627) shipped but never configured ([092656a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/092656ac08d1912e2ecd93a5db8eec7c44e5991a))
+* **web:** make local password auth work end to end ([aaa11e4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/aaa11e46ec4793e9e7623b8800e25078b1c674d1))
+* **web:** onboarding inputs now use &lt;Input&gt;, fixing iOS zoom-to-focus ([#624](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/624)) ([5ccb579](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5ccb5796f7019e6f5bfbab687eaa8e08d8c53c23))
+
 ## [0.1.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.7...v0.1.8) (2026-07-25)
 
 
