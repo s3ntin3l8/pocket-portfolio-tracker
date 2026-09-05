@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Link, redirect } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { DraftReviewClient } from "@/components/draft-review-client";
+import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import type { ImportDraft, ImportTargetPortfolio } from "@/components/import-flow/types";
 import { loadImport, loadPortfolioList } from "@/lib/server-api";
 
@@ -32,20 +33,21 @@ export default async function ImportReviewPage({
 
   return (
     <div className="space-y-6">
+      <PageHeaderSetter title={t("reviewTitle")} backHref="/transactions" />
       <div className="flex items-center gap-3">
         <Button
           variant="outline"
           size="icon"
           asChild
           aria-label={t("title")}
-          className="rounded-xl bg-card shadow-card"
+          className="rounded-xl bg-card shadow-card md:hidden"
         >
           <Link href="/transactions">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">{t("reviewTitle")}</h1>
+          <PageTitle>{t("reviewTitle")}</PageTitle>
           <p className="text-sm text-muted-foreground">{t("reviewSubtitle")}</p>
         </div>
       </div>
