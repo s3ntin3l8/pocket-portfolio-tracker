@@ -24,7 +24,7 @@ export default async function AdminPage({ params }: { params: Promise<{ locale: 
 
   return (
     <>
-      <PageHeaderSetter title={t("providers")} backHref="/admin" />
+      <PageHeaderSetter title={t("providers")} />
       <SectionHeader title={t("providers")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("providersHint")}</p>
       <Card>
