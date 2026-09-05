@@ -7,6 +7,7 @@ import { AllocationDonut } from "@/components/charts/allocation-donut";
 import { IncomeBarChart, IncomeBarChartLegend } from "@/components/charts/income-bar-chart";
 import { IncomeHeatmap } from "@/components/charts/income-heatmap";
 import { ReportHeader } from "@/components/report-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { YieldsTable } from "@/components/income/yields-table";
 import { ByCurrencyTable } from "@/components/income/by-currency-table";
 import { TABLE_LABEL, TABLE_SUBLABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
@@ -43,7 +44,12 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     );
   }
 
-  const heading = <ReportHeader title={t("title")} subtitle={t("subtitle")} />;
+  const heading = (
+    <>
+      <PageHeaderSetter title={t("title")} backHref="/reports" />
+      <ReportHeader title={t("title")} subtitle={t("subtitle")} />
+    </>
+  );
 
   if (result.status !== "ok") {
     return (

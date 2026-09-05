@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ReportHeader } from "@/components/report-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreferenceChips } from "@/components/preference-chips";
@@ -55,27 +56,30 @@ export default async function TaxPage({
   }
 
   const Heading = (
-    <ReportHeader
-      title={t("title")}
-      subtitle={
-        regime === "ID"
-          ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() })
-          : t("subtitle")
-      }
-      action={
-        <div className="flex flex-col items-end gap-1">
-          <PreferenceChips
-            prefKey="taxRegime"
-            current={regime}
-            options={[
-              { value: "DE", label: t("regime.de") },
-              { value: "ID", label: t("regime.id") },
-            ]}
-          />
-          <span className="px-0.5 text-[11px] text-muted-foreground">{t("regime.label")}</span>
-        </div>
-      }
-    />
+    <>
+      <PageHeaderSetter title={t("title")} backHref="/reports" />
+      <ReportHeader
+        title={t("title")}
+        subtitle={
+          regime === "ID"
+            ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() })
+            : t("subtitle")
+        }
+        action={
+          <div className="flex flex-col items-end gap-1">
+            <PreferenceChips
+              prefKey="taxRegime"
+              current={regime}
+              options={[
+                { value: "DE", label: t("regime.de") },
+                { value: "ID", label: t("regime.id") },
+              ]}
+            />
+            <span className="px-0.5 text-[11px] text-muted-foreground">{t("regime.label")}</span>
+          </div>
+        }
+      />
+    </>
   );
 
   if (holders.length === 0) {

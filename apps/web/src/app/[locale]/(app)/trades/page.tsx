@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ScrollText } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ReportHeader } from "@/components/report-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { TABLE_LABEL, TABLE_VALUE, TABLE_VALUE_STRONG } from "@/components/ui/table";
@@ -60,19 +61,22 @@ export default async function TradesPage({
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
 
   const Heading = (
-    <ReportHeader
-      title={t("title")}
-      subtitle={t("subtitle")}
-      action={
-        log ? (
-          <TradeMethodToggle
-            current={method}
-            labelAverage={t("methodAverage")}
-            labelFifo={t("methodFifo")}
-          />
-        ) : undefined
-      }
-    />
+    <>
+      <PageHeaderSetter title={t("title")} backHref="/reports" />
+      <ReportHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        action={
+          log ? (
+            <TradeMethodToggle
+              current={method}
+              labelAverage={t("methodAverage")}
+              labelFifo={t("methodFifo")}
+            />
+          ) : undefined
+        }
+      />
+    </>
   );
 
   if (result.status === "unavailable") {
