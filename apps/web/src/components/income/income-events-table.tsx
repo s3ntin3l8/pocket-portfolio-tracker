@@ -3,6 +3,7 @@
 import { useState, useMemo, Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { IncomeEvent, UpcomingPayment } from "@portfolio/api-client";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { monogram } from "@/lib/brokerages";
 import { formatMoney, cn } from "@/lib/utils";
 import { useApiClient } from "@/lib/api";
@@ -17,6 +18,18 @@ export type IncomeEventRow = IncomeEvent & {
   assumesContributions?: boolean;
   perShare?: string;
   quantity?: string;
+};
+
+type InstrumentGroup = {
+  key: string;
+  symbol: string;
+  displayName: string | null;
+  totalByCurrency: Record<string, number>;
+  totalLabel: string;
+  hasReceived: boolean;
+  hasForecast: boolean;
+  dominantType: string;
+  rows: IncomeEventRow[];
 };
 
 /**
@@ -76,12 +89,203 @@ function TimelineBadge({
   );
 }
 
+function InstrumentGroupRow({
+  group,
+  expanded,
+  onToggle,
+  openRow,
+  loadingId,
+  groupByMonth,
+}: {
+  group: InstrumentGroup;
+  expanded: boolean;
+  onToggle: () => void;
+  openRow: (e: IncomeEventRow) => void;
+  loadingId: string | null;
+  groupByMonth?: boolean;
+}) {
+  const t = useTranslations("Income");
+  const tt = useTranslations("TxType");
+  const locale = useLocale();
+  const df = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+  const label = group.symbol;
+  const allForecast = group.hasForecast && !group.hasReceived;
+
+  const monthFmt = useMemo(
+    () =>
+      groupByMonth
+        ? new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" })
+        : null,
+    [locale, groupByMonth],
+  );
+
+  const monthTotals = useMemo(() => {
+    if (!groupByMonth) return new Map<string, string>();
+    const totals = new Map<string, Record<string, number>>();
+    for (const r of group.rows) {
+      const mk = r.date.slice(0, 7);
+      const prev = totals.get(mk) ?? {};
+      prev[r.currency] = (prev[r.currency] ?? 0) + Number(r.amount);
+      totals.set(mk, prev);
+    }
+    const result = new Map<string, string>();
+    for (const [mk, byCurrency] of totals) {
+      result.set(
+        mk,
+        Object.entries(byCurrency)
+          .map(([cur, amt]) => formatMoney(amt, cur, locale))
+          .join(" · "),
+      );
+    }
+    return result;
+  }, [group.rows, groupByMonth, locale]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3.5 border-b border-line px-0.5 py-[11px] text-left hover:bg-muted/40"
+      >
+        {expanded ? (
+          <ChevronDown className="size-4 shrink-0 text-text-3" />
+        ) : (
+          <ChevronRight className="size-4 shrink-0 text-text-3" />
+        )}
+        <TimelineBadge label={label} type={group.dominantType} forecast={allForecast} />
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="truncate text-[13px] font-bold">{label}</span>
+          {group.displayName && (
+            <span className="truncate text-[11px] font-medium text-text-2">
+              {group.displayName}
+            </span>
+          )}
+          {allForecast && (
+            <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+              {t("est")}
+            </span>
+          )}
+        </div>
+        <span className="tabular whitespace-nowrap text-right text-sm font-bold text-success">
+          {group.totalLabel}
+        </span>
+      </button>
+      {expanded &&
+        group.rows.map((e, i) => {
+          const mc = e.date.slice(0, 7);
+          const showBand = groupByMonth && (i === 0 || group.rows[i - 1].date.slice(0, 7) !== mc);
+          const forecast = Boolean(e.status);
+          const clickable = !forecast && Boolean(e.transactionId && e.portfolioId);
+          const typeLabel = tt(e.type);
+          const dateLabel = df.format(new Date(e.date));
+          const amountLabel = formatMoney(Number(e.amount), e.currency, locale);
+          const amountClass = forecast
+            ? "text-text-2"
+            : Number(e.amount) >= 0
+              ? "text-success"
+              : "text-destructive";
+          const shares =
+            e.quantity != null
+              ? Number(e.quantity).toLocaleString(locale, { maximumFractionDigits: 4 })
+              : "—";
+          const perShare =
+            e.perShare != null ? formatMoney(Number(e.perShare), e.currency, locale) : "—";
+          const estTag = forecast && (
+            <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+              {t("est")}
+            </span>
+          );
+
+          return (
+            <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
+              {showBand && (
+                <div className="bg-card-2 px-0.5 py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3">
+                  {monthFmt!.format(new Date(e.date))}
+                  <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
+                </div>
+              )}
+              <div
+                style={forecast ? { opacity: 0.78 } : undefined}
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onClick={clickable ? () => openRow(e) : undefined}
+                onKeyDown={
+                  clickable
+                    ? (ev) => {
+                        if (ev.key === "Enter" || ev.key === " ") {
+                          ev.preventDefault();
+                          void openRow(e);
+                        }
+                      }
+                    : undefined
+                }
+                className={cn(
+                  "border-t border-line",
+                  clickable && "cursor-pointer transition-colors hover:bg-muted/40",
+                  loadingId === e.transactionId && "opacity-60",
+                )}
+              >
+                {/* Desktop */}
+                <div
+                  className={cn(
+                    "hidden items-center gap-3.5 pl-10 pr-0.5 py-[11px] sm:grid",
+                    TIMELINE_GRID,
+                  )}
+                >
+                  <span className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
+                    {dateLabel}
+                  </span>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="truncate text-[13px] font-bold">{label}</span>
+                    {estTag}
+                  </div>
+                  <span className="truncate text-xs font-medium text-text-2">{typeLabel}</span>
+                  <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                    {shares}
+                  </span>
+                  <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                    {perShare}
+                  </span>
+                  <span
+                    className={cn(
+                      "tabular whitespace-nowrap text-right text-sm font-bold",
+                      amountClass,
+                    )}
+                  >
+                    {amountLabel}
+                  </span>
+                </div>
+                {/* Mobile */}
+                <div className="flex items-center gap-3 pl-10 pr-0.5 py-[11px] sm:hidden">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-[13px] font-bold">{label}</span>
+                      {estTag}
+                    </div>
+                    <span className="truncate text-[11px] font-medium text-text-2">
+                      {typeLabel} {" · "} {dateLabel}
+                    </span>
+                  </div>
+                  <span className={cn("tabular shrink-0 text-sm font-bold", amountClass)}>
+                    {amountLabel}
+                  </span>
+                </div>
+              </div>
+            </Fragment>
+          );
+        })}
+    </div>
+  );
+}
+
 export function IncomeEventsTable({
   rows,
   groupByMonth,
+  groupByInstrument,
 }: {
   rows: IncomeEventRow[];
   groupByMonth?: boolean;
+  groupByInstrument?: boolean;
 }) {
   const t = useTranslations("Income");
   const tt = useTranslations("TxType");
@@ -114,10 +318,57 @@ export function IncomeEventsTable({
     }
     return result;
   }, [rows, groupByMonth, locale]);
+
+  const instrumentGroups = useMemo(() => {
+    if (!groupByInstrument) return null;
+    const map = new Map<string, InstrumentGroup & { typeCounts: Record<string, number> }>();
+    for (const r of rows) {
+      const key = r.instrumentId ?? r.symbol ?? "—";
+      const existing = map.get(key);
+      if (existing) {
+        existing.totalByCurrency[r.currency] =
+          (existing.totalByCurrency[r.currency] ?? 0) + Number(r.amount);
+        existing.hasReceived = existing.hasReceived || !r.status;
+        existing.hasForecast = existing.hasForecast || Boolean(r.status);
+        existing.typeCounts[r.type] = (existing.typeCounts[r.type] ?? 0) + 1;
+        existing.rows.push(r);
+      } else {
+        map.set(key, {
+          key,
+          symbol: r.symbol ?? "—",
+          displayName: r.displayName ?? r.name,
+          totalByCurrency: { [r.currency]: Number(r.amount) },
+          totalLabel: "",
+          hasReceived: !r.status,
+          hasForecast: Boolean(r.status),
+          dominantType: r.type,
+          typeCounts: { [r.type]: 1 },
+          rows: [r],
+        });
+      }
+    }
+    for (const g of map.values()) {
+      g.totalLabel = Object.entries(g.totalByCurrency)
+        .map(([cur, amt]) => formatMoney(amt, cur, locale))
+        .join(" · ");
+      g.dominantType = Object.entries(g.typeCounts).sort((a, b) => b[1] - a[1])[0][0];
+      g.rows.sort((a, b) => b.date.localeCompare(a.date));
+    }
+    return [...map.values()];
+  }, [rows, groupByInstrument, locale]);
+
   const api = useApiClient();
   const router = useRouter();
   const [detailTx, setDetailTx] = useState<TxRow | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Received (non-forecast) rows carry the underlying transaction id/portfolio — open the
   // same detail sheet used on the Activity page. Forecast rows have no backing transaction.
@@ -134,128 +385,140 @@ export function IncomeEventsTable({
 
   return (
     <div>
-      {rows.map((e, i) => {
-        const mc = e.date.slice(0, 7);
-        const showBand = groupByMonth && (i === 0 || rows[i - 1].date.slice(0, 7) !== mc);
-        const forecast = Boolean(e.status);
-        const clickable = !forecast && Boolean(e.transactionId && e.portfolioId);
-        const label = e.symbol ?? e.displayName ?? e.name ?? "—";
-        const typeLabel = tt(e.type);
-        const dateLabel = df.format(new Date(e.date));
-        const amountLabel = formatMoney(Number(e.amount), e.currency, locale);
-        const amountClass = forecast
-          ? "text-text-2"
-          : Number(e.amount) >= 0
-            ? "text-success"
-            : "text-destructive";
-        const shares =
-          e.quantity != null
-            ? Number(e.quantity).toLocaleString(locale, { maximumFractionDigits: 4 })
-            : "—";
-        const perShare =
-          e.perShare != null ? formatMoney(Number(e.perShare), e.currency, locale) : "—";
-        // Forecast growth/contribution assumptions no longer have a dedicated row —
-        // surface them on hover so the number's basis stays discoverable.
-        const title =
-          [
-            e.growthApplied !== undefined
-              ? t("growthHint", {
-                  pct: `${e.growthApplied >= 1 ? "+" : ""}${((e.growthApplied - 1) * 100).toFixed(1)}%`,
-                })
-              : null,
-            e.assumesContributions ? t("contributionsHint") : null,
-          ]
-            .filter(Boolean)
-            .join(" · ") || undefined;
+      {groupByInstrument && instrumentGroups
+        ? instrumentGroups.map((g) => (
+            <InstrumentGroupRow
+              key={g.key}
+              group={g}
+              expanded={expandedGroups.has(g.key)}
+              onToggle={() => toggleGroup(g.key)}
+              openRow={openRow}
+              loadingId={loadingId}
+              groupByMonth={groupByMonth}
+            />
+          ))
+        : rows.map((e, i) => {
+            const mc = e.date.slice(0, 7);
+            const showBand = groupByMonth && (i === 0 || rows[i - 1].date.slice(0, 7) !== mc);
+            const forecast = Boolean(e.status);
+            const clickable = !forecast && Boolean(e.transactionId && e.portfolioId);
+            const label = e.symbol ?? e.displayName ?? e.name ?? "—";
+            const typeLabel = tt(e.type);
+            const dateLabel = df.format(new Date(e.date));
+            const amountLabel = formatMoney(Number(e.amount), e.currency, locale);
+            const amountClass = forecast
+              ? "text-text-2"
+              : Number(e.amount) >= 0
+                ? "text-success"
+                : "text-destructive";
+            const shares =
+              e.quantity != null
+                ? Number(e.quantity).toLocaleString(locale, { maximumFractionDigits: 4 })
+                : "—";
+            const perShare =
+              e.perShare != null ? formatMoney(Number(e.perShare), e.currency, locale) : "—";
+            // Forecast growth/contribution assumptions no longer have a dedicated row —
+            // surface them on hover so the number's basis stays discoverable.
+            const title =
+              [
+                e.growthApplied !== undefined
+                  ? t("growthHint", {
+                      pct: `${e.growthApplied >= 1 ? "+" : ""}${((e.growthApplied - 1) * 100).toFixed(1)}%`,
+                    })
+                  : null,
+                e.assumesContributions ? t("contributionsHint") : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined;
 
-        const estTag = forecast && (
-          <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
-            {t("est")}
-          </span>
-        );
+            const estTag = forecast && (
+              <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+                {t("est")}
+              </span>
+            );
 
-        return (
-          <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
-            {showBand && (
-              <div className="bg-card-2 px-0.5 py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3">
-                {monthFmt!.format(new Date(e.date))}
-                <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
-              </div>
-            )}
-            <div
-              title={title}
-              style={forecast ? { opacity: 0.78 } : undefined}
-              role={clickable ? "button" : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onClick={clickable ? () => openRow(e) : undefined}
-              onKeyDown={
-                clickable
-                  ? (ev) => {
-                      if (ev.key === "Enter" || ev.key === " ") {
-                        ev.preventDefault();
-                        void openRow(e);
-                      }
-                    }
-                  : undefined
-              }
-              className={cn(
-                i > 0 && "border-t border-line",
-                clickable && "cursor-pointer transition-colors hover:bg-muted/40",
-                loadingId === e.transactionId && "opacity-60",
-              )}
-            >
-              {/* Desktop: 6-column grid. */}
-              <div
-                className={cn(
-                  "hidden items-center gap-3.5 px-0.5 py-[11px] sm:grid",
-                  TIMELINE_GRID,
+            return (
+              <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
+                {showBand && (
+                  <div className="bg-card-2 px-0.5 py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3">
+                    {monthFmt!.format(new Date(e.date))}
+                    <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
+                  </div>
                 )}
-              >
-                <span className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
-                  {dateLabel}
-                </span>
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <TimelineBadge label={label} type={e.type} forecast={forecast} />
-                  <span className="truncate text-[13px] font-bold">{label}</span>
-                  {estTag}
-                </div>
-                <span className="truncate text-xs font-medium text-text-2">{typeLabel}</span>
-                <span className="tabular text-right text-[13px] font-semibold text-text-mute">
-                  {shares}
-                </span>
-                <span className="tabular text-right text-[13px] font-semibold text-text-mute">
-                  {perShare}
-                </span>
-                <span
+                <div
+                  title={title}
+                  style={forecast ? { opacity: 0.78 } : undefined}
+                  role={clickable ? "button" : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={clickable ? () => openRow(e) : undefined}
+                  onKeyDown={
+                    clickable
+                      ? (ev) => {
+                          if (ev.key === "Enter" || ev.key === " ") {
+                            ev.preventDefault();
+                            void openRow(e);
+                          }
+                        }
+                      : undefined
+                  }
                   className={cn(
-                    "tabular whitespace-nowrap text-right text-sm font-bold",
-                    amountClass,
+                    i > 0 && "border-t border-line",
+                    clickable && "cursor-pointer transition-colors hover:bg-muted/40",
+                    loadingId === e.transactionId && "opacity-60",
                   )}
                 >
-                  {amountLabel}
-                </span>
-              </div>
-
-              {/* Mobile: flex row. */}
-              <div className="flex items-center gap-3 px-0.5 py-[11px] sm:hidden">
-                <TimelineBadge label={label} type={e.type} forecast={forecast} />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] font-bold">{label}</span>
-                    {estTag}
+                  {/* Desktop: 6-column grid. */}
+                  <div
+                    className={cn(
+                      "hidden items-center gap-3.5 px-0.5 py-[11px] sm:grid",
+                      TIMELINE_GRID,
+                    )}
+                  >
+                    <span className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
+                      {dateLabel}
+                    </span>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <TimelineBadge label={label} type={e.type} forecast={forecast} />
+                      <span className="truncate text-[13px] font-bold">{label}</span>
+                      {estTag}
+                    </div>
+                    <span className="truncate text-xs font-medium text-text-2">{typeLabel}</span>
+                    <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                      {shares}
+                    </span>
+                    <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                      {perShare}
+                    </span>
+                    <span
+                      className={cn(
+                        "tabular whitespace-nowrap text-right text-sm font-bold",
+                        amountClass,
+                      )}
+                    >
+                      {amountLabel}
+                    </span>
                   </div>
-                  <span className="truncate text-[11px] font-medium text-text-2">
-                    {typeLabel} {" · "} {dateLabel}
-                  </span>
+
+                  {/* Mobile: flex row. */}
+                  <div className="flex items-center gap-3 px-0.5 py-[11px] sm:hidden">
+                    <TimelineBadge label={label} type={e.type} forecast={forecast} />
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[13px] font-bold">{label}</span>
+                        {estTag}
+                      </div>
+                      <span className="truncate text-[11px] font-medium text-text-2">
+                        {typeLabel} {" · "} {dateLabel}
+                      </span>
+                    </div>
+                    <span className={cn("tabular shrink-0 text-sm font-bold", amountClass)}>
+                      {amountLabel}
+                    </span>
+                  </div>
                 </div>
-                <span className={cn("tabular shrink-0 text-sm font-bold", amountClass)}>
-                  {amountLabel}
-                </span>
-              </div>
-            </div>
-          </Fragment>
-        );
-      })}
+              </Fragment>
+            );
+          })}
 
       <TransactionDetailSheet
         tx={detailTx}

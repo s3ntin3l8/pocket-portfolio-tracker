@@ -62,6 +62,7 @@ export function IncomeTimeline({
   const [yearFilter, setYearFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [groupByInstrument, setGroupByInstrument] = useState(false);
   const [loadedYears, setLoadedYears] = useState<Map<string, IncomeEventRow[]>>(new Map());
   const [loadingYear, setLoadingYear] = useState<string | null>(null);
 
@@ -286,6 +287,30 @@ export function IncomeTimeline({
             </DropdownMenu>
           )}
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-text-3">{t("groupByLabel")}</span>
+          {(
+            [
+              [false, t("groupByDate")],
+              [true, t("groupByInstrument")],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={String(val)}
+              type="button"
+              onClick={() => setGroupByInstrument(val)}
+              aria-pressed={groupByInstrument === val}
+              className={cn(
+                "whitespace-nowrap rounded-full px-3 py-[5px] text-[11px]",
+                groupByInstrument === val
+                  ? "bg-pill font-bold text-white"
+                  : "border border-border bg-card font-semibold text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="relative flex items-center sm:ml-auto">
           <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
           <Input
@@ -361,7 +386,11 @@ export function IncomeTimeline({
                         <Spinner size="md" className="text-text-3" />
                       </div>
                     ) : displayRows ? (
-                      <IncomeEventsTable rows={displayRows} groupByMonth />
+                      <IncomeEventsTable
+                        rows={displayRows}
+                        groupByMonth
+                        groupByInstrument={groupByInstrument}
+                      />
                     ) : null}
                   </>
                 )}

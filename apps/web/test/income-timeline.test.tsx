@@ -149,4 +149,31 @@ describe("IncomeTimeline", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
     expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
   });
+
+  it("toggles between date and instrument grouping", () => {
+    wrap([bbca2026, tlkm2026Forecast, sap2025]);
+    expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+
+    // In date mode, the date column header and per-event date text should be present
+    // ("Jul 15", "Aug 20", "Mar 1") — these only appear in non-grouped rows
+    expect(screen.getByText("Jul 15")).toBeInTheDocument();
+
+    // Click the "Instrument" toggle button (not the column header)
+    const instrumentBtns = screen.getAllByText("Instrument");
+    const instrumentBtn = instrumentBtns.find((el) => el.tagName === "BUTTON")!;
+    fireEvent.click(instrumentBtn);
+
+    // In instrument mode, per-event date text should NOT be visible
+    // (child rows are collapsed into group headers)
+    expect(screen.queryByText("Jul 15")).not.toBeInTheDocument();
+
+    // Click "Date" toggle to switch back
+    const dateBtns = screen.getAllByText("Date");
+    const dateBtn = dateBtns.find((el) => el.tagName === "BUTTON")!;
+    fireEvent.click(dateBtn);
+
+    // In date mode, per-event date text is visible again
+    expect(screen.getByText("Jul 15")).toBeInTheDocument();
+    expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+  });
 });

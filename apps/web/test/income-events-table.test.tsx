@@ -129,3 +129,48 @@ describe("IncomeEventsTable", () => {
     expect(container.querySelector('[role="button"]')).toBeNull();
   });
 });
+
+describe("IncomeEventsTable — groupByInstrument", () => {
+  const rows: IncomeEventRow[] = [
+    { ...HISTORICAL, instrumentId: "i1", symbol: "BBCA" },
+    {
+      instrumentId: "i1",
+      symbol: "BBCA",
+      name: "Bank Central Asia",
+      displayName: null,
+      type: "dividend",
+      date: "2025-01-20",
+      amount: "250000",
+      currency: "IDR",
+    },
+    { ...UPCOMING, instrumentId: "i2", symbol: "TLKM" },
+  ];
+
+  it("renders one group header per instrument", () => {
+    wrap(<IncomeEventsTable rows={rows} groupByInstrument />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.length).toBe(2);
+  });
+
+  it("does not show child-row content when collapsed", () => {
+    wrap(<IncomeEventsTable rows={rows} groupByInstrument />);
+    // When collapsed, only group headers should be visible, not child-row content
+    // like date text or type labels for individual rows
+    expect(screen.queryByText("Jul 15")).not.toBeInTheDocument();
+    expect(screen.queryByText("Jan 20")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aug 20")).not.toBeInTheDocument();
+  });
+
+  it("expands to show child rows on click", () => {
+    wrap(<IncomeEventsTable rows={rows} groupByInstrument />);
+    const buttons = screen.getAllByRole("button");
+    fireEvent.click(buttons[0]);
+    const allBbca = screen.getAllByText("BBCA");
+    expect(allBbca.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("shows total amount in the group header", () => {
+    wrap(<IncomeEventsTable rows={rows} groupByInstrument />);
+    expect(screen.getAllByText(/750,000/).length).toBeGreaterThan(0);
+  });
+});

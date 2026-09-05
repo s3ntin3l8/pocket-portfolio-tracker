@@ -487,7 +487,10 @@
     "searchPlaceholder": "Search income…",
     "searchClear": "Clear search",
     "noMatches": "No payments match your filters.",
-    "loadOlderYear": "Load {year}"
+    "loadOlderYear": "Load {year}",
+    "groupByDate": "Date",
+    "groupByInstrument": "Instrument",
+    "groupByLabel": "Group by"
   },
   "Savings": {
     "title": "Savings",
