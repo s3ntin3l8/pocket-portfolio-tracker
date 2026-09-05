@@ -487,7 +487,10 @@
     "searchPlaceholder": "Cari pendapatan…",
     "searchClear": "Hapus pencarian",
     "noMatches": "Tidak ada pembayaran yang cocok dengan filter Anda.",
-    "loadOlderYear": "Muat {year}"
+    "loadOlderYear": "Muat {year}",
+    "groupByDate": "Tanggal",
+    "groupByInstrument": "Instrumen",
+    "groupByLabel": "Kelompokkan berdasarkan"
   },
   "Savings": {
     "title": "Tabungan",
