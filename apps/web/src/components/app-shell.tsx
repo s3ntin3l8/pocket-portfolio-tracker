@@ -2,6 +2,7 @@
 
 import { Suspense, useRef } from "react";
 import { useTranslations } from "next-intl";
+import { ChevronLeft } from "lucide-react";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,26 @@ import { MAIN_NAV, ADMIN_NAV, navActiveKey } from "@/components/nav-items";
 import { NavProgressProvider, LinkPendingSignal } from "@/components/nav-progress";
 import { RouteTransition } from "@/components/route-transition";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { PageHeaderProvider, usePageHeader } from "@/components/page-header";
+
+function DesktopTopbarTitle() {
+  const { title, backHref } = usePageHeader();
+  if (!title) return null;
+  return (
+    <div className="hidden items-center gap-2 md:flex">
+      {backHref && (
+        <Link
+          href={backHref}
+          aria-label="Back"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-text-mute transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <ChevronLeft className="size-5" />
+        </Link>
+      )}
+      <h1 className="truncate text-lg font-bold">{title}</h1>
+    </div>
+  );
+}
 
 export function AppShell({
   children,
@@ -171,6 +192,8 @@ export function AppShell({
               <Link href="/holdings" className="md:hidden" aria-label="Pocket">
                 <Brand />
               </Link>
+              {/* Desktop: page title + back button (from context) */}
+              <DesktopTopbarTitle />
               <div className="min-w-0">{switcher}</div>
               <div className="ml-auto flex items-center gap-1">
                 <ThemeToggle className="hidden md:inline-flex" />
@@ -196,7 +219,11 @@ export function AppShell({
           <PullToRefresh scrollContainerRef={scrollContainerRef}>
             <main className="@container mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(11rem,calc(env(safe-area-inset-bottom)+11rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
               <InstallPrompt />
-              <RouteTransition scrollContainerRef={scrollContainerRef}>{children}</RouteTransition>
+              <PageHeaderProvider>
+                <RouteTransition scrollContainerRef={scrollContainerRef}>
+                  {children}
+                </RouteTransition>
+              </PageHeaderProvider>
             </main>
           </PullToRefresh>
         </div>
