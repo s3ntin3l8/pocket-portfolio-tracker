@@ -26,7 +26,7 @@ function DesktopTopbarTitle() {
   const { title, backHref } = usePageHeader();
   if (!title) return null;
   return (
-    <div className="hidden items-center gap-2 md:flex">
+    <div className="hidden min-w-0 max-w-[40%] items-center gap-2 md:flex">
       {backHref && (
         <Link
           href={backHref}
@@ -36,7 +36,7 @@ function DesktopTopbarTitle() {
           <ChevronLeft className="size-5" />
         </Link>
       )}
-      <h1 className="truncate text-lg font-bold">{title}</h1>
+      <h1 className="min-w-0 truncate text-lg font-bold">{title}</h1>
     </div>
   );
 }
@@ -192,7 +192,6 @@ export function AppShell({
               <Link href="/holdings" className="md:hidden" aria-label="Pocket">
                 <Brand />
               </Link>
-              {/* Desktop: page title + back button (from context) */}
               <DesktopTopbarTitle />
               <div className="min-w-0">{switcher}</div>
               <div className="ml-auto flex items-center gap-1">
