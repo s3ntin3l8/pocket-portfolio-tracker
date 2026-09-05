@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { HolderEditForm } from "@/components/holder-edit-form";
 import { loadAccountHolders } from "@/lib/server-api";
 
@@ -24,6 +25,7 @@ export default async function EditHolderPage({
 
   return (
     <>
+      <PageHeaderSetter title={t("editTitle")} backHref="/settings/portfolios" />
       <SectionHeader title={t("editTitle")} backHref="/settings/portfolios" />
       <HolderEditForm mode="edit" holder={holder} />
     </>

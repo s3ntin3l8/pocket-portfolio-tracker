@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { HolderEditForm } from "@/components/holder-edit-form";
 
 /**
@@ -13,6 +14,7 @@ export default async function NewHolderPage({ params }: { params: Promise<{ loca
 
   return (
     <>
+      <PageHeaderSetter title={t("createTitle")} backHref="/settings/portfolios" />
       <SectionHeader title={t("createTitle")} backHref="/settings/portfolios" />
       <HolderEditForm mode="create" />
     </>

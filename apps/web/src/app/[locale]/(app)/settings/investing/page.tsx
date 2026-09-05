@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { InvestingSection } from "@/components/settings-sections/investing-section";
 import { loadPreferences } from "@/lib/server-api";
 
@@ -15,6 +16,7 @@ export default async function SettingsInvestingPage({
 
   return (
     <>
+      <PageHeaderSetter title={t("navInvesting")} backHref="/settings" />
       <SectionHeader title={t("navInvesting")} backHref="/settings" />
       <InvestingSection prefs={prefs} />
     </>
