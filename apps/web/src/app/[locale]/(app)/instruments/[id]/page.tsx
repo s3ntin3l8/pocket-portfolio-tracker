@@ -364,59 +364,45 @@ export default async function InstrumentPage({
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
         <div className="space-y-6 @xl:sticky @xl:top-4 @xl:order-last">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("position")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasPosition && holding ? (
-                <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
-                  <StatCard
-                    label={t("marketValueLabel")}
-                    value={
-                      marketValueDisplay !== null
-                        ? formatMoney(marketValueDisplay, scope.displayCurrency, locale)
-                        : "—"
-                    }
-                  />
-                  <StatCard
-                    label={t("quantityLabel")}
-                    value={qtyFmt.format(Number(holding.quantity))}
-                  />
-                  <StatCard
-                    label={t("avgCostLabel")}
-                    value={formatMoney(
-                      Number(holding.avgCost),
-                      holding.currency ?? instrument.currency,
-                      locale,
-                    )}
-                  />
-                  <StatCard
-                    label={t("unrealizedPnl")}
-                    value={
-                      pnlDisplay !== null
-                        ? formatMoney(pnlDisplay, scope.displayCurrency, locale)
-                        : "—"
-                    }
-                    delta={pnlPct !== undefined ? formatPercent(pnlPct, locale) : undefined}
-                    deltaTone={pnlDisplay === null ? "neutral" : pnlDisplay >= 0 ? "up" : "down"}
-                  />
-                  <StatCard
-                    label={t("portfolioWeightLabel")}
-                    value={
-                      portfolioWeight !== null ? `${(portfolioWeight * 100).toFixed(1)}%` : "—"
-                    }
-                  />
-                </div>
-              ) : (
-                <EmptyState
-                  icon={Wallet}
-                  title={t("noPosition")}
-                  description={t("noPositionBody")}
-                />
-              )}
-            </CardContent>
-          </Card>
+          <h2 className="text-lg font-semibold">{t("position")}</h2>
+          {hasPosition && holding ? (
+            <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
+              <StatCard
+                label={t("marketValueLabel")}
+                value={
+                  marketValueDisplay !== null
+                    ? formatMoney(marketValueDisplay, scope.displayCurrency, locale)
+                    : "—"
+                }
+              />
+              <StatCard
+                label={t("quantityLabel")}
+                value={qtyFmt.format(Number(holding.quantity))}
+              />
+              <StatCard
+                label={t("avgCostLabel")}
+                value={formatMoney(
+                  Number(holding.avgCost),
+                  holding.currency ?? instrument.currency,
+                  locale,
+                )}
+              />
+              <StatCard
+                label={t("unrealizedPnl")}
+                value={
+                  pnlDisplay !== null ? formatMoney(pnlDisplay, scope.displayCurrency, locale) : "—"
+                }
+                delta={pnlPct !== undefined ? formatPercent(pnlPct, locale) : undefined}
+                deltaTone={pnlDisplay === null ? "neutral" : pnlDisplay >= 0 ? "up" : "down"}
+              />
+              <StatCard
+                label={t("portfolioWeightLabel")}
+                value={portfolioWeight !== null ? `${(portfolioWeight * 100).toFixed(1)}%` : "—"}
+              />
+            </div>
+          ) : (
+            <EmptyState icon={Wallet} title={t("noPosition")} description={t("noPositionBody")} />
+          )}
         </div>
       </div>
     </div>

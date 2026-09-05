@@ -417,6 +417,7 @@ export default async function HoldingsPage({
         </div>
 
         {/* ── Sidebar: glance cards (sticky on wide containers) ── */}
+        {/* Reference stacks the glance cards 14px apart. */}
         <div className="space-y-3.5 @xl:sticky @xl:top-4 @xl:order-last">{glanceSection}</div>
       </div>
     </div>

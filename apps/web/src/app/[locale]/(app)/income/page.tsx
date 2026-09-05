@@ -162,7 +162,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           )}
 
           {/* Desktop: these summary cards arrange in a two-column grid (reference). */}
-          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+          <div className="grid gap-4 @2xl:grid-cols-2 @2xl:items-start">
             {s.monthly.length > 0 && (
               <Card>
                 {/* Tight header so the heatmap's dynamic subtitle sits right under the title. */}
@@ -247,8 +247,8 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
         </div>
 
         {/* ── Sidebar: stat cards (sticky on wide containers) ── */}
-        <div className="space-y-5 @xl:sticky @xl:top-4 @xl:order-last">
-          <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
+        <div className="@xl:sticky @xl:top-4 @xl:order-last">
+          <div className="grid grid-cols-1 space-y-2.5 sm:space-y-4">
             <StatCard
               label={t("thisYear")}
               value={m(thisFullYear)}
