@@ -140,13 +140,15 @@ const TOLERANCE_IDR = 10; // ±10 IDR acceptable for decimal arithmetic
 // ---------------------------------------------------------------------------
 
 describe("allocationBreakdown — structure", () => {
-  it("returns all six top-level keys", () => {
+  it("returns all eight top-level keys", () => {
     const result = allocationBreakdown(makeSummary(), instruments);
 
     expect(result.byAssetClass).toBeInstanceOf(Array);
     expect(result.byCurrency).toBeInstanceOf(Array);
     expect(result.byRegion).toBeInstanceOf(Array);
+    expect(result.byCountry).toBeInstanceOf(Array);
     expect(result.bySector).toBeInstanceOf(Array);
+    expect(result.byIndustry).toBeInstanceOf(Array);
     expect(result.topHoldings).toBeInstanceOf(Array);
     expect(result.concentration).toBeDefined();
   });
@@ -162,16 +164,16 @@ describe("allocationBreakdown — structure", () => {
   });
 
   it("all dimensions are sorted descending by pct", () => {
-    const { byAssetClass, byCurrency, byRegion, bySector } = allocationBreakdown(
-      makeSummary(),
-      instruments,
-    );
+    const { byAssetClass, byCurrency, byRegion, byCountry, bySector, byIndustry } =
+      allocationBreakdown(makeSummary(), instruments);
     const isDesc = (arr: { pct: number }[]) =>
       arr.every((s, i) => i === 0 || arr[i - 1].pct >= s.pct);
     expect(isDesc(byAssetClass)).toBe(true);
     expect(isDesc(byCurrency)).toBe(true);
     expect(isDesc(byRegion)).toBe(true);
+    expect(isDesc(byCountry)).toBe(true);
     expect(isDesc(bySector)).toBe(true);
+    expect(isDesc(byIndustry)).toBe(true);
   });
 });
 
@@ -520,7 +522,9 @@ describe("allocationBreakdown — empty portfolio", () => {
     expect(result.byAssetClass).toHaveLength(0);
     expect(result.byCurrency).toHaveLength(0);
     expect(result.byRegion).toHaveLength(0);
+    expect(result.byCountry).toHaveLength(0);
     expect(result.bySector).toHaveLength(0);
+    expect(result.byIndustry).toHaveLength(0);
     expect(result.topHoldings).toHaveLength(0);
     expect(result.concentration.hhi).toBe(0);
     expect(result.concentration.label).toBe("diversified");
@@ -720,5 +724,199 @@ describe("allocationBreakdown — ETF countryWeights look-through", () => {
     const eu = result.byRegion.find((s) => s.key === "EU");
     expect(eu).toBeDefined();
     expect(Math.abs(Number(eu!.value) - 10000)).toBeLessThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allocationBreakdown — byCountry dimension
+// ---------------------------------------------------------------------------
+
+describe("allocationBreakdown — byCountry", () => {
+  it("ETF countryWeights are decomposed into byCountry slices", () => {
+    const inst: Record<string, AllocationInstrumentMeta> = {
+      [ETF]: {
+        assetClass: "etf",
+        market: "US",
+        countryWeights: { "United States": 0.6, Germany: 0.25, Japan: 0.15 },
+      },
+    };
+    const summary = summarizePortfolio({
+      transactions: [
+        {
+          instrumentId: null,
+          type: "deposit",
+          price: "1",
+          quantity: "1",
+          fees: "0",
+          currency: "USD",
+          executedAt: new Date("2026-01-01"),
+        },
+        {
+          instrumentId: ETF,
+          type: "buy",
+          price: "1",
+          quantity: "1",
+          fees: "0",
+          currency: "USD",
+          executedAt: new Date("2026-01-01"),
+        },
+      ],
+      prices: { [ETF]: { price: "10000", currency: "USD" } },
+      displayCurrency: "USD",
+      cashCounted: true,
+      fxRate: (_f: string, _t: string) => "1",
+    });
+    const result = allocationBreakdown(summary, inst);
+
+    const us = result.byCountry.find((s) => s.key === "United States");
+    expect(us).toBeDefined();
+    expect(Math.abs(Number(us!.value) - 6000)).toBeLessThan(1);
+
+    const de = result.byCountry.find((s) => s.key === "Germany");
+    expect(de).toBeDefined();
+    expect(Math.abs(Number(de!.value) - 2500)).toBeLessThan(1);
+
+    const jp = result.byCountry.find((s) => s.key === "Japan");
+    expect(jp).toBeDefined();
+    expect(Math.abs(Number(jp!.value) - 1500)).toBeLessThan(1);
+  });
+
+  it("equity with country field uses country, not market", () => {
+    const result = allocationBreakdown(makeSummary(), instruments);
+    // BBCA has no country field → falls back to market "IDX"
+    const id = result.byCountry.find((s) => s.key === "IDX");
+    expect(id).toBeDefined();
+    expect(Math.abs(Number(id!.value) - 950_000)).toBeLessThan(TOLERANCE_IDR);
+  });
+
+  it("equity with explicit country field uses it", () => {
+    const instWithCountry: Record<string, AllocationInstrumentMeta> = {
+      ...instruments,
+      [BBCA]: {
+        ...instruments[BBCA],
+        country: "Indonesia",
+      },
+    };
+    const result = allocationBreakdown(makeSummary(), instWithCountry);
+    const id = result.byCountry.find((s) => s.key === "Indonesia");
+    expect(id).toBeDefined();
+    expect(Math.abs(Number(id!.value) - 950_000)).toBeLessThan(TOLERANCE_IDR);
+  });
+
+  it("byCountry values sum to total exposure minus cash", () => {
+    const result = allocationBreakdown(makeSummary(), instruments);
+    const countryTotal = result.byCountry.reduce((s, sl) => s + Number(sl.value), 0);
+    // Cash has no country, so total = TOTAL - cash (500 000)
+    expect(Math.abs(countryTotal - (TOTAL - 500_000))).toBeLessThan(TOLERANCE_IDR);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allocationBreakdown — byIndustry dimension
+// ---------------------------------------------------------------------------
+
+describe("allocationBreakdown — byIndustry", () => {
+  it("equity with industry field is categorized", () => {
+    const instWithIndustry: Record<string, AllocationInstrumentMeta> = {
+      [BBCA]: {
+        assetClass: "equity",
+        market: "IDX",
+        sector: "Financials",
+        industry: "Banking",
+        name: "Bank Central Asia",
+      },
+      [XETR]: {
+        assetClass: "equity",
+        market: "XETRA",
+        sector: "Technology",
+        industry: "Software",
+        name: "SAP SE",
+      },
+      [GOLD]: { assetClass: "gold", market: "XAU", sector: null, name: "Gold" },
+      [BOND]: { assetClass: "bond", market: "BEI", sector: null, name: "ORI023" },
+    };
+    const result = allocationBreakdown(makeSummary(), instWithIndustry);
+    const banking = result.byIndustry.find((s) => s.key === "Banking");
+    expect(banking).toBeDefined();
+    expect(Math.abs(Number(banking!.value) - 950_000)).toBeLessThan(TOLERANCE_IDR);
+
+    const sw = result.byIndustry.find((s) => s.key === "Software");
+    expect(sw).toBeDefined();
+    expect(Math.abs(Number(sw!.value) - 17_600_000)).toBeLessThan(TOLERANCE_IDR);
+  });
+
+  it("ETFs are 'uncategorized' (no look-through)", () => {
+    const inst: Record<string, AllocationInstrumentMeta> = {
+      [ETF]: {
+        assetClass: "etf",
+        market: "US",
+        sectorWeights: { Technology: 0.6, Financials: 0.3 },
+        name: "SP500 ETF",
+      },
+    };
+    const summary = summarizePortfolio({
+      transactions: [
+        {
+          instrumentId: null,
+          type: "deposit",
+          price: "1",
+          quantity: "1",
+          fees: "0",
+          currency: "IDR",
+          executedAt: new Date("2026-01-01"),
+        },
+        {
+          instrumentId: ETF,
+          type: "buy",
+          price: "1",
+          quantity: "1",
+          fees: "0",
+          currency: "IDR",
+          executedAt: new Date("2026-01-01"),
+        },
+      ],
+      prices: { [ETF]: { price: "10000", currency: "IDR" } },
+      displayCurrency: "IDR",
+      cashCounted: true,
+      fxRate: (_f: string, _t: string) => "1",
+    });
+    const result = allocationBreakdown(summary, inst);
+    const unc = result.byIndustry.find((s) => s.key === "uncategorized");
+    expect(unc).toBeDefined();
+    expect(Math.abs(Number(unc!.value) - 10_000)).toBeLessThan(1);
+  });
+
+  it("equity without industry field → 'uncategorized'", () => {
+    const result = allocationBreakdown(makeSummary(), instruments);
+    // None of the test equities have an industry field
+    const unc = result.byIndustry.find((s) => s.key === "uncategorized");
+    expect(unc).toBeDefined();
+    // BBCA 950000 + XETR 17600000 + GOLD 5500000 + BOND 5000000 = 29050000
+    expect(Math.abs(Number(unc!.value) - 29_050_000)).toBeLessThan(TOLERANCE_IDR);
+  });
+
+  it("byIndustry values sum to total exposure (no cash)", () => {
+    const instWithIndustry: Record<string, AllocationInstrumentMeta> = {
+      [BBCA]: {
+        assetClass: "equity",
+        market: "IDX",
+        sector: "Financials",
+        industry: "Banking",
+        name: "Bank Central Asia",
+      },
+      [XETR]: {
+        assetClass: "equity",
+        market: "XETRA",
+        sector: "Technology",
+        industry: "Software",
+        name: "SAP SE",
+      },
+      [GOLD]: { assetClass: "gold", market: "XAU", sector: null, name: "Gold" },
+      [BOND]: { assetClass: "bond", market: "BEI", sector: null, name: "ORI023" },
+    };
+    const result = allocationBreakdown(makeSummary(), instWithIndustry);
+    const industryTotal = result.byIndustry.reduce((s, sl) => s + Number(sl.value), 0);
+    // Cash has no industry, so total = TOTAL - cash (500000)
+    expect(Math.abs(industryTotal - (TOTAL - 500_000))).toBeLessThan(TOLERANCE_IDR);
   });
 });

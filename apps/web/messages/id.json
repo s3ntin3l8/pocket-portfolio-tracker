@@ -177,6 +177,9 @@
       "title": "Alokasi & konsentrasi",
       "desc": "Sebaran modal Anda di seluruh kelas aset, wilayah, dan mata uang."
     },
+    "composition": {
+      "title": "Komposisi"
+    },
     "rebalancing": {
       "title": "Penyeimbangan & target",
       "desc": "Penyimpangan dari target dan ke mana mengarahkan setoran berikutnya."
@@ -947,6 +950,8 @@
     "allocationTabCurrency": "Mata uang",
     "allocationTabRegion": "Wilayah",
     "allocationTabSector": "Sektor",
+    "allocationTabCountry": "Negara",
+    "allocationTabIndustry": "Industri",
     "concentrationLabel": "Konsentrasi",
     "concentrationDiversified": "Terdiversifikasi",
     "concentrationModerate": "Moderat",

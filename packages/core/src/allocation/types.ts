@@ -6,6 +6,8 @@ export interface AllocationInstrumentMeta {
   countryWeights?: Record<string, number> | null;
   sectorCheckedAt?: Date | string | null;
   name?: string;
+  country?: string | null;
+  industry?: string | null;
 }
 
 export interface AllocationSlice {
@@ -33,7 +35,9 @@ export interface AllocationBreakdown {
   byAssetClass: AllocationSlice[];
   byCurrency: AllocationSlice[];
   byRegion: AllocationSlice[];
+  byCountry: AllocationSlice[];
   bySector: AllocationSlice[];
+  byIndustry: AllocationSlice[];
   topHoldings: TopHolding[];
   concentration: ConcentrationInfo;
 }

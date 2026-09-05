@@ -49,6 +49,10 @@ export interface InstrumentMeta {
    * Non-null when an explicit per-instrument override is set; null = use asset-class default.
    */
   partialExemptionRate: string | null;
+  /** Country of incorporation for single-name equities; null until enriched. */
+  country: string | null;
+  /** GICS industry (sub-sector) for single-name equities; null until enriched. */
+  industry: string | null;
 }
 
 export interface Valuation {
@@ -110,6 +114,8 @@ export async function valuePortfolio(
         countryWeights: (i.countryWeights as Record<string, number> | null) ?? null,
         sectorCheckedAt: i.sectorCheckedAt ? new Date(i.sectorCheckedAt) : null,
         partialExemptionRate: i.partialExemptionRate ?? null,
+        country: i.country ?? null,
+        industry: i.industry ?? null,
       },
     ]),
   );

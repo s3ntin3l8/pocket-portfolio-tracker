@@ -463,6 +463,10 @@ export interface InstrumentMeta {
   sectorWeights: Record<string, number> | null;
   /** Per-country weights for ETFs (country name → fraction 0–1). Null for non-ETFs. */
   countryWeights: Record<string, number> | null;
+  /** Country of incorporation for single-name equities; null until enriched. */
+  country: string | null;
+  /** GICS industry (sub-sector) for single-name equities; null until enriched. */
+  industry: string | null;
 }
 
 /** A single slice in an allocation breakdown (one category in one dimension). */
@@ -503,7 +507,9 @@ export interface AllocationBreakdown {
   byAssetClass: AllocationSlice[];
   byCurrency: AllocationSlice[];
   byRegion: AllocationSlice[];
+  byCountry: AllocationSlice[];
   bySector: AllocationSlice[];
+  byIndustry: AllocationSlice[];
   topHoldings: AllocationTopHolding[];
   concentration: ConcentrationInfo;
 }

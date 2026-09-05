@@ -151,7 +151,7 @@ function DimensionDrillDown({
 // ---------------------------------------------------------------------------
 
 /**
- * Tabbed allocation breakdown card: Class | Currency | Region | Sector.
+ * Tabbed allocation breakdown card: Class | Currency | Region | Country | Sector | Industry.
  * Each tab renders an AllocationDonut. The concentration badge sits in the
  * card header, supplied by the parent.
  *
@@ -207,6 +207,14 @@ export function AllocationTabs({
     .filter((s) => s.value > 0);
 
   const sectorSlices = allocation.bySector
+    .map((s) => ({ key: s.key, label: s.key, value: toNumber(s.value), actualPct: s.pct }))
+    .filter((s) => s.value > 0);
+
+  const countrySlices = allocation.byCountry
+    .map((s) => ({ key: s.key, label: s.key, value: toNumber(s.value), actualPct: s.pct }))
+    .filter((s) => s.value > 0);
+
+  const industrySlices = allocation.byIndustry
     .map((s) => ({ key: s.key, label: s.key, value: toNumber(s.value), actualPct: s.pct }))
     .filter((s) => s.value > 0);
 
@@ -270,8 +278,14 @@ export function AllocationTabs({
         <TabsTrigger value="region" className="flex-1">
           {t("allocationTabRegion")}
         </TabsTrigger>
+        <TabsTrigger value="country" className="flex-1">
+          {t("allocationTabCountry")}
+        </TabsTrigger>
         <TabsTrigger value="sector" className="flex-1">
           {t("allocationTabSector")}
+        </TabsTrigger>
+        <TabsTrigger value="industry" className="flex-1">
+          {t("allocationTabIndustry")}
         </TabsTrigger>
       </TabsList>
 
@@ -287,8 +301,16 @@ export function AllocationTabs({
         {renderDimension("region", regionSlices, t("allocationTabRegion"))}
       </TabsContent>
 
+      <TabsContent value="country">
+        {renderDimension("country", countrySlices, t("allocationTabCountry"))}
+      </TabsContent>
+
       <TabsContent value="sector">
         {renderDimension("sector", sectorSlices, t("allocationTabSector"))}
+      </TabsContent>
+
+      <TabsContent value="industry">
+        {renderDimension("industry", industrySlices, t("allocationTabIndustry"))}
       </TabsContent>
     </Tabs>
   );

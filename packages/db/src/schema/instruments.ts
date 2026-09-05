@@ -31,6 +31,8 @@ export const instruments = pgTable(
     sectorCheckedAt: timestamp("sector_checked_at", { withTimezone: true }),
     countryWeights: jsonb("country_weights").$type<Record<string, number>>(),
     countryCheckedAt: timestamp("country_checked_at", { withTimezone: true }),
+    industry: text("industry"),
+    country: text("country"),
     fundamentals: jsonb("fundamentals").$type<Record<string, unknown>>(),
     fundamentalsCheckedAt: timestamp("fundamentals_checked_at", { withTimezone: true }),
     faceValue: numeric("face_value"),
