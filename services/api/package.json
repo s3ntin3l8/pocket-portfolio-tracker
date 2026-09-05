@@ -24,8 +24,8 @@
     "repair:instruments": "tsx --env-file=../../.env src/db/repair-eu-instruments.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1117.0",
-    "@aws-sdk/s3-request-presigner": "^3.1117.0",
+    "@aws-sdk/client-s3": "^3.1119.0",
+    "@aws-sdk/s3-request-presigner": "^3.1119.0",
     "@fastify/compress": "^9.2.0",
     "@fastify/cors": "^11.3.0",
     "@fastify/env": "^7.0.0",
@@ -40,7 +40,7 @@
     "cheerio": "^1.0.0",
     "decimal.js": "^10.4.3",
     "drizzle-orm": "^0.45.2",
-    "fast-xml-parser": "^5.11.0",
+    "fast-xml-parser": "^5.11.1",
     "fastify": "^5.12.1",
     "fastify-plugin": "^6.0.0",
     "fflate": "^0.8.3",
@@ -53,8 +53,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.7",
-    "@types/node": "^26.3.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/node": "^26.4.0",
     "@vitest/coverage-v8": "^4.1.11",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-vitest": "^7.1.0",
