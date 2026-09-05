@@ -25,9 +25,15 @@ function StatBlock({
   bordered?: boolean;
 }) {
   return (
-    <div className={cn("min-w-0", bordered && "border-l border-line pl-2.5 sm:pl-4 lg:pl-6")}>
+    <div
+      className={cn(
+        "min-w-0",
+        bordered &&
+          "border-t border-line pt-2.5 sm:pt-4 @xl:border-l @xl:border-t-0 @xl:pl-2.5 @xl:sm:pl-4 @xl:pl-6 @xl:pt-0",
+      )}
+    >
       <p className="truncate text-[11px] font-semibold text-text-2 sm:text-xs">{label}</p>
-      <p className="tabular mt-1 truncate text-sm font-extrabold sm:text-xl lg:text-[26px]">
+      <p className="tabular mt-1 truncate text-sm font-extrabold sm:text-xl @xl:text-[26px]">
         {value}
       </p>
       {sub && (
@@ -46,7 +52,7 @@ function StatBlock({
 
 function Breakdown({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="col-span-full border-t border-line pt-4 lg:col-span-2 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+    <div className="col-span-full border-t border-line pt-4 @xl:col-span-2 @xl:border-l @xl:border-t-0 @xl:pl-6 @xl:pt-0">
       <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
         {label}
       </p>
@@ -65,7 +71,7 @@ export function AllFilterBanner({
 }) {
   return (
     <div className={CARD}>
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xl:grid-cols-3">
         {data.tiles.map((t, i) => (
           <StatBlock
             key={i}
@@ -101,7 +107,7 @@ export function IncomeFilterBanner({
 }) {
   return (
     <div className={CARD}>
-      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 lg:grid-cols-3 lg:items-center">
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xl:grid-cols-3 @xl:items-center">
         <StatBlock
           label={projectedLabel}
           value={data.projected}
@@ -135,7 +141,7 @@ export function TradeFilterBanner({
 }) {
   return (
     <div className={CARD}>
-      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 lg:grid-cols-3 lg:items-center">
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xl:grid-cols-3 @xl:items-center">
         <StatBlock label={averageLabel} value={data.avg} sub={averageNote} tone="neutral" />
         <Breakdown label={headingLabel}>
           {data.bySymbol.map((m, i) => (
