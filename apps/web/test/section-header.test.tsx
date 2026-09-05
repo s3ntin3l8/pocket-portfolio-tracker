@@ -23,8 +23,7 @@ import { SectionHeader } from "../src/components/section-header";
 describe("SectionHeader", () => {
   it("renders the title and a back-link to the given href", () => {
     render(<SectionHeader title="Investing" backHref="/settings" />);
-    // Title appears twice: once in the mobile back-row, once in the desktop-only heading.
-    expect(screen.getAllByText("Investing").length).toBe(2);
+    expect(screen.getAllByText("Investing").length).toBe(1);
     const backLink = screen.getByLabelText("Back");
     expect(backLink).toHaveAttribute("href", "/settings");
   });
