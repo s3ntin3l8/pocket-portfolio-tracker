@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 type PageHeaderState = {
   title: string | null;
@@ -24,13 +25,8 @@ export function PageHeaderProvider({ children }: { children: React.ReactNode }) 
   const [title, setTitle] = useState<string | null>(null);
   const [backHref, setBackHref] = useState<string | null>(null);
 
-  const handleSetTitle = useCallback((t: string | null) => setTitle(t), []);
-  const handleSetBackHref = useCallback((h: string | null) => setBackHref(h), []);
-
   return (
-    <PageHeaderDispatchContext.Provider
-      value={{ setTitle: handleSetTitle, setBackHref: handleSetBackHref }}
-    >
+    <PageHeaderDispatchContext.Provider value={{ setTitle, setBackHref }}>
       <PageHeaderContext.Provider value={{ title, backHref }}>
         {children}
       </PageHeaderContext.Provider>
@@ -41,6 +37,8 @@ export function PageHeaderProvider({ children }: { children: React.ReactNode }) 
 /**
  * Declares the page title and optional back-link for the desktop topbar.
  * Place this inside any page that should show a title in the topbar.
+ * Clears its values on unmount so routes without a setter (or before
+ * one mounts) don't show a stale title from the previous page.
  */
 export function PageHeaderSetter({
   title,
@@ -50,8 +48,14 @@ export function PageHeaderSetter({
   backHref?: string | null;
 }) {
   const { setTitle, setBackHref } = useContext(PageHeaderDispatchContext);
-  setTitle(title);
-  setBackHref(backHref);
+  useEffect(() => {
+    setTitle(title);
+    setBackHref(backHref);
+    return () => {
+      setTitle(null);
+      setBackHref(null);
+    };
+  }, [title, backHref, setTitle, setBackHref]);
   return null;
 }
 
@@ -65,7 +69,7 @@ export function PageTitle({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <h1 className={`text-2xl font-bold md:hidden ${className ?? ""}`}>{children}</h1>;
+  return <h1 className={cn("text-2xl font-bold md:hidden", className)}>{children}</h1>;
 }
 
 /** Read the current page header state (used by AppShell). */
