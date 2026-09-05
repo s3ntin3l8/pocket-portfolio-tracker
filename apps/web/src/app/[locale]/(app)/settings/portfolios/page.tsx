@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Briefcase, Plus } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export default async function SettingsPortfoliosPage({
 
   return (
     <>
+      <PageHeaderSetter title={ts("portfoliosLink")} backHref="/settings" />
       <SectionHeader title={ts("portfoliosLink")} backHref="/settings" />
 
       <div className="space-y-6">

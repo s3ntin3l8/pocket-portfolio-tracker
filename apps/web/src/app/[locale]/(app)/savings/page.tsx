@@ -6,6 +6,7 @@ import { ContributionsChart } from "@/components/charts/contributions-chart";
 import { ForecastPanel } from "@/components/savings/forecast-panel";
 import { SparplanSection } from "@/components/savings/sparplan-section";
 import { ReportHeader } from "@/components/report-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { CashOnHandCard } from "@/components/savings/cash-on-hand-card";
 import { EmptyState } from "@/components/empty-state";
 import { loadContributions, loadSparplan, loadHoldings } from "@/lib/server-api";
@@ -41,7 +42,12 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
     );
   }
 
-  const heading = <ReportHeader title={t("title")} subtitle={t("subtitle")} />;
+  const heading = (
+    <>
+      <PageHeaderSetter title={t("title")} backHref="/reports" />
+      <ReportHeader title={t("title")} subtitle={t("subtitle")} />
+    </>
+  );
 
   if (result.status !== "ok" || Number(result.data.totalContributed) === 0) {
     const unavailable = result.status === "unavailable";

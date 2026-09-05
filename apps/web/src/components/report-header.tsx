@@ -3,10 +3,11 @@ import { Link } from "@/i18n/navigation";
 
 /**
  * Report-screen header (reference: Realized P&L / Income / Savings / Tax). A back chevron —
- * a 36px card-surface button — sits to the LEFT of the title on both mobile and desktop,
- * with the title (700/24) over an optional muted subtitle, and an optional right-aligned
- * action (e.g. Export). The report screens are reached from the `/reports` hub, so back
- * returns there by default.
+ * a 36px card-surface button — sits to the LEFT of the title on mobile, with the title
+ * (700/24) over an optional muted subtitle, and an optional right-aligned action
+ * (e.g. Export). On desktop the topbar owns both the title and back-link (via
+ * `PageHeaderSetter`), so they're hidden here — the action stays visible. The report
+ * screens are reached from the `/reports` hub, so back returns there by default.
  */
 export function ReportHeader({
   title,
@@ -26,12 +27,12 @@ export function ReportHeader({
         aria-label="Back"
         // Visual size stays the reference's 36px card button; `before:` pads the tap
         // target out to ~44px (the touch-target minimum) without affecting layout.
-        className="relative flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-transform before:absolute before:-inset-1 active:scale-95"
+        className="relative flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-transform before:absolute before:-inset-1 active:scale-95 md:hidden"
       >
         <ChevronLeft className="size-[19px]" strokeWidth={2.2} />
       </Link>
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-2xl font-bold">{title}</h1>
+        <h1 className="truncate text-2xl font-bold md:hidden">{title}</h1>
         {subtitle && <p className="truncate text-sm text-text-2">{subtitle}</p>}
       </div>
       {action}

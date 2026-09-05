@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins, ScrollText, PiggyBank, Receipt, FileText } from "lucide-react";
 import { ReportCard } from "@/components/reports/report-card";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
   loadIncomeStats,
   loadTrades,
@@ -415,7 +416,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <PageHeaderSetter title={t("title")} />
+        <PageTitle>{t("title")}</PageTitle>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </header>
 

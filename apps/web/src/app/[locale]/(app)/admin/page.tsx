@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { AdminProviders } from "@/components/admin-providers";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { loadMe, loadAdminProviders } from "@/lib/server-api";
 
 /**
@@ -23,6 +24,7 @@ export default async function AdminPage({ params }: { params: Promise<{ locale: 
 
   return (
     <>
+      <PageHeaderSetter title={t("providers")} />
       <SectionHeader title={t("providers")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("providersHint")}</p>
       <Card>

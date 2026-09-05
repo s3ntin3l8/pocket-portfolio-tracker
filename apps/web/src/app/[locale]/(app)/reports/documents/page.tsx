@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ReportHeader } from "@/components/report-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { TaxReportsInbox } from "@/components/tax-reports-inbox";
 import { loadDocuments, resolveSelection } from "@/lib/server-api";
 
@@ -31,6 +32,7 @@ export default async function TaxReportsPage({ params }: { params: Promise<{ loc
 
   return (
     <div className="space-y-6">
+      <PageHeaderSetter title={t("title")} backHref="/reports" />
       <ReportHeader title={t("title")} subtitle={t("headerSubtitle")} />
       <TaxReportsInbox
         initialDocuments={documents}

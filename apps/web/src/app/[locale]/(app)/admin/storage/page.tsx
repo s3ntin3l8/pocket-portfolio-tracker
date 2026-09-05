@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { AdminStorageForm } from "@/components/admin-storage-form";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { loadMe, loadAdminStorageProviders } from "@/lib/server-api";
 
 export default async function AdminStoragePage({
@@ -21,6 +22,7 @@ export default async function AdminStoragePage({
 
   return (
     <>
+      <PageHeaderSetter title={t("storage")} backHref="/admin" />
       <SectionHeader title={t("storage")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("storageHint")}</p>
       <Card>

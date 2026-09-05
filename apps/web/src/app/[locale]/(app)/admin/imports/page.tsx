@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { AdminImportSettings } from "@/components/admin-import-settings";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { loadMe, loadAdminImportSettings } from "@/lib/server-api";
 
 export default async function AdminImportsPage({
@@ -21,6 +22,7 @@ export default async function AdminImportsPage({
 
   return (
     <>
+      <PageHeaderSetter title={t("importStrategy")} backHref="/admin" />
       <SectionHeader title={t("importStrategy")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("importStrategyHint")}</p>
       <Card>

@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { EditTransaction } from "@/components/edit-transaction";
+import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import { loadTransactionsAcrossPortfolios } from "@/lib/server-api";
 
 export default async function EditTransactionPage({
@@ -21,23 +22,26 @@ export default async function EditTransactionPage({
   const result = await loadTransactionsAcrossPortfolios();
 
   const header = (title: string, subtitle: string) => (
-    <div className="flex items-center gap-3">
-      <Button
-        variant="outline"
-        size="icon"
-        asChild
-        aria-label={t("back")}
-        className="rounded-xl bg-card shadow-card"
-      >
-        <Link href="/transactions">
-          <ArrowLeft className="size-4" />
-        </Link>
-      </Button>
-      <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
+    <>
+      <PageHeaderSetter title={title} backHref="/transactions" />
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="icon"
+          asChild
+          aria-label={t("back")}
+          className="rounded-xl bg-card shadow-card md:hidden"
+        >
+          <Link href="/transactions">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <div>
+          <PageTitle>{title}</PageTitle>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
+        </div>
       </div>
-    </div>
+    </>
   );
 
   if (result.status !== "ok") {

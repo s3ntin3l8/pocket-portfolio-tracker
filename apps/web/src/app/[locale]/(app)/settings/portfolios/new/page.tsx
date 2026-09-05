@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { PortfolioEditForm } from "@/components/portfolio-edit-form";
 
 /**
@@ -17,6 +18,7 @@ export default async function NewPortfolioPage({
 
   return (
     <>
+      <PageHeaderSetter title={t("createTitle")} backHref="/settings/portfolios" />
       <SectionHeader title={t("createTitle")} backHref="/settings/portfolios" />
       <PortfolioEditForm mode="create" />
     </>
