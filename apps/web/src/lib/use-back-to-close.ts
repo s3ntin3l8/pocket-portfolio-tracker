@@ -26,6 +26,15 @@ import * as React from "react";
  * better than discarding a navigation the user just made.
  *
  * No-ops for uncontrolled usage (`open`/`onOpenChange` undefined) and during SSR.
+ *
+ * Consumers that only ever mount the whole `Dialog`/`Sheet` tree once already-open
+ * (`{trade && <Dialog open>...}` rather than an always-mounted `<Dialog open={open}>`,
+ * e.g. `TradeDetailSheet`/`TransactionDetailSheet`) hit this hook's very first render
+ * with `open` already `true`. `wasOpenRef` starts at `false` regardless of the initial
+ * `open` value specifically so that first render still reads as a closed→open
+ * transition and pushes a marker — starting it from `open` itself would make the push
+ * effect see "was true, is true" on mount and skip pushing, silently leaving Android
+ * back and future non-popstate closes with no marker to act on.
  */
 export function useBackToClose(
   open: boolean | undefined,
@@ -45,7 +54,7 @@ export function useBackToClose(
   // would re-run this effect (and push another marker) on every unrelated re-render
   // while the sheet just sits open, stacking history entries a single back-press can't
   // fully unwind.
-  const wasOpenRef = React.useRef(open);
+  const wasOpenRef = React.useRef<boolean | undefined>(false);
   React.useEffect(() => {
     if (typeof window === "undefined" || !enabled) return;
     const wasOpen = wasOpenRef.current;

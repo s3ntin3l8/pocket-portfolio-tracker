@@ -130,6 +130,22 @@ describe("DialogContent", () => {
     );
     expect(screen.getByTestId("probe")).toHaveTextContent("no-footer");
   });
+
+  // Regression test: found by review — `condition && <content/>` (a common React
+  // idiom for a conditional footer, e.g. ca-sheet-content.tsx's `ca && (<>...</>)`)
+  // evaluates to `null`, not `false`, when `condition` is falsy. `hasFooter` used to
+  // only special-case `undefined`/`false`, so a `null` footer rendered an empty footer
+  // bar (border, padding, safe-area inset) with nothing in it instead of omitting it.
+  it("omits the footer bar when footer is null, same as undefined", () => {
+    render(
+      <Dialog open>
+        <DialogContent footer={null}>
+          <DialogTitle>T</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(document.querySelector('[data-slot="dialog-footer"]')).toBeNull();
+  });
 });
 
 describe("full-screen overlay registration", () => {

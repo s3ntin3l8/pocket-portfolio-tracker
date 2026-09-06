@@ -99,7 +99,10 @@ function DialogContent({
    *  nothing alongside the portaled content. */
   footer?: React.ReactNode | true;
 }) {
-  const hasFooter = footer !== undefined && footer !== false;
+  // `!= null` also catches `null` (not just `undefined`) — a caller passing
+  // `condition && <content/>` (a common React idiom) gets `null`, not `false`, when
+  // `condition` is falsy, and that must not render an empty footer bar.
+  const hasFooter = footer != null && footer !== false;
   const structured = Boolean(mobileHeader || hasFooter);
   const [footerEl, setFooterEl] = React.useState<HTMLDivElement | null>(null);
 

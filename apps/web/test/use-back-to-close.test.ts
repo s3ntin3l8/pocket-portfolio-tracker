@@ -75,6 +75,23 @@ describe("useBackToClose", () => {
     expect(backSpy).not.toHaveBeenCalled();
   });
 
+  // Regression test: found by review — TradeDetailSheet/TransactionDetailSheet render
+  // `if (!trade) return null` *before* their <Dialog>, and their callers pass
+  // `open={detailTrade !== null}` alongside `trade={detailTrade}` — so the Dialog (and
+  // this hook) only ever mounts for the first time already `open: true`, never through a
+  // false->true transition on an always-mounted instance. `wasOpenRef` used to
+  // initialize from `open` itself, so that first render read as "was true, is true" and
+  // skipped the push entirely, leaving Android back (and any later non-popstate close)
+  // with no marker to act on for either of the app's two most-used detail overlays.
+  it("pushes a marker even when the hook's first render is already open (conditionally-mounted overlay)", () => {
+    const pushSpy = vi.spyOn(window.history, "pushState");
+    const onOpenChange = vi.fn();
+    renderHook(() => useBackToClose(true, onOpenChange));
+
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ backToCloseMarker: true }), "");
+  });
+
   it("ignores a second popstate once the marker has already been consumed", () => {
     const onOpenChange = vi.fn();
     const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
