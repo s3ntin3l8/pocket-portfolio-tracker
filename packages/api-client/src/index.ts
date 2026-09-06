@@ -683,7 +683,7 @@ export interface InstrumentFundamentals {
       period: string;
       actual: number | null;
       estimate: number | null;
-    }> | null;
+    }>;
     currentQuarterEstimate: number | null;
   } | null;
   /** Link to the instrument's page on the provider's site (e.g. Yahoo Finance). */

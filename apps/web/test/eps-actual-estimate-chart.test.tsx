@@ -14,8 +14,21 @@ import {
 // without standing up a real ResponsiveContainer.
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children, data }: { children: React.ReactNode; data: unknown[] }) => (
-    <div data-testid="barchart" data-count={data.length}>
+  // BarChart stub exposes the chart's data rows as hidden data-* attributes on the
+  // root so tests can assert on the period labels of each row (including the synthetic
+  // forecast row's translated label) without standing up a real SVG layout.
+  BarChart: ({
+    children,
+    data,
+  }: {
+    children: React.ReactNode;
+    data: Array<{ period: string }>;
+  }) => (
+    <div
+      data-testid="barchart"
+      data-count={data.length}
+      data-periods={data.map((d) => d.period).join("|")}
+    >
       {children}
     </div>
   ),
@@ -91,6 +104,13 @@ describe("EpsActualEstimateChart", () => {
     expect(forecast).toHaveAttribute("data-opacity", "0.12");
     expect(forecast).toHaveAttribute("data-stroke", "var(--color-chart-1)");
     expect(forecast).toHaveAttribute("data-stroke-dash", "4 3");
+    // The synthetic row's period label is the translated i18n key — would surface as
+    // a literal "Instrument.epsCurrentQuarterLabel" string if the key were dropped
+    // from a locale file.
+    expect(screen.getByTestId("barchart")).toHaveAttribute(
+      "data-periods",
+      [...QUARTERS.map((q) => q.period), messages.Instrument.epsCurrentQuarterLabel].join("|"),
+    );
   });
 });
 
@@ -133,7 +153,11 @@ describe("EpsActualEstimateChart ChartTooltip", () => {
     expect(screen.getByText("+0.08")).toBeInTheDocument();
   });
 
-  it("omits the estimate row and shows a 0 surprise when the estimate was null pre-report", () => {
+  it("omits both the estimate row and the surprise row when no consensus existed pre-report", () => {
+    // Older quarters sometimes lack a pre-report estimate entirely. Showing a "Surprise:
+    // 0.00" default in that case is misleading — there's nothing to compare against, so
+    // both rows are skipped. The Actual row still renders so the user sees what was
+    // reported.
     render(
       <ChartTooltip
         active
@@ -150,7 +174,28 @@ describe("EpsActualEstimateChart ChartTooltip", () => {
     );
     expect(screen.queryByText(messages.Instrument.epsEstimateLabel)).not.toBeInTheDocument();
     expect(screen.getByText(messages.Instrument.epsActualLabel)).toBeInTheDocument();
-    // Surprise collapses to 0 (no consensus to compare against).
-    expect(screen.getByText("+0.00")).toBeInTheDocument();
+    expect(screen.queryByText(messages.Instrument.epsSurpriseLabel)).not.toBeInTheDocument();
+  });
+
+  it("renders a single dashed forecast bar when only currentQuarterEstimate is provided", () => {
+    // Yahoo sometimes returns earningsChart with currentQuarterEstimate but no historical
+    // quarterly[] (e.g. a recently-listed name). The card's render guard should still kick
+    // in via `currentEstimate != null` and render just the synthetic forecast bar.
+    wrap(<EpsActualEstimateChart data={[]} currentQuarterEstimate={1.98} />);
+    expect(screen.getByTestId("barchart")).toHaveAttribute("data-count", "1");
+    const cells = screen.getAllByTestId("cell");
+    expect(cells).toHaveLength(1);
+    const forecast = cells[0];
+    expect(forecast).toHaveAttribute("data-fill", "var(--color-chart-1)");
+    expect(forecast).toHaveAttribute("data-opacity", "0.12");
+    expect(forecast).toHaveAttribute("data-stroke", "var(--color-chart-1)");
+    expect(forecast).toHaveAttribute("data-stroke-dash", "4 3");
+    // The synthetic row carries the translated period label. Locking this down means a
+    // missing i18n key surfaces as a literal "Instrument.epsCurrentQuarterLabel" string
+    // in the rendered DOM rather than silently rendering an untranslated fallback.
+    expect(screen.getByTestId("barchart")).toHaveAttribute(
+      "data-periods",
+      messages.Instrument.epsCurrentQuarterLabel,
+    );
   });
 });

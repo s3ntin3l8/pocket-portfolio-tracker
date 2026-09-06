@@ -3194,4 +3194,28 @@ describe("YahooFinanceProvider getFundamentals", () => {
     const f = await p.getFundamentals(aapl);
     expect(f?.epsHistory).toBeNull();
   });
+
+  it("returns an empty quarters array when earningsChart is present but quarterly is undefined", async () => {
+    // Yahoo sometimes returns the earningsChart block with only currentQuarterEstimate
+    // and no quarterly[] (e.g. a recently-listed name) — the parser must still surface a
+    // well-typed object so the consumer's "render forecast only" path can find the
+    // current-quarter estimate.
+    const body = {
+      quoteSummary: {
+        result: [
+          {
+            price: { currency: "USD" },
+            earnings: {
+              earningsChart: {
+                currentQuarterEstimate: rawNum(1.55),
+              },
+            },
+          },
+        ],
+      },
+    };
+    const p = new YahooFinanceProvider({ fetch: yahooProfileFetch(body) });
+    const f = await p.getFundamentals(aapl);
+    expect(f?.epsHistory).toEqual({ quarters: [], currentQuarterEstimate: 1.55 });
+  });
 });

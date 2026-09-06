@@ -42,6 +42,11 @@ export function EpsActualEstimateChartLegend() {
  * Per-quarter hover breakdown (estimate vs. actual + surprise), exported for direct unit
  * testing — `recharts`' `Tooltip` only invokes `content` at real layout time, which jsdom
  * stubs don't simulate (same rationale as `RevenueEarningsChart`'s tooltip).
+ *
+ * Surprise is omitted when either side is missing — `currentQuarterEstimate` is *the*
+ * consensus for the in-progress quarter (no prior consensus to compare against), and
+ * older quarters sometimes lack a pre-report estimate entirely. Showing "Surprise: 0.00"
+ * in either case would be a misleading default.
  */
 export function ChartTooltip({
   active,
@@ -59,7 +64,7 @@ export function ChartTooltip({
   if (!bar) return null;
 
   const formatEps = (v: number | null) => (v == null ? "—" : v.toFixed(2));
-  const surprise = bar.actual != null && bar.estimate != null ? bar.actual - bar.estimate : 0;
+  const surprise = bar.actual != null && bar.estimate != null ? bar.actual - bar.estimate : null;
 
   const rows: ChartTooltipRow[] = [
     ...(bar.estimate != null
@@ -76,10 +81,14 @@ export function ChartTooltip({
       value: formatEps(bar.actual),
       dot: "var(--color-chart-2)",
     },
-    {
-      label: t("epsSurpriseLabel"),
-      value: `${surprise >= 0 ? "+" : ""}${surprise.toFixed(2)}`,
-    },
+    ...(surprise != null
+      ? [
+          {
+            label: t("epsSurpriseLabel"),
+            value: `${surprise >= 0 ? "+" : ""}${surprise.toFixed(2)}`,
+          },
+        ]
+      : []),
   ];
 
   return <ChartTooltipPanel title={String(label)} rows={rows} />;

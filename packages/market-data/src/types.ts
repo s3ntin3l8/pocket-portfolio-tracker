@@ -156,7 +156,7 @@ export interface InstrumentFundamentals {
       period: string;
       actual: number | null;
       estimate: number | null;
-    }> | null;
+    }>;
     /** Consensus estimate for the in-progress quarter — the "expected" bar to render
      *  alongside the reported history. */
     currentQuarterEstimate: number | null;

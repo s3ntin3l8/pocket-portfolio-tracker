@@ -1087,7 +1087,7 @@
     "epsEstimateLabel": "Estimasi",
     "epsActualLabel": "Aktual",
     "epsCurrentQuarterLabel": "Kuartal ini",
-    "epsSurpriseLabel": "Surprise",
+    "epsSurpriseLabel": "Selisih",
     "asOfLabel": "Per {date}",
     "recommendation": {
       "strong_buy": "Beli kuat",
