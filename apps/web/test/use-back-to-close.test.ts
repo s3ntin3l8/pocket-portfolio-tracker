@@ -1,6 +1,15 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useBackToClose } from "../src/lib/use-back-to-close";
+import { resetBackToCloseStackForTests } from "../src/lib/back-to-close-stack";
+
+// This repo's vitest config shares the module registry across every test within a file
+// (`isolate` resets per file, not per test) — required so a leftover stack entry,
+// pending-back counter, or attached popstate listener from one test can't leak into the
+// next.
+beforeEach(() => {
+  resetBackToCloseStackForTests();
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -103,5 +112,177 @@ describe("useBackToClose", () => {
 
     window.dispatchEvent(new PopStateEvent("popstate"));
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  // Regression tests for #671: with multiple Dialog/Sheet/CommandDialog instances open
+  // at once (the mobile add-menu's chooser opening a nested portfolio/holder Dialog on
+  // top of itself; Cmd/Ctrl-K opening over any other open overlay), every instance with
+  // a pending marker used to independently react to the same popstate, closing all of
+  // them on one back-press instead of just the topmost.
+  describe("multiple concurrent instances (#671)", () => {
+    it("one back-press closes only the topmost (most-recently-opened) instance", () => {
+      const onOpenChangeA = vi.fn();
+      const onOpenChangeB = vi.fn();
+      const { rerender: rerenderA } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeA),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderA({ open: true }); // A opens first
+
+      const { rerender: rerenderB } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeB),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderB({ open: true }); // B opens on top of A
+
+      window.dispatchEvent(new PopStateEvent("popstate"));
+
+      expect(onOpenChangeB).toHaveBeenCalledWith(false);
+      expect(onOpenChangeA).not.toHaveBeenCalled();
+    });
+
+    it("a second back-press then closes the instance beneath it", () => {
+      const onOpenChangeA = vi.fn();
+      const onOpenChangeB = vi.fn();
+      const { rerender: rerenderA } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeA),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderA({ open: true });
+
+      const { rerender: rerenderB } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeB),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderB({ open: true });
+
+      window.dispatchEvent(new PopStateEvent("popstate")); // closes B
+      rerenderB({ open: false }); // parent reacts to onOpenChangeB(false)
+
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      expect(onOpenChangeA).toHaveBeenCalledWith(false);
+    });
+
+    it("closing a non-topmost instance via X still pops its own marker (no orphan left behind)", () => {
+      const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const onOpenChangeA = vi.fn();
+      const onOpenChangeB = vi.fn();
+      const { rerender: rerenderA } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeA),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderA({ open: true });
+
+      const { rerender: rerenderB } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeB),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderB({ open: true });
+
+      // Close A (opened first, buried underneath B) via X — not a back-press.
+      rerenderA({ open: false });
+
+      expect(backSpy).toHaveBeenCalledTimes(1);
+      expect(onOpenChangeB).not.toHaveBeenCalled();
+    });
+
+    // The bug this whole fix is for, beyond "one back-press closes both": closing the
+    // TOPMOST instance via X (not a back-press) still calls history.back() for its own
+    // marker, and the resulting popstate must not be misattributed to a user back-press
+    // that closes whatever is now topmost.
+    it("closing the topmost instance via X does not close the instance beneath it", () => {
+      const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const onOpenChangeA = vi.fn();
+      const onOpenChangeB = vi.fn();
+      const { rerender: rerenderA } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeA),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderA({ open: true });
+
+      const { rerender: rerenderB } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeB),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderB({ open: true });
+
+      rerenderB({ open: false }); // close B (topmost) via X
+      expect(backSpy).toHaveBeenCalledTimes(1);
+
+      // The real history.back() this triggered would produce a popstate — simulate it.
+      window.dispatchEvent(new PopStateEvent("popstate"));
+
+      expect(onOpenChangeA).not.toHaveBeenCalled();
+    });
+
+    // transactions-table.tsx's TransactionDetailSheet -> EditTransactionSheet handoff
+    // (`setDetailTx(null); setEditTx(tx)` in one batch) pops one marker and pushes
+    // another in the same tick. Parameterized over both possible effect orderings so
+    // the fix doesn't accidentally depend on which sibling's effect runs first.
+    it("same-tick close-then-open handoff leaves the newly-opened instance open (closing effect runs first)", () => {
+      const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const onOpenChangeD = vi.fn();
+      const onOpenChangeE = vi.fn();
+      const { rerender: rerenderD } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeD),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderD({ open: true });
+
+      const hookE = renderHook(({ open }) => useBackToClose(open, onOpenChangeE), {
+        initialProps: { open: false },
+      });
+
+      rerenderD({ open: false }); // D's effect runs first: releases + history.back()
+      hookE.rerender({ open: true }); // E's effect runs second: opens
+
+      expect(backSpy).toHaveBeenCalledTimes(1);
+      window.dispatchEvent(new PopStateEvent("popstate")); // D's queued back() arrives
+
+      expect(onOpenChangeE).not.toHaveBeenCalled();
+    });
+
+    it("same-tick close-then-open handoff leaves the newly-opened instance open (opening effect runs first)", () => {
+      const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const onOpenChangeD = vi.fn();
+      const onOpenChangeE = vi.fn();
+      const { rerender: rerenderD } = renderHook(
+        ({ open }) => useBackToClose(open, onOpenChangeD),
+        {
+          initialProps: { open: false },
+        },
+      );
+      rerenderD({ open: true });
+
+      const hookE = renderHook(({ open }) => useBackToClose(open, onOpenChangeE), {
+        initialProps: { open: false },
+      });
+
+      hookE.rerender({ open: true }); // E's effect runs first: opens
+      rerenderD({ open: false }); // D's effect runs second: releases + history.back()
+
+      expect(backSpy).toHaveBeenCalledTimes(1);
+      window.dispatchEvent(new PopStateEvent("popstate")); // D's queued back() arrives
+
+      expect(onOpenChangeE).not.toHaveBeenCalled();
+    });
   });
 });
