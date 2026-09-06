@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useFocusScroll } from "@/lib/use-focus-scroll";
-import { useSheetFooter } from "@/components/ui/sheet";
+import { useSheetFooter, useSheetFooterChrome } from "@/components/ui/sheet";
 
 /** The slice of the API client this form needs (injectable for tests). */
 export type RecordMergerClient = Pick<ApiClient, "searchInstruments" | "createMerger">;
@@ -115,16 +115,12 @@ export function RecordMergerForm({
   portfolioId,
   onSuccess,
   stickyFooter = false,
-  isDesktop = false,
 }: {
   client: RecordMergerClient;
   portfolioId: string;
   onSuccess?: () => void;
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;
-  /** See `AddTransactionForm`'s `SubmitButton` — compact button, no border-t wrapper (the
-   *  desktop footer bar itself supplies that, alongside Cancel). */
-  isDesktop?: boolean;
 }) {
   const t = useTranslations("Merger");
 
@@ -174,6 +170,7 @@ export function RecordMergerForm({
   // footer region instead of using `position: sticky` (#472).
   const formId = useId();
   const footerEl = useSheetFooter();
+  const hasFooterChrome = useSheetFooterChrome();
   const useFooterPortal = stickyFooter && footerEl;
 
   return (
@@ -282,7 +279,7 @@ export function RecordMergerForm({
         )}
       </form>
       {useFooterPortal &&
-        (isDesktop
+        (hasFooterChrome
           ? createPortal(
               <Button
                 type="submit"

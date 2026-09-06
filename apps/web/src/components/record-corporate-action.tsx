@@ -8,12 +8,10 @@ import { useRouter } from "@/i18n/navigation";
 export function RecordCorporateAction({
   stickyFooter = false,
   isAdmin = false,
-  isDesktop = false,
 }: {
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;
   isAdmin?: boolean;
-  isDesktop?: boolean;
 } = {}) {
   const api = useApiClient();
   const router = useRouter();
@@ -22,7 +20,6 @@ export function RecordCorporateAction({
       client={api}
       stickyFooter={stickyFooter}
       isAdmin={isAdmin}
-      isDesktop={isDesktop}
       onSuccess={() => {
         router.push("/holdings");
         router.refresh();

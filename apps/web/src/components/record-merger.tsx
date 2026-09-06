@@ -8,12 +8,10 @@ import { useRouter } from "@/i18n/navigation";
 export function RecordMerger({
   portfolioId,
   stickyFooter = false,
-  isDesktop = false,
 }: {
   portfolioId: string;
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;
-  isDesktop?: boolean;
 }) {
   const api = useApiClient();
   const router = useRouter();
@@ -22,7 +20,6 @@ export function RecordMerger({
       client={api}
       portfolioId={portfolioId}
       stickyFooter={stickyFooter}
-      isDesktop={isDesktop}
       onSuccess={() => {
         router.push("/holdings");
         router.refresh();

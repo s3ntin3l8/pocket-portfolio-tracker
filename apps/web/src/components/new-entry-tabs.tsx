@@ -129,21 +129,13 @@ export function NewEntryTabs({
       )}
       {visibleTabs.includes("corporate-action") && (
         <TabsContent value="corporate-action">
-          <RecordCorporateAction
-            stickyFooter={stickyFooter}
-            isAdmin={isAdmin}
-            isDesktop={isDesktop}
-          />
+          <RecordCorporateAction stickyFooter={stickyFooter} isAdmin={isAdmin} />
         </TabsContent>
       )}
       {visibleTabs.includes("merger") && (
         <TabsContent value="merger" className="space-y-4">
           {picker}
-          <RecordMerger
-            portfolioId={portfolioId}
-            stickyFooter={stickyFooter}
-            isDesktop={isDesktop}
-          />
+          <RecordMerger portfolioId={portfolioId} stickyFooter={stickyFooter} />
         </TabsContent>
       )}
     </Tabs>

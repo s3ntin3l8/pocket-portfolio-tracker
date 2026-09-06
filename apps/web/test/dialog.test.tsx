@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup, screen } from "@testing-library/react";
 import { Dialog, DialogContent, DialogTitle } from "../src/components/ui/dialog";
-import { useSheetFooter } from "../src/components/ui/sheet";
+import { useSheetFooter, useSheetFooterChrome } from "../src/components/ui/sheet";
 import {
   FullScreenOverlayProvider,
   useAnyFullScreenOverlayOpen,
@@ -145,6 +145,43 @@ describe("DialogContent", () => {
       </Dialog>,
     );
     expect(document.querySelector('[data-slot="dialog-footer"]')).toBeNull();
+  });
+
+  // A useSheetFooter() consumer needs to know whether the portal target it's landing in
+  // is already styled (border/background/padding) so it can decide to portal bare
+  // instead of wrapping itself in the same chrome again — see useSheetFooterChrome's
+  // doc comment (found live: EditTransactionSheet's submit button double-chromed on
+  // mobile before this existed).
+  it("marks its footer as already-styled via useSheetFooterChrome, when a footer is given", () => {
+    function Probe() {
+      const hasChrome = useSheetFooterChrome();
+      return <span data-testid="chrome-probe">{hasChrome ? "styled" : "bare"}</span>;
+    }
+    render(
+      <Dialog open>
+        <DialogContent footer={<span>Cancel</span>}>
+          <DialogTitle>T</DialogTitle>
+          <Probe />
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId("chrome-probe")).toHaveTextContent("styled");
+  });
+
+  it("does not mark the footer as styled when no footer is given", () => {
+    function Probe() {
+      const hasChrome = useSheetFooterChrome();
+      return <span data-testid="chrome-probe">{hasChrome ? "styled" : "bare"}</span>;
+    }
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>T</DialogTitle>
+          <Probe />
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId("chrome-probe")).toHaveTextContent("bare");
   });
 });
 

@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import { useSheetFooterChrome } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 interface SubmitButtonProps {
@@ -28,6 +29,7 @@ export function SubmitButton({
   t,
   isDesktop = false,
 }: SubmitButtonProps) {
+  const hasFooterChrome = useSheetFooterChrome();
   const footerPortal = Boolean(stickyFooter && footerEl);
 
   const button = (
@@ -47,9 +49,11 @@ export function SubmitButton({
   );
 
   if (footerPortal && footerEl) {
-    if (isDesktop) {
-      // The desktop footer node already supplies border-t/bg/padding/justify-end layout —
-      // portal just the bare button into it (the Cancel button sits alongside it there).
+    if (hasFooterChrome) {
+      // The host's footer bar already supplies border-t/bg/padding/justify-end layout —
+      // portal just the bare button into it (a Cancel button, if any, sits alongside it
+      // there). Keyed on the host (see useSheetFooterChrome), not `isDesktop` — that's
+      // this form's own internal two-column-vs-one-column layout, a different axis.
       return createPortal(button, footerEl);
     }
     return createPortal(
