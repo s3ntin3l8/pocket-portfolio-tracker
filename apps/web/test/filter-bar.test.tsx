@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { useState } from "react";
 import { NextIntlClientProvider } from "next-intl";
@@ -15,10 +15,14 @@ function Harness({
   initialYear,
   yearOptions = ["2025", "2026"],
   draftCount = 0,
+  onNavigateSpy,
 }: {
   initialYear?: string;
   yearOptions?: string[];
   draftCount?: number;
+  /** Lets a test observe the raw calls FilterBar makes, in addition to the Harness
+   *  applying them to local state. */
+  onNavigateSpy?: (keyOrUpdates: string | Record<string, string | undefined>) => void;
 }) {
   const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined);
   const [yearFilter, setYearFilter] = useState<string | undefined>(initialYear);
@@ -34,9 +38,14 @@ function Harness({
       onToggleFlagged={() => setShowFlagged((v) => !v)}
       yearOptions={yearOptions}
       yearFilterProp={yearFilter}
-      onNavigateWithParam={(key, value) => {
-        if (key === "type") setTypeFilter(value);
-        if (key === "year") setYearFilter(value);
+      onNavigateWithParam={(keyOrUpdates, value) => {
+        // Mirrors useTransactionUrlNav's real single-key/batch overload — see its own
+        // test (use-transaction-url-nav.test.tsx) for why the batch form matters (a real
+        // router.push race the single-key form alone can't be made safe for).
+        onNavigateSpy?.(keyOrUpdates);
+        const updates = typeof keyOrUpdates === "string" ? { [keyOrUpdates]: value } : keyOrUpdates;
+        if ("type" in updates) setTypeFilter(updates.type);
+        if ("year" in updates) setYearFilter(updates.year);
       }}
       draftCount={draftCount}
       draftFilter={draftFilter}
@@ -121,5 +130,24 @@ describe("FilterBar — mobile filter Sheet (#625 refinements)", () => {
     );
     const draftAllChips = screen.getAllByRole("button", { name: t.draftShowAll });
     expect(draftAllChips.some((b) => b.getAttribute("aria-pressed") === "true")).toBe(true);
+  });
+
+  // Regression test: clearAllFilters() used to call onNavigateWithParam("type",
+  // undefined) then onNavigateWithParam("year", undefined) as two separate calls. In
+  // production those become two sequential router.push() calls racing against the same
+  // stale searchParams snapshot — observed live as the year filter reappearing after
+  // closing the sheet right after "Clear all". This Harness applies updates
+  // synchronously so it can't reproduce the race itself, but it can and must assert the
+  // fix's actual contract: one batched call, not two.
+  it("Clear all issues a single batched onNavigateWithParam call, not one per key", () => {
+    const onNavigateSpy = vi.fn();
+    renderHarness({ initialYear: "2025", onNavigateSpy });
+    openMobileSheet();
+
+    fireEvent.click(screen.getByRole("button", { name: t.filterClearAll }));
+
+    const urlUpdateCalls = onNavigateSpy.mock.calls.filter(([arg]) => typeof arg === "object");
+    expect(urlUpdateCalls).toHaveLength(1);
+    expect(urlUpdateCalls[0][0]).toEqual({ type: undefined, year: undefined });
   });
 });

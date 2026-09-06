@@ -14,6 +14,17 @@ import * as React from "react";
  * Save, Escape, overlay tap), we pop our own marker via `history.back()` so the stack
  * doesn't accumulate stale entries and a later real back-press behaves normally.
  *
+ * Popping is conditional on the marker still being the current history entry
+ * (`history.state?.backToCloseMarker`). If content inside the modal did its own
+ * `router.push`/`pushState` while open — e.g. a filter Sheet updating the URL as the
+ * user picks chips without closing per tap — that navigation sits *on top of* our
+ * marker. Blindly calling `history.back()` then would pop that interim entry instead of
+ * the marker, silently reverting it back to the marker's stale pre-open URL (found live:
+ * clearing filters in the transactions filter Sheet, then closing via the X button,
+ * un-did the clear). When the marker isn't on top anymore, we leave it in the stack
+ * instead — the cost is one extra back-press to fully leave the page later, which is far
+ * better than discarding a navigation the user just made.
+ *
  * No-ops for uncontrolled usage (`open`/`onOpenChange` undefined) and during SSR.
  */
 export function useBackToClose(
@@ -44,7 +55,9 @@ export function useBackToClose(
       pushedRef.current = true;
     } else if (!open && wasOpen && pushedRef.current) {
       pushedRef.current = false;
-      window.history.back();
+      if (window.history.state?.backToCloseMarker) {
+        window.history.back();
+      }
     }
   }, [open, enabled]);
 

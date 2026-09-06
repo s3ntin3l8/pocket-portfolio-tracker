@@ -33,7 +33,10 @@ export function FilterBar({
   onToggleFlagged: () => void;
   yearOptions: string[];
   yearFilterProp?: string;
-  onNavigateWithParam: (key: string, value: string | undefined) => void;
+  onNavigateWithParam: (
+    keyOrUpdates: string | Record<string, string | undefined>,
+    value?: string,
+  ) => void;
   draftCount: number;
   draftFilter: "all" | "drafts";
   onDraftFilterChange: (v: "all" | "drafts") => void;
@@ -67,8 +70,11 @@ export function FilterBar({
     sheetFilterCount + (searchQuery != null && searchQuery.length > 0 ? 1 : 0);
 
   function clearAllFilters() {
-    onNavigateWithParam("type", undefined);
-    onNavigateWithParam("year", undefined);
+    // One batched call, not two sequential single-key ones — see useTransactionUrlNav's
+    // doc comment: two `router.push()` calls in the same handler race against the same
+    // stale `searchParams` snapshot and can resolve out of order (observed live as the
+    // year filter silently reappearing after closing the sheet right after "Clear all").
+    onNavigateWithParam({ type: undefined, year: undefined });
     onDraftFilterChange("all");
     if (showFlagged) onToggleFlagged();
   }
