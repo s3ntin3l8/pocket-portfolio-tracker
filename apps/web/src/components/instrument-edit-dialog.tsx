@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import type { Instrument } from "@portfolio/api-client";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { toast } from "sonner";
@@ -35,6 +35,8 @@ export function InstrumentEditDialog({
   const tc = useTranslations("AssetClass");
   const api = useApiClient();
   const router = useRouter();
+  const formId = useId();
+  const uid = useId();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -83,71 +85,83 @@ export function InstrumentEditDialog({
   }
 
   return (
-    <Sheet
+    <Dialog
       open={open}
       onOpenChange={(next) => {
         if (next) reset();
         setOpen(next);
       }}
     >
-      <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>{t("editTitle")}</SheetTitle>
-        </SheetHeader>
-        <form onSubmit={submit} className="space-y-4 p-6 pt-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-isin">{t("isin")}</Label>
-            <Input id="edit-isin" value={isin} onChange={(e) => setIsin(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-wkn">{t("wkn")}</Label>
-            <Input id="edit-wkn" value={wkn} onChange={(e) => setWkn(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-symbol">{t("symbol")}</Label>
-            <Input
-              id="edit-symbol"
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-name">{t("name")}</Label>
-            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-asset-class">{t("assetClass")}</Label>
-            <Select
-              id="edit-asset-class"
-              value={assetClass}
-              onChange={(e) => setAssetClass(e.target.value)}
-            >
-              {ASSET_CLASSES.map((ac) => (
-                <option key={ac} value={ac}>
-                  {tc(ac)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-market">{t("market")}</Label>
-            <Input
-              id="edit-market"
-              value={market}
-              onChange={(e) => setMarket(e.target.value)}
-              required
-            />
-          </div>
-          <div className="border-t border-border pt-4">
-            <Button type="submit" disabled={busy} className="w-full">
-              {busy && <Spinner size="sm" />}
-              {busy ? t("saving") : t("save")}
-            </Button>
-          </div>
-        </form>
-      </SheetContent>
-    </Sheet>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      {/* Overlay chrome migration (#625): centered sm-size card at md:+, full-screen page
+          below it — was an unconditional bottom Sheet despite the component's name. */}
+      <DialogContent
+        size="sm"
+        mobileHeader={{ title: t("editTitle") }}
+        footer={
+          <Button type="submit" form={formId} disabled={busy} className="w-full">
+            {busy && <Spinner size="sm" />}
+            {busy ? t("saving") : t("save")}
+          </Button>
+        }
+      >
+        <div className="p-4 md:p-6">
+          <DialogTitle className="hidden text-lg font-semibold md:mb-3 md:block">
+            {t("editTitle")}
+          </DialogTitle>
+          <form id={formId} onSubmit={submit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-isin`}>{t("isin")}</Label>
+              <Input id={`${uid}-isin`} value={isin} onChange={(e) => setIsin(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-wkn`}>{t("wkn")}</Label>
+              <Input id={`${uid}-wkn`} value={wkn} onChange={(e) => setWkn(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-symbol`}>{t("symbol")}</Label>
+              <Input
+                id={`${uid}-symbol`}
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-name`}>{t("name")}</Label>
+              <Input
+                id={`${uid}-name`}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-asset-class`}>{t("assetClass")}</Label>
+              <Select
+                id={`${uid}-asset-class`}
+                value={assetClass}
+                onChange={(e) => setAssetClass(e.target.value)}
+              >
+                {ASSET_CLASSES.map((ac) => (
+                  <option key={ac} value={ac}>
+                    {tc(ac)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${uid}-market`}>{t("market")}</Label>
+              <Input
+                id={`${uid}-market`}
+                value={market}
+                onChange={(e) => setMarket(e.target.value)}
+                required
+              />
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

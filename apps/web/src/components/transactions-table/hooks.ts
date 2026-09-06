@@ -30,17 +30,35 @@ export function useAnomalyMap(anomalies: Anomaly[]) {
   }, [anomalies]);
 }
 
+/**
+ * Returns a callback for updating one or more URL query params. Accepts either a single
+ * `(key, value)` pair (every chip click) or a batch `{ key: value, ... }` object (e.g.
+ * "Clear all" resetting type + year together).
+ *
+ * The batch form exists because calling the single-key form twice in the same event
+ * handler doesn't compose: each call reads `searchParams` from the same pre-navigation
+ * closure (React hasn't re-rendered between them), so two sequential `router.push()`
+ * calls race each other against that same stale base — whichever transition's RSC fetch
+ * resolves last wins, independent of call order, and Next's router cache makes this
+ * observable (e.g. closing a Sheet right after a two-key clear could re-surface the
+ * first call's stale target). One `router.push()` per event handler avoids the race
+ * entirely by construction.
+ */
 export function useTransactionUrlNav() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   return useCallback(
-    (key: string, value: string | undefined) => {
+    (keyOrUpdates: string | Record<string, string | undefined>, value?: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
+      const updates: [string, string | undefined][] =
+        typeof keyOrUpdates === "string" ? [[keyOrUpdates, value]] : Object.entries(keyOrUpdates);
+      for (const [key, v] of updates) {
+        if (v) {
+          params.set(key, v);
+        } else {
+          params.delete(key);
+        }
       }
       params.set("page", "1");
       router.push(`${pathname}?${params.toString()}`);

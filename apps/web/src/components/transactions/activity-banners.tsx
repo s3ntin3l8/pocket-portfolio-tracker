@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
@@ -162,10 +162,17 @@ export function ReconciliationBanner({
   title,
   detail,
   tag,
+  dismissLabel,
+  onDismiss,
 }: {
   title: string;
   detail: string;
   tag: string;
+  /** Accessible name for the dismiss button — this component takes pre-resolved
+   *  strings (no `useTranslations` here, so it stays usable from a server component),
+   *  so callers must pass their own `Anomalies.dismiss` translation. */
+  dismissLabel?: string;
+  onDismiss?: () => void;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-amber-400/40 bg-card px-4 py-3.5 shadow-[0_1px_2px_rgba(15,27,20,.04)]">
@@ -179,6 +186,17 @@ export function ReconciliationBanner({
       <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
         {tag}
       </span>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label={dismissLabel ?? title}
+          title={dismissLabel ?? title}
+          className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/50 hover:text-muted-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      )}
     </div>
   );
 }

@@ -1,8 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AddTransactionForm, type AddTransactionInitial } from "@/components/add-transaction-form";
 import { useApiClient } from "@/lib/api";
@@ -46,15 +44,18 @@ function toInitial(tx: TxRow): AddTransactionInitial {
 }
 
 /**
- * Edit a transaction. Mobile: a bottom sheet (reference: editing reuses the manual-entry
- * sheet titled "Edit transaction"), instead of navigating to the standalone edit page.
- * Desktop (v2 design, ≥860px — the same breakpoint the Add flow uses): a centered 860px
- * modal instead, with `AddTransactionForm`'s two-column layout + Summary rail. Unlike Add,
- * this doesn't reuse `add-transaction-menu/desktop-shell.tsx`'s `DesktopShell` — that's
- * sized for a multi-step, multi-destination flow with its own nav rail, which Edit isn't;
- * this instead pattern-matches `transaction-detail-sheet.tsx`'s own lighter hand-rolled
- * desktop `Dialog` (a plain sticky header + scrollable body, no separate footer chrome).
- * On save it closes and refreshes the list in place.
+ * Edit a transaction. Overlay chrome migration (#625): a single DialogContent tree —
+ * full-screen page on mobile, a centered size="lg" (880px) card at md:+ — replacing a
+ * useMediaQuery("(min-width: 860px)") branch between a hand-rolled desktop Dialog and a
+ * bottom Sheet.
+ *
+ * `AddTransactionForm` itself still takes an `isDesktop` prop (its own two-column
+ * layout + Summary rail vs. mobile's single column is a genuinely different internal
+ * layout, not overlay chrome, and out of scope here) — but it's now read reactively off
+ * the same media query and passed to the ONE mounted `AddTransactionForm` instance,
+ * instead of picking which of two separate component trees to mount. Resizing across
+ * the breakpoint now just re-renders its layout; before, it would unmount the whole
+ * form (and every typed field) along with the outer chrome.
  */
 export function EditTransactionSheet({
   tx,
@@ -78,55 +79,17 @@ export function EditTransactionSheet({
     router.refresh();
   };
 
-  if (isDesktop) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          hideClose
-          className="flex w-[calc(100%-4rem)] max-w-[860px] flex-col gap-0 overflow-hidden rounded-[22px] border-0 bg-background p-0 shadow-[0_30px_80px_rgba(0,0,0,.4)] max-h-[calc(100vh-64px)]"
-        >
-          <div className="sticky top-0 z-[2] flex items-center gap-3 border-b border-border bg-background px-[26px] py-[18px]">
-            <DialogTitle className="flex-1 text-[19px] font-extrabold">
-              {tm("editTitle")}
-            </DialogTitle>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              aria-label="Close"
-              className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-colors hover:bg-secondary"
-            >
-              <X className="size-[17px]" strokeWidth={2.2} />
-            </button>
-          </div>
-          <div className="overflow-y-auto px-[26px] py-5">
-            {tx && (
-              <AddTransactionForm
-                client={api}
-                portfolioId={tx.portfolioId}
-                transactionId={tx.id}
-                initial={toInitial(tx)}
-                isDesktop
-                onSuccess={handleSuccess}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
-    // handleOnly: restrict drag-to-close to the handle — the form scrolls within
-    // SheetContent and vaul's at-top scroll gating must not intercept it (#472).
-    <Sheet open={open} onOpenChange={onOpenChange} handleOnly>
-      <SheetContent side="bottom" className="p-0">
-        <SheetHeader className="px-5 pb-1 pt-1">
-          <SheetTitle className="text-[19px]">{tm("editTitle")}</SheetTitle>
-        </SheetHeader>
-        {/* Note: no nested overflow-y-auto here — SheetContent is the single scroll
-            container. Nested scroll containers can confuse vaul's at-top drag gating
-            and cause the form scroll vs. drag-to-close conflict (#472). */}
-        <div className="px-5 pb-7 pt-3">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* footer={true}: AddTransactionForm's own SubmitButton self-portals via
+          useSheetFooter() — this just wires up the slot, no static content of its own
+          (no separate Cancel button; the header's close X/back-chevron already covers
+          that, matching the old desktop chrome). */}
+      <DialogContent size="lg" mobileHeader={{ title: tm("editTitle") }} footer={true}>
+        <div className="p-5 md:p-[26px]">
+          <DialogTitle className="hidden text-[19px] font-extrabold md:mb-3 md:block">
+            {tm("editTitle")}
+          </DialogTitle>
           {tx && (
             <AddTransactionForm
               client={api}
@@ -134,11 +97,12 @@ export function EditTransactionSheet({
               transactionId={tx.id}
               initial={toInitial(tx)}
               stickyFooter
+              isDesktop={isDesktop}
               onSuccess={handleSuccess}
             />
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -162,4 +162,56 @@ describe("CorporateActionsManager", () => {
     expect(rows[0]).toHaveTextContent("2");
     expect(rows[1]).toHaveTextContent("10");
   });
+
+  // The mobile card list (md:hidden) opens CaSheetContent on tap — a separate path
+  // from the desktop table's inline row-editing above, and previously untested.
+  describe("mobile card → overlay chrome (#625 migration)", () => {
+    function openMobileCard() {
+      const { container } = renderManager(undefined, true);
+      // Both the desktop table and the mobile card list render "Split" (CSS-hidden per
+      // viewport, not conditionally mounted — same badge text, two places) — scope to
+      // the mobile card list container. The whole card is the role="button" trigger
+      // (isAdmin), not a separately labeled button.
+      const mobileList = container.querySelector(".md\\:hidden")!;
+      const badge = Array.from(mobileList.querySelectorAll("span")).find(
+        (el) => el.textContent === messages.TxType.split,
+      )!;
+      fireEvent.click(badge.closest('[role="button"]')!);
+    }
+
+    it("opens the editor as a DialogContent sized sm, full-screen on mobile", () => {
+      openMobileCard();
+      const content = screen.getByRole("dialog");
+      expect(content.className).toContain("md:max-w-[480px]");
+      expect(content.className).toContain("inset-0");
+    });
+
+    it("shows the mobile back-chevron header with the edit title", () => {
+      openMobileCard();
+      expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+      expect(screen.getAllByRole("heading", { name: m.edit }).length).toBeGreaterThan(0);
+    });
+
+    it("keeps save+cancel in DialogContent's persistent footer, delete in-flow", async () => {
+      openMobileCard();
+      const saveBtn = screen.getByRole("button", { name: m.save });
+      expect(saveBtn.closest('[data-slot="dialog-footer"]')).not.toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: m.delete }));
+      const confirmBtn = await screen.findByRole("button", { name: m.delete });
+      expect(confirmBtn.closest('[data-slot="dialog-footer"]')).toBeNull();
+    });
+
+    it("saves an edit made from the mobile sheet", async () => {
+      openMobileCard();
+      fireEvent.change(screen.getByLabelText(m.ratio), { target: { value: "5" } });
+      fireEvent.click(screen.getByRole("button", { name: m.save }));
+
+      await waitFor(() => expect(updateCorporateAction).toHaveBeenCalled());
+      expect(updateCorporateAction).toHaveBeenCalledWith(
+        "ca1",
+        expect.objectContaining({ ratio: "5" }),
+      );
+    });
+  });
 });

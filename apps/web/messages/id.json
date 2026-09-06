@@ -1328,6 +1328,8 @@
     "filterInvestments": "Investasi saja",
     "filterType": "Jenis",
     "filterInstrument": "Instrumen",
+    "filterLabel": "Filter",
+    "filterClearAll": "Hapus semua",
     "filterYear": "Tahun",
     "allTypes": "Semua jenis",
     "allInstruments": "Semua instrumen",
@@ -1441,7 +1443,6 @@
       "dividends": "Dividen",
       "couponsInterest": "Kupon & bunga",
       "otherIncome": "Pendapatan lain",
-
       "averageOrder": "Rata-rata transaksi",
       "capitalDeployed": "modal dialokasikan",
       "capitalReturned": "modal dikembalikan",

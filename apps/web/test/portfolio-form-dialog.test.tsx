@@ -606,12 +606,15 @@ describe("PortfolioFormDialog", () => {
     expect(screen.queryByText(m.trLoading)).not.toBeInTheDocument();
   });
 
-  // Regression test for #472: the submit button is sticky-pinned in the sheet context
-  it("wraps the submit button in a sticky footer", () => {
+  // Regression test for #472: the submit button stays visible while scrolling a long
+  // form. Was a `.sticky` div inside the Sheet; the overlay chrome migration (#625)
+  // replaced that with DialogContent's own footer slot (a flex sibling of the
+  // scrollable body, not part of it) — same guarantee, different mechanism.
+  it("keeps the submit button in DialogContent's persistent footer, not the scrollable body", () => {
     renderCreate();
     fireEvent.click(screen.getByRole("button", { name: m.new }));
     const submitBtn = screen.getByRole("button", { name: m.create });
-    expect(submitBtn.closest(".sticky")).not.toBeNull();
+    expect(submitBtn.closest('[data-slot="dialog-footer"]')).not.toBeNull();
   });
 
   // Regression test for #472: FSA helper is not rendered on mount when no holder is selected
@@ -621,5 +624,36 @@ describe("PortfolioFormDialog", () => {
     // Wait for async calls (holders/sibling portfolios) to resolve
     await waitFor(() => expect(listAccountHolders).toHaveBeenCalled());
     expect(screen.queryByText(/across/)).toBeNull();
+  });
+
+  describe("overlay chrome (#625 migration)", () => {
+    it("renders as a DialogContent sized md, not the old unconditional bottom Sheet", () => {
+      renderCreate();
+      fireEvent.click(screen.getByRole("button", { name: m.new }));
+      const content = screen.getByRole("dialog");
+      expect(content.className).toContain("md:max-w-[600px]");
+      // Full-screen-on-mobile geometry (the default) — was a Sheet at every width.
+      expect(content.className).toContain("inset-0");
+      expect(content.className).toContain("md:rounded-[22px]");
+    });
+
+    it("shows the mobile back-chevron header with the create/edit title", () => {
+      renderCreate();
+      fireEvent.click(screen.getByRole("button", { name: m.new }));
+      expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+      // Two headings legitimately exist: the visible mobile h1 and the accessible
+      // DialogTitle shown at md:+ — see dialog.test.tsx for why there are two.
+      expect(screen.getAllByRole("heading", { name: m.createTitle }).length).toBeGreaterThan(0);
+    });
+
+    it("keeps the delete-confirm flow in the scrollable body, separate from the pinned primary button", async () => {
+      renderEdit();
+      fireEvent.click(screen.getByRole("button", { name: m.edit }));
+      await waitFor(() => expect(listAccountHolders).toHaveBeenCalled());
+
+      fireEvent.click(screen.getByRole("button", { name: m.delete }));
+      const confirmBtn = await screen.findByRole("button", { name: m.confirmDelete });
+      expect(confirmBtn.closest('[data-slot="dialog-footer"]')).toBeNull();
+    });
   });
 });

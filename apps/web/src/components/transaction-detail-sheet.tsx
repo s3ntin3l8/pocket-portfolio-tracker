@@ -13,14 +13,12 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TransactionSourcesSection } from "@/components/transaction-sources-section";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
-import { useMediaQuery } from "@/lib/use-media-query";
 import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 import { txAmount, txNetAmount, SOURCE_ICON } from "@/components/transactions-table";
 import type { TxRow } from "@/components/transactions-table";
@@ -87,10 +85,6 @@ export function TransactionDetailSheet({
   const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
-  // 760px, not the app's usual 860 — the detail panel is a narrower 480px-max Dialog,
-  // not the wide two-column Add/Edit modal, so it switches to desktop chrome sooner
-  // (design: Transaction Detail v2.dc.html, `isDesktop = S.w >= 760`).
-  const isDesktop = useMediaQuery("(min-width: 760px)");
   const [clientRate, setClientRate] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -404,43 +398,20 @@ export function TransactionDetailSheet({
     </>
   );
 
-  if (isDesktop) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          hideClose
-          className="flex w-[calc(100%-4rem)] max-w-[480px] flex-col gap-0 overflow-hidden rounded-[22px] border-0 bg-background p-0 shadow-[0_30px_80px_rgba(0,0,0,.4)] max-h-[calc(100vh-64px)]"
-        >
-          <div className="sticky top-0 z-[2] gap-0 bg-background px-5 pb-2.5 pt-4">
-            <div className="flex items-center gap-3">
-              <span
-                className="flex size-11 shrink-0 items-center justify-center rounded-[13px]"
-                style={{ background: badge.bg, color: badge.fg }}
-              >
-                <BadgeIcon className="size-[22px]" strokeWidth={2.2} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <DialogTitle className="truncate text-[18px] font-extrabold leading-none">
-                  {title}
-                </DialogTitle>
-                <p className="truncate text-xs font-medium text-text-2">{subtitle}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {overflowMenu}
-                {closeButton}
-              </div>
-            </div>
-          </div>
-          <div className="overflow-y-auto">{body}</div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
+  // Overlay chrome migration (#625): single tree, no more isDesktop branch — this
+  // component already rendered the identical `body` (and a near-identical header) on
+  // both sides of its own isDesktop split, making it the cleanest of the ten migrated
+  // overlays: no mobileHeader/footer needed, just the existing sticky-header-inside-a-
+  // scrolling-body layout both branches already used, now rendered once. hideClose
+  // suppresses DialogContent's own floating X — this header has its own close button,
+  // identical at every width, so there's no separate mobile/desktop close affordance to
+  // reconcile. One documented deviation: the old desktop breakpoint was 760px ("design:
+  // Transaction Detail v2.dc.html, `isDesktop = S.w >= 760`"); DialogContent's single
+  // `md`/768px breakpoint now applies here too, an 8px shift from that source.
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} handleOnly>
-      <SheetContent className="p-0" side="bottom" hideClose>
-        <SheetHeader className="sticky top-0 z-[2] gap-0 bg-background px-5 pb-2.5 pt-1">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="sm" hideClose className="flex flex-col gap-0 overflow-hidden p-0">
+        <div className="sticky top-0 z-[2] gap-0 bg-background px-5 pb-2.5 pt-4">
           <div className="flex items-center gap-3">
             <span
               className="flex size-11 shrink-0 items-center justify-center rounded-[13px]"
@@ -449,7 +420,9 @@ export function TransactionDetailSheet({
               <BadgeIcon className="size-[22px]" strokeWidth={2.2} />
             </span>
             <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-[18px]">{title}</SheetTitle>
+              <DialogTitle className="truncate text-[18px] font-extrabold leading-none">
+                {title}
+              </DialogTitle>
               <p className="truncate text-xs font-medium text-text-2">{subtitle}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -457,9 +430,9 @@ export function TransactionDetailSheet({
               {closeButton}
             </div>
           </div>
-        </SheetHeader>
-        {body}
-      </SheetContent>
-    </Sheet>
+        </div>
+        <div className="overflow-y-auto">{body}</div>
+      </DialogContent>
+    </Dialog>
   );
 }

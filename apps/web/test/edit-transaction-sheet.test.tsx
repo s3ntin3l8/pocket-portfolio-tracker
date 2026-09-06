@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
@@ -58,29 +58,91 @@ function mockMatchMedia(matches: boolean) {
   return fn;
 }
 
+/** A `matchMedia` mock that can actually flip live, for testing what happens when
+ *  `useMediaQuery` (a `useSyncExternalStore` subscription) crosses the breakpoint mid-render
+ *  — `mockMatchMedia` above always returns a fixed value, which can't simulate a resize. */
+function mockMatchMediaDynamic(initialMatches: boolean) {
+  let matches = initialMatches;
+  const listeners = new Set<() => void>();
+  const mql = {
+    get matches() {
+      return matches;
+    },
+    addEventListener: (_event: string, cb: () => void) => listeners.add(cb),
+    removeEventListener: (_event: string, cb: () => void) => listeners.delete(cb),
+  };
+  window.matchMedia = vi.fn().mockReturnValue(mql);
+  return {
+    resize(next: boolean) {
+      matches = next;
+      act(() => listeners.forEach((cb) => cb()));
+    },
+  };
+}
+
 describe("EditTransactionSheet", () => {
   afterEach(() => {
     // Restore jsdom's default (matches: false) so later tests aren't affected.
     mockMatchMedia(false);
   });
 
-  it("renders a bottom Sheet on mobile — no Summary rail (desktop-only)", () => {
+  // Overlay chrome migration (#625): a single DialogContent tree now, full-screen on
+  // mobile, a centered size="lg" card at md:+ — the "Edit transaction" title
+  // legitimately renders twice (mobile header h1 + desktop DialogTitle, CSS-hidden per
+  // viewport, not conditionally mounted). AddTransactionForm's own isDesktop-driven
+  // internal layout (Summary rail or not) is untouched and still reads the same media
+  // query, since that's a different, in-scope-elsewhere concern from the overlay chrome.
+  it("renders full-screen on mobile — no Summary rail (AddTransactionForm's own isDesktop layout)", () => {
     mockMatchMedia(false);
     renderSheet();
-    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
-    // vaul's Sheet is also `role="dialog"` under the hood, so the desktop/mobile split is
-    // asserted via the Summary rail instead — desktop-only (`isDesktop` threaded into
-    // AddTransactionForm), a much cleaner functional signal than DOM/attribute-sniffing.
+    expect(screen.getAllByText(messages.Manage.tx.editTitle).length).toBeGreaterThan(0);
     expect(screen.queryByText(messages.Manage.tx.summary)).toBeNull();
   });
 
-  it("renders a centered 860px Dialog on desktop, with the Summary rail (v2 design)", () => {
+  it("renders a centered lg (880px) card on desktop, with the Summary rail (v2 design)", () => {
     const matchMedia = mockMatchMedia(true);
     renderSheet();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
+    const content = screen.getByRole("dialog");
+    expect(content.className).toContain("md:max-w-[880px]");
+    expect(screen.getAllByText(messages.Manage.tx.editTitle).length).toBeGreaterThan(0);
     // The desktop-only Summary rail (see add-transaction-form/summary-rail.tsx).
     expect(screen.getByText(messages.Manage.tx.summary)).toBeInTheDocument();
     expect(matchMedia).toHaveBeenCalledWith("(min-width: 860px)");
+  });
+
+  it("keeps the submit button in DialogContent's persistent footer", () => {
+    renderSheet();
+    const submitBtn = screen.getByRole("button", { name: messages.Manage.tx.save });
+    expect(submitBtn.closest('[data-slot="dialog-footer"]')).not.toBeNull();
+  });
+
+  // The regression test for the migration's whole premise (see the plan's "Why
+  // single-tree CSS is the load-bearing part" section): before, EditTransactionSheet
+  // picked between two component trees via `{isDesktop ? <Dialog/> : <Sheet/>}`, so
+  // crossing the breakpoint unmounted the open one and mounted the other — taking
+  // AddTransactionForm's state with it. Now there's one DialogContent tree and
+  // `isDesktop` only reaches AddTransactionForm as a reactive layout prop, so the form
+  // itself never unmounts and a typed value survives the resize.
+  it("keeps a typed field value across a resize past the breakpoint", () => {
+    const media = mockMatchMediaDynamic(false);
+    renderSheet();
+
+    const qtyInput = screen.getByLabelText(messages.Manage.tx.quantity);
+    expect(qtyInput).toHaveValue("10"); // TX.quantity, prefilled
+    fireEvent.change(qtyInput, { target: { value: "777" } });
+    expect(qtyInput).toHaveValue("777");
+
+    // Cross the breakpoint. If this were still two trees, the field above would have
+    // unmounted along with the mobile Sheet and remounted fresh from `initial` (back to
+    // "10") inside a new desktop Dialog instance.
+    media.resize(true);
+
+    // The desktop-only Summary rail proves the resize actually took effect, not just a
+    // no-op mock call. The field's *value* is what has to survive — PricingFields'
+    // surrounding grid legitimately re-lays-out between mobile/desktop (isDesktop is a
+    // real prop change, not nothing), so the input DOM node itself isn't asserted
+    // identical, only the state it displays: still "777", not reset to "10".
+    expect(screen.getByText(messages.Manage.tx.summary)).toBeInTheDocument();
+    expect(screen.getByLabelText(messages.Manage.tx.quantity)).toHaveValue("777");
   });
 });

@@ -338,7 +338,9 @@ describe("TransactionsTable", () => {
     fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
     fireEvent.click(screen.getByRole("button", { name: messages.Manage.edit }));
     // The edit sheet opens in place (no navigation) with its "Edit transaction" title.
-    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
+    // Two copies legitimately exist (mobile header + desktop DialogTitle, CSS-hidden
+    // per viewport, not conditionally mounted — see edit-transaction-sheet.test.tsx).
+    expect(screen.getAllByText(messages.Manage.tx.editTitle).length).toBeGreaterThan(0);
   });
 
   it("hides the reassign action when only one portfolio exists", () => {
@@ -1529,13 +1531,20 @@ describe("TransactionsTable", () => {
   });
 
   describe("text search", () => {
-    function getSearchInput() {
-      return screen.getByPlaceholderText(messages.Transactions.searchPlaceholder);
+    // Two search inputs exist in the DOM at once — one inline for mobile (kept out of
+    // the filter Sheet, #625 review finding 5) and one for the sm:+ toolbar — CSS-hidden
+    // per viewport, not conditionally rendered, so both are always present in JSDOM.
+    // Same pattern as noResults/empty below. They share FilterBar's one `localQuery`
+    // state, so either input reflects the same value.
+    function getSearchInputs() {
+      return screen.getAllByPlaceholderText(messages.Transactions.searchPlaceholder);
     }
 
     it("renders a search input", () => {
       renderFilterTable();
-      expect(getSearchInput()).toBeInTheDocument();
+      const inputs = getSearchInputs();
+      expect(inputs.length).toBe(2);
+      inputs.forEach((input) => expect(input).toBeInTheDocument());
     });
 
     it("filters rows by instrument symbol", () => {
@@ -1578,10 +1587,13 @@ describe("TransactionsTable", () => {
 
     it("clearing the search via the X button restores all rows", () => {
       renderFilterTable({ searchQuery: "BBCA" });
-      // The clear button should be visible when a search query is active.
-      expect(
-        screen.getByRole("button", { name: messages.Transactions.searchClear }),
-      ).toBeInTheDocument();
+      // The clear button should be visible (mobile + desktop copies) when a search
+      // query is active — see the note on getSearchInputs above.
+      const clearButtons = screen.getAllByRole("button", {
+        name: messages.Transactions.searchClear,
+      });
+      expect(clearButtons.length).toBe(2);
+      clearButtons.forEach((button) => expect(button).toBeInTheDocument());
     });
 
     it("composes text search with the Buys chip filter", () => {

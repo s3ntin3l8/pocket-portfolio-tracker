@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Sheet } from "@/components/ui/sheet";
+import { Dialog } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useCorporateActions } from "./corporate-actions/use-corporate-actions";
@@ -226,7 +226,7 @@ export function CorporateActionsManager({
       </div>
 
       {ca.isAdmin && (
-        <Sheet
+        <Dialog
           open={ca.sheetCa !== null}
           onOpenChange={(o) => {
             if (!o) ca.closeSheet();
@@ -250,7 +250,7 @@ export function CorporateActionsManager({
             tc={ca.tc}
             tt={ca.tt}
           />
-        </Sheet>
+        </Dialog>
       )}
     </>
   );
