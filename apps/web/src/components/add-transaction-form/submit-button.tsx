@@ -13,10 +13,11 @@ interface SubmitButtonProps {
   stickyFooter: boolean;
   footerEl: HTMLElement | null;
   t: (key: string) => string;
-  /** Desktop modal shell — compact button, no full-width/border-t wrapper (the desktop
-   *  footer bar itself already supplies border-t/bg/padding/justify-end, alongside the
-   *  Cancel button — see `add-transaction-menu/desktop-shell.tsx`). Defaults to the
-   *  mobile-sheet styling. */
+  /** Compact-vs-full-width button styling only — independent of `useSheetFooterChrome()`
+   *  below, which separately decides whether the button portals bare or wrapped in its
+   *  own border/background. The two happen to agree at every current call site (a
+   *  styled desktop host is also where `isDesktop` is true) but nothing enforces that;
+   *  don't assume one implies the other. */
   isDesktop?: boolean;
 }
 

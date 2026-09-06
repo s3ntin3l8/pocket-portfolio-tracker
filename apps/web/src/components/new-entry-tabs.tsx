@@ -49,8 +49,10 @@ export function NewEntryTabs({
    *  it off (a bottom-pinned bar there would sit under the fixed bottom-nav). */
   stickyFooter?: boolean;
   isAdmin?: boolean;
-  /** Desktop modal shell — see `AddTransactionForm`'s `isDesktop`. Threaded through to every
-   *  sub-form so their submit buttons/layout match the desktop chrome. */
+  /** Desktop modal shell — see `AddTransactionForm`'s `isDesktop`. Only threaded to
+   *  `AddTransaction` (its two-column layout) now — `RecordCorporateAction`/
+   *  `RecordMerger` get their submit button's chrome from `useSheetFooterChrome()`
+   *  instead (which host they're portaling into, not the viewport). */
   isDesktop?: boolean;
   /** Controlled active tab — the desktop nav rail drives this directly instead of the
    *  in-sheet `TabsList` (which is hidden via `hideTabList` on desktop). Uncontrolled

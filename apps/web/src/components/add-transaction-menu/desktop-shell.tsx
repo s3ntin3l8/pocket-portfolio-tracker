@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { SheetFooterContext } from "@/components/ui/sheet";
+import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
 import { NavRail } from "./nav-rail";
 
 export type DesktopStep = "import" | "manual" | "events" | "portfolio" | "holder";
@@ -100,32 +100,45 @@ export function DesktopShell({
             </DialogTitle>
           </div>
 
-          <SheetFooterContext.Provider value={footerEl}>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className={centered ? "mx-auto max-w-[600px] px-[26px] py-5" : "px-[26px] py-5"}>
-                {children}
+          {/* This shell hand-rolls its own already-styled footer bar (border-t/bg/
+              padding/justify-end, below) — SheetFooterChromeContext tells a
+              self-portaling child (SubmitButton, RecordCorporateActionForm,
+              RecordMergerForm) that host already supplies that chrome, so it portals
+              bare instead of wrapping itself in the same border/background again. Value
+              tracks `showFooter`: when it's false (the import step), this bar doesn't
+              render at all and `footerEl` never gets set, so no child's `footerPortal`
+              check passes regardless — but keeping the two in sync avoids a
+              context/DOM mismatch either way. */}
+          <SheetFooterChromeContext.Provider value={showFooter}>
+            <SheetFooterContext.Provider value={footerEl}>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div
+                  className={centered ? "mx-auto max-w-[600px] px-[26px] py-5" : "px-[26px] py-5"}
+                >
+                  {children}
+                </div>
               </div>
-            </div>
 
-            {showFooter && (
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-background px-[26px] py-4">
-                {dismissible && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onCancel}
-                    className="h-auto rounded-[13px] border-border bg-card px-[22px] py-[13px] text-[14px] font-bold text-foreground hover:bg-card"
-                  >
-                    {tm("addMenu.cancel")}
-                  </Button>
-                )}
-                {/* `display:contents` so the portaled submit button (via `useSheetFooter`)
-                    lands as a flex sibling of Cancel above, in DOM order — not visually
-                    nested inside this otherwise-empty div. */}
-                <div ref={setFooterEl} className="contents" />
-              </div>
-            )}
-          </SheetFooterContext.Provider>
+              {showFooter && (
+                <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-background px-[26px] py-4">
+                  {dismissible && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onCancel}
+                      className="h-auto rounded-[13px] border-border bg-card px-[22px] py-[13px] text-[14px] font-bold text-foreground hover:bg-card"
+                    >
+                      {tm("addMenu.cancel")}
+                    </Button>
+                  )}
+                  {/* `display:contents` so the portaled submit button (via `useSheetFooter`)
+                      lands as a flex sibling of Cancel above, in DOM order — not visually
+                      nested inside this otherwise-empty div. */}
+                  <div ref={setFooterEl} className="contents" />
+                </div>
+              )}
+            </SheetFooterContext.Provider>
+          </SheetFooterChromeContext.Provider>
         </div>
       </DialogContent>
     </Dialog>
