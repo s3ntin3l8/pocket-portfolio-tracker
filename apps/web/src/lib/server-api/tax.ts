@@ -13,12 +13,13 @@ import {
   type TaxCurrencyTotal,
   type TaxYearRow,
   type TaxYearDetail,
+  type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
 
 export async function loadNetworthTax(
   year?: number,
   taxRegime: "DE" | "ID" = "DE",
-): Promise<TaxSummaryHolder[]> {
+): Promise<TaxSummaryHolderWithCarryForward[]> {
   const api = await getServerApi();
   if (!api) return [];
   try {
@@ -73,6 +74,7 @@ export async function loadNetworthTax(
             allowanceUsage: zeroAllowance,
             harvestSuggestions: [],
             carryForwardApplied: false,
+            accountHolderId: selected.accountHolderId ?? null,
             distribution: zeroDistribution,
             tfRatesByInstrument: {},
           },
@@ -101,6 +103,7 @@ export async function loadNetworthTax(
           allowanceUsage: zeroAllowance,
           harvestSuggestions: [],
           carryForwardApplied: false,
+          accountHolderId: holderId ?? null,
           distribution: zeroDistribution,
           tfRatesByInstrument: {},
         },
@@ -122,7 +125,7 @@ export async function loadNetworthTax(
         }
         throw err;
       }
-      const holderEntry: TaxSummaryHolder = {
+      const holderEntry: TaxSummaryHolderWithCarryForward = {
         holder: {
           id: selected.accountHolderId ?? selected.id,
           name: selected.accountHolder ?? selected.name,
@@ -136,6 +139,7 @@ export async function loadNetworthTax(
         allowanceUsage: result.allowanceUsage,
         harvestSuggestions: result.harvestSuggestions,
         carryForwardApplied: result.carryForwardApplied,
+        accountHolderId: selected.accountHolderId ?? null,
         distribution: result.holderDistribution,
         tfRatesByInstrument: result.tfRatesByInstrument,
       };
@@ -143,7 +147,10 @@ export async function loadNetworthTax(
     }
 
     const holderId = await resolveHolderScope(portfolios);
-    return await api.getNetworthTax(year, holderId);
+    const holders = await api.getNetworthTax(year, holderId);
+    // /networth/tax always aggregates by a genuine account holder — holder.id here is
+    // never a portfolio-id fallback.
+    return holders.map((h) => ({ ...h, accountHolderId: h.holder.id }));
   } catch {
     return [];
   }

@@ -1999,6 +1999,49 @@
         "tax": "Est. pajak"
       },
       "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan 10% atas dividen, keduanya dipotong di sumber — jadi tidak ada yang perlu dilaporkan lagi, dan tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak."
+    },
+    "vorabpauschale": {
+      "accrued": "Vorabpauschale terakumulasi · YTD",
+      "accruedDesc": "ETF akumulasi — penghasilan fantasi, tanpa penerimaan kas",
+      "credited": "Vorabpauschale dikreditkan · YTD",
+      "creditedDesc": "Pajak dibayar di muka yang dikembalikan saat pelepasan"
+    },
+    "coverage": {
+      "title": "Bagaimana pajak Anda ditutupi · {year}",
+      "fsa": {
+        "title": "Tunjangan FSA terpakai",
+        "usedDesc": "{used} dari {annual}",
+        "allUsed": "Semua keuntungan dan penghasilan dalam batas FSA Anda",
+        "exceeded": "Keuntungan dan penghasilan melebihi batas FSA Anda",
+        "noFsa": "FSA tidak dikonfigurasi — semua penghasilan kena pajak"
+      },
+      "carryForward": {
+        "title": "Penangguhan kerugian diterapkan",
+        "stock": "Pot saham",
+        "general": "Pot umum",
+        "none": "Tidak ada kerugian tahun sebelumnya yang diterapkan tahun ini",
+        "ctaHint": "Masukkan kerugian tahun sebelumnya di bawah untuk mengurangi pajak Anda"
+      },
+      "summary": {
+        "taxable": "Penghasilan kena pajak melebihi FSA",
+        "abgeltungsteuer": "Abgeltungsteuer ({rate}%)",
+        "withheld": "dipotong di sumber",
+        "noTax": "Tidak ada pajak yang terutang — kerugian ditangguhkan",
+        "coveredByFsa": "Tidak ada pajak yang terutang — ditutupi oleh tunjangan FSA Anda"
+      }
+    },
+    "lossCarryforward": {
+      "title": "Penangguhan kerugian · Verlustvortrag",
+      "description": "Masukkan angka dari sertifikat pajak tahun sebelumnya untuk mengimbangi kerugian terhadap keuntungan.",
+      "yearLabel": "Tahun pajak",
+      "stockLabel": "Kerugian pot saham",
+      "stockHint": "Keuntungan ekuitas saja",
+      "generalLabel": "Kerugian pot umum",
+      "generalHint": "Reksa dana, obligasi, Vorabpauschale",
+      "save": "Simpan",
+      "saving": "Menyimpan…",
+      "success": "Penangguhan kerugian tersimpan",
+      "error": "Tidak dapat menyimpan. Silakan coba lagi."
     }
   },
   "Anomalies": {

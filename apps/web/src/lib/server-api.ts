@@ -31,6 +31,7 @@ export {
   type TaxCurrencyTotal,
   type TaxYearRow,
   type TaxYearDetail,
+  type TaxSummaryHolderWithCarryForward,
   loadHoldings,
 } from "./server-api/_shared";
 

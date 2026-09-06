@@ -2001,6 +2001,49 @@
         "tax": "Est. tax"
       },
       "footnote": "Indonesia applies a final 0.1% tax on listed-share sales and 10% on dividends, both withheld at source — so there's nothing extra to file, and no losses to harvest. This is an estimate, not tax advice."
+    },
+    "vorabpauschale": {
+      "accrued": "Vorabpauschale accrued · YTD",
+      "accruedDesc": "Accumulating ETFs — phantom income, no cash received",
+      "credited": "Vorabpauschale credited · YTD",
+      "creditedDesc": "Pre-paid tax reclaimed on disposal"
+    },
+    "coverage": {
+      "title": "How your tax is covered · {year}",
+      "fsa": {
+        "title": "FSA allowance used",
+        "usedDesc": "{used} of {annual}",
+        "allUsed": "All gains and income within your FSA cap",
+        "exceeded": "Gains and income exceed your FSA cap",
+        "noFsa": "No FSA configured — all income is taxable"
+      },
+      "carryForward": {
+        "title": "Loss carry-forward applied",
+        "stock": "Stock pot",
+        "general": "General pot",
+        "none": "No prior-year losses applied this year",
+        "ctaHint": "Enter prior-year losses below to reduce your tax"
+      },
+      "summary": {
+        "taxable": "Taxable income exceeding FSA",
+        "abgeltungsteuer": "Abgeltungsteuer ({rate}%)",
+        "withheld": "withheld at source",
+        "noTax": "No tax owed — losses carried forward",
+        "coveredByFsa": "No tax owed — covered by your FSA allowance"
+      }
+    },
+    "lossCarryforward": {
+      "title": "Loss carry-forward · Verlustvortrag",
+      "description": "Enter prior-year figures from your tax certificate to offset losses against gains.",
+      "yearLabel": "Tax year",
+      "stockLabel": "Stock pot loss",
+      "stockHint": "Equity gains only",
+      "generalLabel": "General pot loss",
+      "generalHint": "Funds, bonds, Vorabpauschale",
+      "save": "Save",
+      "saving": "Saving…",
+      "success": "Loss carry-forward saved",
+      "error": "Couldn't save. Please try again."
     }
   },
   "Anomalies": {

@@ -16,6 +16,7 @@ import type {
   Candle,
   CorporateAction,
   InsightsResponse,
+  TaxSummaryHolder,
 } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import {
@@ -256,6 +257,14 @@ export interface TaxYearDetail {
   dividendTotalsByCurrency: TaxCurrencyTotal[];
   byYear: TaxYearRow[];
   idByYear: IdYearInput[];
+}
+
+/** Extended TaxSummaryHolder carrying the real account-holder id (nullable — the
+ *  single-portfolio path falls back to a portfolio id in `holder.id` when the
+ *  portfolio has no account holder configured, which the loss-carryforward editor
+ *  must not be pointed at). */
+export interface TaxSummaryHolderWithCarryForward extends TaxSummaryHolder {
+  accountHolderId: string | null;
 }
 
 export interface InsightsView {

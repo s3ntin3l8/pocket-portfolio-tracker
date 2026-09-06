@@ -267,6 +267,18 @@ export interface AccountHolderInput {
   taxResidence?: string | null;
 }
 
+// --- Loss carry-forward types --------------------------------------------
+
+export interface LossCarryforwardEntry {
+  pot: "stock" | "general";
+  amount: string;
+}
+
+export interface LossCarryforwardResponse {
+  taxYear: number;
+  entries: LossCarryforwardEntry[];
+}
+
 // --- Tax optimization types -----------------------------------------------
 
 /** One Verlusttopf's (loss pot's) netting result — see `AllowanceUsage.stockPot`/`generalPot`. */
@@ -2148,6 +2160,21 @@ export function createApiClient(config: ApiClientConfig) {
       request<AccountHolder>("PATCH", `/account-holders/${holderId}`, input),
     deleteAccountHolder: (holderId: string) =>
       request<void>("DELETE", `/account-holders/${holderId}`),
+
+    getLossCarryforward: (holderId: string, taxYear: number) =>
+      request<LossCarryforwardResponse>(
+        "GET",
+        `/account-holders/${holderId}/loss-carryforward?taxYear=${taxYear}`,
+      ),
+    setLossCarryforward: (
+      holderId: string,
+      data: { taxYear: number; entries: LossCarryforwardEntry[] },
+    ) =>
+      request<LossCarryforwardResponse>(
+        "PUT",
+        `/account-holders/${holderId}/loss-carryforward`,
+        data,
+      ),
 
     /** `convertTo` requests a per-row `displayRate`/`displayCurrency` (trade-date FX into
      *  that currency) alongside each row's native amount — see issue #465. */
