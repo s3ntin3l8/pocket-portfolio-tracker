@@ -3,7 +3,10 @@
 import type { LucideIcon } from "lucide-react";
 import { Upload, PenLine, Repeat, Briefcase, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DesktopStep } from "./desktop-shell";
+
+/** The desktop rail's destinations — moved here (from `desktop-shell.tsx`) as this
+ *  component's natural home; `desktop-shell.tsx` is going away as part of #669. */
+export type DesktopStep = "import" | "manual" | "events" | "portfolio" | "holder";
 
 interface NavItem {
   key: DesktopStep;
@@ -21,6 +24,7 @@ export function NavRail({
   active,
   onSelect,
   labels,
+  className,
 }: {
   active: DesktopStep;
   onSelect: (step: DesktopStep) => void;
@@ -32,6 +36,9 @@ export function NavRail({
     portfolio: string;
     holder: string;
   };
+  /** #669: lets the merged single-tree overlay hide this at `max-md:` instead of the
+   *  rail only ever mounting inside a desktop-only tree, as it does today. */
+  className?: string;
 }) {
   const top: NavItem[] = [
     { key: "import", label: labels.import, icon: Upload },
@@ -44,7 +51,12 @@ export function NavRail({
   ];
 
   return (
-    <aside className="flex w-[196px] shrink-0 flex-col gap-[3px] overflow-y-auto border-r border-border bg-card-2 p-3">
+    <aside
+      className={cn(
+        "flex w-[196px] shrink-0 flex-col gap-[3px] overflow-y-auto border-r border-border bg-card-2 p-3",
+        className,
+      )}
+    >
       <div className="px-2.5 pb-3.5 pt-0.5 text-[17px] font-extrabold text-foreground">
         {labels.heading}
       </div>

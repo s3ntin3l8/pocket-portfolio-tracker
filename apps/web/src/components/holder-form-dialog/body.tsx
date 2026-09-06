@@ -13,15 +13,21 @@ import { useSheetFooter } from "@/components/ui/sheet";
 import { useHolderForm } from "./hooks";
 
 /**
- * The `HolderFormDialog` body, extracted so the desktop Add Transaction shell's
- * "Account holder" rail destination can render it inline in the modal's main column
- * instead of nesting another Sheet (mobile keeps the original Sheet-wrapped dialog
- * unchanged) — see `add-transaction-menu/desktop-shell.tsx`. Submit/validation logic
- * (`useHolderForm`) is untouched; this only changes what wraps it. Desktop-only in
- * practice: the rail always creates (`mode: "create"`).
+ * The `HolderFormDialog` body — a shared inline form used today by the desktop Add
+ * Transaction shell's "Account holder" rail destination (rendered in the modal's main
+ * column instead of nesting another Sheet), and will also be used by the mobile
+ * chooser's "Add account holder" step once #669 lands and that stops nesting a separate
+ * `HolderFormDialog`. Submit/validation logic (`useHolderForm`) is untouched; this only
+ * changes what wraps it. Desktop-only in practice today: the rail always creates
+ * (`mode: "create"`).
  *
  * Simulates the Sheet's "open" lifecycle once on mount (see `PortfolioFormBody` for why)
  * so the form's fields reset from `holder` the same way the Sheet trigger would.
+ *
+ * Field ids are `useId()`-derived, not hardcoded `-desktop`-suffixed strings. Nothing
+ * exploits this today (this component has exactly one reachable instance, gated by the
+ * desktop-only rail) — pre-emptive, so #669 doesn't also need to touch this file once a
+ * second, mobile-reachable instance becomes possible.
  */
 export function HolderFormBody({
   mode,
@@ -35,6 +41,12 @@ export function HolderFormBody({
   const t = useTranslations("AccountHolders");
   const tf = useTranslations("PortfolioForm");
   const formId = useId();
+  const nameId = useId();
+  const typeLabelId = useId();
+  const birthYearId = useId();
+  const taxResidenceId = useId();
+  const taxAllowanceId = useId();
+  const taxRateId = useId();
   const f = useHolderForm(mode, holder, onSuccess);
   const footerEl = useSheetFooter();
 
@@ -48,7 +60,7 @@ export function HolderFormBody({
       type="submit"
       form={formId}
       disabled={f.busy || !f.name.trim()}
-      className="h-auto rounded-[13px] px-[26px] py-[13px] text-[14px] font-bold"
+      className="h-auto max-md:w-full max-md:rounded-[15px] max-md:py-[15px] md:rounded-[13px] md:px-[26px] md:py-[13px] text-[14px] font-bold"
     >
       {f.busy && <Spinner size="sm" />}
       {mode === "edit" ? tf("save") : t("add")}
@@ -68,9 +80,9 @@ export function HolderFormBody({
         )}
 
         <div className="space-y-1.5">
-          <Label htmlFor="holder-name-desktop">{tf("holderName")}</Label>
+          <Label htmlFor={nameId}>{tf("holderName")}</Label>
           <Input
-            id="holder-name-desktop"
+            id={nameId}
             value={f.name}
             onChange={(e) => f.setName(e.target.value)}
             placeholder={tf("accountHolderPlaceholder")}
@@ -79,18 +91,14 @@ export function HolderFormBody({
         </div>
 
         <div className="space-y-1.5">
-          <Label id="holder-type-label-desktop">{tf("holderType")}</Label>
-          <HolderTypeChips
-            value={f.type}
-            onChange={f.setType}
-            labelledBy="holder-type-label-desktop"
-          />
+          <Label id={typeLabelId}>{tf("holderType")}</Label>
+          <HolderTypeChips value={f.type} onChange={f.setType} labelledBy={typeLabelId} />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="holder-birth-year-desktop">{tf("birthYear")}</Label>
+          <Label htmlFor={birthYearId}>{tf("birthYear")}</Label>
           <Input
-            id="holder-birth-year-desktop"
+            id={birthYearId}
             type="number"
             inputMode="numeric"
             placeholder={tf("birthYearPlaceholder")}
@@ -107,9 +115,9 @@ export function HolderFormBody({
           </summary>
           <div className="mt-3 space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="holder-tax-residence-desktop">{t("taxResidence")}</Label>
+              <Label htmlFor={taxResidenceId}>{t("taxResidence")}</Label>
               <Input
-                id="holder-tax-residence-desktop"
+                id={taxResidenceId}
                 maxLength={2}
                 placeholder="DE"
                 value={f.taxResidence}
@@ -117,9 +125,9 @@ export function HolderFormBody({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="holder-tax-allowance-desktop">{t("taxAllowance")}</Label>
+              <Label htmlFor={taxAllowanceId}>{t("taxAllowance")}</Label>
               <Input
-                id="holder-tax-allowance-desktop"
+                id={taxAllowanceId}
                 type="number"
                 inputMode="decimal"
                 placeholder="1000"
@@ -129,9 +137,9 @@ export function HolderFormBody({
               <p className="text-xs text-muted-foreground">{t("taxAllowanceHint")}</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="holder-tax-rate-desktop">{t("capitalGainsTaxRate")}</Label>
+              <Label htmlFor={taxRateId}>{t("capitalGainsTaxRate")}</Label>
               <Input
-                id="holder-tax-rate-desktop"
+                id={taxRateId}
                 type="number"
                 inputMode="decimal"
                 placeholder="0.25"

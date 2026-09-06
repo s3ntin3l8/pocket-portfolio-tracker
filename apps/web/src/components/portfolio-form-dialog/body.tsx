@@ -12,6 +12,17 @@ import { PortfolioFormSections } from "./sections/form-sections";
 import { TrConnectionSection, IbkrConnectionSection } from "./sections/connection-section";
 import { usePortfolioForm } from "./hooks";
 
+/**
+ * The `PortfolioFormDialog` body — a shared inline form used today by the desktop Add
+ * Transaction shell's "Create portfolio" rail destination, and will also be used by the
+ * mobile chooser's "Add portfolio" step once #669 lands and that stops nesting a
+ * separate `PortfolioFormDialog`. The footer button's `max-md:`/`md:` classes below are
+ * inert until then (this form is desktop-only-reachable today, at the 860px
+ * `add-transaction-menu.tsx` breakpoint) — added now so #669's diff doesn't also need
+ * to touch this file: full-width on mobile (matching the rest of the app's mobile
+ * primary actions), compact on desktop (matching the rail shell's Cancel button beside
+ * it).
+ */
 export function PortfolioFormBody({
   mode,
   portfolio,
@@ -39,7 +50,7 @@ export function PortfolioFormBody({
       <Button
         type="button"
         onClick={() => onDone?.()}
-        className="h-auto rounded-[13px] px-[26px] py-[13px] text-[14px] font-bold"
+        className="h-auto max-md:w-full max-md:rounded-[15px] max-md:py-[15px] md:rounded-[13px] md:px-[26px] md:py-[13px] text-[14px] font-bold"
       >
         {t("done")}
       </Button>
@@ -48,7 +59,7 @@ export function PortfolioFormBody({
         type="submit"
         form={formId}
         disabled={f.busy || !f.name.trim()}
-        className="h-auto rounded-[13px] px-[26px] py-[13px] text-[14px] font-bold"
+        className="h-auto max-md:w-full max-md:rounded-[15px] max-md:py-[15px] md:rounded-[13px] md:px-[26px] md:py-[13px] text-[14px] font-bold"
       >
         {f.busy && <Spinner size="sm" />}
         {f.busy
