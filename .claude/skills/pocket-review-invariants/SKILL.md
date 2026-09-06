@@ -66,3 +66,15 @@ and posting discipline — none of that is repeated here.
 - **PR-description hygiene.** This repo's convention is that PR descriptions and
   commit messages stay generic: no personal or account-holder names, no depot/account
   numbers or exact balances. Check the title/body themselves, not just the diff.
+- **Overlay chrome: one breakpoint, one mounted tree.** Task-tier overlays (forms,
+  detail views) use `DialogContent`'s `size` scale (`sm`/`md`/`lg`/`xl` — 480/600/880/
+  1080px), not an ad-hoc width. The `md` (768px) breakpoint is the only one for overlay
+  chrome — a different width here (`860`, `760`, `sm`) is a red flag unless the commit
+  documents why it deviates. A diff that branches a task-tier overlay's *component
+  tree* on `useMediaQuery`/`isDesktop` (`{isDesktop ? <DialogA/> : <SheetB/>}`) is
+  wrong: crossing the breakpoint unmounts one tree and mounts the other, silently
+  discarding whatever the user had typed. The CSS-switched single tree
+  (`max-md:`/`md:` classes on one `DialogContent`) is the only correct shape for that
+  tier. A component's own *internal* layout (e.g. `AddTransactionForm`'s two-column
+  vs. single-column) may still read `isDesktop` as a prop — that's fine as long as the
+  wrapping overlay tree itself doesn't remount.

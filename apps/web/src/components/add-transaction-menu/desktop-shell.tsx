@@ -69,7 +69,16 @@ export function DesktopShell({
         onInteractOutside={(e) => {
           if (!dismissible) e.preventDefault();
         }}
-        className="flex w-[calc(100%-4rem)] max-w-[1120px] flex-row gap-0 overflow-hidden rounded-[22px] border-0 bg-background p-0 shadow-[0_30px_80px_rgba(0,0,0,.4)] max-h-[calc(100vh-64px)]"
+        // 1080px matches the `xl` tier on `DialogContent` (see `ui/dialog.tsx`'s
+        // `SIZE_CLASS`) — this shell predates that scale and still overrides the whole
+        // width/height via className rather than the `size` prop (see #669: unifying
+        // onto `size="xl"` is the still-open part of the overlay migration), but there's
+        // no reason for its own hardcoded number to disagree with the scale in the
+        // meantime. `100dvh` not `100vh`: this shell is desktop-only today (never
+        // mounted below the 860px `isDesktop` branch in `add-transaction-menu.tsx`), but
+        // `dvh` costs nothing here and matches the one height rule the rest of the
+        // migration uses everywhere else.
+        className="flex w-[calc(100%-4rem)] max-w-[1080px] flex-row gap-0 overflow-hidden rounded-[22px] border-0 bg-background p-0 shadow-[0_30px_80px_rgba(0,0,0,.4)] max-h-[calc(100dvh-64px)]"
       >
         <NavRail
           active={step}

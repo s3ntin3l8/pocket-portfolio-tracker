@@ -106,7 +106,32 @@ import {
 </Card>;
 ```
 
-Overlays (`Dialog`, `Sheet`, `DropdownMenu`) render inline in their own portal —
-no separate mount point needed; just render them where the trigger lives.
-`Sheet` is a bottom sheet (built on `vaul`, not Radix Dialog) — use it for
-mobile-style confirm/detail flows, `Dialog` for centered desktop-style modals.
+Overlays (`Dialog`, `Sheet`, `DropdownMenu`, `Popover`) render inline in their own
+portal — no separate mount point needed; just render them where the trigger lives.
+
+### Which overlay: task tier, refinement tier, or chrome
+
+Pick by what the overlay _is_, not by breakpoint — the breakpoint is handled inside
+the primitive, not by choosing a different component per viewport:
+
+- **Task tier** (forms, detail views, anything the user is "inside" for more than a
+  glance — add/edit portfolio, add/edit holder, transaction detail, add-transaction) —
+  `DialogContent` with a `size` (`sm` 480 / `md` 600 / `lg` 880 / `xl` 1080). One
+  mounted tree: full-screen page below `md`, a centered card at `md:`+, switched in CSS
+  (`max-md:`/`md:` classes on the same element), never `{isDesktop ? <A/> : <B/>}` — a
+  JS branch on a media query unmounts one tree and mounts the other, which loses
+  whatever the user typed the moment they resize or rotate across the breakpoint. Pass
+  `mobileHeader={{ title }}` for the mobile back-chevron + title row, and `footer` for
+  a pinned, non-scrolling action bar (accepts `true` for a bare portal slot when the
+  form's own submit button self-portals via `useSheetFooter()`).
+- **Refinement tier** (filters, quick pickers — a glance-and-dismiss, not a place you
+  "are") — `Popover`/`DropdownMenu` on desktop, a compact `Sheet` on mobile. These _can_
+  still pick their component via a `useMediaQuery` JS branch — losing an unsaved filter
+  selection on resize isn't a real regression the way losing a half-typed form is.
+- **Chrome** (contextual bars that coexist with app navigation, e.g. a selection-mode
+  action bar) — not a `Dialog`/`Sheet` at all; register with
+  `useFullScreenOverlayRegistration` so `BottomNav` hides itself while a task-tier
+  overlay is open, without the bar itself trying to be a modal.
+
+`Sheet` (built on `vaul`, not Radix Dialog — drag-to-close) is now refinement-tier
+only; it's no longer the task-tier "mobile modal."
