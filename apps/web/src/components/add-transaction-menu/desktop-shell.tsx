@@ -5,9 +5,9 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
-import { NavRail } from "./nav-rail";
+import { NavRail, type DesktopStep } from "./nav-rail";
 
-export type DesktopStep = "import" | "manual" | "events" | "portfolio" | "holder";
+export type { DesktopStep };
 
 /**
  * The ≥860px replacement for the mobile bottom Sheet — a centered modal with a 196px
