@@ -15,6 +15,11 @@ import {
   RevenueEarningsChartLegend,
   type RevenueEarningsYear,
 } from "@/components/charts/revenue-earnings-chart";
+import {
+  EpsActualEstimateChart,
+  EpsActualEstimateChartLegend,
+  type EpsQuarter,
+} from "@/components/charts/eps-actual-estimate-chart";
 
 type LoadState = "loading" | "ok" | "empty" | "error";
 
@@ -140,6 +145,14 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
       earnings: Number(f.earnings),
     })) ?? [];
 
+  // EPS actual vs. estimate (#603). `data.epsHistory` is null when Yahoo returned no
+  // earningsChart block at all; when present, `quarters` may be empty if every entry
+  // had both actual/estimate missing — in that case we still render the overlay if a
+  // current-quarter consensus is available.
+  const epsQuarters: EpsQuarter[] = data.epsHistory?.quarters ?? [];
+  const currentEstimate: number | null = data.epsHistory?.currentQuarterEstimate ?? null;
+  const hasEpsData = epsQuarters.length > 0 || currentEstimate != null;
+
   const recommendationTone = data.recommendationKey
     ? (RECOMMENDATION_TONE[data.recommendationKey] ?? "warning")
     : undefined;
@@ -155,7 +168,8 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
     stats.length === 0 &&
     intraday.length === 0 &&
     financials.length === 0 &&
-    !data.analystTrend
+    !data.analystTrend &&
+    !hasEpsData
   ) {
     return null; // every field came back empty — nothing worth showing
   }
@@ -284,6 +298,16 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
               data={financials}
               currency={data.financialCurrency ?? data.currency}
             />
+          </div>
+        )}
+
+        {hasEpsData && (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">{t("epsActualVsEstimateLabel")}</p>
+              <EpsActualEstimateChartLegend />
+            </div>
+            <EpsActualEstimateChart data={epsQuarters} currentQuarterEstimate={currentEstimate} />
           </div>
         )}
 

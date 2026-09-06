@@ -2873,6 +2873,12 @@ describe("YahooFinanceProvider getFundamentals", () => {
 
   // Trimmed from a live probe (values match a real AAPL quoteSummary response) covering
   // every field getFundamentals reads — equities get the full set.
+  // earnings.earningsChart is the source for `epsHistory` (#603) — verified live against
+  // query1.finance.yahoo.com on 2026-09-06: `quarterly[]` returns ~4 calendar-quarter
+  // entries with `{ date: "1Q2025" (calendar-quarter label), actual: {raw, fmt},
+  // estimate: {raw, fmt}, fiscalQuarter, difference, surprisePct, … }`. Yahoo caps the
+  // history at the last 4 reported quarters; the parser mirrors that without truncation
+  // (no `-8` slice — see `parses earningsChart.quarterly` below).
   const fullEquityBody = {
     quoteSummary: {
       result: [
@@ -2908,6 +2914,15 @@ describe("YahooFinanceProvider getFundamentals", () => {
                 { date: 2022, revenue: rawNum(394328000000), earnings: rawNum(99803000000) },
                 { date: 2023, revenue: rawNum(383285000000), earnings: rawNum(96995000000) },
               ],
+            },
+            earningsChart: {
+              quarterly: [
+                { date: "1Q2025", actual: rawNum(1.65), estimate: rawNum(1.62) },
+                { date: "2Q2025", actual: rawNum(1.57), estimate: rawNum(1.43) },
+                { date: "3Q2025", actual: rawNum(1.85), estimate: rawNum(1.77) },
+                { date: "4Q2025", actual: rawNum(2.84), estimate: rawNum(2.67) },
+              ],
+              currentQuarterEstimate: rawNum(1.98),
             },
           },
           recommendationTrend: {
@@ -2949,6 +2964,15 @@ describe("YahooFinanceProvider getFundamentals", () => {
       { year: 2022, revenue: "394328000000", earnings: "99803000000" },
       { year: 2023, revenue: "383285000000", earnings: "96995000000" },
     ]);
+    expect(f?.epsHistory).toEqual({
+      quarters: [
+        { period: "1Q2025", actual: 1.65, estimate: 1.62 },
+        { period: "2Q2025", actual: 1.57, estimate: 1.43 },
+        { period: "3Q2025", actual: 1.85, estimate: 1.77 },
+        { period: "4Q2025", actual: 2.84, estimate: 2.67 },
+      ],
+      currentQuarterEstimate: 1.98,
+    });
   });
 
   // Trimmed from a live probe against a real GBp-quoted equity (SHEL.L). GBp/agorot lines
@@ -3086,5 +3110,88 @@ describe("YahooFinanceProvider getFundamentals", () => {
     const body = { quoteSummary: { result: [] } };
     const p = new YahooFinanceProvider({ fetch: yahooProfileFetch(body) });
     expect(await p.getFundamentals(aapl)).toBeNull();
+  });
+
+  it("parses earningsChart.quarterly even when the array exceeds the historical cap", async () => {
+    // Yahoo normally caps at 4 quarters; we want defensive parsing in case the depth grows
+    // — pass 6 quarters and assert the full array comes through without truncation.
+    const body = {
+      quoteSummary: {
+        result: [
+          {
+            price: { currency: "USD" },
+            earnings: {
+              earningsChart: {
+                quarterly: [
+                  { date: "3Q2024", actual: rawNum(1.4), estimate: rawNum(1.3) },
+                  { date: "4Q2024", actual: rawNum(2.1), estimate: rawNum(2.0) },
+                  { date: "1Q2025", actual: rawNum(1.65), estimate: rawNum(1.62) },
+                  { date: "2Q2025", actual: rawNum(1.57), estimate: rawNum(1.43) },
+                  { date: "3Q2025", actual: rawNum(1.85), estimate: rawNum(1.77) },
+                  { date: "4Q2025", actual: rawNum(2.84), estimate: rawNum(2.67) },
+                ],
+                currentQuarterEstimate: rawNum(1.98),
+              },
+            },
+          },
+        ],
+      },
+    };
+    const p = new YahooFinanceProvider({ fetch: yahooProfileFetch(body) });
+    const f = await p.getFundamentals(aapl);
+    expect(f?.epsHistory?.quarters).toHaveLength(6);
+    expect(f?.epsHistory?.quarters[0]?.period).toBe("3Q2024");
+    expect(f?.epsHistory?.quarters[5]?.period).toBe("4Q2025");
+    expect(f?.epsHistory?.currentQuarterEstimate).toBe(1.98);
+  });
+
+  it("nulls out missing estimates and actuals within earningsChart.quarterly", async () => {
+    // Older entries sometimes lack an estimate (no consensus pre-report); the parser must
+    // not silently coerce — chart components rely on null to render "this side absent".
+    const body = {
+      quoteSummary: {
+        result: [
+          {
+            price: { currency: "USD" },
+            earnings: {
+              earningsChart: {
+                quarterly: [
+                  { date: "2Q2025", actual: rawNum(1.57), estimate: rawNum(1.43) },
+                  { date: "3Q2025", actual: rawNum(1.85) }, // no estimate
+                ],
+              },
+            },
+          },
+        ],
+      },
+    };
+    const p = new YahooFinanceProvider({ fetch: yahooProfileFetch(body) });
+    const f = await p.getFundamentals(aapl);
+    expect(f?.epsHistory?.quarters).toEqual([
+      { period: "2Q2025", actual: 1.57, estimate: 1.43 },
+      { period: "3Q2025", actual: 1.85, estimate: null },
+    ]);
+    // currentQuarterEstimate absent → null, not undefined
+    expect(f?.epsHistory?.currentQuarterEstimate).toBeNull();
+  });
+
+  it("sets epsHistory to null when earningsChart is omitted entirely", async () => {
+    // Some symbols (newly listed, ETFs) lack the earningsChart block entirely — there's
+    // nothing to show, so the field is `null` (not an empty object). Keeps the consumer
+    // card's "is this renderable?" guard a single `null`-check rather than
+    // `(quarters.length === 0 && currentQuarterEstimate == null)`.
+    const body = {
+      quoteSummary: {
+        result: [
+          {
+            price: { currency: "USD" },
+            summaryDetail: { previousClose: rawNum(100) },
+          },
+        ],
+      },
+    };
+    const p = new YahooFinanceProvider({ fetch: yahooProfileFetch(body) });
+    const f = await p.getFundamentals(aapl);
+    expect(f?.epsHistory).toBeNull();
   });
 });

@@ -1083,6 +1083,11 @@
     "revenueVsEarningsLabel": "Pendapatan vs. laba",
     "revenueLabel": "Pendapatan",
     "earningsLabel": "Laba",
+    "epsActualVsEstimateLabel": "EPS · estimasi vs. aktual",
+    "epsEstimateLabel": "Estimasi",
+    "epsActualLabel": "Aktual",
+    "epsCurrentQuarterLabel": "Kuartal ini",
+    "epsSurpriseLabel": "Surprise",
     "asOfLabel": "Per {date}",
     "recommendation": {
       "strong_buy": "Beli kuat",
