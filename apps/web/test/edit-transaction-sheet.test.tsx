@@ -64,23 +64,33 @@ describe("EditTransactionSheet", () => {
     mockMatchMedia(false);
   });
 
-  it("renders a bottom Sheet on mobile — no Summary rail (desktop-only)", () => {
+  // Overlay chrome migration (#625): a single DialogContent tree now, full-screen on
+  // mobile, a centered size="lg" card at md:+ — the "Edit transaction" title
+  // legitimately renders twice (mobile header h1 + desktop DialogTitle, CSS-hidden per
+  // viewport, not conditionally mounted). AddTransactionForm's own isDesktop-driven
+  // internal layout (Summary rail or not) is untouched and still reads the same media
+  // query, since that's a different, in-scope-elsewhere concern from the overlay chrome.
+  it("renders full-screen on mobile — no Summary rail (AddTransactionForm's own isDesktop layout)", () => {
     mockMatchMedia(false);
     renderSheet();
-    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
-    // vaul's Sheet is also `role="dialog"` under the hood, so the desktop/mobile split is
-    // asserted via the Summary rail instead — desktop-only (`isDesktop` threaded into
-    // AddTransactionForm), a much cleaner functional signal than DOM/attribute-sniffing.
+    expect(screen.getAllByText(messages.Manage.tx.editTitle).length).toBeGreaterThan(0);
     expect(screen.queryByText(messages.Manage.tx.summary)).toBeNull();
   });
 
-  it("renders a centered 860px Dialog on desktop, with the Summary rail (v2 design)", () => {
+  it("renders a centered lg (880px) card on desktop, with the Summary rail (v2 design)", () => {
     const matchMedia = mockMatchMedia(true);
     renderSheet();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
+    const content = screen.getByRole("dialog");
+    expect(content.className).toContain("md:max-w-[880px]");
+    expect(screen.getAllByText(messages.Manage.tx.editTitle).length).toBeGreaterThan(0);
     // The desktop-only Summary rail (see add-transaction-form/summary-rail.tsx).
     expect(screen.getByText(messages.Manage.tx.summary)).toBeInTheDocument();
     expect(matchMedia).toHaveBeenCalledWith("(min-width: 860px)");
+  });
+
+  it("keeps the submit button in DialogContent's persistent footer", () => {
+    renderSheet();
+    const submitBtn = screen.getByRole("button", { name: messages.Manage.tx.save });
+    expect(submitBtn.closest('[data-slot="dialog-footer"]')).not.toBeNull();
   });
 });

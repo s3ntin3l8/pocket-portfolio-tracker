@@ -92,10 +92,15 @@ function DialogContent({
    *  its own portal node, so a form already using `useSheetFooter()` (the pattern
    *  `desktop-shell.tsx` hand-rolls today) works unchanged inside this primitive. Omit
    *  for forms that render their own submit button inline (e.g. `portfolio-edit-form.tsx`,
-   *  a real page with no sticky chrome of its own). */
-  footer?: React.ReactNode;
+   *  a real page with no sticky chrome of its own). Pass `true` for a footer that's
+   *  just the portal slot with no static content of its own (e.g. a form whose own
+   *  submit button self-portals via `useSheetFooter()`, like `AddTransactionForm`'s
+   *  `SubmitButton`) — the bar still renders and provides the context, just with
+   *  nothing alongside the portaled content. */
+  footer?: React.ReactNode | true;
 }) {
-  const structured = Boolean(mobileHeader || footer);
+  const hasFooter = footer !== undefined && footer !== false;
+  const structured = Boolean(mobileHeader || hasFooter);
   const [footerEl, setFooterEl] = React.useState<HTMLDivElement | null>(null);
 
   // Registers only while mounted with fullScreenOnMobile — Radix only mounts
@@ -111,7 +116,7 @@ function DialogContent({
     children
   );
 
-  const content = footer ? (
+  const content = hasFooter ? (
     <SheetFooterContext.Provider value={footerEl}>{body}</SheetFooterContext.Provider>
   ) : (
     body
@@ -164,7 +169,7 @@ function DialogContent({
 
         {content}
 
-        {footer && (
+        {hasFooter && (
           <div
             data-slot="dialog-footer"
             className={cn(
@@ -178,7 +183,7 @@ function DialogContent({
               fullScreenOnMobile && "max-md:pb-[env(safe-area-inset-bottom)]",
             )}
           >
-            {footer}
+            {footer !== true && footer}
             {/* display:contents so a portaled submit button (useSheetFooter) lands as a
                 flex sibling of `footer` in DOM order, not visually nested in this div. */}
             <div ref={setFooterEl} className="contents" />

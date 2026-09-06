@@ -338,7 +338,9 @@ describe("TransactionsTable", () => {
     fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
     fireEvent.click(screen.getByRole("button", { name: messages.Manage.edit }));
     // The edit sheet opens in place (no navigation) with its "Edit transaction" title.
-    expect(screen.getByText(messages.Manage.tx.editTitle)).toBeInTheDocument();
+    // Two copies legitimately exist (mobile header + desktop DialogTitle, CSS-hidden
+    // per viewport, not conditionally mounted — see edit-transaction-sheet.test.tsx).
+    expect(screen.getAllByText(messages.Manage.tx.editTitle).length).toBeGreaterThan(0);
   });
 
   it("hides the reassign action when only one portfolio exists", () => {
