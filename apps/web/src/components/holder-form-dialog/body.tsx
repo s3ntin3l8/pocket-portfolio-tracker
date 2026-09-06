@@ -13,19 +13,21 @@ import { useSheetFooter } from "@/components/ui/sheet";
 import { useHolderForm } from "./hooks";
 
 /**
- * The `HolderFormDialog` body — a shared inline form used both by the desktop Add
+ * The `HolderFormDialog` body — a shared inline form used today by the desktop Add
  * Transaction shell's "Account holder" rail destination (rendered in the modal's main
- * column instead of nesting another Sheet) and, per #669, by the mobile chooser's
- * "Add account holder" step too, once that stops nesting a separate `HolderFormDialog`.
- * Submit/validation logic (`useHolderForm`) is untouched; this only changes what wraps
- * it. Desktop-only in practice today: the rail always creates (`mode: "create"`).
+ * column instead of nesting another Sheet), and will also be used by the mobile
+ * chooser's "Add account holder" step once #669 lands and that stops nesting a separate
+ * `HolderFormDialog`. Submit/validation logic (`useHolderForm`) is untouched; this only
+ * changes what wraps it. Desktop-only in practice today: the rail always creates
+ * (`mode: "create"`).
  *
  * Simulates the Sheet's "open" lifecycle once on mount (see `PortfolioFormBody` for why)
  * so the form's fields reset from `holder` the same way the Sheet trigger would.
  *
- * Field ids are `useId()`-derived, not hardcoded `-desktop`-suffixed strings — this is
- * no longer desktop-only, so a hardcoded id would collide if two instances ever mount
- * at once (e.g. during the #669 merge's transition, or any future multi-instance case).
+ * Field ids are `useId()`-derived, not hardcoded `-desktop`-suffixed strings. Nothing
+ * exploits this today (this component has exactly one reachable instance, gated by the
+ * desktop-only rail) — pre-emptive, so #669 doesn't also need to touch this file once a
+ * second, mobile-reachable instance becomes possible.
  */
 export function HolderFormBody({
   mode,

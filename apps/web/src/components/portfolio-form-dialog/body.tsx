@@ -13,12 +13,15 @@ import { TrConnectionSection, IbkrConnectionSection } from "./sections/connectio
 import { usePortfolioForm } from "./hooks";
 
 /**
- * The `PortfolioFormDialog` body — a shared inline form used both by the desktop Add
- * Transaction shell's "Create portfolio" rail destination and, per #669, by the mobile
- * chooser's "Add portfolio" step too, once that stops nesting a separate
- * `PortfolioFormDialog`. The footer button's `max-md:`/`md:` classes below exist for
- * that: full-width on mobile (matching the rest of the app's mobile primary actions),
- * compact on desktop (matching the rail shell's Cancel button beside it).
+ * The `PortfolioFormDialog` body — a shared inline form used today by the desktop Add
+ * Transaction shell's "Create portfolio" rail destination, and will also be used by the
+ * mobile chooser's "Add portfolio" step once #669 lands and that stops nesting a
+ * separate `PortfolioFormDialog`. The footer button's `max-md:`/`md:` classes below are
+ * inert until then (this form is desktop-only-reachable today, at the 860px
+ * `add-transaction-menu.tsx` breakpoint) — added now so #669's diff doesn't also need
+ * to touch this file: full-width on mobile (matching the rest of the app's mobile
+ * primary actions), compact on desktop (matching the rail shell's Cancel button beside
+ * it).
  */
 export function PortfolioFormBody({
   mode,
