@@ -84,6 +84,42 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         index: indexById.get(r.date)?.index ?? "100",
         pct: indexById.get(r.date)?.pct ?? "0",
       }));
+
+      // Benchmark enrichment — same pattern as /networth/history, minus the display
+      // currency (this endpoint returns snapshots in their stored base currency; the
+      // benchmark is a separate indexed series, so no FX conversion is involved).
+      const userId = request.userId;
+      const bmConfig = await getUserBenchmarkConfig(app.db, userId, "");
+      if (result.length > 0) {
+        const bmDates = result.map((p) => p.date);
+        const existingBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
+        const missingDates = bmDates.filter((d) => !existingBm.has(d));
+        if (missingDates.length > 0) {
+          const earliest = missingDates[0];
+          try {
+            const md = await getMarketData();
+            await fetchBenchmarkPrices(app.db, md, userId, bmConfig.symbol, earliest);
+          } catch {
+            /* non-fatal — benchmark is best-effort */
+          }
+        }
+        const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
+        if (refreshedBm.size > 1) {
+          const bmPrices = bmDates
+            .filter((d) => refreshedBm.has(d))
+            .map((d) => ({ date: d, close: refreshedBm.get(d)! }));
+          const bmIndex = computeBenchmarkIndex(bmPrices);
+          const bmById = new Map(bmIndex.map((p) => [p.date, p]));
+          for (const p of result) {
+            const bp = bmById.get(p.date);
+            if (bp) {
+              (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkIndex = bp.index;
+              (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkPct = bp.pct;
+            }
+          }
+        }
+      }
+
       request.timingMeta = {
         portfolioId,
         range,

@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT, exportJWK, type JWK } from "jose";
 import { eq } from "drizzle-orm";
-import { instruments, prices } from "@portfolio/db";
+import {
+  benchmarkPrices,
+  instruments,
+  portfolioSnapshots,
+  prices,
+  userPreferences,
+  users as schemaUsers,
+} from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
 import { buildApp } from "../../src/app.js";
@@ -2908,7 +2915,6 @@ describe("auth + portfolios + transactions", () => {
   });
 
   it("serves net-worth history from snapshots (per portfolio + aggregate)", async () => {
-    const { portfolioSnapshots } = await import("@portfolio/db");
     const t = await token("hist-user");
     const mk = async (name: string) =>
       (
@@ -2959,6 +2965,139 @@ describe("auth + portfolios + transactions", () => {
       headers: auth(await token("user-b")),
     });
     expect(cross.statusCode).toBe(404);
+  });
+
+  it("includes benchmarkIndex/benchmarkPct on /portfolios/:id/history when the user has a benchmark configured", async () => {
+    const t = await token("bm-overlay-user");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) }); // upsert user
+    const create = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: auth(t),
+      payload: { name: "BM Overlay", baseCurrency: "IDR" },
+    });
+    const portfolioId = create.json().id as string;
+
+    const [u] = await app.db
+      .select({ id: schemaUsers.id })
+      .from(schemaUsers)
+      .where(eq(schemaUsers.authSub, "bm-overlay-user"))
+      .limit(1);
+    await app.db.insert(userPreferences).values({
+      userId: u!.id,
+      benchmarkSymbol: "^GSPC",
+    });
+    await app.db.insert(benchmarkPrices).values([
+      {
+        userId: u!.id,
+        symbol: "^GSPC",
+        date: "2026-02-01",
+        close: "4500",
+        currency: "USD",
+        source: "test",
+      },
+      {
+        userId: u!.id,
+        symbol: "^GSPC",
+        date: "2026-02-02",
+        close: "4600",
+        currency: "USD",
+        source: "test",
+      },
+      {
+        userId: u!.id,
+        symbol: "^GSPC",
+        date: "2026-02-03",
+        close: "4700",
+        currency: "USD",
+        source: "test",
+      },
+    ]);
+    await app.db.insert(portfolioSnapshots).values([
+      {
+        portfolioId,
+        date: "2026-02-01",
+        netWorth: "1000000",
+        marketValue: "1000000",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+      {
+        portfolioId,
+        date: "2026-02-02",
+        netWorth: "1050000",
+        marketValue: "1050000",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+      {
+        portfolioId,
+        date: "2026-02-03",
+        netWorth: "1100000",
+        marketValue: "1100000",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/history?range=all`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{
+      benchmarkIndex?: string;
+      benchmarkPct?: string;
+    }>;
+    expect(body[0]).toHaveProperty("benchmarkIndex");
+    expect(body[0]).toHaveProperty("benchmarkPct");
+    expect(body[0].benchmarkIndex).toBe("100");
+    expect(body[0].benchmarkPct).toBe("0");
+    expect(Number(body[2].benchmarkPct)).toBeCloseTo(4.444, 2);
+  });
+
+  it("omits benchmarkIndex/benchmarkPct on /portfolios/:id/history when no benchmark is configured", async () => {
+    const t = await token("bm-overlay-none-user");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const create = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: auth(t),
+      payload: { name: "No BM", baseCurrency: "IDR" },
+    });
+    const portfolioId = create.json().id as string;
+    await app.db.insert(portfolioSnapshots).values([
+      {
+        portfolioId,
+        date: "2026-02-01",
+        netWorth: "1000000",
+        marketValue: "1000000",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+      {
+        portfolioId,
+        date: "2026-02-02",
+        netWorth: "1100000",
+        marketValue: "1100000",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/history?range=all`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{
+      benchmarkIndex?: string;
+      benchmarkPct?: string;
+    }>;
+    expect(body[0].benchmarkIndex).toBeUndefined();
+    expect(body[0].benchmarkPct).toBeUndefined();
   });
 
   it("serves 1D/7D net-worth history from intraday snapshots (per portfolio + aggregate)", async () => {
