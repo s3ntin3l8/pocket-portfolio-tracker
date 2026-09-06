@@ -38,7 +38,9 @@ export function ConfirmActionDialog({
   const t = useTranslations("Common");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* A confirm is a blocking yes/no, not a task — it stays a small centered card at
+          every width instead of taking over the mobile screen. */}
+      <DialogContent fullScreenOnMobile={false}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

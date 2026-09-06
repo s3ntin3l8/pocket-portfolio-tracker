@@ -7,11 +7,14 @@ import { cn } from "@/lib/utils";
 import { MAIN_NAV, navActiveKey } from "@/components/nav-items";
 import { useRepaintOnResume } from "@/lib/use-repaint-on-resume";
 import { LinkPendingSignal } from "@/components/nav-progress";
+import { useAnyFullScreenOverlayOpen } from "@/components/full-screen-overlay";
 
 /**
  * Mobile bottom tab bar — the five Pocket destinations. Frosted, safe-area aware. The
  * Activity tab carries a "needs review" anomaly badge (red for error-severity, gold
- * otherwise). Hidden at `md`+, where the sidebar takes over.
+ * otherwise). Hidden at `md`+, where the sidebar takes over — and hidden below `md` too
+ * while a full-screen task overlay (`DialogContent`) is open, since you're mid-task and
+ * tabbing away isn't a case worth preserving nav access for.
  */
 export function BottomNav({
   anomalyCount = 0,
@@ -23,6 +26,7 @@ export function BottomNav({
   const t = useTranslations("Nav");
   const pathname = usePathname();
   const activeKey = navActiveKey(pathname);
+  const overlayOpen = useAnyFullScreenOverlayOpen();
   // Fixes #451 — see use-repaint-on-resume.ts for why the backdrop-blur layer needs this.
   const navRef = useRef<HTMLElement>(null);
   useRepaintOnResume(navRef);
@@ -31,7 +35,10 @@ export function BottomNav({
     <nav
       ref={navRef}
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-start justify-around border-t border-border bg-card/80 px-3 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg md:hidden"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-30 flex items-start justify-around border-t border-border bg-card/80 px-3 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg md:hidden",
+        overlayOpen && "hidden",
+      )}
     >
       {MAIN_NAV.map(({ href, icon: Icon, key }) => {
         const active = key === activeKey;
