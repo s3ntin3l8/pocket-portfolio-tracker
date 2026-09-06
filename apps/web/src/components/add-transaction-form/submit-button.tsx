@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import { useSheetFooterChrome } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 interface SubmitButtonProps {
@@ -12,10 +13,11 @@ interface SubmitButtonProps {
   stickyFooter: boolean;
   footerEl: HTMLElement | null;
   t: (key: string) => string;
-  /** Desktop modal shell — compact button, no full-width/border-t wrapper (the desktop
-   *  footer bar itself already supplies border-t/bg/padding/justify-end, alongside the
-   *  Cancel button — see `add-transaction-menu/desktop-shell.tsx`). Defaults to the
-   *  mobile-sheet styling. */
+  /** Compact-vs-full-width button styling only — independent of `useSheetFooterChrome()`
+   *  below, which separately decides whether the button portals bare or wrapped in its
+   *  own border/background. The two happen to agree at every current call site (a
+   *  styled desktop host is also where `isDesktop` is true) but nothing enforces that;
+   *  don't assume one implies the other. */
   isDesktop?: boolean;
 }
 
@@ -28,6 +30,7 @@ export function SubmitButton({
   t,
   isDesktop = false,
 }: SubmitButtonProps) {
+  const hasFooterChrome = useSheetFooterChrome();
   const footerPortal = Boolean(stickyFooter && footerEl);
 
   const button = (
@@ -47,9 +50,11 @@ export function SubmitButton({
   );
 
   if (footerPortal && footerEl) {
-    if (isDesktop) {
-      // The desktop footer node already supplies border-t/bg/padding/justify-end layout —
-      // portal just the bare button into it (the Cancel button sits alongside it there).
+    if (hasFooterChrome) {
+      // The host's footer bar already supplies border-t/bg/padding/justify-end layout —
+      // portal just the bare button into it (a Cancel button, if any, sits alongside it
+      // there). Keyed on the host (see useSheetFooterChrome), not `isDesktop` — that's
+      // this form's own internal two-column-vs-one-column layout, a different axis.
       return createPortal(button, footerEl);
     }
     return createPortal(

@@ -116,6 +116,20 @@ describe("EditTransactionSheet", () => {
     expect(submitBtn.closest('[data-slot="dialog-footer"]')).not.toBeNull();
   });
 
+  // Regression test: SubmitButton used to decide bare-vs-wrapped portaling from its own
+  // `isDesktop` prop, which on mobile always wrapped it in a `border-t bg-background`
+  // div — doubling the chrome DialogContent's own footer bar already supplies. Fixed by
+  // keying that decision on useSheetFooterChrome() (the host) instead. The button should
+  // now be a direct child of the footer bar, not nested inside an extra wrapper div.
+  it("portals the submit button bare, not wrapped in its own border/background div", () => {
+    renderSheet();
+    const submitBtn = screen.getByRole("button", { name: messages.Manage.tx.save });
+    expect(submitBtn.closest('[data-slot="dialog-footer"]')).not.toBeNull();
+    // The button's immediate parent should only be DialogContent's own `display:contents`
+    // portal-target div — not an extra `border-t bg-background` wrapper of its own.
+    expect(submitBtn.parentElement?.className ?? "").not.toContain("border-t");
+  });
+
   // The regression test for the migration's whole premise (see the plan's "Why
   // single-tree CSS is the load-bearing part" section): before, EditTransactionSheet
   // picked between two component trees via `{isDesktop ? <Dialog/> : <Sheet/>}`, so

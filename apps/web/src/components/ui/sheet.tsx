@@ -131,6 +131,31 @@ export function useSheetFooter() {
   return React.useContext(SheetFooterContext);
 }
 
+/**
+ * Whether the current `useSheetFooter()` portal target (if any) is already visually
+ * styled by its host — a border, background, and padding — versus bare. `SheetContent`
+ * itself is the bare case (its footer slot is an unstyled `div`, default `false` here);
+ * `DialogContent` provides `true` when it renders its own already-styled footer bar
+ * (`ui/dialog.tsx`).
+ *
+ * Forms that self-portal their submit button via `useSheetFooter()` need this to decide
+ * whether to wrap the button in their own border/background/padding div or portal it
+ * bare — wrapping unconditionally double-chromes it inside an already-styled host (found
+ * live in `EditTransactionSheet` on mobile: the submit button's own `border-t
+ * bg-background px-5` wrapper landed inside `DialogContent`'s already-`border-t bg-card
+ * px-4 py-3` footer bar). This used to be decided from the form's own `isDesktop` prop,
+ * which is wrong for a different reason: `isDesktop` is about the form's *internal*
+ * layout (two-column vs. one-column), not which kind of footer container it's
+ * portaling into — `onboarding-flow.tsx` still hosts the same form in a bare `Sheet` at
+ * every viewport width, so "desktop" and "styled host" aren't the same axis. This flag
+ * tracks the host, independent of viewport or internal form layout.
+ */
+export const SheetFooterChromeContext = React.createContext(false);
+
+export function useSheetFooterChrome() {
+  return React.useContext(SheetFooterChromeContext);
+}
+
 function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Drawer.Overlay>) {
   return (
     <Drawer.Overlay

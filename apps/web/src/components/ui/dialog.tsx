@@ -6,7 +6,7 @@ import { X, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
 import { useFullScreenOverlayRegistration } from "@/components/full-screen-overlay";
-import { SheetFooterContext } from "@/components/ui/sheet";
+import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
 
 function Dialog({
   open,
@@ -120,7 +120,9 @@ function DialogContent({
   );
 
   const content = hasFooter ? (
-    <SheetFooterContext.Provider value={footerEl}>{body}</SheetFooterContext.Provider>
+    <SheetFooterChromeContext.Provider value={true}>
+      <SheetFooterContext.Provider value={footerEl}>{body}</SheetFooterContext.Provider>
+    </SheetFooterChromeContext.Provider>
   ) : (
     body
   );
