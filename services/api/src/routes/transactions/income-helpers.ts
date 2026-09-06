@@ -325,53 +325,73 @@ export async function buildIncomeStats(
   }
 
   const upcoming = [
-    ...upcomingCoupons12mo.map((c) => ({
-      instrumentId: c.instrumentId,
-      symbol: c.symbol,
-      name: c.name,
-      date: c.date,
-      amount: c.amount,
-      currency: c.currency,
-      kind: "coupon" as const,
-      status: "scheduled" as const,
-      growthApplied: undefined as number | undefined,
-      assumesContributions: undefined as boolean | undefined,
-      perShare: undefined as string | undefined,
-      quantity: undefined as string | undefined,
-    })),
-    ...blendedProjected.map((d) => ({
-      instrumentId: d.instrumentId,
-      symbol: d.symbol ?? "",
-      name: d.name,
-      date: d.date,
-      amount: d.amount,
-      currency: d.currency,
-      kind: "dividend" as const,
-      status: "projected" as const,
-      growthApplied: undefined as number | undefined,
-      assumesContributions: d.assumesContributions,
-      perShare: d.perShare,
-      quantity: d.quantity,
-    })),
-    ...blendedNextYear.map((d) => ({
-      instrumentId: d.instrumentId,
-      symbol: d.symbol ?? "",
-      name: d.name,
-      date: d.date,
-      amount: d.amount,
-      currency: d.currency,
-      kind: "dividend" as const,
-      status: (d.source === "grown" ? "grown" : "projected") as "projected" | "grown",
-      growthApplied: d.growthApplied,
-      assumesContributions: d.assumesContributions,
-      perShare: d.perShare,
-      quantity: d.quantity,
-    })),
-    ...upcomingAnnounced.map((d) => ({
-      ...d,
-      growthApplied: undefined as number | undefined,
-      assumesContributions: undefined as boolean | undefined,
-    })),
+    ...upcomingCoupons12mo.map((c) => {
+      const im = meta.get(c.instrumentId);
+      return {
+        instrumentId: c.instrumentId,
+        symbol: c.symbol,
+        name: c.name,
+        date: c.date,
+        amount: c.amount,
+        currency: c.currency,
+        kind: "coupon" as const,
+        status: "scheduled" as const,
+        growthApplied: undefined as number | undefined,
+        assumesContributions: undefined as boolean | undefined,
+        perShare: undefined as string | undefined,
+        quantity: undefined as string | undefined,
+        market: im?.market ?? null,
+        assetClass: im?.assetClass ?? null,
+      };
+    }),
+    ...blendedProjected.map((d) => {
+      const im = d.instrumentId ? meta.get(d.instrumentId) : undefined;
+      return {
+        instrumentId: d.instrumentId,
+        symbol: d.symbol ?? "",
+        name: d.name,
+        date: d.date,
+        amount: d.amount,
+        currency: d.currency,
+        kind: "dividend" as const,
+        status: "projected" as const,
+        growthApplied: undefined as number | undefined,
+        assumesContributions: d.assumesContributions,
+        perShare: d.perShare,
+        quantity: d.quantity,
+        market: im?.market ?? null,
+        assetClass: im?.assetClass ?? null,
+      };
+    }),
+    ...blendedNextYear.map((d) => {
+      const im = d.instrumentId ? meta.get(d.instrumentId) : undefined;
+      return {
+        instrumentId: d.instrumentId,
+        symbol: d.symbol ?? "",
+        name: d.name,
+        date: d.date,
+        amount: d.amount,
+        currency: d.currency,
+        kind: "dividend" as const,
+        status: (d.source === "grown" ? "grown" : "projected") as "projected" | "grown",
+        growthApplied: d.growthApplied,
+        assumesContributions: d.assumesContributions,
+        perShare: d.perShare,
+        quantity: d.quantity,
+        market: im?.market ?? null,
+        assetClass: im?.assetClass ?? null,
+      };
+    }),
+    ...upcomingAnnounced.map((d) => {
+      const im = meta.get(d.instrumentId);
+      return {
+        ...d,
+        growthApplied: undefined as number | undefined,
+        assumesContributions: undefined as boolean | undefined,
+        market: im?.market ?? null,
+        assetClass: im?.assetClass ?? null,
+      };
+    }),
   ].sort((a, b) => a.date.localeCompare(b.date));
 
   const threeYearsAgoStr = toMonthKey(threeYearsAgo);

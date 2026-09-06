@@ -13,6 +13,8 @@ import { ByCurrencyTable } from "@/components/income/by-currency-table";
 import { TABLE_LABEL, TABLE_SUBLABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
 import { IncomeTimeline } from "@/components/income/income-timeline";
 import { CashInterestLine } from "@/components/income/cash-interest-line";
+import { IncomeCalendar } from "@/components/income/income-calendar";
+import { IncomeCalendarEmpty } from "@/components/income/income-calendar-empty";
 import type { IncomeEventRow } from "@/components/income/income-events-table";
 import { loadIncomeStats } from "@/lib/server-api";
 import { formatMoney, formatPercent, cn } from "@/lib/utils";
@@ -238,6 +240,15 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
               </Card>
             )}
           </div>
+
+          {/* Payments calendar (forward-looking, getquin-style) — sits above the timeline
+              so the user's primary question ("what's paying me next?") has the most
+              prominent slot. Renders its own empty state when `upcoming` is empty. */}
+          {s.upcoming.length > 0 ? (
+            <IncomeCalendar upcoming={s.upcoming} currency={currency} />
+          ) : (
+            <IncomeCalendarEmpty />
+          )}
 
           {/* Payments timeline — one card, year sub-headers newest-first, with its own
               year/status filter chips + search (reference). */}
