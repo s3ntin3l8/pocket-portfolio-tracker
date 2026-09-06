@@ -166,6 +166,7 @@ function DialogContent({
 
         {footer && (
           <div
+            data-slot="dialog-footer"
             className={cn(
               "flex shrink-0 items-center justify-end gap-3 border-t border-border bg-card px-4 py-3",
               // In-flow, not fixed: the mobile full-screen container is already h-full
