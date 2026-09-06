@@ -116,7 +116,10 @@ describe("TradeDetailSheet", () => {
 
   it("renders the header, hero and breakdown for a winning trade", () => {
     renderSheet(CLOSED);
-    expect(screen.getByText("BBNI")).toBeInTheDocument();
+    // Two copies exist by design: the mobile back-row's plain heading and the
+    // accessible DialogTitle shown at md:+ (CSS-hidden below it, not conditionally
+    // rendered) — see the overlay chrome migration (#625) tests further down.
+    expect(screen.getAllByText("BBNI").length).toBeGreaterThan(0);
     expect(screen.getByText(/Bank Negara Indonesia.*Closed 2026-05-18/)).toBeInTheDocument();
     expect(screen.getAllByText(messages.Trades.detail.realizedPnl).length).toBeGreaterThan(0);
     // Proceeds/cost derived from legs; realized P&L shown positive.
@@ -146,5 +149,20 @@ describe("TradeDetailSheet", () => {
   it("colors a losing trade's realized P&L and return as negative, with no income section", () => {
     renderSheet(LOSER);
     expect(screen.getAllByText("-IDR 220,000").length).toBeGreaterThan(0);
+  });
+
+  describe("overlay chrome (#625 migration)", () => {
+    it("renders as a DialogContent sized sm, full-screen on mobile — no desktop treatment before this", () => {
+      renderSheet(CLOSED);
+      const content = screen.getByRole("dialog");
+      expect(content.className).toContain("md:max-w-[480px]");
+      expect(content.className).toContain("inset-0");
+    });
+
+    it("shows the mobile back-chevron header with the symbol", () => {
+      renderSheet(CLOSED);
+      expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+      expect(screen.getAllByRole("heading", { name: "BBNI" }).length).toBeGreaterThan(0);
+    });
   });
 });

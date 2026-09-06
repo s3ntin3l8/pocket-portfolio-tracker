@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { monogram, tintFor } from "@/lib/brokerages";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 
@@ -59,10 +59,13 @@ function Row({
 }
 
 /**
- * Trade detail bottom sheet — mirrors `TransactionDetailSheet`'s `Sheet` pattern
- * (same primitive, same bottom-sheet-on-mobile/side-sheet-on-desktop chrome). Content
- * transcribed from `TradesScreen.dc.html`'s `td` object: header, a Realized P&L hero,
- * a Breakdown card, a Trade details card, and an optional Income-while-held card.
+ * Trade detail overlay — read-only, no submit, so no footer slot. Overlay chrome
+ * migration (#625): size="sm", centered card at md:+, full-screen page below it — was
+ * an unconditional bottom Sheet with no desktop treatment at all.
+ *
+ * Content transcribed from `TradesScreen.dc.html`'s `td` object: header, a Realized
+ * P&L hero, a Breakdown card, a Trade details card, and an optional Income-while-held
+ * card.
  *
  * Deviation from the design: the mock's Breakdown has a 4th "Fees" row (Proceeds − Cost
  * − Fees = Realized). `Trade`/`TradeLeg` don't carry a currency-safe standalone fee
@@ -103,12 +106,14 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
 
   const hasDividends = Number(trade.dividends) > 0;
 
-  // handleOnly: see transaction-detail-sheet.tsx — same nested-scroll-container fix (#472).
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} handleOnly>
-      <SheetContent className="p-0" side="bottom">
-        <SheetHeader className="px-6 pt-6">
-          <SheetTitle className="flex items-center gap-3">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="sm" mobileHeader={{ title: symbol }}>
+        <div className="p-6">
+          {/* Desktop-only rich title (avatar + symbol) — mobile gets the compact
+              back-chevron + symbol row instead (mobileHeader). Accessible DialogTitle
+              lives here regardless of breakpoint, just visually hidden below md. */}
+          <div className="hidden items-center gap-3 md:mb-1 md:flex">
             <span
               className="flex size-11 shrink-0 items-center justify-center rounded-xl text-xs font-extrabold text-white"
               style={{ backgroundColor: tintFor(symbol) }}
@@ -116,15 +121,13 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
             >
               {monogram(symbol)}
             </span>
-            <span>{symbol}</span>
-          </SheetTitle>
-          <p className="text-sm text-muted-foreground">
+            <DialogTitle className="text-lg font-semibold">{symbol}</DialogTitle>
+          </div>
+          <p className="mb-4 text-sm text-muted-foreground">
             {name ? `${name} · ` : ""}
             {t("detail.closed", { date: trade.exitDate ?? "—" })}
           </p>
-        </SheetHeader>
 
-        <div className="overflow-y-auto px-6 pb-6 pt-2">
           {/* Hero */}
           <div className="py-4 text-center">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -219,7 +222,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
             </>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
