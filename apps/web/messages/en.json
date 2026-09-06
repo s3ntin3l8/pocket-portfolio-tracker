@@ -2018,12 +2018,15 @@
         "exceeded": "Gains and income exceed your FSA cap",
         "noFsa": "No FSA configured — all income is taxable"
       },
-      "carryForward": {
-        "title": "Loss carry-forward applied",
+      "pots": {
         "stock": "Stock pot",
+        "stockDesc": "Equity realized gains only",
         "general": "General pot",
-        "none": "No prior-year losses applied this year",
-        "ctaHint": "Enter prior-year losses below to reduce your tax"
+        "generalDesc": "Funds, bonds, dividends, interest, Vorabpauschale",
+        "net": "Net gain/loss",
+        "used": "Used",
+        "carryForward": "Carry-forward",
+        "editorHint": "Enter prior-year losses below to reduce your tax"
       },
       "summary": {
         "taxable": "Taxable income exceeding FSA",

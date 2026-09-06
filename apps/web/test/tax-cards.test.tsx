@@ -264,6 +264,56 @@ describe("CoverageCard", () => {
     );
     expect(screen.getByText(/Rp 300/)).toBeInTheDocument();
   });
+
+  it("renders per-pot net gain/loss and used rows", () => {
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({
+          stockPot: { netGainLoss: "-500", carryForwardApplied: "0.00", used: "150" },
+          generalPot: { netGainLoss: "1200", carryForwardApplied: "0.00", used: "800" },
+        })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText("Rp -500")).toBeInTheDocument();
+    expect(screen.getByText("Rp 150")).toBeInTheDocument();
+    expect(screen.getByText("Rp 1,200")).toBeInTheDocument();
+    expect(screen.getByText("Rp 800")).toBeInTheDocument();
+    expect(screen.getByText("Stock pot")).toBeInTheDocument();
+    expect(screen.getByText("General pot")).toBeInTheDocument();
+  });
+
+  it("hides carry-forward row when zero", () => {
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({
+          stockPot: { netGainLoss: "100", carryForwardApplied: "0.00", used: "50" },
+          generalPot: { netGainLoss: "200", carryForwardApplied: "0.00", used: "100" },
+        })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.queryByText("Carry-forward")).not.toBeInTheDocument();
+  });
+
+  it("shows carry-forward row when non-zero", () => {
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({
+          stockPot: { netGainLoss: "0", carryForwardApplied: "100.00", used: "0" },
+          generalPot: { netGainLoss: "0", carryForwardApplied: "0.00", used: "0" },
+        })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText("Carry-forward")).toBeInTheDocument();
+  });
 });
 
 describe("DistributionCard", () => {
