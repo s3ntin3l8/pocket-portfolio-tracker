@@ -13,11 +13,14 @@ import {
   DistributionCard,
   HarvestRow,
   HarvestSummaryNote,
+  VorabpauschaleRow,
+  CoverageCard,
   type TaxTranslator,
 } from "@/components/tax/tax-cards";
+import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
 import { loadNetworthTax, loadPreferences } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
-import type { TaxSummaryHolder } from "@portfolio/api-client";
+import type { TaxSummaryHolderWithCarryForward } from "@/lib/server-api/_shared";
 import { harvestSummary } from "@portfolio/core";
 import { TaxDetailSection, TaxDetailSkeleton } from "./tax-detail-section";
 
@@ -122,14 +125,14 @@ function TaxHolderOverviewDe({
   locale,
   t,
 }: {
-  entry: TaxSummaryHolder;
+  entry: TaxSummaryHolderWithCarryForward;
   locale: string;
   t: TaxTranslator;
 }) {
   const currency = entry.currency;
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
   const moneyCompact = (n: string | number) => formatMoneyCompact(Number(n), currency, locale);
-  const { allowanceUsage: u, harvestSuggestions, distribution } = entry;
+  const { allowanceUsage: u, harvestSuggestions, distribution, carryForward } = entry;
   const pct = parseFloat(u.remaining) / parseFloat(u.allowanceAnnual);
   const usedPct = Math.round((1 - Math.max(0, Math.min(1, pct))) * 100);
   const hasForecast = Number(u.forecastIncomeRestOfYear) > 0;
@@ -167,6 +170,8 @@ function TaxHolderOverviewDe({
         />
       </div>
 
+      <VorabpauschaleRow allowanceUsage={u} money={money} t={t} />
+
       {distribution && <DistributionCard distribution={distribution} money={money} t={t} />}
 
       {hasForecast && (
@@ -199,6 +204,16 @@ function TaxHolderOverviewDe({
           </CardContent>
         </Card>
       )}
+
+      <CoverageCard allowanceUsage={u} carryForward={carryForward} money={money} t={t} />
+
+      <LossCarryforwardEditor
+        holderId={entry.holder.id}
+        currentYear={entry.year}
+        initialStock={carryForward?.stock ?? "0"}
+        initialGeneral={carryForward?.general ?? "0"}
+        t={t}
+      />
 
       <Card className="overflow-hidden rounded-[20px]">
         <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">

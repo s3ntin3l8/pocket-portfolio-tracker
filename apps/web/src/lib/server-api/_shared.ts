@@ -16,6 +16,7 @@ import type {
   Candle,
   CorporateAction,
   InsightsResponse,
+  TaxSummaryHolder,
 } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import {
@@ -256,6 +257,11 @@ export interface TaxYearDetail {
   dividendTotalsByCurrency: TaxCurrencyTotal[];
   byYear: TaxYearRow[];
   idByYear: IdYearInput[];
+}
+
+/** Extended TaxSummaryHolder with server-loaded loss carry-forward data. */
+export interface TaxSummaryHolderWithCarryForward extends TaxSummaryHolder {
+  carryForward: { stock: string; general: string } | null;
 }
 
 export interface InsightsView {

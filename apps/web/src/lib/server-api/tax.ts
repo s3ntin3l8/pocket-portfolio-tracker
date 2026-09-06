@@ -13,12 +13,14 @@ import {
   type TaxCurrencyTotal,
   type TaxYearRow,
   type TaxYearDetail,
+  type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
+import { loadLossCarryforward } from "./account-holders";
 
 export async function loadNetworthTax(
   year?: number,
   taxRegime: "DE" | "ID" = "DE",
-): Promise<TaxSummaryHolder[]> {
+): Promise<TaxSummaryHolderWithCarryForward[]> {
   const api = await getServerApi();
   if (!api) return [];
   try {
@@ -73,6 +75,7 @@ export async function loadNetworthTax(
             allowanceUsage: zeroAllowance,
             harvestSuggestions: [],
             carryForwardApplied: false,
+            carryForward: null,
             distribution: zeroDistribution,
             tfRatesByInstrument: {},
           },
@@ -101,6 +104,7 @@ export async function loadNetworthTax(
           allowanceUsage: zeroAllowance,
           harvestSuggestions: [],
           carryForwardApplied: false,
+          carryForward: null,
           distribution: zeroDistribution,
           tfRatesByInstrument: {},
         },
@@ -122,7 +126,7 @@ export async function loadNetworthTax(
         }
         throw err;
       }
-      const holderEntry: TaxSummaryHolder = {
+      const holderEntry: TaxSummaryHolderWithCarryForward = {
         holder: {
           id: selected.accountHolderId ?? selected.id,
           name: selected.accountHolder ?? selected.name,
@@ -136,6 +140,10 @@ export async function loadNetworthTax(
         allowanceUsage: result.allowanceUsage,
         harvestSuggestions: result.harvestSuggestions,
         carryForwardApplied: result.carryForwardApplied,
+        carryForward: await loadLossCarryforward(
+          selected.accountHolderId ?? selected.id,
+          targetYear,
+        ),
         distribution: result.holderDistribution,
         tfRatesByInstrument: result.tfRatesByInstrument,
       };
@@ -143,7 +151,14 @@ export async function loadNetworthTax(
     }
 
     const holderId = await resolveHolderScope(portfolios);
-    return await api.getNetworthTax(year, holderId);
+    const holders = await api.getNetworthTax(year, holderId);
+    const holdersWithCF: TaxSummaryHolderWithCarryForward[] = await Promise.all(
+      holders.map(async (h) => ({
+        ...h,
+        carryForward: await loadLossCarryforward(h.holder.id, targetYear),
+      })),
+    );
+    return holdersWithCF;
   } catch {
     return [];
   }

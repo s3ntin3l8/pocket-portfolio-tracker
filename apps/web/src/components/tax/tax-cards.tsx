@@ -1,9 +1,10 @@
-import { TriangleAlert, Info, CircleCheck } from "lucide-react";
+import { TriangleAlert, Info, CircleCheck, Receipt } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { InstrumentLogo } from "@/components/instrument-logo";
+import { Separator } from "@/components/ui/separator";
 import { Link } from "@/i18n/navigation";
-import type { HarvestSuggestion, TaxDistribution } from "@portfolio/api-client";
+import type { HarvestSuggestion, TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
 import type { HarvestSummary } from "@portfolio/core";
 
 /** Loosely-typed next-intl translator scoped to the `Tax` namespace — the same shape as
@@ -152,6 +153,125 @@ export function DistributionCard({
             <TriangleAlert className="size-4 mt-0.5 shrink-0" />
             <span>{t("distribution.overAllocated")}</span>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function VorabpauschaleRow({
+  allowanceUsage: u,
+  money,
+  t,
+}: {
+  allowanceUsage: AllowanceUsage;
+  money: (n: string | number) => string;
+  t: TaxTranslator;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+      <StatCard
+        label={t("vorabpauschale.accrued")}
+        value={money(u.vorabpauschaleAccrued)}
+        delta={t("vorabpauschale.accruedDesc")}
+      />
+      <StatCard
+        label={t("vorabpauschale.credited")}
+        value={money(u.vorabpauschaleCredited)}
+        delta={t("vorabpauschale.creditedDesc")}
+      />
+    </div>
+  );
+}
+
+export function CoverageCard({
+  allowanceUsage: u,
+  carryForward,
+  money,
+  t,
+}: {
+  allowanceUsage: AllowanceUsage;
+  carryForward: { stock: string; general: string } | null;
+  money: (n: string | number) => string;
+  t: TaxTranslator;
+}) {
+  const hasFsa = Number(u.allowanceAnnual) > 0;
+  const usedPct = hasFsa ? Math.round((Number(u.usedYtd) / Number(u.allowanceAnnual)) * 100) : 0;
+  const cfStock = carryForward?.stock ?? "0";
+  const cfGeneral = carryForward?.general ?? "0";
+  const hasCf = Number(cfStock) > 0 || Number(cfGeneral) > 0;
+  const hasLoss = Number(u.realizedGainsAdjusted) < 0;
+  const ratePct = (Number(u.taxRate) * 100).toLocaleString(undefined, {
+    maximumFractionDigits: 3,
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Receipt className="size-4" />
+          {t("coverage.title", { year: u.year })}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {hasFsa ? (
+          <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
+            <span className="text-[11px] font-semibold text-text-2">{t("coverage.fsa.title")}</span>
+            <p className="tabular mt-1 text-[15px] font-extrabold">
+              {money(u.usedYtd)} of {money(u.allowanceAnnual)}
+            </p>
+            <div className="mt-2 h-[7px] overflow-hidden rounded-[5px] bg-line">
+              <div
+                className="h-full rounded-[5px] transition-all"
+                style={{
+                  width: `${Math.min(100, Math.max(0, usedPct))}%`,
+                  backgroundColor: "#7C5CFC",
+                }}
+              />
+            </div>
+            <p className="mt-1.5 text-[10px] font-medium text-text-3">
+              {t("coverage.fsa.allUsed")}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
+            <span className="text-[11px] font-semibold text-text-2">{t("coverage.fsa.title")}</span>
+            <p className="mt-1 text-sm text-muted-foreground">{t("coverage.fsa.noFsa")}</p>
+          </div>
+        )}
+
+        <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
+          <span className="text-[11px] font-semibold text-text-2">
+            {t("coverage.carryForward.title")}
+          </span>
+          <p className="tabular mt-1 text-[13px] font-bold">
+            {t("coverage.carryForward.stock")}: {money(cfStock)} ·{" "}
+            {t("coverage.carryForward.general")}: {money(cfGeneral)}
+          </p>
+          <p className="mt-1 text-[10px] font-medium text-text-3">
+            {hasCf ? t("coverage.carryForward.ctaHint") : t("coverage.carryForward.none")}
+          </p>
+        </div>
+
+        <Separator />
+
+        {hasLoss ? (
+          <p className="text-sm font-medium text-muted-foreground">
+            {t("coverage.summary.noTax")} · {money(Math.abs(Number(u.realizedGainsAdjusted)))}
+          </p>
+        ) : Number(u.taxableExcess) > 0 ? (
+          <div>
+            <p className="text-sm">
+              {t("coverage.summary.taxable")}: {money(u.taxableExcess)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t("coverage.summary.abgeltungsteuer", { rate: ratePct })} ·{" "}
+              {money(Number(u.taxableExcess) * Number(u.taxRate))} ·{" "}
+              {t("coverage.summary.withheld")}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm font-medium text-muted-foreground">{t("coverage.summary.noTax")}</p>
         )}
       </CardContent>
     </Card>
