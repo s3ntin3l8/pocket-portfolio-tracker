@@ -15,7 +15,6 @@ import {
   type TaxYearDetail,
   type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
-import { loadLossCarryforward } from "./account-holders";
 
 export async function loadNetworthTax(
   year?: number,
@@ -75,7 +74,7 @@ export async function loadNetworthTax(
             allowanceUsage: zeroAllowance,
             harvestSuggestions: [],
             carryForwardApplied: false,
-            carryForward: null,
+            accountHolderId: selected.accountHolderId ?? null,
             distribution: zeroDistribution,
             tfRatesByInstrument: {},
           },
@@ -104,7 +103,7 @@ export async function loadNetworthTax(
           allowanceUsage: zeroAllowance,
           harvestSuggestions: [],
           carryForwardApplied: false,
-          carryForward: null,
+          accountHolderId: holderId ?? null,
           distribution: zeroDistribution,
           tfRatesByInstrument: {},
         },
@@ -140,10 +139,7 @@ export async function loadNetworthTax(
         allowanceUsage: result.allowanceUsage,
         harvestSuggestions: result.harvestSuggestions,
         carryForwardApplied: result.carryForwardApplied,
-        carryForward: await loadLossCarryforward(
-          selected.accountHolderId ?? selected.id,
-          targetYear,
-        ),
+        accountHolderId: selected.accountHolderId ?? null,
         distribution: result.holderDistribution,
         tfRatesByInstrument: result.tfRatesByInstrument,
       };
@@ -152,13 +148,9 @@ export async function loadNetworthTax(
 
     const holderId = await resolveHolderScope(portfolios);
     const holders = await api.getNetworthTax(year, holderId);
-    const holdersWithCF: TaxSummaryHolderWithCarryForward[] = await Promise.all(
-      holders.map(async (h) => ({
-        ...h,
-        carryForward: await loadLossCarryforward(h.holder.id, targetYear),
-      })),
-    );
-    return holdersWithCF;
+    // /networth/tax always aggregates by a genuine account holder — holder.id here is
+    // never a portfolio-id fallback.
+    return holders.map((h) => ({ ...h, accountHolderId: h.holder.id }));
   } catch {
     return [];
   }

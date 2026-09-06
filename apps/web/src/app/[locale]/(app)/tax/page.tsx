@@ -132,7 +132,7 @@ function TaxHolderOverviewDe({
   const currency = entry.currency;
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
   const moneyCompact = (n: string | number) => formatMoneyCompact(Number(n), currency, locale);
-  const { allowanceUsage: u, harvestSuggestions, distribution, carryForward } = entry;
+  const { allowanceUsage: u, harvestSuggestions, distribution, accountHolderId } = entry;
   const pct = parseFloat(u.remaining) / parseFloat(u.allowanceAnnual);
   const usedPct = Math.round((1 - Math.max(0, Math.min(1, pct))) * 100);
   const hasForecast = Number(u.forecastIncomeRestOfYear) > 0;
@@ -205,15 +205,11 @@ function TaxHolderOverviewDe({
         </Card>
       )}
 
-      <CoverageCard allowanceUsage={u} carryForward={carryForward} money={money} t={t} />
+      <CoverageCard allowanceUsage={u} money={money} locale={locale} t={t} />
 
-      <LossCarryforwardEditor
-        holderId={entry.holder.id}
-        currentYear={entry.year}
-        initialStock={carryForward?.stock ?? "0"}
-        initialGeneral={carryForward?.general ?? "0"}
-        t={t}
-      />
+      {accountHolderId && (
+        <LossCarryforwardEditor holderId={accountHolderId} currentYear={entry.year} t={t} />
+      )}
 
       <Card className="overflow-hidden rounded-[20px]">
         <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">

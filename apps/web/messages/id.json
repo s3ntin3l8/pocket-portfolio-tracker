@@ -2012,6 +2012,7 @@
         "title": "Tunjangan FSA terpakai",
         "usedDesc": "{used} dari {annual}",
         "allUsed": "Semua keuntungan dan penghasilan dalam batas FSA Anda",
+        "exceeded": "Keuntungan dan penghasilan melebihi batas FSA Anda",
         "noFsa": "FSA tidak dikonfigurasi — semua penghasilan kena pajak"
       },
       "carryForward": {
@@ -2025,7 +2026,8 @@
         "taxable": "Penghasilan kena pajak melebihi FSA",
         "abgeltungsteuer": "Abgeltungsteuer ({rate}%)",
         "withheld": "dipotong di sumber",
-        "noTax": "Tidak ada pajak yang terutang — kerugian ditangguhkan"
+        "noTax": "Tidak ada pajak yang terutang — kerugian ditangguhkan",
+        "coveredByFsa": "Tidak ada pajak yang terutang — ditutupi oleh tunjangan FSA Anda"
       }
     },
     "lossCarryforward": {

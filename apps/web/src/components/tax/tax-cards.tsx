@@ -186,22 +186,27 @@ export function VorabpauschaleRow({
 
 export function CoverageCard({
   allowanceUsage: u,
-  carryForward,
   money,
+  locale,
   t,
 }: {
   allowanceUsage: AllowanceUsage;
-  carryForward: { stock: string; general: string } | null;
   money: (n: string | number) => string;
+  locale: string;
   t: TaxTranslator;
 }) {
   const hasFsa = Number(u.allowanceAnnual) > 0;
   const usedPct = hasFsa ? Math.round((Number(u.usedYtd) / Number(u.allowanceAnnual)) * 100) : 0;
-  const cfStock = carryForward?.stock ?? "0";
-  const cfGeneral = carryForward?.general ?? "0";
+  // Read what the backend actually applied (stockPot/generalPot.carryForwardApplied is
+  // "0.00" whenever the multi-depot rule declines to apply it — see tax.test.ts), not
+  // the raw configured row, so this can't overstate coverage the numbers below don't
+  // reflect.
+  const cfStock = u.stockPot.carryForwardApplied;
+  const cfGeneral = u.generalPot.carryForwardApplied;
   const hasCf = Number(cfStock) > 0 || Number(cfGeneral) > 0;
-  const hasLoss = Number(u.realizedGainsAdjusted) < 0;
-  const ratePct = (Number(u.taxRate) * 100).toLocaleString(undefined, {
+  const isTaxable = Number(u.taxableExcess) > 0;
+  const hasLoss = !isTaxable && Number(u.realizedGainsAdjusted) < 0;
+  const ratePct = (Number(u.taxRate) * 100).toLocaleString(locale, {
     maximumFractionDigits: 3,
   });
 
@@ -218,7 +223,10 @@ export function CoverageCard({
           <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
             <span className="text-[11px] font-semibold text-text-2">{t("coverage.fsa.title")}</span>
             <p className="tabular mt-1 text-[15px] font-extrabold">
-              {money(u.usedYtd)} of {money(u.allowanceAnnual)}
+              {t("coverage.fsa.usedDesc", {
+                used: money(u.usedYtd),
+                annual: money(u.allowanceAnnual),
+              })}
             </p>
             <div className="mt-2 h-[7px] overflow-hidden rounded-[5px] bg-line">
               <div
@@ -230,7 +238,7 @@ export function CoverageCard({
               />
             </div>
             <p className="mt-1.5 text-[10px] font-medium text-text-3">
-              {t("coverage.fsa.allUsed")}
+              {isTaxable ? t("coverage.fsa.exceeded") : t("coverage.fsa.allUsed")}
             </p>
           </div>
         ) : (
@@ -255,11 +263,7 @@ export function CoverageCard({
 
         <Separator />
 
-        {hasLoss ? (
-          <p className="text-sm font-medium text-muted-foreground">
-            {t("coverage.summary.noTax")} · {money(Math.abs(Number(u.realizedGainsAdjusted)))}
-          </p>
-        ) : Number(u.taxableExcess) > 0 ? (
+        {isTaxable ? (
           <div>
             <p className="text-sm">
               {t("coverage.summary.taxable")}: {money(u.taxableExcess)}
@@ -270,8 +274,14 @@ export function CoverageCard({
               {t("coverage.summary.withheld")}
             </p>
           </div>
+        ) : hasLoss ? (
+          <p className="text-sm font-medium text-muted-foreground">
+            {t("coverage.summary.noTax")} · {money(Math.abs(Number(u.realizedGainsAdjusted)))}
+          </p>
         ) : (
-          <p className="text-sm font-medium text-muted-foreground">{t("coverage.summary.noTax")}</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            {t("coverage.summary.coveredByFsa")}
+          </p>
         )}
       </CardContent>
     </Card>

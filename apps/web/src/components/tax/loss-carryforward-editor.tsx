@@ -15,21 +15,20 @@ import type { TaxTranslator } from "@/components/tax/tax-cards";
 export function LossCarryforwardEditor({
   holderId,
   currentYear,
-  initialStock,
-  initialGeneral,
   t,
 }: {
   holderId: string;
   currentYear: number;
-  initialStock: string;
-  initialGeneral: string;
   t: TaxTranslator;
 }) {
   const router = useRouter();
   const api = useApiClient();
-  const [year, setYear] = useState(currentYear - 1);
-  const [stock, setStock] = useState(initialStock);
-  const [general, setGeneral] = useState(initialGeneral);
+  // `taxYear` is the year the carry-forward is *applied in* (see
+  // lossCarryForwardFor on the API side), not the year it originated from — so this
+  // must default to, and include, the year currently on screen.
+  const [year, setYear] = useState(currentYear);
+  const [stock, setStock] = useState("0");
+  const [general, setGeneral] = useState("0");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -70,7 +69,12 @@ export function LossCarryforwardEditor({
     }
   };
 
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - 1 - i);
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+
+  // Entered as a positive figure (a loss amount, per the labels/hints below) — strip
+  // any minus sign rather than silently netting to zero downstream (compute.ts clamps
+  // negative carry-forward to 0 with no feedback to the user).
+  const sanitizeAmount = (v: string) => v.replace(/-/g, "");
 
   return (
     <Card>
@@ -97,14 +101,24 @@ export function LossCarryforwardEditor({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label>{t("lossCarryforward.stockLabel")}</Label>
-            <Input type="text" value={stock} onChange={(e) => setStock(e.target.value)} />
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={stock}
+              onChange={(e) => setStock(sanitizeAmount(e.target.value))}
+            />
             <p className="mt-1 text-[10px] text-muted-foreground">
               {t("lossCarryforward.stockHint")}
             </p>
           </div>
           <div>
             <Label>{t("lossCarryforward.generalLabel")}</Label>
-            <Input type="text" value={general} onChange={(e) => setGeneral(e.target.value)} />
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={general}
+              onChange={(e) => setGeneral(sanitizeAmount(e.target.value))}
+            />
             <p className="mt-1 text-[10px] text-muted-foreground">
               {t("lossCarryforward.generalHint")}
             </p>

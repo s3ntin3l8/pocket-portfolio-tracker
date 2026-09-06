@@ -2014,6 +2014,7 @@
         "title": "FSA allowance used",
         "usedDesc": "{used} of {annual}",
         "allUsed": "All gains and income within your FSA cap",
+        "exceeded": "Gains and income exceed your FSA cap",
         "noFsa": "No FSA configured — all income is taxable"
       },
       "carryForward": {
@@ -2027,7 +2028,8 @@
         "taxable": "Taxable income exceeding FSA",
         "abgeltungsteuer": "Abgeltungsteuer ({rate}%)",
         "withheld": "withheld at source",
-        "noTax": "No tax owed — losses carried forward"
+        "noTax": "No tax owed — losses carried forward",
+        "coveredByFsa": "No tax owed — covered by your FSA allowance"
       }
     },
     "lossCarryforward": {

@@ -8,6 +8,8 @@ import {
   DistributionCard,
   HarvestRow,
   HarvestSummaryNote,
+  VorabpauschaleRow,
+  CoverageCard,
   type TaxTranslator,
 } from "../src/components/tax/tax-cards";
 import {
@@ -16,7 +18,7 @@ import {
   IdDividendsTable,
   IdByYearTable,
 } from "../src/components/tax/tax-tables";
-import type { HarvestSuggestion, TaxDistribution } from "@portfolio/api-client";
+import type { HarvestSuggestion, TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
 
 // The four table components (DividendsTable, ByYearTable, IdDividendsTable,
 // IdByYearTable) are now client components in ./tax-tables.tsx — they call
@@ -158,6 +160,109 @@ describe("AllowanceSummaryBoxes", () => {
     // The "Tax saving available" figure — carried over from the old 3-up StatCard row so
     // it isn't lost by the 2-box relayout.
     expect(screen.getByText(/Tax saving available: Rp 148/)).toBeInTheDocument();
+  });
+});
+
+function makeAllowanceUsage(overrides: Partial<AllowanceUsage> = {}): AllowanceUsage {
+  return {
+    year: 2026,
+    allowanceAnnual: "1000",
+    realizedGainsAdjusted: "0",
+    incomeYtd: "0",
+    vorabpauschaleAccrued: "2.93",
+    vorabpauschaleCredited: "0",
+    stockPot: { netGainLoss: "0", carryForwardApplied: "0.00", used: "0" },
+    generalPot: { netGainLoss: "0", carryForwardApplied: "0.00", used: "0" },
+    usedYtd: "0",
+    taxableExcess: "0",
+    remaining: "1000",
+    taxRate: "0.25",
+    taxSavingAvailable: "250",
+    currency: "IDR",
+    forecastIncomeRestOfYear: "0",
+    projectedUsedFullYear: "0",
+    projectedRemaining: "1000",
+    projectedTaxSavingAvailable: "250",
+    ...overrides,
+  };
+}
+
+describe("VorabpauschaleRow", () => {
+  it("shows accrued and credited Vorabpauschale amounts", () => {
+    render(
+      <VorabpauschaleRow
+        allowanceUsage={makeAllowanceUsage({
+          vorabpauschaleAccrued: "2.93",
+          vorabpauschaleCredited: "1.10",
+        })}
+        money={money}
+        t={t}
+      />,
+    );
+    expect(screen.getByText("Rp 2.93")).toBeInTheDocument();
+    expect(screen.getByText("Rp 1.1")).toBeInTheDocument();
+  });
+});
+
+describe("CoverageCard", () => {
+  it("shows the taxable-excess branch when gains exceed the FSA, even in a year with a net trading loss", () => {
+    // Stock pot loss, but dividends push taxableExcess above zero — the two-pot
+    // system means a net trading loss does NOT imply no tax is owed.
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({
+          realizedGainsAdjusted: "-5000",
+          taxableExcess: "2000",
+        })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText(/Taxable income exceeding FSA/)).toBeInTheDocument();
+    expect(screen.queryByText(/losses carried forward/)).not.toBeInTheDocument();
+  });
+
+  it("shows the loss-carried-forward branch only when nothing is taxable and there's a net trading loss", () => {
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({
+          realizedGainsAdjusted: "-500",
+          taxableExcess: "0",
+        })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText(/losses carried forward/)).toBeInTheDocument();
+  });
+
+  it("shows the FSA-covered branch when nothing is taxable and there's no net trading loss", () => {
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({ realizedGainsAdjusted: "400", taxableExcess: "0" })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText(/covered by your FSA allowance/)).toBeInTheDocument();
+  });
+
+  it("reads the carry-forward-applied amount from the pots, not raw configured figures", () => {
+    render(
+      <CoverageCard
+        allowanceUsage={makeAllowanceUsage({
+          stockPot: { netGainLoss: "0", carryForwardApplied: "0.00", used: "0" },
+          generalPot: { netGainLoss: "0", carryForwardApplied: "300.00", used: "0" },
+        })}
+        money={money}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText(/Rp 300/)).toBeInTheDocument();
   });
 });
 
