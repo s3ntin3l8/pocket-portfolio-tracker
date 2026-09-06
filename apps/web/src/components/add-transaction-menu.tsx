@@ -11,10 +11,12 @@ import {
   ChevronLeft,
   Briefcase,
   UserPlus,
+  X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
 import { ImportFlowClient } from "@/components/import-flow-client";
 import { NewEntryTabs, type NewEntryTab } from "@/components/new-entry-tabs";
 import type { AddTransactionInitial } from "@/components/add-transaction-form";
@@ -22,20 +24,18 @@ import { useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
 import type { ImportTargetPortfolio } from "@/components/import-flow/types";
-import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
-import { HolderFormDialog } from "@/components/holder-form-dialog";
 import { PortfolioFormBody } from "@/components/portfolio-form-dialog/body";
 import { HolderFormBody } from "@/components/holder-form-dialog/body";
 import { MethodCard } from "@/components/add-transaction-menu/method-card";
 import { loadHarvestPrefill } from "@/components/add-transaction-menu/helpers";
-import { DesktopShell, type DesktopStep } from "@/components/add-transaction-menu/desktop-shell";
+import { NavRail, type DesktopStep } from "@/components/add-transaction-menu/nav-rail";
 import { EventsTabSwitch } from "@/components/add-transaction-menu/events-tab-switch";
 
 type EventsTab = "corporate-action" | "merger";
 
-/** Mobile's step model plus the desktop-only rail destinations ("events" hosts the
- *  corporate-action/merger 2-way switch; "portfolio"/"holder" are the inline create
- *  forms). Mobile only ever sets the first three — see `AddTransactionMenu`. */
+/** Every reachable destination of the unified overlay. "choose" is the mobile-only
+ *  chooser screen (never entered on a `md:`+ viewport — the rail replaces it there, see
+ *  `onAddOpenChange`); every other value renders identically regardless of viewport. */
 type Step = "choose" | "manual" | "import" | "events" | "portfolio" | "holder";
 
 /** Entry-mode-specific dropzone copy for the import flow — see `UseImportFlowProps`. */
@@ -44,9 +44,14 @@ type ImportEntryMode = "screenshot" | "csv" | "file";
 /**
  * The unified add-entry launcher, transcribed from `Pocket Prototype.dc.html`'s
  * ADD / IMPORT bottom sheet: step 1 offers "Snap a screenshot" / "Import a CSV" /
- * "Add manually" method cards; "Add manually" swaps the sheet content (with a back
- * button) to the Transaction / Corporate action / Merger entry tabs. Screenshot and
- * CSV both feed the same unified import flow.
+ * "Add manually" method cards; "Add manually" swaps the content (with a back button) to
+ * the Transaction / Corporate action / Merger entry tabs. Screenshot and CSV both feed
+ * the same unified import flow.
+ *
+ * One `Dialog`/`DialogContent` tree at every viewport (#669): a 196px left nav rail
+ * (`max-md:hidden`) replaces the mobile chooser + back button at `md:`+, but every
+ * step's content is the same mounted subtree either way — nothing here branches on
+ * `isDesktop`/`isWide` to decide WHAT renders, only IF the rail or a back-chevron shows.
  *
  * `autoOpenFromParams` must be set on exactly ONE rendered instance per page — the global
  * shell instance. It owns the `?shared=1` / `?import=1` auto-open (PWA share-target and
@@ -71,10 +76,31 @@ export function AddTransactionMenu({
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  // AddTransactionForm's own internal two-column/Summary-rail layout threshold — an
+  // in-scope-elsewhere concern (permitted to read live, per the repo's "internal layout
+  // may branch on isDesktop; only the overlay tree itself may not" invariant). Threaded
+  // through to NewEntryTabs below, unchanged from before the merge.
   const isDesktop = useMediaQuery("(min-width: 860px)");
+  // The chrome/step-model breakpoint: matches the rail's own `md:` (768px) reveal.
+  // Anything gating WHICH STEP is entered, or WHICH CONTENT SHAPE a step renders, must
+  // use this — not `isDesktop` — or the rail can end up visible (`md:`+) while the step
+  // machinery still thinks it's in the narrower, chooser-driven regime.
+  const isWide = useMediaQuery("(min-width: 768px)");
 
   const [addOpen, setAddOpen] = useState(false);
   const [step, setStep] = useState<Step>("choose");
+  // Whether the "manual" step should render its desktop-rail shape (transaction tab
+  // only, tab list hidden) instead of mobile's full transaction/corporate-action/merger
+  // switcher. Snapshotted at each transition INTO "manual" (see `openManual` and the two
+  // other call sites below) rather than read live from `isWide` — the same fix pattern
+  // as `step` itself: a value read reactively here would let a resize while a
+  // corporate-action/merger tab is filled in unmount that tab (`NewEntryTabs`'
+  // `visibleTabs` conditionally mounts `TabsContent`), silently discarding it. Snapshotting
+  // means a resize while "manual" is open changes only chrome (the rail's visibility),
+  // never content.
+  const [manualStepDesktop, setManualStepDesktop] = useState(false);
+  // The persistent footer's portal-target DOM node — see `SheetFooterContext` below.
+  const [footerEl, setFooterEl] = useState<HTMLDivElement | null>(null);
   const [portfolios, setPortfolios] = useState<ImportTargetPortfolio[] | null>(null);
   const [defaultPortfolioId, setDefaultPortfolioId] = useState("");
   const [manualDefaultTab, setManualDefaultTab] = useState<NewEntryTab>("transaction");
@@ -103,18 +129,20 @@ export function AddTransactionMenu({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
-  // The rail's "events"/"portfolio"/"holder" destinations only exist on desktop — if the
-  // viewport shrinks below 860px while one is open, fall back to the mobile chooser rather
-  // than rendering a step the mobile Sheet's own branches don't know about.
+  // "choose" is the mobile-only chooser — the rail has no equivalent destination for
+  // it, so a LIVE widen across `md:` while it's open (a resize, an orientation flip, a
+  // devtools device-toolbar toggle) would otherwise leave the rail visible and
+  // highlighting the wrong item while the chooser cards are still what's rendered (see
+  // #669's PR discussion). Unlike the deleted shrink-reset effect this replaces in
+  // spirit, this is safe in the opposite direction: "choose" holds no user input to
+  // lose, so re-entering "manual" here can't discard anything, and it mirrors exactly
+  // what opening the dialog fresh at this width already does (`onAddOpenChange`, below).
   useEffect(() => {
-    if (isDesktop) return;
-    if (step === "events" || step === "portfolio" || step === "holder") {
-      // Deriving `step` from a matchMedia breakpoint crossing, not synchronizing with an
-      // external system.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStep("choose");
-    }
-  }, [isDesktop, step]);
+    if (!addOpen || !isWide || step !== "choose") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setManualStepDesktop(true);
+    setStep("manual");
+  }, [addOpen, isWide, step]);
 
   // A screenshot shared into the app lands on /transactions?shared=1 (see sw.ts); the
   // "Import screenshot" PWA shortcut lands on ?import=1. Either auto-opens the import sheet
@@ -170,7 +198,12 @@ export function AddTransactionMenu({
       // On desktop, a corporate-action/merger deep link routes to the rail's "Instrument
       // event" destination instead of "Add transaction" (which is transaction-only there —
       // see `NewEntryTabs`' `visibleTabs` wiring below).
-      setStep(isDesktop && targetTab !== "transaction" ? "events" : "manual");
+      if (isWide && targetTab !== "transaction") {
+        setStep("events");
+      } else {
+        setManualStepDesktop(isWide);
+        setStep("manual");
+      }
       router.replace(pathname);
     })();
 
@@ -210,6 +243,7 @@ export function AddTransactionMenu({
     setInitialTransaction(undefined);
     setManualDefaultTab("transaction");
     setEntryNonce((n) => n + 1);
+    setManualStepDesktop(isWide);
     setStep("manual");
   }
 
@@ -223,14 +257,26 @@ export function AddTransactionMenu({
   function onAddOpenChange(open: boolean) {
     setAddOpen(open);
     if (open) {
-      setStep("choose");
+      // Honest at open time: on a `md:`+ viewport, land directly on "manual" (the rail's
+      // default destination) instead of a "choose" step the rail has no back-button path
+      // out of. Below `md:`, "choose" is the real first screen. This used to be a
+      // DISPLAY-only derivation (`step` always started at "choose", desktop merely
+      // rendered it as "manual") — resizing while that lie was live could unmount a
+      // freshly-typed form the moment "choose" started rendering for real. `step` now
+      // matches what's on screen at every width, always.
+      if (isWide) {
+        setManualStepDesktop(true);
+        setStep("manual");
+      } else {
+        setStep("choose");
+      }
       void loadPortfolios();
     }
   }
 
   /** Desktop nav-rail click → the corresponding step, reusing the same open/prefill logic
    *  the mobile chooser cards use for "import"/"manual" so behavior stays identical. */
-  function onSelectDesktopStep(next: DesktopStep) {
+  function onSelectStep(next: DesktopStep) {
     if (next === "import") void openImport("file");
     else if (next === "manual") void openManual();
     else if (next === "events") void openEvents();
@@ -244,165 +290,95 @@ export function AddTransactionMenu({
     setHasHolders(true);
   }
 
-  // ---- Mobile (<860px): the existing bottom sheet, unchanged ----
-  const mobileSheet = (
-    <>
-      {/* One sheet, three steps (choose/manual/import) swapped via `step` — swapping content
-          in place (rather than closing this sheet and opening a second `Drawer.Root`) avoids
-          a vaul body-scroll-lock race that left the import step unopenable (#471). Not
-          drag/outside/blur-dismissible while importing: a mid-import swipe must not discard
-          the flow. `handleOnly`: the manual step's form scrolls, so drag-to-close is
-          restricted to the handle rather than the whole content surface fighting the
-          form's own scroll (#472). */}
-      <Sheet
-        open={addOpen}
-        onOpenChange={onAddOpenChange}
-        dismissible={step !== "import"}
-        handleOnly
-      >
-        <SheetContent className={step === "import" ? "max-w-3xl" : undefined}>
-          <SheetHeader className="sticky top-0 z-[2] flex-row items-center gap-2.5 bg-background px-5 pb-3 pt-3">
-            {step !== "choose" && (
-              <button
-                type="button"
-                onClick={() => setStep("choose")}
-                aria-label={tm("back")}
-                className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)]"
-              >
-                <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
-              </button>
-            )}
-            <SheetTitle className="flex-1">
-              {step === "import" ? ti("title") : tm("addMenu.title")}
-            </SheetTitle>
-            {/* spacer so the title clears the built-in close button */}
-            <span className="w-[34px] shrink-0" aria-hidden />
-          </SheetHeader>
+  const dismissible = step !== "import";
+  // The shared Cancel+submit-portal footer bar: absent for "import" (its own step-local
+  // upload/parsing/review actions, unchanged from before the merge) and "choose" (the
+  // mobile chooser has no footer — matches its pre-merge, footer-less Sheet rendering).
+  const showFooter = step !== "import" && step !== "choose";
+  // Only "manual" uses the two-column form+Summary-rail-width grid; every other step
+  // (choose/events/portfolio/holder/import) gets a centered, max-width-600px column.
+  const centered = step !== "manual";
+  const headerTitle =
+    step === "choose"
+      ? tm("addMenu.title")
+      : step === "import"
+        ? ti("title")
+        : step === "manual"
+          ? tm("addMenu.railAddTransaction")
+          : step === "events"
+            ? tm("addMenu.railInstrumentEvent")
+            : step === "portfolio"
+              ? tm("addMenu.createPortfolio")
+              : tm("addMenu.createAccountHolder");
 
-          {step === "choose" ? (
-            <div className="px-5 pb-7 pt-1.5">
-              <p className="mx-0.5 mb-3.5 text-[13px] font-medium text-text-2">
-                {tm("addMenu.subtitle")}
-              </p>
-              <div className="flex flex-col gap-3">
-                <MethodCard
-                  icon={Camera}
-                  title={tm("addMenu.screenshot")}
-                  description={tm("addMenu.screenshotDesc")}
-                  tone="green"
-                  tag={tm("addMenu.recommended")}
-                  onClick={() => void openImport("screenshot")}
-                />
-                <MethodCard
-                  icon={FileSpreadsheet}
-                  title={tm("addMenu.csv")}
-                  description={tm("addMenu.csvDesc")}
-                  tone="violet"
-                  onClick={() => void openImport("csv")}
-                />
-                <MethodCard
-                  icon={PenLine}
-                  title={tm("addMenu.manual")}
-                  description={tm("addMenu.manualDesc")}
-                  tone="gold"
-                  onClick={() => void openManual()}
-                />
-              </div>
+  const content =
+    step === "choose" ? (
+      <>
+        <p className="mx-0.5 mb-3.5 text-[13px] font-medium text-text-2">
+          {tm("addMenu.subtitle")}
+        </p>
+        <div className="flex flex-col gap-3">
+          <MethodCard
+            icon={Camera}
+            title={tm("addMenu.screenshot")}
+            description={tm("addMenu.screenshotDesc")}
+            tone="green"
+            tag={tm("addMenu.recommended")}
+            onClick={() => void openImport("screenshot")}
+          />
+          <MethodCard
+            icon={FileSpreadsheet}
+            title={tm("addMenu.csv")}
+            description={tm("addMenu.csvDesc")}
+            tone="violet"
+            onClick={() => void openImport("csv")}
+          />
+          <MethodCard
+            icon={PenLine}
+            title={tm("addMenu.manual")}
+            description={tm("addMenu.manualDesc")}
+            tone="gold"
+            onClick={() => void openManual()}
+          />
+        </div>
 
-              <hr className="my-2 border-border" />
+        <hr className="my-2 border-border" />
 
-              <div className="flex flex-col gap-3">
-                <PortfolioFormDialog
-                  mode="create"
-                  trigger={
-                    <MethodCard
-                      icon={Briefcase}
-                      title={tm("addMenu.createPortfolio")}
-                      description={tm("addMenu.createPortfolioDesc")}
-                      tone="blue"
-                    />
-                  }
-                  onSuccess={onDialogSuccess}
-                />
-                {!hasHolders && (
-                  <HolderFormDialog
-                    mode="create"
-                    trigger={
-                      <MethodCard
-                        icon={UserPlus}
-                        title={tm("addMenu.createAccountHolder")}
-                        description={tm("addMenu.createAccountHolderDesc")}
-                        tone="orange"
-                      />
-                    }
-                    onSuccess={onDialogSuccess}
-                  />
-                )}
-              </div>
-            </div>
-          ) : step === "manual" ? (
-            <div className="px-5 pb-7 pt-1.5">
-              {portfolios && (
-                <NewEntryTabs
-                  key={entryNonce}
-                  portfolios={portfolios}
-                  initialPortfolioId={defaultPortfolioId}
-                  defaultTab={manualDefaultTab}
-                  initialTransaction={initialTransaction}
-                  stickyFooter
-                  isAdmin={isAdmin}
-                />
-              )}
-            </div>
-          ) : (
-            // Note: no nested overflow-y-auto — SheetContent is the single scroll
-            // container (#472).
-            <div className="px-5 pb-7 pt-1.5">
-              {portfolios && (
-                <ImportFlowClient
-                  portfolios={portfolios}
-                  defaultPortfolioId={defaultPortfolioId}
-                  onClose={() => onAddOpenChange(false)}
-                  entryMode={importEntryMode}
-                />
-              )}
-            </div>
+        <div className="flex flex-col gap-3">
+          <MethodCard
+            icon={Briefcase}
+            title={tm("addMenu.createPortfolio")}
+            description={tm("addMenu.createPortfolioDesc")}
+            tone="blue"
+            onClick={() => setStep("portfolio")}
+          />
+          {!hasHolders && (
+            <MethodCard
+              icon={UserPlus}
+              title={tm("addMenu.createAccountHolder")}
+              description={tm("addMenu.createAccountHolderDesc")}
+              tone="orange"
+              onClick={() => setStep("holder")}
+            />
           )}
-        </SheetContent>
-      </Sheet>
-    </>
-  );
-
-  // ---- Desktop (≥860px): centered modal, left nav rail, no chooser/back-button step ----
-  const effStep: DesktopStep = step === "choose" ? "manual" : step;
-  const desktopHeaderTitle =
-    effStep === "manual"
-      ? tm("addMenu.railAddTransaction")
-      : effStep === "events"
-        ? tm("addMenu.railInstrumentEvent")
-        : effStep === "portfolio"
-          ? tm("addMenu.createPortfolio")
-          : effStep === "holder"
-            ? tm("addMenu.createAccountHolder")
-            : ti("title");
-
-  const desktopContent =
-    effStep === "manual" ? (
+        </div>
+      </>
+    ) : step === "manual" ? (
       portfolios && (
         <NewEntryTabs
           key={entryNonce}
           portfolios={portfolios}
           initialPortfolioId={defaultPortfolioId}
-          defaultTab="transaction"
+          defaultTab={manualStepDesktop ? "transaction" : manualDefaultTab}
           initialTransaction={initialTransaction}
           stickyFooter
           isAdmin={isAdmin}
-          isDesktop
-          hideTabList
-          visibleTabs={["transaction"]}
+          isDesktop={isDesktop}
+          hideTabList={manualStepDesktop}
+          visibleTabs={manualStepDesktop ? ["transaction"] : undefined}
         />
       )
-    ) : effStep === "events" ? (
+    ) : step === "events" ? (
       portfolios && (
         <>
           <EventsTabSwitch
@@ -418,15 +394,15 @@ export function AddTransactionMenu({
             onValueChange={(tab) => setEventsTab(tab as EventsTab)}
             stickyFooter
             isAdmin={isAdmin}
-            isDesktop
+            isDesktop={isDesktop}
             hideTabList
             visibleTabs={["corporate-action", "merger"]}
           />
         </>
       )
-    ) : effStep === "portfolio" ? (
+    ) : step === "portfolio" ? (
       <PortfolioFormBody mode="create" onSuccess={onDialogSuccess} onDone={openManual} />
-    ) : effStep === "holder" ? (
+    ) : step === "holder" ? (
       <HolderFormBody
         mode="create"
         onSuccess={() => {
@@ -444,22 +420,6 @@ export function AddTransactionMenu({
         />
       )
     );
-
-  const desktopShell = (
-    <DesktopShell
-      open={addOpen}
-      onOpenChange={onAddOpenChange}
-      step={effStep}
-      onSelectStep={onSelectDesktopStep}
-      headerTitle={desktopHeaderTitle}
-      centered={effStep !== "manual"}
-      dismissible={effStep !== "import"}
-      showFooter={effStep !== "import"}
-      onCancel={() => onAddOpenChange(false)}
-    >
-      {desktopContent}
-    </DesktopShell>
-  );
 
   return (
     <>
@@ -483,7 +443,101 @@ export function AddTransactionMenu({
           </Button>,
           document.body,
         )}
-      {isDesktop ? desktopShell : mobileSheet}
+
+      <Dialog open={addOpen} onOpenChange={onAddOpenChange}>
+        {/* size="xl" matches the 1080px desktop width this shell has always used; the
+            rest of the geometry below is `md:`-prefixed on top of `DialogContent`'s own
+            full-screen-mobile/centered-desktop defaults — every class here used to be
+            unconditional in the pre-merge `desktop-shell.tsx`, which only ever mounted
+            on desktop and so never had to coexist with those mobile defaults. */}
+        <DialogContent
+          hideClose
+          size="xl"
+          onEscapeKeyDown={(e) => {
+            if (!dismissible) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (!dismissible) e.preventDefault();
+          }}
+          className="flex flex-row gap-0 overflow-hidden bg-background p-0 md:w-[calc(100%-4rem)] md:rounded-[22px] md:border-0 md:shadow-[0_30px_80px_rgba(0,0,0,.4)] md:max-h-[calc(100dvh-64px)]"
+        >
+          <NavRail
+            className="max-md:hidden"
+            active={step === "choose" ? "manual" : step}
+            onSelect={onSelectStep}
+            labels={{
+              heading: tm("addMenu.desktopHeading"),
+              import: tm("addMenu.railImport"),
+              manual: tm("addMenu.railAddTransaction"),
+              events: tm("addMenu.railInstrumentEvent"),
+              portfolio: tm("addMenu.railCreatePortfolio"),
+              holder: tm("addMenu.railAccountHolder"),
+            }}
+          />
+
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="sticky top-0 z-[2] flex flex-row items-center gap-2.5 border-b border-border bg-background px-5 py-3 md:px-[26px] md:py-[18px]">
+              {step !== "choose" && (
+                <button
+                  type="button"
+                  onClick={() => setStep("choose")}
+                  aria-label={tm("back")}
+                  className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                >
+                  <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
+                </button>
+              )}
+              <DialogTitle className="flex-1 text-[19px] font-extrabold leading-none text-foreground">
+                {headerTitle}
+              </DialogTitle>
+              {/* Mobile-only close — desktop has no floating X, only the footer's Cancel
+                  (mirrors the pre-merge desktop shell's `hideClose`). Unlike `dismissible`
+                  above (which only guards Esc/outside-click), this stays clickable even
+                  mid-import — the pre-merge mobile Sheet's built-in close button worked
+                  the same way. */}
+              <DialogClose
+                className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                aria-label="Close"
+              >
+                <X className="size-[18px]" strokeWidth={2.2} />
+              </DialogClose>
+            </div>
+
+            <SheetFooterChromeContext.Provider value={showFooter}>
+              <SheetFooterContext.Provider value={footerEl}>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <div
+                    className={
+                      centered
+                        ? "mx-auto max-w-[600px] px-5 py-4 md:px-[26px] md:py-5"
+                        : "px-5 py-4 md:px-[26px] md:py-5"
+                    }
+                  >
+                    {content}
+                  </div>
+                </div>
+
+                {showFooter && (
+                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-background px-5 py-3 max-md:pb-[env(safe-area-inset-bottom)] md:px-[26px] md:py-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => onAddOpenChange(false)}
+                      className="h-auto max-md:hidden rounded-[13px] border-border bg-card px-[22px] py-[13px] text-[14px] font-bold text-foreground hover:bg-card"
+                    >
+                      {tm("addMenu.cancel")}
+                    </Button>
+                    {/* `display:contents` so the portaled submit button (via
+                        `useSheetFooter`) lands as a flex sibling of Cancel above, in DOM
+                        order — not visually nested inside this otherwise-empty div. */}
+                    <div ref={setFooterEl} className="contents" />
+                  </div>
+                )}
+              </SheetFooterContext.Provider>
+            </SheetFooterChromeContext.Provider>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

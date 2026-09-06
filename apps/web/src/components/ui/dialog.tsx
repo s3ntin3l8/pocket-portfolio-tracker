@@ -90,7 +90,7 @@ function DialogContent({
   /** A persistent, non-scrolling footer — pinned flush to the safe area on mobile
    *  full-screen, an in-flow bottom bar on desktop. Provides `SheetFooterContext` with
    *  its own portal node, so a form already using `useSheetFooter()` (the pattern
-   *  `desktop-shell.tsx` hand-rolls today) works unchanged inside this primitive. Omit
+   *  `add-transaction-menu.tsx` hand-rolls today) works unchanged inside this primitive. Omit
    *  for forms that render their own submit button inline (e.g. `portfolio-edit-form.tsx`,
    *  a real page with no sticky chrome of its own). Pass `true` for a footer that's
    *  just the portal slot with no static content of its own (e.g. a form whose own
