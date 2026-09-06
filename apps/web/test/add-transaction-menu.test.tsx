@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
+import { useSheetFooterChrome } from "@/components/ui/sheet";
 
 const search = { value: "" };
 
@@ -27,19 +29,43 @@ vi.mock("@/lib/api", () => ({
   useApiClient: () => ({ listPortfolios, listAccountHolders, getInstrument, getSummary }),
 }));
 
-// Stub the heavy flows — we only assert the right step/sheet renders.
+// Stub the heavy flows — we only assert the right step/sheet renders. Each stub also
+// probes `useSheetFooterChrome()` (real, unmocked `ui/sheet.tsx`) so tests can assert
+// `add-transaction-menu.tsx`'s `SheetFooterChromeContext.Provider` is wired the same way
+// the deleted `desktop-shell.test.tsx` regression-tested — see "marks the shared footer
+// as already-styled for every step except import" below.
 vi.mock("@/components/import-flow-client", () => ({
-  ImportFlowClient: () => <div data-testid="import-flow" />,
+  ImportFlowClient: () => (
+    <div data-testid="import-flow">
+      <ChromeProbe testId="chrome-probe-import" />
+    </div>
+  ),
 }));
 // Captures the props NewEntryTabs was last rendered with, so deep-link tests can assert
 // the tab/prefill actually threaded through rather than just that the sheet opened.
 const lastEntryTabsProps = { current: null as Record<string, unknown> | null };
+// Counts real mounts (not re-renders) of the stub — the #669 regression is a viewport
+// resize forcing an actual unmount/remount of the manual step's form, which a bare
+// render-call count can't distinguish from a harmless prop update.
+const entryTabsMountCount = { current: 0 };
 vi.mock("@/components/new-entry-tabs", () => ({
   NewEntryTabs: (props: Record<string, unknown>) => {
     lastEntryTabsProps.current = props;
-    return <div data-testid="entry-tabs" />;
+    useEffect(() => {
+      entryTabsMountCount.current += 1;
+    }, []);
+    return (
+      <div data-testid="entry-tabs">
+        <ChromeProbe testId="chrome-probe-manual" />
+      </div>
+    );
   },
 }));
+
+function ChromeProbe({ testId }: { testId: string }) {
+  const hasChrome = useSheetFooterChrome();
+  return <span data-testid={testId}>{hasChrome ? "styled" : "bare"}</span>;
+}
 
 import { AddTransactionMenu } from "../src/components/add-transaction-menu";
 
@@ -55,6 +81,41 @@ function openMenu() {
   fireEvent.click(screen.getByRole("button", { name: messages.Manage.addTransaction }));
 }
 
+/** Fixed matchMedia mock — every query (isWide's 768px and isDesktop's 860px alike)
+ *  resolves to the same `matches` value, which is enough to pin either the mobile or
+ *  the rail-driven regime without distinguishing the two breakpoints. */
+function mockMatchMedia(matches: boolean) {
+  const fn = vi.fn().mockReturnValue({
+    matches,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
+  window.matchMedia = fn;
+  return fn;
+}
+
+/** A `matchMedia` mock that can flip live, for testing what happens when a resize
+ *  crosses the breakpoint mid-render — see `edit-transaction-sheet.test.tsx`'s copy of
+ *  this same helper for the underlying `useSyncExternalStore` mechanics. */
+function mockMatchMediaDynamic(initialMatches: boolean) {
+  let matches = initialMatches;
+  const listeners = new Set<() => void>();
+  const mql = {
+    get matches() {
+      return matches;
+    },
+    addEventListener: (_event: string, cb: () => void) => listeners.add(cb),
+    removeEventListener: (_event: string, cb: () => void) => listeners.delete(cb),
+  };
+  window.matchMedia = vi.fn().mockReturnValue(mql);
+  return {
+    resize(next: boolean) {
+      matches = next;
+      act(() => listeners.forEach((cb) => cb()));
+    },
+  };
+}
+
 describe("AddTransactionMenu", () => {
   beforeEach(() => {
     search.value = "";
@@ -66,6 +127,12 @@ describe("AddTransactionMenu", () => {
     getInstrument.mockReset();
     getSummary.mockReset();
     lastEntryTabsProps.current = null;
+    entryTabsMountCount.current = 0;
+  });
+
+  afterEach(() => {
+    // Restore jsdom's default (matches: false) so later tests aren't affected.
+    mockMatchMedia(false);
   });
 
   it("opens the add sheet with the three reference method cards", () => {
@@ -307,6 +374,199 @@ describe("AddTransactionMenu", () => {
 
       await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
       expect(lastEntryTabsProps.current).toMatchObject({ initialTransaction: undefined });
+    });
+
+    it("routes a corporate-action deep link to the rail's Instrument event step at a wide viewport", async () => {
+      mockMatchMedia(true);
+      listPortfolios.mockResolvedValue([
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+      ]);
+      search.value = "entry=corporate-action";
+      renderMenu({ autoOpenFromParams: true });
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole("dialog", { name: messages.Manage.addMenu.railInstrumentEvent }),
+        ).toBeInTheDocument(),
+      );
+      expect(replace).toHaveBeenCalledWith("/transactions");
+    });
+  });
+
+  // #669: AddTransactionMenu and DesktopShell merged into one tree — the rail
+  // (`max-md:hidden`) replaces the mobile chooser at `md:`+ instead of a second,
+  // separately-mounted component swapped in via `isDesktop`.
+  describe("merged desktop rail (#669)", () => {
+    it("opens directly on the manual step at a wide viewport, skipping the chooser", async () => {
+      mockMatchMedia(true);
+      renderMenu();
+      openMenu();
+
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(
+        screen.getByRole("dialog", { name: messages.Manage.addMenu.railAddTransaction }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(messages.Manage.addMenu.screenshot)).not.toBeInTheDocument();
+    });
+
+    it("switches step and header title as each rail destination is clicked", async () => {
+      mockMatchMedia(true);
+      renderMenu();
+      openMenu();
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.Manage.addMenu.railInstrumentEvent }),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("dialog", { name: messages.Manage.addMenu.railInstrumentEvent }),
+        ).toBeInTheDocument(),
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.Manage.addMenu.railCreatePortfolio }),
+      );
+      expect(
+        screen.getByRole("dialog", { name: messages.Manage.addMenu.createPortfolio }),
+      ).toBeInTheDocument();
+      // The anti-nesting check: the rail's "Create portfolio" destination renders
+      // PortfolioFormBody inline, not a second, separately-controlled Dialog on top.
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.Manage.addMenu.railAccountHolder }),
+      );
+      expect(
+        screen.getByRole("dialog", { name: messages.Manage.addMenu.createAccountHolder }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    });
+
+    it("keeps the manual step's NewEntryTabs mounted, and its props stable, across a live viewport resize", async () => {
+      const media = mockMatchMediaDynamic(false);
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(entryTabsMountCount.current).toBe(1);
+      expect(lastEntryTabsProps.current).toMatchObject({
+        hideTabList: false,
+        visibleTabs: undefined,
+      });
+
+      // A resize while "manual" is open must not change the step's own shape — the
+      // desktop/mobile split is decided once, at the transition into the step (see
+      // `manualStepDesktop` in add-transaction-menu.tsx), specifically so a live
+      // viewport crossing can never unmount (and so discard) an in-progress form.
+      media.resize(true);
+      expect(entryTabsMountCount.current).toBe(1);
+      expect(lastEntryTabsProps.current).toMatchObject({
+        hideTabList: false,
+        visibleTabs: undefined,
+      });
+
+      media.resize(false);
+      expect(entryTabsMountCount.current).toBe(1);
+    });
+
+    it("routes the mobile chooser's portfolio/holder cards to inline steps, not a nested dialog", async () => {
+      listAccountHolders.mockResolvedValue([]);
+      renderMenu();
+      openMenu();
+      await waitFor(() =>
+        expect(screen.getByText(messages.Manage.addMenu.createAccountHolder)).toBeInTheDocument(),
+      );
+
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.createPortfolio));
+      expect(
+        screen.getByRole("dialog", { name: messages.Manage.addMenu.createPortfolio }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+
+      fireEvent.click(screen.getByRole("button", { name: messages.Manage.back }));
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.createAccountHolder));
+      expect(
+        screen.getByRole("dialog", { name: messages.Manage.addMenu.createAccountHolder }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    });
+
+    it("shows no shared footer bar on the mobile chooser step", () => {
+      renderMenu();
+      openMenu();
+      expect(
+        screen.queryByRole("button", { name: messages.Manage.addMenu.cancel }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides the shared footer during import but shows it for every other step", async () => {
+      mockMatchMedia(true);
+      renderMenu();
+      openMenu();
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(
+        screen.getByRole("button", { name: messages.Manage.addMenu.cancel }),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: messages.Manage.addMenu.railImport }));
+      await waitFor(() => expect(screen.getByTestId("import-flow")).toBeInTheDocument());
+      expect(
+        screen.queryByRole("button", { name: messages.Manage.addMenu.cancel }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Regression test for the bug the deleted `desktop-shell.test.tsx` guarded against
+    // (#674): a self-portaling submit button double-wrapping itself in footer chrome
+    // when `SheetFooterChromeContext` isn't correctly threaded through to it.
+    it("marks the shared footer as already-styled for every step except import", async () => {
+      mockMatchMedia(true);
+      renderMenu();
+      openMenu();
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(screen.getByTestId("chrome-probe-manual")).toHaveTextContent("styled");
+
+      fireEvent.click(screen.getByRole("button", { name: messages.Manage.addMenu.railImport }));
+      await waitFor(() => expect(screen.getByTestId("import-flow")).toBeInTheDocument());
+      expect(screen.getByTestId("chrome-probe-import")).toHaveTextContent("bare");
+    });
+
+    // A live resize/orientation-flip/devtools-toolbar toggle across `md:` while the
+    // mobile-only chooser is open has no CSS-only equivalent to land on (the rail has no
+    // "choose" destination) — without this, the rail would show and highlight the wrong
+    // item while the chooser cards kept rendering underneath it.
+    it("self-heals off the mobile chooser when a live resize crosses into the rail's width", async () => {
+      const media = mockMatchMediaDynamic(false);
+      renderMenu();
+      openMenu();
+      expect(screen.getByText(messages.Manage.addMenu.screenshot)).toBeInTheDocument();
+
+      media.resize(true);
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(screen.queryByText(messages.Manage.addMenu.screenshot)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("dialog", { name: messages.Manage.addMenu.railAddTransaction }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the rail, back-chevron, and desktop Cancel button CSS-hidden rather than conditionally mounted", async () => {
+      // Default (mobile) matchMedia — if these were viewport-gated by JS instead of
+      // `max-md:`/`md:` classes, none of them would be in the DOM at all here.
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+
+      const back = screen.getByRole("button", { name: messages.Manage.back });
+      expect(back.className).toContain("md:hidden");
+
+      const cancel = screen.getByRole("button", { name: messages.Manage.addMenu.cancel });
+      expect(cancel.className).toContain("max-md:hidden");
+
+      const rail = screen
+        .getByRole("button", { name: messages.Manage.addMenu.railImport })
+        .closest("aside");
+      expect(rail?.className).toContain("max-md:hidden");
     });
   });
 });
