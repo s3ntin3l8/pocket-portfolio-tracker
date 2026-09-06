@@ -168,6 +168,7 @@ export function ImportHistory({
         onBulkDelete={bulkDelete}
         onSetConfirmingBulk={setConfirmingBulk}
         onExitSelection={exitSelection}
+        className="md:mx-6 md:mb-3"
       />
       <CardContent className="p-0">
         <div className="hidden md:block">

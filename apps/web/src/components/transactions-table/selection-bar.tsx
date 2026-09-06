@@ -1,10 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { X, Check, FolderInput, GitMerge, Trash2 } from "lucide-react";
+import { Check, FolderInput, GitMerge, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { useMediaQuery } from "@/lib/use-media-query";
+import { SelectionBarShell } from "@/components/ui/selection-bar-shell";
 
 export function SelectionBar({
   selectionMode,
@@ -40,7 +40,6 @@ export function SelectionBar({
   onCancelDelete: () => void;
 }) {
   const tb = useTranslations("Transactions.batch");
-  const isMobile = !useMediaQuery("(min-width: 768px)");
 
   if (!selectionMode) return null;
 
@@ -91,47 +90,13 @@ export function SelectionBar({
       )
     ) : null;
 
-  if (isMobile) {
-    return (
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur-sm safe-area-bottom">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
-            <button
-              type="button"
-              onClick={onClearSelection}
-              aria-label={tb("cancel")}
-              title={tb("cancel")}
-              className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
-            {selectedCount > 0 ? tb("selected", { count: selectedCount }) : tb("selectPrompt")}
-          </span>
-          {actions && (
-            <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {actions}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2 text-sm">
-      <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
-        <button
-          type="button"
-          onClick={onClearSelection}
-          aria-label={tb("cancel")}
-          title={tb("cancel")}
-          className="flex size-8 items-center justify-center text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
-        {selectedCount > 0 ? tb("selected", { count: selectedCount }) : tb("selectPrompt")}
-      </span>
+    <SelectionBarShell
+      label={selectedCount > 0 ? tb("selected", { count: selectedCount }) : tb("selectPrompt")}
+      onDismiss={onClearSelection}
+      dismissLabel={tb("cancel")}
+    >
       {actions}
-    </div>
+    </SelectionBarShell>
   );
 }
