@@ -145,6 +145,22 @@ export interface InstrumentFundamentals {
    *  differ from `currency` (e.g. a GBp-quoted line whose income statement is USD- or
    *  EUR-denominated). Falls back to `currency` when the provider doesn't report one. */
   financialCurrency?: string | null;
+  /** Trailing quarterly EPS: analyst estimate vs. reported actual, oldest first (#603).
+   *  Sourced from Yahoo `earnings.earningsChart.quarterly[]` — typically ~4 quarters,
+   *  with no fixed upper bound (caller decides how many to render). Null when the
+   *  provider doesn't expose the data for this instrument. EPS is dimensionless per-share,
+   *  so values are plain numbers (not decimal strings). */
+  epsHistory?: {
+    quarters: Array<{
+      /** Yahoo's calendar-quarter label, e.g. "1Q2025". */
+      period: string;
+      actual: number | null;
+      estimate: number | null;
+    }>;
+    /** Consensus estimate for the in-progress quarter — the "expected" bar to render
+     *  alongside the reported history. */
+    currentQuarterEstimate: number | null;
+  } | null;
   /** Link to the instrument's page on the provider's site (e.g. Yahoo Finance), using
    *  the exact symbol the provider resolved — avoids the caller guessing exchange suffixes. */
   externalUrl?: string | null;

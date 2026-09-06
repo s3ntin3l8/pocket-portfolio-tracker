@@ -675,6 +675,17 @@ export interface InstrumentFundamentals {
   /** Currency of `financials[]` figures — can differ from `currency` (e.g. a GBp-quoted
    *  line whose income statement is reported in USD or EUR). Falls back to `currency`. */
   financialCurrency?: string | null;
+  /** Trailing quarterly EPS: analyst estimate vs. reported actual (#603). Sourced from
+   *  Yahoo `earnings.earningsChart.quarterly[]` (~4 quarters typical). Plain numbers
+   *  (EPS is per-share, not money). Null when the provider exposes no earningsChart. */
+  epsHistory?: {
+    quarters: Array<{
+      period: string;
+      actual: number | null;
+      estimate: number | null;
+    }>;
+    currentQuarterEstimate: number | null;
+  } | null;
   /** Link to the instrument's page on the provider's site (e.g. Yahoo Finance). */
   externalUrl?: string | null;
 }

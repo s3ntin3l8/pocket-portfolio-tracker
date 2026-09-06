@@ -515,6 +515,10 @@ export class YahooFinanceProvider implements MarketDataProvider {
             financialsChart?: {
               yearly?: Array<{ date: number; revenue: unknown; earnings: unknown }>;
             };
+            earningsChart?: {
+              quarterly?: Array<{ date: string; actual?: unknown; estimate?: unknown }>;
+              currentQuarterEstimate?: unknown;
+            };
           };
           recommendationTrend?: { trend?: Array<Record<string, unknown>> };
           fundProfile?: { feesExpensesInvestment?: { annualReportExpenseRatio?: unknown } };
@@ -569,6 +573,22 @@ export class YahooFinanceProvider implements MarketDataProvider {
           f.revenue !== null && f.earnings !== null,
       );
 
+    // EPS actual vs. estimate (#603) — Yahoo's `earningsChart.quarterly[]` typically holds
+    // the last ~4 reported quarters. We don't truncate: the cap is a UI-side concern.
+    // `epsHistory` itself is null when the provider returns no earningsChart block at all
+    // (newly listed, ETFs) so consumers can do a single `!= null` guard.
+    const earningsChart = result.earnings?.earningsChart;
+    const epsHistory = earningsChart
+      ? {
+          quarters: (earningsChart.quarterly ?? []).map((q) => ({
+            period: q.date,
+            actual: unwrapNumber(q.actual),
+            estimate: unwrapNumber(q.estimate),
+          })),
+          currentQuarterEstimate: unwrapNumber(earningsChart.currentQuarterEstimate),
+        }
+      : null;
+
     const fundamentals: InstrumentFundamentals = {
       currency,
       asOf: new Date().toISOString(),
@@ -601,6 +621,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
       exDividendDate: unixToIsoDate(result.calendarEvents?.exDividendDate),
       financials: financials.length > 0 ? financials : null,
       financialCurrency,
+      epsHistory,
       externalUrl: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`,
     };
 

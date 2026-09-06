@@ -1085,6 +1085,11 @@
     "revenueVsEarningsLabel": "Revenue vs. earnings",
     "revenueLabel": "Revenue",
     "earningsLabel": "Earnings",
+    "epsActualVsEstimateLabel": "EPS · expected vs. actual",
+    "epsEstimateLabel": "Estimate",
+    "epsActualLabel": "Actual",
+    "epsCurrentQuarterLabel": "Current Q",
+    "epsSurpriseLabel": "Surprise",
     "asOfLabel": "As of {date}",
     "recommendation": {
       "strong_buy": "Strong buy",
