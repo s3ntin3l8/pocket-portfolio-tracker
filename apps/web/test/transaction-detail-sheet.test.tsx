@@ -506,20 +506,20 @@ describe("TransactionDetailSheet — v2 design fidelity", () => {
     expect(subtitle).toBeInTheDocument();
   });
 
-  it("renders as a centered Dialog on desktop (≥760px, not the app's usual 860 — a narrower panel) instead of a bottom Sheet", () => {
-    const matchMedia = vi.fn().mockReturnValue({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    });
-    window.matchMedia = matchMedia;
+  // Overlay chrome migration (#625): was a `useMediaQuery("(min-width: 760px)")` JS
+  // branch between a Dialog and a bottom Sheet — narrower than the app's usual 860px
+  // switch, since this is a 480px-max panel, not the wide two-column Add/Edit modal.
+  // Now a single DialogContent tree at size="sm" (480px), full-screen below the app's
+  // one shared `md`/768px breakpoint — an 8px shift from the old 760px, documented as
+  // a deviation in the PR body.
+  it("renders as a single DialogContent tree, sized sm, full-screen on mobile", () => {
     renderSheet();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    // The desktop close button has no drag handle — the mobile Sheet's shows one.
+    const content = screen.getByRole("dialog");
+    expect(content.className).toContain("md:max-w-[480px]");
+    expect(content.className).toContain("inset-0");
+    // The header's own close button is the only one — DialogContent's floating X is
+    // suppressed (hideClose), identical at every width, no drag handle either way.
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-    // Locks in the specific breakpoint — the detail panel's own 480px-max Dialog switches
-    // to desktop chrome sooner than the app's usual 860px (Add/Edit's wider modal).
-    expect(matchMedia).toHaveBeenCalledWith("(min-width: 760px)");
   });
 
   it("labels a dividend's breakdown rows Shares/Per share/Gross/Net income (not Quantity/Price/Amount/Net Amount)", () => {
