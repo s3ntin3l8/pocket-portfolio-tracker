@@ -78,6 +78,7 @@ export function PortfolioFormDialog({
             fsaRemainingForHolder={f.fsaRemainingForHolder}
             selectedHolderName={f.selectedHolderObj?.name ?? null}
             cashCounted={f.cashCounted}
+            allowNegativeCash={f.allowNegativeCash}
             documentRetention={f.documentRetention}
             includeInAggregate={f.includeInAggregate}
             onNameChange={f.setName}
@@ -91,6 +92,7 @@ export function PortfolioFormDialog({
             onCurrencyChange={f.setCurrency}
             onTaxAllowanceChange={f.setTaxAllowanceAnnual}
             onCashCountedChange={f.setCashCounted}
+            onAllowNegativeCashChange={f.setAllowNegativeCash}
             onDocumentRetentionChange={f.setDocumentRetention}
             onIncludeInAggregateChange={f.setIncludeInAggregate}
           />

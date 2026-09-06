@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import type { AccountHolder, AccountHolderType } from "@portfolio/api-client";
 import { useTranslations } from "next-intl";
 import { TriangleAlert } from "lucide-react";
@@ -13,7 +14,9 @@ import { KNOWN_BROKERAGES } from "@/lib/brokerages";
 import { CURRENCIES, NEW_HOLDER } from "../constants";
 import { AccountingSection } from "./accounting-section";
 
-const CARD = "rounded-[16px] border border-border bg-card p-4 shadow-card";
+// space-y-3.5 gives the Eyebrow room from its first field — dropping it left the section
+// label flush against the field below in all three form hosts (#625 review finding).
+const CARD = "space-y-3.5 rounded-[16px] border border-border bg-card p-4 shadow-card";
 
 export function PortfolioFormSections({
   // Basics
@@ -40,6 +43,7 @@ export function PortfolioFormSections({
   selectedHolderName,
   // Accounting
   cashCounted,
+  allowNegativeCash,
   documentRetention,
   includeInAggregate,
   // Setters
@@ -54,6 +58,7 @@ export function PortfolioFormSections({
   onCurrencyChange,
   onTaxAllowanceChange,
   onCashCountedChange,
+  onAllowNegativeCashChange,
   onDocumentRetentionChange,
   onIncludeInAggregateChange,
 }: {
@@ -78,6 +83,7 @@ export function PortfolioFormSections({
   fsaRemainingForHolder: number;
   selectedHolderName: string | null;
   cashCounted: boolean;
+  allowNegativeCash: boolean;
   documentRetention: boolean;
   includeInAggregate: boolean;
   onNameChange: (v: string) => void;
@@ -91,10 +97,13 @@ export function PortfolioFormSections({
   onCurrencyChange: (v: string) => void;
   onTaxAllowanceChange: (v: string) => void;
   onCashCountedChange: (v: boolean) => void;
+  onAllowNegativeCashChange: (v: boolean) => void;
   onDocumentRetentionChange: (v: boolean) => void;
   onIncludeInAggregateChange: (v: boolean) => void;
 }) {
   const t = useTranslations("PortfolioForm");
+  // Distinct per mount — see the matching note in accounting-section.tsx.
+  const uid = useId();
 
   return (
     <div className="space-y-3.5">
@@ -104,19 +113,19 @@ export function PortfolioFormSections({
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="portfolio-brokerage">{t("brokerage")}</Label>
+            <Label htmlFor={`${uid}-brokerage`}>{t("brokerage")}</Label>
             <div className="flex items-center gap-2">
               <BrokerageIcon brokerage={brokerage} />
               <Input
-                id="portfolio-brokerage"
+                id={`${uid}-brokerage`}
                 value={brokerage}
                 onChange={(e) => onBrokerageChange(e.target.value)}
                 placeholder={t("brokeragePlaceholder")}
-                list="pf-brokerage-list"
+                list={`${uid}-brokerage-list`}
                 autoComplete="off"
               />
             </div>
-            <datalist id="pf-brokerage-list">
+            <datalist id={`${uid}-brokerage-list`}>
               {KNOWN_BROKERAGES.map((b: string) => (
                 <option key={b} value={b} />
               ))}
@@ -130,9 +139,9 @@ export function PortfolioFormSections({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portfolio-name">{t("name")}</Label>
+            <Label htmlFor={`${uid}-name`}>{t("name")}</Label>
             <Input
-              id="portfolio-name"
+              id={`${uid}-name`}
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
               placeholder={t("namePlaceholder")}
@@ -141,9 +150,9 @@ export function PortfolioFormSections({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portfolio-account-holder">{t("accountHolder")}</Label>
+            <Label htmlFor={`${uid}-account-holder`}>{t("accountHolder")}</Label>
             <Select
-              id="portfolio-account-holder"
+              id={`${uid}-account-holder`}
               value={accountHolderId}
               onChange={(e) => onAccountHolderChange(e.target.value)}
             >
@@ -162,27 +171,27 @@ export function PortfolioFormSections({
             {accountHolderId === NEW_HOLDER && (
               <div className="mt-2 space-y-3 rounded-md border border-border/60 p-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="new-holder-name">{t("holderName")}</Label>
+                  <Label htmlFor={`${uid}-new-holder-name`}>{t("holderName")}</Label>
                   <Input
-                    id="new-holder-name"
+                    id={`${uid}-new-holder-name`}
                     value={newHolderName}
                     onChange={(e) => onNewHolderNameChange(e.target.value)}
                     placeholder={t("accountHolderPlaceholder")}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label id="new-holder-type-label">{t("holderType")}</Label>
+                  <Label id={`${uid}-new-holder-type-label`}>{t("holderType")}</Label>
                   <HolderTypeChips
                     value={newHolderType}
                     onChange={onNewHolderTypeChange}
-                    labelledBy="new-holder-type-label"
+                    labelledBy={`${uid}-new-holder-type-label`}
                   />
                 </div>
                 {newHolderType === "child" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="new-holder-birth-year">{t("birthYear")}</Label>
+                    <Label htmlFor={`${uid}-new-holder-birth-year`}>{t("birthYear")}</Label>
                     <Input
-                      id="new-holder-birth-year"
+                      id={`${uid}-new-holder-birth-year`}
                       type="number"
                       inputMode="numeric"
                       placeholder={t("birthYearPlaceholder")}
@@ -204,9 +213,9 @@ export function PortfolioFormSections({
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="portfolio-account-number">{t("accountNumber")}</Label>
+            <Label htmlFor={`${uid}-account-number`}>{t("accountNumber")}</Label>
             <Input
-              id="portfolio-account-number"
+              id={`${uid}-account-number`}
               value={accountNumber}
               onChange={(e) => onAccountNumberChange(e.target.value)}
               placeholder={t("accountNumberPlaceholder")}
@@ -215,9 +224,9 @@ export function PortfolioFormSections({
 
           <div className="flex items-start gap-3">
             <div className="w-[130px] shrink-0 space-y-1.5">
-              <Label htmlFor="portfolio-currency">{t("currency")}</Label>
+              <Label htmlFor={`${uid}-currency`}>{t("currency")}</Label>
               <Select
-                id="portfolio-currency"
+                id={`${uid}-currency`}
                 value={currency}
                 onChange={(e) => onCurrencyChange(e.target.value)}
               >
@@ -230,9 +239,9 @@ export function PortfolioFormSections({
             </div>
 
             <div className="flex-1 space-y-1.5">
-              <Label htmlFor="portfolio-iban">{t("iban")}</Label>
+              <Label htmlFor={`${uid}-iban`}>{t("iban")}</Label>
               <Input
-                id="portfolio-iban"
+                id={`${uid}-iban`}
                 value={iban}
                 onChange={(e) => onIbanChange(e.target.value)}
                 placeholder={t("ibanPlaceholder")}
@@ -241,9 +250,9 @@ export function PortfolioFormSections({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portfolio-fsa">{t("taxAllowanceAnnual")}</Label>
+            <Label htmlFor={`${uid}-fsa`}>{t("taxAllowanceAnnual")}</Label>
             <Input
-              id="portfolio-fsa"
+              id={`${uid}-fsa`}
               type="number"
               inputMode="decimal"
               min={0}
@@ -282,9 +291,11 @@ export function PortfolioFormSections({
         <Eyebrow>{t("sectionAccounting")}</Eyebrow>
         <AccountingSection
           cashCounted={cashCounted}
+          allowNegativeCash={allowNegativeCash}
           documentRetention={documentRetention}
           includeInAggregate={includeInAggregate}
           onCashCountedChange={onCashCountedChange}
+          onAllowNegativeCashChange={onAllowNegativeCashChange}
           onDocumentRetentionChange={onDocumentRetentionChange}
           onIncludeInAggregateChange={onIncludeInAggregateChange}
         />

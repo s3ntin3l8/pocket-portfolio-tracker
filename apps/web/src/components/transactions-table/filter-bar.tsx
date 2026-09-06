@@ -54,13 +54,6 @@ export function FilterBar({
     [],
   );
 
-  const hasActiveFilter =
-    (searchQuery && searchQuery.length > 0) ||
-    showFlagged ||
-    typeFilter != null ||
-    yearFilterProp != null ||
-    draftFilter !== "all";
-
   const activeFilterCount = [
     typeFilter != null,
     showFlagged,
@@ -145,7 +138,7 @@ export function FilterBar({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {draftCount > 0 && (
+        {(draftCount > 0 || draftFilter !== "all") && (
           <select
             aria-label={t("filterDraftLabel")}
             value={draftFilter}
@@ -158,16 +151,50 @@ export function FilterBar({
         )}
       </div>
 
-      {/* Mobile: filter button + search */}
+      {/* Mobile: search + filter button — search stays inline rather than living inside
+          the filter Sheet, so it's reachable in one tap and results update on a visible
+          list instead of behind an open sheet. */}
       <div className="flex items-center gap-2 sm:hidden">
+        <div className="relative flex flex-1 items-center">
+          <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder={t("searchPlaceholder")}
+            value={localQuery}
+            onChange={(e) => {
+              const v = e.target.value;
+              setLocalQuery(v);
+              if (debounceRef.current) clearTimeout(debounceRef.current);
+              debounceRef.current = setTimeout(() => {
+                onSearchChange(v || undefined);
+              }, 300);
+            }}
+            className="h-9 w-full pl-7 pr-7 text-xs"
+          />
+          {localQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setLocalQuery("");
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                onSearchChange(undefined);
+              }}
+              aria-label={t("searchClear")}
+              className="absolute right-2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
         <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
           <SheetTrigger asChild>
             <button
               type="button"
               aria-label={t("filterLabel")}
               className={cn(
-                "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                hasActiveFilter
+                "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                activeFilterCount > 0
                   ? "border-pill bg-pill text-white"
                   : "border-border bg-card text-foreground",
               )}
@@ -189,38 +216,6 @@ export function FilterBar({
               <SheetTitle className="text-left text-base">{t("filterLabel")}</SheetTitle>
             </SheetHeader>
             <div className="flex flex-col gap-4">
-              <div className="relative flex items-center">
-                <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder={t("searchPlaceholder")}
-                  value={localQuery}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setLocalQuery(v);
-                    if (debounceRef.current) clearTimeout(debounceRef.current);
-                    debounceRef.current = setTimeout(() => {
-                      onSearchChange(v || undefined);
-                    }, 300);
-                  }}
-                  className="h-9 w-full pl-7 pr-7 text-xs"
-                />
-                {localQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLocalQuery("");
-                      if (debounceRef.current) clearTimeout(debounceRef.current);
-                      onSearchChange(undefined);
-                    }}
-                    aria-label={t("searchClear")}
-                    className="absolute right-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
-
               <div>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
                   {t("filterType")}
@@ -256,7 +251,7 @@ export function FilterBar({
                 </div>
               )}
 
-              {draftCount > 0 && (
+              {(draftCount > 0 || draftFilter !== "all") && (
                 <div>
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
                     {t("filterDraftLabel")}

@@ -162,11 +162,16 @@ export function ReconciliationBanner({
   title,
   detail,
   tag,
+  dismissLabel,
   onDismiss,
 }: {
   title: string;
   detail: string;
   tag: string;
+  /** Accessible name for the dismiss button — this component takes pre-resolved
+   *  strings (no `useTranslations` here, so it stays usable from a server component),
+   *  so callers must pass their own `Anomalies.dismiss` translation. */
+  dismissLabel?: string;
   onDismiss?: () => void;
 }) {
   return (
@@ -185,8 +190,8 @@ export function ReconciliationBanner({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label={title}
-          title={title}
+          aria-label={dismissLabel ?? title}
+          title={dismissLabel ?? title}
           className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/50 hover:text-muted-foreground"
         >
           <X className="size-4" />

@@ -370,6 +370,7 @@ export default async function HoldingsPage({
               title: ta("reconciliationTitle"),
               detail: anomalyLabel(a, ta as AnomalyTranslator, locale),
               tag: ta("portfolioTag"),
+              dismissLabel: ta("dismiss"),
             }))}
           />
 

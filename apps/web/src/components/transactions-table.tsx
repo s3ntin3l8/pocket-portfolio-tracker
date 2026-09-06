@@ -395,7 +395,9 @@ export function TransactionsTable({
           )}
         {showFilterBanners &&
           portfolioAnomalies
-            .filter((a) => !dismissedRecon.has(`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`))
+            .filter(
+              (a) => !dismissedRecon.has(`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`),
+            )
             .map((a) => {
               const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
               return (
@@ -404,6 +406,7 @@ export function TransactionsTable({
                   title={ta("reconciliationTitle")}
                   detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
                   tag={ta("portfolioTag")}
+                  dismissLabel={ta("dismiss")}
                   onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(key))}
                 />
               );
