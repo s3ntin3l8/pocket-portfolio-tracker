@@ -20,8 +20,10 @@ import {
  * Save, Escape, overlay tap), we pop our own marker via `history.back()` so the stack
  * doesn't accumulate stale entries and a later real back-press behaves normally.
  *
- * Popping is conditional on the marker still being the current history entry
- * (`history.state?.backToCloseMarker`). If content inside the modal did its own
+ * Popping is conditional on THIS instance's marker still being the current history
+ * entry (`history.state?.backToCloseMarkerId === id`, an id tag, not a bare boolean —
+ * see the #671 doc block below for why identity matters once more than one instance
+ * can be open). If content inside the modal did its own
  * `router.push`/`pushState` while open — e.g. a filter Sheet updating the URL as the
  * user picks chips without closing per tap — that navigation sits *on top of* our
  * marker. Blindly calling `history.back()` then would pop that interim entry instead of
@@ -55,6 +57,15 @@ import {
  * NON-topmost instance normally (X/Save/Escape) still calls `history.back()` for its own
  * marker, and the resulting `popstate` must not be misattributed to the user and used to
  * close whatever is now topmost.
+ *
+ * The pushed marker is tagged with THIS instance's own `id` (`backToCloseMarkerId`, not
+ * a bare `backToCloseMarker: true` boolean) for the same multi-instance reason: with two
+ * markers on the real history stack, a boolean can't tell "my own marker is current"
+ * from "a DIFFERENT still-open instance's marker happens to be current" — and closing
+ * while it's the latter must not call `history.back()` at all (that would consume the
+ * OTHER instance's real history entry instead of leaving it alone, corrupting its
+ * bookkeeping: that instance still believes its own marker is pending and will try to
+ * pop it again on its own eventual close, over-popping by one).
  */
 export function useBackToClose(
   open: boolean | undefined,
@@ -99,13 +110,13 @@ export function useBackToClose(
     const wasOpen = wasOpenRef.current;
     wasOpenRef.current = open;
     if (open && !wasOpen) {
-      window.history.pushState({ ...window.history.state, backToCloseMarker: true }, "");
+      window.history.pushState({ ...window.history.state, backToCloseMarkerId: id }, "");
       pushedRef.current = true;
       registerMarker(id, onPop);
     } else if (!open && wasOpen && pushedRef.current) {
       pushedRef.current = false;
       releaseMarker(id);
-      if (window.history.state?.backToCloseMarker) {
+      if (window.history.state?.backToCloseMarkerId === id) {
         notePendingProgrammaticBack();
         window.history.back();
       }

@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useBackToClose } from "../src/lib/use-back-to-close";
@@ -34,7 +35,10 @@ describe("useBackToClose", () => {
 
     rerender({ open: true });
     expect(pushSpy).toHaveBeenCalledTimes(1);
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ backToCloseMarker: true }), "");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ backToCloseMarkerId: expect.any(String) }),
+      "",
+    );
   });
 
   it("pops the marker via history.back() when closed normally (X/Save/Escape) with no interim navigation", () => {
@@ -63,7 +67,7 @@ describe("useBackToClose", () => {
     rerender({ open: true }); // pushes the marker
 
     // Simulate a filter change's router.push while the sheet stays open — a real
-    // navigation, not our marker (no backToCloseMarker flag on its state).
+    // navigation, not our marker (no backToCloseMarkerId on its state).
     window.history.pushState({}, "", "?year=2026");
 
     rerender({ open: false }); // closed via X
@@ -98,7 +102,10 @@ describe("useBackToClose", () => {
     renderHook(() => useBackToClose(true, onOpenChange));
 
     expect(pushSpy).toHaveBeenCalledTimes(1);
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ backToCloseMarker: true }), "");
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ backToCloseMarkerId: expect.any(String) }),
+      "",
+    );
   });
 
   it("ignores a second popstate once the marker has already been consumed", () => {
@@ -171,7 +178,15 @@ describe("useBackToClose", () => {
       expect(onOpenChangeA).toHaveBeenCalledWith(false);
     });
 
-    it("closing a non-topmost instance via X still pops its own marker (no orphan left behind)", () => {
+    // Closing A (buried underneath B, opened first) must NOT call history.back(): B's
+    // marker is the current history entry, not A's, and popping it would consume B's
+    // real entry instead of leaving it alone — corrupting B's own bookkeeping (B still
+    // believes its marker is pending and would try to pop it again on its own eventual
+    // close, over-popping by one). A's own marker is left in place rather than
+    // "orphaned" in the sense of being lost — it's still the entry a later back-press
+    // (after B closes) will correctly consume, one silent extra back-press to fully
+    // leave the page, the same accepted trade-off as the interim-navigation case above.
+    it("closing a non-topmost instance via X does not call history.back() (its own marker isn't current)", () => {
       const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
       const onOpenChangeA = vi.fn();
       const onOpenChangeB = vi.fn();
@@ -194,7 +209,7 @@ describe("useBackToClose", () => {
       // Close A (opened first, buried underneath B) via X — not a back-press.
       rerenderA({ open: false });
 
-      expect(backSpy).toHaveBeenCalledTimes(1);
+      expect(backSpy).not.toHaveBeenCalled();
       expect(onOpenChangeB).not.toHaveBeenCalled();
     });
 
@@ -260,7 +275,14 @@ describe("useBackToClose", () => {
       expect(onOpenChangeE).not.toHaveBeenCalled();
     });
 
-    it("same-tick close-then-open handoff leaves the newly-opened instance open (opening effect runs first)", () => {
+    // Unlike the "closing effect runs first" case above, here E opens WHILE D is still
+    // open (D closes second) — so by the time D closes, E's marker (not D's own) is the
+    // current history entry, and D must NOT call history.back() for the same reason as
+    // the non-topmost-close test below: popping would consume E's real entry instead of
+    // D's own. D's own marker is left in place (the same one-extra-silent-back-press
+    // trade-off), and there's no queued history.back() for a later popstate to consume
+    // — E is simply never touched by any of this.
+    it("same-tick close-then-open handoff: D closing after E has already opened does not call history.back()", () => {
       const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
       const onOpenChangeD = vi.fn();
       const onOpenChangeE = vi.fn();
@@ -276,13 +298,30 @@ describe("useBackToClose", () => {
         initialProps: { open: false },
       });
 
-      hookE.rerender({ open: true }); // E's effect runs first: opens
-      rerenderD({ open: false }); // D's effect runs second: releases + history.back()
+      hookE.rerender({ open: true }); // E opens while D is still open
+      rerenderD({ open: false }); // D closes second — E's marker, not D's, is current
 
-      expect(backSpy).toHaveBeenCalledTimes(1);
-      window.dispatchEvent(new PopStateEvent("popstate")); // D's queued back() arrives
-
+      expect(backSpy).not.toHaveBeenCalled();
       expect(onOpenChangeE).not.toHaveBeenCalled();
     });
+  });
+
+  // Regression test: found by review — React Strict Mode (on in this repo's
+  // next.config.mjs) simulates a mount->cleanup->remount cycle for every effect. The
+  // hook's push effect has a reconcile specifically to survive this (re-registering with
+  // the shared stack if pushedRef is already true but the id was released by the
+  // simulated unmount) — without it, the marker would sit in window.history with
+  // nothing tracking it, and no back-press or close would ever pop it.
+  it("pushes exactly one marker under React Strict Mode's double-invoked effects", () => {
+    const pushSpy = vi.spyOn(window.history, "pushState");
+    const onOpenChange = vi.fn();
+    const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
+      initialProps: { open: false },
+      wrapper: StrictMode,
+    });
+
+    rerender({ open: true });
+
+    expect(pushSpy).toHaveBeenCalledTimes(1);
   });
 });

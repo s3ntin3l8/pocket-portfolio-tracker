@@ -64,22 +64,34 @@ export function registerMarker(id: string, onPop: () => void) {
 }
 
 /** Idempotent, removes by id from any position — a non-topmost instance can close
- *  (programmatically, or via unmount) without its marker having been popped first. */
+ *  (programmatically, or via unmount) without its marker having been popped first.
+ *
+ *  Does NOT reset `pendingProgrammaticBacks` here. An earlier version zeroed it
+ *  whenever this call drained the stack to empty, meant to bound a desynced counter (a
+ *  `history.back()` that produces no `popstate`, e.g. nothing earlier to go back to) to
+ *  at most one swallowed back-press. That's unsound when two instances close in the
+ *  same tick: the first's `releaseMarker` leaves the stack non-empty (no reset) and
+ *  arms the counter; the second's `releaseMarker` then drains it to empty and zeroes
+ *  the counter the first call just legitimately armed, while ITS OWN `history.back()`
+ *  is still in flight — a real `popstate` then falls through to "topmost closes"
+ *  instead of being swallowed, misattributing a self-triggered back-press to the user.
+ *  Left un-self-correcting instead: a stuck-armed counter (the rare case this was
+ *  guarding) swallows one future real back-press indefinitely rather than within one
+ *  cycle, which is worse than never, but still strictly better than the alternative's
+ *  wrong-overlay-closes failure mode. */
 export function releaseMarker(id: string) {
   if (typeof window === "undefined") return;
   stack = stack.filter((entry) => entry.id !== id);
-  // Bounds a desynced counter (a history.back() we made that produces no popstate,
-  // e.g. already at the start of the stack) to at most one swallowed back-press —
-  // self-corrects the next time every registered overlay has closed.
-  if (stack.length === 0) pendingProgrammaticBacks = 0;
 }
 
 export function isMarkerRegistered(id: string): boolean {
+  if (typeof window === "undefined") return false;
   return stack.some((entry) => entry.id === id);
 }
 
 /** Call immediately before every `history.back()` this module causes. */
 export function notePendingProgrammaticBack() {
+  if (typeof window === "undefined") return;
   pendingProgrammaticBacks += 1;
 }
 
