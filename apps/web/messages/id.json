@@ -2016,12 +2016,15 @@
         "exceeded": "Keuntungan dan penghasilan melebihi batas FSA Anda",
         "noFsa": "FSA tidak dikonfigurasi — semua penghasilan kena pajak"
       },
-      "carryForward": {
-        "title": "Penangguhan kerugian diterapkan",
+      "pots": {
         "stock": "Pot saham",
+        "stockDesc": "Keuntungan terealisasi ekuitas saja",
         "general": "Pot umum",
-        "none": "Tidak ada kerugian tahun sebelumnya yang diterapkan tahun ini",
-        "ctaHint": "Masukkan kerugian tahun sebelumnya di bawah untuk mengurangi pajak Anda"
+        "generalDesc": "Reksa dana, obligasi, dividen, bunga, Vorabpauschale",
+        "net": "Keuntungan/kerugian bersih",
+        "used": "Terpakai",
+        "carryForward": "Penangguhan",
+        "editorHint": "Masukkan kerugian tahun sebelumnya di bawah untuk mengurangi pajak Anda"
       },
       "summary": {
         "taxable": "Penghasilan kena pajak melebihi FSA",

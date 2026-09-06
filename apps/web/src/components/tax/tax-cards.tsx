@@ -184,6 +184,47 @@ export function VorabpauschaleRow({
   );
 }
 
+function PotCard({
+  title,
+  desc,
+  netGainLoss,
+  used,
+  carryForward,
+  money,
+  t,
+}: {
+  title: string;
+  desc: string;
+  netGainLoss: string;
+  used: string;
+  carryForward: string;
+  money: (n: string | number) => string;
+  t: TaxTranslator;
+}) {
+  return (
+    <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
+      <span className="text-[11px] font-semibold text-text-2">{title}</span>
+      <p className="mt-0.5 text-[10px] text-text-3">{desc}</p>
+      <div className="mt-2 space-y-1">
+        <div className="flex justify-between text-[11px]">
+          <span className="text-text-3">{t("coverage.pots.net")}</span>
+          <span className="tabular font-bold">{money(netGainLoss)}</span>
+        </div>
+        <div className="flex justify-between text-[11px]">
+          <span className="text-text-3">{t("coverage.pots.used")}</span>
+          <span className="tabular font-bold">{money(used)}</span>
+        </div>
+        {Number(carryForward) > 0 && (
+          <div className="flex justify-between text-[11px]">
+            <span className="text-text-3">{t("coverage.pots.carryForward")}</span>
+            <span className="tabular font-bold">{money(carryForward)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CoverageCard({
   allowanceUsage: u,
   money,
@@ -248,18 +289,30 @@ export function CoverageCard({
           </div>
         )}
 
-        <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
-          <span className="text-[11px] font-semibold text-text-2">
-            {t("coverage.carryForward.title")}
-          </span>
-          <p className="tabular mt-1 text-[13px] font-bold">
-            {t("coverage.carryForward.stock")}: {money(cfStock)} ·{" "}
-            {t("coverage.carryForward.general")}: {money(cfGeneral)}
-          </p>
-          <p className="mt-1 text-[10px] font-medium text-text-3">
-            {hasCf ? t("coverage.carryForward.ctaHint") : t("coverage.carryForward.none")}
-          </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <PotCard
+            title={t("coverage.pots.stock")}
+            desc={t("coverage.pots.stockDesc")}
+            netGainLoss={u.stockPot.netGainLoss}
+            used={u.stockPot.used}
+            carryForward={cfStock}
+            money={money}
+            t={t}
+          />
+          <PotCard
+            title={t("coverage.pots.general")}
+            desc={t("coverage.pots.generalDesc")}
+            netGainLoss={u.generalPot.netGainLoss}
+            used={u.generalPot.used}
+            carryForward={cfGeneral}
+            money={money}
+            t={t}
+          />
         </div>
+
+        {hasCf ? (
+          <p className="text-[10px] font-medium text-text-3">{t("coverage.pots.editorHint")}</p>
+        ) : null}
 
         <Separator />
 
