@@ -359,58 +359,66 @@ export default async function HoldingsPage({
   return (
     <div className="space-y-5">
       {Heading}
-      {anomalyBanner}
-      {standaloneAnomalies.map((a, i) => (
-        <ReconciliationBanner
-          key={`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`}
-          title={ta("reconciliationTitle")}
-          detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-          tag={ta("portfolioTag")}
-        />
-      ))}
-      {/* Reference stacks the glance cards 14px apart (each card: margin-bottom:14px). */}
-      <div className="space-y-3.5">{glanceSection}</div>
 
-      <div className="space-y-3">
-        <Tabs defaultValue="all">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-base font-bold">
-              <span className="sm:hidden">{t("positionsSectionMobile")}</span>
-              <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
-            </h2>
-            <div className="overflow-x-auto">
-              {/* Pill spec transcribed from the reference's `deskOn`/`deskOff` chips:
-                  active 700 12px white on var(--pill); inactive 600 12px on bg-card
-                  WITH a border — not a bare transparent outline. */}
-              <TabsList className="h-auto gap-2 rounded-full border-0 bg-transparent p-0">
-                {visibleClassTabs.map((key) => (
-                  <TabsTrigger
-                    key={key}
-                    value={key}
-                    className="rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold text-foreground data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none"
-                  >
-                    {key === "all" ? t("all") : tc(key)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
-          </div>
-          {visibleClassTabs.map((key) => (
-            <TabsContent key={key} value={key}>
-              <div className="overflow-hidden rounded-[18px] bg-card shadow-card">
-                <HoldingsTable
-                  rows={
-                    key === "all"
-                      ? holdings
-                      : holdings.filter((h) => h.instrument?.assetClass === key)
-                  }
-                  currency={currency}
-                  cash={(key === "all" || key === "cash") && hasCash ? cash : undefined}
-                />
-              </div>
-            </TabsContent>
+      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+        {/* ── Main column: anomaly banners + tabs + table ── */}
+        <div className="space-y-5">
+          {anomalyBanner}
+          {standaloneAnomalies.map((a, i) => (
+            <ReconciliationBanner
+              key={`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`}
+              title={ta("reconciliationTitle")}
+              detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
+              tag={ta("portfolioTag")}
+            />
           ))}
-        </Tabs>
+
+          <div className="space-y-3">
+            <Tabs defaultValue="all">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-base font-bold">
+                  <span className="sm:hidden">{t("positionsSectionMobile")}</span>
+                  <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
+                </h2>
+                <div className="overflow-x-auto">
+                  {/* Pill spec transcribed from the reference's `deskOn`/`deskOff` chips:
+                      active 700 12px white on var(--pill); inactive 600 12px on bg-card
+                      WITH a border — not a bare transparent outline. */}
+                  <TabsList className="h-auto gap-2 rounded-full border-0 bg-transparent p-0">
+                    {visibleClassTabs.map((key) => (
+                      <TabsTrigger
+                        key={key}
+                        value={key}
+                        className="rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold text-foreground data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none"
+                      >
+                        {key === "all" ? t("all") : tc(key)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+              </div>
+              {visibleClassTabs.map((key) => (
+                <TabsContent key={key} value={key}>
+                  <div className="overflow-hidden rounded-[18px] bg-card shadow-card">
+                    <HoldingsTable
+                      rows={
+                        key === "all"
+                          ? holdings
+                          : holdings.filter((h) => h.instrument?.assetClass === key)
+                      }
+                      currency={currency}
+                      cash={(key === "all" || key === "cash") && hasCash ? cash : undefined}
+                    />
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          </div>
+        </div>
+
+        {/* ── Sidebar: glance cards (sticky on wide containers) ── */}
+        {/* Reference stacks the glance cards 14px apart. */}
+        <div className="space-y-3.5 @xl:sticky @xl:top-4 @xl:order-last">{glanceSection}</div>
       </div>
     </div>
   );

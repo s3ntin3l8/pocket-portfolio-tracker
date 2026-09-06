@@ -225,36 +225,148 @@ export default async function InstrumentPage({
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("priceHistory")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <InstrumentPriceCard
-            instrumentId={id}
-            initialHistory={history}
-            currency={instrument.currency}
-            lastPrice={lastPrice}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[1fr_320px] @xl:items-start">
+        {/* ── Main column: price chart + fundamentals + lots + transactions ── */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("priceHistory")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <InstrumentPriceCard
+                instrumentId={id}
+                initialHistory={history}
+                currency={instrument.currency}
+                lastPrice={lastPrice}
+              />
+            </CardContent>
+          </Card>
 
-      {/* Fundamentals: PE, market cap, dividend yield, analyst recs, revenue-vs-earnings —
-          client-fetched (self-heals a per-instrument DB cache), so a slow/unreachable
-          provider can't block the rest of the page. Only meaningful for equity/ETF; other
-          asset classes (gold, bond, mutual_fund, crypto, cash) never had a fundamentals
-          concept, so the card isn't even mounted for them. */}
-      {(instrument.assetClass === "equity" || instrument.assetClass === "etf") && (
-        <InstrumentFundamentalsCard instrumentId={id} />
-      )}
+          {/* Fundamentals: PE, market cap, dividend yield, analyst recs, revenue-vs-earnings —
+              client-fetched (self-heals a per-instrument DB cache), so a slow/unreachable
+              provider can't block the rest of the page. Only meaningful for equity/ETF; other
+              asset classes (gold, bond, mutual_fund, crypto, cash) never had a fundamentals
+              concept, so the card isn't even mounted for them. */}
+          {(instrument.assetClass === "equity" || instrument.assetClass === "etf") && (
+            <InstrumentFundamentalsCard instrumentId={id} />
+          )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("position")}</CardTitle>
-        </CardHeader>
-        <CardContent>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+            {lots.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("openLots")}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-0">
+                  <InstrumentLotsTable lots={lots} currency={lotCurrency} />
+                </CardContent>
+              </Card>
+            )}
+            <InstrumentIncomeCard
+              title={t("incomeCardTitle")}
+              dividendsReceived={
+                instrumentIncome
+                  ? formatMoney(
+                      Number(instrumentIncome.total),
+                      incomeStats?.displayCurrency ?? scope.displayCurrency,
+                      locale,
+                    )
+                  : null
+              }
+              receivedCaption={t("incomeReceivedCaption")}
+              emptyMessage={t("incomeEmpty")}
+              yieldOnCost={
+                instrumentYield?.yieldOnCost != null
+                  ? formatPercent(Number(instrumentYield.yieldOnCost), locale)
+                  : null
+              }
+              yieldTitle={t("yieldOnCostLabel")}
+              yieldCaption={t("yieldOnCostCaption")}
+              bondInfo={
+                instrument.assetClass === "bond" &&
+                instrument.couponRate != null &&
+                instrument.maturityDate != null
+                  ? {
+                      label: t("bondTermsLabel"),
+                      couponRate: formatPercent(Number(instrument.couponRate), locale),
+                      maturityDate: new Date(
+                        `${instrument.maturityDate}T00:00:00`,
+                      ).toLocaleDateString(locale, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      }),
+                    }
+                  : null
+              }
+            />
+          </div>
+
+          {/* Flat heading + TransactionsTable, matching Activity's own layout exactly (#585) —
+              no outer Card here: DesktopTable already renders its own card-styled box, so
+              wrapping it in a second Card doubled the boxing and flushed the filter chips/search
+              bar against the outer card's edge instead of reading as a toolbar above the table. */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">{t("transactions")}</h2>
+              {(instrumentAnomalyErrors > 0 || instrumentAnomalyWarnings > 0) && (
+                <span
+                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                    instrumentAnomalyErrors > 0
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                  }`}
+                >
+                  {instrumentAnomalyErrors > 0 ? (
+                    <AlertCircle className="size-3" />
+                  ) : (
+                    <AlertTriangle className="size-3" />
+                  )}
+                  {instrumentAnomalyErrors > 0
+                    ? ta("bannerError", { count: instrumentAnomalyErrors })
+                    : ta("bannerWarning", { count: instrumentAnomalyWarnings })}
+                </span>
+              )}
+            </div>
+            {txTotal > 0 || hasActiveTxFilter ? (
+              <TransactionsTable
+                rows={txRows}
+                showPortfolio={aggregate}
+                anomalies={instrumentAnomalies}
+                showFilterBanners={false}
+                scopeCurrency={scope.displayCurrency}
+                years={txYears}
+                typeFilter={typeFilter}
+                yearFilter={yearFilter}
+                searchQuery={searchQuery}
+                portfolioId={selectedId ?? undefined}
+                total={txTotal}
+                instrumentId={id}
+              />
+            ) : (
+              <EmptyState
+                icon={Receipt}
+                title={t("noTransactions")}
+                description={t("noTransactionsBody")}
+              />
+            )}
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("corporateActions")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CorporateActionsManager items={corporateActions} isAdmin={isAdmin} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Sidebar: position stats (sticky on wide containers) ── */}
+        <div className="space-y-6 @xl:sticky @xl:top-4 @xl:order-last">
+          <h2 className="text-lg font-semibold">{t("position")}</h2>
           {hasPosition && holding ? (
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
               <StatCard
                 label={t("marketValueLabel")}
                 value={
@@ -291,119 +403,8 @@ export default async function InstrumentPage({
           ) : (
             <EmptyState icon={Wallet} title={t("noPosition")} description={t("noPositionBody")} />
           )}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
-        {lots.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("openLots")}</CardTitle>
-            </CardHeader>
-            <CardContent className="px-0">
-              <InstrumentLotsTable lots={lots} currency={lotCurrency} />
-            </CardContent>
-          </Card>
-        )}
-        <InstrumentIncomeCard
-          title={t("incomeCardTitle")}
-          dividendsReceived={
-            instrumentIncome
-              ? formatMoney(
-                  Number(instrumentIncome.total),
-                  incomeStats?.displayCurrency ?? scope.displayCurrency,
-                  locale,
-                )
-              : null
-          }
-          receivedCaption={t("incomeReceivedCaption")}
-          emptyMessage={t("incomeEmpty")}
-          yieldOnCost={
-            instrumentYield?.yieldOnCost != null
-              ? formatPercent(Number(instrumentYield.yieldOnCost), locale)
-              : null
-          }
-          yieldTitle={t("yieldOnCostLabel")}
-          yieldCaption={t("yieldOnCostCaption")}
-          bondInfo={
-            instrument.assetClass === "bond" &&
-            instrument.couponRate != null &&
-            instrument.maturityDate != null
-              ? {
-                  label: t("bondTermsLabel"),
-                  couponRate: formatPercent(Number(instrument.couponRate), locale),
-                  maturityDate: new Date(`${instrument.maturityDate}T00:00:00`).toLocaleDateString(
-                    locale,
-                    {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    },
-                  ),
-                }
-              : null
-          }
-        />
-      </div>
-
-      {/* Flat heading + TransactionsTable, matching Activity's own layout exactly (#585) —
-          no outer Card here: DesktopTable already renders its own card-styled box, so
-          wrapping it in a second Card doubled the boxing and flushed the filter chips/search
-          bar against the outer card's edge instead of reading as a toolbar above the table. */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold">{t("transactions")}</h2>
-          {(instrumentAnomalyErrors > 0 || instrumentAnomalyWarnings > 0) && (
-            <span
-              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                instrumentAnomalyErrors > 0
-                  ? "bg-destructive/10 text-destructive"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-              }`}
-            >
-              {instrumentAnomalyErrors > 0 ? (
-                <AlertCircle className="size-3" />
-              ) : (
-                <AlertTriangle className="size-3" />
-              )}
-              {instrumentAnomalyErrors > 0
-                ? ta("bannerError", { count: instrumentAnomalyErrors })
-                : ta("bannerWarning", { count: instrumentAnomalyWarnings })}
-            </span>
-          )}
         </div>
-        {txTotal > 0 || hasActiveTxFilter ? (
-          <TransactionsTable
-            rows={txRows}
-            showPortfolio={aggregate}
-            anomalies={instrumentAnomalies}
-            showFilterBanners={false}
-            scopeCurrency={scope.displayCurrency}
-            years={txYears}
-            typeFilter={typeFilter}
-            yearFilter={yearFilter}
-            searchQuery={searchQuery}
-            portfolioId={selectedId ?? undefined}
-            total={txTotal}
-            instrumentId={id}
-          />
-        ) : (
-          <EmptyState
-            icon={Receipt}
-            title={t("noTransactions")}
-            description={t("noTransactionsBody")}
-          />
-        )}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("corporateActions")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CorporateActionsManager items={corporateActions} isAdmin={isAdmin} />
-        </CardContent>
-      </Card>
     </div>
   );
 }

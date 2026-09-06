@@ -72,114 +72,117 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
     <div className="space-y-5">
       {heading}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
-        <StatCard label={t("totalContributed")} value={m(Number(c.netContributed))} />
-        <StatCard
-          label={t("monthlyAverage")}
-          value={m(Number(c.monthlyAverage))}
-          delta={t("monthsElapsed", { count: c.monthsElapsed })}
-          deltaTone="neutral"
-        />
-        <StatCard
-          label={t("currentValue")}
-          value={m(Number(c.currentValue))}
-          delta={
-            c.simpleGainPct !== null
-              ? `${formatPercent(c.simpleGainPct, locale)} ${t("simpleGain")}`
-              : undefined
-          }
-          deltaTone={gainTone}
-        />
-        {c.totalReturnPct !== null && (
-          <StatCard
-            label={t("totalReturn")}
-            value={formatPercent(c.totalReturnPct, locale)}
-            delta={t("totalReturnHint")}
-            deltaTone={c.totalReturnPct >= 0 ? "up" : "down"}
-          />
-        )}
-        <StatCard
-          label={t("xirr")}
-          value={c.xirr !== null ? formatPercent(c.xirr, locale) : "—"}
-          // Under a year of data, XIRR extrapolates one-time/early gains (e.g. a starting
-          // bonus) into an apparent annual rate — flag it so it isn't read as a run-rate.
-          delta={c.xirr !== null && c.monthsElapsed < 12 ? t("xirrYoungHint") : undefined}
-          deltaTone="neutral"
-          // With totalReturn also shown, this grid holds 5 cards — an odd count leaves this
-          // trailing tile alone in a half-width mobile cell. Span both mobile columns so it
-          // reads as a deliberate row instead of a lopsided leftover; desktop has room to
-          // spare so it stays single-width there.
-          className={c.totalReturnPct !== null ? "col-span-2 lg:col-span-1" : undefined}
-        />
-      </div>
+      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+        {/* ── Main column: chart + plans + forecast + cash ── */}
+        <div className="space-y-5">
+          <Card>
+            <CardHeader>
+              {/* Reference: title/subtitle on the left, the chart legend on the right of the same row. */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="text-base">{t("contributionsOverTime")}</CardTitle>
+                  {c.dailySeries.length > 0 && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {t("contributionsSubtitle", {
+                        date: new Intl.DateTimeFormat(locale, {
+                          month: "short",
+                          year: "numeric",
+                        }).format(new Date(c.dailySeries[0].date)),
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-[3px] bg-success" />
+                    {t("chartValue")}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-0 w-3.5 border-t-2 border-dashed border-text-3" />
+                    {t("chartContributions")}
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ContributionsChart
+                series={c.series}
+                dailySeries={c.dailySeries}
+                valueHistory={result.valueHistory}
+                currency={currency}
+              />
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          {/* Reference: title/subtitle on the left, the chart legend on the right of the same row. */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-base">{t("contributionsOverTime")}</CardTitle>
-              {c.dailySeries.length > 0 && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t("contributionsSubtitle", {
-                    date: new Intl.DateTimeFormat(locale, {
-                      month: "short",
-                      year: "numeric",
-                    }).format(new Date(c.dailySeries[0].date)),
-                  })}
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
-              <span className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-[3px] bg-success" />
-                {t("chartValue")}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-0 w-3.5 border-t-2 border-dashed border-text-3" />
-                {t("chartContributions")}
-              </span>
-            </div>
+          {/* Plans + forecast side by side on desktop (reference: 2-col grid). */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {sparplanResult.status === "ok" && sparplanResult.data.plans.length > 0 && (
+              <SparplanSection
+                data={sparplanResult.data}
+                currency={currency}
+                locale={locale}
+                portfolioId={sparplanResult.portfolioId ?? undefined}
+                drift={sparplanResult.data.drift}
+                contributionSplit={sparplanResult.data.contributionSplit}
+              />
+            )}
+
+            <ForecastPanel
+              currentValue={c.currentValue}
+              netContributed={c.netContributed}
+              monthlyAverage={c.monthlyAverage}
+              seedAnnualReturn={c.seedAnnualReturn}
+              currency={currency}
+              birthYear={c.birthYear}
+              portfolioType={c.portfolioType}
+              retirementAge={c.retirementAge}
+            />
           </div>
-        </CardHeader>
-        <CardContent>
-          <ContributionsChart
-            series={c.series}
-            dailySeries={c.dailySeries}
-            valueHistory={result.valueHistory}
-            currency={currency}
-          />
-        </CardContent>
-      </Card>
 
-      {/* Plans + forecast side by side on desktop (reference: 2-col grid). */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {sparplanResult.status === "ok" && sparplanResult.data.plans.length > 0 && (
-          <SparplanSection
-            data={sparplanResult.data}
-            currency={currency}
-            locale={locale}
-            portfolioId={sparplanResult.portfolioId ?? undefined}
-            drift={sparplanResult.data.drift}
-            contributionSplit={sparplanResult.data.contributionSplit}
-          />
-        )}
+          {holdingsResult.status === "ok" && holdingsResult.cashTracked && (
+            <CashOnHandCard cash={holdingsResult.cash} locale={locale} />
+          )}
+        </div>
 
-        <ForecastPanel
-          currentValue={c.currentValue}
-          netContributed={c.netContributed}
-          monthlyAverage={c.monthlyAverage}
-          seedAnnualReturn={c.seedAnnualReturn}
-          currency={currency}
-          birthYear={c.birthYear}
-          portfolioType={c.portfolioType}
-          retirementAge={c.retirementAge}
-        />
+        {/* ── Sidebar: stat cards (sticky on wide containers) ── */}
+        <div className="@xl:sticky @xl:top-4 @xl:order-last">
+          <div className="grid grid-cols-1 space-y-2.5 sm:space-y-4">
+            <StatCard label={t("totalContributed")} value={m(Number(c.netContributed))} />
+            <StatCard
+              label={t("monthlyAverage")}
+              value={m(Number(c.monthlyAverage))}
+              delta={t("monthsElapsed", { count: c.monthsElapsed })}
+              deltaTone="neutral"
+            />
+            <StatCard
+              label={t("currentValue")}
+              value={m(Number(c.currentValue))}
+              delta={
+                c.simpleGainPct !== null
+                  ? `${formatPercent(c.simpleGainPct, locale)} ${t("simpleGain")}`
+                  : undefined
+              }
+              deltaTone={gainTone}
+            />
+            {c.totalReturnPct !== null && (
+              <StatCard
+                label={t("totalReturn")}
+                value={formatPercent(c.totalReturnPct, locale)}
+                delta={t("totalReturnHint")}
+                deltaTone={c.totalReturnPct >= 0 ? "up" : "down"}
+              />
+            )}
+            <StatCard
+              label={t("xirr")}
+              value={c.xirr !== null ? formatPercent(c.xirr, locale) : "—"}
+              // Under a year of data, XIRR extrapolates one-time/early gains (e.g. a starting
+              // bonus) into an apparent annual rate — flag it so it isn't read as a run-rate.
+              delta={c.xirr !== null && c.monthsElapsed < 12 ? t("xirrYoungHint") : undefined}
+              deltaTone="neutral"
+            />
+          </div>
+        </div>
       </div>
-
-      {holdingsResult.status === "ok" && holdingsResult.cashTracked && (
-        <CashOnHandCard cash={holdingsResult.cash} locale={locale} />
-      )}
     </div>
   );
 }
