@@ -1331,6 +1331,7 @@
     "filterType": "Type",
     "filterInstrument": "Instrument",
     "filterLabel": "Filters",
+    "filterClearAll": "Clear all",
     "filterYear": "Year",
     "allTypes": "All types",
     "allInstruments": "All instruments",

@@ -54,13 +54,24 @@ export function FilterBar({
     [],
   );
 
-  const activeFilterCount = [
+  // The filter Sheet's own scope — excludes search, which lives outside it (inline,
+  // with its own clear-X) and has nothing to do with the sheet's "Clear all".
+  const sheetFilterCount = [
     typeFilter != null,
     showFlagged,
     yearFilterProp != null,
     draftFilter !== "all",
-    searchQuery != null && searchQuery.length > 0,
   ].filter(Boolean).length;
+
+  const activeFilterCount =
+    sheetFilterCount + (searchQuery != null && searchQuery.length > 0 ? 1 : 0);
+
+  function clearAllFilters() {
+    onNavigateWithParam("type", undefined);
+    onNavigateWithParam("year", undefined);
+    onDraftFilterChange("all");
+    if (showFlagged) onToggleFlagged();
+  }
 
   const typeChips = (
     <>
@@ -106,9 +117,9 @@ export function FilterBar({
   );
 
   return (
-    <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-2 text-sm md:flex-row md:items-center">
       {/* Desktop: inline chips */}
-      <div className="hidden flex-wrap items-center gap-2 sm:flex">
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
         {typeChips}
         {yearOptions.length > 1 && (
           <DropdownMenu>
@@ -154,7 +165,7 @@ export function FilterBar({
       {/* Mobile: search + filter button — search stays inline rather than living inside
           the filter Sheet, so it's reachable in one tap and results update on a visible
           list instead of behind an open sheet. */}
-      <div className="flex items-center gap-2 sm:hidden">
+      <div className="flex items-center gap-2 md:hidden">
         <div className="relative flex flex-1 items-center">
           <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
           <Input
@@ -208,10 +219,7 @@ export function FilterBar({
               )}
             </button>
           </SheetTrigger>
-          <SheetContent
-            side="bottom"
-            className="rounded-t-[20px] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-          >
+          <SheetContent side="bottom" className="rounded-t-[20px] px-5">
             <SheetHeader className="pb-3 pt-1">
               <SheetTitle className="text-left text-base">{t("filterLabel")}</SheetTitle>
             </SheetHeader>
@@ -233,10 +241,8 @@ export function FilterBar({
                       <button
                         key={y}
                         type="button"
-                        onClick={() => {
-                          onNavigateWithParam("year", y === "all" ? undefined : y);
-                          setMobileFilterOpen(false);
-                        }}
+                        onClick={() => onNavigateWithParam("year", y === "all" ? undefined : y)}
+                        aria-pressed={y === "all" ? !yearFilterProp : yearFilterProp === y}
                         className={cn(
                           "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
                           (y === "all" ? !yearFilterProp : yearFilterProp === y)
@@ -261,10 +267,8 @@ export function FilterBar({
                       <button
                         key={v}
                         type="button"
-                        onClick={() => {
-                          onDraftFilterChange(v);
-                          setMobileFilterOpen(false);
-                        }}
+                        onClick={() => onDraftFilterChange(v)}
+                        aria-pressed={draftFilter === v}
                         className={cn(
                           "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
                           draftFilter === v
@@ -279,12 +283,26 @@ export function FilterBar({
                 </div>
               )}
             </div>
+
+            {/* Sticky footer: chips no longer close the sheet per tap (uniform
+                behaviour — type/flagged chips never did, year/draft chips used to),
+                so batch review + a single "Clear all" replaces closing on selection. */}
+            <div className="sticky bottom-0 -mx-5 mt-4 border-t border-border bg-background px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                disabled={sheetFilterCount === 0}
+                className="w-full rounded-[13px] border border-border bg-card py-2.5 text-sm font-semibold text-foreground disabled:opacity-40"
+              >
+                {t("filterClearAll")}
+              </button>
+            </div>
           </SheetContent>
         </Sheet>
       </div>
 
       {/* Desktop search */}
-      <div className="relative hidden items-center sm:flex sm:ml-auto">
+      <div className="relative hidden items-center md:flex md:ml-auto">
         <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
         <Input
           type="text"
@@ -298,7 +316,7 @@ export function FilterBar({
               onSearchChange(v || undefined);
             }, 300);
           }}
-          className="h-8 w-full pl-7 pr-7 text-xs sm:w-44"
+          className="h-8 w-full pl-7 pr-7 text-xs md:w-44"
         />
         {localQuery && (
           <button

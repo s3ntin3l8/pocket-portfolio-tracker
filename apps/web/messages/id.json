@@ -1329,6 +1329,7 @@
     "filterType": "Jenis",
     "filterInstrument": "Instrumen",
     "filterLabel": "Filter",
+    "filterClearAll": "Hapus semua",
     "filterYear": "Tahun",
     "allTypes": "Semua jenis",
     "allInstruments": "Semua instrumen",
