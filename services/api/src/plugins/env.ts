@@ -205,6 +205,11 @@ export function resolveFileSecrets(
       );
     }
     const value = raw.trim();
+    if (!value) {
+      throw new Error(
+        `${prefix}_FILE at ${filePath} is empty. Refusing to start with an empty secret.`,
+      );
+    }
     // Overwrite the inline var so @fastify/env picks up the file's contents below.
     process.env[prefix] = value;
   }
