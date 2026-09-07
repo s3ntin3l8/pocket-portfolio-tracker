@@ -1310,7 +1310,10 @@
     "hero": {
       "label": "Total nilai portofolio",
       "periodPast": "{range} terakhir",
-      "periodAllTime": "sepanjang masa"
+      "periodAllTime": "sepanjang masa",
+      "legendPortfolio": "Portofolio",
+      "legendBenchmark": "{symbol}",
+      "benchmarkPillUnavailable": "—"
     },
     "allocation": {
       "title": "Alokasi",

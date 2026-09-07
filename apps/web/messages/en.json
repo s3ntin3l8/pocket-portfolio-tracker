@@ -1312,7 +1312,10 @@
     "hero": {
       "label": "Total portfolio value",
       "periodPast": "past {range}",
-      "periodAllTime": "all-time"
+      "periodAllTime": "all-time",
+      "legendPortfolio": "Portfolio",
+      "legendBenchmark": "{symbol}",
+      "benchmarkPillUnavailable": "—"
     },
     "allocation": {
       "title": "Allocation",

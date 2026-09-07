@@ -11,6 +11,7 @@ function isDailyPoint(p: HistoryPoint): p is PerformancePoint {
   return !isIntradayPoint(p);
 }
 import { PriceChart } from "@/components/charts/price-chart";
+import { HeroOverlayChart } from "@/components/charts/hero-overlay-chart";
 import { RangeToggle, type ChartRange } from "@/components/charts/range-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { useApiClient } from "@/lib/api";
@@ -30,6 +31,22 @@ const HERO_RANGES: ChartRange[] = ["1d", "7d", "1m", "1y", "all"];
 export interface ChartSeriesPoint {
   date: string;
   close: number;
+}
+
+/**
+ * Snapshot the hero variant emits to its parent so it can derive pills + legend
+ * without re-walking the underlying series. `benchmarkPct` is the final point's
+ * TWR % (stringified, as `chainIndex` produces — divide by 100 before formatting),
+ * or `null` if no benchmark data is present. `hasBenchmark` is true whenever at
+ * least one point in the rendered series carries a benchmarkPct value.
+ * `isIntraday` distinguishes 1D/7D (where points carry absolute currency) from
+ * day-grained ranges (where points carry TWR %).
+ */
+export interface HeroSeriesSnapshot {
+  points: ChartSeriesPoint[];
+  benchmarkPct: string | null;
+  hasBenchmark: boolean;
+  isIntraday: boolean;
 }
 
 export function NetWorthHistoryChart({
@@ -53,7 +70,7 @@ export function NetWorthHistoryChart({
   initialRange?: ChartRange;
   /** Fired whenever the rendered series (or range) changes — lets a "hero" caller derive
    *  its own period delta/pct pill from the same data the chart is already showing. */
-  onSeriesChange?: (points: ChartSeriesPoint[], range: ChartRange) => void;
+  onSeriesChange?: (snapshot: HeroSeriesSnapshot, range: ChartRange) => void;
 }) {
   const te = useTranslations("Empty");
   const t = useTranslations("Chart");
@@ -108,17 +125,51 @@ export function NetWorthHistoryChart({
             .map((p) => ({ date: p.date, close: p.marketValue ?? p.netWorth }))
         : data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.netWorth }));
 
-  // Let a "hero" caller (e.g. the Holdings glance card) derive its own period
-  // delta/pct pill from exactly the series this chart is rendering.
+  // Hero variant input. Intraday ranges emit absolute currency values for the
+  // portfolio line and `null` for benchmark (no benchmark intraday data); day-
+  // grained ranges emit TWR-rebased portfolio + benchmark (both dimensionless
+  // percentages × 100, matching how `chainIndex` already produces them).
+  const heroOverlayPoints = isHero
+    ? intraday
+      ? data.filter(isIntradayPoint).map((p) => ({
+          date: intradayLabelFmt.format(new Date(p.at)),
+          portfolio: Number(selectedId ? (p.marketValue ?? p.netWorth) : p.netWorth),
+          benchmark: null,
+        }))
+      : data.filter(isDailyPoint).map((p) => ({
+          date: p.date,
+          portfolio: Number(p.pct ?? "0"),
+          benchmark: p.benchmarkPct === undefined ? null : Number(p.benchmarkPct),
+        }))
+    : null;
+
+  // Hero variant snapshot — wraps the same points so the parent can derive
+  // pills + legend without re-walking the data. `benchmarkPct` carries the
+  // final point's TWR % (stringified, as `chainIndex` produces — divide by 100
+  // before formatting), or null when no benchmark is configured for this range.
+  const heroSeriesSnapshot: HeroSeriesSnapshot | null =
+    isHero && heroOverlayPoints
+      ? (() => {
+          const last = heroOverlayPoints[heroOverlayPoints.length - 1];
+          const hasBenchmark = heroOverlayPoints.some((p) => p.benchmark !== null);
+          return {
+            points: heroOverlayPoints.map((p) => ({ date: p.date, close: p.portfolio })),
+            benchmarkPct: hasBenchmark && last?.benchmark != null ? String(last.benchmark) : null,
+            hasBenchmark,
+            isIntraday: intraday,
+          };
+        })()
+      : null;
+
   useEffect(() => {
-    onSeriesChange?.(
-      chartData.map((p) => ({ date: p.date, close: Number(p.close) })),
-      range,
-    );
-    // chartData is a pure function of [data, range, effectiveMode, selectedId] — depending
-    // on those (rather than the freshly-allocated chartData array) avoids an extra re-run.
+    if (!isHero || !heroSeriesSnapshot) return;
+    onSeriesChange?.(heroSeriesSnapshot, range);
+    // heroSeriesSnapshot is a fresh object on every render; depending on its
+    // identity directly would re-fire this effect in a loop with the parent's
+    // `onSeriesChange` setter. The snapshot is a pure function of the inputs
+    // below, which are referentially stable when they haven't actually changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, range, effectiveMode, selectedId, onSeriesChange]);
+  }, [data, range, selectedId, isHero, onSeriesChange]);
 
   const collectingNote = (
     <p
@@ -145,7 +196,7 @@ export function NetWorthHistoryChart({
         {intraday && data.length < 2 ? (
           collectingNote
         ) : data.length > 1 ? (
-          chart
+          <HeroOverlayChart points={heroOverlayPoints ?? []} />
         ) : (
           <p className="py-8 text-center text-sm text-white/80">{te("historyTitle")}</p>
         )}

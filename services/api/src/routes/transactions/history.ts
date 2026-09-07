@@ -59,35 +59,82 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         }));
       }
 
-      const start = rangeStart(range);
-      const conds = [eq(portfolioSnapshots.portfolioId, portfolioId)];
-      if (start) conds.push(gte(portfolioSnapshots.date, start));
-      const rows = await app.db
-        .select()
-        .from(portfolioSnapshots)
-        .where(and(...conds))
-        .orderBy(asc(portfolioSnapshots.date));
+      const result = await withDerivationCache(
+        historyCache,
+        `${portfolioId}:${range}`,
+        async () => {
+          const start = rangeStart(range);
+          const conds = [eq(portfolioSnapshots.portfolioId, portfolioId)];
+          if (start) conds.push(gte(portfolioSnapshots.date, start));
+          const rows = await app.db
+            .select()
+            .from(portfolioSnapshots)
+            .where(and(...conds))
+            .orderBy(asc(portfolioSnapshots.date));
 
-      // Compute TWR chain from stored (marketValue, effectiveFlow) pairs.
-      const series = rows.map((r) => ({
-        date: r.date,
-        marketValue: r.marketValue ?? "0",
-        effectiveFlow: r.effectiveFlow ?? "0",
-      }));
-      const indexed = chainIndex(series);
-      const indexById = new Map(indexed.map((p) => [p.date, p]));
+          // Compute TWR chain from stored (marketValue, effectiveFlow) pairs.
+          const series = rows.map((r) => ({
+            date: r.date,
+            marketValue: r.marketValue ?? "0",
+            effectiveFlow: r.effectiveFlow ?? "0",
+          }));
+          const indexed = chainIndex(series);
+          const indexById = new Map(indexed.map((p) => [p.date, p]));
 
-      const result = rows.map((r) => ({
-        date: r.date,
-        netWorth: r.netWorth,
-        marketValue: r.marketValue ?? "0",
-        index: indexById.get(r.date)?.index ?? "100",
-        pct: indexById.get(r.date)?.pct ?? "0",
-      }));
+          const result = rows.map((r) => ({
+            date: r.date,
+            netWorth: r.netWorth,
+            marketValue: r.marketValue ?? "0",
+            index: indexById.get(r.date)?.index ?? "100",
+            pct: indexById.get(r.date)?.pct ?? "0",
+          }));
+
+          // Benchmark enrichment — same pattern as /networth/history, minus the
+          // display currency (this endpoint returns snapshots in their stored
+          // base currency; the benchmark is a separate indexed series, so no FX
+          // conversion is involved). Lives inside the cache callback so the
+          // 2× `userPreferences`/`benchmarkPrices` queries + possible market-data
+          // fetch are skipped on repeated calls for the same (portfolioId, range).
+          const userId = request.userId;
+          const bmConfig = await getUserBenchmarkConfig(app.db, userId, "");
+          if (result.length > 0) {
+            const bmDates = result.map((p) => p.date);
+            const existingBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
+            const missingDates = bmDates.filter((d) => !existingBm.has(d));
+            if (missingDates.length > 0) {
+              const earliest = missingDates[0];
+              try {
+                const md = await getMarketData();
+                await fetchBenchmarkPrices(app.db, md, userId, bmConfig.symbol, earliest);
+              } catch {
+                /* non-fatal — benchmark is best-effort */
+              }
+            }
+            const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
+            if (refreshedBm.size > 1) {
+              const bmPrices = bmDates
+                .filter((d) => refreshedBm.has(d))
+                .map((d) => ({ date: d, close: refreshedBm.get(d)! }));
+              const bmIndex = computeBenchmarkIndex(bmPrices);
+              const bmById = new Map(bmIndex.map((p) => [p.date, p]));
+              for (const p of result) {
+                const bp = bmById.get(p.date);
+                if (bp) {
+                  (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkIndex =
+                    bp.index;
+                  (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkPct = bp.pct;
+                }
+              }
+            }
+          }
+          return result;
+        },
+      );
+
       request.timingMeta = {
         portfolioId,
         range,
-        pointCount: rows.length,
+        pointCount: result.length,
       };
       return result;
     },
