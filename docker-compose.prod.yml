@@ -26,6 +26,13 @@
 # STORAGE_SECRET_KEY/provider API keys, and `api` has no business holding AUTH_SECRET/
 # AUTHENTIK_CLIENT_SECRET.
 #
+# Sensitive values (DB_ENCRYPTION_KEY, STORAGE_SECRET_KEY) are passed as Docker `secrets:`
+# mounted at /run/secrets/<name>, and the API reads them via `*_FILE` indirection in
+# services/api/src/plugins/env.ts. The `_FILE` indirection means the secret value never
+# appears in `docker inspect` output, process env listings, or core dumps — only the path
+# is visible. `external: true` so the operator manages the secret files out-of-band
+# (typically via a deploy step that writes them to a host directory or mounts a tmpfs).
+#
 # Explicit project name, pinned to the value compose already derives from this
 # directory. Without it, docker-compose.yml (the dev stack) resolves to the same
 # project when run from the same checkout, so `docker compose ps`/`down` in the repo
@@ -47,10 +54,16 @@ services:
     restart: unless-stopped
     networks:
       - backend
+    # Secrets mounted read-only at /run/secrets/<name> (the path @fastify/env's *_FILE
+    # indirection expects). The inline env vars below point to those mount paths so the
+    # API reads the file contents instead of having the values inlined into process env.
+    secrets:
+      - db_encryption_key
+      - storage_secret_key
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
-      DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      DB_ENCRYPTION_KEY_FILE: /run/secrets/db_encryption_key
       AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
       AUTHENTIK_AUDIENCE: ${AUTHENTIK_AUDIENCE}
       AUTHENTIK_ADMIN_GROUP: ${AUTHENTIK_ADMIN_GROUP}
@@ -67,7 +80,7 @@ services:
       STORAGE_REGION: ${STORAGE_REGION}
       STORAGE_BUCKET: ${STORAGE_BUCKET}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
-      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_SECRET_KEY_FILE: /run/secrets/storage_secret_key
       STORAGE_FORCE_PATH_STYLE: ${STORAGE_FORCE_PATH_STYLE:-true}
       STORAGE_SIGNED_URL_TTL: ${STORAGE_SIGNED_URL_TTL:-3600}
       # Screenshot parsing (pick whichever provider(s) you've configured — see .env.example).
@@ -157,6 +170,16 @@ networks:
       config:
         - subnet: 172.28.0.0/24
         - subnet: fd00:172:28::/64
+
+# Sensitive values are read from these files by the API via the *_FILE indirection in
+# services/api/src/plugins/env.ts (resolveFileSecrets()). Files are external (managed by
+# the operator / deploy step, not by compose) so compose never sees the plaintext and
+# secret rotation does not require a compose change.
+secrets:
+  db_encryption_key:
+    external: true
+  storage_secret_key:
+    external: true
 
 volumes:
   apilogs:

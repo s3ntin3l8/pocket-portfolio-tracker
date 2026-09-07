@@ -1,5 +1,6 @@
 import fp from "fastify-plugin";
 import env from "@fastify/env";
+import fs from "node:fs";
 
 const schema = {
   type: "object",
@@ -173,7 +174,44 @@ const schema = {
   },
 };
 
+/**
+ * Resolve `*_FILE` indirection for known env vars: if `FOUND_X_FILE` points to a readable
+ * file, replace `FOUND_X` with the file's trimmed contents. This is the standard Docker /
+ * Kubernetes / Docker-Swarm convention for handing secrets to a process — the secret value
+ * never appears in `docker inspect` output, environment listings, or core dumps, only its
+ * on-disk path. `_FILE` takes precedence over the inline `VAR` when both are set.
+ *
+ * Reads happen at startup, so a later mount (e.g. a Docker secret appearing after the
+ * process boots) won't be picked up — that's intentional, secrets must be present at boot.
+ *
+ * Loud failure on a missing/unreadable file: a misconfigured secret MUST NOT silently fall
+ * back to "" or to the inline value, because that produces a running service that appears
+ * up but authenticates with the wrong key (or no key at all).
+ */
+export function resolveFileSecrets(
+  prefixes: readonly string[] = ["DB_ENCRYPTION_KEY", "STORAGE_SECRET_KEY"],
+) {
+  for (const prefix of prefixes) {
+    const filePath = process.env[`${prefix}_FILE`];
+    if (!filePath) continue;
+    let raw: string;
+    try {
+      raw = fs.readFileSync(filePath, "utf8");
+    } catch (err) {
+      const reason = (err as NodeJS.ErrnoException).code ?? "unknown";
+      throw new Error(
+        `Cannot read ${prefix}_FILE at ${filePath} (${reason}). Refusing to start with a missing secret.`,
+        { cause: err },
+      );
+    }
+    const value = raw.trim();
+    // Overwrite the inline var so @fastify/env picks up the file's contents below.
+    process.env[prefix] = value;
+  }
+}
+
 export const envPlugin = fp(async (app) => {
+  resolveFileSecrets();
   await app.register(env, {
     schema: schema,
     // Don't read the developer's .env during tests — keep them hermetic.
