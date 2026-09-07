@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { toDateKey } from "@portfolio/core";
 import { corporateActions } from "@portfolio/db";
 import { createAndReturn, deleteOwnedOr404 } from "./helpers.js";
-import { corporateActionInputSchema } from "@portfolio/schema";
+import { corporateActionBaseSchema, corporateActionInputSchema } from "@portfolio/schema";
 
 export async function corporateActionsRoute(app: FastifyInstance) {
   // Record a corporate action (split/bonus/rights) for an instrument. Shared
@@ -17,6 +17,9 @@ export async function corporateActionsRoute(app: FastifyInstance) {
       ratio: input.ratio,
       exDate: toDateKey(input.exDate),
       terms: input.terms ?? null,
+      targetInstrumentId: input.targetInstrumentId ?? null,
+      ratioTo: input.ratioTo ?? null,
+      taxableMarketValue: input.taxableMarketValue ?? null,
     });
   });
 
@@ -27,12 +30,17 @@ export async function corporateActionsRoute(app: FastifyInstance) {
     "/corporate-actions/:id",
     { preHandler: app.requireAdmin },
     async (request, reply) => {
-      const input = corporateActionInputSchema.partial().parse(request.body);
+      const input = corporateActionBaseSchema.partial().parse(request.body);
       const values: Partial<typeof corporateActions.$inferInsert> = {};
       if (input.type !== undefined) values.type = input.type;
       if (input.ratio !== undefined) values.ratio = input.ratio;
       if (input.exDate !== undefined) values.exDate = toDateKey(input.exDate);
       if (input.terms !== undefined) values.terms = input.terms ?? null;
+      if (input.targetInstrumentId !== undefined)
+        values.targetInstrumentId = input.targetInstrumentId;
+      if (input.ratioTo !== undefined) values.ratioTo = input.ratioTo;
+      if (input.taxableMarketValue !== undefined)
+        values.taxableMarketValue = input.taxableMarketValue;
       if (Object.keys(values).length === 0) {
         reply.code(400);
         return { error: "no fields to update" };
