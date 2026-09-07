@@ -1847,6 +1847,100 @@ describe("auth + portfolios + transactions", () => {
     ).toBe(404);
   });
 
+  it("rejects unrecognised ?type= values on the corporate-actions list with 400", async () => {
+    const t = await token("ca-filter-user");
+    const [inst] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "FILT",
+        market: "JKSE",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Filterco",
+      })
+      .returning();
+
+    const bogus = await app.inject({
+      method: "GET",
+      url: `/instruments/${inst.id}/corporate-actions?type=bogus`,
+      headers: auth(t),
+    });
+    expect(bogus.statusCode).toBe(400);
+    expect(bogus.json().error).toBe("invalid_type");
+    expect(bogus.json().allowed).toEqual(["split", "bonus", "rights", "merger"]);
+  });
+
+  it("filters corporate-actions list by type", async () => {
+    const t = await token("ca-filter2-user");
+    const admin = await adminToken("ca-filter2-admin");
+    const [inst] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "FILT2",
+        market: "JKSE",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Filterco2",
+      })
+      .returning();
+    const [target] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "TGT2",
+        market: "JKSE",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Target2",
+      })
+      .returning();
+    // One split + one merger-type CA against the same instrument.
+    await app.inject({
+      method: "POST",
+      url: "/corporate-actions",
+      headers: auth(admin),
+      payload: { instrumentId: inst.id, type: "split", ratio: "2", exDate: "2026-02-01" },
+    });
+    await app.inject({
+      method: "POST",
+      url: "/corporate-actions",
+      headers: auth(admin),
+      payload: {
+        instrumentId: inst.id,
+        type: "merger",
+        ratio: "1",
+        ratioTo: "1",
+        exDate: "2026-03-01",
+        targetInstrumentId: target.id,
+      },
+    });
+
+    // No filter → both rows.
+    const all = await app.inject({
+      method: "GET",
+      url: `/instruments/${inst.id}/corporate-actions`,
+      headers: auth(t),
+    });
+    expect(all.json()).toHaveLength(2);
+
+    // ?type=split → only the split row.
+    const splits = await app.inject({
+      method: "GET",
+      url: `/instruments/${inst.id}/corporate-actions?type=split`,
+      headers: auth(t),
+    });
+    expect(splits.json()).toHaveLength(1);
+    expect(splits.json()[0].type).toBe("split");
+
+    // ?type=merger → only the merger row.
+    const mergers = await app.inject({
+      method: "GET",
+      url: `/instruments/${inst.id}/corporate-actions?type=merger`,
+      headers: auth(t),
+    });
+    expect(mergers.json()).toHaveLength(1);
+    expect(mergers.json()[0].type).toBe("merger");
+  });
+
   it("aggregates net worth across a user's portfolios", async () => {
     const t = await token("nw-user");
     const mkPortfolio = async (name: string) =>
