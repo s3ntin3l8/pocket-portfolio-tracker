@@ -1865,6 +1865,28 @@ describe("screenshot import → confirm flow", () => {
     expect(res.json().error).toBe("file_too_large");
   });
 
+  // Regression test for #S3: Fastify's default 1 MB bodyLimit used to fire
+  // before the multipart fileSize (25 MB) check, rejecting every realistic
+  // screenshot. The route now sets bodyLimit: 30 * 1024 * 1024, so a 2 MB
+  // screenshot (above the old default, well below the file cap) reaches the
+  // parser and returns 201.
+  it("accepts a 2 MB screenshot (Fastify bodyLimit raised to 30 MB, #S3)", async () => {
+    const t = await ssToken("ss-bodylimit-user");
+    // 2 MB of 'A' — well over Fastify's default 1 MB bodyLimit, well under
+    // the multipart 25 MB fileSize cap. Pre-fix: 413 from bodyLimit. Post-fix:
+    // 201 from the parser.
+    const buf = Buffer.alloc(2 * 1024 * 1024, 0x41);
+    const form = screenshotPart(buf, "image/png", "mid.png");
+    const res = await ssApp.inject({
+      method: "POST",
+      url: `/imports/screenshot`,
+      headers: { ...auth(t), ...form.headers },
+      payload: form.payload,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().drafts).toHaveLength(1);
+  });
+
   // NOTE: This test creates and closes its own app instance. Closing it fires the
   // dbPlugin.onClose hook → closeDb(), destroying the shared PGlite singleton. Any
   // subsequent test that uses ssApp (from beforeAll) will fail with "PGlite is closed".

@@ -12,6 +12,7 @@ import {
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
 import { boundaryFlows } from "./flows.js";
 import { instrumentMeta } from "./helpers.js";
+import { Decimal } from "decimal.js";
 
 export function enrichContributions(
   stats: ContributionStats,
@@ -21,21 +22,30 @@ export function enrichContributions(
   portfolioType: "standard" | "child" = "standard",
   opts: { totalReturn?: boolean; retirementAge?: number | null } = {},
 ) {
-  const net = Number(stats.netContributed);
-  const simpleGainPct = net > 0 ? (Number(currentValue) - net) / net : null;
+  // Money-as-Decimal: every money reduction/compare here runs through Decimal so
+  // a long flow list can't accumulate float drift before the pct ratio is
+  // computed. The two ratio outputs (simpleGainPct, totalReturnPct) stay as
+  // numbers because they're percentages, not money — but their *inputs* are
+  // Decimal-derived, so the precision is exact. #S2
+  const net = new Decimal(stats.netContributed);
+  const currentValueDec = new Decimal(currentValue);
+  const simpleGainPct = net.gt(0) ? currentValueDec.minus(net).div(net).toNumber() : null;
 
-  const gross = Number(stats.totalContributed);
+  const gross = new Decimal(stats.totalContributed);
   const positiveFlows = flows.reduce((s, f) => {
-    const amt = Number(f.amount);
-    return amt > 0 ? s + amt : s;
-  }, 0);
+    const amt = new Decimal(f.amount);
+    return amt.gt(0) ? s.plus(amt) : s;
+  }, new Decimal(0));
   const totalReturnPct =
-    (opts.totalReturn ?? true) && gross > 0
-      ? (Number(currentValue) + positiveFlows - gross) / gross
+    (opts.totalReturn ?? true) && gross.gt(0)
+      ? currentValueDec.plus(positiveFlows).minus(gross).div(gross).toNumber()
       : null;
 
+  // xirr takes Number(amount) at its boundary (its Newton-Raphson iteration is
+  // float-based), so the conversion here is a deliberate handoff to a float
+  // algorithm — not a money computation in this file. #S2 leaves this alone.
   const asOf = new Date();
-  const allFlows: CashFlowPoint[] = [...flows, { amount: Number(currentValue), date: asOf }];
+  const allFlows: CashFlowPoint[] = [...flows, { amount: currentValueDec.toNumber(), date: asOf }];
   const rate = flows.length ? xirr(allFlows) : NaN;
   const xirrVal = Number.isFinite(rate) ? rate : null;
   const seedAnnualReturn =

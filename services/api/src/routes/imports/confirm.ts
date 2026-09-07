@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { screenshotImports, trResolvedEvents } from "@portfolio/db";
+import { and, eq, sql } from "drizzle-orm";
+import { portfolios, screenshotImports, trResolvedEvents } from "@portfolio/db";
 import { parsedGoldContractSchema, parsedTransactionSchema } from "@portfolio/schema";
 import { accountMismatchVerdict } from "./helpers.js";
 import { ownedPortfolio } from "../helpers.js";
@@ -10,6 +10,8 @@ import {
   resolveDraftInstruments,
   classifyDraftDuplicates,
   writeResolvedDrafts,
+  type CommittedCandidate,
+  type TxRow,
 } from "../../services/materialize-drafts.js";
 import { writeGoldContracts } from "./gold-contracts.js";
 import { finalizeConfirmedImport } from "./finalize.js";
@@ -175,51 +177,18 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
       // independently and is authoritative. The classifier itself lives in
       // services/materialize-drafts.ts so the sync path reuses it.
       //
-      // KNOWN RACE (4.3): this SELECT runs outside the write transaction below. Two concurrent
-      // confirms of overlapping sources can both clear the 409 and both write. The practical
-      // risk is low (same user, two concurrent confirms in sub-second window), and the fallback
-      // is the same-source `(portfolioId, source, externalId)` unique index which absorbs true
-      // re-imports silently. A future hardening pass can re-run this check inside the transaction.
-      const { enrichmentMatches, enrichmentDraftIndices, plainDuplicates } =
-        await classifyDraftDuplicates(app, {
-          resolved,
-          targetPortfolioId,
-          source,
-          importId: imp.id,
-        });
-      const likelyDuplicates = plainDuplicates.length;
-      if (likelyDuplicates > 0) {
-        request.log.info(
-          {
-            importId: imp.id,
-            likelyDuplicates,
-            enrichments: enrichmentMatches.length,
-            acknowledged: acknowledgeDuplicates,
-          },
-          "confirm: cross-source duplicates among selected drafts",
-        );
-        if (!acknowledgeDuplicates) {
-          const isoDay = (v: Date | string) =>
-            (v instanceof Date ? v.toISOString() : new Date(v).toISOString()).slice(0, 10);
-          return reply.code(409).send({
-            error: "duplicate_transactions",
-            count: likelyDuplicates,
-            duplicates: plainDuplicates.map(({ draftIndex, matched }) => {
-              const d = resolved[draftIndex].draft;
-              return {
-                draftIndex,
-                matchedTransactionId: matched.id,
-                name: d.name ?? d.isin ?? d.ticker ?? null,
-                action: d.action,
-                quantity: d.quantity,
-                executedAt: isoDay(d.executedAt),
-                matchedSource: matched.source,
-                matchedExecutedAt: isoDay(matched.executedAt),
-              };
-            }),
-          });
-        }
-      }
+      // KNOWN RACE (B11): the cross-source dedup check used to run *outside* the
+      // write transaction below. Two concurrent confirms of overlapping sources
+      // could both pass the 409 gate (both seeing no committed match yet) and
+      // both write the same economic trade. The fallback was the same-source
+      // (portfolioId, source, externalId) unique index, which only catches
+      // identical externalIds — cross-source duplicates (e.g. CSV vs PDF) still
+      // slipped through.
+      //
+      // Fix: do the row-locked SELECT … FOR UPDATE and the classification inside
+      // the write transaction. The lock serialises concurrent confirms of the
+      // same portfolio; the second one waits, then sees the first's committed
+      // matches and returns 409 unless the caller already acknowledged.
 
       // Pass 2 — write the transactions and reconcile the import atomically.
       const parsed = (imp.parsedJson ?? {}) as {
@@ -230,7 +199,63 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
       let attempted = 0;
       let skipped = 0;
       let finalStatus: "draft" | "confirmed" = "draft";
-      const created = await app.db.transaction(async (tx) => {
+      type TxResult =
+        | {
+            kind: "ok";
+            written: TxRow[];
+            enrichmentMatches: Array<{ draftIndex: number; matchedTransactionId: string }>;
+          }
+        | {
+            kind: "duplicate";
+            plainDuplicates: Array<{ draftIndex: number; matched: CommittedCandidate }>;
+            enrichmentMatches: Array<{ draftIndex: number; matchedTransactionId: string }>;
+          };
+      const txResult = await app.db.transaction(async (tx) => {
+        // Row-level lock on the portfolio itself so a concurrent confirm of an
+        // overlapping source serialises behind us (#B11). The second confirm
+        // blocks on FOR UPDATE, then sees our commit (or our classification)
+        // before classifying its own drafts. Locking the portfolio row — not
+        // the (possibly empty) `transactions` set — is what closes the race:
+        // when neither confirm has written anything yet, locking zero rows
+        // would let both proceed.
+        await tx.execute(
+          sql`SELECT 1 FROM ${portfolios} WHERE ${portfolios.id} = ${targetPortfolioId} FOR UPDATE`,
+        );
+
+        const { enrichmentMatches, enrichmentDraftIndices, plainDuplicates } =
+          await classifyDraftDuplicates(
+            { db: tx, log: request.log },
+            {
+              resolved,
+              targetPortfolioId,
+              source,
+              importId: imp.id,
+            },
+          );
+
+        const likelyDuplicates = plainDuplicates.length;
+        if (likelyDuplicates > 0) {
+          request.log.info(
+            {
+              importId: imp.id,
+              likelyDuplicates,
+              enrichments: enrichmentMatches.length,
+              acknowledged: acknowledgeDuplicates,
+            },
+            "confirm: cross-source duplicates among selected drafts",
+          );
+          if (!acknowledgeDuplicates) {
+            // Don't write anything — surface the 409 to the caller. Committing
+            // here is fine; this is a read-only tx (the FOR UPDATE lock is
+            // released on commit, not rollback).
+            return {
+              kind: "duplicate",
+              plainDuplicates,
+              enrichmentMatches,
+            } satisfies TxResult;
+          }
+        }
+
         // Pass 2 — write the (non-enrichment) drafts as new transactions + source rows.
         // Confirm writes status="normal"; the shared writer is also used by sync with "draft".
         const {
@@ -354,8 +379,40 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
             finalStatus = "confirmed";
           }
         }
-        return written;
+        return { kind: "ok", written, enrichmentMatches } satisfies TxResult;
       });
+
+      if (txResult.kind === "duplicate") {
+        const isoDay = (v: Date | string) =>
+          (v instanceof Date ? v.toISOString() : new Date(v).toISOString()).slice(0, 10);
+        return reply.code(409).send({
+          error: "duplicate_transactions",
+          count: txResult.plainDuplicates.length,
+          duplicates: txResult.plainDuplicates.map(({ draftIndex, matched }) => {
+            const d = resolved[draftIndex].draft;
+            const m = matched as {
+              id: string;
+              action: string;
+              quantity: string;
+              executedAt: Date;
+              source: string | null;
+            };
+            return {
+              draftIndex,
+              matchedTransactionId: m.id,
+              name: d.name ?? d.isin ?? d.ticker ?? null,
+              action: d.action,
+              quantity: d.quantity,
+              executedAt: isoDay(d.executedAt),
+              matchedSource: m.source,
+              matchedExecutedAt: isoDay(m.executedAt),
+            };
+          }),
+        });
+      }
+      const created = txResult.written;
+      const { enrichmentMatches } = txResult;
+      const likelyDuplicates = 0;
 
       const { enriched } = await finalizeConfirmedImport(app, {
         importId: imp.id,
