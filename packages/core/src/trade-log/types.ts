@@ -81,9 +81,13 @@ export interface TradeLog {
   winRate: number | null;
   realizedByYear: YearAmount[]; // method-aware (from leg tax years)
   dividendsByYear: YearTax[]; // all income incl. instrument-less interest
-  /** Broker-credited bonuses by year: bonus_cash (e.g. Kindergeld), saveback buy legs,
-   * and transfer_in free-share receipts. Purely informational — NOT included in
-   * totalReturn or totalDividends. Excludes roundup (user's own spare change). */
+  /** Broker-credited bonuses by year: bonus_cash (e.g. Kindergeld) and saveback buy
+   * legs. Purely informational — NOT included in totalReturn or totalDividends.
+   * Excludes roundup (user's own spare change). Note: first-class transfer_in
+   * rows (added with the merger/transfer rewrite, migration 0044) are NOT here
+   * because they already contribute capital via the contribution layer
+   * (insideDays / outsideDays in packages/core/src/contributions.ts) — counting
+   * them again here would double-count. */
   bonusesByYear: YearAmount[];
 }
 

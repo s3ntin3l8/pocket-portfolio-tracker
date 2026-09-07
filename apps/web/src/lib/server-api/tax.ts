@@ -16,7 +16,7 @@ import {
   type IndonesianFinalTaxLike,
   type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
-import { loadPreferences } from "./user.js";
+import { loadPreferences } from "./user";
 
 export async function loadNetworthTax(
   year?: number,
