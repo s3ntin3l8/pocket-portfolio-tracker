@@ -13,6 +13,7 @@ import {
 } from "../../services/materialize-drafts.js";
 import { writeGoldContracts } from "./gold-contracts.js";
 import { finalizeConfirmedImport } from "./finalize.js";
+import { bumpImportListVersion } from "../../lib/derivation-cache.js";
 
 const confirmBodySchema = z.object({
   // Target portfolio — required when the import was uploaded without one (upload-first
@@ -384,6 +385,7 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
         },
         "confirm complete",
       );
+      bumpImportListVersion(id);
       reply.code(201);
       return {
         confirmed: created.length,
