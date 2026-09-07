@@ -2046,7 +2046,8 @@
         "dividends": "Dividends",
         "tax": "Est. tax"
       },
-      "footnote": "Indonesia applies a final 0.1% tax on listed-share sales and 10% on dividends, both withheld at source — so there's nothing extra to file, and no losses to harvest. This is an estimate, not tax advice."
+      "footnote": "Indonesia applies a final 0.1% tax on listed-share sales and 10% on dividends, both withheld at source — so there's nothing extra to file, and no losses to harvest. This is an estimate, not tax advice.",
+      "unavailable": "Indonesian tax breakdown is unavailable."
     },
     "vorabpauschale": {
       "accrued": "Vorabpauschale accrued · YTD",

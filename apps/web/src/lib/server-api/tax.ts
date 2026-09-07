@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import {
@@ -191,7 +192,25 @@ export async function loadTaxYearDetail(
         : holderId === ID_ALL_PORTFOLIOS_ID
           ? portfolios
           : portfolios.filter((p) => p.accountHolderId === holderId);
-      if (pfs.length === 0) return;
+      if (pfs.length === 0) {
+        // Synthetic / unallocated holder (no matching portfolio). Under ID, the
+        // /networth/tax response already carries indonesianFinalTax on this entry.
+        // Surface it directly so the reports headline isn't silently zero.
+        if (regime === "ID" && entry.indonesianFinalTax) {
+          result.set(holderId, {
+            currency: entry.currency,
+            disposals: [],
+            totalProceeds: "0",
+            totalGain: "0",
+            dividendRows: [],
+            dividendTotalsByCurrency: [],
+            byYear: [],
+            idByYear: [],
+            indonesianFinalTax: entry.indonesianFinalTax as IndonesianFinalTaxLike,
+          });
+        }
+        return;
+      }
 
       try {
         const [tradeLog, incomeLists, idTaxByPortfolio, idTaxByHolder] = await Promise.all([
@@ -202,10 +221,10 @@ export async function loadTaxYearDetail(
           regime === "ID" && selected
             ? api.getPortfolioTax(selected.id, targetYear)
             : Promise.resolve<PortfolioTaxSummary | null>(null),
-          // W2 fix (re-review round 2): the ID tax payload also needs to surface in the
-          // default aggregate (no-selection) scope. /networth/tax returns one entry per
-          // holder with indonesianFinalTax already populated under ID. Without this, the
-          // ID detail section silently zeroed for the most common view.
+          // W2 fix: the ID tax payload also needs to surface in the default aggregate
+          // (no-selection) scope. /networth/tax returns one entry per holder with
+          // indonesianFinalTax already populated under ID. Without this, the ID detail
+          // section silently zeroed for the most common view.
           regime === "ID" && !selected
             ? api.getNetworthTax(
                 targetYear,
@@ -219,55 +238,56 @@ export async function loadTaxYearDetail(
               if (!idTaxByHolder?.length) return undefined;
               // In the no-selection scope holderId is the "__id_all_portfolios__"
               // sentinel — never a real holder id. Aggregate every holder's ID tax
-              // payload into one combined object.
-              let totalProceeds = 0;
-              let totalTax = 0;
-              let totalDivGross = 0;
-              let totalDivTax = 0;
-              let totalDivNet = 0;
+              // payload into one combined object. Use Decimal throughout to avoid
+              // float drift on monetary sums.
+              const totalProceeds = new Decimal(0);
+              const totalTax = new Decimal(0);
+              const totalDivGross = new Decimal(0);
+              const totalDivTax = new Decimal(0);
+              const totalDivNet = new Decimal(0);
               const byYearMap = new Map<
                 number,
-                { realized: number; dividends: number; tax: number }
+                { realized: Decimal; dividends: Decimal; tax: Decimal }
               >();
               for (const h of idTaxByHolder) {
                 const ift = h.indonesianFinalTax;
                 if (!ift) continue;
-                totalProceeds += Number(ift.totalProceeds) || 0;
-                totalTax += Number(ift.totalSalesTax) || 0;
-                totalDivGross += Number(ift.totalDividendGross) || 0;
-                totalDivTax += Number(ift.totalDividendTax) || 0;
-                totalDivNet += Number(ift.totalDividendNet) || 0;
+                totalProceeds.add(ift.totalProceeds || "0");
+                totalTax.add(ift.totalSalesTax || "0");
+                totalDivGross.add(ift.totalDividendGross || "0");
+                totalDivTax.add(ift.totalDividendTax || "0");
+                totalDivNet.add(ift.totalDividendNet || "0");
                 for (const y of ift.byYear) {
                   const existing = byYearMap.get(y.year);
                   if (existing) {
-                    existing.realized += Number(y.realized) || 0;
-                    existing.dividends += Number(y.dividends) || 0;
-                    existing.tax += Number(y.tax) || 0;
+                    existing.realized.add(y.realized || "0");
+                    existing.dividends.add(y.dividends || "0");
+                    existing.tax.add(y.tax || "0");
                   } else {
                     byYearMap.set(y.year, {
-                      realized: Number(y.realized) || 0,
-                      dividends: Number(y.dividends) || 0,
-                      tax: Number(y.tax) || 0,
+                      realized: new Decimal(y.realized || "0"),
+                      dividends: new Decimal(y.dividends || "0"),
+                      tax: new Decimal(y.tax || "0"),
                     });
                   }
                 }
               }
               return {
                 disposals: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.disposals ?? []),
-                totalProceeds: String(totalProceeds),
-                totalSalesTax: String(totalTax),
+                totalProceeds: totalProceeds.toString(),
+                totalSalesTax: totalTax.toString(),
                 dividends: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.dividends ?? []),
-                totalDividendGross: String(totalDivGross),
-                totalDividendTax: String(totalDivTax),
-                totalDividendNet: String(totalDivNet),
-                estimatedTax: String(totalTax + totalDivTax),
+                totalDividendGross: totalDivGross.toString(),
+                totalDividendTax: totalDivTax.toString(),
+                totalDividendNet: totalDivNet.toString(),
+                estimatedTax: totalTax.add(totalDivTax).toString(),
                 byYear: [...byYearMap.entries()]
                   .sort((a, b) => a[0] - b[0])
                   .map(([year, v]) => ({
                     year,
-                    realized: String(v.realized),
-                    dividends: String(v.dividends),
-                    tax: String(v.tax),
+                    realized: v.realized.toString(),
+                    dividends: v.dividends.toString(),
+                    tax: v.tax.toString(),
                   })),
               };
             })();
