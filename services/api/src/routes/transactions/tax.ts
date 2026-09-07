@@ -10,6 +10,7 @@ import {
   type InstrumentMeta,
 } from "../../services/valuation.js";
 import { mapPool } from "../../lib/promise-pool.js";
+import { toDecimalSafe } from "../../lib/decimal-safe.js";
 
 import {
   loadValuation,
@@ -48,7 +49,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         taxAllowanceAnnual: string | null;
         capitalGainsTaxRate: string | null;
       } | null = null;
-      let totalAllocatedForHolder = new Decimal(portfolio.taxAllowanceAnnual ?? 0);
+      let totalAllocatedForHolder = toDecimalSafe(portfolio.taxAllowanceAnnual);
       let lossCarryForwardInput: { stock?: string; general?: string } | undefined;
       let carryForwardApplied = false;
 
@@ -72,7 +73,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         if (holder) holderProfile = holder;
 
         totalAllocatedForHolder = siblingRows.reduce(
-          (sum, p) => sum.plus(new Decimal(p.taxAllowanceAnnual ?? 0)),
+          (sum, p) => sum.plus(toDecimalSafe(p.taxAllowanceAnnual)),
           new Decimal(0),
         );
 
@@ -227,7 +228,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         if (pfs.length === 0) return null;
 
         const totalAllocated = pfs.reduce(
-          (sum, p) => sum.plus(new Decimal(p.taxAllowanceAnnual ?? 0)),
+          (sum, p) => sum.plus(toDecimalSafe(p.taxAllowanceAnnual)),
           new Decimal(0),
         );
         if (totalAllocated.isZero()) return null;
