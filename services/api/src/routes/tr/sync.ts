@@ -11,6 +11,7 @@ import { syncTrConnection } from "../../services/pytr/sync.js";
 import { enqueueTrSync, SYNC_CLAIM_LEASE_MS } from "../../services/scheduler.js";
 import { deleteStorageObjectsByKey } from "../../storage/receipts.js";
 import { getConnection } from "./_shared.js";
+import { ownedPortfolio } from "../../lib/owned-portfolio.js";
 
 export function registerSyncRoutes(app: FastifyInstance) {
   app.post("/tr/connection/sync", { preHandler: app.authenticate }, async (request, reply) => {
@@ -89,6 +90,12 @@ export function registerSyncRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: "not_connected" });
     }
     const portfolioId = conn.portfolioId;
+    // Defense-in-depth: same rationale as the ibkr reimport handler — verify the
+    // connection's portfolioId still belongs to the caller before mass-deleting
+    // transactions / events keyed on it.
+    if (!(await ownedPortfolio(app, id, portfolioId))) {
+      return reply.code(404).send({ error: "portfolio_not_found" });
+    }
 
     const toRemoveIds = await app.db
       .select({ id: transactions.id })

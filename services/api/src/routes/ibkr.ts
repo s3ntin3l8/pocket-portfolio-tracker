@@ -11,6 +11,7 @@ import {
 import { IbkrFlexError } from "../services/ibkr/flex-client.js";
 import { syncIbkrConnection } from "../services/ibkr/sync.js";
 import { enqueueIbkrSync, SYNC_CLAIM_LEASE_MS } from "../services/scheduler.js";
+import { ownedPortfolio } from "../lib/owned-portfolio.js";
 
 const connectBodySchema = z.object({
   // The Flex API token from the IBKR portal.
@@ -199,6 +200,13 @@ export async function ibkrRoute(app: FastifyInstance) {
         return reply.code(409).send({ error: "not_connected" });
       }
       const portfolioId = conn.portfolioId;
+      // Defense-in-depth: the connection row is already user-scoped, but verify the
+      // portfolioId it points at ALSO belongs to the caller before we delete transactions
+      // / mutate the resolved-events ledger keyed on it. Returns 404 (not 403) so a
+      // probing client can't distinguish "you don't own it" from "it doesn't exist".
+      if (!(await ownedPortfolio(app, id, portfolioId))) {
+        return reply.code(404).send({ error: "portfolio_not_found" });
+      }
       return app.db.transaction(async (tx) => {
         const removed = await tx
           .delete(transactions)
