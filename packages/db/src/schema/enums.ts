@@ -59,7 +59,12 @@ export const txSourceTypeEnum = pgEnum("tx_source_type", [
   "ibkr",
 ]);
 
-export const corpActionTypeEnum = pgEnum("corporate_action_type", ["split", "bonus", "rights"]);
+export const corpActionTypeEnum = pgEnum("corporate_action_type", [
+  "split",
+  "bonus",
+  "rights",
+  "merger",
+]);
 
 export const importStatusEnum = pgEnum("import_status", ["draft", "confirmed", "discarded"]);
 

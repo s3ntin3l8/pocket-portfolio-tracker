@@ -45,5 +45,11 @@ export const corporateActions = pgTable("corporate_actions", {
   ratio: numeric("ratio").notNull(),
   exDate: date("ex_date").notNull(),
   terms: text("terms"),
+  // Merger-specific (nullable — only set when type = "merger")
+  targetInstrumentId: uuid("target_instrument_id").references(() => instruments.id, {
+    onDelete: "set null",
+  }),
+  ratioTo: numeric("ratio_to"),
+  taxableMarketValue: numeric("taxable_market_value"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

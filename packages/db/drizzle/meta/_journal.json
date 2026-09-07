@@ -547,6 +547,20 @@
       "when": 1788606956358,
       "tag": "0077_sad_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788781930190,
+      "tag": "0078_sleepy_metal_master",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1788782175624,
+      "tag": "0079_curved_alex_wilder",
+      "breakpoints": true
     }
   ]
 }

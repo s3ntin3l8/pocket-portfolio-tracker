@@ -1,9 +1,14 @@
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { toDateKey } from "@portfolio/core";
 import { corporateActions } from "@portfolio/db";
 import { createAndReturn, deleteOwnedOr404 } from "./helpers.js";
-import { corporateActionInputSchema } from "@portfolio/schema";
+import {
+  corporateActionBaseSchema,
+  corporateActionInputSchema,
+  corporateActionTypeSchema,
+  type CorporateActionType,
+} from "@portfolio/schema";
 
 export async function corporateActionsRoute(app: FastifyInstance) {
   // Record a corporate action (split/bonus/rights) for an instrument. Shared
@@ -17,6 +22,9 @@ export async function corporateActionsRoute(app: FastifyInstance) {
       ratio: input.ratio,
       exDate: toDateKey(input.exDate),
       terms: input.terms ?? null,
+      targetInstrumentId: input.targetInstrumentId ?? null,
+      ratioTo: input.ratioTo ?? null,
+      taxableMarketValue: input.taxableMarketValue ?? null,
     });
   });
 
@@ -27,12 +35,17 @@ export async function corporateActionsRoute(app: FastifyInstance) {
     "/corporate-actions/:id",
     { preHandler: app.requireAdmin },
     async (request, reply) => {
-      const input = corporateActionInputSchema.partial().parse(request.body);
+      const input = corporateActionBaseSchema.partial().parse(request.body);
       const values: Partial<typeof corporateActions.$inferInsert> = {};
       if (input.type !== undefined) values.type = input.type;
       if (input.ratio !== undefined) values.ratio = input.ratio;
       if (input.exDate !== undefined) values.exDate = toDateKey(input.exDate);
       if (input.terms !== undefined) values.terms = input.terms ?? null;
+      if (input.targetInstrumentId !== undefined)
+        values.targetInstrumentId = input.targetInstrumentId;
+      if (input.ratioTo !== undefined) values.ratioTo = input.ratioTo;
+      if (input.taxableMarketValue !== undefined)
+        values.taxableMarketValue = input.taxableMarketValue;
       if (Object.keys(values).length === 0) {
         reply.code(400);
         return { error: "no fields to update" };
@@ -65,15 +78,34 @@ export async function corporateActionsRoute(app: FastifyInstance) {
     },
   );
 
-  // List an instrument's corporate actions.
-  app.get<{ Params: { instrumentId: string } }>(
+  // List an instrument's corporate actions. Optional `type` query parameter
+  // filters by corporate action type (e.g. "merger", "split") — useful for
+  // distinguishing merger CAs from splits/bonuses on the same instrument when
+  // multiple kinds coexist. Unrecognised values 400 rather than 500-ing into
+  // the Postgres enum check.
+  app.get<{ Params: { instrumentId: string }; Querystring: { type?: string } }>(
     "/instruments/:instrumentId/corporate-actions",
     { preHandler: app.authenticate },
-    async (request) => {
+    async (request, reply) => {
+      const { instrumentId } = request.params;
+      const { type } = request.query;
+      let parsedType: CorporateActionType | undefined;
+      if (type !== undefined) {
+        const result = corporateActionTypeSchema.safeParse(type);
+        if (!result.success) {
+          return reply.code(400).send({
+            error: "invalid_type",
+            allowed: corporateActionTypeSchema.options,
+          });
+        }
+        parsedType = result.data;
+      }
+      const conditions = [eq(corporateActions.instrumentId, instrumentId)];
+      if (parsedType) conditions.push(eq(corporateActions.type, parsedType));
       return app.db
         .select()
         .from(corporateActions)
-        .where(eq(corporateActions.instrumentId, request.params.instrumentId));
+        .where(and(...conditions));
     },
   );
 }

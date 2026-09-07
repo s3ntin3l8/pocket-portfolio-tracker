@@ -123,11 +123,25 @@ describe("POST /portfolios/:id/mergers", () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    const legs = res.json() as { type: string; kind: string; instrumentId: string }[];
+    const body = res.json() as {
+      transactions: { type: string; kind: string; instrumentId: string }[];
+      corporateAction: {
+        instrumentId: string;
+        type: string;
+        targetInstrumentId: string;
+        ratioTo: string;
+        taxableMarketValue: string;
+      };
+    };
+    const legs = body.transactions;
     expect(legs).toHaveLength(2);
     expect(legs.every((l) => l.kind === "merger")).toBe(true);
     expect(legs.find((l) => l.instrumentId === oldI)?.type).toBe("sell");
     expect(legs.find((l) => l.instrumentId === newI)?.type).toBe("buy");
+    expect(body.corporateAction.instrumentId).toBe(oldI);
+    expect(body.corporateAction.type).toBe("merger");
+    expect(body.corporateAction.targetInstrumentId).toBe(newI);
+    expect(body.corporateAction.taxableMarketValue).toBe("1200");
 
     const hs = await holdings(t, pf);
     const oldH = hs.find((h) => h.instrumentId === oldI)!;
@@ -290,5 +304,50 @@ describe("POST /portfolios/:id/mergers", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe("currency_mismatch");
+  });
+
+  it("also creates a corporate action record for the merger", async () => {
+    const pf = await createPortfolio(t, "CARecord");
+    await buy(t, pf, oldI, "10", "100");
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/portfolios/${pf}/mergers`,
+      headers: auth(t),
+      payload: {
+        fromInstrumentId: oldI,
+        toInstrumentId: newI,
+        outQty: "10",
+        inQty: "5",
+        executedAt: "2024-02-01T00:00:00.000Z",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+
+    // The instruments oldI / newI are shared across tests in this file (beforeAll), so
+    // earlier mergers in this file have already piled up CAs against oldI — assert the
+    // new CA exists and is shaped correctly rather than expecting exclusivity. This
+    // merger is tax-neutral, so look for the one with a null taxableMarketValue to
+    // distinguish it from the earlier taxable test's CA.
+    const caRes = await app.inject({
+      method: "GET",
+      url: `/instruments/${oldI}/corporate-actions`,
+      headers: auth(t),
+    });
+    const cas = caRes.json() as {
+      instrumentId: string;
+      type: string;
+      targetInstrumentId: string;
+      ratioTo: string;
+      taxableMarketValue: string | null;
+    }[];
+    const created = cas.find(
+      (c) =>
+        c.instrumentId === oldI && c.targetInstrumentId === newI && c.taxableMarketValue === null,
+    );
+    expect(created).toBeDefined();
+    expect(created!.type).toBe("merger");
+    expect(created!.taxableMarketValue).toBeNull();
+    expect(Number(created!.ratioTo)).toBe(0.5);
   });
 });

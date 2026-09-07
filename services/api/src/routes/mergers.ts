@@ -114,15 +114,46 @@ export async function mergersRoute(app: FastifyInstance) {
         },
       ];
 
-      // The legs share a deterministic externalId per side, so re-recording the same
-      // merger trips the (portfolioId, source, externalId) unique index — surface that
-      // as a friendly 409 rather than a 500.
-      let created;
+      // The legs and the corporate-action reference row commit or roll back together —
+      // wrapping in a single transaction guarantees we never leave an orphaned sell+buy
+      // pair persisted without its CA reference row (or vice-versa). The CA row is the
+      // domain-correct record of the merger; the transaction pair is the per-portfolio
+      // tax/economics materialization.
+      //
+      // Ratio semantics: `ratio` is source-per-target (outQty ÷ inQty — old shares per
+      // new share), `ratioTo` is its reciprocal (target-per-source — new shares per old
+      // share). These are intentionally stored as a pair so Phase 2's auto-apply engine
+      // can pick whichever orientation it needs without re-deriving. Don't change the
+      // orientation without checking #527 — this repo's split-adjustment math has a
+      // history of subtle ratio-direction bugs.
+      let created: (typeof transactions.$inferSelect)[];
+      let ca: typeof corporateActions.$inferSelect;
       try {
-        created = await app.db.insert(transactions).values(legs).returning();
+        const result = await app.db.transaction(async (tx) => {
+          const insertedLegs = await tx.insert(transactions).values(legs).returning();
+          const [insertedCa] = await tx
+            .insert(corporateActions)
+            .values({
+              instrumentId: input.fromInstrumentId,
+              type: "merger",
+              ratio: outQty.div(inQty).toString(),
+              exDate: dateStr,
+              targetInstrumentId: input.toInstrumentId,
+              ratioTo: inQty.div(outQty).toString(),
+              taxableMarketValue: input.taxable ? input.marketValue : null,
+            })
+            .returning();
+          return { insertedLegs, insertedCa };
+        });
+        created = result.insertedLegs;
+        ca = result.insertedCa;
       } catch (err) {
-        // Postgres unique-violation is 23505; drizzle/PGlite may nest it under `cause`,
-        // so also match the message as a fallback across drivers.
+        // The legs share a deterministic externalId per side, so re-recording the same
+        // merger trips the (portfolioId, source, externalId) unique index — surface that
+        // as a friendly 409 rather than a 500. Postgres unique-violation is 23505;
+        // drizzle/PGlite may nest it under `cause`, so also match the message as a
+        // fallback across drivers. The transaction wrapper guarantees the legs and the
+        // CA row share a fate, so catching here rolls both back.
         const e = err as { code?: string; cause?: { code?: string }; message?: string };
         if (
           e.code === "23505" ||
@@ -135,7 +166,7 @@ export async function mergersRoute(app: FastifyInstance) {
       }
       await enqueueRecompute(portfolioId, dateStr);
       reply.code(201);
-      return created;
+      return { transactions: created, corporateAction: ca };
     },
   );
 }

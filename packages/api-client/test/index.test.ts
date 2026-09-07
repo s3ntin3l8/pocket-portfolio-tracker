@@ -466,6 +466,12 @@ describe("createApiClient request methods", () => {
       url: "/instruments/i1/corporate-actions",
     },
     {
+      name: "listCorporateActions filtered by type",
+      call: (c) => c.listCorporateActions("i1", "merger"),
+      method: "GET",
+      url: "/instruments/i1/corporate-actions?type=merger",
+    },
+    {
       name: "getHoldings",
       call: (c) => c.getHoldings("p1"),
       method: "GET",
