@@ -159,6 +159,20 @@ describe("parseDkbPdf — Kapitalmaßnahme fund merger (Fondsverschmelzung)", ()
     const r = parseDkbPdf(MERGER_ANNOUNCEMENT);
     expect(r.drafts.some((d) => d.kind === "merger")).toBe(false);
   });
+
+  it("emits a mergerCA alongside the sell+buy pair", () => {
+    const r = parseDkbPdf(MERGER);
+    expect(r.mergerCA).toBeDefined();
+    expect(r.mergerCA!.fromIsin).toBeDefined();
+    expect(r.mergerCA!.toIsin).toBeDefined();
+    expect(r.mergerCA!.fromIsin).not.toBe(r.mergerCA!.toIsin);
+    expect(r.mergerCA!.taxableMarketValue).toBeDefined();
+  });
+
+  it("does not emit mergerCA for non-merger documents", () => {
+    const r = parseDkbPdf(KAUF);
+    expect(r.mergerCA).toBeUndefined();
+  });
 });
 
 describe("parseDkbPdf — stock dividend (foreign Quellensteuer + FX)", () => {

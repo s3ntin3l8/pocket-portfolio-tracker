@@ -31,6 +31,19 @@ export interface DkbPdfResult {
   drafts: ParsedTransaction[];
   errors: { line: number; message: string }[];
   accountNumber: string | null;
+  // When the parser recognised a Fondsverschmelzung document, this carries the
+  // merger metadata for downstream CA reference data. ISINs are carried (not
+  // instrument IDs) because instrument resolution happens in the confirm-route
+  // materialize step. Phase 1: stored as-is alongside the drafts; Phase 2
+  // (separate plan) wires the actual CA row creation into the confirm flow.
+  mergerCA?: {
+    fromIsin: string;
+    toIsin: string;
+    ratioFrom: string; // outQty / inQty (source shares per target share)
+    ratioTo: string; // inQty / outQty (target shares per source share)
+    taxableMarketValue: string | null; // Kurswert as a decimal string, or null if missing
+    exDate: string; // YYYY-MM-DD
+  };
 }
 
 const ISIN_RE = /\b([A-Z]{2}[A-Z0-9]{9}\d)\b/;
@@ -181,7 +194,26 @@ export function parseDkbPdf(rawText: string): DkbPdfResult {
       );
     leg("out", out, outQty, value.div(outQty).toFixed(8));
     leg("in", inb, inQty, value.div(inQty).toFixed(8));
-    return { drafts, errors, accountNumber };
+    const fromIsin = out[3];
+    const toIsin = inb[3];
+    const ratioFromDec = new Decimal(outQty).div(new Decimal(inQty));
+    const ratioToDec = new Decimal(inQty).div(new Decimal(outQty));
+    const exDate = valuta
+      ? valuta.toISOString().slice(0, 10)
+      : (docDate?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    return {
+      drafts,
+      errors,
+      accountNumber,
+      mergerCA: {
+        fromIsin,
+        toIsin,
+        ratioFrom: ratioFromDec.toString(),
+        ratioTo: ratioToDec.toString(),
+        taxableMarketValue: kurswert,
+        exDate,
+      },
+    };
   }
 
   const { name, isin, wkn, quantity } = extractSecurity(text);
