@@ -54,7 +54,8 @@
     "setupPasswordMismatch": "Passwords don't match.",
     "setupAlreadyDone": "Setup has already been completed — sign in below instead.",
     "setupError": "Couldn't create the account. Please try again.",
-    "setupTrust": "One-time setup · Only shown while no account exists"
+    "setupTrust": "One-time setup · Only shown while no account exists",
+    "migrationNotice": "Your account has been linked to single sign-on. Please sign in again with your new method."
   },
   "AuthError": {
     "retrying": "Signing you back in…",

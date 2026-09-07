@@ -22,6 +22,21 @@ export function useApiClient(): ApiClient {
       fetch: async (input, init) => {
         const res = await fetch(input, init);
         if (res.status === 401) {
+          // The API's `auth_migrated_relogin` code means a local-auth user just made
+          // their first OIDC login — the row's authSub was rewritten to the OIDC sub,
+          // which invalidates the local JWT they were carrying. Stash a flag so the
+          // landing page can show "account linked, please sign in again" instead of
+          // dropping them at the form with no explanation. The flag is read once on
+          // landing-page mount and cleared, so it can't outlive the redirect.
+          if (res.headers.get("content-type")?.includes("application/json")) {
+            const body = await res
+              .clone()
+              .json()
+              .catch(() => ({}));
+            if (body?.error === "auth_migrated_relogin") {
+              sessionStorage.setItem("pocket:auth-migrated", "1");
+            }
+          }
           // Not gated on which auth mode is configured (unlike session-error-guard.tsx,
           // this hook has no component tree to thread that flag through) — routing to
           // the login page itself, which already renders the right form for whichever
