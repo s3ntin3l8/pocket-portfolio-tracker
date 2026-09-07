@@ -129,7 +129,7 @@ describe("imports route cache scoping (latent IDOR)", () => {
       .values({
         userId: userAId,
         name: "A's portfolio",
-        currency: "USD",
+        baseCurrency: "USD",
         cashCounted: true,
       })
       .returning();

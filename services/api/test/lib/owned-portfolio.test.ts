@@ -58,7 +58,7 @@ async function makePortfolio(userId: string, name: string) {
   const db = await getDb();
   const [p] = await db
     .insert(portfolios)
-    .values({ userId, name, currency: "USD", cashCounted: true })
+    .values({ userId, name, baseCurrency: "USD", cashCounted: true })
     .returning();
   return p;
 }
