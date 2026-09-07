@@ -55,11 +55,12 @@ export async function handleListDocuments(
   request.timingName = "GET /documents";
 
   if (hasPagination) {
-    // Defense-in-depth: documents.userId already scopes the query, but if the caller
-    // passes a ?portfolioId= that belongs to another user, refuse (404, not 403) instead
-    // of silently returning an empty list — same hardening as the reimport handlers.
-    // Falling through with an unknown portfolioId would also be a wasted cache slot under
-    // the portfolioId segment of the cache key, polluting the store.
+    // Defense-in-depth: documents.userId already scopes the query, so a ?portfolioId=
+    // belonging to another user would match zero rows anyway. Returning the empty page
+    // explicitly here avoids populating a wasted cache slot under the portfolioId
+    // segment of the cache key. The reimport handlers (ibkr/tr-sync) harden the same
+    // check with a 404; this read endpoint deliberately softens to empty since an
+    // empty list is a legitimate response shape callers must already handle.
     if (portfolioId && !(await ownedPortfolio(app, id, portfolioId))) {
       return { rows: [], total: 0 };
     }
