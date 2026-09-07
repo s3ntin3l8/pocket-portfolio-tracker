@@ -92,6 +92,7 @@ const ROWS: TxRow[] = [
     currency: "IDR",
     executedAt: "2026-02-01T00:00:00.000Z",
     source: "manual",
+    instrumentId: "instr-bbca",
     instrument: { symbol: "BBCA", name: "Bank Central Asia" },
   },
   {
@@ -107,6 +108,7 @@ const ROWS: TxRow[] = [
     currency: "USD",
     executedAt: "2026-01-01T00:00:00.000Z",
     source: "csv",
+    instrumentId: "instr-aapl",
     instrument: { symbol: "AAPL", name: "Apple" },
   },
 ];
@@ -125,6 +127,7 @@ const FILTER_ROWS: TxRow[] = [
     currency: "IDR",
     executedAt: "2025-06-01T00:00:00.000Z",
     source: "manual",
+    instrumentId: "instr-bbca",
     instrument: { symbol: "BBCA", name: "Bank Central Asia" },
   },
   {
@@ -139,6 +142,7 @@ const FILTER_ROWS: TxRow[] = [
     currency: "IDR",
     executedAt: "2026-03-01T00:00:00.000Z",
     source: "manual",
+    instrumentId: "instr-bbca",
     instrument: { symbol: "BBCA", name: "Bank Central Asia" },
   },
   {
@@ -153,6 +157,7 @@ const FILTER_ROWS: TxRow[] = [
     currency: "IDR",
     executedAt: "2026-04-01T00:00:00.000Z",
     source: "manual",
+    instrumentId: "instr-aapl",
     instrument: { symbol: "AAPL", name: "Apple" },
   },
 ];
@@ -1688,6 +1693,20 @@ describe("TransactionsTable", () => {
       ).toBeInTheDocument();
       // No transaction-scoped anomaly → no "Show flagged" toggle, yet the recon banner shows.
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
+    });
+  });
+
+  describe("keyboard accessibility", () => {
+    it("renders exactly one focusable anchor per row (the per-cell instrument link)", () => {
+      renderTable(true);
+      // Skip the header row — only count data rows.
+      const rows = screen.getAllByRole("row").slice(1);
+      const dataRows = rows.filter((r) => !r.querySelector("td[colspan]"));
+      expect(dataRows.length).toBeGreaterThan(0);
+      for (const row of dataRows) {
+        const anchors = row.querySelectorAll("a");
+        expect(anchors.length, `row ${row.textContent}`).toBe(1);
+      }
     });
   });
 });

@@ -4,8 +4,9 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { HoldingValuation } from "@portfolio/api-client";
 
+const routerPush = vi.fn();
 vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), push: routerPush }),
   Link: ({
     href,
     children,
@@ -206,5 +207,29 @@ describe("HoldingsTable", () => {
   it("omits the sparkline for a holding with no series data", () => {
     const { container } = renderTable({ rows: [makeHolding("AAPL", "10", "1500")] });
     expect(container.querySelector("polyline")).toBeNull();
+  });
+
+  describe("keyboard accessibility", () => {
+    it("renders exactly one focusable anchor per row (the per-cell instrument link)", () => {
+      renderTable();
+      // Skip the header and footer rows; only assert on the data rows.
+      const dataRows = screen
+        .getAllByRole("row")
+        .filter((r) => r.querySelector('td a[href^="/instruments/"]'));
+      expect(dataRows.length).toBeGreaterThan(0);
+      for (const row of dataRows) {
+        const anchors = row.querySelectorAll("a");
+        expect(anchors.length, `row ${row.textContent}`).toBe(1);
+      }
+    });
+
+    it("does not navigate when a non-link cell is clicked — the per-cell link is the only keyboard-reachable navigation target", () => {
+      routerPush.mockClear();
+      renderTable();
+      // Pick a row, click on a cell that's NOT the instrument-link cell (the quantity column).
+      const row = screen.getAllByRole("row")[1];
+      fireEvent.click(row.querySelectorAll("td")[1]);
+      expect(routerPush).not.toHaveBeenCalled();
+    });
   });
 });

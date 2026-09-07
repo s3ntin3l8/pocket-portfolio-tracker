@@ -19,7 +19,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { MonogramBadge } from "@/components/monogram-badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { HoldingSparkline } from "@/components/holding-sparkline";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
@@ -55,7 +55,6 @@ export interface HoldingsTableProps {
 export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   const t = useTranslations("Holdings");
   const locale = useLocale();
-  const router = useRouter();
   const { sortKey, sortDir, toggle, sort } = useTableSort<HoldingValuation>(HOLDINGS_COLS);
 
   const sorted = sort(rows);
@@ -158,11 +157,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                     ? "text-success"
                     : "text-destructive";
               return (
-                <TableRow
-                  key={h.instrumentId}
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/instruments/${h.instrumentId}`)}
-                >
+                <TableRow key={h.instrumentId}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <InstrumentLogo
@@ -175,7 +170,6 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                         <Link
                           href={`/instruments/${h.instrumentId}`}
                           className={cn(TABLE_LABEL, "hover:underline")}
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {h.instrument?.symbol ?? "—"}
                         </Link>
@@ -259,10 +253,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <div
               key={h.instrumentId}
               className={cn(
-                "flex cursor-pointer items-center gap-3 py-3 pl-4 pr-4",
+                "flex items-center gap-3 py-3 pl-4 pr-4",
                 i > 0 && "border-t border-border",
               )}
-              onClick={() => router.push(`/instruments/${h.instrumentId}`)}
             >
               <InstrumentLogo
                 label={h.instrument?.symbol ?? h.instrumentId}
@@ -274,7 +267,6 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/instruments/${h.instrumentId}`}
-                  onClick={(e) => e.stopPropagation()}
                   className="block truncate text-[15px] font-bold hover:underline"
                 >
                   {h.instrument?.symbol ?? "—"}

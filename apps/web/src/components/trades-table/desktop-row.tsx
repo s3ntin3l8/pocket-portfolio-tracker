@@ -44,14 +44,9 @@ export function DesktopRow({
   const heldLabel = (days: number) =>
     days >= 365 ? `${(days / 365).toFixed(1)}${t("yearsAbbr")}` : `${days}${t("daysAbbr")}`;
 
-  const handleRowClick = () => {
-    if (tr.status === "closed") onDetail(tr);
-    else if (tr.legs.length > 0) onToggle(key);
-  };
-
   return (
     <Fragment>
-      <TableRow className="cursor-pointer" onClick={handleRowClick}>
+      <TableRow>
         <TableCell>
           <div className="relative flex items-center gap-2">
             <ChevronRight
