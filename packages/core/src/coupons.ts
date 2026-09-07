@@ -59,7 +59,17 @@ export function projectCoupons(
       .toString();
 
     const d = new Date(maturity);
-    while (d > now) {
+    // Walk back through the coupon ladder stopping at today's UTC start-of-day (not the
+    // current instant). Otherwise `d` (a midnight-anchored YYYY-MM-DD coupon) compared
+    // to `now` (a precise instant anywhere later in the same day) is strictly less, so
+    // any coupon landing today would be silently skipped — the schedule says "06/15",
+    // `now` is 06/15 18:00, `d` is 06/15 00:00, `d > now` is false, loop exits,
+    // today's coupon is dropped. Coercing `now` to start-of-day makes the day-precision
+    // coupon rows fall on the right side of the comparison.
+    const nowStartOfDayUtc = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    while (d >= nowStartOfDayUtc) {
       if (d <= horizonEnd) {
         out.push({
           instrumentId: p.instrumentId,
