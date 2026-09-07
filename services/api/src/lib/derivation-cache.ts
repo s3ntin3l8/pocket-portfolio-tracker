@@ -97,6 +97,12 @@ export function userScopedKey(scope: string, userId: string, key: string): strin
  * the cheapest correct invalidation is to make the previous key unreachable (TTL = 60s
  * means it expires soon enough anyway). Keeping the stamp per-user avoids the
  * global-flush blast radius of `clearDerivationCache()`.
+ *
+ * ⚠ Eviction surface: this Map never evicts entries — one slot per unique user for
+ * the lifetime of the process. Acceptable for this product (a personal tracker with
+ * O(1000) users max) since the steady-state entry count is bounded by the user
+ * count. A multi-tenant deployment (e.g. one shared process per region) would need
+ * either TTL-based eviction or a startup reload — revisit before horizontal scaling.
  */
 const importListVersionByUser = new Map<string, number>();
 
