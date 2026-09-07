@@ -549,6 +549,26 @@ describe("AddTransactionMenu", () => {
       ).toBeInTheDocument();
     });
 
+    // Hermes review, PR #678: `NavRail`'s own contract is "pass 'choose' through as-is,
+    // nothing highlights" (see its doc comment) — remapping it to "manual" at the call
+    // site (as an earlier version of this diff did) would mark "Add transaction" active
+    // via `aria-current` while the chooser cards are what's actually rendered, which is
+    // observable in this exact steady state (no resize needed: `step` is "choose" here
+    // unconditionally, on mount, at a narrow viewport).
+    it("does not mark any rail destination active while the mobile chooser is showing", () => {
+      renderMenu();
+      openMenu();
+      for (const name of [
+        messages.Manage.addMenu.railImport,
+        messages.Manage.addMenu.railAddTransaction,
+        messages.Manage.addMenu.railInstrumentEvent,
+        messages.Manage.addMenu.railCreatePortfolio,
+        messages.Manage.addMenu.railAccountHolder,
+      ]) {
+        expect(screen.getByRole("button", { name })).not.toHaveAttribute("aria-current", "step");
+      }
+    });
+
     it("keeps the rail, back-chevron, and desktop Cancel button CSS-hidden rather than conditionally mounted", async () => {
       // Default (mobile) matchMedia — if these were viewport-gated by JS instead of
       // `max-md:`/`md:` classes, none of them would be in the DOM at all here.

@@ -463,7 +463,13 @@ export function AddTransactionMenu({
         >
           <NavRail
             className="max-md:hidden"
-            active={step === "choose" ? "manual" : step}
+            // Pass "choose" through as-is (NavRail's own contract, see its doc comment)
+            // rather than remapping it to "manual" — a remap here would highlight "Add
+            // transaction" for the one render between a live widen and the self-heal
+            // effect above committing `step` to "manual", while the chooser cards are
+            // still what's actually mounted. Honest: nothing highlights during that
+            // transient, matching what's really on screen.
+            active={step}
             onSelect={onSelectStep}
             labels={{
               heading: tm("addMenu.desktopHeading"),
