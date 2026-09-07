@@ -33,6 +33,7 @@ import {
 } from "./shared.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
+import { Decimal } from "decimal.js";
 
 export function registerSparplanRoutes(app: FastifyInstance) {
   // Sparplan detection for a single portfolio (in its base currency).
@@ -92,15 +93,19 @@ export function registerSparplanRoutes(app: FastifyInstance) {
 
       // Compute total value across only the targeted instruments to normalise pct
       // correctly: targets sum to 100 over the targeted sleeves, so actual pct must too.
+      // Decimal here so chained additions (e.g. a 3-sleeve target) never accumulate
+      // float drift before `rebalancingDrift` consumes the result — #B12.
       const targetedIds = new Set(targets.map((t) => t.key));
       const targetedTotal = [...targetedIds].reduce((acc, key) => {
-        return acc + Number(valueByInstrument.get(key) ?? "0");
-      }, 0);
+        return acc.plus(new Decimal(valueByInstrument.get(key) ?? "0"));
+      }, new Decimal(0));
 
       // Build AllocationSlice-compatible objects with pct normalised over targeted total.
+      // pct itself is a float ratio, but its inputs (value / targetedTotal) are Decimal.
       const slices = targets.map((t) => {
         const value = valueByInstrument.get(t.key) ?? "0";
-        const pct = targetedTotal > 0 ? (Number(value) / targetedTotal) * 100 : 0;
+        const valueDec = new Decimal(value);
+        const pct = targetedTotal.gt(0) ? valueDec.div(targetedTotal).mul(100).toNumber() : 0;
         return { key: t.key, value, pct };
       });
 

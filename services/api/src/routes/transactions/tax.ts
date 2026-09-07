@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { accountHolders, portfolios, users } from "@portfolio/db";
 import type { TradeLog } from "@portfolio/core";
 import { allowanceUsageYTD, harvestSuggestions, mergeTradeLogs } from "@portfolio/core";
+import { Decimal } from "decimal.js";
 import {
   derivationCacheKey,
   getCachedFifoTradeLog,
@@ -47,7 +48,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         taxAllowanceAnnual: string | null;
         capitalGainsTaxRate: string | null;
       } | null = null;
-      let totalAllocatedForHolder = Number(portfolio.taxAllowanceAnnual);
+      let totalAllocatedForHolder = new Decimal(portfolio.taxAllowanceAnnual ?? 0);
       let lossCarryForwardInput: { stock?: string; general?: string } | undefined;
       let carryForwardApplied = false;
 
@@ -71,8 +72,8 @@ export function registerTaxRoutes(app: FastifyInstance) {
         if (holder) holderProfile = holder;
 
         totalAllocatedForHolder = siblingRows.reduce(
-          (sum, p) => sum + Number(p.taxAllowanceAnnual ?? 0),
-          0,
+          (sum, p) => sum.plus(new Decimal(p.taxAllowanceAnnual ?? 0)),
+          new Decimal(0),
         );
 
         if (siblingRows.length <= 1) {
@@ -81,9 +82,12 @@ export function registerTaxRoutes(app: FastifyInstance) {
         }
       }
 
-      const holderAllowanceCap = Number(holderProfile?.taxAllowanceAnnual ?? 1000);
-      const remainingToDistribute = Math.max(0, holderAllowanceCap - totalAllocatedForHolder);
-      const overAllocated = totalAllocatedForHolder > holderAllowanceCap;
+      const holderAllowanceCap = new Decimal(holderProfile?.taxAllowanceAnnual ?? 1000);
+      const remainingToDistribute = Decimal.max(
+        new Decimal(0),
+        holderAllowanceCap.minus(totalAllocatedForHolder),
+      );
+      const overAllocated = totalAllocatedForHolder.gt(holderAllowanceCap);
 
       const valuation = await loadValuation(
         app,
@@ -222,8 +226,11 @@ export function registerTaxRoutes(app: FastifyInstance) {
 
         if (pfs.length === 0) return null;
 
-        const totalAllocated = pfs.reduce((sum, p) => sum + Number(p.taxAllowanceAnnual ?? 0), 0);
-        if (totalAllocated === 0) return null;
+        const totalAllocated = pfs.reduce(
+          (sum, p) => sum.plus(new Decimal(p.taxAllowanceAnnual ?? 0)),
+          new Decimal(0),
+        );
+        if (totalAllocated.isZero()) return null;
 
         const now = new Date();
         const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
@@ -271,9 +278,12 @@ export function registerTaxRoutes(app: FastifyInstance) {
           totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
         const lossCarryForward = await lossCarryForwardFor(app, holder.id, year);
 
-        const holderAllowanceCap = Number(holder.taxAllowanceAnnual ?? 1000);
-        const remainingToDistribute = Math.max(0, holderAllowanceCap - totalAllocated);
-        const overAllocated = totalAllocated > holderAllowanceCap;
+        const holderAllowanceCap = new Decimal(holder.taxAllowanceAnnual ?? 1000);
+        const remainingToDistribute = Decimal.max(
+          new Decimal(0),
+          holderAllowanceCap.minus(totalAllocated),
+        );
+        const overAllocated = totalAllocated.gt(holderAllowanceCap);
 
         const allowanceAnnual = holderAllowanceCap.toFixed(2);
 
