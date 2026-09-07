@@ -2027,6 +2027,80 @@ describe("auth + portfolios + transactions", () => {
     expect(denied.statusCode).toBe(404);
   });
 
+  it("upcoming rows carry the instrument's market + assetClass (#602)", async () => {
+    // The income-calendar UI uses <InstrumentLogo> on day cells, which needs the same
+    // market+assetClass pair that `InstrumentYield` already exposes — project it onto
+    // each upcoming row at the API layer so the web side never has to do an extra
+    // instrument-meta roundtrip per row.
+    const t = await token("income-logo-meta-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Logo meta", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const maturity = toDateKey(new Date(Date.now() + 100 * 86_400_000));
+    const recentCoupon = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const [bond] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "META-602",
+        market: "IDX",
+        assetClass: "bond",
+        currency: "IDR",
+        name: "Meta bond 602",
+        faceValue: "1000000",
+        couponRate: "0.06",
+        couponSchedule: "semiannual",
+        maturityDate: maturity,
+      })
+      .returning();
+
+    await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions`,
+      headers: auth(t),
+      payload: {
+        type: "buy",
+        instrumentId: bond.id,
+        quantity: "10",
+        price: "1000000",
+        currency: "IDR",
+        executedAt: "2026-01-05T00:00:00.000Z",
+      },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions`,
+      headers: auth(t),
+      payload: {
+        type: "coupon",
+        instrumentId: bond.id,
+        quantity: "0",
+        price: "300000",
+        currency: "IDR",
+        executedAt: recentCoupon,
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/networth/income",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.upcoming.length).toBeGreaterThan(0);
+    for (const row of body.upcoming as { symbol: string; market: string; assetClass: string }[]) {
+      expect(row.symbol).toBe("META-602");
+      expect(row.market).toBe("IDX");
+      expect(row.assetClass).toBe("bond");
+    }
+  });
+
   it("surfaces the clean displayName on yields/events/byInstrument when set on the instrument (#480)", async () => {
     // MSFT-shaped fixture: a raw broker-style name that the displayName enrichment
     // is meant to clean up. The income response must prefer displayName everywhere a

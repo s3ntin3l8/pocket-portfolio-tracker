@@ -1149,6 +1149,13 @@ export interface UpcomingPayment {
   perShare?: string;
   /** Share count used for this payment (split-adjusted, same basis as `perShare`). */
   quantity?: string;
+  /** Internal market/venue (e.g. IDX, XETRA, US) — needed alongside `symbol` for a
+   *  correct logo.dev lookup; the same bare ticker can be a different company on
+   *  different exchanges. Mirrors `InstrumentYield.market`. */
+  market: string | null;
+  /** Asset class for icon/tint (e.g. equity, etf, bond). Mirrors `InstrumentYield.assetClass`.
+   *  `null` when the instrument isn't in the local metadata cache. */
+  assetClass: string | null;
 }
 
 /** Trailing-12-month income + yield for an income-paying holding (display currency). */
