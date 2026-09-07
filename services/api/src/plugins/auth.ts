@@ -272,45 +272,46 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       if (authMethod === "local") {
         return reply.code(401).send({ error: "invalid_token" });
       }
-      const [created, wasMigrated] = await app.db
-        .insert(users)
-        .values({ authSub: sub!, email: email! })
-        .returning()
-        .then(
-          (rows) => [rows[0], false] as const,
-          async (err: unknown) => {
-            // OIDC login collided on email with a pre-existing row — the most likely
-            // cause is a user originally created via local auth (authSub: "local|<email>")
-            // whose first OIDC login we're now seeing. Migrate that row to the OIDC sub
-            // rather than 500ing: the user keeps their id, passwordHash, isAdmin, and
-            // every related row (portfolios, transactions, settings). The previously-
-            // issued local JWT is naturally invalidated on its next use — it's signed
-            // with the old "local|<email>" sub, which now matches no row.
-            //
-            // Postgres unique-violation is 23505; drizzle/PGlite may nest it under
-            // `cause`, so match the message as a driver-portable fallback. Same pattern
-            // as routes/mergers.ts and routes/admin/users.ts.
-            const e = err as { code?: string; cause?: { code?: string }; message?: string };
-            const isUniqueViolation =
-              e.code === "23505" ||
-              e.cause?.code === "23505" ||
-              /duplicate key|unique constraint/i.test(e.message ?? "");
-            if (!isUniqueViolation) throw err;
-            const [existing] = await app.db
-              .select()
-              .from(users)
-              .where(eq(users.email, email!))
-              .limit(1);
-            if (!existing) throw err;
-            const [migratedRow] = await app.db
-              .update(users)
-              .set({ authSub: sub!, email: email! })
-              .where(eq(users.id, existing.id))
-              .returning();
-            if (!migratedRow) throw err;
-            return [migratedRow, true] as const;
-          },
-        );
+      // OIDC JIT-insert. The happy path is a brand-new user; the recovery path handles
+      // the local→OIDC migration when the email we want to use is already taken by a
+      // row originally created via local auth.
+      //
+      // Postgres unique-violation is 23505; drizzle/PGlite may nest it under `cause`,
+      // so match the message as a driver-portable fallback. Same pattern as
+      // routes/mergers.ts and routes/admin/users.ts.
+      let created: typeof users.$inferSelect | undefined;
+      let wasMigrated = false;
+      try {
+        [created] = await app.db.insert(users).values({ authSub: sub!, email: email! }).returning();
+      } catch (err) {
+        const e = err as { code?: string; cause?: { code?: string }; message?: string };
+        const isUniqueViolation =
+          e.code === "23505" ||
+          e.cause?.code === "23505" ||
+          /duplicate key|unique constraint/i.test(e.message ?? "");
+        if (!isUniqueViolation) throw err;
+        const [existing] = await app.db
+          .select()
+          .from(users)
+          .where(eq(users.email, email!))
+          .limit(1);
+        // Only migrate when the colliding row is itself a local account (authSub
+        // starts with "local|"). An OIDC row with the same email means a different
+        // identity claims this address — silently rebinding its authSub to the new
+        // sub would be an account merge/hijack. The 401 below leaves both rows
+        // untouched; admin can reconcile out-of-band.
+        if (!existing || !existing.authSub.startsWith("local|")) {
+          return reply.code(401).send({ error: "invalid_token" });
+        }
+        const [migratedRow] = await app.db
+          .update(users)
+          .set({ authSub: sub!, email: email! })
+          .where(eq(users.id, existing.id))
+          .returning();
+        if (!migratedRow) throw err;
+        created = migratedRow;
+        wasMigrated = true;
+      }
       user = created;
       migrated = wasMigrated;
     }

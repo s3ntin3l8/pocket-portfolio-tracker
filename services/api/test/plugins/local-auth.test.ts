@@ -447,6 +447,36 @@ describe("OIDC migration from local authSub", () => {
 
     await migApp.db.delete(users).where(eq(users.email, `${cleanSub}@example.com`));
   });
+
+  it("does not migrate when the colliding row is already an OIDC identity — guard against account hijack via email collision", async () => {
+    // Two OIDC logins with the same email but different subs: a legitimate collision
+    // that must NOT silently merge/overwrite the existing row's authSub. Without the
+    // local|<email> guard, the migration would rebind the existing OIDC row to the
+    // attacker's sub, then return auth_migrated_relogin — an account hijack.
+    const email = "hijack-target@example.com";
+    await migApp.db.insert(users).values({
+      authSub: "oidc-victim-sub",
+      email,
+      name: "Victim",
+    });
+
+    const attackerSub = "oidc-attacker-sub";
+    const attackerJwt = await oidcJwtFor(attackerSub, migKey, email);
+
+    const res = await migApp.inject({
+      method: "GET",
+      url: "/me",
+      headers: auth(attackerJwt),
+    });
+    // The request is rejected — never authenticated, never silently merged.
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error).not.toBe("auth_migrated_relogin");
+
+    const [survivor] = await migApp.db.select().from(users).where(eq(users.email, email)).limit(1);
+    expect(survivor.authSub).toBe("oidc-victim-sub");
+
+    await migApp.db.delete(users).where(eq(users.email, email));
+  });
 });
 
 // A separate app instance (its own in-memory PGlite + its own per-route rate-limit
