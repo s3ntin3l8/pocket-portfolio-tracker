@@ -405,8 +405,8 @@ export interface PortfolioTaxSummary {
 }
 
 /** Canonical Indonesian final-tax payload shape, shared by {@link PortfolioTaxSummary}
- *  and {@link TaxSummaryHolder}. Re-exported from `@portfolio/api-client` so the web tier
- *  can type its `indonesianFinalTax` field without `as unknown as` casts. */
+ *  and {@link TaxSummaryHolder}. Exported from `@portfolio/api-client` so consumers can
+ *  type `indonesianFinalTax` fields against a known shape. */
 export interface IndonesianFinalTax {
   disposals: {
     symbol: string;

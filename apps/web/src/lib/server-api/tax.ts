@@ -1,4 +1,4 @@
-import Decimal from "decimal.js";
+import { Decimal } from "decimal.js";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import {
@@ -282,7 +282,7 @@ export async function loadTaxYearDetail(
                 totalDividendNet: totalDivNet.toString(),
                 estimatedTax: totalTax.add(totalDivTax).toString(),
                 byYear: [...byYearMap.entries()]
-                  .sort((a, b) => a[0] - b[0])
+                  .sort((a, b) => b[0] - a[0])
                   .map(([year, v]) => ({
                     year,
                     realized: v.realized.toString(),

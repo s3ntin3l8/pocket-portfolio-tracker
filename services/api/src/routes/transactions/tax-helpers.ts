@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { Decimal } from "decimal.js";
 import { and, eq, inArray } from "drizzle-orm";
 import { dividendEvents, instruments, lossCarryforward } from "@portfolio/db";
 import type {
@@ -154,7 +155,9 @@ export async function restOfYearForecastGross(
       currency: b.currency,
     }));
   const yearEnd = new Date(Date.UTC(now.getUTCFullYear(), 11, 31, 23, 59, 59, 999));
-  const restOfYearCoupons = projectCoupons(bondPositions, yearEnd, now);
+  const restOfYearCoupons = projectCoupons(bondPositions, yearEnd, now).filter(
+    (c) => c.date > todayStr,
+  );
 
   const allCcys = new Set<string>([
     ...blendedProjected.map((d) => d.currency),
@@ -235,15 +238,14 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   const { tradeLog, coreTxns, year, metaById, displayCurrency, fxRates } = input;
   const ZERO = "0";
 
-  // Native-currency → display-currency. Returns the same number when source currency
-  // is already the display currency (or no rate is registered — we log a fallback rate
-  // of 1 and accept the imprecision on that one bucket rather than throwing on the
-  // entire report).
-  const fxTo = (amount: number, fromCurrency: string): number => {
+  // Native-currency → display-currency. Returns the same amount when source currency
+  // is already the display currency (or no rate is registered — accepts the imprecision
+  // on that one bucket rather than throwing on the entire report).
+  const fxTo = (amount: Decimal, fromCurrency: string): Decimal => {
     if (fromCurrency === displayCurrency) return amount;
     const rate = fxRates.get(fromCurrency);
     if (rate === undefined) return amount;
-    return amount * rate;
+    return amount.mul(rate);
   };
 
   // Disposals for the selected year, grouped per (instrumentId, sellDate).
@@ -251,24 +253,24 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     instrumentId: string;
     symbol: string;
     when: string;
-    proceeds: number;
-    quantity: number;
-    cost: number;
+    proceeds: Decimal;
+    quantity: Decimal;
+    cost: Decimal;
   };
   const disposalGroups = new Map<string, DisposalGroup>();
   for (const t of tradeLog.trades) {
     for (const l of t.legs) {
       if (l.taxYear !== year) continue;
       const key = `${t.instrumentId}:${l.sellDate}`;
-      const qty = Number(l.quantity);
-      const proceeds = Number(l.proceeds);
-      const cost = Number(l.cost);
+      const qty = new Decimal(l.quantity);
+      const proceeds = new Decimal(l.proceeds);
+      const cost = new Decimal(l.cost);
       const existing = disposalGroups.get(key);
       const symbol = metaById.get(t.instrumentId)?.symbol ?? t.instrumentId.slice(0, 8);
       if (existing) {
-        existing.proceeds += proceeds;
-        existing.quantity += qty;
-        existing.cost += cost;
+        existing.proceeds = existing.proceeds.add(proceeds);
+        existing.quantity = existing.quantity.add(qty);
+        existing.cost = existing.cost.add(cost);
       } else {
         disposalGroups.set(key, {
           instrumentId: t.instrumentId,
@@ -286,13 +288,13 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     when: g.when,
     instrumentId: g.instrumentId,
     proceeds: g.proceeds.toFixed(2),
-    quantity: g.quantity > 0 ? g.quantity.toString() : ZERO,
-    avgBuyPrice: g.quantity > 0 ? (g.cost / g.quantity).toFixed(2) : ZERO,
-    sellPrice: g.quantity > 0 ? (g.proceeds / g.quantity).toFixed(2) : ZERO,
+    quantity: g.quantity.gt(0) ? g.quantity.toString() : ZERO,
+    avgBuyPrice: g.quantity.gt(0) ? g.cost.div(g.quantity).toFixed(2) : ZERO,
+    sellPrice: g.quantity.gt(0) ? g.proceeds.div(g.quantity).toFixed(2) : ZERO,
   }));
 
   // Dividends / coupons / interest for the selected year, grouped per (instrumentId, currency).
-  type DivBucket = { symbol: string; currency: string; gross: number; tax: number };
+  type DivBucket = { symbol: string; currency: string; gross: Decimal; tax: Decimal };
   const divBuckets = new Map<string, DivBucket>();
   for (const t of coreTxns) {
     if (t.type !== "dividend" && t.type !== "coupon" && t.type !== "interest") {
@@ -309,15 +311,15 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     // Convert each income row's net + tax to display currency so the sum doesn't mix
     // native-currency figures under the response's display label (hermes re-review warning).
     const net = fxTo(
-      Number(cashFlow({ ...t, type: t.type as CoreTransaction["type"] }).toString()),
+      new Decimal(cashFlow({ ...t, type: t.type as CoreTransaction["type"] }).toString()),
       t.currency,
     );
-    const tax = fxTo(Number((t as { tax?: string | null }).tax ?? "0"), t.currency);
-    const gross = net + tax;
+    const tax = fxTo(new Decimal((t as { tax?: string | null }).tax ?? "0"), t.currency);
+    const gross = net.add(tax);
     const existing = divBuckets.get(key);
     if (existing) {
-      existing.gross += gross;
-      existing.tax += tax;
+      existing.gross = existing.gross.add(gross);
+      existing.tax = existing.tax.add(tax);
     } else {
       divBuckets.set(key, { symbol, currency: t.currency, gross, tax });
     }
@@ -331,13 +333,11 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   // Per-year proceeds from the trade log legs (across ALL years, for the byYear table).
   // TradeLog itself is already in display currency (built via `mergeTradeLogs(logs, display)`),
   // so byYear rows stay in display currency end-to-end — no FX pass needed here.
-  const proceedsByYearMap = new Map<number, number>();
+  const proceedsByYearMap = new Map<number, Decimal>();
   for (const t of tradeLog.trades) {
     for (const l of t.legs) {
-      proceedsByYearMap.set(
-        l.taxYear,
-        (proceedsByYearMap.get(l.taxYear) ?? 0) + Number(l.proceeds),
-      );
+      const prev = proceedsByYearMap.get(l.taxYear) ?? new Decimal(0);
+      proceedsByYearMap.set(l.taxYear, prev.add(l.proceeds));
     }
   }
   const allYears = new Set<number>([
@@ -349,11 +349,13 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
     // tradeLog.dividendsByYear is in display currency (same as the per-holder divBuckets
     // conversion above). Add amount + tax to recover gross.
-    const dividendGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax ?? "0") : 0;
+    const dividendGross = divEntry
+      ? new Decimal(divEntry.amount).add(divEntry.tax ?? "0")
+      : new Decimal(0);
     const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
     return {
       year: y,
-      proceeds: (proceedsByYearMap.get(y) ?? 0).toFixed(2),
+      proceeds: (proceedsByYearMap.get(y) ?? new Decimal(0)).toFixed(2),
       dividendGross: dividendGross.toFixed(2),
       realized,
     };
