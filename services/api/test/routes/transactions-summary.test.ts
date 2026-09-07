@@ -162,4 +162,35 @@ describe("transactions summary — income-type SQL branches (B6)", () => {
     const summary = res.json().summary as { totalIncome: string };
     expect(summary.totalIncome).toBe("20"); // 10 * 2 unchanged
   });
+
+  it("tax rows (lump-sum debit in price, qty is irrelevant) contribute -price regardless of qty (Hermes #3)", async () => {
+    // Mirror packages/core/src/cash.ts cashFlow() for the `tax` branch: magnitude
+    // lives in `price` (it's a standalone debit, not a per-share amount), so the
+    // SQL aggregate must subtract `price` rather than `price * quantity`. The
+    // previous `-price * quantity` over-deducted when qty was non-zero (a Vorab
+    // row imported with qty=1 would multiply the deduction by 1; harmless today
+    // because importers leave qty=0, but fragile against a future importer
+    // change). With qty=1 and price=10 the expected totalIncome contribution is
+    // -10, not -10*1 (which happens to coincide by luck) — distinguish by using
+    // qty=2 so the broken and fixed formulas give different answers.
+    const t = await token("summary-income-tax-user");
+    const portfolioId = await createPortfolio(t, "Tax book");
+
+    await postTx(t, portfolioId, {
+      type: "tax",
+      instrumentId: null,
+      quantity: "2", // would multiply the deduction by 2 if qty were applied
+      price: "10",
+      currency: "EUR",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/transactions?page=1&pageSize=25`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const summary = res.json().summary as { totalIncome: string };
+    expect(summary.totalIncome).toBe("-10"); // cashFlow() of `tax` is -price = -10
+  });
 });

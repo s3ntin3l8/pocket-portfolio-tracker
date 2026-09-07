@@ -46,13 +46,14 @@ function proceedsCase(t: typeof transactions): ReturnType<typeof sql> {
 // Mirror packages/core/src/cash.ts cashFlow(): interest / bonus_cash are lump sums
 // (no instrument, qty = 0, amount in `price`), so `price * quantity` would silently
 // drop them. dividend / coupon are per-share (`price * quantity`). `tax` is a
-// standalone debit — explicitly subtracted as a defense so a future type added to
-// the income list can't silently double-count it.
+// standalone debit whose magnitude lives in `price` (cashFlow ignores quantity for
+// this branch) — subtract `price` directly, NOT `price * quantity`, so a tax row
+// with non-zero qty still lands at its true cash magnitude.
 function incomeCase(t: typeof transactions): ReturnType<typeof sql> {
   return sql`case \
     when ${t.type} in ('interest','bonus_cash') then ${t.price}::numeric \
     when ${t.type} in ('dividend','coupon')      then ${t.price}::numeric * ${t.quantity}::numeric \
-    when ${t.type} = 'tax'                        then -${t.price}::numeric * ${t.quantity}::numeric \
+    when ${t.type} = 'tax'                        then -${t.price}::numeric \
     else 0 end`;
 }
 
