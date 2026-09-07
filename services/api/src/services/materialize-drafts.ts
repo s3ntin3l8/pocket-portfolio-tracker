@@ -5,3 +5,4 @@ export {
   type CommittedCandidate,
 } from "./materialize-drafts/duplicates.js";
 export { writeResolvedDrafts, materializeDrafts } from "./materialize-drafts/write.js";
+export type { TxRow } from "./materialize-drafts/types.js";
