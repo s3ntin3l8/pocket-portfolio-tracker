@@ -4,6 +4,7 @@ import { documents, portfolios } from "@portfolio/db";
 import { documentListQuerySchema } from "@portfolio/schema";
 import { withDerivationCache, createStore } from "../../lib/derivation-cache.js";
 import { listInboxDocuments } from "../../storage/inbox.js";
+import { ownedPortfolio } from "../../lib/owned-portfolio.js";
 import { parsePagination, cacheKey } from "../helpers.js";
 
 const documentsCache = createStore<{ rows: unknown[]; total: number }>();
@@ -54,6 +55,15 @@ export async function handleListDocuments(
   request.timingName = "GET /documents";
 
   if (hasPagination) {
+    // Defense-in-depth: documents.userId already scopes the query, so a ?portfolioId=
+    // belonging to another user would match zero rows anyway. Returning the empty page
+    // explicitly here avoids populating a wasted cache slot under the portfolioId
+    // segment of the cache key. The reimport handlers (ibkr/tr-sync) harden the same
+    // check with a 404; this read endpoint deliberately softens to empty since an
+    // empty list is a legitimate response shape callers must already handle.
+    if (portfolioId && !(await ownedPortfolio(app, id, portfolioId))) {
+      return { rows: [], total: 0 };
+    }
     const conditions = [eq(documents.userId, id), eq(documents.category, category ?? "tax_report")];
     if (portfolioId) conditions.push(eq(documents.portfolioId, portfolioId));
 
@@ -93,7 +103,10 @@ export async function handleListDocuments(
     return cached;
   }
 
-  const docs = await listInboxDocuments(app, { userId: id, category, portfolioId });
+  const docs =
+    portfolioId && !(await ownedPortfolio(app, id, portfolioId))
+      ? []
+      : await listInboxDocuments(app, { userId: id, category, portfolioId });
 
   const portfolioIds = [
     ...new Set(docs.map((d) => d.portfolioId).filter((x): x is string => Boolean(x))),

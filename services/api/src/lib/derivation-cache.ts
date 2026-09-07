@@ -74,3 +74,51 @@ export async function withDerivationCache<T>(
 export function clearDerivationCache(): void {
   for (const store of stores) store.clear();
 }
+
+/**
+ * Build a cache key that is namespaced by a stable scope string AND the owning userId.
+ * Without this, a single cache entry keyed only by an `importId` / `portfolioId` is shared
+ * across every user — the second request from a different user reuses the first user's
+ * compute result, which is a latent IDOR (the compute itself still checks ownership, but
+ * only on a cache miss; once primed by user A, user B's GET never re-runs the check and
+ * returns A's data). Always include the request.userId in keys that touch user-owned rows.
+ *
+ * Format: `<scope>:<userId>:<key>`. The leading scope keeps unrelated stores from
+ * accidentally colliding on the same key prefix.
+ */
+export function userScopedKey(scope: string, userId: string, key: string): string {
+  return `${scope}:${userId}:${key}`;
+}
+
+/**
+ * Per-user monotonically increasing stamp used as part of the imports-list cache key.
+ * Incremented by `bumpImportListVersion(userId)` whenever the user confirms, discards,
+ * or undoes an import — that mutates which rows the next /imports read should see, and
+ * the cheapest correct invalidation is to make the previous key unreachable (TTL = 60s
+ * means it expires soon enough anyway). Keeping the stamp per-user avoids the
+ * global-flush blast radius of `clearDerivationCache()`.
+ *
+ * ⚠ Eviction surface: this Map never evicts entries — one slot per unique user for
+ * the lifetime of the process. Acceptable for this product (a personal tracker with
+ * O(1000) users max) since the steady-state entry count is bounded by the user
+ * count. A multi-tenant deployment (e.g. one shared process per region) would need
+ * either TTL-based eviction or a startup reload — revisit before horizontal scaling.
+ */
+const importListVersionByUser = new Map<string, number>();
+
+export function currentImportListVersion(userId: string): number {
+  return importListVersionByUser.get(userId) ?? 0;
+}
+
+export function bumpImportListVersion(userId: string): void {
+  importListVersionByUser.set(userId, currentImportListVersion(userId) + 1);
+}
+
+/**
+ * Convenience: build the imports-list cache key for a user with its current version stamp.
+ * The version segment changes after every confirm/discard/undo, so the resulting key never
+ * matches the post-mutation store contents and the next read recomputes.
+ */
+export function importListKey(userId: string): string {
+  return userScopedKey("importsList", userId, `v${currentImportListVersion(userId)}`);
+}

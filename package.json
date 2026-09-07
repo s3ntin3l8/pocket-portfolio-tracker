@@ -43,6 +43,7 @@
   "overrides": {
     "vite": "^8.0.0",
     "esbuild": "^0.28.1",
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "browserslist": "^4.28.7"
   }
 }

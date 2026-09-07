@@ -25,7 +25,7 @@ jobs:
       pull-requests: write
       issues: write
       checks: write
-    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
     with:
       mention-trigger: s3ntin3l8-hermes # the GitHub App slug
     secrets: inherit # pragma: allowlist secret
