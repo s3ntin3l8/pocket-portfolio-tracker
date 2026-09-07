@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { contributionStats, mergeContributionStats, type CoreTransaction } from "../src/index.js";
 
 function tx(p: Partial<CoreTransaction>): CoreTransaction {
@@ -428,5 +428,133 @@ describe("contributionStats — day-resolution series (dailySeries)", () => {
     });
     const merged = mergeContributionStats([a, b], "EUR");
     expect(merged.dailySeries).toEqual([{ date: "2026-04-14", contributed: "150" }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B4 — cross-currency transfer_out uses cost-currency, not tx.currency
+// ---------------------------------------------------------------------------
+// EUR depot, USD-denominated instrument: the avg-cost pool must accumulate in USD
+// (the trade currency of buys), and a transfer_out (tx.currency = depot's base =
+// EUR) must convert the cost from USD to display — NOT from EUR (which would be a
+// double-conversion / silent zero-conversion in some configurations).
+describe("contributionStats — cross-currency transfer_out (B4)", () => {
+  it("EUR depot + USD-denominated buys: transfer_out converts from USD, not EUR (tx.currency)", () => {
+    // Spec scenario: depot base = EUR, transfer_out currency = EUR, display = EUR,
+    // buys priced in USD. The pool is in costCurrency (USD), so the outflow must
+    // be converted from USD → EUR using the FX rate, not from EUR → EUR.
+    const fx = (from: string, to: string) => (from === "USD" && to === "EUR" ? "0.9" : "1");
+    const txns: CoreTransaction[] = [
+      // Buy USD-denominated: pool cost = 10 × 100 = 1000 USD.
+      tx({
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        currency: "USD",
+        executedAt: new Date("2024-01-15"),
+      }),
+      // Transfer half out at depot's base currency (EUR), no fee.
+      tx({
+        type: "transfer_out",
+        quantity: "5",
+        price: "0",
+        currency: "EUR",
+        executedAt: new Date("2024-02-15"),
+      }),
+    ];
+    const s = contributionStats({ txns, displayCurrency: "EUR", fx, boundary: "outside" });
+    // Inflow: 1000 USD × 0.9 = 900 EUR (display). Outflow: 5 × 100 = 500 USD × 0.9 = 450 EUR.
+    expect(s.totalContributed).toBe("900");
+    expect(s.totalWithdrawn).toBe("450");
+    expect(s.netContributed).toBe("450");
+  });
+
+  it("regression: when displayCurrency differs from depot base, the bug surfaces (display=USD, depot=EUR, buys=USD)", () => {
+    // The current code converts costOfTransferred via `tx.currency → display`, which
+    // double-converts when the pool is in display currency. Once the pool is in
+    // costCurrency and we convert from costCurrency → display, the outflow lands at
+    // the actual USD cost basis (no spurious EUR→USD conversion).
+    const fx = (from: string, to: string) => {
+      if (from === "USD" && to === "EUR") return "0.9";
+      if (from === "EUR" && to === "USD") return "1.1111"; // deliberately skewed
+      return "1";
+    };
+    const txns: CoreTransaction[] = [
+      // Buy USD-denominated: pool cost = 1000 USD (costCurrency = USD).
+      tx({
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        currency: "USD",
+        executedAt: new Date("2024-01-15"),
+      }),
+      // Transfer_out: tx.currency = EUR (depot base), display = USD.
+      tx({
+        type: "transfer_out",
+        quantity: "5",
+        price: "0",
+        currency: "EUR",
+        executedAt: new Date("2024-02-15"),
+      }),
+    ];
+    const s = contributionStats({ txns, displayCurrency: "USD", fx, boundary: "outside" });
+    // Outflow: 5 × 100 USD = 500 USD (in costCurrency), convert USD → USD display = 500.
+    // Buggy code would do convert(500, EUR, USD) = 500 × 1.1111 ≈ 555.55 — over-counted.
+    expect(s.totalWithdrawn).toBe("500");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hermes review follow-up: mixed-currency acquisitions no longer throw on the
+// outside-boundary stats summary — the offending instrument is skipped (with a
+// structured stderr warning) and the rest of the summary still computes.
+// ---------------------------------------------------------------------------
+describe("contributionStats — mixed-currency acquisitions (Hermes #1)", () => {
+  it("skips the offending instrument and lets the rest of the summary compute", () => {
+    // Two instruments:
+    //   - inst-good: a clean buy (should count toward totalContributed)
+    //   - inst-mixed: two acquisitions in different currencies (current code throws)
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const txns: CoreTransaction[] = [
+        tx({ type: "buy", quantity: "5", price: "100", executedAt: new Date("2026-01-15") }),
+        tx({
+          instrumentId: "inst-mixed",
+          type: "buy",
+          quantity: "10",
+          price: "100",
+          currency: "USD",
+          executedAt: new Date("2026-02-15"),
+        }),
+        tx({
+          instrumentId: "inst-mixed",
+          type: "buy",
+          quantity: "10",
+          price: "950",
+          currency: "EUR",
+          executedAt: new Date("2026-03-15"),
+        }),
+      ];
+      let s: ReturnType<typeof contributionStats> | undefined;
+      expect(() => {
+        s = contributionStats({ txns, displayCurrency: "EUR", boundary: "outside" });
+      }).not.toThrow();
+      // inst-good counts toward totalContributed; inst-mixed is dropped entirely
+      // (both the EUR and the USD leg, so its sells would not match an incomplete
+      // pool either). 5 * 100 = 500.
+      expect(s!.totalContributed).toBe("500");
+
+      const warnings = stderrSpy.mock.calls
+        .map((call) => String(call[0] ?? ""))
+        .filter((line) => line.includes("contributions_mixed_currency_instrument"));
+      expect(warnings).toHaveLength(1);
+      const payload = JSON.parse(warnings[0]!.trim());
+      expect(payload.level).toBe("warn");
+      expect(payload.event).toBe("contributions_mixed_currency_instrument");
+      expect(payload.instrumentId).toBe("inst-mixed");
+      expect(payload.currencies).toEqual(["EUR", "USD"]);
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 });

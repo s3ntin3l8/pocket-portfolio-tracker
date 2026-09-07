@@ -94,12 +94,6 @@ function withdrawalOutflow(tx: CoreTransaction, fx: FxRateFn, display: string): 
   return D(convert(amount.toString(), tx.currency, display, fx));
 }
 
-/** Money put into a security by an acquisition: gross notional + fees, in display ccy. */
-function acquisitionCost(tx: CoreTransaction, fx: FxRateFn, display: string): Decimal {
-  const gross = D(tx.quantity).mul(D(tx.price)).abs().add(D(tx.fees));
-  return D(convert(gross.toString(), tx.currency, display, fx));
-}
-
 /** Whether an acquisition is the user's own external capital (outside boundary). */
 function isExternalAcquisition(tx: CoreTransaction): boolean {
   // Reward-funded (cash_neutral) acquisitions still build the cost-basis pool but are
@@ -160,11 +154,46 @@ function insideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map
  */
 function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
   const sorted = [...txns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
-  const pool = new Map<string, { qty: Decimal; cost: Decimal }>();
+  // Pool is denominated in costCurrency (the trade currency of the instrument's
+  // buys) — mirror of computeHoldings. Mixing currencies for one instrument is
+  // meaningless (cost basis is currency-blind). Rather than crash the entire
+  // summary (the original behavior) or skip-and-refund mid-loop, we pre-scan
+  // for instruments whose acquisitions span more than one currency and drop
+  // them entirely — every tx for that instrument is skipped in the main loop.
+  const skippedInstruments = new Set<string>();
+  const acquisitionCurrencies = new Map<string, Set<string>>();
+  for (const tx of sorted) {
+    if (!tx.instrumentId) continue;
+    if (
+      tx.type !== "buy" &&
+      tx.type !== "savings_plan" &&
+      tx.type !== "bonus" &&
+      tx.type !== "transfer_in"
+    )
+      continue;
+    const set = acquisitionCurrencies.get(tx.instrumentId) ?? new Set<string>();
+    set.add(tx.currency);
+    acquisitionCurrencies.set(tx.instrumentId, set);
+  }
+  for (const [instrumentId, ccys] of acquisitionCurrencies) {
+    if (ccys.size > 1) {
+      skippedInstruments.add(instrumentId);
+      process.stderr.write(
+        JSON.stringify({
+          level: "warn",
+          event: "contributions_mixed_currency_instrument",
+          instrumentId,
+          currencies: [...ccys].sort(),
+        }) + "\n",
+      );
+    }
+  }
+  const pool = new Map<string, { qty: Decimal; cost: Decimal; costCurrency: string }>();
   const months = new Map<string, FlowAgg>();
 
   for (const tx of sorted) {
     if (!tx.instrumentId) continue;
+    if (skippedInstruments.has(tx.instrumentId)) continue;
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
 
@@ -174,35 +203,56 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
       tx.type === "bonus" ||
       tx.type === "transfer_in"
     ) {
-      const cost = acquisitionCost(tx, fx, display);
-      const p = pool.get(tx.instrumentId) ?? { qty: D(0), cost: D(0) };
+      // Acquisitions add to the pool in costCurrency (NOT pre-converted to display).
+      // The previous code accumulated in display, which forced a redundant conversion
+      // at outflow time using tx.currency (the depot's base) — wrong for cross-currency
+      // holdings where buys were priced in a non-base currency.
+      const existing = pool.get(tx.instrumentId);
+      if (!existing) {
+        pool.set(tx.instrumentId, {
+          qty: D(0),
+          cost: D(0),
+          costCurrency: tx.currency,
+        });
+      }
+      const p = pool.get(tx.instrumentId)!;
+      const gross = D(tx.quantity).abs().mul(D(tx.price)).add(D(tx.fees));
       p.qty = p.qty.add(D(tx.quantity).abs());
-      p.cost = p.cost.add(cost);
-      pool.set(tx.instrumentId, p);
-      if (isExternalAcquisition(tx)) m.inflow = m.inflow.add(cost);
+      p.cost = p.cost.add(gross);
+      if (isExternalAcquisition(tx)) {
+        // Convert from costCurrency to display only at the inflow boundary.
+        m.inflow = m.inflow.add(D(convert(gross.toString(), tx.currency, display, fx)));
+      }
     } else if (tx.type === "transfer_out") {
       // Outbound transfer removes from the avg-cost pool and counts as outflow
       // (capital leaving the boundary), analogous to a sell but with no P&L.
-      if (!tx.instrumentId) continue;
-      const p = pool.get(tx.instrumentId) ?? { qty: D(0), cost: D(0) };
+      const p = pool.get(tx.instrumentId);
+      if (!p || p.qty.lte(0)) continue;
       const transferQty = Decimal.min(D(tx.quantity).abs(), p.qty);
-      const avg = p.qty.gt(0) ? p.cost.div(p.qty) : D(0);
-      const costOfTransferred = avg.mul(transferQty);
+      const avg = p.cost.div(p.qty);
+      const costOfTransferred = avg.mul(transferQty); // in costCurrency
       p.qty = p.qty.sub(transferQty);
       p.cost = p.cost.sub(costOfTransferred);
-      pool.set(tx.instrumentId, p);
-      m.outflow = m.outflow.add(D(convert(costOfTransferred.toString(), tx.currency, display, fx)));
+      // Convert from costCurrency → display (B4 fix). Previously this used
+      // `tx.currency` (= depot base), which double-converted when the pool was in
+      // display, or silently zero-converted when the depot base equalled display.
+      m.outflow = m.outflow.add(
+        D(convert(costOfTransferred.toString(), p.costCurrency, display, fx)),
+      );
     } else if (tx.type === "sell") {
-      const p = pool.get(tx.instrumentId) ?? { qty: D(0), cost: D(0) };
-      const sellQty = Decimal.min(D(tx.quantity).abs(), p.qty);
-      const avg = p.qty.gt(0) ? p.cost.div(p.qty) : D(0);
-      const costOfSold = avg.mul(sellQty);
-      p.qty = p.qty.sub(sellQty);
-      p.cost = p.cost.sub(costOfSold);
-      pool.set(tx.instrumentId, p);
+      const p = pool.get(tx.instrumentId);
+      const sellQty = p ? Decimal.min(D(tx.quantity).abs(), p.qty) : D(0);
+      const avg = p && p.qty.gt(0) ? p.cost.div(p.qty) : D(0);
+      const costOfSold = avg.mul(sellQty); // in costCurrency
+      if (p) {
+        p.qty = p.qty.sub(sellQty);
+        p.cost = p.cost.sub(costOfSold);
+      }
       // A merger's sell leg removes the old position but returns no capital — the
       // basis moves into the new instrument's buy leg. Draw the pool, skip outflow.
-      if (tx.kind !== "merger") m.outflow = m.outflow.add(costOfSold);
+      if (tx.kind !== "merger" && p) {
+        m.outflow = m.outflow.add(D(convert(costOfSold.toString(), p.costCurrency, display, fx)));
+      }
     }
     months.set(key, m);
   }
