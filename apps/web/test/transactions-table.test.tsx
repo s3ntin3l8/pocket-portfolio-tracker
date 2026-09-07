@@ -278,8 +278,9 @@ describe("TransactionsTable", () => {
         <TransactionsTable rows={ROWS} showPortfolio portfolios={PORTFOLIOS} />
       </NextIntlClientProvider>,
     );
-    // Single-row actions live in the detail sheet (opened by clicking the row), not inline.
-    fireEvent.click(screen.getByText("Bank Central Asia")); // t1 (portfolio p1)
+    // Single-row actions live in the detail sheet, opened via a per-row keyboard-reachable
+    // button (whole-row onClick is gone for WCAG #684 batch-4 review).
+    fireEvent.click(detailButton("Bank Central Asia")); // t1 (portfolio p1)
     // Secondary actions live in the header "⋯" overflow menu now.
     fireEvent.keyDown(screen.getByRole("button", { name: messages.Manage.actions }), {
       key: "Enter",
@@ -298,6 +299,17 @@ describe("TransactionsTable", () => {
     const table = screen.getByRole("table");
     const row = within(table).getByText(label).closest("tr")!;
     return within(row as HTMLElement).getByLabelText(tb.selectRow);
+  }
+
+  // Scope a row's own keyboard-reachable detail-sheet-open button. Used by every test
+  // that used to `fireEvent.click(screen.getByText(rowLabel))` before the row-level
+  // onClick was removed for accessibility.
+  function detailButton(rowLabel: string) {
+    const table = screen.getByRole("table");
+    const row = within(table).getByText(rowLabel).closest("tr")!;
+    return within(row as HTMLElement).getByRole("button", {
+      name: messages.Manage.viewDetails,
+    });
   }
 
   it("offers Merge only when exactly two selected rows share a portfolio", async () => {
@@ -340,7 +352,7 @@ describe("TransactionsTable", () => {
         <TransactionsTable rows={ROWS} showPortfolio portfolios={PORTFOLIOS} />
       </NextIntlClientProvider>,
     );
-    fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
+    fireEvent.click(detailButton("Bank Central Asia")); // open the detail sheet
     fireEvent.click(screen.getByRole("button", { name: messages.Manage.edit }));
     // The edit sheet opens in place (no navigation) with its "Edit transaction" title.
     // Two copies legitimately exist (mobile header + desktop DialogTitle, CSS-hidden
@@ -355,7 +367,7 @@ describe("TransactionsTable", () => {
       </NextIntlClientProvider>,
     );
     // Open the detail sheet — with a single portfolio there's nowhere to reassign to.
-    fireEvent.click(screen.getByText("Bank Central Asia"));
+    fireEvent.click(detailButton("Bank Central Asia"));
     // The overflow menu still opens (status control), but Reassign isn't offered.
     fireEvent.keyDown(screen.getByRole("button", { name: messages.Manage.actions }), {
       key: "Enter",
@@ -697,7 +709,7 @@ describe("TransactionsTable", () => {
 
     it("exposes a per-row status control in the detail sheet", () => {
       renderSingleRow({ ...ROWS[0], status: "normal" });
-      fireEvent.click(screen.getByText("Bank Central Asia"));
+      fireEvent.click(detailButton("Bank Central Asia"));
       // Status options live in the header "⋯" overflow menu.
       fireEvent.keyDown(screen.getByRole("button", { name: messages.Manage.actions }), {
         key: "Enter",
@@ -761,7 +773,7 @@ describe("TransactionsTable", () => {
     it("confirming a draft row calls resolveDraftTransactions with action=confirm", async () => {
       resolveDraftTransactions.mockClear();
       renderSingleRow({ ...ROWS[0], status: "draft" });
-      fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
+      fireEvent.click(detailButton("Bank Central Asia")); // open the detail sheet
       fireEvent.click(screen.getByRole("button", { name: md.confirmDraft }));
       await waitFor(() =>
         expect(resolveDraftTransactions).toHaveBeenCalledWith("p1", ["t1"], "confirm"),
@@ -771,7 +783,7 @@ describe("TransactionsTable", () => {
     it("discarding a draft row calls resolveDraftTransactions with action=discard", async () => {
       resolveDraftTransactions.mockClear();
       renderSingleRow({ ...ROWS[0], status: "draft" });
-      fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
+      fireEvent.click(detailButton("Bank Central Asia")); // open the detail sheet
       fireEvent.click(screen.getByRole("button", { name: md.discardDraft }));
       await waitFor(() =>
         expect(resolveDraftTransactions).toHaveBeenCalledWith("p1", ["t1"], "discard"),
@@ -786,7 +798,7 @@ describe("TransactionsTable", () => {
         </NextIntlClientProvider>,
       );
 
-      fireEvent.click(screen.getByText("Bank Central Asia")); // open the detail sheet
+      fireEvent.click(detailButton("Bank Central Asia")); // open the detail sheet
       expect(screen.getByRole("button", { name: md.confirmDraft })).toBeInTheDocument();
 
       // Confirming calls the API and triggers router.refresh(), which re-feeds `rows` with
@@ -1333,8 +1345,9 @@ describe("TransactionsTable", () => {
       fireEvent.click(screen.getByRole("button", { name: messages.Anomalies.showFlagged }));
       await waitFor(() => expect(screen.getByText("Off Page Co")).toBeInTheDocument());
 
-      // Click the flagged row to open the detail sheet.
-      fireEvent.click(screen.getByText("Off Page Co"));
+      // Click the flagged row's keyboard-reachable detail button to open the detail sheet
+      // (whole-row onClick is gone for WCAG accessibility, #684 batch-4 review).
+      fireEvent.click(detailButton("Off Page Co"));
 
       // The detail sheet must stay open — pre-fix the reconciliation effect searched
       // accumulatedRows (which doesn't contain the off-page row) and immediately closed it.
@@ -1693,6 +1706,36 @@ describe("TransactionsTable", () => {
       ).toBeInTheDocument();
       // No transaction-scoped anomaly → no "Show flagged" toggle, yet the recon banner shows.
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
+    });
+  });
+
+  describe("detail-sheet open via keyboard-reachable button", () => {
+    // The whole-row onClick (which used to open the TransactionDetailSheet) is gone for
+    // WCAG keyboard-reachability — the only keyboard-reachable trigger is a dedicated
+    // button. Helper: scope to a single row's button via the row's text label.
+    function detailButton(rowLabel: string) {
+      const table = screen.getByRole("table");
+      const row = within(table).getByText(rowLabel).closest("tr")!;
+      return within(row as HTMLElement).getByRole("button", {
+        name: messages.Manage.viewDetails,
+      });
+    }
+
+    it("opens the detail sheet via a per-row button (no whole-row onClick)", () => {
+      renderTable(true);
+      fireEvent.click(detailButton("Bank Central Asia"));
+      // The sheet's overflow menu's Edit button is the canonical signal the sheet is open.
+      expect(screen.getByRole("button", { name: messages.Manage.edit })).toBeInTheDocument();
+    });
+
+    it("clicking a non-button cell on the row no longer opens the detail sheet", () => {
+      renderTable(true);
+      // The date cell used to bubble to the row's onClick. It now does nothing.
+      const table = screen.getByRole("table");
+      const row = within(table).getByText("Bank Central Asia").closest("tr")!;
+      const dateCell = within(row as HTMLElement).getByText(/^1 Feb/);
+      fireEvent.click(dateCell);
+      expect(screen.queryByRole("button", { name: messages.Manage.edit })).toBeNull();
     });
   });
 

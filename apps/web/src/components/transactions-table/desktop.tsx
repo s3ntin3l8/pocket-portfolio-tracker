@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { AlertCircle, AlertTriangle, ListChecks } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronRight, ListChecks } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -208,10 +208,9 @@ export function DesktopTable({
                 )}
                 <TableRow
                   data-state={isSelected ? "selected" : undefined}
-                  className={`cursor-pointer select-none ${status === "archived" ? "opacity-50" : ""} ${
+                  className={`select-none ${status === "archived" ? "opacity-50" : ""} ${
                     status === "draft" ? "bg-amber-50/40 dark:bg-amber-950/10" : ""
                   }`}
-                  onClick={() => onRowActivate(tx)}
                   {...longPressHandlers(tx.id)}
                 >
                   <TableCell className="w-16">
@@ -320,6 +319,17 @@ export function DesktopTable({
                     className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
                   >
                     {m(netAmount, tx.currency)}
+                  </TableCell>
+                  <TableCell className="w-10 pr-2 text-right">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label={tm("viewDetails")}
+                      onClick={() => onRowActivate(tx)}
+                    >
+                      <ChevronRight className="size-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               </Fragment>

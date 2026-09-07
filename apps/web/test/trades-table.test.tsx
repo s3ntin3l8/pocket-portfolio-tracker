@@ -186,6 +186,62 @@ describe("TradesTable", () => {
     });
   });
 
+  describe("leg expansion via keyboard-reachable button", () => {
+    it("expands an open trade to reveal its matched legs via a keyboard-reachable button", () => {
+      renderTable([open]);
+      // Leg detail is hidden until the row is expanded.
+      expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
+      // The whole-row onClick is gone — the only keyboard-reachable trigger is the
+      // dedicated button in the symbol cell.
+      fireEvent.click(screen.getByRole("button", { name: /legs/i }));
+      expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
+    });
+
+    it("collapses an open trade to hide its matched legs via the same button", () => {
+      renderTable([open]);
+      const button = screen.getByRole("button", { name: /legs/i });
+      fireEvent.click(button);
+      expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
+      fireEvent.click(button);
+      expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
+    });
+
+    it("toggles the button's aria-label between expand and collapse", () => {
+      renderTable([open]);
+      const button = screen.getByRole("button", { name: /show.*legs|legs/i });
+      // Initially collapsed → the label advertises the expand action.
+      expect(button.getAttribute("aria-label")).toMatch(/show|expand/i);
+      fireEvent.click(button);
+      expect(button.getAttribute("aria-label")).toMatch(/hide|collapse/i);
+    });
+
+    it("does not render a leg-expand button for a closed trade", () => {
+      renderTable([closed]);
+      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
+    });
+
+    it("does not render a leg-expand button for an open trade with no legs", () => {
+      const openNoLegs: Trade = { ...open, legs: [] };
+      renderTable([openNoLegs]);
+      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
+    });
+  });
+
+  describe("detail-sheet open via keyboard-reachable button", () => {
+    it("opens the trade detail sheet via a keyboard-reachable button for a closed trade", () => {
+      renderTable([closed]);
+      // Whole-row onClick is gone — the only keyboard-reachable trigger is a dedicated
+      // button. Sheet header reads "Closed 2021-06-01".
+      fireEvent.click(screen.getByRole("button", { name: /detail/i }));
+      expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
+    });
+
+    it("does not render a detail button for an open trade (open trades use leg expansion instead)", () => {
+      renderTable([open]);
+      expect(screen.queryByRole("button", { name: /detail/i })).toBeNull();
+    });
+  });
+
   describe("keyboard accessibility", () => {
     it("renders exactly one focusable anchor per collapsed row (the per-cell instrument link)", () => {
       renderTable([open, closed]);
