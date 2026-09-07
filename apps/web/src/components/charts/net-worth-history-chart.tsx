@@ -160,10 +160,12 @@ export function NetWorthHistoryChart({
   useEffect(() => {
     if (!isHero || !heroSeriesSnapshot) return;
     onSeriesChange?.(heroSeriesSnapshot, range);
-    // heroSeriesSnapshot is a pure function of [data, range, selectedId] — depending
-    // on those (rather than the freshly-allocated snapshot) avoids an extra re-run.
+    // heroSeriesSnapshot is a fresh object on every render; depending on its
+    // identity directly would re-fire this effect in a loop with the parent's
+    // `onSeriesChange` setter. The snapshot is a pure function of the inputs
+    // below, which are referentially stable when they haven't actually changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heroSeriesSnapshot, range, onSeriesChange]);
+  }, [data, range, selectedId, isHero, onSeriesChange]);
 
   const collectingNote = (
     <p
