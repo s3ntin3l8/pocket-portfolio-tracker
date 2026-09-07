@@ -20,12 +20,36 @@ export const userPreferences = pgTable("user_preferences", {
   dashboardKpis: jsonb("dashboard_kpis").$type<string[]>(),
   costBasisMode: text("cost_basis_mode").notNull().default("purchase_price"),
   taxRegime: text("tax_regime").notNull().default("DE"),
-  benchmarkSymbol: text("benchmark_symbol"),
   riskFreeRate: numeric("risk_free_rate"),
   retirementAge: integer("retirement_age"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
+
+/**
+ * User-selected reference indices for benchmark comparison. Replaces the previous
+ * single-symbol `userPreferences.benchmarkSymbol` column. Capped at 3 entries per
+ * user (enforced at the API layer; no DB constraint, so the cap is easy to lift
+ * in a future migration). `displayOrder` is the column order — call sites should
+ * rebalance to a contiguous 0..N-1 range on add/remove.
+ */
+export const userBenchmarkSymbols = pgTable(
+  "user_benchmark_symbols",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    symbol: text("symbol").notNull(),
+    displayName: text("display_name").notNull(),
+    displayOrder: integer("display_order").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("user_benchmark_symbols_user_symbol_idx").on(t.userId, t.symbol),
+    index("user_benchmark_symbols_user_order_idx").on(t.userId, t.displayOrder),
+  ],
+).enableRLS();
 
 export const benchmarkPrices = pgTable(
   "benchmark_prices",

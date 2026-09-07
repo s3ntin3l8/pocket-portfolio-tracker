@@ -154,6 +154,14 @@ export {
 } from "./volatility.js";
 export { streakAnalysis, type StreakResult, type Streak } from "./streaks.js";
 export {
+  computeYearlyReturns,
+  type ComputeYearlyReturnsInput,
+  type YearlyReturnRow,
+  type YearlyReturnBenchmarkInput,
+  type YearlyReturnBenchmarkOutput,
+  type YearlyPortfolioFlow,
+} from "./yearly-returns.js";
+export {
   ACQUISITION_TYPES,
   DISPOSAL_TYPES,
   INCOME_TYPES,

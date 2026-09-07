@@ -962,6 +962,12 @@ export interface NetWorth {
 }
 
 /** User dashboard preferences (period selector, KPI layout). */
+export interface BenchmarkSymbolEntry {
+  symbol: string;
+  displayName: string;
+  displayOrder: number;
+}
+
 export interface UserPreferences {
   dashboardPeriod: "ytd" | "1y" | "5y" | "max";
   dashboardKpis: string[] | null;
@@ -969,8 +975,13 @@ export interface UserPreferences {
   costBasisMode: "purchase_price" | "total_paid";
   /** Global tax regime — drives the Tax screen (DE/ID) and the sparplan harvest gate. */
   taxRegime: "DE" | "ID";
-  /** User's benchmark symbol for comparison (e.g. "^GSPC"). Null = disabled. */
-  benchmarkSymbol: string | null;
+  /**
+   * User's selected reference indices (1–3 entries). The first one (displayOrder
+   * = 0) drives the existing BenchmarkCard on /insights; all of them drive the
+   * new per-year comparison card. Empty array would only happen during a failed
+   * migration; the API normalizes to a single ^GSPC default in that case.
+   */
+  benchmarkSymbols: BenchmarkSymbolEntry[];
   /** Risk-free rate for Sharpe/Sortino (decimal fraction). Null = auto-detect. */
   riskFreeRate: number | null;
   /** User's target retirement age. Null = no retirement forecast target. */
@@ -1097,6 +1108,24 @@ export interface PeriodMover {
   pct: number;
 }
 
+/** One benchmark's per-year TWR and active return. */
+export interface YearlyReturnBenchmark {
+  symbol: string;
+  displayName: string;
+  nativeCurrency: string;
+  twr: string | null;
+  activeReturn: string | null;
+}
+
+/** One row in the per-year returns table. */
+export interface YearlyReturnRow {
+  year: number;
+  isCurrentYear: boolean;
+  portfolioTwr: string | null;
+  portfolioXirr: string | null;
+  benchmarks: YearlyReturnBenchmark[];
+}
+
 export interface InsightsResponse {
   drawdown: InsightsDrawdown;
   volatility: InsightsVolatility;
@@ -1105,6 +1134,13 @@ export interface InsightsResponse {
   concentrationTrend: ConcentrationPoint[];
   bestWorstMonthly: { best: PeriodMover | null; worst: PeriodMover | null };
   bestWorstYearly: { best: PeriodMover | null; worst: PeriodMover | null };
+  /**
+   * Per-calendar-year portfolio TWR / XIRR plus each selected benchmark's TWR
+   * and the active return (portfolio TWR − benchmark TWR). Ordered oldest →
+   * newest; the current year is the last row with `isCurrentYear: true` and is
+   * labelled "YTD" in the UI.
+   */
+  yearlyReturns: YearlyReturnRow[];
 }
 
 /** A projected future coupon payment for a held bond (instrument currency). */
@@ -2101,7 +2137,7 @@ export function createApiClient(config: ApiClientConfig) {
         dashboardKpis: string[];
         costBasisMode: "purchase_price" | "total_paid";
         taxRegime: "DE" | "ID";
-        benchmarkSymbol: string | null;
+        benchmarkSymbols: { symbol: string; displayName?: string }[];
         riskFreeRate: number | null;
         retirementAge: number | null;
       }>,

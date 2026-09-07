@@ -27,6 +27,10 @@ import { insightsCache } from "./shared.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import { emptyInsightsResponse } from "./insights/defaults.js";
 import { computeConcentrationSection } from "./insights/concentration.js";
+import {
+  computeInsightsYearlyReturns,
+  loadBoundaryFlowsForUser,
+} from "./insights/yearly-returns.js";
 
 export function registerInsightsRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { range?: string; holderId?: string; portfolioId?: string } }>(
@@ -120,6 +124,38 @@ export function registerInsightsRoutes(app: FastifyInstance) {
 
         const aggregated = aggregateValueFlows(allFlows);
         const indexed = chainIndex(aggregated);
+
+        // ── Per-year returns (portfolio TWR + XIRR, each benchmark TWR) ──
+        // Reuses the same display-currency conversion and snapshot range as the
+        // rest of /insights. The new compute is bounded by the per-year table
+        // size (≤ ~years since first snapshot) so it's a negligible cost on top
+        // of the chained-index work.
+        const perPortfolioForYearly = [...perPortfolio.entries()].map(([id, rows]) => ({
+          id,
+          flows: rows.map((r) => ({
+            date: r.date,
+            marketValue: r.marketValue ?? "0",
+            currency: r.currency,
+          })),
+        }));
+        const boundaryFlowsForYearly = await loadBoundaryFlowsForUser(
+          app,
+          id,
+          pfs.map((p) => p.id),
+          display,
+          // Default to "inside" — the per-year table tracks the user's real
+          // cash deposits/withdrawals, not the kind-aware invested-capital view.
+          "inside",
+        );
+        const yearlyReturns = await computeInsightsYearlyReturns({
+          app,
+          userId: id,
+          aggregatedFlows: aggregated,
+          perPortfolio: perPortfolioForYearly,
+          boundaryFlows: boundaryFlowsForYearly,
+          displayCurrency: display,
+          ratesByDate,
+        });
 
         // ── Drawdown ───────────────────────────────────────────────────
         const drawdown = maxDrawdown(indexed.map((p) => ({ date: p.date, netWorth: p.index })));
@@ -217,6 +253,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
           concentrationTrend,
           bestWorstMonthly,
           bestWorstYearly,
+          yearlyReturns,
         };
       });
 

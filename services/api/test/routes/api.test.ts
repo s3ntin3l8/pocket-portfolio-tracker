@@ -6,7 +6,7 @@ import {
   instruments,
   portfolioSnapshots,
   prices,
-  userPreferences,
+  userBenchmarkSymbols,
   users as schemaUsers,
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
@@ -3077,9 +3077,11 @@ describe("auth + portfolios + transactions", () => {
       .from(schemaUsers)
       .where(eq(schemaUsers.authSub, "bm-overlay-user"))
       .limit(1);
-    await app.db.insert(userPreferences).values({
+    await app.db.insert(userBenchmarkSymbols).values({
       userId: u!.id,
-      benchmarkSymbol: "^GSPC",
+      symbol: "^GSPC",
+      displayName: "S&P 500",
+      displayOrder: 0,
     });
     await app.db.insert(benchmarkPrices).values([
       {

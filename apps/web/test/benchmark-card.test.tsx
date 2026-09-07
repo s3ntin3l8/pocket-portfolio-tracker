@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { BenchmarkCard } from "../src/components/insights/benchmark-card";
-import type { InsightsBenchmark } from "@portfolio/api-client";
+import type { BenchmarkSymbolEntry, InsightsBenchmark } from "@portfolio/api-client";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
@@ -13,10 +13,13 @@ vi.mock("@/lib/api", () => ({
   useApiClient: () => ({ putPreferences, lookupInstruments: vi.fn(async () => []) }),
 }));
 
-function renderCard(benchmark: InsightsBenchmark | null) {
+function renderCard(
+  benchmark: InsightsBenchmark | null,
+  symbols: BenchmarkSymbolEntry[] = [{ symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 }],
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <BenchmarkCard benchmark={benchmark} locale="en" />
+      <BenchmarkCard benchmark={benchmark} symbols={symbols} locale="en" />
     </NextIntlClientProvider>,
   );
 }
@@ -54,7 +57,7 @@ describe("BenchmarkCard", () => {
   });
 
   it("shows a placeholder when no benchmark is configured", () => {
-    renderCard(null);
+    renderCard(null, []);
 
     const els = screen.getAllByText("Set benchmark");
     expect(els.length).toBeGreaterThanOrEqual(1);
@@ -87,9 +90,12 @@ describe("BenchmarkCard", () => {
     expect(screen.getByPlaceholderText("Search benchmark...")).toBeInTheDocument();
   });
 
-  it("saves a new benchmark symbol via putPreferences when a suggested benchmark is picked", async () => {
+  it("saves the new benchmark list as an array via putPreferences when a suggested benchmark is added", async () => {
     putPreferences.mockResolvedValue({
-      benchmarkSymbol: "^GDAXI",
+      benchmarkSymbols: [
+        { symbol: "^GDAXI", displayName: "DAX", displayOrder: 0 },
+        { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 1 },
+      ],
       riskFreeRate: null,
       retirementAge: null,
     });
@@ -108,13 +114,18 @@ describe("BenchmarkCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Save/i }));
 
     await waitFor(() => {
-      expect(putPreferences).toHaveBeenCalledWith({ benchmarkSymbol: "^GDAXI" });
+      expect(putPreferences).toHaveBeenCalledWith({
+        benchmarkSymbols: [
+          { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 },
+          { symbol: "^GDAXI", displayName: "DAX", displayOrder: 1 },
+        ],
+      });
     });
   });
 
-  it("allows removing the benchmark", async () => {
+  it("allows removing a benchmark from the list", async () => {
     putPreferences.mockResolvedValue({
-      benchmarkSymbol: null,
+      benchmarkSymbols: [],
       riskFreeRate: null,
       retirementAge: null,
     });
@@ -129,10 +140,15 @@ describe("BenchmarkCard", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /Remove/i }));
+    // The dialog lists the current symbols as removable chips.
+    const removeButtons = screen.getAllByRole("button", { name: /Remove/i });
+    fireEvent.click(removeButtons[0]);
 
+    // After removing the only entry, the list-area "no benchmarks" placeholder
+    // appears (the S&P 500 text still shows in the suggested-chips row below,
+    // so we assert on the placeholder text instead of the chip itself).
     await waitFor(() => {
-      expect(putPreferences).toHaveBeenCalledWith({ benchmarkSymbol: null });
+      expect(screen.getByText(/Add at least one benchmark/i)).toBeInTheDocument();
     });
   });
 });
