@@ -39,11 +39,14 @@ export interface ChartSeriesPoint {
  * TWR % (stringified, as `chainIndex` produces — divide by 100 before formatting),
  * or `null` if no benchmark data is present. `hasBenchmark` is true whenever at
  * least one point in the rendered series carries a benchmarkPct value.
+ * `isIntraday` distinguishes 1D/7D (where points carry absolute currency) from
+ * day-grained ranges (where points carry TWR %).
  */
 export interface HeroSeriesSnapshot {
   points: ChartSeriesPoint[];
   benchmarkPct: string | null;
   hasBenchmark: boolean;
+  isIntraday: boolean;
 }
 
 export function NetWorthHistoryChart({
@@ -153,6 +156,7 @@ export function NetWorthHistoryChart({
             points: heroOverlayPoints.map((p) => ({ date: p.date, close: p.portfolio })),
             benchmarkPct: hasBenchmark && last?.benchmark != null ? String(last.benchmark) : null,
             hasBenchmark,
+            isIntraday: intraday,
           };
         })()
       : null;

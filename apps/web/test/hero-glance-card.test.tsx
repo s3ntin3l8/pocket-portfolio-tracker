@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { HistoryPoint } from "@portfolio/api-client";
@@ -96,5 +96,57 @@ describe("HeroGlanceCard", () => {
     expect(screen.queryByText(/▲/)).not.toBeInTheDocument();
     expect(screen.queryByText(/▼/)).not.toBeInTheDocument();
     expect(screen.queryByText(/past/)).not.toBeInTheDocument();
+  });
+
+  it("renders pill 1 as a currency delta (not a percent) on intraday 1D/7D ranges", async () => {
+    // Intraday points carry absolute currency values. The hero card must
+    // format pill 1 as a currency delta (e.g. "▲ IDR 50,000"), not as a percent
+    // (which would render a nonsense 50,000% for a 50k move on a 1M base).
+    // Start on 7D so the 1D click triggers a real fetch (the chart is a no-op
+    // when the clicked range already matches the current range).
+    getNetWorthHistory.mockResolvedValueOnce([
+      {
+        at: "2026-09-07T01:00:00.000Z",
+        netWorth: "1000000",
+        marketValue: "1000000",
+      },
+      {
+        at: "2026-09-07T05:00:00.000Z",
+        netWorth: "1050000",
+        marketValue: "1050000",
+      },
+    ]);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard netWorth="1050000" currency="IDR" initialHistory={[]} initialRange="7d" />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "1D" }));
+    await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
+    await waitFor(() => expect(screen.getByText(/past 1D/)).toBeInTheDocument());
+    // Pill 1 shows the absolute currency delta (50,000 IDR) — NOT a percent.
+    expect(screen.getByText(/IDR\s*50,000/)).toBeInTheDocument();
+    // And does not show a "50,000%" or "10,000%" style percent (the bug).
+    expect(screen.queryByText(/50,?000\.00%|10,?000\.00%/)).not.toBeInTheDocument();
+  });
+
+  it("uses the configured benchmark symbol for the pill + legend (not the ^GSPC default)", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1m"
+          benchmarkSymbol="^IXIC"
+        />
+      </NextIntlClientProvider>,
+    );
+    // The friendly label for ^IXIC (Nasdaq Composite) appears twice: once in
+    // the pill 2 prefix "vs Nasdaq Composite" and once in the legend. The
+    // default ^GSPC label (S&P 500) should not appear anywhere — the previous
+    // hardcoded value would have leaked here.
+    expect(screen.getAllByText(/Nasdaq Composite/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/S&P 500/)).not.toBeInTheDocument();
   });
 });

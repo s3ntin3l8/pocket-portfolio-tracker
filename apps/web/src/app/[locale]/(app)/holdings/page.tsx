@@ -289,6 +289,7 @@ export default async function HoldingsPage({
         initialHistory={history}
         initialRange={HERO_INITIAL_RANGE}
         selectedId={selectedId}
+        benchmarkSymbol={prefs?.benchmarkSymbol ?? null}
       />
 
       {allocation && allocation.byAssetClass.some((s) => Number(s.value) > 0) && (

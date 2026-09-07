@@ -26,12 +26,18 @@ export function HeroGlanceCard({
   initialHistory,
   initialRange,
   selectedId = null,
+  benchmarkSymbol = "^GSPC",
 }: {
   netWorth: string;
   currency: string;
   initialHistory: HistoryPoint[];
   initialRange: ChartRange;
   selectedId?: string | null;
+  /** The user's configured benchmark symbol (from `userPreferences.benchmarkSymbol`).
+   *  Defaults to `^GSPC` if unset, matching the server-side default. The holdings
+   *  page already calls `loadPreferences()` and threads the symbol down so the
+   *  pill + legend labels track the line the chart is actually drawing. */
+  benchmarkSymbol?: string | null;
 }) {
   const t = useTranslations("Holdings.hero");
   const tr = useTranslations("Chart.range");
@@ -41,6 +47,7 @@ export function HeroGlanceCard({
     points: [],
     benchmarkPct: null,
     hasBenchmark: false,
+    isIntraday: false,
   });
   const [range, setRange] = useState<ChartRange>(initialRange);
 
@@ -52,19 +59,16 @@ export function HeroGlanceCard({
   const first = snapshot.points[0];
   const last = snapshot.points[snapshot.points.length - 1];
   const hasDelta = first !== undefined && last !== undefined && snapshot.points.length > 1;
-  // The chart emits `pct` (TWR %, chain-indexed, already ×100) as `close` on the
-  // hero series. The period delta is the difference between the first and last
-  // point's `close` (e.g. 0 → 5.4 means +5.4 pp of TWR). Divide by 100 before
-  // `formatPercent` (which multiplies back by 100 internally).
-  const portfolioPct = hasDelta ? Number(last.close) - Number(first.close) : null;
+  // Intraday (1D/7D) points carry absolute currency values, not TWR %. The
+  // pill 1 is rendered as a TWR % for day-grained ranges and a currency delta
+  // for intraday — feeding the raw currency delta into `formatPercent` would
+  // produce a nonsense figure (e.g. 10,000% for a €100 move on a €1M base).
+  // Day-grained points already carry TWR % (chain-index, ×100), so the period
+  // delta is the literal `close` difference between first and last (e.g. 5.4
+  // means +5.4 pp of TWR) — divide by 100 for `formatPercent`.
+  const closeDelta = hasDelta ? Number(last.close) - Number(first.close) : null;
   const benchmarkPct = snapshot.benchmarkPct !== null ? Number(snapshot.benchmarkPct) : null;
   const periodWord = range === "all" ? t("periodAllTime") : t("periodPast", { range: tr(range) });
-  // The hero card doesn't need to know the user's exact configured symbol to render
-  // the label correctly — `benchmarkLabel("^GSPC")` is the default and the
-  // user-facing symbol picker is already on the Insights page. If the user changes
-  // their benchmark, both the chart and the label update on the next render via
-  // `router.refresh()` from the existing `EditBenchmarkDialog` flow.
-  const benchmarkSymbol = "^GSPC";
 
   return (
     <div
@@ -76,13 +80,20 @@ export function HeroGlanceCard({
         {formatMoney(Number(netWorth), currency, locale)}
       </p>
 
-      {hasDelta && portfolioPct !== null && (
+      {hasDelta && closeDelta !== null && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          {snapshot.isIntraday ? (
+            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
+              {closeDelta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
+              {periodWord}
+            </span>
+          ) : (
+            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
+              {closeDelta >= 0 ? "▲" : "▼"} {formatPercent(closeDelta / 100, locale)} {periodWord}
+            </span>
+          )}
           <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
-            {portfolioPct >= 0 ? "▲" : "▼"} {formatPercent(portfolioPct / 100, locale)} {periodWord}
-          </span>
-          <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
-            {tb("vs", { symbol: benchmarkLabel(benchmarkSymbol) })}{" "}
+            {tb("vs", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}{" "}
             {benchmarkPct !== null
               ? formatPercent(benchmarkPct / 100, locale)
               : t("benchmarkPillUnavailable")}
@@ -121,7 +132,7 @@ export function HeroGlanceCard({
                   height: 0,
                 }}
               />
-              {t("legendBenchmark", { symbol: benchmarkLabel(benchmarkSymbol) })}
+              {t("legendBenchmark", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}
             </span>
           )}
         </div>
