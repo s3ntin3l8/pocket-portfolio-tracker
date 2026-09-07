@@ -26,13 +26,39 @@ function renderWithIntl(ui: React.ReactElement) {
   );
 }
 
-/** useMediaQuery reads window.matchMedia — see edit-transaction-sheet.test.tsx. */
+/** Mutable matchMedia mock: the test mutates `matches` via the returned setter, then
+ *  triggers `change` so useSyncExternalStore (used by `useMediaQuery`) re-runs. */
+function makeMatchMedia(initialMatches: boolean) {
+  const listeners: Array<() => void> = [];
+  let matches = initialMatches;
+  window.matchMedia = vi.fn().mockImplementation(() => ({
+    get matches() {
+      return matches;
+    },
+    media: "",
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: (_event: string, cb: () => void) => {
+      listeners.push(cb);
+    },
+    removeEventListener: (_event: string, cb: () => void) => {
+      const i = listeners.indexOf(cb);
+      if (i !== -1) listeners.splice(i, 1);
+    },
+    dispatchEvent: vi.fn(),
+  }));
+  return {
+    set(next: boolean) {
+      matches = next;
+      listeners.forEach((cb) => cb());
+    },
+  };
+}
+
+/** Back-compat wrapper used by the pre-existing tests. */
 function mockMatchMedia(matches: boolean) {
-  window.matchMedia = vi.fn().mockReturnValue({
-    matches,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  });
+  makeMatchMedia(matches);
 }
 
 describe("KpiPickerSheet", () => {
@@ -92,6 +118,25 @@ describe("KpiPickerSheet", () => {
       fireEvent.click(screen.getByRole("button", { name: t.cancel }));
 
       expect(putPreferences).not.toHaveBeenCalled();
+    });
+
+    it("toggle state survives a viewport resize across the md breakpoint", () => {
+      // Regression: the old design branched on `isDesktop` and returned one chrome or
+      // the other. Crossing the md breakpoint remounted the chrome and discarded the
+      // open in-progress toggle list. A single mounted tree is supposed to keep state
+      // regardless of which chrome is visible.
+      const mq = makeMatchMedia(false);
+      renderWithIntl(<KpiPickerSheet currentKpis={["netWorth", "xirr"]} />);
+      fireEvent.click(screen.getByRole("button", { name: t.title }));
+      fireEvent.click(screen.getByRole("switch", { name: t.dayChange }));
+      // Crossing md while open: chrome swaps (Sheet → Popover), state must persist.
+      mq.set(true);
+      // The previously-toggled `dayChange` is still on (and `xirr` still on, the
+      // pre-selected KPI we never touched is also still on).
+      const dayChange = screen.getByRole("switch", { name: t.dayChange });
+      expect(dayChange).toHaveAttribute("data-state", "checked");
+      const xirr = screen.getByRole("switch", { name: t.xirr });
+      expect(xirr).toHaveAttribute("data-state", "checked");
     });
   });
 });

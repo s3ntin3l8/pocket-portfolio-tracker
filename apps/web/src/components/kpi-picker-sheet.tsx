@@ -4,7 +4,7 @@ import { Settings2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -29,11 +29,10 @@ interface KpiPickerSheetProps {
 
 /**
  * Refinement tier (#625 overlay chrome migration): a Popover anchored to its trigger at
- * md:+, a compact bottom Sheet below it — was an unconditional Sheet regardless of
- * viewport. Unlike the task-tier DialogContent migrations elsewhere, this swaps chrome
- * via a media query rather than a single CSS-switched tree: the "form" here is just a
- * Set of toggled keys living in this component, not a tree of controlled inputs, so a
- * chrome swap on resize loses nothing — only which wrapper renders around it changes.
+ * md:+, a compact bottom Sheet below it. Both chromes live in a single mounted tree —
+ * one below md, the other at md+ — so crossing the breakpoint never unmounts the
+ * toggle list. `useMediaQuery` is read once for any per-viewport internals; the chrome
+ * swap itself is purely CSS (`max-md:hidden` / `md:hidden`).
  */
 export function KpiPickerSheet({ currentKpis }: KpiPickerSheetProps) {
   const t = useTranslations("KpiPicker");
@@ -88,33 +87,24 @@ export function KpiPickerSheet({ currentKpis }: KpiPickerSheetProps) {
     </div>
   );
 
-  if (isDesktop) {
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm">
+  return (
+    <div>
+      <Popover open={open && isDesktop} onOpenChange={setOpen}>
+        <PopoverAnchor asChild>
+          <Button variant="ghost" size="sm" aria-label={t("title")} onClick={() => setOpen(true)}>
             <Settings2 className="size-4" />
             <span className="sr-only">{t("title")}</span>
           </Button>
-        </PopoverTrigger>
-        <PopoverContent>
+        </PopoverAnchor>
+        <PopoverContent className="max-md:hidden">
           <p className="mb-1 text-sm font-semibold">{t("title")}</p>
           <p className="mb-3 text-xs text-muted-foreground">{t("description")}</p>
           {fields}
           {actions}
         </PopoverContent>
       </Popover>
-    );
-  }
-
-  return (
-    <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-        <Settings2 className="size-4" />
-        <span className="sr-only">{t("title")}</span>
-      </Button>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent>
+      <Sheet open={open && !isDesktop} onOpenChange={setOpen}>
+        <SheetContent className="md:hidden">
           <SheetHeader>
             <SheetTitle>{t("title")}</SheetTitle>
             <p className="text-sm text-muted-foreground">{t("description")}</p>
@@ -123,6 +113,6 @@ export function KpiPickerSheet({ currentKpis }: KpiPickerSheetProps) {
           {actions}
         </SheetContent>
       </Sheet>
-    </>
+    </div>
   );
 }
