@@ -112,11 +112,6 @@ export function AddTransactionMenu({
   const [initialTransaction, setInitialTransaction] = useState<AddTransactionInitial | undefined>(
     undefined,
   );
-  // Forces a fresh `NewEntryTabs` mount whenever a deep link sets a new default tab /
-  // prefill: `Tabs`' `defaultValue` and the form's `initial` prop are both lazy
-  // (uncontrolled) initializers, so changing them on an already-mounted instance
-  // wouldn't otherwise take effect.
-  const [entryNonce, setEntryNonce] = useState(0);
   // Whether at least one account holder exists — gates the "Add account holder" card.
   const [hasHolders, setHasHolders] = useState(true);
   // The mobile FAB below is portaled to `document.body` (see its render site) so its
@@ -192,7 +187,6 @@ export function AddTransactionMenu({
         setInitialTransaction(undefined);
         setManualDefaultTab(targetTab);
       }
-      setEntryNonce((n) => n + 1);
       setAddOpen(true);
       if (targetTab === "corporate-action" || targetTab === "merger") setEventsTab(targetTab);
       // On desktop, a corporate-action/merger deep link routes to the rail's "Instrument
@@ -242,7 +236,6 @@ export function AddTransactionMenu({
     // open.
     setInitialTransaction(undefined);
     setManualDefaultTab("transaction");
-    setEntryNonce((n) => n + 1);
     setManualStepDesktop(isWide);
     setStep("manual");
   }
@@ -366,10 +359,10 @@ export function AddTransactionMenu({
     ) : step === "manual" ? (
       portfolios && (
         <NewEntryTabs
-          key={entryNonce}
           portfolios={portfolios}
           initialPortfolioId={defaultPortfolioId}
-          defaultTab={manualStepDesktop ? "transaction" : manualDefaultTab}
+          value={manualStepDesktop ? "transaction" : manualDefaultTab}
+          onValueChange={setManualDefaultTab}
           initialTransaction={initialTransaction}
           stickyFooter
           isAdmin={isAdmin}
@@ -387,7 +380,6 @@ export function AddTransactionMenu({
             labels={{ corporateAction: tca("link"), merger: tmg("link") }}
           />
           <NewEntryTabs
-            key={entryNonce}
             portfolios={portfolios}
             initialPortfolioId={defaultPortfolioId}
             value={eventsTab}

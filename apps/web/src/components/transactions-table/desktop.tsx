@@ -216,15 +216,14 @@ export function DesktopTable({
                 >
                   <TableCell className="w-16">
                     {selectionMode && (
-                      <span onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          className="size-4 align-middle accent-primary"
-                          aria-label={tb("selectRow")}
-                          checked={isSelected}
-                          onChange={() => onToggle(tx.id)}
-                        />
-                      </span>
+                      <input
+                        type="checkbox"
+                        className="size-4 align-middle accent-primary"
+                        aria-label={tb("selectRow")}
+                        checked={isSelected}
+                        onChange={() => onToggle(tx.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
                     )}
                   </TableCell>
                   <TableCell className="tabular whitespace-nowrap text-xs font-semibold text-text-2">

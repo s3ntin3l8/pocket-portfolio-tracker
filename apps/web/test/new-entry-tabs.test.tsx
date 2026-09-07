@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
@@ -21,7 +22,7 @@ vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
-import { NewEntryTabs } from "../src/components/new-entry-tabs";
+import { NewEntryTabs, type NewEntryTab } from "../src/components/new-entry-tabs";
 
 const tx = messages.Manage.tx;
 const ca = messages.CorpAction;
@@ -35,25 +36,32 @@ type TestPortfolio = {
 };
 
 function renderTabs(
-  defaultTab?: "transaction" | "corporate-action" | "merger",
+  initialTab: NewEntryTab = "transaction",
   portfolios: TestPortfolio[] = [{ id: "p1", name: "Main", brokerage: null, accountHolder: null }],
   isAdmin?: boolean,
 ) {
-  return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+  function Harness() {
+    const [tab, setTab] = useState<NewEntryTab>(initialTab);
+    return (
       <NewEntryTabs
         portfolios={portfolios}
         initialPortfolioId={portfolios[0]?.id ?? ""}
-        defaultTab={defaultTab}
+        value={tab}
+        onValueChange={setTab}
         isAdmin={isAdmin}
       />
+    );
+  }
+  return render(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <Harness />
     </NextIntlClientProvider>,
   );
 }
 
 describe("NewEntryTabs", () => {
   it("shows the transaction form by default and switches to the corporate-action form", () => {
-    renderTabs(undefined, undefined, true);
+    renderTabs("transaction", undefined, true);
 
     // Transaction tab active: the manual form's submit button is shown; the corp form
     // (inactive tab) is unmounted, so its Ratio field is absent.

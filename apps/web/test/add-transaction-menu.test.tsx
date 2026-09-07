@@ -269,7 +269,7 @@ describe("AddTransactionMenu", () => {
 
       await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
       expect(lastEntryTabsProps.current).toMatchObject({
-        defaultTab: "corporate-action",
+        value: "corporate-action",
         initialTransaction: undefined,
       });
       expect(replace).toHaveBeenCalledWith("/transactions");
@@ -280,7 +280,7 @@ describe("AddTransactionMenu", () => {
       renderMenu({ autoOpenFromParams: true });
 
       await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
-      expect(lastEntryTabsProps.current).toMatchObject({ defaultTab: "merger" });
+      expect(lastEntryTabsProps.current).toMatchObject({ value: "merger" });
     });
 
     it("ignores an unrecognized ?entry value, falling back to the transaction tab", async () => {
@@ -288,7 +288,7 @@ describe("AddTransactionMenu", () => {
       renderMenu({ autoOpenFromParams: true });
 
       await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
-      expect(lastEntryTabsProps.current).toMatchObject({ defaultTab: "transaction" });
+      expect(lastEntryTabsProps.current).toMatchObject({ value: "transaction" });
     });
 
     it("ignores ?entry without autoOpenFromParams (only the shell instance owns it)", async () => {
@@ -329,7 +329,7 @@ describe("AddTransactionMenu", () => {
       await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
       expect(getSummary).toHaveBeenCalledWith("p1");
       expect(lastEntryTabsProps.current).toMatchObject({
-        defaultTab: "transaction",
+        value: "transaction",
         initialTransaction: {
           type: "sell",
           instrumentId: "i1",
