@@ -154,13 +154,22 @@ export function registerContributionsRoutes(app: FastifyInstance) {
           );
           const flows: CashFlowPoint[] = flowsByPortfolio.flat();
           const aggregated = aggregatePortfolios(summaries, display);
+          // Effective networth boundary = "outside" when ANY portfolio is outside — the
+          // mixed-boundary case can't derive a single contribution number from transactions
+          // alone (the user must assert a monthly contribution for the forecast). All-inside
+          // keeps the XIRR-derived seed (XIRR makes sense when contribution and return
+          // coexist on the same boundary).
+          const effectiveBoundary: "inside" | "outside" =
+            loaded.length > 0 && loaded.every((l) => l.boundary === "inside")
+              ? "inside"
+              : "outside";
           return enrichContributions(
             mergeContributionStats(perPortfolio, display),
             aggregated.netWorth,
             flows,
             holderBirthYear,
             holderPortfolioType,
-            { retirementAge },
+            { retirementAge, boundary: effectiveBoundary },
           );
         },
       );

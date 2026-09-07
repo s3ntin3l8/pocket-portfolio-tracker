@@ -210,3 +210,157 @@ describe("GET /portfolios/:id/tax — Indonesian taxRegime", () => {
     expect(body.indonesianFinalTax).toBeUndefined();
   });
 });
+
+describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload regardless of selection)", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  it("returns indonesianFinalTax on the holder entry when taxRegime='ID' (no FSA allocation required)", async () => {
+    const t = await token("tax-id-nw-1");
+    await setTaxRegime(t, "ID");
+    // Seed an instrument so the transactions resolve to a real instrumentId;
+    // without this the trade-log entries have no legs to iterate.
+    const [eq] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-NW1",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "IDX NW1",
+      })
+      .returning();
+    // ID users typically have NO FSA allocation — holder has no taxAllowanceAnnual.
+    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR" });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "buy",
+      instrumentId: eq.id,
+      quantity: "5",
+      price: "100",
+      currency: "EUR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "sell",
+      instrumentId: eq.id,
+      quantity: "5",
+      price: "150",
+      currency: "EUR",
+      executedAt: "2025-06-15T00:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/networth/tax?year=2025",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{
+      holder: { id: string; name: string };
+      year: number;
+      currency: string;
+      allowanceUsage?: unknown;
+      indonesianFinalTax?: {
+        totalProceeds: string;
+        totalSalesTax: string;
+        totalDividendGross: string;
+        totalDividendTax: string;
+        estimatedTax: string;
+      };
+    }>;
+    // /networth/tax used to return [] for ID users with no FSA. Now it returns the
+    // holder's ID payload directly (the holder exists; taxAllowanceAnnual is just null).
+    expect(body.length).toBeGreaterThanOrEqual(1);
+    const [entry] = body;
+    expect(entry.year).toBe(2025);
+    // /networth/tax echoes the user's displayCurrency; portfolio.baseCurrency
+    // ("EUR" above) is irrelevant here — see /portfolios/:id/tax for per-portfolio FX.
+    expect(entry.currency).toBe("IDR");
+    expect(entry.indonesianFinalTax).toBeDefined();
+    expect(entry.indonesianFinalTax!.totalProceeds).toBe("750.00");
+    expect(entry.indonesianFinalTax!.totalSalesTax).toBe("0.75"); // 0.1% of 750
+    // No German-shape fields leaked into the ID response.
+    expect(entry.allowanceUsage).toBeUndefined();
+  });
+
+  it("rolls proceeds across multiple portfolios of the same holder into one ID payload", async () => {
+    const t = await token("tax-id-nw-2");
+    await setTaxRegime(t, "ID");
+    const [eq] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-NW2",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "IDX NW2",
+      })
+      .returning();
+    const pf1 = await createPortfolio(t, { name: "NW-ID-1", baseCurrency: "EUR" });
+    const pf2 = await createPortfolio(t, { name: "NW-ID-2", baseCurrency: "EUR" });
+    await seedTransaction(app, pf1, auth(t), {
+      type: "buy",
+      instrumentId: eq.id,
+      quantity: "2",
+      price: "100",
+      currency: "EUR",
+      executedAt: "2025-02-01T00:00:00.000Z",
+    });
+    await seedTransaction(app, pf1, auth(t), {
+      type: "sell",
+      instrumentId: eq.id,
+      quantity: "2",
+      price: "200",
+      currency: "EUR",
+      executedAt: "2025-07-01T00:00:00.000Z",
+    });
+    await seedTransaction(app, pf2, auth(t), {
+      type: "buy",
+      instrumentId: eq.id,
+      quantity: "1",
+      price: "300",
+      currency: "EUR",
+      executedAt: "2025-03-01T00:00:00.000Z",
+    });
+    await seedTransaction(app, pf2, auth(t), {
+      type: "sell",
+      instrumentId: eq.id,
+      quantity: "1",
+      price: "500",
+      currency: "EUR",
+      executedAt: "2025-08-01T00:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/networth/tax?year=2025",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Array<{
+      indonesianFinalTax?: { totalProceeds: string; totalSalesTax: string };
+    }>;
+    // 2*200 + 1*500 = 900; 0.1% sales tax = 0.90.
+    const totalProceeds = body.reduce(
+      (s, e) => s + Number(e.indonesianFinalTax?.totalProceeds ?? 0),
+      0,
+    );
+    const totalSalesTax = body.reduce(
+      (s, e) => s + Number(e.indonesianFinalTax?.totalSalesTax ?? 0),
+      0,
+    );
+    expect(totalProceeds).toBe(900);
+    expect(totalSalesTax).toBeCloseTo(0.9, 2);
+  });
+});
