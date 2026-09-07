@@ -114,11 +114,11 @@ const SheetClose = Drawer.Close;
  *  (side="bottom") — see `useSheetFooter`. `null` outside a Sheet (or for `side="full"`,
  *  which doesn't render one).
  *
- *  Exported (not just the `useSheetFooter` hook) so the desktop Dialog-based Add Transaction
- *  shell (`add-transaction-menu/desktop-shell.tsx`) can provide this same context with its
- *  own footer node — every form that already portals its submit button via `useSheetFooter`
- *  then works unchanged inside a Dialog too, with no new hook and no other Sheet consumer
- *  touched. */
+ *  Exported (not just the `useSheetFooter` hook) so the Dialog-based `add-transaction-menu.tsx`
+ *  and `DialogContent`'s own `footer` prop (`ui/dialog.tsx`) can provide this same context
+ *  with their own footer node — every form that already portals its submit button via
+ *  `useSheetFooter` then works unchanged inside a Dialog too, with no new hook and no
+ *  other Sheet consumer touched. */
 export const SheetFooterContext = React.createContext<HTMLDivElement | null>(null);
 
 /** A form rendered inside a Sheet can portal its submit button into the sheet's

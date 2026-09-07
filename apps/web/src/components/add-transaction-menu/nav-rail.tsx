@@ -4,8 +4,8 @@ import type { LucideIcon } from "lucide-react";
 import { Upload, PenLine, Repeat, Briefcase, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** The desktop rail's destinations — moved here (from `desktop-shell.tsx`) as this
- *  component's natural home; `desktop-shell.tsx` is going away as part of #669. */
+/** The rail's destinations — a subset of `add-transaction-menu.tsx`'s own `Step` (it
+ *  excludes "choose", the mobile-only chooser screen the rail has no equivalent of). */
 export type DesktopStep = "import" | "manual" | "events" | "portfolio" | "holder";
 
 interface NavItem {
@@ -15,10 +15,10 @@ interface NavItem {
 }
 
 /**
- * The desktop modal's 196px left destination rail — replaces the mobile chooser screen
- * and back button entirely on desktop (see `desktop-shell.tsx`). Order: Import, Add
- * transaction, a separator, then Instrument event, Create portfolio, Account holder —
- * matching the "Add Transaction v2" design 1:1.
+ * The modal's 196px left destination rail, `max-md:hidden` — replaces the mobile
+ * chooser screen and back button at `md:`+ (see `add-transaction-menu.tsx`). Order:
+ * Import, Add transaction, a separator, then Instrument event, Create portfolio,
+ * Account holder — matching the "Add Transaction v2" design 1:1.
  */
 export function NavRail({
   active,
@@ -26,7 +26,11 @@ export function NavRail({
   labels,
   className,
 }: {
-  active: DesktopStep;
+  /** The mobile-only "choose" step has no rail equivalent — pass it through as-is (no
+   *  item matches, so nothing highlights) rather than forcing callers to remap it; the
+   *  rail is `max-md:hidden` whenever "choose" is even reachable, so it's never visible
+   *  in that state anyway. */
+  active: DesktopStep | "choose";
   onSelect: (step: DesktopStep) => void;
   labels: {
     heading: string;

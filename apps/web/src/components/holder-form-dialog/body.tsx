@@ -13,21 +13,17 @@ import { useSheetFooter } from "@/components/ui/sheet";
 import { useHolderForm } from "./hooks";
 
 /**
- * The `HolderFormDialog` body — a shared inline form used today by the desktop Add
- * Transaction shell's "Account holder" rail destination (rendered in the modal's main
- * column instead of nesting another Sheet), and will also be used by the mobile
- * chooser's "Add account holder" step once #669 lands and that stops nesting a separate
- * `HolderFormDialog`. Submit/validation logic (`useHolderForm`) is untouched; this only
- * changes what wraps it. Desktop-only in practice today: the rail always creates
- * (`mode: "create"`).
+ * The `HolderFormDialog` body — used inline by `add-transaction-menu.tsx`'s "holder"
+ * step (the desktop rail's "Account holder" destination and, since #669, the mobile
+ * chooser's "Add account holder" card too — both render this same component, no nested
+ * `Dialog`). Submit/validation logic (`useHolderForm`) is untouched; this only changes
+ * what wraps it. Always creates (`mode: "create"`) at both reachable call sites today.
  *
  * Simulates the Sheet's "open" lifecycle once on mount (see `PortfolioFormBody` for why)
  * so the form's fields reset from `holder` the same way the Sheet trigger would.
  *
- * Field ids are `useId()`-derived, not hardcoded `-desktop`-suffixed strings. Nothing
- * exploits this today (this component has exactly one reachable instance, gated by the
- * desktop-only rail) — pre-emptive, so #669 doesn't also need to touch this file once a
- * second, mobile-reachable instance becomes possible.
+ * Field ids are `useId()`-derived, not hardcoded `-desktop`-suffixed strings — needed
+ * now that this component mounts from more than one call site.
  */
 export function HolderFormBody({
   mode,

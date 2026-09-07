@@ -6,10 +6,9 @@ import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 
 /**
- * Extracted from `HolderFormDialog` (unchanged behavior) so the desktop Add Transaction
- * shell's "Account holder" rail destination can render the form body inline instead of
- * nesting another Sheet — see `holder-form-dialog/body.tsx` and
- * `add-transaction-menu/desktop-shell.tsx`.
+ * Backs `HolderFormBody` (unchanged behavior) — the "Account holder" step in
+ * `add-transaction-menu.tsx`, rendered inline at every viewport rather than nesting a
+ * separate `Dialog`. See `holder-form-dialog/body.tsx`.
  */
 export function useHolderForm(
   mode: "create" | "edit",
