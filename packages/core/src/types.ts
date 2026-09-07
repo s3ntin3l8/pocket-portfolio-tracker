@@ -90,9 +90,13 @@ export interface CoreTransaction {
 
 export interface CorporateAction {
   instrumentId: string;
-  type: "split" | "bonus" | "rights";
-  ratio: string; // split 2:1 => "2"; 1:10 bonus => "0.1"
+  type: "split" | "bonus" | "rights" | "merger";
+  ratio: string; // split 2:1 => "2"; 1:10 bonus => "0.1"; merger = source ratio
   exDate: Date;
+  // Merger-specific (undefined for non-merger CAs)
+  targetInstrumentId?: string;
+  ratioTo?: string; // target instrument's ratio
+  taxableMarketValue?: string; // market value for taxable mergers
 }
 
 export interface Holding {
