@@ -2336,9 +2336,14 @@ export function createApiClient(config: ApiClientConfig) {
         `/imports/${importId}/reassign`,
         { targetPortfolioId },
       ),
-    /** Record a fund merger (Fondsverschmelzung) as an atomic sell+buy pair. */
+    /** Record a fund merger (Fondsverschmelzung) as an atomic sell+buy pair.
+     *  Also creates a corporate_actions reference row for cross-portfolio discoverability. */
     createMerger: (portfolioId: string, input: Omit<MergerInput, "portfolioId">) =>
-      request<Transaction[]>("POST", `/portfolios/${portfolioId}/mergers`, input),
+      request<{ transactions: Transaction[]; corporateAction: CorporateAction }>(
+        "POST",
+        `/portfolios/${portfolioId}/mergers`,
+        input,
+      ),
     /** Read-only preview of merging two duplicate transactions — validates the guardrails
      * (same instrument, compatible type, no loan legs) and returns what the merged result
      * would look like, without writing anything. */
@@ -2421,8 +2426,13 @@ export function createApiClient(config: ApiClientConfig) {
     updateCorporateAction: (id: string, input: Partial<CorporateActionInput>) =>
       request<CorporateAction>("PATCH", `/corporate-actions/${id}`, input),
     deleteCorporateAction: (id: string) => request<void>("DELETE", `/corporate-actions/${id}`),
-    listCorporateActions: (instrumentId: string) =>
-      request<CorporateAction[]>("GET", `/instruments/${instrumentId}/corporate-actions`),
+    listCorporateActions: (instrumentId: string, type?: string) => {
+      const qs = type ? `?type=${encodeURIComponent(type)}` : "";
+      return request<CorporateAction[]>(
+        "GET",
+        `/instruments/${instrumentId}/corporate-actions${qs}`,
+      );
+    },
 
     getHoldings: (portfolioId: string) =>
       request<HoldingsResult>("GET", `/portfolios/${portfolioId}/holdings`),
