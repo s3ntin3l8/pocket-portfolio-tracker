@@ -215,7 +215,12 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
           (s, d) => s.add(convert(d.amount, d.currency, displayCurrency, fx)),
           ZERO(),
         )
-      : ttmDividends;
+      : // Fallback to the scaled on-position TTM: zero for sold-out instruments,
+        // reflecting that no future income is expected from a closed position.
+        // The unscaled `ttmDividendsHistorical` is exposed on the public surface
+        // for consumers that want the "what has this instrument historically paid"
+        // figure independent of the current position.
+        ttmDividends;
   const forecast = nextYearDividendForecast.add(couponForecast);
 
   const restOfYearCouponSum = (input.restOfYearCoupons ?? []).reduce(

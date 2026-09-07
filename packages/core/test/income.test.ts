@@ -243,9 +243,9 @@ describe("aggregateIncome", () => {
     expect(statsScaled.ttmDividendsOnPosition).toBe("300");
   });
 
-  it("falls back to ttmDividendsOnPosition (TTM scaled) for forecastNextYear when no projection given", () => {
-    // forecastNextYear falls back to the on-position scaled TTM when no
-    // projectedDividendsNextYear is provided. Existing behavior must be preserved.
+  it("falls back to ttmDividends (TTM scaled) for forecastNextYear when no projection given", () => {
+    // forecastNextYear falls back to the on-position scaled TTM: zero for sold-out
+    // instruments, reflecting that no future income is expected from a closed position.
     const result = aggregateIncome({
       events: [
         {
@@ -261,7 +261,7 @@ describe("aggregateIncome", () => {
       heldQty: new Map([["bbca", "200"]]),
       qtyAt: () => "100",
     });
-    // scaled TTM = 300 × (200/100) = 600 IDR; forecastNextYear should mirror this.
+    // scaled TTM = 300 × (200/100) = 600 IDR; forecastNextYear mirrors this.
     expect(result.forecastNextYear).toBe("600");
     expect(result.ttmDividendsOnPosition).toBe("600");
     // Historical track is also exposed (unscaled = 300).

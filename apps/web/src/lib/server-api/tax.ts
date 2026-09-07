@@ -213,13 +213,64 @@ export async function loadTaxYearDetail(
               )
             : Promise.resolve<TaxSummaryHolder[] | null>(null),
         ]);
-        const idTaxFromHolder = !selected
-          ? idTaxByHolder?.find((h) => h.holder.id === holderId)
-          : undefined;
-        const apiIdTax: IndonesianFinalTaxLike | undefined =
-          (idTaxByPortfolio?.indonesianFinalTax as IndonesianFinalTaxLike | undefined) ??
-          (idTaxFromHolder?.indonesianFinalTax as IndonesianFinalTaxLike | undefined) ??
-          undefined;
+        const apiIdTax: IndonesianFinalTaxLike | undefined = selected
+          ? (idTaxByPortfolio?.indonesianFinalTax as IndonesianFinalTaxLike | undefined)
+          : (() => {
+              if (!idTaxByHolder?.length) return undefined;
+              // In the no-selection scope holderId is the "__id_all_portfolios__"
+              // sentinel — never a real holder id. Aggregate every holder's ID tax
+              // payload into one combined object.
+              let totalProceeds = 0;
+              let totalTax = 0;
+              let totalDivGross = 0;
+              let totalDivTax = 0;
+              let totalDivNet = 0;
+              const byYearMap = new Map<
+                number,
+                { realized: number; dividends: number; tax: number }
+              >();
+              for (const h of idTaxByHolder) {
+                const ift = h.indonesianFinalTax;
+                if (!ift) continue;
+                totalProceeds += Number(ift.totalProceeds) || 0;
+                totalTax += Number(ift.totalSalesTax) || 0;
+                totalDivGross += Number(ift.totalDividendGross) || 0;
+                totalDivTax += Number(ift.totalDividendTax) || 0;
+                totalDivNet += Number(ift.totalDividendNet) || 0;
+                for (const y of ift.byYear) {
+                  const existing = byYearMap.get(y.year);
+                  if (existing) {
+                    existing.realized += Number(y.realized) || 0;
+                    existing.dividends += Number(y.dividends) || 0;
+                    existing.tax += Number(y.tax) || 0;
+                  } else {
+                    byYearMap.set(y.year, {
+                      realized: Number(y.realized) || 0,
+                      dividends: Number(y.dividends) || 0,
+                      tax: Number(y.tax) || 0,
+                    });
+                  }
+                }
+              }
+              return {
+                disposals: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.disposals ?? []),
+                totalProceeds: String(totalProceeds),
+                totalSalesTax: String(totalTax),
+                dividends: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.dividends ?? []),
+                totalDividendGross: String(totalDivGross),
+                totalDividendTax: String(totalDivTax),
+                totalDividendNet: String(totalDivNet),
+                estimatedTax: String(totalTax + totalDivTax),
+                byYear: [...byYearMap.entries()]
+                  .sort((a, b) => a[0] - b[0])
+                  .map(([year, v]) => ({
+                    year,
+                    realized: String(v.realized),
+                    dividends: String(v.dividends),
+                    tax: String(v.tax),
+                  })),
+              };
+            })();
 
         const disposalGroups = new Map<
           string,
