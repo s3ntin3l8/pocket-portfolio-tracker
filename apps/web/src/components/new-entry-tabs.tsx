@@ -28,7 +28,6 @@ const ALL_TABS: NewEntryTab[] = ["transaction", "corporate-action", "merger"];
 export function NewEntryTabs({
   portfolios,
   initialPortfolioId,
-  defaultTab = "transaction",
   initialTransaction,
   stickyFooter = false,
   isAdmin = false,
@@ -40,7 +39,6 @@ export function NewEntryTabs({
 }: {
   portfolios: PickablePortfolio[];
   initialPortfolioId: string;
-  defaultTab?: NewEntryTab;
   /** Prefill for the Transaction tab (e.g. a harvest-suggestion sell draft from
    *  `/tax`, threaded in via `?harvestInstrument=<id>`). */
   initialTransaction?: AddTransactionInitial;
@@ -54,11 +52,10 @@ export function NewEntryTabs({
    *  `RecordMerger` get their submit button's chrome from `useSheetFooterChrome()`
    *  instead (which host they're portaling into, not the viewport). */
   isDesktop?: boolean;
-  /** Controlled active tab — the desktop nav rail drives this directly instead of the
-   *  in-sheet `TabsList` (which is hidden via `hideTabList` on desktop). Uncontrolled
-   *  (`defaultTab`) when omitted — mobile's existing behavior. */
-  value?: NewEntryTab;
-  onValueChange?: (tab: NewEntryTab) => void;
+  /** Controlled active tab — the caller owns the state, so changing it on an already-
+   *  mounted tree (deep-link prefill, manual reset, …) takes effect without remount. */
+  value: NewEntryTab;
+  onValueChange: (tab: NewEntryTab) => void;
   /** Suppress the in-body segmented tab control — the desktop rail's "Instrument event"
    *  destination hosts corporate-action/merger as a 2-way switch of its own instead. */
   hideTabList?: boolean;
@@ -86,12 +83,8 @@ export function NewEntryTabs({
       </div>
     ) : null;
 
-  const tabsProps = value
-    ? { value, onValueChange: (v: string) => onValueChange?.(v as NewEntryTab) }
-    : { defaultValue: defaultTab };
-
   return (
-    <Tabs {...tabsProps}>
+    <Tabs value={value} onValueChange={(v: string) => onValueChange(v as NewEntryTab)}>
       {/* Full-width, evenly-distributed segmented control (#472 — was left-clustered under
           the shared TabsList's `inline-flex` default). Hidden on desktop, where the nav rail
           (or the events step's own 2-way switch) replaces it. */}

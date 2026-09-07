@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { vi } from "vitest";
 import messages from "../messages/en.json";
 
+const routerPush = vi.fn();
 vi.mock("@/i18n/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
   Link: ({ children, onClick }: { children: React.ReactNode; onClick?: (e: unknown) => void }) => (
     <a onClick={onClick}>{children}</a>
   ),
@@ -126,47 +127,6 @@ describe("TradesTable", () => {
     expect(screen.getAllByText(/Tax-free/).length).toBeGreaterThan(0);
   });
 
-  it("expands an open trade to reveal its matched legs", () => {
-    renderTable([open]);
-    // Leg detail is hidden until the row is expanded.
-    expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
-    fireEvent.click(screen.getAllByText("BCA")[0]);
-    expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
-  });
-
-  it("aligns leg detail cells with their corresponding header columns", () => {
-    renderTable([open]);
-    fireEvent.click(screen.getAllByText("BCA")[0]);
-
-    const legRow = screen.getByText("2021-02-01 → 2021-03-01").closest("tr");
-    expect(legRow).toBeTruthy();
-
-    // 7 <td> elements: dates(colSpan=2, covering instrument+period) + held(1) +
-    // invested(1) + realized(1) + dividends(1) + totalReturn(1) + annualized(1) = 8 columns
-    const legCells = legRow!.querySelectorAll("td");
-    expect(legCells.length).toBe(7);
-
-    // Verify key values are present in the leg row
-    expect(legRow!.textContent).toContain("28d");
-    expect(legRow!.textContent).toContain("€400");
-    expect(legRow!.textContent).toContain("€500");
-    expect(legRow!.textContent).toContain("€100");
-  });
-
-  it("opens the trade detail sheet when a closed row is clicked, instead of expanding inline", () => {
-    renderTable([closed]);
-    // The collapsed row's merged Period column already shows "entry → exit" for a
-    // closed trade, so assert the count is unchanged by the click (no leg row added)
-    // rather than asserting absence outright.
-    const periodOccurrences = () => screen.queryAllByText("2021-01-01 → 2021-06-01").length;
-    const before = periodOccurrences();
-    fireEvent.click(screen.getAllByText("Telkom")[0]);
-    // No inline leg expansion for closed rows...
-    expect(periodOccurrences()).toBe(before);
-    // ...the detail sheet opens instead (unique header title).
-    expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
-  });
-
   it("opens the trade detail sheet from the mobile card for a closed trade", () => {
     renderTable([closed]);
     // Both the desktop table and mobile list render in jsdom (Tailwind's responsive
@@ -223,6 +183,84 @@ describe("TradesTable", () => {
       expect(screen.queryByText("BBCA")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
       expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("leg expansion via keyboard-reachable button", () => {
+    it("expands an open trade to reveal its matched legs via a keyboard-reachable button", () => {
+      renderTable([open]);
+      // Leg detail is hidden until the row is expanded.
+      expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
+      // The whole-row onClick is gone — the only keyboard-reachable trigger is the
+      // dedicated button in the symbol cell.
+      fireEvent.click(screen.getByRole("button", { name: /legs/i }));
+      expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
+    });
+
+    it("collapses an open trade to hide its matched legs via the same button", () => {
+      renderTable([open]);
+      const button = screen.getByRole("button", { name: /legs/i });
+      fireEvent.click(button);
+      expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
+      fireEvent.click(button);
+      expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
+    });
+
+    it("toggles the button's aria-label between expand and collapse", () => {
+      renderTable([open]);
+      const button = screen.getByRole("button", { name: /show.*legs|legs/i });
+      // Initially collapsed → the label advertises the expand action.
+      expect(button.getAttribute("aria-label")).toMatch(/show|expand/i);
+      fireEvent.click(button);
+      expect(button.getAttribute("aria-label")).toMatch(/hide|collapse/i);
+    });
+
+    it("does not render a leg-expand button for a closed trade", () => {
+      renderTable([closed]);
+      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
+    });
+
+    it("does not render a leg-expand button for an open trade with no legs", () => {
+      const openNoLegs: Trade = { ...open, legs: [] };
+      renderTable([openNoLegs]);
+      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
+    });
+  });
+
+  describe("detail-sheet open via keyboard-reachable button", () => {
+    it("opens the trade detail sheet via a keyboard-reachable button for a closed trade", () => {
+      renderTable([closed]);
+      // Whole-row onClick is gone — the only keyboard-reachable trigger is a dedicated
+      // button. Sheet header reads "Closed 2021-06-01".
+      fireEvent.click(screen.getByRole("button", { name: /detail/i }));
+      expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
+    });
+
+    it("does not render a detail button for an open trade (open trades use leg expansion instead)", () => {
+      renderTable([open]);
+      expect(screen.queryByRole("button", { name: /detail/i })).toBeNull();
+    });
+  });
+
+  describe("keyboard accessibility", () => {
+    it("renders exactly one focusable anchor per collapsed row (the per-cell instrument link)", () => {
+      renderTable([open, closed]);
+      const dataRows = screen.getAllByRole("row").filter((r) => r.querySelector("a[onclick], a"));
+      // Both trade rows should be present.
+      expect(dataRows.length).toBeGreaterThan(0);
+      for (const row of dataRows) {
+        const anchors = row.querySelectorAll("a");
+        expect(anchors.length, `row ${row.textContent}`).toBe(1);
+      }
+    });
+
+    it("does not push any route when a non-link cell is clicked on the desktop row", () => {
+      routerPush.mockClear();
+      renderTable([closed]);
+      const row = screen.getAllByRole("row")[1];
+      // Click the period cell — not the link.
+      fireEvent.click(row.querySelectorAll("td")[1]);
+      expect(routerPush).not.toHaveBeenCalled();
     });
   });
 });

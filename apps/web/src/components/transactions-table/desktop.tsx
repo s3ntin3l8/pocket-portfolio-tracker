@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { AlertCircle, AlertTriangle, ListChecks } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronRight, ListChecks } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -14,6 +14,7 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 import { TxRow, KIND_ICON } from "./types";
 import {
@@ -207,23 +208,21 @@ export function DesktopTable({
                 )}
                 <TableRow
                   data-state={isSelected ? "selected" : undefined}
-                  className={`cursor-pointer select-none ${status === "archived" ? "opacity-50" : ""} ${
+                  className={`select-none ${status === "archived" ? "opacity-50" : ""} ${
                     status === "draft" ? "bg-amber-50/40 dark:bg-amber-950/10" : ""
                   }`}
-                  onClick={() => onRowActivate(tx)}
                   {...longPressHandlers(tx.id)}
                 >
                   <TableCell className="w-16">
                     {selectionMode && (
-                      <span onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          className="size-4 align-middle accent-primary"
-                          aria-label={tb("selectRow")}
-                          checked={isSelected}
-                          onChange={() => onToggle(tx.id)}
-                        />
-                      </span>
+                      <input
+                        type="checkbox"
+                        className="size-4 align-middle accent-primary"
+                        aria-label={tb("selectRow")}
+                        checked={isSelected}
+                        onChange={() => onToggle(tx.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
                     )}
                   </TableCell>
                   <TableCell className="tabular whitespace-nowrap text-xs font-semibold text-text-2">
@@ -236,7 +235,18 @@ export function DesktopTable({
                         <div className="flex min-w-0 items-center gap-[7px]">
                           <span className="truncate text-sm font-bold">
                             {tx.kind && KIND_ICON[tx.kind] ? tt(tx.kind) : tt(tx.type)}
-                            {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
+                            {tx.instrument?.symbol ? " · " : ""}
+                            {tx.instrumentId && tx.instrument?.symbol ? (
+                              <Link
+                                href={`/instruments/${tx.instrumentId}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:underline"
+                              >
+                                {tx.instrument.symbol}
+                              </Link>
+                            ) : (
+                              (tx.instrument?.symbol ?? "")
+                            )}
                           </span>
                           {anomaly && (
                             <span
@@ -309,6 +319,17 @@ export function DesktopTable({
                     className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
                   >
                     {m(netAmount, tx.currency)}
+                  </TableCell>
+                  <TableCell className="w-10 pr-2 text-right">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label={tm("viewDetails")}
+                      onClick={() => onRowActivate(tx)}
+                    >
+                      <ChevronRight className="size-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               </Fragment>

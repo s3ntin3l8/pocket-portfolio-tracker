@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImportTasksProvider } from "@/components/import-tasks-provider";
 import { ImportFlowClient } from "@/components/import-flow-client";
-import { NewEntryTabs } from "@/components/new-entry-tabs";
+import { NewEntryTabs, type NewEntryTab } from "@/components/new-entry-tabs";
 import { Icon, ICONS } from "./icon";
 import { resolveTheme } from "./theme";
 import { BrandPanel } from "./brand-panel";
@@ -85,6 +85,7 @@ export function OnboardingFlow() {
   const [addDataView, setAddDataView] = useState<AddDataView>("cards");
   const [importOpen, setImportOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [manualTab, setManualTab] = useState<NewEntryTab>("transaction");
   const [exiting, setExiting] = useState(false);
 
   const th = resolveTheme(isDark, isDesktop);
@@ -766,7 +767,8 @@ export function OnboardingFlow() {
               <NewEntryTabs
                 portfolios={targetPortfolios}
                 initialPortfolioId={createdPortfolio.id}
-                defaultTab="transaction"
+                value={manualTab}
+                onValueChange={setManualTab}
                 stickyFooter
               />
             )}

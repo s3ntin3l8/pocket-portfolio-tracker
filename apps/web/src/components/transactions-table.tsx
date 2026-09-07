@@ -324,7 +324,7 @@ export function TransactionsTable({
     router.refresh();
   }
 
-  const colSpan = showPortfolio ? 9 : 8;
+  const colSpan = showPortfolio ? 10 : 9;
 
   const sortedRows = sort(visibleRows);
   const windowedRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount]);

@@ -38,29 +38,39 @@ export function DesktopRow({
   const ret = Number(tr.totalReturn);
   const realized = Number(tr.realizedPnL);
   const isOpen = expanded.has(key);
+  const hasExpandableLegs = tr.status === "open" && tr.legs.length > 0;
 
   const money = (n: number, ccy = currency) => formatMoney(n, ccy, locale);
   const signed = (n: number) => formatSignedMoney(n, currency, locale);
   const heldLabel = (days: number) =>
     days >= 365 ? `${(days / 365).toFixed(1)}${t("yearsAbbr")}` : `${days}${t("daysAbbr")}`;
 
-  const handleRowClick = () => {
-    if (tr.status === "closed") onDetail(tr);
-    else if (tr.legs.length > 0) onToggle(key);
-  };
-
   return (
     <Fragment>
-      <TableRow className="cursor-pointer" onClick={handleRowClick}>
+      <TableRow>
         <TableCell>
           <div className="relative flex items-center gap-2">
-            <ChevronRight
-              className={cn(
-                "absolute -left-4 size-3.5 text-muted-foreground transition-transform",
-                (tr.status !== "open" || tr.legs.length === 0) && "opacity-0",
-                isOpen && "rotate-90",
-              )}
-            />
+            {hasExpandableLegs ? (
+              <button
+                type="button"
+                aria-label={isOpen ? t("collapseLegs") : t("expandLegs")}
+                aria-expanded={isOpen}
+                onClick={() => onToggle(key)}
+                className="absolute -left-5 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+              >
+                <ChevronRight
+                  className={cn("size-3.5 transition-transform", isOpen && "rotate-90")}
+                />
+              </button>
+            ) : (
+              <ChevronRight
+                aria-hidden
+                className={cn(
+                  "absolute -left-4 size-3.5 text-muted-foreground transition-transform",
+                  tr.status === "closed" && "opacity-0",
+                )}
+              />
+            )}
             <InstrumentLogo
               label={tr.instrument?.symbol ?? tr.instrumentId}
               symbol={tr.instrument?.symbol}
@@ -73,13 +83,22 @@ export function DesktopRow({
                 <Link
                   href={`/instruments/${tr.instrumentId}`}
                   className={cn(TABLE_LABEL, "min-w-0 truncate hover:underline")}
-                  onClick={(e) => e.stopPropagation()}
                 >
                   {tr.instrument?.symbol ?? "—"}
                 </Link>
                 <Badge variant={tr.status === "open" ? "default" : "outline"} className="shrink-0">
                   {t(`status_${tr.status}`)}
                 </Badge>
+                {tr.status === "closed" && (
+                  <button
+                    type="button"
+                    aria-label={t("showTradeDetail")}
+                    onClick={() => onDetail(tr)}
+                    className="ml-auto inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <ChevronRight className="size-3.5" />
+                  </button>
+                )}
               </div>
               <div className={cn(TABLE_SUBLABEL, "truncate")}>
                 {tr.instrument?.displayName ?? tr.instrument?.name ?? tr.instrumentId}
