@@ -202,6 +202,69 @@ describe("aggregateIncome", () => {
     // Total: 300 IDR
     expect(statsScaled.forecastNextYear).toBe("300");
   });
+
+  it("exposes ttmDividendsHistorical (unscaled) and ttmDividendsOnPosition (scaled)", () => {
+    // VWRL: 1 EUR dividend on 2026-05-01 → 17000 IDR. Not in heldQty here.
+    // BBCA 2026-03-01: 300 IDR; histQty = 100; currentQty = 200 → scaled = 600 IDR.
+    const statsScaled = aggregateIncome({
+      events,
+      displayCurrency: "IDR",
+      fx,
+      now: NOW,
+      forecastCoupons: [],
+      heldQty: new Map([["bbca", "200"]]),
+      qtyAt: (instId, _at) => (instId === "bbca" ? "100" : "0"),
+    });
+    // Historical TTM = unscaled sum of dividends in the TTM window.
+    // BBCA 2026-03-01 (300) + VWRL 2026-05-01 (17000) = 17300 IDR.
+    expect(statsScaled.ttmDividendsHistorical).toBe("17300");
+    // On-position TTM = scaled: BBCA 300 × (200 / 100) = 600; VWRL not held → 0; = 600.
+    expect(statsScaled.ttmDividendsOnPosition).toBe("600");
+  });
+
+  it("keeps ttmDividendsHistorical non-zero for instruments that have ever paid (sold-out)", () => {
+    // VWRL has paid in the TTM window but is fully sold (not in heldQty).
+    // ttmDividendsOnPosition must be zero for it, but ttmDividendsHistorical must
+    // still include the cash it actually paid.
+    const statsScaled = aggregateIncome({
+      events,
+      displayCurrency: "IDR",
+      fx,
+      now: NOW,
+      forecastCoupons: [],
+      heldQty: new Map([["bbca", "100"]]),
+      qtyAt: (_instId, _at) => "100",
+    });
+    // Unscaled TTM dividends = 300 (BBCA) + 17000 (VWRL) = 17300 IDR (still non-zero
+    // even though VWRL is fully sold and BBCA scales 1:1).
+    expect(Number(statsScaled.ttmDividendsHistorical)).toBeGreaterThan(0);
+    expect(statsScaled.ttmDividendsHistorical).toBe("17300");
+    // Scaled-on-position = 300 (BBCA 1:1) + 0 (VWRL fully sold) = 300 IDR.
+    expect(statsScaled.ttmDividendsOnPosition).toBe("300");
+  });
+
+  it("falls back to ttmDividendsOnPosition (TTM scaled) for forecastNextYear when no projection given", () => {
+    // forecastNextYear falls back to the on-position scaled TTM when no
+    // projectedDividendsNextYear is provided. Existing behavior must be preserved.
+    const result = aggregateIncome({
+      events: [
+        {
+          instrumentId: "bbca",
+          type: "dividend",
+          price: "300",
+          currency: "IDR",
+          executedAt: d("2026-03-01"),
+        },
+      ],
+      displayCurrency: "IDR",
+      now: NOW,
+      heldQty: new Map([["bbca", "200"]]),
+      qtyAt: () => "100",
+    });
+    // scaled TTM = 300 × (200/100) = 600 IDR; forecastNextYear should mirror this.
+    expect(result.forecastNextYear).toBe("600");
+    expect(result.ttmDividendsOnPosition).toBe("600");
+  });
 });
 
 describe("aggregateIncome — forecastRestOfYear / forecastFullYear", () => {
