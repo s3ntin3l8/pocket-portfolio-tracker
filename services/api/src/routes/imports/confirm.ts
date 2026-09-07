@@ -245,8 +245,9 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
             "confirm: cross-source duplicates among selected drafts",
           );
           if (!acknowledgeDuplicates) {
-            // Don't write anything — surface the 409 to the caller. Rolling back
-            // here is fine; we only did a SELECT (the lock is released on rollback).
+            // Don't write anything — surface the 409 to the caller. Committing
+            // here is fine; this is a read-only tx (the FOR UPDATE lock is
+            // released on commit, not rollback).
             return {
               kind: "duplicate",
               plainDuplicates,
