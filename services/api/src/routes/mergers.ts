@@ -133,9 +133,22 @@ export async function mergersRoute(app: FastifyInstance) {
         }
         throw err;
       }
+      // Also record a corporate action for reference data / future auto-apply.
+      const [ca] = await app.db
+        .insert(corporateActions)
+        .values({
+          instrumentId: input.fromInstrumentId,
+          type: "merger",
+          ratio: outQty.div(inQty).toString(),
+          exDate: dateStr,
+          targetInstrumentId: input.toInstrumentId,
+          ratioTo: inQty.div(outQty).toString(),
+          taxableMarketValue: input.taxable ? input.marketValue : null,
+        })
+        .returning();
       await enqueueRecompute(portfolioId, dateStr);
       reply.code(201);
-      return created;
+      return { transactions: created, corporateAction: ca };
     },
   );
 }
