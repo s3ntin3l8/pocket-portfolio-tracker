@@ -115,9 +115,15 @@ async function localJwtFor(email: string, password: string): Promise<string> {
 
 /** Mint an OIDC-style JWT (authMethod: "jwt") against the injected test key, simulating
  *  an interactive Authentik session — used for the "OIDC user attaching a local password"
- *  scenario, which set-password is explicitly meant to support. */
-async function oidcJwtFor(sub: string, key: CryptoKey): Promise<string> {
-  return new SignJWT({ email: `${sub}@example.com` })
+ *  scenario, which set-password is explicitly meant to support. Pass an explicit email
+ *  when the test needs the OIDC claims to collide with a pre-existing row's email
+ *  (the local→OIDC migration path); otherwise a synthetic <sub>@example.com is used. */
+async function oidcJwtFor(
+  sub: string,
+  key: CryptoKey,
+  email: string = `${sub}@example.com`,
+): Promise<string> {
+  return new SignJWT({ email })
     .setProtectedHeader({ alg: "ES256" })
     .setSubject(sub)
     .setIssuer(ISSUER)
@@ -331,6 +337,145 @@ describe("local auth routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual({ needsSetup: false });
     });
+  });
+});
+
+// When an OIDC login lands on a row that was originally created via local auth
+// (authSub: "local|<email>"), the JIT-insert collides with the existing email
+// unique index. The migration path catches that conflict, rewrites the row's
+// authSub to the OIDC sub, and returns 401 auth_migrated_relogin so the web app
+// can prompt for re-authentication (the previously-issued local JWT, signed with
+// the old local|<email> sub, becomes unauthentic on the very next request — the
+// sub no longer matches any row).
+describe("OIDC migration from local authSub", () => {
+  let migApp: App;
+  let migKey: CryptoKey;
+
+  beforeAll(async () => {
+    process.env.AUTH_LOCAL_SECRET = LOCAL_SECRET;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    const kp = await generateKeyPair("ES256");
+    migKey = kp.privateKey;
+    migApp = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await migApp.db.delete(users).where(eq(users.email, "migrate@example.com"));
+    await migApp.close();
+    await closeDb();
+    delete process.env.AUTH_LOCAL_SECRET;
+    delete process.env.AUTHENTIK_ISSUER;
+    delete process.env.AUTHENTIK_AUDIENCE;
+    delete process.env.RATE_LIMIT_MAX;
+  });
+
+  it("migrates the row's authSub when an OIDC login collides on email and returns 401 auth_migrated_relogin", async () => {
+    const email = "migrate@example.com";
+    const originalHash = hashPassword("keep-me");
+    await migApp.db.insert(users).values({
+      authSub: `local|${email}`,
+      email,
+      name: "Migrate Me",
+      passwordHash: originalHash,
+    });
+
+    const oidcSub = "oidc-sub-for-migration";
+    // Email must match the existing row's email to trigger the migration path.
+    const oidcJwt = await oidcJwtFor(oidcSub, migKey, email);
+
+    const res = await migApp.inject({
+      method: "GET",
+      url: "/me",
+      headers: auth(oidcJwt),
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: "auth_migrated_relogin" });
+
+    const [migrated] = await migApp.db.select().from(users).where(eq(users.email, email)).limit(1);
+    expect(migrated.authSub).toBe(oidcSub);
+    // passwordHash must be preserved byte-for-byte — a fresh hash with a new salt would
+    // silently change the user's credentials. Comparing against the pre-migration hash
+    // (not a re-computation) catches that.
+    expect(migrated.passwordHash).toBe(originalHash);
+    expect(migrated.name).toBe("Migrate Me");
+  });
+
+  it("subsequent OIDC login with the same sub resolves to the same user row", async () => {
+    const oidcSub = "oidc-sub-for-migration";
+    const oidcJwt = await oidcJwtFor(oidcSub, migKey, "migrate@example.com");
+
+    const res = await migApp.inject({
+      method: "GET",
+      url: "/me",
+      headers: auth(oidcJwt),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().email).toBe("migrate@example.com");
+  });
+
+  it("local login still works after migration, signed with the new authSub", async () => {
+    const loginRes = await migApp.inject({
+      method: "POST",
+      url: "/auth/local/login",
+      payload: { email: "migrate@example.com", password: "keep-me" }, // pragma: allowlist secret
+    });
+    expect(loginRes.statusCode).toBe(200);
+
+    const meRes = await migApp.inject({
+      method: "GET",
+      url: "/me",
+      headers: auth(loginRes.json().accessToken),
+    });
+    expect(meRes.statusCode).toBe(200);
+    expect(meRes.json().email).toBe("migrate@example.com");
+  });
+
+  it("does not migrate when no email collision — OIDC JIT-insert is unaffected", async () => {
+    const cleanSub = "oidc-clean-sub";
+    const cleanJwt = await oidcJwtFor(cleanSub, migKey);
+
+    const res = await migApp.inject({
+      method: "GET",
+      url: "/me",
+      headers: auth(cleanJwt),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().email).toBe(`${cleanSub}@example.com`);
+
+    await migApp.db.delete(users).where(eq(users.email, `${cleanSub}@example.com`));
+  });
+
+  it("does not migrate when the colliding row is already an OIDC identity — guard against account hijack via email collision", async () => {
+    // Two OIDC logins with the same email but different subs: a legitimate collision
+    // that must NOT silently merge/overwrite the existing row's authSub. Without the
+    // local|<email> guard, the migration would rebind the existing OIDC row to the
+    // attacker's sub, then return auth_migrated_relogin — an account hijack.
+    const email = "hijack-target@example.com";
+    await migApp.db.insert(users).values({
+      authSub: "oidc-victim-sub",
+      email,
+      name: "Victim",
+    });
+
+    const attackerSub = "oidc-attacker-sub";
+    const attackerJwt = await oidcJwtFor(attackerSub, migKey, email);
+
+    const res = await migApp.inject({
+      method: "GET",
+      url: "/me",
+      headers: auth(attackerJwt),
+    });
+    // The request is rejected — never authenticated, never silently merged.
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error).not.toBe("auth_migrated_relogin");
+
+    const [survivor] = await migApp.db.select().from(users).where(eq(users.email, email)).limit(1);
+    expect(survivor.authSub).toBe("oidc-victim-sub");
+
+    await migApp.db.delete(users).where(eq(users.email, email));
   });
 });
 

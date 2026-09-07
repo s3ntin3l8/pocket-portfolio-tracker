@@ -263,6 +263,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
 
     const [found] = await app.db.select().from(users).where(eq(users.authSub, sub!)).limit(1);
     let user = found;
+    let migrated = false;
     if (!user) {
       // Local tokens are never JIT-inserted: a local sub always names a pre-existing row
       // (login/setup only sign a row's own authSub), so a miss here means the user was
@@ -271,11 +272,57 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       if (authMethod === "local") {
         return reply.code(401).send({ error: "invalid_token" });
       }
-      const [created] = await app.db
-        .insert(users)
-        .values({ authSub: sub!, email: email! })
-        .returning();
+      // OIDC JIT-insert. The happy path is a brand-new user; the recovery path handles
+      // the local→OIDC migration when the email we want to use is already taken by a
+      // row originally created via local auth.
+      //
+      // Postgres unique-violation is 23505; drizzle/PGlite may nest it under `cause`,
+      // so match the message as a driver-portable fallback. Same pattern as
+      // routes/mergers.ts and routes/admin/users.ts.
+      let created: typeof users.$inferSelect | undefined;
+      let wasMigrated = false;
+      try {
+        [created] = await app.db.insert(users).values({ authSub: sub!, email: email! }).returning();
+      } catch (err) {
+        const e = err as { code?: string; cause?: { code?: string }; message?: string };
+        const isUniqueViolation =
+          e.code === "23505" ||
+          e.cause?.code === "23505" ||
+          /duplicate key|unique constraint/i.test(e.message ?? "");
+        if (!isUniqueViolation) throw err;
+        const [existing] = await app.db
+          .select()
+          .from(users)
+          .where(eq(users.email, email!))
+          .limit(1);
+        // Only migrate when the colliding row is itself a local account (authSub
+        // starts with "local|"). An OIDC row with the same email means a different
+        // identity claims this address — silently rebinding its authSub to the new
+        // sub would be an account merge/hijack. The 401 below leaves both rows
+        // untouched; admin can reconcile out-of-band.
+        if (!existing || !existing.authSub.startsWith("local|")) {
+          return reply.code(401).send({ error: "invalid_token" });
+        }
+        const [migratedRow] = await app.db
+          .update(users)
+          .set({ authSub: sub!, email: email! })
+          .where(eq(users.id, existing.id))
+          .returning();
+        if (!migratedRow) throw err;
+        created = migratedRow;
+        wasMigrated = true;
+      }
       user = created;
+      migrated = wasMigrated;
+    }
+
+    if (migrated) {
+      // Migration just happened: any previously-issued local JWT (signed with the row's
+      // OLD authSub) is stale by definition, and this request's bearer was issued
+      // before the migration ran. Reject with a distinct code so the web app can show
+      // "account linked, please re-authenticate" — the next OIDC login finds the
+      // freshly-migrated row by its new authSub.
+      return reply.code(401).send({ error: "auth_migrated_relogin" });
     }
 
     if (authMethod === "local") {

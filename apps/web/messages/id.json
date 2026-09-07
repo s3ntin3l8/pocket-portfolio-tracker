@@ -54,7 +54,8 @@
     "setupPasswordMismatch": "Kata sandi tidak cocok.",
     "setupAlreadyDone": "Penyiapan sudah selesai — silakan masuk di bawah ini.",
     "setupError": "Gagal membuat akun. Silakan coba lagi.",
-    "setupTrust": "Penyiapan sekali · Hanya ditampilkan selama belum ada akun"
+    "setupTrust": "Penyiapan sekali · Hanya ditampilkan selama belum ada akun",
+    "migrationNotice": "Akun Anda telah ditautkan ke masuk tunggal. Silakan masuk lagi dengan metode baru Anda."
   },
   "AuthError": {
     "retrying": "Menandatangani Anda kembali…",

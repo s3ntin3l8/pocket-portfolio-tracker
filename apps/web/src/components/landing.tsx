@@ -70,6 +70,17 @@ export function Landing({
   const [busy, setBusy] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [loginError, setLoginError] = useState(false);
+  // When the API returns 401 auth_migrated_relogin (set by useApiClient on a 401 with
+  // that error code), the local-auth row's authSub was just rewritten to the OIDC sub.
+  // Surface a one-time message explaining the forced re-login instead of dropping the
+  // user at a fresh login form with no context. Read sessionStorage once at mount via
+  // lazy initialization and immediately clear the flag — a useEffect would just re-do
+  // the same read on the next render and trigger the cascading-renders lint rule.
+  const [migrationNotice] = useState(() => {
+    if (sessionStorage.getItem("pocket:auth-migrated") !== "1") return false;
+    sessionStorage.removeItem("pocket:auth-migrated");
+    return true;
+  });
 
   const demoCurrency =
     DEMO_AMOUNT_BY_CURRENCY[initialCurrency] !== undefined ? initialCurrency : "IDR";
@@ -190,6 +201,16 @@ export function Landing({
               {needsSetup ? t("setupSub") : t("signInSub")}
             </p>
           </div>
+
+          {migrationNotice && (
+            <div
+              role="status"
+              className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-foreground"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-primary" />
+              <span>{t("migrationNotice")}</span>
+            </div>
+          )}
 
           {devBypass ? (
             <Button asChild className="w-full gap-2" size="lg">
