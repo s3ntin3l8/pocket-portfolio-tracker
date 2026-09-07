@@ -15,7 +15,6 @@ import {
 } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/utils";
 import type { TrendTone } from "@/components/reports/trend-chip";
-import { indonesianFinalTax } from "@portfolio/core";
 
 const ICONS = {
   income: { icon: Coins, bg: "rgba(14,159,110,.12)", fg: "#0E9F6E" },
@@ -281,9 +280,9 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
 
   // ── Tax ──────────────────────────────────────────────────────────────────
   if (taxRegime === "ID" && idDetailByHolder) {
-    // Indonesian final tax: 0.1% on sale proceeds + 10% on dividend/coupon gross,
-    // withheld at source — no Sparerpauschbetrag/Abgeltungsteuer headline here.
-    // Same recompute-over-the-same-disposals approach as tax/page.tsx's ID branch.
+    // Indonesian final tax headline: aggregate the per-portfolio ID breakdown returned by
+    // /portfolios/:id/tax (`detail.indonesianFinalTax`) rather than recomputing it here.
+    // The API is now the single source of truth.
     const currency = taxHolders[0]?.currency ?? "IDR";
     const m = (n: number) => formatMoney(n, currency, locale);
     const mc = (n: number) => formatMoneyCompact(n, currency, locale);
@@ -292,23 +291,10 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     let totalDividendGross = 0;
     for (const entry of taxHolders) {
       const detail = idDetailByHolder.get(entry.holder.id);
-      if (!detail) continue;
-      const idTax = indonesianFinalTax({
-        disposals: detail.disposals.map((d) => ({
-          symbol: d.symbol,
-          when: d.when,
-          proceeds: d.proceeds,
-        })),
-        dividends: detail.dividendRows.map((d) => ({
-          symbol: d.symbol,
-          currency: d.currency,
-          gross: d.gross,
-        })),
-        byYear: [],
-      });
-      totalTax += Number(idTax.estimatedTax);
-      totalProceeds += Number(idTax.totalProceeds);
-      totalDividendGross += Number(idTax.totalDividendGross);
+      if (!detail?.indonesianFinalTax) continue;
+      totalTax += Number(detail.indonesianFinalTax.estimatedTax);
+      totalProceeds += Number(detail.indonesianFinalTax.totalProceeds);
+      totalDividendGross += Number(detail.indonesianFinalTax.totalDividendGross);
     }
 
     cards.push(
@@ -337,10 +323,10 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     const mc = (n: number) => formatMoneyCompact(n, currency, locale);
     const sum = (f: (h: (typeof taxHolders)[number]) => number) =>
       taxHolders.reduce((acc, h) => acc + f(h), 0);
-    const usedYtd = sum((h) => Number(h.allowanceUsage.usedYtd));
-    const allowanceAnnual = sum((h) => Number(h.allowanceUsage.allowanceAnnual));
-    const realizedGains = sum((h) => Number(h.allowanceUsage.realizedGainsAdjusted));
-    const incomeYtd = sum((h) => Number(h.allowanceUsage.incomeYtd));
+    const usedYtd = sum((h) => Number(h.allowanceUsage?.usedYtd ?? 0));
+    const allowanceAnnual = sum((h) => Number(h.allowanceUsage?.allowanceAnnual ?? 0));
+    const realizedGains = sum((h) => Number(h.allowanceUsage?.realizedGainsAdjusted ?? 0));
+    const incomeYtd = sum((h) => Number(h.allowanceUsage?.incomeYtd ?? 0));
     const usedPct = allowanceAnnual > 0 ? Math.round((usedYtd / allowanceAnnual) * 100) : 0;
 
     cards.push(

@@ -13,8 +13,10 @@ import {
   type TaxCurrencyTotal,
   type TaxYearRow,
   type TaxYearDetail,
+  type IndonesianFinalTaxLike,
   type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
+import { loadPreferences } from "./user.js";
 
 export async function loadNetworthTax(
   year?: number,
@@ -165,6 +167,11 @@ export async function loadTaxYearDetail(
   const api = await getServerApi();
   if (!api) return result;
   const targetYear = year ?? new Date().getUTCFullYear();
+  // ID branch consumes the API's pre-computed `indonesianFinalTax` rather than re-deriving
+  // the per-row numbers client-side. Without this flag the page renders the German
+  // tables from `disposals`/`dividendRows` as before.
+  const prefs = await loadPreferences();
+  const regime: "DE" | "ID" = prefs?.taxRegime === "ID" ? "ID" : "DE";
 
   let portfolios: import("@portfolio/api-client").Portfolio[];
   let selected: import("@portfolio/api-client").Portfolio | undefined;
@@ -187,12 +194,17 @@ export async function loadTaxYearDetail(
       if (pfs.length === 0) return;
 
       try {
-        const [tradeLog, incomeLists] = await Promise.all([
+        const [tradeLog, incomeLists, idTaxByPf] = await Promise.all([
           selected
             ? api.getTrades(selected.id, "fifo")
             : api.getNetWorthTrades("fifo", undefined, holderId),
           Promise.all(pfs.map((p) => api.listIncomeByYear(p.id, targetYear))),
+          regime === "ID" && selected
+            ? api.getPortfolioTax(selected.id, targetYear)
+            : Promise.resolve<PortfolioTaxSummary | null>(null),
         ]);
+        const apiIdTax: IndonesianFinalTaxLike | undefined =
+          idTaxByPf?.indonesianFinalTax ?? undefined;
 
         const disposalGroups = new Map<
           string,
@@ -306,43 +318,46 @@ export async function loadTaxYearDetail(
             net: t.net.toFixed(2),
           }));
 
-        const taxRate = Number(entry.allowanceUsage.taxRate);
-        const allowanceAnnual = Number(entry.allowanceUsage.allowanceAnnual);
+        const taxRate = Number(entry.allowanceUsage?.taxRate ?? "0");
+        const allowanceAnnual = Number(entry.allowanceUsage?.allowanceAnnual ?? "0");
         const years = new Set<number>([
           ...tradeLog.realizedByYear.map((r) => r.year),
           ...tradeLog.dividendsByYear.map((d) => d.year),
         ]);
-        const byYear: TaxYearRow[] = [...years]
-          .sort((a, b) => b - a)
-          .map((y) => {
-            if (y === entry.year) {
-              const u = entry.allowanceUsage;
-              const taxable = Number(u.taxableExcess);
+        const byYear: TaxYearRow[] = (
+          [...years]
+            .sort((a, b) => b - a)
+            .map((y) => {
+              if (y === entry.year) {
+                const u = entry.allowanceUsage;
+                if (!u) return null;
+                const taxable = Number(u.taxableExcess);
+                return {
+                  year: y,
+                  realized: u.realizedGainsAdjusted,
+                  dividends: u.incomeYtd,
+                  tax: (taxable * taxRate).toFixed(2),
+                  fsaUsed: u.usedYtd,
+                };
+              }
+
+              const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
+              const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
+              const dividendsGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax) : 0;
+              const taxable = Math.max(0, Number(realized) + dividendsGross - allowanceAnnual);
+              const fsaUsed = Math.min(
+                allowanceAnnual,
+                Math.max(0, Number(realized) + dividendsGross),
+              );
               return {
                 year: y,
-                realized: u.realizedGainsAdjusted,
-                dividends: u.incomeYtd,
+                realized,
+                dividends: dividendsGross.toFixed(2),
                 tax: (taxable * taxRate).toFixed(2),
-                fsaUsed: u.usedYtd,
+                fsaUsed: fsaUsed.toFixed(2),
               };
-            }
-
-            const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
-            const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
-            const dividendsGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax) : 0;
-            const taxable = Math.max(0, Number(realized) + dividendsGross - allowanceAnnual);
-            const fsaUsed = Math.min(
-              allowanceAnnual,
-              Math.max(0, Number(realized) + dividendsGross),
-            );
-            return {
-              year: y,
-              realized,
-              dividends: dividendsGross.toFixed(2),
-              tax: (taxable * taxRate).toFixed(2),
-              fsaUsed: fsaUsed.toFixed(2),
-            };
-          });
+            }) as Array<TaxYearRow | null>
+        ).filter((r): r is TaxYearRow => r !== null);
 
         const proceedsByYearMap = new Map<number, number>();
         for (const t of tradeLog.trades) {
@@ -379,6 +394,7 @@ export async function loadTaxYearDetail(
           dividendTotalsByCurrency,
           byYear,
           idByYear,
+          indonesianFinalTax: apiIdTax,
         });
       } catch {
         // Best-effort per holder

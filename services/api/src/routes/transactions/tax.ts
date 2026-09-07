@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
-import { accountHolders, portfolios, users } from "@portfolio/db";
+import { accountHolders, portfolios, users, userPreferences } from "@portfolio/db";
 import type { TradeLog } from "@portfolio/core";
 import { allowanceUsageYTD, harvestSuggestions, mergeTradeLogs } from "@portfolio/core";
 import { Decimal } from "decimal.js";
@@ -18,7 +18,12 @@ import {
   PORTFOLIO_VALUATION_CONCURRENCY,
   type PortfolioParams,
 } from "./shared.js";
-import { lossCarryForwardFor, restOfYearForecastGross, buildTfRates } from "./tax-helpers.js";
+import {
+  lossCarryForwardFor,
+  restOfYearForecastGross,
+  buildTfRates,
+  computeIndonesianFinalTaxFromTradeLog,
+} from "./tax-helpers.js";
 
 export function registerTaxRoutes(app: FastifyInstance) {
   /**
@@ -37,7 +42,17 @@ export function registerTaxRoutes(app: FastifyInstance) {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
 
-      if (!portfolio.taxAllowanceAnnual) {
+      // Tax regime comes from userPreferences; default is "DE". The Indonesian path does
+      // NOT require the holder/portfolio FSA allocation that the DE Sparerpauschbetrag
+      // path needs — ID is a flat, withheld-at-source regime with no annual allowance.
+      const [prefs] = await app.db
+        .select({ taxRegime: userPreferences.taxRegime })
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, id))
+        .limit(1);
+      const regime: "DE" | "ID" = prefs?.taxRegime === "ID" ? "ID" : "DE";
+
+      if (regime === "DE" && !portfolio.taxAllowanceAnnual) {
         return reply.code(422).send({ error: "tax_allowance_not_configured" });
       }
 
@@ -117,8 +132,6 @@ export function registerTaxRoutes(app: FastifyInstance) {
       const assetClasses = Object.fromEntries(
         [...metaById.entries()].map(([iid, m]) => [iid, m.assetClass]),
       );
-      const allowanceAnnual = portfolio.taxAllowanceAnnual;
-      const taxRate = holderProfile?.capitalGainsTaxRate ?? "0.25";
 
       const forecastIncomeRestOfYear = await restOfYearForecastGross(
         app,
@@ -128,6 +141,42 @@ export function registerTaxRoutes(app: FastifyInstance) {
         year,
         now,
       );
+
+      request.timingName = "GET /portfolios/:id/tax";
+      request.timingMeta = {
+        portfolioId,
+        year,
+        hasHolder: holderId != null,
+        carryForwardApplied,
+        regime,
+      };
+
+      // Indonesian final-tax is flat, withheld-at-source: 0.1% of SALE PROCEEDS + 10% of
+      // dividend/coupon GROSS. No Sparerpauschbetrag, no harvesting, no realized-gain
+      // computation — so the entire German-shape response (`allowanceUsage`,
+      // `harvestSuggestions`, `tfRatesByInstrument`, `holderDistribution`,
+      // `carryForwardApplied`) is replaced by a single `indonesianFinalTax` block sourced
+      // from the same trade log the German branch uses.
+      if (regime === "ID") {
+        const idTax = computeIndonesianFinalTaxFromTradeLog({
+          tradeLog,
+          coreTxns,
+          year,
+          metaById,
+        });
+        return {
+          year,
+          regime: "ID" as const,
+          currency: portfolio.baseCurrency,
+          indonesianFinalTax: idTax,
+          harvestSuggestions: [],
+        };
+      }
+
+      // DE path — all the FSA/Harvest/Tf computations need `portfolio.taxAllowanceAnnual`
+      // to be set (guarded by the regime==="DE" 422 above).
+      const allowanceAnnual = portfolio.taxAllowanceAnnual as string;
+      const taxRate = holderProfile?.capitalGainsTaxRate ?? "0.25";
 
       const usage = allowanceUsageYTD({
         tradeLog,
@@ -148,15 +197,9 @@ export function registerTaxRoutes(app: FastifyInstance) {
         usage,
       });
 
-      request.timingName = "GET /portfolios/:id/tax";
-      request.timingMeta = {
-        portfolioId,
-        year,
-        hasHolder: holderId != null,
-        carryForwardApplied,
-      };
       return {
         year,
+        regime: "DE" as const,
         currency: portfolio.baseCurrency,
         allowanceUsage: usage,
         harvestSuggestions: suggestions.map((s) => ({

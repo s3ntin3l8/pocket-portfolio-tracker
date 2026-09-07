@@ -1,8 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq, inArray } from "drizzle-orm";
 import { dividendEvents, instruments, lossCarryforward } from "@portfolio/db";
-import type { CoreTransaction, PortfolioSummary, IncomeEntry } from "@portfolio/core";
-import { cashFlow, projectCoupons, projectDividends, convert, toDateKey } from "@portfolio/core";
+import type {
+  CoreTransaction,
+  PortfolioSummary,
+  IncomeEntry,
+  TradeLog,
+  IndonesianFinalTax,
+  IdDisposalInput,
+  IdDividendInput,
+  IdYearInput,
+} from "@portfolio/core";
+import {
+  cashFlow,
+  projectCoupons,
+  projectDividends,
+  convert,
+  toDateKey,
+  indonesianFinalTax,
+} from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 
@@ -189,4 +205,132 @@ export function buildTfRates(
     }
   }
   return result;
+}
+
+/**
+ * Build the Indonesian final-tax payload from a (single) portfolio's trade log + raw core
+ * transactions. Mirrors the web tier's per-holder assembly in `loadTaxYearDetail` so the
+ * API and the (replaced) client side agree to the decimal — single source of truth.
+ *
+ * - Disposals for `year` are grouped by (instrumentId, sellDate) so each disposal row is
+ *   one economic sale day, with proceeds / quantity / avg-buy / sell-price.
+ * - Dividends for `year` are grouped by (instrumentId, currency) with gross = net + tax
+ *   (`cashFlow` computes net = qty × price − fees for income rows).
+ * - `byYear` rolls proceeds and dividends across every year the trade log spans so prior
+ *   tax years still get a real Est. tax figure under ID.
+ */
+export function computeIndonesianFinalTaxFromTradeLog(input: {
+  tradeLog: TradeLog;
+  coreTxns: CoreTransaction[];
+  year: number;
+  metaById: Map<string, InstrumentMeta>;
+}): IndonesianFinalTax {
+  const { tradeLog, coreTxns, year, metaById } = input;
+  const ZERO = "0";
+
+  // Disposals for the selected year, grouped per (instrumentId, sellDate).
+  type DisposalGroup = {
+    instrumentId: string;
+    symbol: string;
+    when: string;
+    proceeds: number;
+    quantity: number;
+    cost: number;
+  };
+  const disposalGroups = new Map<string, DisposalGroup>();
+  for (const t of tradeLog.trades) {
+    for (const l of t.legs) {
+      if (l.taxYear !== year) continue;
+      const key = `${t.instrumentId}:${l.sellDate}`;
+      const qty = Number(l.quantity);
+      const proceeds = Number(l.proceeds);
+      const cost = Number(l.cost);
+      const existing = disposalGroups.get(key);
+      const symbol = metaById.get(t.instrumentId)?.symbol ?? t.instrumentId.slice(0, 8);
+      if (existing) {
+        existing.proceeds += proceeds;
+        existing.quantity += qty;
+        existing.cost += cost;
+      } else {
+        disposalGroups.set(key, {
+          instrumentId: t.instrumentId,
+          symbol,
+          when: l.sellDate,
+          proceeds,
+          quantity: qty,
+          cost,
+        });
+      }
+    }
+  }
+  const disposals: IdDisposalInput[] = [...disposalGroups.values()].map((g) => ({
+    symbol: g.symbol,
+    when: g.when,
+    instrumentId: g.instrumentId,
+    proceeds: g.proceeds.toFixed(2),
+    quantity: g.quantity > 0 ? g.quantity.toString() : ZERO,
+    avgBuyPrice: g.quantity > 0 ? (g.cost / g.quantity).toFixed(2) : ZERO,
+    sellPrice: g.quantity > 0 ? (g.proceeds / g.quantity).toFixed(2) : ZERO,
+  }));
+
+  // Dividends / coupons / interest for the selected year, grouped per (instrumentId, currency).
+  type DivBucket = { symbol: string; currency: string; gross: number; tax: number };
+  const divBuckets = new Map<string, DivBucket>();
+  for (const t of coreTxns) {
+    if (t.type !== "dividend" && t.type !== "coupon" && t.type !== "interest") {
+      continue;
+    }
+    if (t.executedAt.getUTCFullYear() !== year) continue;
+    const instrumentId = t.instrumentId ?? null;
+    const symbol = instrumentId ?? t.type;
+    const key = `${instrumentId ?? t.type}:${t.currency}`;
+    // cashFlow computes net = (qty>0 ? qty*price : price) − fees for income rows; gross
+    // is then net + broker-recorded withholding (so the ID 10% sits on the gross figure,
+    // not the net received). The ID tax function deliberately re-derives its own 10% on
+    // this gross and ignores the broker's withholding tag.
+    const net = Number(cashFlow({ ...t, type: t.type as CoreTransaction["type"] }).toString());
+    const tax = Number((t as { tax?: string | null }).tax ?? "0");
+    const gross = net + tax;
+    const existing = divBuckets.get(key);
+    if (existing) {
+      existing.gross += gross;
+      existing.tax += tax;
+    } else {
+      divBuckets.set(key, { symbol, currency: t.currency, gross, tax });
+    }
+  }
+  const dividends: IdDividendInput[] = [...divBuckets.values()].map((b) => ({
+    symbol: b.symbol,
+    currency: b.currency,
+    gross: b.gross.toFixed(2),
+  }));
+
+  // Per-year proceeds from the trade log legs (across ALL years, for the byYear table).
+  const proceedsByYearMap = new Map<number, number>();
+  for (const t of tradeLog.trades) {
+    for (const l of t.legs) {
+      proceedsByYearMap.set(
+        l.taxYear,
+        (proceedsByYearMap.get(l.taxYear) ?? 0) + Number(l.proceeds),
+      );
+    }
+  }
+  const allYears = new Set<number>([
+    ...proceedsByYearMap.keys(),
+    ...tradeLog.dividendsByYear.map((d) => d.year),
+    ...tradeLog.realizedByYear.map((r) => r.year),
+  ]);
+  const byYear: IdYearInput[] = [...allYears].map((y) => {
+    const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
+    const dividendGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax) : 0;
+    const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
+    return {
+      year: y,
+      proceeds: (proceedsByYearMap.get(y) ?? 0).toFixed(2),
+      dividendGross: dividendGross.toFixed(2),
+      realized,
+    };
+  });
+
+  return indonesianFinalTax({ disposals, dividends, byYear });
 }

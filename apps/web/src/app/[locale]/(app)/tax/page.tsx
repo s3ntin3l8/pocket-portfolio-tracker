@@ -133,6 +133,9 @@ function TaxHolderOverviewDe({
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
   const moneyCompact = (n: string | number) => formatMoneyCompact(Number(n), currency, locale);
   const { allowanceUsage: u, harvestSuggestions, distribution, accountHolderId } = entry;
+  // ID entries carry `indonesianFinalTax` instead of `allowanceUsage` — render nothing
+  // here; the parent's `TaxHolderSectionId` branch will render the ID cards.
+  if (!u) return null;
   const pct = parseFloat(u.remaining) / parseFloat(u.allowanceAnnual);
   const usedPct = Math.round((1 - Math.max(0, Math.min(1, pct))) * 100);
   const hasForecast = Number(u.forecastIncomeRestOfYear) > 0;
