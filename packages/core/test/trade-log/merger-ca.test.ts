@@ -287,6 +287,67 @@ describe("computeTrades — merger CA consumes taxableMarketValue (B3)", () => {
       stderrSpy.mockRestore();
     }
   });
+
+  it("defense-in-depth: mismatched buy-leg basis emits a structured stderr warning (Hermes #2)", () => {
+    // Mirror of the sell-leg warning test above — the buy leg's basis should also
+    // sum to taxableMarketValue (the importer prices both legs at MV). Mismatch
+    // doesn't fail the run; it surfaces a structured warning so downstream log
+    // shippers can flag the discrepancy.
+    const txns: CoreTransaction[] = [
+      buyTx({ quantity: "10", price: "100" }),
+      {
+        instrumentId: OLD,
+        type: "sell",
+        quantity: "10",
+        price: "120", // proceeds = 1200 = MV (matches)
+        fees: "0",
+        currency: "EUR",
+        executedAt: new Date("2024-02-01"),
+        kind: "merger",
+      },
+      {
+        instrumentId: NEW,
+        type: "buy",
+        quantity: "5",
+        price: "220", // basis = 1100 ≠ MV 1200 (mismatch)
+        fees: "0",
+        currency: "EUR",
+        executedAt: new Date("2024-02-01"),
+        kind: "merger",
+      },
+    ];
+    const cas: CorporateAction[] = [mergerCa({ taxableMarketValue: "1200" })];
+
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      computeTrades({
+        transactions: txns,
+        prices: {},
+        displayCurrency: "EUR",
+        now: new Date("2024-06-01"),
+        corporateActions: cas,
+      });
+
+      const warnings = stderrSpy.mock.calls
+        .map((call) => String(call[0] ?? ""))
+        .filter((line) => line.includes("merger_importer_basis_mismatch"));
+      expect(warnings).toHaveLength(1);
+      const payload = JSON.parse(warnings[0]!.trim());
+      expect(payload.level).toBe("warn");
+      expect(payload.event).toBe("merger_importer_basis_mismatch");
+      expect(payload.expected).toBe("1200");
+      expect(payload.got).toBe("1100");
+      expect(typeof payload.caId).toBe("string");
+      expect(payload.caId.length).toBeGreaterThan(0);
+      // The matching sell leg must NOT emit its own warning — only the buy leg is wrong.
+      const proceedsWarnings = stderrSpy.mock.calls
+        .map((call) => String(call[0] ?? ""))
+        .filter((line) => line.includes("merger_importer_proceeds_mismatch"));
+      expect(proceedsWarnings).toHaveLength(0);
+    } finally {
+      stderrSpy.mockRestore();
+    }
+  });
 });
 
 describe("computeHoldings — merger CA synthesizes the pair (B3 mirror)", () => {

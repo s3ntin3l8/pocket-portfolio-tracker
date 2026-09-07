@@ -86,6 +86,23 @@ export function augmentTransactionsWithSyntheticMergerLegs(
         );
       }
     }
+    // Symmetric check on the buy leg: the new instrument's stepped-up basis
+    // (= buyPair.quantity * buyPair.price) should equal taxableMarketValue too.
+    // Same policy — log but don't fail; the importer's data wins.
+    if (buyPair) {
+      const pairBasis = D(buyPair.quantity).mul(D(buyPair.price));
+      if (!pairBasis.eq(taxableMarketValue)) {
+        process.stderr.write(
+          JSON.stringify({
+            level: "warn",
+            event: "merger_importer_basis_mismatch",
+            caId: `${ca.instrumentId}@${ca.exDate.toISOString()}`,
+            expected: taxableMarketValue.toString(),
+            got: pairBasis.toString(),
+          }) + "\n",
+        );
+      }
+    }
 
     if (sellPair && buyPair) continue;
 
