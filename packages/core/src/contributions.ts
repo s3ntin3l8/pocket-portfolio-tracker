@@ -156,12 +156,44 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
   const sorted = [...txns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
   // Pool is denominated in costCurrency (the trade currency of the instrument's
   // buys) — mirror of computeHoldings. Mixing currencies for one instrument is
-  // meaningless (cost basis is currency-blind), so we fail loud like computeHoldings.
+  // meaningless (cost basis is currency-blind). Rather than crash the entire
+  // summary (the original behavior) or skip-and-refund mid-loop, we pre-scan
+  // for instruments whose acquisitions span more than one currency and drop
+  // them entirely — every tx for that instrument is skipped in the main loop.
+  const skippedInstruments = new Set<string>();
+  const acquisitionCurrencies = new Map<string, Set<string>>();
+  for (const tx of sorted) {
+    if (!tx.instrumentId) continue;
+    if (
+      tx.type !== "buy" &&
+      tx.type !== "savings_plan" &&
+      tx.type !== "bonus" &&
+      tx.type !== "transfer_in"
+    )
+      continue;
+    const set = acquisitionCurrencies.get(tx.instrumentId) ?? new Set<string>();
+    set.add(tx.currency);
+    acquisitionCurrencies.set(tx.instrumentId, set);
+  }
+  for (const [instrumentId, ccys] of acquisitionCurrencies) {
+    if (ccys.size > 1) {
+      skippedInstruments.add(instrumentId);
+      process.stderr.write(
+        JSON.stringify({
+          level: "warn",
+          event: "contributions_mixed_currency_instrument",
+          instrumentId,
+          currencies: [...ccys].sort(),
+        }) + "\n",
+      );
+    }
+  }
   const pool = new Map<string, { qty: Decimal; cost: Decimal; costCurrency: string }>();
   const months = new Map<string, FlowAgg>();
 
   for (const tx of sorted) {
     if (!tx.instrumentId) continue;
+    if (skippedInstruments.has(tx.instrumentId)) continue;
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
 
@@ -182,11 +214,6 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
           cost: D(0),
           costCurrency: tx.currency,
         });
-      } else if (existing.costCurrency !== tx.currency) {
-        throw new Error(
-          `Instrument ${tx.instrumentId} has acquisitions in multiple currencies ` +
-            `(${existing.costCurrency} and ${tx.currency}); outside-boundary cost pool can't be computed.`,
-        );
       }
       const p = pool.get(tx.instrumentId)!;
       const gross = D(tx.quantity).abs().mul(D(tx.price)).add(D(tx.fees));
