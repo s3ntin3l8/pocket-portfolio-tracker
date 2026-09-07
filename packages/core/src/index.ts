@@ -2,7 +2,6 @@ export type { Decimal } from "decimal.js";
 export { D, ZERO } from "./decimal.js";
 export { toDateKey, toMonthKey } from "./date-utils.js";
 export * from "./types.js";
-export { BudgetPlanRequiresInput } from "./errors.js";
 export {
   computeHoldings,
   marketValue,

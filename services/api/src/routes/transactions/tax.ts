@@ -12,6 +12,18 @@ import {
 import { mapPool } from "../../lib/promise-pool.js";
 import { toDecimalSafe } from "../../lib/decimal-safe.js";
 
+/**
+ * Coerce Drizzle's `fxRates: Record<string, string>` (returned by loadValuation) into the
+ * `Map<string, number>` shape `computeIndonesianFinalTaxFromTradeLog` expects. The Record
+ * format uses stringified decimals to survive JSON serialization; the ID tax math needs
+ * the numeric form.
+ */
+function makeIdFxRateMap(fxRates: Record<string, string>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [k, v] of Object.entries(fxRates)) out.set(k, Number(v));
+  return out;
+}
+
 import {
   loadValuation,
   buildTradeLog,
@@ -112,7 +124,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         undefined,
         portfolio.cashCounted,
       );
-      const { coreTxns, prices, metaById, summary, corporateActions: cas, fxRates } = valuation;
+      const { coreTxns, prices, metaById, corporateActions: cas, fxRates } = valuation;
       const cacheKey = derivationCacheKey(
         portfolioId,
         portfolio.baseCurrency,
@@ -132,38 +144,43 @@ export function registerTaxRoutes(app: FastifyInstance) {
       const assetClasses = Object.fromEntries(
         [...metaById.entries()].map(([iid, m]) => [iid, m.assetClass]),
       );
-
-      const forecastIncomeRestOfYear = await restOfYearForecastGross(
-        app,
-        coreTxns,
-        summary,
-        portfolio.baseCurrency,
-        year,
-        now,
-      );
-
-      request.timingName = "GET /portfolios/:id/tax";
-      request.timingMeta = {
-        portfolioId,
-        year,
-        hasHolder: holderId != null,
-        carryForwardApplied,
-        regime,
-      };
+      // Skip the rest-of-year forecast under ID — the German branch is the only consumer.
+      const forecastIncomeRestOfYear =
+        regime === "ID"
+          ? "0"
+          : (
+              await restOfYearForecastGross(
+                app,
+                coreTxns,
+                valuation.summary,
+                portfolio.baseCurrency,
+                year,
+                new Date(),
+              )
+            ).toString();
 
       // Indonesian final-tax is flat, withheld-at-source: 0.1% of SALE PROCEEDS + 10% of
       // dividend/coupon GROSS. No Sparerpauschbetrag, no harvesting, no realized-gain
       // computation — so the entire German-shape response (`allowanceUsage`,
       // `harvestSuggestions`, `tfRatesByInstrument`, `holderDistribution`,
       // `carryForwardApplied`) is replaced by a single `indonesianFinalTax` block sourced
-      // from the same trade log the German branch uses.
+      // from the same trade log the German branch uses. Computed BEFORE the German
+      // forecast / tf-rates / allowance work below — those are wasted cycles for ID.
       if (regime === "ID") {
         const idTax = computeIndonesianFinalTaxFromTradeLog({
           tradeLog,
           coreTxns,
           year,
           metaById,
+          displayCurrency: portfolio.baseCurrency,
+          fxRates: makeIdFxRateMap(fxRates),
         });
+        request.timingName = "GET /portfolios/:id/tax";
+        request.timingMeta = {
+          portfolioId,
+          year,
+          regime,
+        };
         return {
           year,
           regime: "ID" as const,
@@ -333,13 +350,13 @@ export function registerTaxRoutes(app: FastifyInstance) {
 
         const now = new Date();
         const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
-          const { coreTxns, prices, metaById, summary } = await loadValuation(
-            app,
-            p.id,
-            display,
-            undefined,
-            p.cashCounted,
-          );
+          const {
+            coreTxns,
+            prices,
+            metaById,
+            summary,
+            fxRates: pFxRates,
+          } = await loadValuation(app, p.id, display, undefined, p.cashCounted);
           const log = await buildTradeLog(
             app,
             coreTxns,
@@ -349,22 +366,34 @@ export function registerTaxRoutes(app: FastifyInstance) {
             undefined,
             metaById,
           );
-          const pfForecast = await restOfYearForecastGross(
-            app,
+          // Skip restOfYearForecastGross under ID — the forecast is gross-income-only
+          // (used by the German branch's harvestSuggestion / FSP path) and the ID
+          // branch doesn't read `totalForecastGross`. Saves a per-portfolio query.
+          const pfForecast =
+            regime === "ID"
+              ? Promise.resolve({ toString: () => "0" } as { toString: () => string })
+              : restOfYearForecastGross(app, coreTxns, summary, display, year, now);
+          const forecast = await pfForecast;
+          return {
+            log,
+            metaById,
             coreTxns,
-            summary,
-            display,
-            year,
-            now,
-          );
-          return { log, metaById, coreTxns, forecast: Number(pfForecast) };
+            forecast: Number(forecast.toString()),
+            rateByCcy: pFxRates as Record<string, string>,
+          };
         });
         const logs: TradeLog[] = perPortfolio.map((r) => r.log);
         const meta = new Map<string, InstrumentMeta>();
         let totalForecastGross = 0;
-        for (const { metaById, forecast } of perPortfolio) {
-          for (const [k, v] of metaById) meta.set(k, v);
-          totalForecastGross += forecast;
+        if (regime !== "ID") {
+          for (const { metaById, forecast } of perPortfolio) {
+            for (const [k, v] of metaById) meta.set(k, v);
+            totalForecastGross += forecast;
+          }
+        } else {
+          for (const { metaById } of perPortfolio) {
+            for (const [k, v] of metaById) meta.set(k, v);
+          }
         }
         const mergedLog = mergeTradeLogs(logs, display, "fifo");
 
@@ -376,11 +405,21 @@ export function registerTaxRoutes(app: FastifyInstance) {
         // which silently zeroed the ID payload for ID users — now it surfaces directly.)
         if (regime === "ID") {
           const allCoreTxns = perPortfolio.flatMap((p) => p.coreTxns);
+          // The per-portfolio loadValuation returned fxRates for each portfolio's display
+          // (its baseCurrency), not the networth-level `display`. Re-derive a display→
+          // native→display map that covers every distinct native currency across all the
+          // holder's portfolios. (mergeTradeLogs already folded the legs into display.)
+          const displayRates = new Map<string, number>();
+          for (const { rateByCcy } of perPortfolio) {
+            for (const [k, v] of Object.entries(rateByCcy ?? {})) displayRates.set(k, Number(v));
+          }
           const idTax = computeIndonesianFinalTaxFromTradeLog({
             tradeLog: mergedLog,
             coreTxns: allCoreTxns,
             year,
             metaById: meta,
+            displayCurrency: display,
+            fxRates: displayRates,
           });
           return {
             holder: {

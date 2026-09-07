@@ -194,7 +194,7 @@ export async function loadTaxYearDetail(
       if (pfs.length === 0) return;
 
       try {
-        const [tradeLog, incomeLists, idTaxByPf] = await Promise.all([
+        const [tradeLog, incomeLists, idTaxByPortfolio, idTaxByHolder] = await Promise.all([
           selected
             ? api.getTrades(selected.id, "fifo")
             : api.getNetWorthTrades("fifo", undefined, holderId),
@@ -202,9 +202,24 @@ export async function loadTaxYearDetail(
           regime === "ID" && selected
             ? api.getPortfolioTax(selected.id, targetYear)
             : Promise.resolve<PortfolioTaxSummary | null>(null),
+          // W2 fix (re-review round 2): the ID tax payload also needs to surface in the
+          // default aggregate (no-selection) scope. /networth/tax returns one entry per
+          // holder with indonesianFinalTax already populated under ID. Without this, the
+          // ID detail section silently zeroed for the most common view.
+          regime === "ID" && !selected
+            ? api.getNetworthTax(
+                targetYear,
+                holderId === ID_ALL_PORTFOLIOS_ID ? undefined : holderId,
+              )
+            : Promise.resolve<TaxSummaryHolder[] | null>(null),
         ]);
+        const idTaxFromHolder = !selected
+          ? idTaxByHolder?.find((h) => h.holder.id === holderId)
+          : undefined;
         const apiIdTax: IndonesianFinalTaxLike | undefined =
-          idTaxByPf?.indonesianFinalTax ?? undefined;
+          (idTaxByPortfolio?.indonesianFinalTax as IndonesianFinalTaxLike | undefined) ??
+          (idTaxFromHolder?.indonesianFinalTax as IndonesianFinalTaxLike | undefined) ??
+          undefined;
 
         const disposalGroups = new Map<
           string,

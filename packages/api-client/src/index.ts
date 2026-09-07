@@ -401,33 +401,38 @@ export interface PortfolioTaxSummary {
   tfRatesByInstrument?: Record<string, string>;
   /** Indonesian final-tax payload (ID-only). Omitted under the DE regime. Source of truth:
    *  computed server-side — the web tier does NOT recompute this. */
-  indonesianFinalTax?: {
-    disposals: {
-      symbol: string;
-      when: string;
-      proceeds: string;
-      tax: string;
-      instrumentId?: string | null;
-      quantity?: string;
-      avgBuyPrice?: string;
-      sellPrice?: string;
-      lots?: unknown[];
-    }[];
-    totalProceeds: string;
-    totalSalesTax: string;
-    dividends: {
-      symbol: string;
-      currency: string;
-      gross: string;
-      tax: string;
-      net: string;
-    }[];
-    totalDividendGross: string;
-    totalDividendTax: string;
-    totalDividendNet: string;
-    estimatedTax: string;
-    byYear: { year: number; realized: string; dividends: string; tax: string }[];
-  };
+  indonesianFinalTax?: IndonesianFinalTax;
+}
+
+/** Canonical Indonesian final-tax payload shape, shared by {@link PortfolioTaxSummary}
+ *  and {@link TaxSummaryHolder}. Re-exported from `@portfolio/api-client` so the web tier
+ *  can type its `indonesianFinalTax` field without `as unknown as` casts. */
+export interface IndonesianFinalTax {
+  disposals: {
+    symbol: string;
+    when: string;
+    proceeds: string;
+    tax: string;
+    instrumentId?: string | null;
+    quantity?: string;
+    avgBuyPrice?: string;
+    sellPrice?: string;
+    lots?: unknown[];
+  }[];
+  totalProceeds: string;
+  totalSalesTax: string;
+  dividends: {
+    symbol: string;
+    currency: string;
+    gross: string;
+    tax: string;
+    net: string;
+  }[];
+  totalDividendGross: string;
+  totalDividendTax: string;
+  totalDividendNet: string;
+  estimatedTax: string;
+  byYear: { year: number; realized: string; dividends: string; tax: string }[];
 }
 
 /** One holder's entry in the GET /networth/tax response. */
@@ -458,7 +463,7 @@ export interface TaxSummaryHolder {
   /** See {@link PortfolioTaxSummary.tfRatesByInstrument}'s doc comment. Omitted under ID. */
   tfRatesByInstrument?: Record<string, string>;
   /** Indonesian final-tax breakdown (ID-only). Omitted under DE. */
-  indonesianFinalTax?: unknown;
+  indonesianFinalTax?: IndonesianFinalTax;
 }
 
 export interface Portfolio {

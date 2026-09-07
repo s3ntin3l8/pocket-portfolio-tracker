@@ -224,9 +224,27 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   coreTxns: CoreTransaction[];
   year: number;
   metaById: Map<string, InstrumentMeta>;
+  /** User's display currency. Dividends are converted from their native currency to
+   *  this before being summed — otherwise a EUR depot + IDR user would sum EUR figures
+   *  and label them IDR (the response's `currency` field). */
+  displayCurrency: string;
+  /** Native-currency → displayCurrency conversion rates, keyed by the native currency.
+   *  Obtained from `getFxRates(app.db, ccys, display)` in the calling route. */
+  fxRates: Map<string, number>;
 }): IndonesianFinalTax {
-  const { tradeLog, coreTxns, year, metaById } = input;
+  const { tradeLog, coreTxns, year, metaById, displayCurrency, fxRates } = input;
   const ZERO = "0";
+
+  // Native-currency → display-currency. Returns the same number when source currency
+  // is already the display currency (or no rate is registered — we log a fallback rate
+  // of 1 and accept the imprecision on that one bucket rather than throwing on the
+  // entire report).
+  const fxTo = (amount: number, fromCurrency: string): number => {
+    if (fromCurrency === displayCurrency) return amount;
+    const rate = fxRates.get(fromCurrency);
+    if (rate === undefined) return amount;
+    return amount * rate;
+  };
 
   // Disposals for the selected year, grouped per (instrumentId, sellDate).
   type DisposalGroup = {
@@ -288,8 +306,13 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     // is then net + broker-recorded withholding (so the ID 10% sits on the gross figure,
     // not the net received). The ID tax function deliberately re-derives its own 10% on
     // this gross and ignores the broker's withholding tag.
-    const net = Number(cashFlow({ ...t, type: t.type as CoreTransaction["type"] }).toString());
-    const tax = Number((t as { tax?: string | null }).tax ?? "0");
+    // Convert each income row's net + tax to display currency so the sum doesn't mix
+    // native-currency figures under the response's display label (hermes re-review warning).
+    const net = fxTo(
+      Number(cashFlow({ ...t, type: t.type as CoreTransaction["type"] }).toString()),
+      t.currency,
+    );
+    const tax = fxTo(Number((t as { tax?: string | null }).tax ?? "0"), t.currency);
     const gross = net + tax;
     const existing = divBuckets.get(key);
     if (existing) {
@@ -306,6 +329,8 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   }));
 
   // Per-year proceeds from the trade log legs (across ALL years, for the byYear table).
+  // TradeLog itself is already in display currency (built via `mergeTradeLogs(logs, display)`),
+  // so byYear rows stay in display currency end-to-end — no FX pass needed here.
   const proceedsByYearMap = new Map<number, number>();
   for (const t of tradeLog.trades) {
     for (const l of t.legs) {
@@ -322,7 +347,9 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   ]);
   const byYear: IdYearInput[] = [...allYears].map((y) => {
     const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
-    const dividendGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax) : 0;
+    // tradeLog.dividendsByYear is in display currency (same as the per-holder divBuckets
+    // conversion above). Add amount + tax to recover gross.
+    const dividendGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax ?? "0") : 0;
     const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
     return {
       year: y,

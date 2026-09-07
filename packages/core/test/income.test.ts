@@ -264,6 +264,8 @@ describe("aggregateIncome", () => {
     // scaled TTM = 300 × (200/100) = 600 IDR; forecastNextYear should mirror this.
     expect(result.forecastNextYear).toBe("600");
     expect(result.ttmDividendsOnPosition).toBe("600");
+    // Historical track is also exposed (unscaled = 300).
+    expect(result.ttmDividendsHistorical).toBe("300");
   });
 });
 
