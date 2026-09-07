@@ -20,8 +20,17 @@ export function enrichContributions(
   flows: CashFlowPoint[],
   birthYear: number | null = null,
   portfolioType: "standard" | "child" = "standard",
-  opts: { totalReturn?: boolean; retirementAge?: number | null } = {},
+  opts: {
+    totalReturn?: boolean;
+    retirementAge?: number | null;
+    boundary?: "inside" | "outside";
+    monthlyContribution?: string;
+  } = {},
 ) {
+  const boundary = opts.boundary ?? "outside";
+  const isOutside = boundary === "outside";
+  const budgetPlanMissing = isOutside && opts.monthlyContribution === undefined;
+
   // Money-as-Decimal: every money reduction/compare here runs through Decimal so
   // a long flow list can't accumulate float drift before the pct ratio is
   // computed. The two ratio outputs (simpleGainPct, totalReturnPct) stay as
@@ -61,6 +70,7 @@ export function enrichContributions(
     birthYear,
     portfolioType,
     retirementAge: opts.retirementAge ?? null,
+    requiresBudgetPlan: budgetPlanMissing,
     asOf: asOf.toISOString(),
   };
 }
@@ -72,8 +82,9 @@ export async function buildContributions(
   display: string,
   birthYear: number | null = null,
   portfolioType: "standard" | "child" = "standard",
-  boundary: "inside" | "outside" = "inside",
+  boundary: "inside" | "outside" = "outside",
   retirementAge: number | null = null,
+  monthlyContribution?: string,
 ) {
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
@@ -88,6 +99,8 @@ export async function buildContributions(
   return enrichContributions(stats, summary.netWorth, flows, birthYear, portfolioType, {
     totalReturn: boundary === "outside",
     retirementAge,
+    boundary,
+    monthlyContribution,
   });
 }
 
