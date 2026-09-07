@@ -10,7 +10,7 @@ jobs:
   test-node:
     permissions:
       contents: read
-    uses: s3ntin3l8/.github/.github/workflows/ci-node.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/ci-node.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
     with:
       node-version: "26"
       # Root scripts fan out across all workspaces (Turbo for build/lint/typecheck,
@@ -39,8 +39,8 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
       - name: Install test deps
@@ -59,7 +59,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
     with:
       image-name: "s3ntin3l8/${{ github.event.repository.name }}"
       push-edge: ${{ github.event_name == 'push' }}

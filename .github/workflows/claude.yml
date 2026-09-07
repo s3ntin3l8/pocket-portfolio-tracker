@@ -24,7 +24,7 @@ jobs:
       issues: read
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
-    uses: s3ntin3l8/.github/.github/workflows/claude-code.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/claude-code.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
     with:
       setup-node: true
       build-tools: '"Bash(npm run lint*)" "Bash(npm run typecheck*)" "Bash(npm run test*)" "Bash(npm test*)" "Bash(npm ci*)"'

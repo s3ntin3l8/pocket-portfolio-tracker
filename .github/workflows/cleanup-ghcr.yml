@@ -9,6 +9,6 @@ jobs:
   cleanup:
     permissions:
       packages: write
-    uses: s3ntin3l8/.github/.github/workflows/ghcr-cleanup.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/ghcr-cleanup.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
     with:
       package-name: "${{ github.event.repository.name }}"
