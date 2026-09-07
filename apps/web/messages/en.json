@@ -502,7 +502,7 @@
     "calendarEmptyTitle": "No upcoming payments",
     "calendarEmptyBody": "Once projections or announcements are available, the calendar will show what's coming.",
     "calendarDayEvents": "{count, plural, one {# payment} other {# payments}}",
-    "calendarDayTotal": "Total",
+    "calendarDayMixedCurrencies": "Multiple currencies",
     "calendarMore": "+{count} more",
     "calendarMoreAria": "and {count} more payments",
     "calendarJumpToday": "Jump to today",

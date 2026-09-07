@@ -3,25 +3,28 @@ import { buildMonthGrid } from "../src/lib/calendar";
 
 describe("buildMonthGrid", () => {
   it("September 2026 — starts on Tuesday, renders 5 weeks", () => {
-    // 2026-09-01 is a Tuesday. Mon-start → 6 spillover cells → first row is empty.
+    // 2026-09-01 is a Tuesday. en-US week-info's real first day is Sunday (ICU
+    // `getWeekInfo().firstDay === 7`) → 2 spillover cells → first row starts
+    // on the preceding Sunday.
     const grid = buildMonthGrid(2026, 8, "en-US");
-    expect(grid.weekdayLabels).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+    expect(grid.weekdayLabels).toEqual(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
     expect(grid.days).toHaveLength(35);
-    expect(grid.days[0]).toMatchObject({ dateKey: "2026-08-31", dayOfMonth: 31, inMonth: false });
-    expect(grid.days[5]).toMatchObject({ dateKey: "2026-09-05", dayOfMonth: 5, inMonth: true });
-    expect(grid.days[34]).toMatchObject({ dateKey: "2026-10-04", dayOfMonth: 4, inMonth: false });
+    expect(grid.days[0]).toMatchObject({ dateKey: "2026-08-30", dayOfMonth: 30, inMonth: false });
+    expect(grid.days[6]).toMatchObject({ dateKey: "2026-09-05", dayOfMonth: 5, inMonth: true });
+    expect(grid.days[34]).toMatchObject({ dateKey: "2026-10-03", dayOfMonth: 3, inMonth: false });
     // No today in this grid (today = default new Date() may be 2026-09-06 in this
     // run; let's only assert the in-month day-cell for the 1st).
     const first = grid.days.find((c) => c.dateKey === "2026-09-01");
     expect(first).toMatchObject({ dayOfMonth: 1, inMonth: true, isToday: false });
   });
 
-  it("February 2027 — starts on Monday, renders 4 weeks (28 days)", () => {
-    // 2027-02-01 is a Monday → no spillover prefix → 4-row, 28-cell grid.
-    const grid = buildMonthGrid(2027, 1, "en-US");
+  it("February 2026 — starts on Sunday, renders 4 weeks (28 days)", () => {
+    // 2026-02-01 is a Sunday, which is en-US's real week start → no spillover
+    // prefix → 4-row, 28-cell grid.
+    const grid = buildMonthGrid(2026, 1, "en-US");
     expect(grid.days).toHaveLength(28);
-    expect(grid.days[0]).toMatchObject({ dateKey: "2027-02-01", dayOfMonth: 1, inMonth: true });
-    expect(grid.days[27]).toMatchObject({ dateKey: "2027-02-28", dayOfMonth: 28, inMonth: true });
+    expect(grid.days[0]).toMatchObject({ dateKey: "2026-02-01", dayOfMonth: 1, inMonth: true });
+    expect(grid.days[27]).toMatchObject({ dateKey: "2026-02-28", dayOfMonth: 28, inMonth: true });
   });
 
   it("leap year February 2028 — has 29 days, renders 5 weeks", () => {
@@ -47,9 +50,8 @@ describe("buildMonthGrid", () => {
   });
 
   it("Sunday-start locale (en-US Sun=0) shifts the weekday labels", () => {
-    // en-US default in `Intl.Locale` is Monday for weekInfo on ICU 73+ — use an
-    // explicit fallback by passing through. The contract is only that labels exist
-    // and are unique; we'll just assert the array length + uniqueness.
+    // en-US's real ICU week info (`getWeekInfo().firstDay === 7`) starts the week
+    // on Sunday. The contract here is only that labels exist and are unique.
     const grid = buildMonthGrid(2026, 8, "en-US");
     expect(grid.weekdayLabels).toHaveLength(7);
     expect(new Set(grid.weekdayLabels).size).toBe(7);

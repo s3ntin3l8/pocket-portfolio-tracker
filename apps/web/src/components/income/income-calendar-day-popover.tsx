@@ -4,6 +4,7 @@ import { useTranslations, useLocale } from "next-intl";
 import type { UpcomingPayment } from "@portfolio/api-client";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { formatMoney } from "@/lib/utils";
+import { paymentLabel } from "./income-calendar-day";
 
 const STATUS_TONES: Record<UpcomingPayment["status"], { fg: string; bg: string }> = {
   scheduled: { fg: "#0D9488", bg: "rgba(13,148,136,.14)" },
@@ -43,6 +44,14 @@ export function IncomeCalendarDayPopoverContent({
   const sorted = [...events].sort((a, b) => Number(b.amount) - Number(a.amount));
   const total = events.reduce((acc, e) => acc + Number(e.amount), 0);
   const mixedCurrencies = new Set(events.map((e) => e.currency)).size > 1;
+  // `events[0].currency` — not the portfolio's display `currency` — because `total` is
+  // a raw sum of each event's *native*-currency `amount` (never FX-converted); labeling
+  // it with the display currency would misrepresent the value whenever an instrument's
+  // native currency differs from the portfolio's display currency, even though every
+  // event on this day happens to share one (non-display) currency. `currency` is only
+  // used as a defensive fallback — `events` is always non-empty here (see the
+  // `interactive` guard in `IncomeCalendarDay`, the only caller).
+  const totalCurrency = events[0]?.currency ?? currency;
 
   return (
     <div className="flex max-h-[60vh] flex-col">
@@ -52,13 +61,15 @@ export function IncomeCalendarDayPopoverContent({
           {t("calendarDayEvents", { count: events.length })}
           {" · "}
           <span className="tabular text-foreground">
-            {mixedCurrencies ? t("calendarDayTotal") : formatMoney(total, currency, locale)}
+            {mixedCurrencies
+              ? t("calendarDayMixedCurrencies")
+              : formatMoney(total, totalCurrency, locale)}
           </span>
         </p>
       </header>
       <ul className="flex-1 overflow-y-auto px-1.5 py-1.5">
         {sorted.map((e, i) => {
-          const label = e.displayName ?? e.name ?? e.symbol ?? "—";
+          const label = paymentLabel(e);
           const tone = STATUS_TONES[e.status];
           const statusKey =
             `calendarLegend${e.status.charAt(0).toUpperCase() + e.status.slice(1)}` as const;

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { toDateKey } from "@portfolio/core";
 import type { UpcomingPayment } from "@portfolio/api-client";
 import { buildMonthGrid } from "@/lib/calendar";
 import { IncomeCalendarHeader } from "./income-calendar-header";
@@ -41,8 +42,9 @@ export function IncomeCalendar({
     if (upcoming.length === 0) {
       return { year: today.getUTCFullYear(), month: today.getUTCMonth() };
     }
-    const earliest = [...upcoming].sort((a, b) => a.date.localeCompare(b.date))[0];
-    const [y, m] = earliest.date.split("-").map(Number);
+    // `upcoming` is already sorted ascending by date server-side
+    // (income-helpers.ts's `buildIncomeStats`), so the first element is the earliest.
+    const [y, m] = upcoming[0].date.split("-").map(Number);
     return { year: y, month: m - 1 };
   });
 
@@ -75,7 +77,7 @@ export function IncomeCalendar({
   }, [upcoming]);
 
   const today = new Date();
-  const todayKey = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
+  const todayKey = toDateKey(today);
   const isCurrentMonth =
     today.getUTCFullYear() === viewMonth.year && today.getUTCMonth() === viewMonth.month;
 
@@ -145,7 +147,10 @@ export function IncomeCalendar({
             <span
               className="size-2 rounded-[3px]"
               style={{
-                backgroundColor: "rgba(13,148,136,.16)",
+                // Matches STATUS_TONES.scheduled's bg in income-calendar-day-popover.tsx —
+                // keep these in sync (no shared constant yet) so the legend swatch and the
+                // popover's status badge for the same status never drift apart.
+                backgroundColor: "rgba(13,148,136,.14)",
                 border: "1.5px solid #0D9488",
               }}
             />

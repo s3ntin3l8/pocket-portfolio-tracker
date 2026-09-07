@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { UpcomingPayment } from "@portfolio/api-client";
 import { InstrumentLogo } from "@/components/instrument-logo";
@@ -13,12 +14,19 @@ import { IncomeCalendarDayPopoverContent } from "./income-calendar-day-popover";
  *  24×24 logos — a third logo lands cleanly when cells stretch on wide viewports. */
 const INLINE_LOGO_LIMIT = 3;
 
+/** Best-available display label for a payment row — clean display name, falling back
+ *  to the raw instrument name, then the bare ticker. Shared by the day cell's logo
+ *  and the per-day popover so the two never drift on which field wins. */
+export function paymentLabel(payment: Pick<UpcomingPayment, "displayName" | "name" | "symbol">) {
+  return payment.displayName ?? payment.name ?? payment.symbol ?? "—";
+}
+
 /** Compact 24×24 wrapper around `<InstrumentLogo>` for use inside calendar day cells.
  *  Pumps through the existing `className` so it shrinks the underlying 38×38 frame
  *  plus the rounded mask; keeps full logo/monogram-fallback logic from the canonical
  *  component. */
 function CalendarLogo({ payment }: { payment: UpcomingPayment }) {
-  const label = payment.displayName ?? payment.name ?? payment.symbol ?? "—";
+  const label = paymentLabel(payment);
   return (
     <InstrumentLogo
       label={label}
@@ -48,12 +56,19 @@ export function IncomeCalendarDay({
 }) {
   const t = useTranslations("Income");
   const locale = useLocale();
-  const dateLabel = new Intl.DateTimeFormat(locale, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${cell.dateKey}T00:00:00Z`));
+  // Memoized on [locale, cell.dateKey] rather than recomputed on every render — a
+  // cell's own popover open/close still re-renders this component, and a stable
+  // date shouldn't pay for a fresh Intl.DateTimeFormat + format() each time.
+  const dateLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(`${cell.dateKey}T00:00:00Z`)),
+    [locale, cell.dateKey],
+  );
 
   const visible = events.slice(0, INLINE_LOGO_LIMIT);
   const overflow = events.length - visible.length;
@@ -119,14 +134,10 @@ export function IncomeCalendarDay({
           aria-label={ariaLabel}
           className={cn(cellClass, "cursor-pointer")}
         >
-          <div className="flex items-center justify-between">
-            {dayNumber}
-            {overflow > 0 && (
-              <span className="rounded-full bg-muted px-1.5 text-[9px] font-bold tabular text-text-2 sm:hidden">
-                +{overflow}
-              </span>
-            )}
-          </div>
+          {/* The day-number row only needs the number itself — `body` below already
+              renders the "+N more" overflow chip at every breakpoint, so a second,
+              compact overflow indicator here would just duplicate the same count. */}
+          <div className="flex items-center justify-between">{dayNumber}</div>
           {body}
         </button>
       </PopoverTrigger>

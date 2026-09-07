@@ -8,6 +8,8 @@
  * `UpcomingPayment.date` shape the API returns is date-key, not instant).
  */
 
+import { toDateKey } from "@portfolio/core";
+
 export interface DayCell {
   /** YYYY-MM-DD, UTC. Identical to `UpcomingPayment.date`, so days can be matched
    *  without re-parsing. */
@@ -30,33 +32,31 @@ export interface MonthGrid {
   todayIndex: number;
 }
 
-/** Resolve the week start [0..6] for a locale. Defaults to Monday (1) when the host
- *  ICU doesn't expose `getWeekInfo` (rare — Node ≥ 22 always does). */
+/** Resolve the week start [0..6] (Sun=0..Sat=6, matching `Date.getUTCDay()`) for a
+ *  locale. Defaults to Monday (1) when the host ICU doesn't expose `getWeekInfo`
+ *  (rare — Node ≥ 22 always does). */
 function firstDayOfWeek(locale: string): number {
   try {
     // `getWeekInfo` is part of ICU 73+ / ES2025 but not in the @types/web `lib`
     // that's pinned to ES2022 by this app's tsconfig — narrow-via-cast so we
     // degrade gracefully to a Monday start when the runtime doesn't expose it.
+    // The real ICU shape is `{ firstDay, weekend, minimalDays }` with `firstDay`
+    // 1 (Monday) through 7 (Sunday) — NOT `weekStart` (verified against Node's
+    // built-in `Intl.Locale.prototype.getWeekInfo`).
     type LocaleWithWeekInfo = Intl.Locale & {
-      getWeekInfo?: () => { weekStart: number; weekend: readonly number[] };
+      getWeekInfo?: () => { firstDay: number; weekend: readonly number[] };
     };
     const info = (new Intl.Locale(locale) as LocaleWithWeekInfo).getWeekInfo?.();
-    if (info && typeof info.weekStart === "number") return info.weekStart % 7;
+    if (info && typeof info.firstDay === "number") return info.firstDay % 7;
   } catch {
     /* fall through */
   }
   return 1; // Mon
 }
 
-/** Pad a 0–9 number to two digits. */
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
-
-/** Build a YYYY-MM-DD key in UTC for the given year/month/day — matches
- *  `toDateKey()` in `packages/core/src/date-utils.ts`. */
+/** Build a YYYY-MM-DD key in UTC for the given year/month/day. */
 function utcDateKey(year: number, month: number, day: number): string {
-  return `${year}-${pad2(month + 1)}-${pad2(day)}`;
+  return toDateKey(new Date(Date.UTC(year, month, day)));
 }
 
 /**
@@ -76,14 +76,17 @@ export function buildMonthGrid(
   locale: string,
   today: Date = new Date(),
 ): MonthGrid {
-  const todayKey = `${today.getUTCFullYear()}-${pad2(today.getUTCMonth() + 1)}-${pad2(today.getUTCDate())}`;
+  const todayKey = toDateKey(today);
   const weekStart = firstDayOfWeek(locale);
+  // One formatter reused across all 7 labels instead of constructing a fresh
+  // Intl.DateTimeFormat per iteration.
+  const weekdayFormatter = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
   const weekdayLabels = Array.from({ length: 7 }, (_, i) => {
     // Pick a known Sunday so we can shift to whatever weekday is at position `i`
     // relative to the locale's week start. Sunday 2024-01-07 sits at JS getUTCDay=0.
     const dow = (weekStart + i) % 7;
     const ref = new Date(Date.UTC(2024, 0, 7 + dow));
-    return new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(ref);
+    return weekdayFormatter.format(ref);
   });
 
   // First-of-month at the visible month's week-start.
@@ -96,7 +99,6 @@ export function buildMonthGrid(
   // month doesn't end on a 5-row grid when 4 would have been enough. The 6-row max
   // is needed for any month that doesn't start on the week-start day.
   const cells: DayCell[] = [];
-  let todayIndex = -1;
   for (let i = 0; i < 42; i += 1) {
     const dayOffset = i - offset;
     const cellDate = new Date(Date.UTC(year, monthIndex, 1 + dayOffset));
@@ -104,13 +106,11 @@ export function buildMonthGrid(
     const cellMonth = cellDate.getUTCMonth();
     const cellDay = cellDate.getUTCDate();
     const dateKey = utcDateKey(cellYear, cellMonth, cellDay);
-    const isToday = dateKey === todayKey;
-    if (isToday) todayIndex = i;
     cells.push({
       dateKey,
       dayOfMonth: cellDay,
       inMonth: cellMonth === monthIndex,
-      isToday,
+      isToday: dateKey === todayKey,
     });
   }
   // Trim trailing all-out-of-month weeks so short months (Feb, 30-day months that
@@ -121,6 +121,10 @@ export function buildMonthGrid(
     if (lastWeek.every((c) => !c.inMonth)) cells.splice(-7, 7);
     else break;
   }
+  // Computed after trimming (rather than tracked during the build loop above) so a
+  // trimmed trailing week can never leave `todayIndex` pointing at a spliced-out
+  // cell or a now-shifted index.
+  const todayIndex = cells.findIndex((c) => c.isToday);
 
   return { weekdayLabels, days: cells, todayIndex };
 }

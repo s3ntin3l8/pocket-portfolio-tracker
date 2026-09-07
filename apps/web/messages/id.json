@@ -502,7 +502,7 @@
     "calendarEmptyTitle": "Belum ada pembayaran yang akan datang",
     "calendarEmptyBody": "Kalender akan menampilkan proyeksi dan pengumuman dividen begitu data tersedia.",
     "calendarDayEvents": "{count, plural, other {# pembayaran}}",
-    "calendarDayTotal": "Total",
+    "calendarDayMixedCurrencies": "Beberapa mata uang",
     "calendarMore": "+{count} lagi",
     "calendarMoreAria": "dan {count} pembayaran lainnya",
     "calendarJumpToday": "Loncat ke hari ini",
