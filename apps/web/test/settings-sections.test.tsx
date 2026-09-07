@@ -67,7 +67,7 @@ describe("InvestingSection", () => {
         dashboardKpis: null,
         taxRegime: "ID",
         costBasisMode: "total_paid",
-        benchmarkSymbol: null,
+        benchmarkSymbols: [],
         riskFreeRate: null,
         retirementAge: null,
       },

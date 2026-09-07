@@ -1,5 +1,5 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { benchmarkPrices, userPreferences } from "@portfolio/db";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { benchmarkPrices, userBenchmarkSymbols } from "@portfolio/db";
 import { chainIndex, type DailyValueFlow } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
@@ -15,31 +15,95 @@ export interface BenchmarkConfig {
   currency: string;
 }
 
+/** A user-selected reference index, as read from the `user_benchmark_symbols` table. */
+export interface UserBenchmarkSymbol {
+  symbol: string;
+  displayName: string;
+  displayOrder: number;
+  /** Inferred from the most recent `benchmark_prices` row, or unset if no data yet. */
+  currency: string | null;
+}
+
 const DEFAULT_BENCHMARK_SYMBOL = "^GSPC";
 const DEFAULT_BENCHMARK_CURRENCY = "USD";
 
+/**
+ * Reads the user's selected reference indices in `displayOrder`. If the user
+ * has none (shouldn't happen post-migration, but defensive), returns the S&P
+ * 500 default so downstream code can always assume at least one symbol.
+ */
+export async function getUserBenchmarkSymbols(
+  db: DB,
+  userId: string,
+): Promise<UserBenchmarkSymbol[]> {
+  const rows = await db
+    .select({
+      symbol: userBenchmarkSymbols.symbol,
+      displayName: userBenchmarkSymbols.displayName,
+      displayOrder: userBenchmarkSymbols.displayOrder,
+    })
+    .from(userBenchmarkSymbols)
+    .where(eq(userBenchmarkSymbols.userId, userId))
+    .orderBy(asc(userBenchmarkSymbols.displayOrder));
+
+  if (rows.length === 0) {
+    return [
+      {
+        symbol: DEFAULT_BENCHMARK_SYMBOL,
+        displayName: "S&P 500",
+        displayOrder: 0,
+        currency: DEFAULT_BENCHMARK_CURRENCY,
+      },
+    ];
+  }
+
+  // One round-trip to fetch the currency for each unique symbol.
+  const symbols = rows.map((r) => r.symbol);
+  const latestRows = await db
+    .selectDistinctOn([benchmarkPrices.symbol], {
+      symbol: benchmarkPrices.symbol,
+      currency: benchmarkPrices.currency,
+    })
+    .from(benchmarkPrices)
+    .where(and(eq(benchmarkPrices.userId, userId), inArray(benchmarkPrices.symbol, symbols)))
+    .orderBy(asc(benchmarkPrices.symbol), desc(benchmarkPrices.date));
+
+  const currencyBySymbol = new Map(latestRows.map((r) => [r.symbol, r.currency]));
+  return rows.map((r) => ({
+    ...r,
+    currency: currencyBySymbol.get(r.symbol) ?? null,
+  }));
+}
+
+/**
+ * Convenience: the primary (displayOrder=0) benchmark, used by the existing
+ * BenchmarkCard (active return / tracking error / correlation). Returns the
+ * symbol + its inferred currency. The legacy `userPreferences.benchmarkSymbol`
+ * column is gone; this function now reads from the new table.
+ */
 export async function getUserBenchmarkConfig(
   db: DB,
   userId: string,
   _displayCurrency: string,
 ): Promise<{ symbol: string; currency: string }> {
-  const [prefs] = await db
-    .select({ symbol: userPreferences.benchmarkSymbol })
-    .from(userPreferences)
-    .where(eq(userPreferences.userId, userId))
-    .limit(1);
-  const symbol = prefs?.symbol || DEFAULT_BENCHMARK_SYMBOL;
-
-  // Infer the benchmark's native currency from stored price data (e.g. ^GDAXI → EUR,
-  // ^N225 → JPY). If no prices have been fetched yet, fall back to the default.
-  const [priceRow] = await db
-    .select({ currency: benchmarkPrices.currency })
-    .from(benchmarkPrices)
-    .where(and(eq(benchmarkPrices.userId, userId), eq(benchmarkPrices.symbol, symbol)))
+  const [primary] = await db
+    .select({ symbol: userBenchmarkSymbols.symbol, currency: benchmarkPrices.currency })
+    .from(userBenchmarkSymbols)
+    .leftJoin(
+      benchmarkPrices,
+      and(
+        eq(benchmarkPrices.userId, userBenchmarkSymbols.userId),
+        eq(benchmarkPrices.symbol, userBenchmarkSymbols.symbol),
+      ),
+    )
+    .where(and(eq(userBenchmarkSymbols.userId, userId), eq(userBenchmarkSymbols.displayOrder, 0)))
     .orderBy(desc(benchmarkPrices.date))
     .limit(1);
 
-  return { symbol, currency: priceRow?.currency ?? DEFAULT_BENCHMARK_CURRENCY };
+  return {
+    symbol: primary?.symbol ?? DEFAULT_BENCHMARK_SYMBOL,
+    currency: primary?.currency ?? DEFAULT_BENCHMARK_CURRENCY,
+  };
 }
 
 export async function fetchBenchmarkPrices(
@@ -108,6 +172,44 @@ export async function getBenchmarkPrices(
     map.set(r.date, r.close);
   }
   return map;
+}
+
+/**
+ * Multi-symbol variant: returns one Map<date, close> per symbol. Single
+ * round-trip; empty symbols are skipped (not represented in the result).
+ */
+export async function getBenchmarkPricesMulti(
+  db: DB,
+  userId: string,
+  symbols: string[],
+  dates: string[],
+): Promise<Map<string, Map<string, string>>> {
+  const out = new Map<string, Map<string, string>>();
+  if (symbols.length === 0 || dates.length === 0) return out;
+  const rows = await db
+    .select({
+      symbol: benchmarkPrices.symbol,
+      date: benchmarkPrices.date,
+      close: benchmarkPrices.close,
+    })
+    .from(benchmarkPrices)
+    .where(
+      and(
+        eq(benchmarkPrices.userId, userId),
+        inArray(benchmarkPrices.symbol, symbols),
+        inArray(benchmarkPrices.date, dates),
+      ),
+    )
+    .orderBy(benchmarkPrices.date);
+  for (const r of rows) {
+    let inner = out.get(r.symbol);
+    if (!inner) {
+      inner = new Map();
+      out.set(r.symbol, inner);
+    }
+    inner.set(r.date, r.close);
+  }
+  return out;
 }
 
 export function computeBenchmarkIndex(

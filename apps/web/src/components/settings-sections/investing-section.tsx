@@ -81,7 +81,7 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
         <Card>
           <CardContent className="p-4">
             <BenchmarkSettingsForm
-              symbol={prefs?.benchmarkSymbol ?? null}
+              symbols={prefs?.benchmarkSymbols ?? []}
               rate={prefs?.riskFreeRate ?? null}
             />
           </CardContent>

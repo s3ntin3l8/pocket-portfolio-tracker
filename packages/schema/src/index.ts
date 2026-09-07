@@ -12,4 +12,5 @@ export * from "./schema/gold-contract.js";
 export * from "./schema/allocation.js";
 export * from "./schema/search.js";
 export * from "./schema/preferences.js";
+export { BENCHMARK_LABELS, benchmarkLabel } from "./benchmark-labels.js";
 export * from "./schema/document.js";

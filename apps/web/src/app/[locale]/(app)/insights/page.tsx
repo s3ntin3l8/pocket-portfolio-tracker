@@ -9,6 +9,7 @@ import { StreaksCard } from "@/components/insights/streaks-card";
 import { BenchmarkCard } from "@/components/insights/benchmark-card";
 import { ConcentrationTrendCard } from "@/components/insights/concentration-trend-card";
 import { CompositionCard } from "@/components/insights/composition-card";
+import { YearlyReturnsCard } from "@/components/insights/yearly-returns-card";
 import {
   loadNetWorth,
   loadNetWorthHistory,
@@ -222,6 +223,15 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         />
       )}
 
+      {insightsData && insightsData.yearlyReturns.length > 0 && (
+        <YearlyReturnsCard
+          rows={insightsData.yearlyReturns}
+          symbols={prefs?.benchmarkSymbols ?? []}
+          currency={summary.displayCurrency}
+          locale={locale}
+        />
+      )}
+
       {insightsData && (
         <section className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -230,7 +240,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
             <StreaksCard streaks={insightsData.streaks} locale={locale} />
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BenchmarkCard benchmark={insightsData.benchmark ?? null} locale={locale} />
+            <BenchmarkCard
+              benchmark={insightsData.benchmark ?? null}
+              symbols={prefs?.benchmarkSymbols ?? []}
+              locale={locale}
+            />
             {insightsData.concentrationTrend.length > 0 && (
               <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
             )}

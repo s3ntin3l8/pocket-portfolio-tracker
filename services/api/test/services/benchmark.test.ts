@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { computeActiveReturn, getUserBenchmarkConfig } from "../../src/services/benchmark.js";
+import {
+  computeActiveReturn,
+  getUserBenchmarkConfig,
+  getUserBenchmarkSymbols,
+  getBenchmarkPricesMulti,
+} from "../../src/services/benchmark.js";
 import { buildApp } from "../../src/app.js";
-import { users, userPreferences, benchmarkPrices } from "@portfolio/db";
+import { users, userBenchmarkSymbols, benchmarkPrices } from "@portfolio/db";
 
 const TEST_KEY = new TextEncoder().encode("test-key");
 
@@ -170,7 +175,12 @@ describe("getUserBenchmarkConfig", () => {
       })
       .returning();
     if (symbol) {
-      await app.db.insert(userPreferences).values({ userId: u.id, benchmarkSymbol: symbol });
+      await app.db.insert(userBenchmarkSymbols).values({
+        userId: u.id,
+        symbol,
+        displayName: symbol,
+        displayOrder: 0,
+      });
     }
     return u;
   }
@@ -253,6 +263,143 @@ describe("getUserBenchmarkConfig", () => {
       ]);
       expect(configA.currency).toBe("EUR");
       expect(configB.currency).toBe("EUR");
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("getUserBenchmarkSymbols", () => {
+  async function seedUserWithBenchmarks(
+    app: Awaited<ReturnType<typeof buildApp>>,
+    entries: { symbol: string; displayName?: string; displayOrder: number }[],
+  ) {
+    const authSub = crypto.randomUUID();
+    const [u] = await app.db
+      .insert(users)
+      .values({ authSub, email: `${authSub}@example.com` })
+      .returning();
+    for (const e of entries) {
+      await app.db.insert(userBenchmarkSymbols).values({
+        userId: u.id,
+        symbol: e.symbol,
+        displayName: e.displayName ?? e.symbol,
+        displayOrder: e.displayOrder,
+      });
+    }
+    return u;
+  }
+
+  it("returns the user's symbols in displayOrder, with inferred currency per symbol", async () => {
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      const u = await seedUserWithBenchmarks(app, [
+        { symbol: "^JKSE", displayName: "IDX Composite", displayOrder: 1 },
+        { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 },
+      ]);
+      await app.db.insert(benchmarkPrices).values({
+        userId: u.id,
+        symbol: "^GSPC",
+        date: "2026-01-15",
+        close: "4500",
+        currency: "USD",
+        source: "yahoo",
+      });
+      await app.db.insert(benchmarkPrices).values({
+        userId: u.id,
+        symbol: "^JKSE",
+        date: "2026-01-15",
+        close: "7200",
+        currency: "IDR",
+        source: "yahoo",
+      });
+      const got = await getUserBenchmarkSymbols(app.db, u.id);
+      expect(got.map((s) => s.symbol)).toEqual(["^GSPC", "^JKSE"]);
+      expect(got[0].currency).toBe("USD");
+      expect(got[1].currency).toBe("IDR");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns the ^GSPC default for a user with no rows (defensive)", async () => {
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      const authSub = crypto.randomUUID();
+      const [u] = await app.db
+        .insert(users)
+        .values({ authSub, email: `${authSub}@example.com` })
+        .returning();
+      const got = await getUserBenchmarkSymbols(app.db, u.id);
+      expect(got).toEqual([
+        { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0, currency: "USD" },
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("getBenchmarkPricesMulti", () => {
+  it("returns one date→close map per symbol, in a single round-trip", async () => {
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      const authSub = crypto.randomUUID();
+      const [u] = await app.db
+        .insert(users)
+        .values({ authSub, email: `${authSub}@example.com` })
+        .returning();
+      await app.db.insert(benchmarkPrices).values([
+        {
+          userId: u.id,
+          symbol: "^GSPC",
+          date: "2026-01-15",
+          close: "4500",
+          currency: "USD",
+          source: "yahoo",
+        },
+        {
+          userId: u.id,
+          symbol: "^GSPC",
+          date: "2026-01-16",
+          close: "4550",
+          currency: "USD",
+          source: "yahoo",
+        },
+        {
+          userId: u.id,
+          symbol: "^JKSE",
+          date: "2026-01-15",
+          close: "7200",
+          currency: "IDR",
+          source: "yahoo",
+        },
+      ]);
+      const got = await getBenchmarkPricesMulti(
+        app.db,
+        u.id,
+        ["^GSPC", "^JKSE", "^NOPE"],
+        ["2026-01-15", "2026-01-16"],
+      );
+      expect(got.get("^GSPC")?.get("2026-01-15")).toBe("4500");
+      expect(got.get("^GSPC")?.get("2026-01-16")).toBe("4550");
+      expect(got.get("^JKSE")?.get("2026-01-15")).toBe("7200");
+      expect(got.get("^NOPE")).toBeUndefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns an empty map when no symbols are requested", async () => {
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      const authSub = crypto.randomUUID();
+      const [u] = await app.db
+        .insert(users)
+        .values({ authSub, email: `${authSub}@example.com` })
+        .returning();
+      const got = await getBenchmarkPricesMulti(app.db, u.id, [], ["2026-01-15"]);
+      expect(got.size).toBe(0);
     } finally {
       await app.close();
     }

@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { cn, formatPercent } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import { EditBenchmarkDialog } from "./edit-benchmark-dialog";
-import type { InsightsBenchmark } from "@portfolio/api-client";
+import type { BenchmarkSymbolEntry, InsightsBenchmark } from "@portfolio/api-client";
 
 export function BenchmarkCard({
   benchmark,
+  symbols,
   locale,
 }: {
   benchmark: InsightsBenchmark | null;
+  symbols: BenchmarkSymbolEntry[];
   locale: string;
 }) {
   const t = useTranslations("Insights.benchmark");
@@ -35,7 +37,11 @@ export function BenchmarkCard({
             {t("setBenchmark")}
           </Button>
         </div>
-        <EditBenchmarkDialog open={dialogOpen} onOpenChange={setDialogOpen} currentSymbol={null} />
+        <EditBenchmarkDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          currentSymbols={symbols}
+        />
       </Card>
     );
   }
@@ -81,7 +87,7 @@ export function BenchmarkCard({
       <EditBenchmarkDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        currentSymbol={benchmark.symbol}
+        currentSymbols={symbols}
       />
     </Card>
   );

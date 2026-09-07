@@ -175,7 +175,7 @@ describe("preferences", () => {
     expect(body.period).toBe("max");
   });
 
-  it("PUT /me/preferences sets and clears benchmarkSymbol and riskFreeRate", async () => {
+  it("PUT /me/preferences sets and replaces benchmarkSymbols", async () => {
     const t = await token("prefs-user-benchmark-1");
 
     const get0 = await app.inject({
@@ -184,17 +184,26 @@ describe("preferences", () => {
       headers: auth(t),
     });
     expect(get0.statusCode).toBe(200);
-    expect(get0.json().benchmarkSymbol).toBeNull();
+    // First call: defaults to a single ^GSPC entry (seeded by the migration).
+    expect(get0.json().benchmarkSymbols).toEqual([
+      { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 },
+    ]);
     expect(get0.json().riskFreeRate).toBeNull();
 
     const put1 = await app.inject({
       method: "PUT",
       url: "/me/preferences",
       headers: auth(t),
-      payload: { benchmarkSymbol: "^GSPC", riskFreeRate: 0.05 },
+      payload: {
+        benchmarkSymbols: [{ symbol: "^GDAXI" }, { symbol: "^GSPC", displayName: "S&P 500" }],
+        riskFreeRate: 0.05,
+      },
     });
     expect(put1.statusCode).toBe(200);
-    expect(put1.json().benchmarkSymbol).toBe("^GSPC");
+    expect(put1.json().benchmarkSymbols).toEqual([
+      { symbol: "^GDAXI", displayName: "DAX", displayOrder: 0 },
+      { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 1 },
+    ]);
     expect(put1.json().riskFreeRate).toBe(0.05);
 
     const get1 = await app.inject({
@@ -202,26 +211,64 @@ describe("preferences", () => {
       url: "/me/preferences",
       headers: auth(t),
     });
-    expect(get1.json().benchmarkSymbol).toBe("^GSPC");
-    expect(get1.json().riskFreeRate).toBe(0.05);
+    expect(get1.json().benchmarkSymbols).toEqual([
+      { symbol: "^GDAXI", displayName: "DAX", displayOrder: 0 },
+      { symbol: "^GSPC", displayName: "S&P 500", displayOrder: 1 },
+    ]);
 
+    // Replace with a single entry — displayOrder should rebalance to 0.
     const put2 = await app.inject({
       method: "PUT",
       url: "/me/preferences",
       headers: auth(t),
-      payload: { benchmarkSymbol: null, riskFreeRate: null },
+      payload: { benchmarkSymbols: [{ symbol: "^N225" }] },
     });
     expect(put2.statusCode).toBe(200);
-    expect(put2.json().benchmarkSymbol).toBeNull();
-    expect(put2.json().riskFreeRate).toBeNull();
+    expect(put2.json().benchmarkSymbols).toEqual([
+      { symbol: "^N225", displayName: "Nikkei 225", displayOrder: 0 },
+    ]);
+  });
 
-    const get2 = await app.inject({
-      method: "GET",
+  it("PUT /me/preferences rejects an empty benchmarkSymbols array", async () => {
+    const t = await token("prefs-user-benchmark-empty");
+    const res = await app.inject({
+      method: "PUT",
       url: "/me/preferences",
       headers: auth(t),
+      payload: { benchmarkSymbols: [] },
     });
-    expect(get2.json().benchmarkSymbol).toBeNull();
-    expect(get2.json().riskFreeRate).toBeNull();
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("PUT /me/preferences rejects more than 3 benchmarkSymbols", async () => {
+    const t = await token("prefs-user-benchmark-cap");
+    const res = await app.inject({
+      method: "PUT",
+      url: "/me/preferences",
+      headers: auth(t),
+      payload: {
+        benchmarkSymbols: [
+          { symbol: "^GSPC" },
+          { symbol: "^DJI" },
+          { symbol: "^IXIC" },
+          { symbol: "^RUT" },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("PUT /me/preferences rejects duplicate benchmarkSymbols", async () => {
+    const t = await token("prefs-user-benchmark-dup");
+    const res = await app.inject({
+      method: "PUT",
+      url: "/me/preferences",
+      headers: auth(t),
+      payload: {
+        benchmarkSymbols: [{ symbol: "^GSPC" }, { symbol: "^GSPC" }],
+      },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it("PUT /me/preferences rejects invalid period", async () => {

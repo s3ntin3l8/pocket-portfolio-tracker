@@ -242,6 +242,18 @@
       "worstMonth": "Worst mo",
       "positiveMonths": "{pct}% positive months ({pos}/{total})"
     },
+    "yearlyReturns": {
+      "title": "Per-year returns",
+      "subtitle": "{currency} · vs {benchmarks}",
+      "ytdLabel": "YTD",
+      "headerYear": "Year",
+      "headerPortfolioTwr": "Portfolio TWR",
+      "headerPortfolioXirr": "Portfolio XIRR",
+      "headerActiveReturn": "Active vs {symbol}",
+      "noData": "—",
+      "insufficientData": "Not enough data for a per-year breakdown yet — keep using the app and check back in a few days.",
+      "emptyBenchmarks": "Add a benchmark to see how your returns compare to the market each year."
+    },
     "benchmark": {
       "activeReturn": "Active return",
       "trackingError": "Tracking error",
@@ -256,7 +268,8 @@
       "cancel": "Cancel",
       "remove": "Remove",
       "setBenchmark": "Set benchmark",
-      "setBenchmarkHint": "Choose a benchmark to compare your portfolio against."
+      "setBenchmarkHint": "Choose a benchmark to compare your portfolio against.",
+      "noBenchmarks": "Add at least one benchmark to compare against."
     },
     "concentrationTrend": {
       "title": "Concentration Trend",
@@ -1279,8 +1292,10 @@
     "retirementAge": "Target retirement age",
     "retirementAgeHint": "Used to calculate years to retirement in the forecast panel.",
     "benchmarkLabel": "Benchmark & risk-free rate",
-    "benchmarkSymbolLabel": "Benchmark symbol",
-    "benchmarkSymbolHint": "S&P 500 (^GSPC) by default. Yahoo Finance ticker for comparison.",
+    "benchmarkSymbolLabel": "Benchmark indices",
+    "benchmarkSymbolHint": "Up to 3 indices for per-year comparison. S&P 500 (^GSPC) by default. Yahoo Finance tickers.",
+    "addBenchmark": "Add",
+    "removeBenchmark": "Remove benchmark",
     "riskFreeRateLabel": "Risk-free rate",
     "riskFreeRateHint": "Annual rate for Sharpe/Sortino — auto-detected from display currency when empty.",
     "portfoliosLabel": "Portfolios",

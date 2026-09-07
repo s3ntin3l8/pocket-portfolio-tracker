@@ -22,5 +22,6 @@ export function emptyInsightsResponse() {
     concentrationTrend: [],
     bestWorstMonthly: { best: null, worst: null },
     bestWorstYearly: { best: null, worst: null },
+    yearlyReturns: [],
   } as const;
 }

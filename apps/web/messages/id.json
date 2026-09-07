@@ -242,6 +242,18 @@
       "worstMonth": "Bulan terburuk",
       "positiveMonths": "{pct}% bulan positif ({pos}/{total})"
     },
+    "yearlyReturns": {
+      "title": "Imbal hasil per tahun",
+      "subtitle": "{currency} · vs {benchmarks}",
+      "ytdLabel": "YTD",
+      "headerYear": "Tahun",
+      "headerPortfolioTwr": "TWR Portofolio",
+      "headerPortfolioXirr": "XIRR Portofolio",
+      "headerActiveReturn": "Aktif vs {symbol}",
+      "noData": "—",
+      "insufficientData": "Belum cukup data untuk rincian per tahun — lanjutkan penggunaan dan cek lagi dalam beberapa hari.",
+      "emptyBenchmarks": "Tambahkan benchmark untuk membandingkan imbal hasil Anda dengan pasar tiap tahun."
+    },
     "benchmark": {
       "activeReturn": "Imbal hasil aktif",
       "trackingError": "Error pelacakan",
@@ -256,7 +268,8 @@
       "cancel": "Batal",
       "remove": "Hapus",
       "setBenchmark": "Atur benchmark",
-      "setBenchmarkHint": "Pilih benchmark untuk membandingkan portofolio Anda."
+      "setBenchmarkHint": "Pilih benchmark untuk membandingkan portofolio Anda.",
+      "noBenchmarks": "Tambahkan minimal satu benchmark untuk perbandingan."
     },
     "concentrationTrend": {
       "title": "Tren Konsentrasi",
@@ -1277,8 +1290,10 @@
     "retirementAge": "Target usia pensiun",
     "retirementAgeHint": "Digunakan untuk menghitung tahun menuju pensiun di panel proyeksi.",
     "benchmarkLabel": "Benchmark & tingkat bebas risiko",
-    "benchmarkSymbolLabel": "Simbol benchmark",
-    "benchmarkSymbolHint": "S&P 500 (^GSPC) secara default. Ticker Yahoo Finance untuk perbandingan.",
+    "benchmarkSymbolLabel": "Indeks benchmark",
+    "benchmarkSymbolHint": "Hingga 3 indeks untuk perbandingan per tahun. S&P 500 (^GSPC) secara default. Ticker Yahoo Finance.",
+    "addBenchmark": "Tambah",
+    "removeBenchmark": "Hapus benchmark",
     "riskFreeRateLabel": "Tingkat bebas risiko",
     "riskFreeRateHint": "Tingkat tahunan untuk Sharpe/Sortino — terdeteksi otomatis dari mata uang tampilan jika kosong.",
     "portfoliosLabel": "Portofolio",
