@@ -38,6 +38,115 @@ const DKB_FUND_DISTRIBUTION_TEXT =
   "EUR Den Betrag buchen wir mit Wertstellung 18.11.2021 zu Gunsten des Kontos 0000000000 " +
   "(IBAN DE00 0000 0000 0000 0000 00), BLZ 120 300 00 (BIC BYLADEM1001).";
 
+// Kapitalmaßnahme — taxable Fondsverschmelzung *confirmation* (Umbuchung): both legs +
+// Kurswert. A2H9QY (LU1737652237) merges into A3DH0A (IE000CNSFAR2) at ratio 1 : 7,4817192.
+const DKB_MERGER_TEXT =
+  "10919 Berlin Frau Max Mustermann Schloßgasse 1e 85120 Hepberg Seite 1 von 4 Depotnummer " +
+  "506740786 Kundennummer 0000000000 Max Mustermann Belegnummer 61395576 Datum 23.01.2024 " +
+  "Kapitalmaßnahme LU17376522370100 0883.01232222.0022362KM52 Steuerwirksame " +
+  "Fondsverschmelzung Nominale Wertpapierbezeichnung ISIN (WKN) Stück 48,1464 AIS-AMUNDI " +
+  "INDEX MSCI WORLD ACT.NOM.UCITS ETF DR D ON LU1737652237 (A2H9QY) Sehr geehrte Frau " +
+  "Mustermann, Ihren Depotbestand haben wir mit Valuta 23.01.2024 zu folgenden Bedingungen " +
+  "umgebucht: Ex-Tag: 18.01.2024 Verhältnis: 1 : 7,4817192 Ausbuchung Stück 48,1464- " +
+  "AIS-AMUNDI INDEX MSCI WORLD ACT.NOM.UCITS ETF DR D ON LU1737652237 (A2H9QY) Einbuchung " +
+  "Stück 360,2180 AM.ETF I.-MSCI WORLD U.ETF REG. SHS DIS. ON Wertpapierrechnung " +
+  "Großbritannien IE000CNSFAR2 (A3DH0A) Als Ergebnis der Fondsverschmelzung buchen wir Ihre " +
+  "Anteile um. Veräußerung infolge Kapitalmaßnahme Kurswert 3.869,77 EUR steuerrelevanter " +
+  "Bewertungskurs 87,4238889 USD Devisenkurs 1,0877 USD/EUR Veräußerungsergebnis " +
+  "(Differenzmethode) 169,89+ EUR Mit freundlichen Grüßen Deutsche Kreditbank AG";
+
+// The earlier *announcement* (Anschreiben): same merger but the ratio isn't published yet,
+// so there's no Ausbuchung/Einbuchung/Kurswert — it can't produce the merged-in quantity.
+const DKB_MERGER_ANNOUNCEMENT_TEXT =
+  "10919 Berlin Frau Max Mustermann Depotnummer 506740786 Belegnummer 51710196 Datum " +
+  "28.12.2023 Kapitalmaßnahme Steuerwirksame Fondsverschmelzung Nominale Wertpapierbezeichnung " +
+  "ISIN (WKN) Stück 44,8329 AIS-AMUNDI INDEX MSCI WORLD ACT.NOM.UCITS ETF DR D ON " +
+  "LU1737652237 (A2H9QY) Ex-Tag 18.01.2024 Umtauschverhältnis noch nicht veröffentlicht ISIN " +
+  "(WKN) neu IE000CNSFAR2 (A3DH0A) Mit freundlichen Grüßen Deutsche Kreditbank AG";
+
+// Merger document with no parseable Valuta (no "Valuta" clause) — only the document-level
+// "Datum" survives. exDate should fall back to that, NOT to `new Date()`.
+const DKB_MERGER_NO_VALUTA =
+  "Depotnummer 506740786 Belegnummer 61395576 Datum 23.01.2024 Kapitalmaßnahme " +
+  "Steuerwirksame Fondsverschmelzung Nominale Wertpapierbezeichnung ISIN (WKN) Stück 48,1464 " +
+  "AIS-AMUNDI INDEX MSCI WORLD ACT.NOM.UCITS ETF DR D ON LU1737652237 (A2H9QY) " +
+  "Ex-Tag 18.01.2024 Ausbuchung Stück 48,1464- AIS-AMUNDI INDEX MSCI WORLD ACT.NOM.UCITS " +
+  "ETF DR D ON LU1737652237 (A2H9QY) Einbuchung Stück 360,2180 AM.ETF I.-MSCI WORLD U.ETF " +
+  "REG. SHS DIS. ON Wertpapierrechnung Großbritannien IE000CNSFAR2 (A3DH0A) Veräußerung " +
+  "infolge Kapitalmaßnahme Kurswert 3.869,77 EUR Mit freundlichen Grüßen Deutsche Kreditbank AG";
+
+describe("parseDkbPdf — Kapitalmaßnahme fund merger (Fondsverschmelzung) (#577)", () => {
+  it("detects a taxable merger confirmation but not the incomplete announcement", () => {
+    expect(detectDkbPdf(DKB_MERGER_TEXT)).toBe(true);
+    expect(detectDkbPdf(DKB_MERGER_ANNOUNCEMENT_TEXT)).toBe(false);
+  });
+
+  it("emits a sell+buy pair tagged kind:merger, priced at the Kurswert", () => {
+    const { drafts, errors, accountNumber } = parseDkbPdf(DKB_MERGER_TEXT);
+    expect(errors).toEqual([]);
+    expect(accountNumber).toBe("506740786");
+    expect(drafts).toHaveLength(2);
+
+    const sell = drafts.find((d) => d.action === "sell")!;
+    const buy = drafts.find((d) => d.action === "buy")!;
+
+    expect(sell).toMatchObject({
+      action: "sell",
+      isin: "LU1737652237",
+      wkn: "A2H9QY",
+      quantity: "48.1464",
+      price: "80.37506439", // 3869,77 / 48,1464
+      total: "3869.77",
+      kind: "merger",
+      currency: "EUR",
+    });
+    expect(buy).toMatchObject({
+      action: "buy",
+      isin: "IE000CNSFAR2",
+      wkn: "A3DH0A",
+      quantity: "360.2180",
+      price: "10.74285572", // 3869,77 / 360,218
+      total: "3869.77",
+      kind: "merger",
+      assetClass: "etf",
+    });
+    expect(sell.executedAt.toISOString()).toBe("2024-01-23T00:00:00.000Z"); // Valuta
+  });
+
+  it("emits a mergerCA alongside the sell+buy pair with reciprocal ratios", () => {
+    const { mergerCA } = parseDkbPdf(DKB_MERGER_TEXT);
+    expect(mergerCA).toBeDefined();
+    expect(mergerCA!.fromIsin).toBe("LU1737652237");
+    expect(mergerCA!.toIsin).toBe("IE000CNSFAR2");
+    // Decimal division — exact ratio, full Decimal precision. Reciprocal of ratioTo.
+    expect(mergerCA!.ratioFrom).toBe("0.13365906201244801759"); // 48.1464 / 360.2180
+    expect(mergerCA!.ratioTo).toBe("7.4817224133060831132"); // 360.2180 / 48.1464
+    // Reciprocity: ratioFrom × ratioTo ≈ 1 (computed via Decimal precision).
+    const product = Number(mergerCA!.ratioFrom) * Number(mergerCA!.ratioTo);
+    expect(product).toBeCloseTo(1, 9);
+    expect(mergerCA!.taxableMarketValue).toBe("3869.77");
+    expect(mergerCA!.exDate).toBe("2024-01-23"); // Valuta
+  });
+
+  it("does not parse the incomplete announcement into a merger or mergerCA", () => {
+    // detectDkbPdf gates it out in the route; called directly it yields no merger drafts
+    // and no mergerCA — confirmed via DKB's gating (announcement lacks Ausbuchung/Einbuchung/
+    // Kurswert, so the merger branch doesn't fire).
+    const r = parseDkbPdf(DKB_MERGER_ANNOUNCEMENT_TEXT);
+    expect(r.drafts.some((d) => d.kind === "merger")).toBe(false);
+    expect(r.mergerCA).toBeUndefined();
+  });
+
+  it("falls back exDate to the document Datum (not 'today') when Valuta is missing", () => {
+    // Regression guard for a Phase 1 suggestion: a missing date must not silently
+    // become "now" — that would re-date historical mergers at import time. With Valuta
+    // absent but Datum present, we use Datum.
+    const { mergerCA } = parseDkbPdf(DKB_MERGER_NO_VALUTA);
+    expect(mergerCA).toBeDefined();
+    expect(mergerCA!.exDate).toBe("2024-01-23"); // from "Datum 23.01.2024", NOT new Date()
+  });
+});
+
 describe("parseDkbPdf — dividend/distribution shares & per-share (#508)", () => {
   it("extracts shares, perShare, nativeCurrency and grossNative from a foreign dividend", () => {
     expect(detectDkbPdf(DKB_DIVIDEND_TEXT)).toBe(true);

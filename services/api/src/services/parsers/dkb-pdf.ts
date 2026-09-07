@@ -36,13 +36,15 @@ export interface DkbPdfResult {
   // instrument IDs) because instrument resolution happens in the confirm-route
   // materialize step. Phase 1: stored as-is alongside the drafts; Phase 2
   // (separate plan) wires the actual CA row creation into the confirm flow.
+  // `exDate` is undefined when neither Valuta nor Datum is parseable — falling
+  // back to "today" would silently re-date historical mergers at confirm time.
   mergerCA?: {
     fromIsin: string;
     toIsin: string;
     ratioFrom: string; // outQty / inQty (source shares per target share)
     ratioTo: string; // inQty / outQty (target shares per source share)
-    taxableMarketValue: string | null; // Kurswert as a decimal string, or null if missing
-    exDate: string; // YYYY-MM-DD
+    taxableMarketValue: string | null;
+    exDate?: string; // YYYY-MM-DD; undefined when no date was parseable
   };
 }
 
@@ -198,9 +200,7 @@ export function parseDkbPdf(rawText: string): DkbPdfResult {
     const toIsin = inb[3];
     const ratioFromDec = new Decimal(outQty).div(new Decimal(inQty));
     const ratioToDec = new Decimal(inQty).div(new Decimal(outQty));
-    const exDate = valuta
-      ? valuta.toISOString().slice(0, 10)
-      : (docDate?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    const exDate = (valuta ?? docDate)?.toISOString().slice(0, 10);
     return {
       drafts,
       errors,
