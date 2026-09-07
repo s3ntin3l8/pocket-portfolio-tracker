@@ -10,8 +10,14 @@ export function registerParseImportRoutes(app: FastifyInstance) {
     (request, reply) => handleCsvUpload(app, request, reply),
   );
 
-  app.post("/imports/screenshot", { preHandler: app.authenticate }, (request, reply) =>
-    handleScreenshotUpload(app, request, reply),
+  // 30 MB request body — 5 MB headroom over the multipart `fileSize` cap of
+  // 25 MB (see app.ts:189). Without this override Fastify's default 1 MB
+  // bodyLimit fires first and rejects every screenshot before the multipart
+  // parser can return the in-route "file_too_large" 413. #S3
+  app.post(
+    "/imports/screenshot",
+    { preHandler: app.authenticate, bodyLimit: 30 * 1024 * 1024 },
+    (request, reply) => handleScreenshotUpload(app, request, reply),
   );
 
   registerMaterializeRoutes(app);
