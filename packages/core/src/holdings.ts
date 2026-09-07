@@ -2,6 +2,7 @@ import { Decimal } from "decimal.js";
 import { D, ZERO } from "./decimal.js";
 import { isAcquisitionType, isTradeType, isTransferType } from "./categorization.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
+import { augmentTransactionsWithSyntheticMergerLegs } from "./merger-augment.js";
 
 type Event =
   { kind: "tx"; at: Date; tx: CoreTransaction } | { kind: "ca"; at: Date; ca: CorporateAction };
@@ -24,7 +25,11 @@ export function computeHoldings(
 ): Holding[] {
   const byInstrument = new Map<string, Event[]>();
 
-  for (const tx of transactions) {
+  // Synthesize the sell+buy pair for any taxable merger CA that the importer forgot
+  // to write as a `kind:"merger"` pair — mirror of computeTrades' augmentation.
+  const txns = augmentTransactionsWithSyntheticMergerLegs(transactions, corporateActions);
+
+  for (const tx of txns) {
     if (!tx.instrumentId) continue;
     // Archived + draft rows are excluded from every derivation (cash_neutral rows still
     // count here — their shares are real; only their cash effect is suppressed in cash.ts).

@@ -19,6 +19,7 @@ import type {
 } from "./types.js";
 import { LONG_TERM_DAYS, DEFAULT_DUST, makeEpisode, calcAvgHoldingDays } from "./helpers.js";
 import { finalizeLog } from "./finalize.js";
+import { augmentTransactionsWithSyntheticMergerLegs } from "../merger-augment.js";
 
 /**
  * Compute the trade log for a set of transactions. Pure — the caller injects current
@@ -52,7 +53,10 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
 
   // Group price-bearing transactions + corporate actions per instrument.
   const byInstrument = new Map<string, Event[]>();
-  for (const tx of input.transactions) {
+  // Synthesize the sell+buy pair for any taxable merger CA that the importer forgot
+  // to write as a `kind:"merger"` pair — see packages/core/test/trade-log/merger-ca.test.ts.
+  const txns = augmentTransactionsWithSyntheticMergerLegs(input.transactions, cas);
+  for (const tx of txns) {
     if (!tx.instrumentId) continue;
     if (tx.status === "archived" || tx.status === "draft") continue; // excluded from every derivation
 

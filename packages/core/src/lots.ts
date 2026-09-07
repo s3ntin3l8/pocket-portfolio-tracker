@@ -15,6 +15,7 @@ import { D } from "./decimal.js";
 import { isAcquisitionType } from "./categorization.js";
 import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction, CorporateAction } from "./types.js";
+import { augmentTransactionsWithSyntheticMergerLegs } from "./merger-augment.js";
 
 /** A FIFO lot: shares acquired together at a per-unit cost (fees included). */
 interface Lot {
@@ -47,7 +48,11 @@ export function openLots(
 ): Map<string, LotView[]> {
   const byInstrument = new Map<string, Event[]>();
 
-  for (const tx of transactions) {
+  // Synthesize the sell+buy pair for any taxable merger CA that the importer forgot
+  // to write as a `kind:"merger"` pair — mirror of computeTrades / computeHoldings.
+  const txns = augmentTransactionsWithSyntheticMergerLegs(transactions, corporateActions);
+
+  for (const tx of txns) {
     if (!tx.instrumentId) continue;
     if (tx.status === "archived" || tx.status === "draft") continue;
     if (asOf !== undefined && tx.executedAt > asOf) continue;
