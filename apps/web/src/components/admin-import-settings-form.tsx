@@ -18,7 +18,7 @@ const STRATEGIES: ImportStrategy[] = ["parser_first", "vision_only"];
  * (screenshots + PDFs). "parser_first" runs the deterministic broker parser before the
  * vision-LLM; "vision_only" always uses the vision-LLM. CSV imports are unaffected.
  *
- * Design (`Admin Settings.dc.html`): one `rounded-[20px]` card holding both options as
+ * Design (`Admin Settings.dc.html`): one `rounded-2xl` card holding both options as
  * radio rows — selecting a row saves immediately (no separate Save button). Optimistic:
  * the selection flips right away and rolls back on a failed save, rather than waiting on
  * the request before reflecting the choice.
@@ -73,7 +73,7 @@ export function AdminImportSettingsForm({
       <div
         role="radiogroup"
         aria-labelledby="import-strategy-label"
-        className="overflow-hidden rounded-[20px] bg-card shadow-card"
+        className="overflow-hidden rounded-2xl bg-card shadow-card"
       >
         {STRATEGIES.map((s, i) => {
           const active = strategy === s;

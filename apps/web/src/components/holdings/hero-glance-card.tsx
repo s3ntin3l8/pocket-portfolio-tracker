@@ -72,7 +72,7 @@ export function HeroGlanceCard({
 
   return (
     <div
-      className="rounded-[26px] px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-[20px]"
+      className="rounded-[26px] px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-2xl"
       style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
     >
       <p className="text-[13px] font-semibold text-white/78">{t("label")}</p>

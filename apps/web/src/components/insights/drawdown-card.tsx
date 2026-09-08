@@ -10,7 +10,7 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
   const isUnderwater = currDdpct < 0;
 
   return (
-    <Card className="rounded-[20px] bg-card p-4 shadow-card">
+    <Card className="rounded-2xl bg-card p-4 shadow-card">
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
       <p
         className={cn(

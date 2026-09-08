@@ -200,7 +200,7 @@ export function CorporateActionsManager({
                   role: "button" as const,
                   tabIndex: 0,
                   className:
-                    "flex cursor-pointer items-center justify-between rounded-[20px] bg-card shadow-card px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex cursor-pointer items-center justify-between rounded-2xl bg-card shadow-card px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   onClick: () => ca.openSheet(c),
                   onKeyDown: (e: React.KeyboardEvent) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -211,7 +211,7 @@ export function CorporateActionsManager({
                 }
               : {
                   className:
-                    "flex items-center justify-between rounded-[20px] bg-card shadow-card px-4 py-3",
+                    "flex items-center justify-between rounded-2xl bg-card shadow-card px-4 py-3",
                 })}
           >
             <div>

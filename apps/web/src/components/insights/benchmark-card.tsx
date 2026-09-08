@@ -24,7 +24,7 @@ export function BenchmarkCard({
 
   if (!benchmark) {
     return (
-      <Card className="rounded-[20px] bg-card p-4 shadow-card">
+      <Card className="rounded-2xl bg-card p-4 shadow-card">
         <div className="flex flex-col items-center gap-3 py-4 text-center">
           <div className="flex size-10 items-center justify-center rounded-full bg-secondary">
             <TrendingUp className="size-5 text-text-3" />
@@ -51,7 +51,7 @@ export function BenchmarkCard({
   const correlation = Number(benchmark.correlation);
 
   return (
-    <Card className="group relative rounded-[20px] bg-card p-4 shadow-card">
+    <Card className="group relative rounded-2xl bg-card p-4 shadow-card">
       <button
         type="button"
         onClick={() => setDialogOpen(true)}

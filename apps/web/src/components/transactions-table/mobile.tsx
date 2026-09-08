@@ -45,7 +45,7 @@ export function MobileView({
           <div className="mb-2 ml-1 text-[12px] font-bold uppercase tracking-[0.04em] text-text-3">
             {group.label}
           </div>
-          <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+          <div className="overflow-hidden rounded-2xl bg-card shadow-card">
             {group.rows.map((tx, i) => {
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
@@ -127,7 +127,7 @@ export function MobileView({
         </div>
       ))}
       {showEmpty && (
-        <div className="rounded-[20px] bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
+        <div className="rounded-2xl bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
           {hasActiveFilter ? t("noResults") : t("empty")}
         </div>
       )}

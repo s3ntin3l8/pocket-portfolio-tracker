@@ -214,7 +214,7 @@ function TaxHolderOverviewDe({
         <LossCarryforwardEditor holderId={accountHolderId} currentYear={entry.year} t={t} />
       )}
 
-      <Card className="overflow-hidden rounded-[20px]">
+      <Card className="overflow-hidden rounded-2xl">
         <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-[15px] font-bold">
