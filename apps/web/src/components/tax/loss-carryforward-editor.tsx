@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useApiClient } from "@/lib/api";
@@ -21,7 +22,7 @@ export function LossCarryforwardEditor({
   t: TaxTranslator;
 }) {
   const api = useApiClient();
-  const mountedRef = useRef(true);
+  const router = useRouter();
   // `taxYear` is the year the carry-forward is *applied in* (see
   // lossCarryForwardFor on the API side), not the year it originated from — so this
   // must default to, and include, the year currently on screen.
@@ -31,12 +32,11 @@ export function LossCarryforwardEditor({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    mountedRef.current = true;
     let cancelled = false;
     api
       .getLossCarryforward(holderId, year)
       .then((res) => {
-        if (cancelled || !mountedRef.current) return;
+        if (cancelled) return;
         const stockEntry = res.entries.find((e) => e.pot === "stock");
         const generalEntry = res.entries.find((e) => e.pot === "general");
         setStock(stockEntry?.amount ?? "0");
@@ -47,7 +47,6 @@ export function LossCarryforwardEditor({
       });
     return () => {
       cancelled = true;
-      mountedRef.current = false;
     };
   }, [api, holderId, year]);
 
@@ -62,6 +61,11 @@ export function LossCarryforwardEditor({
         ],
       });
       toast.success(t("lossCarryforward.success"));
+      // Refresh server-rendered tax figures (estimated tax, allowance usage, harvest
+      // suggestions) that depend on carry-forward data. A single post-save refresh is
+      // safe — the mount-path fetch already populated local state, so there's no
+      // re-render cascade.
+      router.refresh();
     } catch {
       toast.error(t("lossCarryforward.error"));
     } finally {
