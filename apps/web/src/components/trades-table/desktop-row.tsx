@@ -56,17 +56,17 @@ export function DesktopRow({
                 aria-label={isOpen ? t("collapseLegs") : t("expandLegs")}
                 aria-expanded={isOpen}
                 onClick={() => onToggle(key)}
-                className="absolute -left-5 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                className="absolute -left-4 inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ChevronRight
-                  className={cn("size-3.5 transition-transform", isOpen && "rotate-90")}
+                  className={cn("size-4 transition-transform", isOpen && "rotate-90")}
                 />
               </button>
             ) : (
               <ChevronRight
                 aria-hidden
                 className={cn(
-                  "absolute -left-4 size-3.5 text-muted-foreground transition-transform",
+                  "absolute -left-4 size-4 text-muted-foreground transition-transform",
                   tr.status === "closed" && "opacity-0",
                 )}
               />
@@ -78,7 +78,7 @@ export function DesktopRow({
               assetClass={tr.instrument?.assetClass}
               className="shrink-0"
             />
-            <div className="min-w-0 max-w-[130px]">
+            <div className="min-w-0 max-w-[180px]">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Link
                   href={`/instruments/${tr.instrumentId}`}
