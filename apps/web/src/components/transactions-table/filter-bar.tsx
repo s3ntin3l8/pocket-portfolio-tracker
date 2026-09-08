@@ -322,7 +322,7 @@ export function FilterBar({
               onSearchChange(v || undefined);
             }, 300);
           }}
-          className="h-8 w-full pl-7 pr-7 text-xs md:w-44"
+          className="h-8 w-full pl-7 pr-7 text-xs md:w-56"
         />
         {localQuery && (
           <button
