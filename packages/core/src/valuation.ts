@@ -190,15 +190,32 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     let dayChangePct: string | null = null;
     if (prev) {
       const priceDelta = new Decimal(quote.price).sub(prev);
-      dayChange = priceDelta.mul(h.quantity).toString();
       const rawPct = priceDelta.div(prev).mul(100);
       // Sanity gate: daily moves beyond ±50% are data artifacts (stale previousClose,
-      // Yahoo API unit mismatch), not real market moves.  Clamp to avoid distorting
-      // portfolio-level metrics that aggregate per-holding day changes.
-      dayChangePct = rawPct.clamp(-50, 50).toString();
-      totalDayChange = totalDayChange.add(
-        new Decimal(convert(dayChange, quoteCcy, input.displayCurrency, fx)),
-      );
+      // Yahoo API unit mismatch), not real market moves.  Null both fields and exclude
+      // from totals to prevent a single bad holding from distorting portfolio-level
+      // day-% (which is currency-derived from totalDayChange).
+      if (rawPct.abs().gt(50)) {
+        if (typeof process !== "undefined") {
+          process.stderr.write(
+            JSON.stringify({
+              level: "warn",
+              msg: "[valuation] skipped implausible day change",
+              symbol: h.instrumentId,
+              pct: rawPct.toNumber(),
+              priceDelta: priceDelta.toString(),
+            }) + "\n",
+          );
+        }
+        dayChange = null;
+        dayChangePct = null;
+      } else {
+        dayChange = priceDelta.mul(h.quantity).toString();
+        dayChangePct = rawPct.toString();
+        totalDayChange = totalDayChange.add(
+          new Decimal(convert(dayChange, quoteCcy, input.displayCurrency, fx)),
+        );
+      }
     }
 
     return {
