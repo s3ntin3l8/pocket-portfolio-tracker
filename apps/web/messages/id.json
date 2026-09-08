@@ -2044,7 +2044,8 @@
         "dividends": "Dividen",
         "tax": "Est. pajak"
       },
-      "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan 10% atas dividen, keduanya dipotong di sumber — jadi tidak ada yang perlu dilaporkan lagi, dan tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak."
+      "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan 10% atas dividen, keduanya dipotong di sumber — jadi tidak ada yang perlu dilaporkan lagi, dan tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",
+      "unavailable": "Rincian pajak Indonesia tidak tersedia."
     },
     "vorabpauschale": {
       "accrued": "Vorabpauschale terakumulasi · YTD",

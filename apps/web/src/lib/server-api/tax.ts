@@ -1,3 +1,4 @@
+import { Decimal } from "decimal.js";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import {
@@ -13,8 +14,10 @@ import {
   type TaxCurrencyTotal,
   type TaxYearRow,
   type TaxYearDetail,
+  type IndonesianFinalTaxLike,
   type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
+import { loadPreferences } from "./user";
 
 export async function loadNetworthTax(
   year?: number,
@@ -165,6 +168,11 @@ export async function loadTaxYearDetail(
   const api = await getServerApi();
   if (!api) return result;
   const targetYear = year ?? new Date().getUTCFullYear();
+  // ID branch consumes the API's pre-computed `indonesianFinalTax` rather than re-deriving
+  // the per-row numbers client-side. Without this flag the page renders the German
+  // tables from `disposals`/`dividendRows` as before.
+  const prefs = await loadPreferences();
+  const regime: "DE" | "ID" = prefs?.taxRegime === "ID" ? "ID" : "DE";
 
   let portfolios: import("@portfolio/api-client").Portfolio[];
   let selected: import("@portfolio/api-client").Portfolio | undefined;
@@ -184,15 +192,105 @@ export async function loadTaxYearDetail(
         : holderId === ID_ALL_PORTFOLIOS_ID
           ? portfolios
           : portfolios.filter((p) => p.accountHolderId === holderId);
-      if (pfs.length === 0) return;
+      if (pfs.length === 0) {
+        // Synthetic / unallocated holder (no matching portfolio). Under ID, the
+        // /networth/tax response already carries indonesianFinalTax on this entry.
+        // Surface it directly so the reports headline isn't silently zero.
+        if (regime === "ID" && entry.indonesianFinalTax) {
+          result.set(holderId, {
+            currency: entry.currency,
+            disposals: [],
+            totalProceeds: "0",
+            totalGain: "0",
+            dividendRows: [],
+            dividendTotalsByCurrency: [],
+            byYear: [],
+            idByYear: [],
+            indonesianFinalTax: entry.indonesianFinalTax as IndonesianFinalTaxLike,
+          });
+        }
+        return;
+      }
 
       try {
-        const [tradeLog, incomeLists] = await Promise.all([
+        const [tradeLog, incomeLists, idTaxByPortfolio, idTaxByHolder] = await Promise.all([
           selected
             ? api.getTrades(selected.id, "fifo")
             : api.getNetWorthTrades("fifo", undefined, holderId),
           Promise.all(pfs.map((p) => api.listIncomeByYear(p.id, targetYear))),
+          regime === "ID" && selected
+            ? api.getPortfolioTax(selected.id, targetYear)
+            : Promise.resolve<PortfolioTaxSummary | null>(null),
+          // W2 fix: the ID tax payload also needs to surface in the default aggregate
+          // (no-selection) scope. /networth/tax returns one entry per holder with
+          // indonesianFinalTax already populated under ID. Without this, the ID detail
+          // section silently zeroed for the most common view.
+          regime === "ID" && !selected
+            ? api.getNetworthTax(
+                targetYear,
+                holderId === ID_ALL_PORTFOLIOS_ID ? undefined : holderId,
+              )
+            : Promise.resolve<TaxSummaryHolder[] | null>(null),
         ]);
+        const apiIdTax: IndonesianFinalTaxLike | undefined = selected
+          ? (idTaxByPortfolio?.indonesianFinalTax as IndonesianFinalTaxLike | undefined)
+          : (() => {
+              if (!idTaxByHolder?.length) return undefined;
+              // In the no-selection scope holderId is the "__id_all_portfolios__"
+              // sentinel — never a real holder id. Aggregate every holder's ID tax
+              // payload into one combined object. Use Decimal throughout to avoid
+              // float drift on monetary sums.
+              let totalProceeds = new Decimal(0);
+              let totalTax = new Decimal(0);
+              let totalDivGross = new Decimal(0);
+              let totalDivTax = new Decimal(0);
+              let totalDivNet = new Decimal(0);
+              const byYearMap = new Map<
+                number,
+                { realized: Decimal; dividends: Decimal; tax: Decimal }
+              >();
+              for (const h of idTaxByHolder) {
+                const ift = h.indonesianFinalTax;
+                if (!ift) continue;
+                totalProceeds = totalProceeds.add(ift.totalProceeds || "0");
+                totalTax = totalTax.add(ift.totalSalesTax || "0");
+                totalDivGross = totalDivGross.add(ift.totalDividendGross || "0");
+                totalDivTax = totalDivTax.add(ift.totalDividendTax || "0");
+                totalDivNet = totalDivNet.add(ift.totalDividendNet || "0");
+                for (const y of ift.byYear) {
+                  const existing = byYearMap.get(y.year);
+                  if (existing) {
+                    existing.realized = existing.realized.add(y.realized || "0");
+                    existing.dividends = existing.dividends.add(y.dividends || "0");
+                    existing.tax = existing.tax.add(y.tax || "0");
+                  } else {
+                    byYearMap.set(y.year, {
+                      realized: new Decimal(y.realized || "0"),
+                      dividends: new Decimal(y.dividends || "0"),
+                      tax: new Decimal(y.tax || "0"),
+                    });
+                  }
+                }
+              }
+              return {
+                disposals: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.disposals ?? []),
+                totalProceeds: totalProceeds.toString(),
+                totalSalesTax: totalTax.toString(),
+                dividends: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.dividends ?? []),
+                totalDividendGross: totalDivGross.toString(),
+                totalDividendTax: totalDivTax.toString(),
+                totalDividendNet: totalDivNet.toString(),
+                estimatedTax: totalTax.add(totalDivTax).toString(),
+                byYear: [...byYearMap.entries()]
+                  .sort((a, b) => b[0] - a[0])
+                  .map(([year, v]) => ({
+                    year,
+                    realized: v.realized.toString(),
+                    dividends: v.dividends.toString(),
+                    tax: v.tax.toString(),
+                  })),
+              };
+            })();
 
         const disposalGroups = new Map<
           string,
@@ -200,11 +298,11 @@ export async function loadTaxYearDetail(
             symbol: string;
             when: string;
             instrumentId: string;
-            proceeds: number;
-            gain: number;
-            quantity: number;
-            cost: number;
-            tfRate: number;
+            proceeds: Decimal;
+            gain: Decimal;
+            quantity: Decimal;
+            cost: Decimal;
+            tfRate: Decimal;
             lots: TaxDisposalLot[];
           }
         >();
@@ -212,29 +310,29 @@ export async function loadTaxYearDetail(
           for (const l of t.legs) {
             if (l.taxYear !== targetYear) continue;
             const key = `${t.instrumentId}:${l.sellDate}`;
-            const qty = Number(l.quantity);
-            const cost = Number(l.cost);
-            const proceeds = Number(l.proceeds);
+            const qty = new Decimal(l.quantity);
+            const cost = new Decimal(l.cost);
+            const proceeds = new Decimal(l.proceeds);
             const group = disposalGroups.get(key) ?? {
               symbol: t.instrument?.symbol ?? t.instrumentId.slice(0, 8),
               when: l.sellDate,
               instrumentId: t.instrumentId,
-              proceeds: 0,
-              gain: 0,
-              quantity: 0,
-              cost: 0,
-              tfRate: Number(entry.tfRatesByInstrument?.[t.instrumentId] ?? "0"),
+              proceeds: new Decimal(0),
+              gain: new Decimal(0),
+              quantity: new Decimal(0),
+              cost: new Decimal(0),
+              tfRate: new Decimal(entry.tfRatesByInstrument?.[t.instrumentId] ?? "0"),
               lots: [],
             };
-            group.proceeds += proceeds;
-            group.gain += Number(l.gain);
-            group.quantity += qty;
-            group.cost += cost;
+            group.proceeds = group.proceeds.add(proceeds);
+            group.gain = group.gain.add(new Decimal(l.gain));
+            group.quantity = group.quantity.add(qty);
+            group.cost = group.cost.add(cost);
             group.lots.push({
               acqDate: l.acqDate,
               quantity: l.quantity,
-              buyPrice: qty > 0 ? (cost / qty).toString() : "0",
-              sellPrice: qty > 0 ? (proceeds / qty).toString() : "0",
+              buyPrice: qty.gt(0) ? cost.div(qty).toString() : "0",
+              sellPrice: qty.gt(0) ? proceeds.div(qty).toString() : "0",
               proceeds: l.proceeds,
               gain: l.gain,
               holdingDays: l.holdingDays,
@@ -250,14 +348,14 @@ export async function loadTaxYearDetail(
           proceeds: g.proceeds.toFixed(2),
           gain: g.gain.toFixed(2),
           tfRate: g.tfRate.toString(),
-          gainAdjusted: (g.gain * (1 - g.tfRate)).toFixed(2),
+          gainAdjusted: g.gain.mul(new Decimal(1).sub(g.tfRate)).toFixed(2),
           quantity: g.quantity.toString(),
-          avgBuyPrice: g.quantity > 0 ? (g.cost / g.quantity).toString() : "0",
-          sellPrice: g.quantity > 0 ? (g.proceeds / g.quantity).toString() : "0",
+          avgBuyPrice: g.quantity.gt(0) ? g.cost.div(g.quantity).toString() : "0",
+          sellPrice: g.quantity.gt(0) ? g.proceeds.div(g.quantity).toString() : "0",
           lots: g.lots.sort((a, b) => a.acqDate.localeCompare(b.acqDate)),
         }));
-        const totalProceeds = legs.reduce((s, l) => s + Number(l.proceeds), 0);
-        const totalGain = legs.reduce((s, l) => s + Number(l.gain), 0);
+        const totalProceeds = legs.reduce((s, l) => s.add(l.proceeds), new Decimal(0));
+        const totalGain = legs.reduce((s, l) => s.add(l.gain), new Decimal(0));
 
         const incomeTxns = incomeLists
           .flat()
@@ -270,31 +368,43 @@ export async function loadTaxYearDetail(
           );
         const byInstrument = new Map<
           string,
-          { symbol: string; currency: string; net: number; tax: number }
+          { symbol: string; currency: string; net: Decimal; tax: Decimal }
         >();
         for (const t of incomeTxns) {
-          const qty = Number(t.quantity);
-          const net = (qty > 0 ? qty * Number(t.price) : Number(t.price)) - Number(t.fees ?? 0);
+          const qty = new Decimal(t.quantity);
+          const net = (qty.gt(0) ? qty.mul(t.price) : new Decimal(t.price)).sub(t.fees ?? "0");
           const key = `${t.instrumentId ?? t.description ?? t.type}:${t.currency}`;
           const symbol = t.instrument?.symbol ?? t.description ?? t.type;
-          const bucket = byInstrument.get(key) ?? { symbol, currency: t.currency, net: 0, tax: 0 };
-          bucket.net += net;
-          bucket.tax += Number(t.tax ?? 0);
+          const bucket = byInstrument.get(key) ?? {
+            symbol,
+            currency: t.currency,
+            net: new Decimal(0),
+            tax: new Decimal(0),
+          };
+          bucket.net = bucket.net.add(net);
+          bucket.tax = bucket.tax.add(new Decimal(t.tax ?? "0"));
           byInstrument.set(key, bucket);
         }
         const dividendRows: TaxDividendRow[] = [...byInstrument.values()].map((b) => ({
           symbol: b.symbol,
           currency: b.currency,
-          gross: (b.net + b.tax).toFixed(2),
+          gross: b.net.add(b.tax).toFixed(2),
           tax: b.tax.toFixed(2),
           net: b.net.toFixed(2),
         }));
-        const totalsByCurrencyMap = new Map<string, { gross: number; tax: number; net: number }>();
+        const totalsByCurrencyMap = new Map<
+          string,
+          { gross: Decimal; tax: Decimal; net: Decimal }
+        >();
         for (const r of dividendRows) {
-          const t = totalsByCurrencyMap.get(r.currency) ?? { gross: 0, tax: 0, net: 0 };
-          t.gross += Number(r.gross);
-          t.tax += Number(r.tax);
-          t.net += Number(r.net);
+          const t = totalsByCurrencyMap.get(r.currency) ?? {
+            gross: new Decimal(0),
+            tax: new Decimal(0),
+            net: new Decimal(0),
+          };
+          t.gross = t.gross.add(r.gross);
+          t.tax = t.tax.add(r.tax);
+          t.net = t.net.add(r.net);
           totalsByCurrencyMap.set(r.currency, t);
         }
         const dividendTotalsByCurrency: TaxCurrencyTotal[] = [...totalsByCurrencyMap.entries()]
@@ -306,51 +416,55 @@ export async function loadTaxYearDetail(
             net: t.net.toFixed(2),
           }));
 
-        const taxRate = Number(entry.allowanceUsage.taxRate);
-        const allowanceAnnual = Number(entry.allowanceUsage.allowanceAnnual);
+        const taxRate = new Decimal(entry.allowanceUsage?.taxRate ?? "0");
+        const allowanceAnnual = new Decimal(entry.allowanceUsage?.allowanceAnnual ?? "0");
         const years = new Set<number>([
           ...tradeLog.realizedByYear.map((r) => r.year),
           ...tradeLog.dividendsByYear.map((d) => d.year),
         ]);
-        const byYear: TaxYearRow[] = [...years]
-          .sort((a, b) => b - a)
-          .map((y) => {
-            if (y === entry.year) {
-              const u = entry.allowanceUsage;
-              const taxable = Number(u.taxableExcess);
+        const byYear: TaxYearRow[] = (
+          [...years]
+            .sort((a, b) => b - a)
+            .map((y) => {
+              if (y === entry.year) {
+                const u = entry.allowanceUsage;
+                if (!u) return null;
+                const taxable = new Decimal(u.taxableExcess);
+                return {
+                  year: y,
+                  realized: u.realizedGainsAdjusted,
+                  dividends: u.incomeYtd,
+                  tax: taxable.mul(taxRate).toFixed(2),
+                  fsaUsed: u.usedYtd,
+                };
+              }
+
+              const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
+              const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
+              const dividendsGross = divEntry
+                ? new Decimal(divEntry.amount).add(divEntry.tax)
+                : new Decimal(0);
+              const realizedD = new Decimal(realized);
+              const taxable = Decimal.max(0, realizedD.add(dividendsGross).sub(allowanceAnnual));
+              const fsaUsed = Decimal.min(
+                allowanceAnnual,
+                Decimal.max(0, realizedD.add(dividendsGross)),
+              );
               return {
                 year: y,
-                realized: u.realizedGainsAdjusted,
-                dividends: u.incomeYtd,
-                tax: (taxable * taxRate).toFixed(2),
-                fsaUsed: u.usedYtd,
+                realized,
+                dividends: dividendsGross.toFixed(2),
+                tax: taxable.mul(taxRate).toFixed(2),
+                fsaUsed: fsaUsed.toFixed(2),
               };
-            }
+            }) as Array<TaxYearRow | null>
+        ).filter((r): r is TaxYearRow => r !== null);
 
-            const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
-            const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
-            const dividendsGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax) : 0;
-            const taxable = Math.max(0, Number(realized) + dividendsGross - allowanceAnnual);
-            const fsaUsed = Math.min(
-              allowanceAnnual,
-              Math.max(0, Number(realized) + dividendsGross),
-            );
-            return {
-              year: y,
-              realized,
-              dividends: dividendsGross.toFixed(2),
-              tax: (taxable * taxRate).toFixed(2),
-              fsaUsed: fsaUsed.toFixed(2),
-            };
-          });
-
-        const proceedsByYearMap = new Map<number, number>();
+        const proceedsByYearMap = new Map<number, Decimal>();
         for (const t of tradeLog.trades) {
           for (const l of t.legs) {
-            proceedsByYearMap.set(
-              l.taxYear,
-              (proceedsByYearMap.get(l.taxYear) ?? 0) + Number(l.proceeds),
-            );
+            const prev = proceedsByYearMap.get(l.taxYear) ?? new Decimal(0);
+            proceedsByYearMap.set(l.taxYear, prev.add(l.proceeds));
           }
         }
         const idYears = new Set<number>([
@@ -360,11 +474,13 @@ export async function loadTaxYearDetail(
         ]);
         const idByYear: IdYearInput[] = [...idYears].map((y) => {
           const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
-          const dividendGross = divEntry ? Number(divEntry.amount) + Number(divEntry.tax) : 0;
+          const dividendGross = divEntry
+            ? new Decimal(divEntry.amount).add(divEntry.tax)
+            : new Decimal(0);
           const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
           return {
             year: y,
-            proceeds: (proceedsByYearMap.get(y) ?? 0).toFixed(2),
+            proceeds: (proceedsByYearMap.get(y) ?? new Decimal(0)).toFixed(2),
             dividendGross: dividendGross.toFixed(2),
             realized,
           };
@@ -379,6 +495,7 @@ export async function loadTaxYearDetail(
           dividendTotalsByCurrency,
           byYear,
           idByYear,
+          indonesianFinalTax: apiIdTax,
         });
       } catch {
         // Best-effort per holder

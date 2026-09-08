@@ -202,6 +202,28 @@ describe("aggregateIncome", () => {
     // Total: 300 IDR
     expect(statsScaled.forecastNextYear).toBe("300");
   });
+
+  it("falls back to ttmDividends (TTM scaled) for forecastNextYear when no projection given", () => {
+    // forecastNextYear falls back to the on-position scaled TTM: zero for sold-out
+    // instruments, reflecting that no future income is expected from a closed position.
+    const result = aggregateIncome({
+      events: [
+        {
+          instrumentId: "bbca",
+          type: "dividend",
+          price: "300",
+          currency: "IDR",
+          executedAt: d("2026-03-01"),
+        },
+      ],
+      displayCurrency: "IDR",
+      now: NOW,
+      heldQty: new Map([["bbca", "200"]]),
+      qtyAt: () => "100",
+    });
+    // scaled TTM = 300 × (200/100) = 600 IDR; forecastNextYear mirrors this.
+    expect(result.forecastNextYear).toBe("600");
+  });
 });
 
 describe("aggregateIncome — forecastRestOfYear / forecastFullYear", () => {

@@ -12,7 +12,7 @@ import { DisposalTable, IdSalesTable } from "@/components/tax/disposal-table";
 import { loadTaxYearDetail, loadPreferences, type TaxYearDetail } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 import type { TaxSummaryHolder } from "@portfolio/api-client";
-import { indonesianFinalTax } from "@portfolio/core";
+import type { IndonesianFinalTax } from "@portfolio/core";
 
 export function TaxDetailSkeleton() {
   return (
@@ -119,24 +119,20 @@ function TaxHolderSectionId({
   t: TaxTranslator;
 }) {
   const moneyCompact = (n: string | number) => formatMoneyCompact(Number(n), currency, locale);
-  const idTax = indonesianFinalTax({
-    disposals: (detail?.disposals ?? []).map((d) => ({
-      symbol: d.symbol,
-      when: d.when,
-      instrumentId: d.instrumentId,
-      proceeds: d.proceeds,
-      quantity: d.quantity,
-      avgBuyPrice: d.avgBuyPrice,
-      sellPrice: d.sellPrice,
-      lots: d.lots,
-    })),
-    dividends: (detail?.dividendRows ?? []).map((d) => ({
-      symbol: d.symbol,
-      currency: d.currency,
-      gross: d.gross,
-    })),
-    byYear: detail?.idByYear ?? [],
-  });
+  // Indonesian final-tax breakdown is now computed server-side by /portfolios/:id/tax;
+  // consuming detail.indonesianFinalTax directly (no client-side recompute) keeps the
+  // API as the single source of truth. The cast bridges the api-client's structural
+  // shape (lots typed loosely as unknown[]) to the @portfolio/core type the ID tables
+  // accept.
+  const idTax = detail?.indonesianFinalTax as unknown as
+    (IndonesianFinalTax & { lots?: unknown }) | undefined;
+  if (!idTax) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {t("id.unavailable", { defaultValue: "Indonesian tax breakdown is unavailable." })}
+      </p>
+    );
+  }
 
   return (
     <>

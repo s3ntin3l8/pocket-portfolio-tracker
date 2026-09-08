@@ -376,22 +376,63 @@ export interface TaxDistribution {
 /** Response from GET /portfolios/:id/tax */
 export interface PortfolioTaxSummary {
   year: number;
+  /** "DE" | "ID" — mirrors userPreferences.taxRegime, default "DE". Set on every response
+   *  so the web tier can branch on it without a second round-trip. */
+  regime?: "DE" | "ID";
   currency: string;
-  allowanceUsage: AllowanceUsage;
+  /** German `Sparerpauschbetrag` summary (DE-only). Omitted under the ID regime. */
+  allowanceUsage?: AllowanceUsage;
   harvestSuggestions: HarvestSuggestion[];
   /**
    * Whether this response applied the holder's seeded loss carry-forward. False for a
    * multi-depot holder — a per-person carry-forward can't be correctly attributed to just
    * one of several depots; see GET /networth/tax for the authoritative combined figure.
+   * Always omitted under the ID regime (no carry-forward concept there).
    */
-  carryForwardApplied: boolean;
-  /** Distribution context for the holder's full FSA allocation (used by the edit-portfolio modal). */
-  holderDistribution: TaxDistribution;
+  carryForwardApplied?: boolean;
+  /** Distribution context for the holder's full FSA allocation (used by the edit-portfolio modal).
+   *  Omitted under the ID regime. */
+  holderDistribution?: TaxDistribution;
   /** Teilfreistellung rate per instrumentId, the same map `allowanceUsage`/
    *  `harvestSuggestions` were computed with — lets the frontend Tf-adjust a per-disposal
    *  figure without re-deriving the asset-class-default rate (which could silently
-   *  disagree whenever a manual per-instrument override is set on the backend). */
-  tfRatesByInstrument: Record<string, string>;
+   *  disagree whenever a manual per-instrument override is set on the backend).
+   *  Omitted under the ID regime (no Teilfreistellung concept there). */
+  tfRatesByInstrument?: Record<string, string>;
+  /** Indonesian final-tax payload (ID-only). Omitted under the DE regime. Source of truth:
+   *  computed server-side — the web tier does NOT recompute this. */
+  indonesianFinalTax?: IndonesianFinalTax;
+}
+
+/** Canonical Indonesian final-tax payload shape, shared by {@link PortfolioTaxSummary}
+ *  and {@link TaxSummaryHolder}. Exported from `@portfolio/api-client` so consumers can
+ *  type `indonesianFinalTax` fields against a known shape. */
+export interface IndonesianFinalTax {
+  disposals: {
+    symbol: string;
+    when: string;
+    proceeds: string;
+    tax: string;
+    instrumentId?: string | null;
+    quantity?: string;
+    avgBuyPrice?: string;
+    sellPrice?: string;
+    lots?: unknown[];
+  }[];
+  totalProceeds: string;
+  totalSalesTax: string;
+  dividends: {
+    symbol: string;
+    currency: string;
+    gross: string;
+    tax: string;
+    net: string;
+  }[];
+  totalDividendGross: string;
+  totalDividendTax: string;
+  totalDividendNet: string;
+  estimatedTax: string;
+  byYear: { year: number; realized: string; dividends: string; tax: string }[];
 }
 
 /** One holder's entry in the GET /networth/tax response. */
@@ -407,14 +448,22 @@ export interface TaxSummaryHolder {
   };
   year: number;
   currency: string;
-  allowanceUsage: AllowanceUsage;
+  /**
+   * German `Sparerpauschbetrag` summary (DE-only). Omitted under the ID regime.
+   * Always present at the route level when called via GET /networth/tax because the
+   * caller filters out holders with no FSA allocation — but optional at the type level
+   * so the same shape can carry an ID payload.
+   */
+  allowanceUsage?: AllowanceUsage;
   harvestSuggestions: HarvestSuggestion[];
-  /** Always true here — this route aggregates every depot for the holder. */
-  carryForwardApplied: boolean;
-  /** Distribution summary across this holder's depots. */
-  distribution: TaxDistribution;
-  /** See {@link PortfolioTaxSummary.tfRatesByInstrument}'s doc comment. */
-  tfRatesByInstrument: Record<string, string>;
+  /** Always true here — this route aggregates every depot for the holder. Omitted under ID. */
+  carryForwardApplied?: boolean;
+  /** Distribution summary across this holder's depots. Omitted under ID. */
+  distribution?: TaxDistribution;
+  /** See {@link PortfolioTaxSummary.tfRatesByInstrument}'s doc comment. Omitted under ID. */
+  tfRatesByInstrument?: Record<string, string>;
+  /** Indonesian final-tax breakdown (ID-only). Omitted under DE. */
+  indonesianFinalTax?: IndonesianFinalTax;
 }
 
 export interface Portfolio {

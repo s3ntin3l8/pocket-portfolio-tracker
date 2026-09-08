@@ -131,7 +131,9 @@ export async function buildIncomeStats(
     }));
   const upcomingCoupons12mo = projectCoupons(positions, 12, now);
   const yearEnd = new Date(Date.UTC(now.getUTCFullYear(), 11, 31, 23, 59, 59, 999));
-  const restOfYearCoupons = projectCoupons(positions, yearEnd, now);
+  const restOfYearCoupons = projectCoupons(positions, yearEnd, now).filter(
+    (c) => c.date > toDateKey(now),
+  );
 
   const corpActions = await corporateActionsFor(app, heldIds);
   const heldQtyMap = new Map(

@@ -20,7 +20,10 @@ export function enrichContributions(
   flows: CashFlowPoint[],
   birthYear: number | null = null,
   portfolioType: "standard" | "child" = "standard",
-  opts: { totalReturn?: boolean; retirementAge?: number | null } = {},
+  opts: {
+    totalReturn?: boolean;
+    retirementAge?: number | null;
+  } = {},
 ) {
   // Money-as-Decimal: every money reduction/compare here runs through Decimal so
   // a long flow list can't accumulate float drift before the pct ratio is
@@ -72,7 +75,7 @@ export async function buildContributions(
   display: string,
   birthYear: number | null = null,
   portfolioType: "standard" | "child" = "standard",
-  boundary: "inside" | "outside" = "inside",
+  boundary: "inside" | "outside" = "outside",
   retirementAge: number | null = null,
 ) {
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];

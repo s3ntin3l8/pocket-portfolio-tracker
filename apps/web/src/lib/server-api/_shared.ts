@@ -248,6 +248,40 @@ export interface TaxYearRow {
   fsaUsed: string;
 }
 
+/**
+ * Loose structural shape of `indonesianFinalTax`'s return value — defined locally so
+ * the web tier doesn't have to import from `@portfolio/core` (which would force the
+ * boundary layer to take a private dep only for type info). The API client (and the
+ * core function it forwards to) is the source of truth at runtime.
+ */
+export interface IndonesianFinalTaxLike {
+  disposals: Array<{
+    symbol: string;
+    when: string;
+    proceeds: string;
+    tax: string;
+    instrumentId?: string | null;
+    quantity?: string;
+    avgBuyPrice?: string;
+    sellPrice?: string;
+    lots?: unknown[];
+  }>;
+  totalProceeds: string;
+  totalSalesTax: string;
+  dividends: Array<{
+    symbol: string;
+    currency: string;
+    gross: string;
+    tax: string;
+    net: string;
+  }>;
+  totalDividendGross: string;
+  totalDividendTax: string;
+  totalDividendNet: string;
+  estimatedTax: string;
+  byYear: Array<{ year: number; realized: string; dividends: string; tax: string }>;
+}
+
 export interface TaxYearDetail {
   currency: string;
   disposals: TaxDisposalRow[];
@@ -257,6 +291,14 @@ export interface TaxYearDetail {
   dividendTotalsByCurrency: TaxCurrencyTotal[];
   byYear: TaxYearRow[];
   idByYear: IdYearInput[];
+  /**
+   * Server-computed Indonesian final-tax breakdown for the same year. Only populated
+   * when `userPreferences.taxRegime === "ID"`. The web tier treats this as the
+   * source of truth — no client-side recomputation against `disposals` /
+   * `dividendRows` / `idByYear` (which were retained only for the German branch and
+   * as defensive fallbacks).
+   */
+  indonesianFinalTax?: IndonesianFinalTaxLike;
 }
 
 /** Extended TaxSummaryHolder carrying the real account-holder id (nullable — the
