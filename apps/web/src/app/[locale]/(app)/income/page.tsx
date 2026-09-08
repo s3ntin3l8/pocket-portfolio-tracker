@@ -198,16 +198,6 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                 </CardContent>
               </Card>
             )}
-            {classSlices.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("byClassTitle")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AllocationDonut data={classSlices} currency={currency} showPercent={false} />
-                </CardContent>
-              </Card>
-            )}
             {s.byInstrument.length > 0 && (
               <Card>
                 <CardHeader>
