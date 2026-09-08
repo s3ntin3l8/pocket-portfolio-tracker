@@ -78,11 +78,11 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
       />
 
       {visible.length === 0 ? (
-        <div className="rounded-xl bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
+        <div className="rounded-2xl bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
           {t("noMatches")}
         </div>
       ) : (
-        <div className="rounded-xl bg-card shadow-card">
+        <div className="rounded-2xl bg-card shadow-card">
           {/* ── Desktop table (lg+) ── */}
           <div className="hidden overflow-x-auto lg:block">
             <Table>

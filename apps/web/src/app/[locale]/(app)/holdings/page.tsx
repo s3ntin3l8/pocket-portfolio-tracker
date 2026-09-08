@@ -275,91 +275,27 @@ export default async function HoldingsPage({
       </div>
     ) : null;
 
-  // ── Glance hero + allocation + region/currency (aggregate/single-portfolio scope
-  // via loadNetWorth — same cookie-driven scope the rest of the app uses, independent
-  // of the `?portfolio=` override that only applies to the positions table below). ──
+  // ── Allocation (aggregate/single-portfolio scope via loadNetWorth — same
+  // cookie-driven scope the rest of the app uses, independent of the `?portfolio=`
+  // override that only applies to the positions table below). ──
   const summary = netWorthResult.status === "ok" ? netWorthResult.data : null;
   const allocation = summary?.allocation;
-
-  const glanceSection = summary && (
-    <>
-      <HeroGlanceCard
-        netWorth={summary.netWorth}
-        currency={summary.displayCurrency}
-        initialHistory={history}
-        initialRange={HERO_INITIAL_RANGE}
-        selectedId={selectedId}
-        benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
-      />
-
-      {allocation && allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
-        <AllocationCard
-          slices={allocation.byAssetClass
-            .filter((s) => Number(s.value) > 0)
-            .map((s) => ({
-              key: s.key,
-              label: s.key === "cash" ? tc("cash") : tc(s.key),
-              value: Number(s.value),
-            }))}
-          currency={summary.displayCurrency}
-          total={Number(summary.netWorth)}
-          totalLabel={t("allocation.totalLabel")}
-          totalValueFormatted={formatMoney(
-            Number(summary.netWorth),
-            summary.displayCurrency,
-            locale,
-          )}
-          allTimeLabel={t("allocation.allTimeLabel")}
-          allTimeAmount={formatSignedMoney(
-            Number(summary.totalUnrealizedPnL),
-            summary.displayCurrency,
-            locale,
-          )}
-          allTimePct={
-            Number(summary.totalCost) > 0
-              ? formatPercent(
-                  Number(summary.totalUnrealizedPnL) / Number(summary.totalCost),
-                  locale,
-                )
-              : null
-          }
-          allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
-          todayLabel={t("allocation.todayLabel")}
-          todayAmount={formatSignedMoney(
-            Number(summary.totalDayChange),
-            summary.displayCurrency,
-            locale,
-          )}
-          todayPct={(() => {
-            // Day-change %: the day's move over the prior close's book value. Securities
-            // that lack a previous close contribute nothing to either totalDayChange or
-            // (via a null/0 market value) totalMarketValue, so `market − change` is the
-            // priced book's opening base. Guard a non-positive base.
-            const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
-            return base > 0 ? formatPercent(Number(summary.totalDayChange) / base, locale) : null;
-          })()}
-          todayTone={toneOf(Number(summary.totalDayChange))}
-        />
-      )}
-
-      {allocation && (
-        <RegionCurrencyCard
-          regionTitle={t("byRegion")}
-          currencyTitle={t("byCurrency")}
-          regionRows={allocation.byRegion
-            .filter((s) => Number(s.value) > 0)
-            .map((s) => ({ key: s.key, label: tr(s.key), pct: s.pct }))}
-          currencyRows={allocation.byCurrency
-            .filter((s) => Number(s.value) > 0)
-            .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
-        />
-      )}
-    </>
-  );
 
   return (
     <div className="space-y-5">
       {Heading}
+
+      {/* ── Hero chart: full-width above the table ── */}
+      {summary && (
+        <HeroGlanceCard
+          netWorth={summary.netWorth}
+          currency={summary.displayCurrency}
+          initialHistory={history}
+          initialRange={HERO_INITIAL_RANGE}
+          selectedId={selectedId}
+          benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Main column: anomaly banners + tabs + table ── */}
@@ -401,7 +337,7 @@ export default async function HoldingsPage({
               </div>
               {visibleClassTabs.map((key) => (
                 <TabsContent key={key} value={key}>
-                  <div className="overflow-hidden rounded-[18px] bg-card shadow-card">
+                  <div className="overflow-hidden rounded-2xl bg-card shadow-card">
                     <HoldingsTable
                       rows={
                         key === "all"
@@ -418,9 +354,73 @@ export default async function HoldingsPage({
           </div>
         </div>
 
-        {/* ── Sidebar: glance cards (sticky on wide containers) ── */}
-        {/* Reference stacks the glance cards 14px apart. */}
-        <div className="space-y-3.5 @xl:sticky @xl:top-4 @xl:order-last">{glanceSection}</div>
+        {/* ── Sidebar: allocation + region/currency (sticky on wide containers) ── */}
+        {allocation && (
+          <div className="space-y-3.5 @xl:sticky @xl:top-4 @xl:order-last">
+            {allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
+              <AllocationCard
+                slices={allocation.byAssetClass
+                  .filter((s) => Number(s.value) > 0)
+                  .map((s) => ({
+                    key: s.key,
+                    label: s.key === "cash" ? tc("cash") : tc(s.key),
+                    value: Number(s.value),
+                  }))}
+                currency={summary.displayCurrency}
+                total={Number(summary.netWorth)}
+                totalLabel={t("allocation.totalLabel")}
+                totalValueFormatted={formatMoney(
+                  Number(summary.netWorth),
+                  summary.displayCurrency,
+                  locale,
+                )}
+                allTimeLabel={t("allocation.allTimeLabel")}
+                allTimeAmount={formatSignedMoney(
+                  Number(summary.totalUnrealizedPnL),
+                  summary.displayCurrency,
+                  locale,
+                )}
+                allTimePct={
+                  Number(summary.totalCost) > 0
+                    ? formatPercent(
+                        Number(summary.totalUnrealizedPnL) / Number(summary.totalCost),
+                        locale,
+                      )
+                    : null
+                }
+                allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
+                todayLabel={t("allocation.todayLabel")}
+                todayAmount={formatSignedMoney(
+                  Number(summary.totalDayChange),
+                  summary.displayCurrency,
+                  locale,
+                )}
+                todayPct={(() => {
+                  // Day-change %: the day's move over the prior close's book value. Securities
+                  // that lack a previous close contribute nothing to either totalDayChange or
+                  // (via a null/0 market value) totalMarketValue, so `market − change` is the
+                  // priced book's opening base. Guard a non-positive base.
+                  const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
+                  return base > 0
+                    ? formatPercent(Number(summary.totalDayChange) / base, locale)
+                    : null;
+                })()}
+                todayTone={toneOf(Number(summary.totalDayChange))}
+              />
+            )}
+
+            <RegionCurrencyCard
+              regionTitle={t("byRegion")}
+              currencyTitle={t("byCurrency")}
+              regionRows={allocation.byRegion
+                .filter((s) => Number(s.value) > 0)
+                .map((s) => ({ key: s.key, label: tr(s.key), pct: s.pct }))}
+              currencyRows={allocation.byCurrency
+                .filter((s) => Number(s.value) > 0)
+                .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -30,8 +30,7 @@ function DialogOverlay({
       className={cn(
         "fixed inset-0 z-50",
         // A full-screen mobile overlay isn't a modal over other content — no scrim.
-        // Matches SettingsModalShell's own mobile treatment (transparent below md,
-        // scrim at md:+). Non-full-screen (confirms/pickers) always gets the scrim.
+        // Non-full-screen (confirms/pickers) always gets the scrim.
         fullScreenOnMobile ? "bg-transparent md:bg-black/50" : "bg-black/50",
         className,
       )}

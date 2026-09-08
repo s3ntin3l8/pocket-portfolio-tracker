@@ -1131,13 +1131,14 @@
   },
   "CorpAction": {
     "title": "Catat aksi korporasi",
-    "subtitle": "Terapkan pemecahan, bonus, atau rights pada instrumen.",
+    "subtitle": "Terapkan pemecahan, bonus, rights, atau merger pada instrumen.",
     "link": "Aksi korporasi",
     "instrument": "Instrumen",
     "scopeHint": "Aksi korporasi dicatat sekali dan berlaku untuk instrumen di semua portofolio yang memilikinya.",
     "scopeHintFor": "Dicatat sekali — ini berlaku untuk {symbol} di semua portofolio yang memilikinya.",
     "search": "Cari berdasarkan simbol atau nama",
     "type": "Jenis",
+    "details": "Detail",
     "ratio": "Rasio",
     "ratioHint": "mis. 2 untuk pemecahan 2:1, 0.1 untuk bonus 1:10",
     "exDate": "Tanggal ex",
@@ -1145,6 +1146,19 @@
     "submitting": "Mencatat…",
     "needInstrument": "Cari dan pilih instrumen dulu.",
     "error": "Tidak dapat mencatat aksi. Periksa kolom dan coba lagi.",
+    "mergerInstruments": "Instrumen",
+    "mergerFrom": "Instrumen asal (lama)",
+    "mergerTo": "Instrumen tujuan (baru)",
+    "mergerOutQty": "Jumlah saham keluar",
+    "mergerInQty": "Jumlah saham masuk",
+    "mergerDate": "Tanggal",
+    "mergerTaxable": "Merger kena pajak (realisasikan keuntungan di nilai pasar)",
+    "mergerMarketValue": "Nilai pasar",
+    "mergerMarketValueHint": "Total nilai posisi saat merger — hanya untuk merger kena pajak.",
+    "mergerSubmit": "Catat merger",
+    "mergerNeedInstruments": "Pilih instrumen lama dan baru.",
+    "mergerNeedPortfolio": "Pilih portofolio dulu.",
+    "mergerError": "Tidak dapat mencatat merger. Periksa kolom dan coba lagi.",
     "edit": "Ubah",
     "delete": "Hapus",
     "save": "Simpan",
@@ -1158,23 +1172,6 @@
     "errors": {
       "forbidden": "Anda tidak memiliki izin untuk mengelola aksi korporasi."
     }
-  },
-  "Merger": {
-    "link": "Merger",
-    "subtitle": "Ubah kepemilikan dari satu ISIN ke ISIN lain (Fondsverschmelzung), membawa basis biaya.",
-    "from": "Instrumen asal (lama)",
-    "to": "Instrumen tujuan (baru)",
-    "search": "Cari berdasarkan simbol, nama, atau ISIN",
-    "outQty": "Unit keluar",
-    "inQty": "Unit masuk",
-    "date": "Tanggal",
-    "taxable": "Merger kena pajak (realisasikan keuntungan pada nilai pasar)",
-    "marketValue": "Nilai pasar",
-    "marketValueHint": "Total nilai posisi saat merger — hanya untuk merger kena pajak.",
-    "submit": "Catat merger",
-    "submitting": "Mencatat…",
-    "needInstruments": "Pilih instrumen lama dan baru.",
-    "error": "Tidak dapat mencatat merger. Periksa kolom dan coba lagi."
   },
   "Search": {
     "triggerLabel": "Cari",
@@ -1680,7 +1677,8 @@
     "saveback": "Saveback",
     "roundup": "Pembulatan",
     "crypto_bonus": "Bonus kripto",
-    "reinvestment": "Reinvestasi"
+    "reinvestment": "Reinvestasi",
+    "merger": "Merger"
   },
   "AssetClass": {
     "equity": "Saham",

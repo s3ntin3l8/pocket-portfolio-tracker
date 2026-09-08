@@ -7,23 +7,19 @@ import { PortfolioPicker, type PickablePortfolio } from "@/components/portfolio-
 import { AddTransaction } from "@/components/add-transaction";
 import type { AddTransactionInitial } from "@/components/add-transaction-form";
 import { RecordCorporateAction } from "@/components/record-corporate-action";
-import { RecordMerger } from "@/components/record-merger";
 
-export type NewEntryTab = "transaction" | "corporate-action" | "merger";
+export type NewEntryTab = "transaction" | "corporate-action";
 
 /**
- * Unifies the manual-entry forms behind one tabbed page. A transaction and a merger are
- * portfolio-scoped money events; a corporate action is instrument-global reference data —
- * different forms and endpoints, so they stay separate components, just one entry point.
+ * Unifies the manual-entry forms behind one tabbed page. A transaction is
+ * portfolio-scoped; a corporate action (split, bonus, rights, or merger) is either
+ * instrument-global or portfolio-scoped depending on the type — handled within a
+ * single form component.
  *
- * The portfolio picker makes the destination explicit (in the aggregate "All portfolios"
- * scope the page falls back to the first portfolio, which is otherwise invisible). It's the
- * same rich {@link PortfolioPicker} as the app-shell switcher — brokerage icon plus
- * `name · brokerage · accountHolder` — so a plain "Main" vs "Main" is told apart by its
- * broker. Shared by the two portfolio-scoped tabs (transaction, merger), hidden with a
- * single portfolio, and absent from the corporate-action tab (an action is instrument-global).
+ * The portfolio picker makes the destination explicit. Shared by the transaction
+ * tab, absent from the corporate-action tab when the type is not a merger.
  */
-const ALL_TABS: NewEntryTab[] = ["transaction", "corporate-action", "merger"];
+const ALL_TABS: NewEntryTab[] = ["transaction", "corporate-action"];
 
 export function NewEntryTabs({
   portfolios,
@@ -48,24 +44,22 @@ export function NewEntryTabs({
   stickyFooter?: boolean;
   isAdmin?: boolean;
   /** Desktop modal shell — see `AddTransactionForm`'s `isDesktop`. Only threaded to
-   *  `AddTransaction` (its two-column layout) now — `RecordCorporateAction`/
-   *  `RecordMerger` get their submit button's chrome from `useSheetFooterChrome()`
-   *  instead (which host they're portaling into, not the viewport). */
+   *  `AddTransaction` (its two-column layout) now — `RecordCorporateAction`
+   *  gets its submit button's chrome from `useSheetFooterChrome()` instead. */
   isDesktop?: boolean;
   /** Controlled active tab — the caller owns the state, so changing it on an already-
    *  mounted tree (deep-link prefill, manual reset, …) takes effect without remount. */
   value: NewEntryTab;
   onValueChange: (tab: NewEntryTab) => void;
   /** Suppress the in-body segmented tab control — the desktop rail's "Instrument event"
-   *  destination hosts corporate-action/merger as a 2-way switch of its own instead. */
+   *  destination hosts corporate-action as a standalone form instead. */
   hideTabList?: boolean;
   /** Restrict which tabs are mounted — e.g. the desktop rail's "Add transaction" destination
-   *  only ever shows the transaction tab. Defaults to all three (mobile's existing set). */
+   *  only ever shows the transaction tab. Defaults to both tabs. */
   visibleTabs?: NewEntryTab[];
 }) {
   const tt = useTranslations("Manage.tx");
   const tca = useTranslations("CorpAction");
-  const tmg = useTranslations("Merger");
   const [portfolioId, setPortfolioId] = useState(initialPortfolioId);
   const activePortfolio = portfolios.find((p) => p.id === portfolioId) ?? portfolios[0];
 
@@ -85,9 +79,6 @@ export function NewEntryTabs({
 
   return (
     <Tabs value={value} onValueChange={(v: string) => onValueChange(v as NewEntryTab)}>
-      {/* Full-width, evenly-distributed segmented control (#472 — was left-clustered under
-          the shared TabsList's `inline-flex` default). Hidden on desktop, where the nav rail
-          (or the events step's own 2-way switch) replaces it. */}
       {!hideTabList && (
         <TabsList className="flex w-full">
           {visibleTabs.includes("transaction") && (
@@ -100,18 +91,10 @@ export function NewEntryTabs({
               {tca("link")}
             </TabsTrigger>
           )}
-          {visibleTabs.includes("merger") && (
-            <TabsTrigger value="merger" className="flex-1">
-              {tmg("link")}
-            </TabsTrigger>
-          )}
         </TabsList>
       )}
       {visibleTabs.includes("transaction") && (
         <TabsContent value="transaction">
-          {/* v2 design: the picker sits inside the form, between the bucket switcher and
-              the instrument field — not above it (unlike the merger tab below, which
-              doesn't go through AddTransactionForm and keeps its own copy above). */}
           <AddTransaction
             portfolioId={portfolioId}
             portfolio={activePortfolio}
@@ -123,14 +106,13 @@ export function NewEntryTabs({
         </TabsContent>
       )}
       {visibleTabs.includes("corporate-action") && (
-        <TabsContent value="corporate-action">
-          <RecordCorporateAction stickyFooter={stickyFooter} isAdmin={isAdmin} />
-        </TabsContent>
-      )}
-      {visibleTabs.includes("merger") && (
-        <TabsContent value="merger" className="space-y-4">
+        <TabsContent value="corporate-action" className="space-y-4">
           {picker}
-          <RecordMerger portfolioId={portfolioId} stickyFooter={stickyFooter} />
+          <RecordCorporateAction
+            portfolioId={portfolioId}
+            stickyFooter={stickyFooter}
+            isAdmin={isAdmin}
+          />
         </TabsContent>
       )}
     </Tabs>

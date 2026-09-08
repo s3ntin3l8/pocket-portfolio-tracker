@@ -1133,13 +1133,14 @@
   },
   "CorpAction": {
     "title": "Record a corporate action",
-    "subtitle": "Apply a split, bonus or rights issue to an instrument.",
+    "subtitle": "Apply a split, bonus, rights issue, or merger to an instrument.",
     "link": "Corporate action",
     "instrument": "Instrument",
     "scopeHint": "A corporate action is recorded once and applies to the instrument across every portfolio that holds it.",
     "scopeHintFor": "Recorded once — this applies to {symbol} across every portfolio that holds it.",
     "search": "Search by symbol or name",
     "type": "Type",
+    "details": "Details",
     "ratio": "Ratio",
     "ratioHint": "e.g. 2 for a 2:1 split, 0.1 for a 1:10 bonus",
     "exDate": "Ex-date",
@@ -1147,6 +1148,19 @@
     "submitting": "Recording…",
     "needInstrument": "Search for and select an instrument first.",
     "error": "Couldn't record the action. Check the fields and try again.",
+    "mergerInstruments": "Instruments",
+    "mergerFrom": "From instrument (old)",
+    "mergerTo": "To instrument (new)",
+    "mergerOutQty": "Shares out",
+    "mergerInQty": "Shares in",
+    "mergerDate": "Date",
+    "mergerTaxable": "Taxable merger (realise the gain at market value)",
+    "mergerMarketValue": "Market value",
+    "mergerMarketValueHint": "Total value of the position at the merger — taxable mergers only.",
+    "mergerSubmit": "Record merger",
+    "mergerNeedInstruments": "Select both the old and the new instrument.",
+    "mergerNeedPortfolio": "Select a portfolio first.",
+    "mergerError": "Couldn't record the merger. Check the fields and try again.",
     "edit": "Edit",
     "delete": "Delete",
     "save": "Save",
@@ -1160,23 +1174,6 @@
     "errors": {
       "forbidden": "You don't have permission to manage corporate actions."
     }
-  },
-  "Merger": {
-    "link": "Merger",
-    "subtitle": "Convert a holding from one ISIN to another (Fondsverschmelzung), carrying cost basis.",
-    "from": "From instrument (old)",
-    "to": "To instrument (new)",
-    "search": "Search by symbol, name or ISIN",
-    "outQty": "Shares out",
-    "inQty": "Shares in",
-    "date": "Date",
-    "taxable": "Taxable merger (realise the gain at market value)",
-    "marketValue": "Market value",
-    "marketValueHint": "Total value of the position at the merger — taxable mergers only.",
-    "submit": "Record merger",
-    "submitting": "Recording…",
-    "needInstruments": "Select both the old and the new instrument.",
-    "error": "Couldn't record the merger. Check the fields and try again."
   },
   "Search": {
     "triggerLabel": "Search",
@@ -1682,7 +1679,8 @@
     "saveback": "Saveback",
     "roundup": "Round-up",
     "crypto_bonus": "Crypto bonus",
-    "reinvestment": "Reinvestment"
+    "reinvestment": "Reinvestment",
+    "merger": "Merger"
   },
   "AssetClass": {
     "equity": "Stocks",

@@ -29,9 +29,6 @@ import { HolderFormBody } from "@/components/holder-form-dialog/body";
 import { MethodCard } from "@/components/add-transaction-menu/method-card";
 import { loadHarvestPrefill } from "@/components/add-transaction-menu/helpers";
 import { NavRail, type DesktopStep } from "@/components/add-transaction-menu/nav-rail";
-import { EventsTabSwitch } from "@/components/add-transaction-menu/events-tab-switch";
-
-type EventsTab = "corporate-action" | "merger";
 
 /** Every reachable destination of the unified overlay. "choose" is the mobile-only
  *  chooser screen (never entered on a `md:`+ viewport — the rail replaces it there, see
@@ -70,8 +67,6 @@ export function AddTransactionMenu({
 } = {}) {
   const tm = useTranslations("Manage");
   const ti = useTranslations("Import");
-  const tca = useTranslations("CorpAction");
-  const tmg = useTranslations("Merger");
   const api = useApiClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -104,10 +99,6 @@ export function AddTransactionMenu({
   const [portfolios, setPortfolios] = useState<ImportTargetPortfolio[] | null>(null);
   const [defaultPortfolioId, setDefaultPortfolioId] = useState("");
   const [manualDefaultTab, setManualDefaultTab] = useState<NewEntryTab>("transaction");
-  // The desktop rail's "Instrument event" destination hosts its own Corp. action/Merger
-  // 2-way switch (`EventsTabSwitch`) instead of `NewEntryTabs`' internal `TabsList`
-  // (`hideTabList`) — this is that switch's controlled value.
-  const [eventsTab, setEventsTab] = useState<EventsTab>("corporate-action");
   const [importEntryMode, setImportEntryMode] = useState<ImportEntryMode>("file");
   const [initialTransaction, setInitialTransaction] = useState<AddTransactionInitial | undefined>(
     undefined,
@@ -182,14 +173,16 @@ export function AddTransactionMenu({
         setInitialTransaction(prefill ?? undefined);
         setManualDefaultTab("transaction");
       } else {
+        // Merger is now a type within the corporate-action form — redirect deep links.
         targetTab =
-          entryParam === "corporate-action" || entryParam === "merger" ? entryParam : "transaction";
+          entryParam === "corporate-action" || entryParam === "merger"
+            ? "corporate-action"
+            : "transaction";
         setInitialTransaction(undefined);
         setManualDefaultTab(targetTab);
       }
       setAddOpen(true);
-      if (targetTab === "corporate-action" || targetTab === "merger") setEventsTab(targetTab);
-      // On desktop, a corporate-action/merger deep link routes to the rail's "Instrument
+      // On desktop, a corporate-action deep link routes to the rail's "Instrument
       // event" destination instead of "Add transaction" (which is transaction-only there —
       // see `NewEntryTabs`' `visibleTabs` wiring below).
       if (isWide && targetTab !== "transaction") {
@@ -240,10 +233,9 @@ export function AddTransactionMenu({
     setStep("manual");
   }
 
-  /** Desktop rail only — "Instrument event" hosts corporate-action/merger. */
-  async function openEvents(tab: EventsTab = "corporate-action") {
+  /** Desktop rail only — "Instrument event" hosts corporate-action (with merger as a type). */
+  async function openEvents() {
     await loadPortfolios();
-    setEventsTab(tab);
     setStep("events");
   }
 
@@ -373,24 +365,17 @@ export function AddTransactionMenu({
       )
     ) : step === "events" ? (
       portfolios && (
-        <>
-          <EventsTabSwitch
-            value={eventsTab}
-            onChange={setEventsTab}
-            labels={{ corporateAction: tca("link"), merger: tmg("link") }}
-          />
-          <NewEntryTabs
-            portfolios={portfolios}
-            initialPortfolioId={defaultPortfolioId}
-            value={eventsTab}
-            onValueChange={(tab) => setEventsTab(tab as EventsTab)}
-            stickyFooter
-            isAdmin={isAdmin}
-            isDesktop={isDesktop}
-            hideTabList
-            visibleTabs={["corporate-action", "merger"]}
-          />
-        </>
+        <NewEntryTabs
+          portfolios={portfolios}
+          initialPortfolioId={defaultPortfolioId}
+          value="corporate-action"
+          onValueChange={() => {}}
+          stickyFooter
+          isAdmin={isAdmin}
+          isDesktop={isDesktop}
+          hideTabList
+          visibleTabs={["corporate-action"]}
+        />
       )
     ) : step === "portfolio" ? (
       <PortfolioFormBody mode="create" onSuccess={onDialogSuccess} onDone={openManual} />
