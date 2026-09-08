@@ -18,12 +18,12 @@ function baseStats(): ContributionStats {
   };
 }
 
-describe("enrichContributions — outside-boundary requires user-provided monthlyContribution (S8)", () => {
-  it("flags requiresBudgetPlan when boundary='outside' and monthlyContribution is undefined", () => {
+describe("enrichContributions — outside-boundary without user-provided monthlyContribution (S8)", () => {
+  it("does not include requiresBudgetPlan when boundary='outside' and monthlyContribution is undefined", () => {
     const result = enrichContributions(baseStats(), "1000", fakeFlows, null, "standard", {
       boundary: "outside",
     });
-    expect(result.requiresBudgetPlan).toBe(true);
+    expect(result).not.toHaveProperty("requiresBudgetPlan");
   });
 
   it("returns a seedAnnualReturn for boundary='outside' when monthlyContribution is provided", () => {
@@ -33,14 +33,7 @@ describe("enrichContributions — outside-boundary requires user-provided monthl
     });
     expect(result.seedAnnualReturn).toBeTruthy();
     expect(typeof result.seedAnnualReturn).toBe("string");
-    expect(result.requiresBudgetPlan).toBe(false);
-  });
-
-  it("returns requiresBudgetPlan=true on outside-boundary without explicit monthlyContribution so the UI can prompt the user", () => {
-    const result = enrichContributions(baseStats(), "1000", fakeFlows, null, "standard", {
-      boundary: "outside",
-    });
-    expect(result.requiresBudgetPlan).toBe(true);
+    expect(result).not.toHaveProperty("requiresBudgetPlan");
   });
 
   it("does NOT throw on inside-boundary (default) — XIRR seed is the legacy contract there", () => {

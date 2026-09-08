@@ -27,10 +27,6 @@ export function enrichContributions(
     monthlyContribution?: string;
   } = {},
 ) {
-  const boundary = opts.boundary ?? "outside";
-  const isOutside = boundary === "outside";
-  const budgetPlanMissing = isOutside && opts.monthlyContribution === undefined;
-
   // Money-as-Decimal: every money reduction/compare here runs through Decimal so
   // a long flow list can't accumulate float drift before the pct ratio is
   // computed. The two ratio outputs (simpleGainPct, totalReturnPct) stay as
@@ -70,7 +66,6 @@ export function enrichContributions(
     birthYear,
     portfolioType,
     retirementAge: opts.retirementAge ?? null,
-    requiresBudgetPlan: budgetPlanMissing,
     asOf: asOf.toISOString(),
   };
 }

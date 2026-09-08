@@ -1402,13 +1402,6 @@ export interface ContributionStats {
   portfolioType: "standard" | "child";
   /** User's target retirement age for the "to retirement" forecast target. */
   retirementAge: number | null;
-  /**
-   * True when the effective boundary is "outside" AND no `monthlyContribution` was
-   * provided. The UI should prompt the user for a monthly top-up before showing the
-   * forecast — outside-boundary portfolios' contribution cannot be derived from
-   * transactions alone, so the forecast's seed is unsafe until the user supplies one.
-   */
-  requiresBudgetPlan: boolean;
   asOf: string;
 }
 

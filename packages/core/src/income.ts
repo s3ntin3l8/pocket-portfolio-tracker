@@ -77,20 +77,6 @@ export interface IncomeStats {
   byYear: YearIncome[];
   monthly: MonthIncome[];
   ttm: string;
-  /**
-   * Unscaled sum of dividend cash actually paid in the TTM window (display currency).
-   * Always non-zero for instruments that have ever paid in the window, including those
-   * fully sold before `now`. Useful for "what this stock has ever paid me" reporting
-   * independent of current position.
-   */
-  ttmDividendsHistorical: string;
-  /**
-   * Per-position TTM dividend run-rate: scaled by the current/historical qty ratio per
-   * event. Zero for instruments that are no longer held (cannot produce income from a
-   * zero-qty position). Feeds `forecastNextYear`'s fallback when no explicit projection
-   * is supplied.
-   */
-  ttmDividendsOnPosition: string;
   thisYear: string;
   lastYear: string;
   deltaAbs: string;
@@ -142,8 +128,6 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
   let lifetime = ZERO();
   let ttm = ZERO();
   let ttmDividends = ZERO();
-  let ttmDividendsHistorical = ZERO();
-  let ttmDividendsOnPosition = ZERO();
   let thisYear = ZERO();
   let lastYear = ZERO();
 
@@ -195,8 +179,6 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
           }
         }
         ttmDividends = ttmDividends.add(scaledAmount);
-        ttmDividendsHistorical = ttmDividendsHistorical.add(amount);
-        ttmDividendsOnPosition = ttmDividendsOnPosition.add(scaledAmount);
       }
     }
     if (e.executedAt.getUTCFullYear() === currentYear) thisYear = thisYear.add(amount);
@@ -217,9 +199,6 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
         )
       : // Fallback to the scaled on-position TTM: zero for sold-out instruments,
         // reflecting that no future income is expected from a closed position.
-        // The unscaled `ttmDividendsHistorical` is exposed on the public surface
-        // for consumers that want the "what has this instrument historically paid"
-        // figure independent of the current position.
         ttmDividends;
   const forecast = nextYearDividendForecast.add(couponForecast);
 
@@ -244,8 +223,6 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
       .map(([month, total]) => ({ month, total: total.toString() }))
       .sort((a, b) => a.month.localeCompare(b.month)),
     ttm: ttm.toString(),
-    ttmDividendsHistorical: ttmDividendsHistorical.toString(),
-    ttmDividendsOnPosition: ttmDividendsOnPosition.toString(),
     thisYear: thisYear.toString(),
     lastYear: lastYear.toString(),
     deltaAbs: deltaAbs.toString(),

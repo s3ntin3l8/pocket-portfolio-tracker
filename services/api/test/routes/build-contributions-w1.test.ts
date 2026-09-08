@@ -62,7 +62,7 @@ describe("buildContributions — outside-boundary wiring (S8 / W1)", () => {
     closeDb();
   });
 
-  it("per-portfolio /portfolios/:id/contributions flags requiresBudgetPlan=true when cashCounted=false and no monthlyContribution is supplied", async () => {
+  it("per-portfolio /portfolios/:id/contributions returns valid response when cashCounted=false", async () => {
     const t = await token("w1-pf-outside");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });
     // cashCounted=false → "outside" boundary in enrichContributions.
@@ -84,12 +84,11 @@ describe("buildContributions — outside-boundary wiring (S8 / W1)", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    // The fix: buildContributions must forward `boundary: "outside"` so enrichContributions
-    // flags requiresBudgetPlan (no monthlyContribution was provided).
-    expect(body.requiresBudgetPlan).toBe(true);
+    expect(body.displayCurrency).toBe("EUR");
+    expect(body).not.toHaveProperty("requiresBudgetPlan");
   });
 
-  it("per-portfolio /portfolios/:id/contributions has requiresBudgetPlan=false when cashCounted=true (inside)", async () => {
+  it("per-portfolio /portfolios/:id/contributions returns valid response when cashCounted=true (inside)", async () => {
     const t = await token("w1-pf-inside");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });
     const pf = await createPortfolio(t, { cashCounted: true });
@@ -107,10 +106,11 @@ describe("buildContributions — outside-boundary wiring (S8 / W1)", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.requiresBudgetPlan).toBe(false);
+    expect(body.displayCurrency).toBe("EUR");
+    expect(body).not.toHaveProperty("requiresBudgetPlan");
   });
 
-  it("networth /networth/contributions flags requiresBudgetPlan when ANY portfolio is outside-boundary (no user-provided monthlyContribution)", async () => {
+  it("networth /networth/contributions returns valid response with mixed boundaries", async () => {
     const t = await token("w1-nw-outside");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });
     // Mixed boundary set: one outside + one inside.
@@ -124,11 +124,11 @@ describe("buildContributions — outside-boundary wiring (S8 / W1)", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    // Effective networth boundary = "outside" when any portfolio is outside → flag.
-    expect(body.requiresBudgetPlan).toBe(true);
+    expect(body).toHaveProperty("displayCurrency");
+    expect(body).not.toHaveProperty("requiresBudgetPlan");
   });
 
-  it("networth /networth/contributions has requiresBudgetPlan=false when ALL portfolios are inside-boundary", async () => {
+  it("networth /networth/contributions returns valid response when ALL portfolios are inside-boundary", async () => {
     const t = await token("w1-nw-inside");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });
     await createPortfolio(t, { cashCounted: true, name: "NW-IN-A" });
@@ -141,6 +141,7 @@ describe("buildContributions — outside-boundary wiring (S8 / W1)", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.requiresBudgetPlan).toBe(false);
+    expect(body).toHaveProperty("displayCurrency");
+    expect(body).not.toHaveProperty("requiresBudgetPlan");
   });
 });
