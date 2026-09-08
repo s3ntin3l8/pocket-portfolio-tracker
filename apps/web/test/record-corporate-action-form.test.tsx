@@ -46,8 +46,25 @@ function makeClient(over: Partial<RecordCorpActionClient> = {}): RecordCorpActio
       return [INSTRUMENT];
     }),
     lookupInstruments: vi.fn(async () => []),
-    createCorporateAction: vi.fn(async () => ({})),
-    createMerger: vi.fn(async () => ({})),
+    createCorporateAction: vi.fn(async () => ({
+      id: "ca-1",
+      instrumentId: "inst-1",
+      type: "split" as const,
+      ratio: "1",
+      exDate: "2026-01-01",
+      terms: null,
+    })),
+    createMerger: vi.fn(async () => ({
+      transactions: [],
+      corporateAction: {
+        id: "ca-1",
+        instrumentId: "inst-1",
+        type: "merger" as const,
+        ratio: "1",
+        exDate: "2026-01-01",
+        terms: null,
+      },
+    })),
     ...over,
   };
 }
@@ -164,6 +181,74 @@ describe("RecordCorporateActionForm", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(m.mergerNeedInstruments),
     );
     expect(client.createMerger).not.toHaveBeenCalled();
+  });
+
+  it("sends marketValue when the taxable toggle is on (German-format input)", async () => {
+    const client = makeClient();
+    const onSuccess = renderForm(client, vi.fn(), true, "p1");
+
+    // Switch to merger type
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "merger" } });
+
+    // Pick from instrument
+    fireEvent.change(screen.getByLabelText(m.mergerFrom), { target: { value: "old" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /OLDF/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /OLDF/ }));
+
+    // Pick to instrument
+    fireEvent.change(screen.getByLabelText(m.mergerTo), { target: { value: "new" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /NEWF/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /NEWF/ }));
+
+    fireEvent.change(screen.getByLabelText(m.mergerOutQty), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.mergerInQty), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText(m.mergerDate, { selector: "input" }), {
+      target: { value: "2024-01-23" },
+    });
+
+    // Enable taxable toggle and enter German-format market value
+    fireEvent.click(screen.getByLabelText(m.mergerTaxable));
+    fireEvent.change(screen.getByLabelText(m.mergerMarketValue), {
+      target: { value: "3.869,77" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: m.mergerSubmit }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(client.createMerger).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({
+        taxable: true,
+        marketValue: "3869.77",
+      }),
+    );
+  });
+
+  it("allows non-admin users to record mergers", async () => {
+    const client = makeClient();
+    const onSuccess = renderForm(client, vi.fn(), false, "p1");
+
+    // Non-admin should see the merger form (not the admin-only message)
+    expect(screen.getByLabelText(m.mergerFrom)).toBeInTheDocument();
+
+    // Pick from instrument
+    fireEvent.change(screen.getByLabelText(m.mergerFrom), { target: { value: "old" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /OLDF/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /OLDF/ }));
+
+    // Pick to instrument
+    fireEvent.change(screen.getByLabelText(m.mergerTo), { target: { value: "new" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /NEWF/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /NEWF/ }));
+
+    fireEvent.change(screen.getByLabelText(m.mergerOutQty), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText(m.mergerInQty), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(m.mergerDate, { selector: "input" }), {
+      target: { value: "2024-01-23" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.mergerSubmit }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
 
   it("wraps the submit button in a sticky footer when stickyFooter is set", () => {

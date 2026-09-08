@@ -137,6 +137,7 @@ export function RecordCorporateActionForm({
 }) {
   const t = useTranslations("CorpAction");
   const tt = useTranslations("TxType");
+  const [type, setType] = useState<CaType>(isAdmin ? "split" : "merger");
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Instrument[]>([]);
@@ -144,7 +145,6 @@ export function RecordCorporateActionForm({
   const [discovered, setDiscovered] = useState<InstrumentSearchResult[]>([]);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selected, setSelected] = useState<Instrument | null>(null);
-  const [type, setType] = useState<CaType>("split");
   const [ratio, setRatio] = useState("");
   const [exDate, setExDate] = useState("");
   const [busy, setBusy] = useState(false);
@@ -276,7 +276,12 @@ export function RecordCorporateActionForm({
   const hasFooterChrome = useSheetFooterChrome();
   const useFooterPortal = stickyFooter && footerEl;
 
-  if (!isAdmin) {
+  // Mergers are portfolio-scoped transactions (like buy/sell) and don't require admin
+  // privileges. Other corporate action types (split/bonus/rights) are instrument-global
+  // and require admin.
+  const isMergerOnly = !isAdmin && type === "merger";
+
+  if (!isAdmin && type !== "merger") {
     return (
       <div className="rounded-md border border-border bg-muted/40 px-4 py-6 text-center">
         <p className="text-sm font-medium text-muted-foreground">{t("adminOnly")}</p>
@@ -303,18 +308,20 @@ export function RecordCorporateActionForm({
         )}
 
         {/* ── Action type ─────────────────────────────────────────── */}
-        <div className={CARD}>
-          <Eyebrow>{t("type")}</Eyebrow>
-          <div className="space-y-1.5">
-            <Select id="ca-type" value={type} onChange={(e) => setType(e.target.value as CaType)}>
-              {TYPES.map((ty) => (
-                <option key={ty} value={ty}>
-                  {tt(ty)}
-                </option>
-              ))}
-            </Select>
+        {!isMergerOnly && (
+          <div className={CARD}>
+            <Eyebrow>{t("type")}</Eyebrow>
+            <div className="space-y-1.5">
+              <Select id="ca-type" value={type} onChange={(e) => setType(e.target.value as CaType)}>
+                {TYPES.map((ty) => (
+                  <option key={ty} value={ty}>
+                    {tt(ty)}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Instrument(s) ────────────────────────────────────────── */}
         <div className={CARD}>

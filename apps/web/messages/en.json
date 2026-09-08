@@ -1696,7 +1696,8 @@
     "saveback": "Saveback",
     "roundup": "Round-up",
     "crypto_bonus": "Crypto bonus",
-    "reinvestment": "Reinvestment"
+    "reinvestment": "Reinvestment",
+    "merger": "Merger"
   },
   "AssetClass": {
     "equity": "Stocks",

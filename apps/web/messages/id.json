@@ -1694,7 +1694,8 @@
     "saveback": "Saveback",
     "roundup": "Pembulatan",
     "crypto_bonus": "Bonus kripto",
-    "reinvestment": "Reinvestasi"
+    "reinvestment": "Reinvestasi",
+    "merger": "Merger"
   },
   "AssetClass": {
     "equity": "Saham",
