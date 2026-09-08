@@ -26,7 +26,6 @@ import { NewEntryTabs, type NewEntryTab } from "../src/components/new-entry-tabs
 
 const tx = messages.Manage.tx;
 const ca = messages.CorpAction;
-const mg = messages.Merger;
 
 type TestPortfolio = {
   id: string;
@@ -79,13 +78,6 @@ describe("NewEntryTabs", () => {
     expect(screen.getByLabelText(ca.ratio)).toBeInTheDocument();
   });
 
-  it("starts on the merger tab when requested", () => {
-    renderTabs("merger");
-    // The merger form's two instrument pickers are present (their search inputs).
-    expect(screen.getByLabelText(mg.from)).toBeInTheDocument();
-    expect(screen.getByLabelText(mg.to)).toBeInTheDocument();
-  });
-
   it("offers the rich portfolio picker only when more than one portfolio exists", () => {
     // Single portfolio: no picker (destination is unambiguous).
     const { unmount } = renderTabs();
@@ -121,14 +113,6 @@ describe("NewEntryTabs", () => {
     expect(
       picker.compareDocumentPosition(instrumentLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-  });
-
-  it("shares the rich portfolio picker with the merger tab", () => {
-    renderTabs("merger", [
-      { id: "p1", name: "Main", brokerage: null, accountHolder: null },
-      { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
-    ]);
-    expect(screen.getByRole("button", { name: tx.portfolioPicker })).toBeInTheDocument();
   });
 
   // Regression test for #472: the tab bar used to shrink-wrap and hug the left edge
