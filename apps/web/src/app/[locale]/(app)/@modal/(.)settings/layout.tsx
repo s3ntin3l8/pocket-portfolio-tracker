@@ -148,7 +148,7 @@ export default async function SettingsModalLayout({
           identityCard && (
             <Link
               href="/settings/account"
-              className="mb-4 flex items-center gap-3.5 rounded-[20px] border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
+              className="mb-4 flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
             >
               {identityCard}
             </Link>

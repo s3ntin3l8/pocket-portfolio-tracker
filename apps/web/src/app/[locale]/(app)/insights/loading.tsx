@@ -10,7 +10,7 @@ export default function Loading() {
       </div>
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-4">
-          <Card className="rounded-[20px]">
+          <Card className="rounded-2xl">
             <div className="space-y-3 p-6">
               <Skeleton className="h-3 w-1/3" />
               <Skeleton className="h-10 w-1/2" />
@@ -26,14 +26,14 @@ export default function Loading() {
         </div>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Card className="rounded-[20px]">
+            <Card className="rounded-2xl">
               <div className="space-y-2 p-4">
                 <Skeleton className="h-3 w-2/3" />
                 <Skeleton className="h-7 w-1/2" />
                 <Skeleton className="h-3 w-3/4" />
               </div>
             </Card>
-            <Card className="rounded-[20px]">
+            <Card className="rounded-2xl">
               <div className="space-y-2 p-4">
                 <Skeleton className="h-3 w-2/3" />
                 <Skeleton className="h-7 w-1/2" />

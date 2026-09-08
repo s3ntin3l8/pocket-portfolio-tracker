@@ -119,7 +119,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-4">
           <div
-            className="rounded-[20px] p-6 text-white"
+            className="rounded-2xl p-6 text-white"
             style={{ background: "linear-gradient(135deg,#11211a,#1d3a2c)" }}
           >
             <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
@@ -141,7 +141,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <div className="space-y-4">
           {allocation && (
             <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-[20px] bg-card p-4 shadow-card">
+              <div className="rounded-2xl bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("concentration.label")}</p>
                 <p className="tabular mt-1 text-[22px] font-extrabold leading-none">
                   {allocation.concentration.top1Pct.toFixed(0)}%
@@ -162,7 +162,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                 )}
               </div>
 
-              <div className="rounded-[20px] bg-card p-4 shadow-card">
+              <div className="rounded-2xl bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("diversification.label")}</p>
                 <p className="mt-1 text-[22px] font-extrabold leading-none">
                   {t("diversification.value", { count: assetClassSlices.length })}
