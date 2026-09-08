@@ -396,6 +396,10 @@ export default async function HoldingsPage({
                   locale,
                 )}
                 todayPct={(() => {
+                  // Day-change %: the day's move over the prior close's book value. Securities
+                  // that lack a previous close contribute nothing to either totalDayChange or
+                  // (via a null/0 market value) totalMarketValue, so `market − change` is the
+                  // priced book's opening base. Guard a non-positive base.
                   const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
                   return base > 0
                     ? formatPercent(Number(summary.totalDayChange) / base, locale)
