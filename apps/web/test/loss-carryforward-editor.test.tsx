@@ -75,4 +75,12 @@ describe("LossCarryforwardEditor", () => {
     fireEvent.change(stockInput, { target: { value: "-500" } });
     expect(stockInput.value).toBe("500");
   });
+
+  it("calls router.refresh() after a successful save to update server-rendered tax figures", async () => {
+    renderEditor(2026);
+    await waitFor(() => expect(getLossCarryforward).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() => expect(setLossCarryforward).toHaveBeenCalled());
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
 });
