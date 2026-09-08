@@ -105,7 +105,7 @@ export function AppShell({
           {/* Desktop sidebar — transcribed from the reference: 236px, 22/16 padding, nav
           items 600 14px text-mute (inactive) / 700 14px green on a green tint (active),
           12px radius, 19px icons, 3px gap. */}
-          <aside className="hidden w-[236px] shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pt-[max(22px,env(safe-area-inset-top))] md:flex">
+          <aside className="hidden w-[236px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-border bg-card px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pt-[max(22px,env(safe-area-inset-top))] md:flex">
             <div className="px-2 pb-6">
               <Brand />
             </div>
