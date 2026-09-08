@@ -155,6 +155,12 @@ export async function computeConcentrationSection(
         const adjustedEnd = new Decimal(rawEnd).div(saEnd);
         const pct = adjustedEnd.div(adjustedStart).toNumber() - 1;
 
+        // Sanity gate: returns beyond ±200% in a month/year are almost certainly data
+        // quality issues (stale price, missing corporate action, Yahoo API mismatch) rather
+        // than genuine market moves.  Skipping them prevents a single bad price from
+        // distorting the best/worst performer cards.
+        if (Math.abs(pct) > 2) continue;
+
         const inst = instMap.get(instId);
         if (!inst) continue;
         movers.push({

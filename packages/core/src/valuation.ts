@@ -191,7 +191,11 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     if (prev) {
       const priceDelta = new Decimal(quote.price).sub(prev);
       dayChange = priceDelta.mul(h.quantity).toString();
-      dayChangePct = priceDelta.div(prev).mul(100).toString();
+      const rawPct = priceDelta.div(prev).mul(100);
+      // Sanity gate: daily moves beyond ±50% are data artifacts (stale previousClose,
+      // Yahoo API unit mismatch), not real market moves.  Clamp to avoid distorting
+      // portfolio-level metrics that aggregate per-holding day changes.
+      dayChangePct = rawPct.clamp(-50, 50).toString();
       totalDayChange = totalDayChange.add(
         new Decimal(convert(dayChange, quoteCcy, input.displayCurrency, fx)),
       );
