@@ -18,8 +18,7 @@ const FullScreenOverlayCountContext = createContext(0);
  * pinned-footer/no-footer special case inside `DialogContent` itself.
  *
  * Mount once near the shell root (`AppShell`); `DialogContent` self-registers via
- * `useFullScreenOverlayRegistration` below. `SettingsModalShell`'s own mobile full-page
- * treatment is unaffected — it predates this migration and isn't built on `DialogContent`.
+ * `useFullScreenOverlayRegistration` below.
  *
  * Deliberately mounted in `AppShell`, not the root layout: routes outside it
  * (`/onboarding`, `/auth-error`) have no `BottomNav` to hide, so there's nothing for a

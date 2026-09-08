@@ -7,10 +7,9 @@
  *
  * Deliberately module-level state, not React Context: `useBackToClose`'s three call
  * sites (`Dialog`, `Sheet`, `CommandDialog`) need this to work identically regardless of
- * where in the tree they render, including outside `AppShell` — the `@modal` parallel
- * route, `/onboarding`, `/auth-error` — where a Context provider mounted in `AppShell`
- * (the pattern `full-screen-overlay.tsx` uses for an adjacent problem) wouldn't reach at
- * all. `window.history` is itself a browser-global singleton; coordinating access to it
+ * where in the tree they render, including outside `AppShell` — `/onboarding`,
+ * `/auth-error` — where a Context provider mounted in `AppShell` (the pattern
+ * `full-screen-overlay.tsx` uses for an adjacent problem) wouldn't reach at all. `window.history` is itself a browser-global singleton; coordinating access to it
  * through React state would be an impedance mismatch for no benefit, since nothing here
  * renders from this state. Every mutation happens only inside effects that already guard
  * `typeof window === "undefined"`, so this is never touched during SSR.
