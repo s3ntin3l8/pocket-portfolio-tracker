@@ -10,7 +10,7 @@ export function VolatilityCard({ volatility }: { volatility: InsightsVolatility 
   const sortino = volatility.sortinoRatio ? Number(volatility.sortinoRatio) : null;
 
   return (
-    <Card className="rounded-[20px] bg-card p-4 shadow-card">
+    <Card className="rounded-2xl bg-card p-4 shadow-card">
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
       {vol !== null ? (
         <p className="tabular mt-1 text-[22px] font-extrabold leading-none">

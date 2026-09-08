@@ -115,7 +115,7 @@ export function ForecastPanel({
 
   return (
     <div
-      className="rounded-[20px] p-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.28)]"
+      className="rounded-2xl p-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.28)]"
       style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
     >
       <p className="text-base font-bold">{t("forecastTitle")}</p>

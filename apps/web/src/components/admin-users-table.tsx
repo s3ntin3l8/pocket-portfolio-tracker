@@ -30,7 +30,7 @@ export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+    <div className="overflow-hidden rounded-2xl bg-card shadow-card">
       {users.map((u, i) => (
         <div key={u.id} className={i > 0 ? "border-t border-line px-4 py-3.5" : "px-4 py-3.5"}>
           <div className="flex items-baseline gap-2.5">

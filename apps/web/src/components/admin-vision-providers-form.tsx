@@ -143,7 +143,7 @@ export function AdminVisionProvidersForm({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-          <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+          <div className="overflow-hidden rounded-2xl bg-card shadow-card">
             {rows.map((p, i) => {
               const editable = canEditVisionCredential(encryptionEnabled);
               const editing = editingId === p.id;

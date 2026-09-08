@@ -18,7 +18,7 @@ function formatRows(rows: number | null | undefined): string {
 /**
  * `/admin/database`. Design (`Admin Settings.dc.html`, "DATABASE / STATS" section): two
  * `rounded-[16px]` stat tiles (Database size / Rows est.), an uppercase "TABLES" eyebrow
- * over a `rounded-[20px]` table-list card, and — the design's one deviation from real
+ * over a `rounded-2xl` table-list card, and — the design's one deviation from real
  * data — a static "Object storage not used" callout. This app's storage backend is
  * real and configurable (see PR B2's `admin-storage-form.tsx`), so that callout only
  * shows when storage genuinely isn't configured; when it is, the real usage stats render
@@ -57,7 +57,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
         {t("statsTablesLabel")}
       </div>
       {db.tables.length > 0 ? (
-        <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
           <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-[11px] font-bold uppercase tracking-[.03em] text-text-3 md:flex">
             <span className="flex-1">{t("statsColumnTable")}</span>
             <span className="w-[100px] text-right">{t("statsRowsEstimate")}</span>

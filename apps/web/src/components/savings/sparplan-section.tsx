@@ -61,7 +61,7 @@ export function SparplanSection({
       : null;
 
   return (
-    <Card className="min-w-0 rounded-[20px] p-5">
+    <Card className="min-w-0 rounded-2xl p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-bold">{t("sparplanTitle")}</h2>
         <div className="flex shrink-0 items-center gap-2">

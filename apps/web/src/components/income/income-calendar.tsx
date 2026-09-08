@@ -99,7 +99,7 @@ export function IncomeCalendar({
   const canGoNext = true;
 
   return (
-    <div className="rounded-[20px] bg-card p-[22px] shadow-card">
+    <div className="rounded-2xl bg-card p-[22px] shadow-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-bold">{t("calendarTitle")}</h2>

@@ -159,7 +159,7 @@ export function SettingsShell({
               <div
                 key={`group-${i}`}
                 className={cn(
-                  "divide-y divide-line overflow-hidden rounded-[20px] bg-card",
+                  "divide-y divide-line overflow-hidden rounded-2xl bg-card",
                   CARD_SHADOW,
                 )}
               >
@@ -198,7 +198,7 @@ export function SettingsShell({
             {landingExtra && (
               <div
                 className={cn(
-                  "divide-y divide-line overflow-hidden rounded-[20px] bg-card",
+                  "divide-y divide-line overflow-hidden rounded-2xl bg-card",
                   CARD_SHADOW,
                 )}
               >

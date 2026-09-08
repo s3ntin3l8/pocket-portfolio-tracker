@@ -87,7 +87,7 @@ export function InstrumentLotsTable({ lots, currency }: { lots: LotView[]; curre
       </div>
       <div className="space-y-3 md:hidden">
         {sorted.map((lot, i) => (
-          <div key={`${lot.acqDate}-${i}`} className="rounded-[20px] bg-card shadow-card px-4 py-3">
+          <div key={`${lot.acqDate}-${i}`} className="rounded-2xl bg-card shadow-card px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{dateFmt.format(new Date(lot.acqDate))}</div>

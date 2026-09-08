@@ -72,7 +72,7 @@ export async function DataConnectionsSection({
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("dataSourcesLabel")}
         </p>
-        <div className="divide-y divide-border overflow-hidden rounded-[20px] bg-card shadow-card">
+        <div className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-card">
           {sources.map((s) => (
             <div key={s.key} className="flex items-center gap-3 px-4 py-3">
               {s.key === "import" ? (

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
 
-const CARD = "rounded-[20px] bg-card p-[22px] shadow-card";
+const CARD = "rounded-2xl bg-card p-[22px] shadow-card";
 
 const TONE_CLASS: Record<"up" | "down" | "neutral", string> = {
   up: "text-success",

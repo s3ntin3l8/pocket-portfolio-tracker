@@ -17,7 +17,7 @@ export function CompositionCard({
   const t = useTranslations("Insights.composition");
 
   return (
-    <Card className="rounded-[20px] bg-card p-4 shadow-card">
+    <Card className="rounded-2xl bg-card p-4 shadow-card">
       <div className="flex items-center gap-2 p-2 pb-0">
         <p className="text-sm font-semibold">{t("title")}</p>
         <ConcentrationBadge label={allocation.concentration.label} />

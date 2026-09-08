@@ -36,7 +36,7 @@ export function ConcentrationTrendCard({ trend }: { trend: ConcentrationPoint[] 
   const top1Data = trend.map((p) => p.top1Pct);
 
   return (
-    <Card className="rounded-[20px] bg-card p-4 shadow-card">
+    <Card className="rounded-2xl bg-card p-4 shadow-card">
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
       {latest ? (
         <>

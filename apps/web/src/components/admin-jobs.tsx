@@ -110,7 +110,7 @@ interface AdminJobsProps {
 }
 
 /**
- * Design (`Admin Settings.dc.html`, JOBS section): one `rounded-[20px]` card-row list —
+ * Design (`Admin Settings.dc.html`, JOBS section): one `rounded-2xl` card-row list —
  * replacing the old desktop `<table>` / mobile-card split — with capitalized status
  * pills and a green "Run now" / white-bordered "Force re-run". The poll-for-completion
  * state machine (queued/timed-out) is unchanged from the old layout, just restyled.
@@ -170,7 +170,7 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[20px] bg-card shadow-card">
+    <div className="overflow-hidden rounded-2xl bg-card shadow-card">
       {jobs.map((job, i) => {
         const entry = pending[job.name];
         const isPending = Boolean(entry) && !entry?.timedOut;
