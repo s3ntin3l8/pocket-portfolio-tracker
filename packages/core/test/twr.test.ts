@@ -519,3 +519,60 @@ describe("TWR: aggregateValueFlows then chainIndex ≠ average of per-portfolio 
     expect(Number(aggregateIndex[1].pct)).toBeCloseTo(8.18, 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. Artifact guard: single-day moves beyond threshold are carried forward
+// ---------------------------------------------------------------------------
+
+describe("TWR: artifact guard drops implausible single-day moves", () => {
+  it("carries index forward when |rt| > maxSingleDayReturn (default 50%)", () => {
+    const series: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "1100", effectiveFlow: "0" }, // +10% → index 110
+      { date: "2026-01-03", marketValue: "2200", effectiveFlow: "0" }, // +100% artifact → dropped
+      { date: "2026-01-04", marketValue: "2310", effectiveFlow: "0" }, // +5% from 2200
+    ];
+
+    const index = chainIndex(series);
+
+    expect(Number(index[0].index)).toBeCloseTo(100, 6);
+    expect(Number(index[1].index)).toBeCloseTo(110, 6);
+    // Artifact day: index carries forward at 110 (not 220)
+    expect(Number(index[2].index)).toBeCloseTo(110, 6);
+    // Recovery: prevMv = 2200 (the artifact day's mv), +5% applied to carried index
+    expect(Number(index[3].index)).toBeCloseTo(115.5, 6);
+  });
+
+  it("carries index forward when growth ≤ 0 (≥100% loss)", () => {
+    const series: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "1100", effectiveFlow: "0" }, // +10%
+      { date: "2026-01-03", marketValue: "0", effectiveFlow: "0" }, // -100% gap → dropped
+      { date: "2026-01-04", marketValue: "1150", effectiveFlow: "0" },
+    ];
+
+    const index = chainIndex(series);
+
+    expect(Number(index[0].index)).toBeCloseTo(100, 6);
+    expect(Number(index[1].index)).toBeCloseTo(110, 6);
+    // Gap day: index carries forward at 110 (not collapsed to 0)
+    expect(Number(index[2].index)).toBeCloseTo(110, 6);
+    // Recovery: prevMv = 0 (gap day), carry-forward again
+    expect(Number(index[3].index)).toBeCloseTo(110, 6);
+  });
+
+  it("respects custom maxSingleDayReturn threshold", () => {
+    const series: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "1100", effectiveFlow: "0" }, // +10%
+      { date: "2026-01-03", marketValue: "1210", effectiveFlow: "0" }, // +10% → allowed at 0.2 threshold
+    ];
+
+    // With maxSingleDayReturn = 0.2 (20%), +10% is allowed
+    const index = chainIndex(series, 100, 0.2);
+
+    expect(Number(index[0].index)).toBeCloseTo(100, 6);
+    expect(Number(index[1].index)).toBeCloseTo(110, 6);
+    expect(Number(index[2].index)).toBeCloseTo(121, 6);
+  });
+});

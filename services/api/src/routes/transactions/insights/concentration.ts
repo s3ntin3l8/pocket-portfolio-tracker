@@ -159,7 +159,13 @@ export async function computeConcentrationSection(
         // quality issues (stale price, missing corporate action, Yahoo API mismatch) rather
         // than genuine market moves.  Skipping them prevents a single bad price from
         // distorting the best/worst performer cards.
-        if (Math.abs(pct) > 2) continue;
+        if (Math.abs(pct) > 2) {
+          app.log.warn(
+            { symbol: instMap.get(instId)?.symbol, pct, window: `${startDate}→${latestDate}` },
+            "[insights] skipped implausible period mover",
+          );
+          continue;
+        }
 
         const inst = instMap.get(instId);
         if (!inst) continue;

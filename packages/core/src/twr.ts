@@ -218,6 +218,18 @@ export function chainIndex(
       // Both indicate data artifacts (stale/missing prices), not real returns.
       if (growth.gt(0) && rt.abs().lte(maxSingleDayReturn)) {
         index = index.mul(growth);
+      } else if (typeof process !== "undefined" && process.stderr) {
+        // Log dropped days so artifact prices become visible in logs instead of
+        // silently vanishing — aids debugging stale/missing price data.
+        process.stderr.write(
+          JSON.stringify({
+            level: "warn",
+            msg: "[twr] dropped artifact day",
+            date: point.date,
+            rt: rt.toString(),
+            reason: growth.lte(0) ? "negative_growth" : "exceeds_max_single_day_return",
+          }) + "\n",
+        );
       }
     }
     // prevMv === null: first point, index stays at base.
