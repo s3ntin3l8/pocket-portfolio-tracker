@@ -56,7 +56,7 @@ export function DesktopRow({
                 aria-label={isOpen ? t("collapseLegs") : t("expandLegs")}
                 aria-expanded={isOpen}
                 onClick={() => onToggle(key)}
-                className="absolute -left-5 inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="absolute -left-4 inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ChevronRight
                   className={cn("size-4 transition-transform", isOpen && "rotate-90")}
