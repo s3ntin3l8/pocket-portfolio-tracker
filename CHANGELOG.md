@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.1.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.8...v0.1.9) (2026-09-08)
+
+
+### Features
+
+* **api:** populate benchmark fields on single-portfolio history ([#600](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/600)) ([e4c6e9c](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/e4c6e9c208ee02420320afe65090101f3247ce2d))
+* **auth:** migrate local users to OIDC on email collision ([#680](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/680)) ([64c1e11](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/64c1e1193a4918bc282d0aa6ce708c23d05ac1a5))
+* **income:** forward-looking payment calendar with company logos ([#602](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/602)) ([#677](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/677)) ([9bbf810](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9bbf810868ee415fa83895f92a113626ed048cf9))
+* **income:** group timeline events by instrument ([#663](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/663)) ([d6237c8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d6237c83e0aa11a9e7e4f00bd2a042d7005b6fbb))
+* **insights:** add composition card with allocation drill-downs ([d17defd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d17defda52e9de595cc40685dada407265915d0c)), closes [#599](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/599)
+* **insights:** per-year returns with multi-benchmark comparison ([#595](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/595)) ([#682](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/682)) ([4ac1839](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4ac18394ff105ecac477010968e9cd12f3aeba34))
+* **instrument:** show EPS expected vs. actual history on the instrument card ([#676](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/676)) ([befaa8a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/befaa8a8068c0931aece738133a1eec93620f32f))
+* model mergers as first-class corporate actions ([#577](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/577)) ([#681](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/681)) ([063dc9f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/063dc9ff1777cb610588d81254466120db65d5e9))
+* overlay benchmark on Holdings wealth chart ([#600](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/600)) ([f283209](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f283209b424e1f001e98a3f7dabe60cba697bb8f))
+* responsive sidepanel layout for Holdings, Instruments, Income, Savings ([#667](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/667)) ([11f77d8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/11f77d82a7847b68050a08a2658ebe44451b8f05))
+* **tax:** add per-pot breakdown with netGainLoss, used, carryForwardApplied to CoverageCard ([#547](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/547)) ([#672](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/672)) ([4683362](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4683362565285f63dcc09dd1b24cd1311db6b4e0))
+* **tax:** restructure /tax page with Vorabpauschale, coverage card, and loss carry-forward editor ([#668](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/668)) ([03bc925](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/03bc925a152b4a21ca2118f1f59f8e220adc6461))
+* **web:** add HeroOverlayChart for two-line benchmark comparison ([66c86e5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/66c86e5e633e5b2ba8c4927dcce9d17ec1b95e7e))
+* **web:** merge AddTransactionMenu and DesktopShell into one CSS-switched overlay ([#669](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/669)) ([#678](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/678)) ([4eb7718](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4eb77184349496bb4ce04601c3a36fc6bf63e6a8))
+* **web:** overlay chrome migration — single-tree DialogContent, task/refinement/chrome tiers ([#625](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/625)) ([26ed6a5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/26ed6a53051cbfc743cb9b6d750e0dd31cb9080f))
+* **web:** render TWR-normalized hero overlay in NetWorthHistoryChart ([52e8414](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/52e84148de7732d6ccd1c2f7c25f20ab1ffedc10))
+* **web:** rewire HeroGlanceCard pills to TWR % + benchmark delta ([4f030af](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4f030af779ccc5f429f92f2ae9e17212bfb4a46a))
+* **web:** show page title and back-nav in desktop topbar ([#598](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/598)) ([#662](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/662)) ([c02548a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c02548ac841b5b539f59ea0b7052aaf54fd4ec23))
+* widescreen sidepanel layout for Activity page ([#665](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/665)) ([8668653](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8668653aa5cdef804b21edfecedbee7cfc2628e8))
+* widescreen sidepanel layout for Trades page ([#666](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/666)) ([53615d9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/53615d9be6a00d6c0101d7fdcca6016d1090d949))
+
+
+### Bug Fixes
+
+* **api,web:** local auth correctness bugs, first-run admin bootstrap, and change-password UI ([#657](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/657)) ([dd4c241](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/dd4c2419d952c58a11d64bb32e32e88f883378a4))
+* **api:** let PATs carry admin in local development only ([#631](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/631)) ([a48c21b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a48c21b09b85f308a76a9f00e5557b9ad0a86497))
+* **api:** pre-release v0.2.0 — concurrent confirm, money-as-decimal, bodyLimit ([#685](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/685)) ([ee393d0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ee393d0403cddc796e83b016bde5fe0f487242e0))
+* **core,api:** pre-release v0.2.0 — income track, ID tax regime, forecast seed ([#687](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/687)) ([0e526e2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0e526e21c7b22b78a3c8bf65b57c50f5365c8311))
+* **core,api:** pre-release v0.2.0 — merger-aware engine, cross-currency transfer, income SQL ([#686](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/686)) ([61bd4e6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/61bd4e6578a65723eadc403dd7d63ab0ea0d8a62))
+* **db:** keep non-enum statements transactional in enum-adding migrations ([#655](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/655)) ([ca455c9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ca455c9589fe5833c1b3e1ea254f50df08eda616)), closes [#654](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/654)
+* **db:** run enum-adding migrations outside a transaction ([#645](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/645)) ([6e37e8b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6e37e8b84389b49c334a385863772b18cdc2e239))
+* **dev:** wire up the PGlite dev workflow PR [#627](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/627) shipped but never configured ([092656a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/092656ac08d1912e2ecd93a5db8eec7c44e5991a))
+* **security,infra:** pre-release v0.2.0 — CVE pin, prod secrets, IDOR cache key, scoped ownership ([#683](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/683)) ([ddabefd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ddabefdb968d85d70017d2fa92f7a844ab8818b1))
+* **web,api:** hero pill math + symbol prop + benchmark cache ([ef1b5b4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ef1b5b4038286644f82029813f5288b6db0407a5))
+* **web:** back-press closes only the topmost open Dialog/Sheet/CommandDialog ([#673](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/673)) ([3ccd246](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3ccd246e8ae9baec38b9475d297ee4e596878d4e))
+* **web:** break hero snapshot useEffect re-render loop ([a2026c3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a2026c3ce0b5bcb555df1957945046bf0e347d83))
+* **web:** decide submit-button footer chrome by host, not viewport ([#674](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/674)) ([718b819](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/718b819774d2da867bdc0050a28444cf476bac69))
+* **web:** make local password auth work end to end ([aaa11e4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/aaa11e46ec4793e9e7623b8800e25078b1c674d1))
+* **web:** onboarding inputs now use &lt;Input&gt;, fixing iOS zoom-to-focus ([#624](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/624)) ([5ccb579](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5ccb5796f7019e6f5bfbab687eaa8e08d8c53c23))
+* **web:** pre-release v0.2.0 — a11y row keys, kpi-picker CSS-switch, segment loading/error ([#684](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/684)) ([af72f02](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/af72f0263140c98f166881138ca0f2c43b70c3a0))
+
 ## [0.1.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.7...v0.1.8) (2026-07-25)
 
 
