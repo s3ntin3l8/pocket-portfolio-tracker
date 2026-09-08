@@ -23,8 +23,6 @@ export function enrichContributions(
   opts: {
     totalReturn?: boolean;
     retirementAge?: number | null;
-    boundary?: "inside" | "outside";
-    monthlyContribution?: string;
   } = {},
 ) {
   // Money-as-Decimal: every money reduction/compare here runs through Decimal so
@@ -79,7 +77,6 @@ export async function buildContributions(
   portfolioType: "standard" | "child" = "standard",
   boundary: "inside" | "outside" = "outside",
   retirementAge: number | null = null,
-  monthlyContribution?: string,
 ) {
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
@@ -94,8 +91,6 @@ export async function buildContributions(
   return enrichContributions(stats, summary.netWorth, flows, birthYear, portfolioType, {
     totalReturn: boundary === "outside",
     retirementAge,
-    boundary,
-    monthlyContribution,
   });
 }
 
