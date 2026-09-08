@@ -134,6 +134,28 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     <div className="space-y-5">
       {heading}
 
+      {/* ── Stat cards: horizontal strip on desktop ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard
+          label={t("thisYear")}
+          value={m(thisFullYear)}
+          delta={
+            deltaPct !== null
+              ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
+              : undefined
+          }
+          deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
+        />
+        <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
+        <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
+        <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
+        <StatCard
+          label={t("payments")}
+          value={String(s.paymentCount)}
+          delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Main column: interest + charts + timeline ── */}
         <div className="space-y-5">
@@ -257,29 +279,19 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           )}
         </div>
 
-        {/* ── Sidebar: stat cards (sticky on wide containers) ── */}
-        <div className="@xl:sticky @xl:top-4 @xl:order-last">
-          <div className="grid grid-cols-1 space-y-2.5 sm:space-y-4">
-            <StatCard
-              label={t("thisYear")}
-              value={m(thisFullYear)}
-              delta={
-                deltaPct !== null
-                  ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
-                  : undefined
-              }
-              deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
-            />
-            <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
-            <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
-            <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
-            <StatCard
-              label={t("payments")}
-              value={String(s.paymentCount)}
-              delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
-            />
+        {/* ── Sidebar: allocation donut (sticky on wide containers) ── */}
+        {classSlices.length > 0 && (
+          <div className="@xl:sticky @xl:top-4 @xl:order-last">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("byClassTitle")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AllocationDonut data={classSlices} currency={currency} showPercent={false} />
+              </CardContent>
+            </Card>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
