@@ -275,12 +275,12 @@ describe("AddTransactionMenu", () => {
       expect(replace).toHaveBeenCalledWith("/transactions");
     });
 
-    it("auto-opens the manual entry tabs on ?entry=merger", async () => {
+    it("auto-opens the manual entry tabs on ?entry=merger (redirects to corporate-action)", async () => {
       search.value = "entry=merger";
       renderMenu({ autoOpenFromParams: true });
 
       await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
-      expect(lastEntryTabsProps.current).toMatchObject({ value: "merger" });
+      expect(lastEntryTabsProps.current).toMatchObject({ value: "corporate-action" });
     });
 
     it("ignores an unrecognized ?entry value, falling back to the transaction tab", async () => {

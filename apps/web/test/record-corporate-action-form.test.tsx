@@ -22,19 +22,50 @@ const INSTRUMENT: Instrument = {
   name: "Bank Central Asia",
 };
 
+function inst(id: string, symbol: string): Instrument {
+  return {
+    id,
+    isin: null,
+    wkn: null,
+    symbol,
+    market: "XETRA",
+    assetClass: "etf",
+    unit: "shares",
+    currency: "EUR",
+    name: symbol,
+  };
+}
+const OLD = inst("i-old", "OLDF");
+const NEW = inst("i-new", "NEWF");
+
 function makeClient(over: Partial<RecordCorpActionClient> = {}): RecordCorpActionClient {
   return {
-    searchInstruments: vi.fn(async () => [INSTRUMENT]),
+    searchInstruments: vi.fn(async (q?: string) => {
+      if (q?.includes("new")) return [NEW];
+      if (q?.includes("old")) return [OLD];
+      return [INSTRUMENT];
+    }),
     lookupInstruments: vi.fn(async () => []),
-    createCorporateAction: vi.fn(async () => ({}) as never),
+    createCorporateAction: vi.fn(async () => ({})),
+    createMerger: vi.fn(async () => ({})),
     ...over,
   };
 }
 
-function renderForm(client: RecordCorpActionClient, onSuccess = vi.fn(), isAdmin?: boolean) {
+function renderForm(
+  client: RecordCorpActionClient,
+  onSuccess = vi.fn(),
+  isAdmin?: boolean,
+  portfolioId?: string,
+) {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <RecordCorporateActionForm client={client} onSuccess={onSuccess} isAdmin={isAdmin} />
+      <RecordCorporateActionForm
+        client={client}
+        portfolioId={portfolioId}
+        onSuccess={onSuccess}
+        isAdmin={isAdmin}
+      />
     </NextIntlClientProvider>,
   );
   return onSuccess;
@@ -63,7 +94,7 @@ describe("RecordCorporateActionForm", () => {
     );
   });
 
-  it("requires an instrument", async () => {
+  it("requires an instrument for split/bonus/rights", async () => {
     const client = makeClient();
     renderForm(client, vi.fn(), true);
 
@@ -77,8 +108,64 @@ describe("RecordCorporateActionForm", () => {
     expect(client.createCorporateAction).not.toHaveBeenCalled();
   });
 
-  // Regression test for #472: same buried-submit-button fix as AddTransactionForm,
-  // shared by all three tabs in the manual-add sheet.
+  it("records a tax-neutral merger between two selected instruments", async () => {
+    const client = makeClient();
+    const onSuccess = renderForm(client, vi.fn(), true, "p1");
+
+    // Switch to merger type
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "merger" } });
+
+    // Pick from instrument
+    fireEvent.change(screen.getByLabelText(m.mergerFrom), { target: { value: "old" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /OLDF/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /OLDF/ }));
+
+    // Pick to instrument
+    fireEvent.change(screen.getByLabelText(m.mergerTo), { target: { value: "new" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /NEWF/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /NEWF/ }));
+
+    fireEvent.change(screen.getByLabelText(m.mergerOutQty), { target: { value: "48.1464" } });
+    fireEvent.change(screen.getByLabelText(m.mergerInQty), { target: { value: "360.218" } });
+    fireEvent.change(screen.getByLabelText(m.mergerDate, { selector: "input" }), {
+      target: { value: "2024-01-23" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.mergerSubmit }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(client.createMerger).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({
+        fromInstrumentId: "i-old",
+        toInstrumentId: "i-new",
+        outQty: "48.1464",
+        inQty: "360.218",
+        taxable: false,
+        marketValue: undefined,
+      }),
+    );
+  });
+
+  it("requires both instruments for merger", async () => {
+    const client = makeClient();
+    renderForm(client, vi.fn(), true, "p1");
+
+    // Switch to merger type
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "merger" } });
+
+    fireEvent.change(screen.getByLabelText(m.mergerOutQty), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText(m.mergerInQty), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(m.mergerDate, { selector: "input" }), {
+      target: { value: "2024-01-23" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.mergerSubmit }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(m.mergerNeedInstruments),
+    );
+    expect(client.createMerger).not.toHaveBeenCalled();
+  });
+
   it("wraps the submit button in a sticky footer when stickyFooter is set", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
