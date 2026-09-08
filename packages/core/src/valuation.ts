@@ -5,6 +5,7 @@ import { netWorth, convert, type FxRateFn } from "./networth.js";
 import { financingByInstrument, totalLiabilities } from "./loans.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
 import type { LotView } from "./lots.js";
+import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
 
 /**
  * How a financed holding's cost basis is reported. "purchase_price" keeps the
@@ -190,11 +191,33 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     let dayChangePct: string | null = null;
     if (prev) {
       const priceDelta = new Decimal(quote.price).sub(prev);
-      dayChange = priceDelta.mul(h.quantity).toString();
-      dayChangePct = priceDelta.div(prev).mul(100).toString();
-      totalDayChange = totalDayChange.add(
-        new Decimal(convert(dayChange, quoteCcy, input.displayCurrency, fx)),
-      );
+      const rawPct = priceDelta.div(prev).mul(100);
+      // Sanity gate: daily moves beyond ±SINGLE_DAY_MAX_PCT are data artifacts
+      // (stale previousClose, Yahoo API unit mismatch), not real market moves.
+      // Null both fields and exclude from totals to prevent a single bad holding
+      // from distorting portfolio-level day-% (which is currency-derived from
+      // totalDayChange).  See sanity-gates.ts for the threshold rationale.
+      if (rawPct.abs().gt(SINGLE_DAY_MAX_PCT)) {
+        if (typeof process !== "undefined") {
+          process.stderr.write(
+            JSON.stringify({
+              level: "warn",
+              msg: "[valuation] skipped implausible day change",
+              symbol: h.instrumentId,
+              pct: rawPct.toNumber(),
+              priceDelta: priceDelta.toString(),
+            }) + "\n",
+          );
+        }
+        dayChange = null;
+        dayChangePct = null;
+      } else {
+        dayChange = priceDelta.mul(h.quantity).toString();
+        dayChangePct = rawPct.toString();
+        totalDayChange = totalDayChange.add(
+          new Decimal(convert(dayChange, quoteCcy, input.displayCurrency, fx)),
+        );
+      }
     }
 
     return {

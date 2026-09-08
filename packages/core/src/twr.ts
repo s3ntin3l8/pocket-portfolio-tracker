@@ -18,6 +18,7 @@ import { D, ZERO } from "./decimal.js";
 import { isTradeType } from "./categorization.js";
 import { computeHoldings, marketValue } from "./holdings.js";
 import { cashFlow } from "./cash.js";
+import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction, CorporateAction } from "./types.js";
@@ -186,15 +187,28 @@ const BASE = 100;
  * Chain the TWR index from a (marketValue, effectiveFlow) series.
  * V_{t-1} = 0: r_t = 0, index carries forward (no reset).
  *
- * Guard: r_t ≤ −1 (a ≥100% single-day loss) is carried forward instead of applied.
- * A held, long-only position cannot legitimately lose 100%+ of its value in one day —
- * this only happens when a snapshot's marketValue was recorded as ~0 with no offsetting
- * flow (a stale/missing price for a still-held instrument, a data artifact upstream in
- * snapshot generation, not a real return). Applying it would multiply the index by ≤0,
- * permanently zeroing (or flipping the sign of) every subsequent point — one bad day
- * would otherwise read as a portfolio-wide -100% drawdown forever after.
+ * Guards against data artifacts:
+ * - r_t ≤ −1 (a ≥100% single-day loss): carried forward — a held, long-only position
+ *   cannot legitimately lose 100%+ of its value in one day; this only happens when a
+ *   snapshot's marketValue was recorded as ~0 with no offsetting flow (a stale/missing
+ *   price, not a real return).  Applying it would multiply the index by ≤0, permanently
+ *   zeroing (or flipping the sign of) every subsequent point.
+ * - |r_t| > MAX_SINGLE_DAY_RETURN (default SINGLE_DAY_MAX_PCT, 50%): also carried
+ *   forward — a diversified portfolio cannot gain or lose more than 50% in a single
+ *   day; values beyond this threshold indicate a stale/missing price in one or more
+ *   snapshots that would otherwise corrupt the entire index chain, drawdown, and
+ *   volatility metrics.
+ *
+ * Caveat: SINGLE_DAY_MAX_PCT is tuned for diversified multi-holding books.  Concentrated
+ * single-name portfolios can see real >50% days (takeover gap, limit move, M&A close)
+ * — those days will be silently dropped, and TWR/drawdown will understate the move.
+ * Callers serving single-stock portfolios should pass a per-caller override.
  */
-export function chainIndex(series: DailyValueFlow[], base = BASE): IndexPoint[] {
+export function chainIndex(
+  series: DailyValueFlow[],
+  base = BASE,
+  maxSingleDayReturn: number = SINGLE_DAY_MAX_PCT / 100,
+): IndexPoint[] {
   const result: IndexPoint[] = [];
   let index = D(base);
   let prevMv: Decimal | null = null;
@@ -207,10 +221,23 @@ export function chainIndex(series: DailyValueFlow[], base = BASE): IndexPoint[] 
       // r_t = (V_t − flow_t) / V_{t-1} − 1
       const rt = mv.sub(flow).div(prevMv).sub(1);
       const growth = D(1).add(rt);
-      if (growth.gt(0)) {
+      // Guard: growth ≤ 0 (≥100% loss) or |rt| > threshold (suspect single-day move).
+      // Both indicate data artifacts (stale/missing prices), not real returns.
+      if (growth.gt(0) && rt.abs().lte(maxSingleDayReturn)) {
         index = index.mul(growth);
+      } else if (typeof process !== "undefined" && process.stderr) {
+        // Log dropped days so artifact prices become visible in logs instead of
+        // silently vanishing — aids debugging stale/missing price data.
+        process.stderr.write(
+          JSON.stringify({
+            level: "warn",
+            msg: "[twr] dropped artifact day",
+            date: point.date,
+            rt: rt.toString(),
+            reason: growth.lte(0) ? "negative_growth" : "exceeds_max_single_day_return",
+          }) + "\n",
+        );
       }
-      // growth ≤ 0: impossible single-day return — data artifact, carry index forward.
     }
     // prevMv === null: first point, index stays at base.
     // prevMv.isZero(): reset-proof carry-forward (index unchanged).
