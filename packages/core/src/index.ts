@@ -81,6 +81,7 @@ export {
   type IndexPoint,
   type BuildDailyValueFlowsInput,
 } from "./twr.js";
+export { SINGLE_DAY_MAX_PCT, PERIOD_GAIN_MAX_PCT, PERIOD_LOSS_MAX_PCT } from "./sanity-gates.js";
 export {
   computeTrades,
   mergeTradeLogs,

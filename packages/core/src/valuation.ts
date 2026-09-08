@@ -5,6 +5,7 @@ import { netWorth, convert, type FxRateFn } from "./networth.js";
 import { financingByInstrument, totalLiabilities } from "./loans.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
 import type { LotView } from "./lots.js";
+import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
 
 /**
  * How a financed holding's cost basis is reported. "purchase_price" keeps the
@@ -191,11 +192,12 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     if (prev) {
       const priceDelta = new Decimal(quote.price).sub(prev);
       const rawPct = priceDelta.div(prev).mul(100);
-      // Sanity gate: daily moves beyond ±50% are data artifacts (stale previousClose,
-      // Yahoo API unit mismatch), not real market moves.  Null both fields and exclude
-      // from totals to prevent a single bad holding from distorting portfolio-level
-      // day-% (which is currency-derived from totalDayChange).
-      if (rawPct.abs().gt(50)) {
+      // Sanity gate: daily moves beyond ±SINGLE_DAY_MAX_PCT are data artifacts
+      // (stale previousClose, Yahoo API unit mismatch), not real market moves.
+      // Null both fields and exclude from totals to prevent a single bad holding
+      // from distorting portfolio-level day-% (which is currency-derived from
+      // totalDayChange).  See sanity-gates.ts for the threshold rationale.
+      if (rawPct.abs().gt(SINGLE_DAY_MAX_PCT)) {
         if (typeof process !== "undefined") {
           process.stderr.write(
             JSON.stringify({

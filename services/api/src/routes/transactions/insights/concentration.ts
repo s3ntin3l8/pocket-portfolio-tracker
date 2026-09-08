@@ -2,7 +2,13 @@ import type { FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
 import { asc, inArray } from "drizzle-orm";
 import { corporateActions, instruments, prices, transactions } from "@portfolio/db";
-import { type CorporateAction, computeHoldings, splitAdjustmentFactor } from "@portfolio/core";
+import {
+  type CorporateAction,
+  computeHoldings,
+  splitAdjustmentFactor,
+  PERIOD_GAIN_MAX_PCT,
+  PERIOD_LOSS_MAX_PCT,
+} from "@portfolio/core";
 import { toCoreTxns } from "../../../services/tx-core.js";
 
 export interface PeriodMoverResult {
@@ -155,12 +161,13 @@ export async function computeConcentrationSection(
         const adjustedEnd = new Decimal(rawEnd).div(saEnd);
         const pct = adjustedEnd.div(adjustedStart).toNumber() - 1;
 
-        // Sanity gate: returns beyond +200% (gain) or −90% (loss) in a month/year are
-        // almost certainly data quality issues (stale price, missing corporate action,
-        // Yahoo API mismatch) rather than genuine market moves.  The bounds are
-        // asymmetric: a long-only equity cannot lose more than −100%, so −90% is already
-        // near-total wipeout, while genuine multi-baggers (NVDA +239% in '23) need room.
-        if (pct > 2 || pct < -0.9) {
+        // Sanity gate: returns beyond PERIOD_GAIN_MAX_PCT (gain) or PERIOD_LOSS_MAX_PCT
+        // (loss) in a month/year are almost certainly data quality issues (stale price,
+        // missing corporate action, Yahoo API mismatch) rather than genuine market moves.
+        // The bounds are asymmetric: a long-only equity cannot lose more than −100%, so
+        // a near-total wipeout is suspicious, while genuine multi-baggers are still
+        // excluded only beyond the gain cap.  See sanity-gates.ts for the rationale.
+        if (pct > PERIOD_GAIN_MAX_PCT / 100 || pct < -PERIOD_LOSS_MAX_PCT / 100) {
           app.log.warn(
             { symbol: instMap.get(instId)?.symbol, pct, window: `${startDate}→${latestDate}` },
             "[insights] skipped implausible period mover",
