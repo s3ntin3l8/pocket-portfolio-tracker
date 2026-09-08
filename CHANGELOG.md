@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.10](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.9...v0.1.10) (2026-09-08)
+
+
+### Bug Fixes
+
+* **core,api:** add sanity checks to prevent implausible insights metrics ([#702](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/702)) ([a78893b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a78893b66835e17785ba60c80027604db50d83cc))
+* **infra:** drop Swarm-only external secrets from prod compose ([#688](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/688)) ([21f40bb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/21f40bb62f3ac13478bb5322b5c4e6f17a254fdf))
+* **web:** add overscroll-contain to desktop sidebar ([#708](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/708)) ([b2c0012](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b2c0012c6ab76b096644c501da21e872a626d8ff))
+* **web:** improve trades table chevron UX and symbol truncation ([#707](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/707)) ([7cd4db0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7cd4db091ac138cc496a96c7c9ee9dfa25c53a5d))
+* **web:** restructure desktop layout — promote holdings hero, widen search, standardize tables ([#705](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/705)) ([cafdbe1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/cafdbe1a215335ece6cff7cefb6c252704798e52))
+* **web:** restructure income report — stat cards as horizontal strip ([#706](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/706)) ([8c6b88e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8c6b88e98d7ee81ffa7309e97e9defc08e90cdc4))
+* **web:** revert settings/admin from overlay modals to full-page routes ([#704](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/704)) ([d02c2f3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d02c2f3cb79427ffb7376584529ada9fba97d62d))
+* **web:** standardize card border-radius across admin and app ([#709](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/709)) ([6c9b28b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6c9b28bcc3306e741a46284ae050103a6919ff71))
+* **web:** Tax page crash — remove re-render cascade in LossCarryforwardEditor ([#701](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/701)) ([5c1168b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5c1168b75cd497101493cbee6f7c9a1e6d695e9c))
+* **web:** unified corporate action form with merger type + add modal visual standardization ([#703](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/703)) ([2b74c93](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2b74c93e87e2aa6b619655158bb31754797ad59c))
+
 ## [0.1.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.8...v0.1.9) (2026-09-08)
 
 
