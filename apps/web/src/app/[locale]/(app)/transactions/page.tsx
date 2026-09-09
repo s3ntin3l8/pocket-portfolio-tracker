@@ -194,10 +194,14 @@ export default async function TransactionsPage({
       {/* On md+ the sidebar nav highlights the active page, so the mobile-only
       `PageTitle` (which is `md:hidden`) leaves the document with no h1 — break the
       a11y outline. Keep an sr-only h1 for screen readers and document outline
-      tooling; visually the topbar carries no duplicate title. `hidden md:sr-only`
-      (not plain `sr-only`) because `PageTitle` is the visible h1 below md — without
-      the `hidden`, mobile would announce "Activity" twice from two consecutive h1s. */}
-      <h1 className="hidden md:sr-only">{t("title")}</h1>
+      tooling; visually the topbar carries no duplicate title. `max-md:hidden`
+      below md (where `PageTitle` is the visible h1) and `md:sr-only` at md+
+      (desktop SR users). NOT `hidden md:sr-only`: `hidden` pins `display:none`
+      at every breakpoint, and Tailwind v4's `sr-only` recipe never sets
+      `display`, so it can't undo `hidden` — that combination silently kills the
+      h1 in the accessibility tree. `max-md:` scopes the `display:none` to
+      below-md only. */}
+      <h1 className="max-md:hidden md:sr-only">{t("title")}</h1>
     </>
   );
 

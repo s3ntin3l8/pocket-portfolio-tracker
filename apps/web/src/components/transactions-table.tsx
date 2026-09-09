@@ -366,8 +366,11 @@ export function TransactionsTable({
       {/* ── Alerts: above the grid so they're DOM-first on mobile (single column)
       and lead the main column above the controls on desktop. Previously these
       lived at the top of the sidebar rail — alerts vs stat summaries were
-      visually mixed, and on mobile the stat summaries now render below them. */}
-      <div className="mb-3 space-y-3">
+      visually mixed, and on mobile the stat summaries now render below them.
+      `data-testid` locks the mobile DOM order against regressions — the
+      AnomalyBanner + reconciliation banners MUST render before the stat
+      summaries, otherwise alerts lose their visual lead. */}
+      <div data-testid="transactions-alerts" className="mb-3 space-y-3">
         {!bannerDismissed && (
           <AnomalyBanner
             anomalies={anomalies}
