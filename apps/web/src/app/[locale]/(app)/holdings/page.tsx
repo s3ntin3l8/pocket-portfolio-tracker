@@ -1,16 +1,15 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Layers, Plus, AlertCircle, AlertTriangle } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ExportCsvButton } from "@/components/export-csv-button";
-import { HoldingsTable } from "@/components/holdings-table";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
 import { AllocationCard, type Tone } from "@/components/holdings/allocation-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
+import { PositionsPanel } from "@/components/holdings/positions-panel";
 import {
   loadHoldings,
   loadAnomalies,
@@ -156,38 +155,41 @@ export default async function HoldingsPage({
       .map(([ccy, balance]) => ["Cash", t("cash"), "cash", "", "", "", "", ccy, balance, "", ccy]),
   ];
 
-  // Title + (icon-only) export share the top line; the subtitle spans the full width below
-  // it — same pattern as the Activity page header.
+  // Export moved out of the heading into the positions toolbar (it exports the table, so
+  // it belongs next to the table's own search/filters — see PositionsPanel below).
+  // Rendered unconditionally there rather than gated on `holdings.length > 0` as before:
+  // that guard also hid it for a cash-only portfolio, even though `exportRows` already
+  // included its cash rows.
+  const exportButton = (
+    <ExportCsvButton
+      filename="holdings.csv"
+      headers={[
+        "Symbol",
+        "Name",
+        "AssetClass",
+        "Quantity",
+        "Unit",
+        "AvgCost",
+        "Price",
+        "PriceCurrency",
+        "MarketValue",
+        "UnrealizedPnL",
+        "Currency",
+      ]}
+      rows={exportRows}
+      label={t("exportCsv")}
+      iconOnly
+      className="shrink-0 md:size-8"
+    />
+  );
+
   const Heading = (
     <div className="space-y-1">
       <PageHeaderSetter title={t("title")} />
-      <div className="flex items-center justify-between gap-3">
-        <PageTitle>
-          <span className="sm:hidden">{t("titleMobile")}</span>
-          <span className="hidden sm:inline">{t("title")}</span>
-        </PageTitle>
-        {result.status === "ok" && holdings.length > 0 && (
-          <ExportCsvButton
-            filename="holdings.csv"
-            headers={[
-              "Symbol",
-              "Name",
-              "AssetClass",
-              "Quantity",
-              "Unit",
-              "AvgCost",
-              "Price",
-              "PriceCurrency",
-              "MarketValue",
-              "UnrealizedPnL",
-              "Currency",
-            ]}
-            rows={exportRows}
-            label={t("exportCsv")}
-            iconOnly
-          />
-        )}
-      </div>
+      <PageTitle>
+        <span className="sm:hidden">{t("titleMobile")}</span>
+        <span className="hidden sm:inline">{t("title")}</span>
+      </PageTitle>
       <p className="text-sm text-muted-foreground">
         {result.status === "ok" && holdings.length > 0
           ? t(currency === "IDR" ? "subtitleCountIdx" : "subtitleCount", { count: holdings.length })
@@ -311,47 +313,13 @@ export default async function HoldingsPage({
             }))}
           />
 
-          <div className="space-y-3">
-            <Tabs defaultValue="all">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-bold">
-                  <span className="sm:hidden">{t("positionsSectionMobile")}</span>
-                  <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
-                </h2>
-                <div className="overflow-x-auto">
-                  {/* Pill spec transcribed from the reference's `deskOn`/`deskOff` chips:
-                      active 700 12px white on var(--pill); inactive 600 12px on bg-card
-                      WITH a border — not a bare transparent outline. */}
-                  <TabsList className="h-auto gap-2 rounded-full border-0 bg-transparent p-0">
-                    {visibleClassTabs.map((key) => (
-                      <TabsTrigger
-                        key={key}
-                        value={key}
-                        className="rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold text-foreground data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none"
-                      >
-                        {key === "all" ? t("all") : tc(key)}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </div>
-              </div>
-              {visibleClassTabs.map((key) => (
-                <TabsContent key={key} value={key}>
-                  <div className="overflow-hidden rounded-2xl bg-card shadow-card">
-                    <HoldingsTable
-                      rows={
-                        key === "all"
-                          ? holdings
-                          : holdings.filter((h) => h.instrument?.assetClass === key)
-                      }
-                      currency={currency}
-                      cash={(key === "all" || key === "cash") && hasCash ? cash : undefined}
-                    />
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          </div>
+          <PositionsPanel
+            rows={holdings}
+            currency={currency}
+            cash={hasCash ? cash : undefined}
+            classTabs={visibleClassTabs}
+            actions={exportButton}
+          />
         </div>
 
         {/* ── Sidebar: allocation + region/currency (sticky on wide containers) ── */}

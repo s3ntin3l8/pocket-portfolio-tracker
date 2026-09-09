@@ -162,16 +162,19 @@ export default async function TransactionsPage({
     ...(aggregate ? [r.portfolioName ?? ""] : []),
   ]);
 
-  // Adding is handled by the global add-entry menu in the app-shell header, so this page
-  // header only carries the export actions (no redundant second Add button).
-  const addButton = (
-    <div className="flex items-center gap-2">
+  // Export moved out of the heading into the table's filter toolbar (it exports the
+  // table, so it belongs next to the table's own search/filters, right of the search
+  // input) — same treatment as Holdings. Adding is handled by the global add-entry menu
+  // in the app-shell header, so no Add button lives here either.
+  const actions = (
+    <>
       <ExportCsvButton
         filename="transactions.csv"
         headers={exportHeaders}
         rows={exportRows}
         label={t("exportCsv")}
         iconOnly
+        className="shrink-0 md:size-8"
       />
       {singlePortfolio?.documentRetention && (
         <ExportDocumentsButton
@@ -179,21 +182,17 @@ export default async function TransactionsPage({
           portfolioName={singlePortfolio.name}
           label={t("exportDocuments")}
           iconOnly
+          className="shrink-0 md:size-8"
         />
       )}
-    </div>
+    </>
   );
 
-  // Title + (icon-only) actions share the top line; the subtitle spans the full width
-  // below it — so on narrow screens the count isn't squeezed against the buttons.
   const displayCount = total;
-  const heading = (action?: React.ReactNode) => (
+  const heading = (
     <div className="space-y-1">
       <PageHeaderSetter title={t("title")} />
-      <div className="flex items-center justify-between gap-3">
-        <PageTitle>{t("title")}</PageTitle>
-        {action}
-      </div>
+      <PageTitle>{t("title")}</PageTitle>
       <p className="text-sm font-medium text-text-2">
         {displayCount > 0 ? t("subtitleCount", { count: displayCount }) : t("subtitle")}
       </p>
@@ -206,7 +205,7 @@ export default async function TransactionsPage({
   if (status === "unavailable") {
     return (
       <div className="space-y-5">
-        {heading()}
+        {heading}
         <EmptyState
           icon={Receipt}
           title={te("unavailableTitle")}
@@ -223,7 +222,7 @@ export default async function TransactionsPage({
     if (!hasActiveFilter) {
       return (
         <div className="space-y-5">
-          {heading()}
+          {heading}
           <EmptyState
             icon={Receipt}
             title={te("noTransactionsTitle")}
@@ -238,7 +237,7 @@ export default async function TransactionsPage({
 
   return (
     <div className="space-y-5">
-      {heading(addButton)}
+      {heading}
       <TransactionsTable
         rows={rows}
         showPortfolio={aggregate}
@@ -252,6 +251,7 @@ export default async function TransactionsPage({
         searchQuery={searchQuery}
         portfolioId={singlePortfolio?.id ?? undefined}
         total={total}
+        actions={actions}
       />
       {importsSection}
     </div>

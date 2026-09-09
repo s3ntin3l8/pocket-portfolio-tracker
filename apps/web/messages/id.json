@@ -1320,6 +1320,9 @@
     "total": "Total",
     "cash": "Kas",
     "exportCsv": "Ekspor CSV",
+    "searchPlaceholder": "Cari kepemilikan…",
+    "searchClear": "Hapus pencarian",
+    "noResults": "Tidak ada kepemilikan yang cocok dengan pencarian Anda.",
     "hero": {
       "label": "Total nilai portofolio",
       "periodPast": "{range} terakhir",

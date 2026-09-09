@@ -54,8 +54,13 @@ export function AllocationDonut({
   // center "Assets" 600 10px + total 800 15px; legend rows gap-10px, 10×10 3px-radius
   // square swatch, label 600 12px, value 600 11px, pct 700 12px in a 50px column.
   return (
-    <div className="flex items-center gap-7">
-      <div className="relative h-32 w-32 shrink-0">
+    // `@container`: this card can live in a fixed-width sidebar (Holdings' 320px rail,
+    // Income's allocation card) as well as a wide main column (Insights' composition
+    // card) — @sm keeps the row layout everywhere the ~321px it needs is available, and
+    // stacks the donut above the legend when it isn't, instead of letting the legend's
+    // value/percent columns overflow the card edge.
+    <div className="@container flex flex-col gap-4 @sm:flex-row @sm:items-center @sm:gap-7">
+      <div className="relative mx-auto h-32 w-32 shrink-0 @sm:mx-0">
         <ResponsiveContainer
           width="100%"
           height="100%"

@@ -8,15 +8,29 @@ export default function Loading() {
         <Skeleton className="h-7 w-1/3" />
         <Skeleton className="h-4 w-1/4" />
       </div>
+
+      {/* Hero chart: full-width above the table (matches the promoted HeroGlanceCard). */}
+      <Card>
+        <div className="space-y-4 p-6">
+          <Skeleton className="h-7 w-1/3" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-6 w-40" />
+          {/* Toolbar: chips left, search + export right — matches PositionsPanel. */}
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <div className="flex gap-2">
               <Skeleton className="h-7 w-16 rounded-full" />
               <Skeleton className="h-7 w-16 rounded-full" />
               <Skeleton className="h-7 w-16 rounded-full" />
               <Skeleton className="h-7 w-16 rounded-full" />
+            </div>
+            <div className="flex items-center gap-2 md:ml-auto">
+              <Skeleton className="h-8 w-full md:w-56" />
+              <Skeleton className="size-11 shrink-0 rounded-[13px] md:size-8" />
             </div>
           </div>
           <Card>
@@ -43,12 +57,6 @@ export default function Loading() {
           </Card>
         </div>
         <div className="space-y-3.5">
-          <Card>
-            <div className="space-y-4 p-6">
-              <Skeleton className="h-7 w-3/4" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          </Card>
           <Card>
             <div className="space-y-3 p-6">
               <Skeleton className="h-6 w-2/3" />

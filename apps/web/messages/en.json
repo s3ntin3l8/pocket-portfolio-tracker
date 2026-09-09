@@ -1322,6 +1322,9 @@
     "total": "Total",
     "cash": "Cash",
     "exportCsv": "Export CSV",
+    "searchPlaceholder": "Search holdings…",
+    "searchClear": "Clear search",
+    "noResults": "No holdings match your search.",
     "hero": {
       "label": "Total portfolio value",
       "periodPast": "past {range}",

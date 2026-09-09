@@ -16,6 +16,7 @@ function Harness({
   yearOptions = ["2025", "2026"],
   draftCount = 0,
   onNavigateSpy,
+  actions,
 }: {
   initialYear?: string;
   yearOptions?: string[];
@@ -23,6 +24,7 @@ function Harness({
   /** Lets a test observe the raw calls FilterBar makes, in addition to the Harness
    *  applying them to local state. */
   onNavigateSpy?: (keyOrUpdates: string | Record<string, string | undefined>) => void;
+  actions?: React.ReactNode;
 }) {
   const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined);
   const [yearFilter, setYearFilter] = useState<string | undefined>(initialYear);
@@ -52,6 +54,7 @@ function Harness({
       onDraftFilterChange={setDraftFilter}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
+      actions={actions}
     />
   );
 }
@@ -149,5 +152,10 @@ describe("FilterBar — mobile filter Sheet (#625 refinements)", () => {
     const urlUpdateCalls = onNavigateSpy.mock.calls.filter(([arg]) => typeof arg === "object");
     expect(urlUpdateCalls).toHaveLength(1);
     expect(urlUpdateCalls[0][0]).toEqual({ type: undefined, year: undefined });
+  });
+
+  it("renders a passed actions node, right of the search input", () => {
+    renderHarness({ actions: <button aria-label="Export CSV">Export</button> });
+    expect(screen.getByRole("button", { name: "Export CSV" })).toBeInTheDocument();
   });
 });
