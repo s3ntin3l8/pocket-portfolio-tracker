@@ -1,23 +1,59 @@
-name: Hermes (on-demand)
+name: Hermes (review)
 
-# On-demand @mention ONLY. Trigger on issue_comment — PR-conversation comments AND
-# issue comments both arrive as issue_comment. Do NOT add pull_request_review_comment:
-# a submitted review fires that event (and review bodies contain "@<slug>"), which
-# re-triggers the bot with no human summon (the Claude->Hermes cascade, .github#527).
-# The mention substring itself is enforced inside the reusable workflow via
-# mention-trigger, so the slug lives in exactly one place (the with: below).
+# Two ways to get a review from the s3ntin3l8-hermes bot:
+#   1. auto-review    -> exactly once per PR: on `opened` if it starts non-draft,
+#      or on `ready_for_review` if it starts as a draft.
+#   2. on-demand-review -> comment "@s3ntin3l8-hermes Review" (or "Triage" on
+#      an issue) any time you want another look -- including every follow-up
+#      after the initial auto-review.
+# Both call the same reusable workflow (s3ntin3l8/.github/.github/workflows/
+# hermes-review.yml@main) with a different `mode`, gated by github.event_name
+# so each job only runs for its own trigger.
+#
+# IMPORTANT: do NOT add `synchronize` back. It re-triggers a fresh review on
+# EVERY subsequent push, which on a PR under active iteration is an unbounded
+# review loop (each review's comments prompt more commits, each commit fires
+# another review...). `ready_for_review` is safe to keep alongside `opened` --
+# it fires at most once per PR (the draft->ready transition), not on every push.
 on:
+  pull_request:
+    types: [opened, ready_for_review]
+    # `opened`           => review once, if the PR starts non-draft.
+    # `ready_for_review`  => review once, if the PR started as a draft (its
+    # `opened` event is skipped below since draft was true at that point).
   issue_comment:
     types: [created]
+    # Covers both PR-conversation comments and issue comments. The reusable
+    # workflow's "Check mention" step enforces the "@s3ntin3l8-hermes" substring
+    # in on-demand mode (default), so a plain comment without the mention is a
+    # cheap no-op, not a review.
 
 jobs:
-  hermes:
-    # Only human comment events from trusted commenters; the bot never re-triggers
-    # itself. Mirrors claude.yml's author_association guard -- without it, any
-    # non-member commenter on this public repo could summon a secrets-bearing,
-    # self-hosted-runner run just by typing the mention string. The actual
-    # "@<slug>" mention check lives inside the reusable workflow.
-    if: |
+  auto-review:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.actor != 's3ntin3l8-hermes[bot]' &&
+      github.actor != 'dependabot[bot]' &&
+      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.draft == false &&
+      !startsWith(github.event.pull_request.head.ref, 'mullion/task-')
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: write
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
+    with:
+      mode: auto # review on trigger, no @mention needed
+      mention-trigger: s3ntin3l8-hermes
+    secrets: inherit # pragma: allowlist secret
+
+  on-demand-review:
+    # Restrict to trusted commenters -- otherwise any user on a public repo could
+    # post "@s3ntin3l8-hermes Review" and trigger a run that inherits HERMES_*
+    # secrets and executes on the self-hosted runner. Mirrors claude.yml's guard.
+    if: >-
+      github.event_name == 'issue_comment' &&
       github.actor != 's3ntin3l8-hermes[bot]' &&
       contains(fromJSON('["MEMBER", "OWNER", "COLLABORATOR"]'), github.event.comment.author_association)
     permissions:
@@ -25,7 +61,7 @@ jobs:
       pull-requests: write
       issues: write
       checks: write
-    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
-      mention-trigger: s3ntin3l8-hermes # the GitHub App slug
+      mention-trigger: s3ntin3l8-hermes # mode: on-demand is the reusable workflow's default
     secrets: inherit # pragma: allowlist secret
