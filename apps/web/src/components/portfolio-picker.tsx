@@ -48,7 +48,7 @@ export function PortfolioPicker({
       <DropdownMenuTrigger
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex h-9 max-w-full items-center gap-1.5 rounded-full bg-card py-1.5 pl-1.5 pr-3 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex h-9 max-w-full items-center gap-1.5 rounded-[10px] bg-card py-1.5 pl-1.5 pr-3 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           triggerClassName,
         )}
       >

@@ -1160,6 +1160,7 @@
     "mergerSubmit": "Record merger",
     "mergerNeedInstruments": "Select both the old and the new instrument.",
     "mergerNeedPortfolio": "Select a portfolio first.",
+    "portfolio": "Portfolio",
     "mergerError": "Couldn't record the merger. Check the fields and try again.",
     "edit": "Edit",
     "delete": "Delete",

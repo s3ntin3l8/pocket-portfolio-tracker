@@ -11,7 +11,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Eyebrow } from "@/components/ui/eyebrow";
+import { PortfolioPicker, type PickablePortfolio } from "@/components/portfolio-picker";
 import { cn } from "@/lib/utils";
 import { useFocusScroll } from "@/lib/use-focus-scroll";
 import { useSheetFooter, useSheetFooterChrome } from "@/components/ui/sheet";
@@ -24,8 +24,6 @@ export type RecordCorpActionClient = Pick<
 
 const TYPES = ["split", "bonus", "rights", "merger"] as const;
 type CaType = (typeof TYPES)[number];
-
-const CARD = "space-y-3.5 rounded-[16px] border border-border bg-card p-4 shadow-card";
 
 /**
  * Accept German-formatted numbers as typed off a DKB document — `"3.869,77"` → `"3869.77"`.
@@ -123,6 +121,8 @@ function InstrumentPicker({
 export function RecordCorporateActionForm({
   client,
   portfolioId,
+  portfolios,
+  onPortfolioChange,
   onSuccess,
   stickyFooter = false,
   isAdmin = false,
@@ -130,6 +130,10 @@ export function RecordCorporateActionForm({
   client: RecordCorpActionClient;
   /** Required when type is "merger" (mergers are portfolio-scoped). */
   portfolioId?: string;
+  /** Available portfolios for the merger portfolio picker. */
+  portfolios?: PickablePortfolio[];
+  /** Called when the user picks a different portfolio in the merger picker. */
+  onPortfolioChange?: (id: string) => void;
   onSuccess?: () => void;
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;
@@ -291,7 +295,12 @@ export function RecordCorporateActionForm({
 
   return (
     <>
-      <form ref={formRef} id={formId} onSubmit={submit} className="space-y-3.5">
+      <form
+        ref={formRef}
+        id={formId}
+        onSubmit={submit}
+        className="flex max-w-[600px] flex-col gap-[13px]"
+      >
         {info && (
           <div className="flex items-center gap-2 rounded-md border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
             {info}
@@ -307,25 +316,37 @@ export function RecordCorporateActionForm({
           </div>
         )}
 
+        {/* ── Portfolio (merger only) ──────────────────────────────── */}
+        {isMerger && portfolios && portfolios.length > 1 && (
+          <div className="space-y-1.5">
+            <Label>{t("portfolio")}</Label>
+            <PortfolioPicker
+              portfolios={portfolios}
+              value={portfolioId ?? ""}
+              onChange={onPortfolioChange ?? (() => {})}
+              ariaLabel={t("portfolio")}
+              triggerClassName="w-full sm:max-w-xs"
+            />
+          </div>
+        )}
+
         {/* ── Action type ─────────────────────────────────────────── */}
         {!isMergerOnly && (
-          <div className={CARD}>
-            <Eyebrow>{t("type")}</Eyebrow>
-            <div className="space-y-1.5">
-              <Select id="ca-type" value={type} onChange={(e) => setType(e.target.value as CaType)}>
-                {TYPES.map((ty) => (
-                  <option key={ty} value={ty}>
-                    {tt(ty)}
-                  </option>
-                ))}
-              </Select>
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-type">{t("type")}</Label>
+            <Select id="ca-type" value={type} onChange={(e) => setType(e.target.value as CaType)}>
+              {TYPES.map((ty) => (
+                <option key={ty} value={ty}>
+                  {tt(ty)}
+                </option>
+              ))}
+            </Select>
           </div>
         )}
 
         {/* ── Instrument(s) ────────────────────────────────────────── */}
-        <div className={CARD}>
-          <Eyebrow>{isMerger ? t("mergerInstruments") : t("instrument")}</Eyebrow>
+        <div className="space-y-1.5">
+          <Label>{isMerger ? t("mergerInstruments") : t("instrument")}</Label>
           {isMerger ? (
             <div className="space-y-3.5">
               <InstrumentPicker
@@ -429,91 +450,88 @@ export function RecordCorporateActionForm({
         </div>
 
         {/* ── Details ───────────────────────────────────────────────── */}
-        <div className={CARD}>
-          <Eyebrow>{t("details")}</Eyebrow>
-          {isMerger ? (
-            <div className="space-y-3.5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="merger-out">{t("mergerOutQty")}</Label>
-                  <Input
-                    id="merger-out"
-                    inputMode="decimal"
-                    value={outQty}
-                    onChange={(e) => setOutQty(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="merger-in">{t("mergerInQty")}</Label>
-                  <Input
-                    id="merger-in"
-                    inputMode="decimal"
-                    value={inQty}
-                    onChange={(e) => setInQty(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="merger-date">{t("mergerDate")}</Label>
-                <DatePicker
-                  id="merger-date"
-                  label={t("mergerDate")}
-                  value={executedAt}
-                  onChange={(e) => setExecutedAt(e.target.value)}
-                  required
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={taxable}
-                  onChange={(e) => setTaxable(e.target.checked)}
-                  className="size-4"
-                />
-                {t("mergerTaxable")}
-              </label>
-              {taxable && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="merger-value">{t("mergerMarketValue")}</Label>
-                  <Input
-                    id="merger-value"
-                    inputMode="decimal"
-                    value={marketValue}
-                    onChange={(e) => setMarketValue(e.target.value)}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">{t("mergerMarketValueHint")}</p>
-                </div>
-              )}
-            </div>
-          ) : (
+        {isMerger ? (
+          <div className="space-y-3.5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="ca-ratio">{t("ratio")}</Label>
+                <Label htmlFor="merger-out">{t("mergerOutQty")}</Label>
                 <Input
-                  id="ca-ratio"
+                  id="merger-out"
                   inputMode="decimal"
-                  value={ratio}
-                  onChange={(e) => setRatio(e.target.value)}
+                  value={outQty}
+                  onChange={(e) => setOutQty(e.target.value)}
                   required
                 />
-                <p className="text-xs text-muted-foreground">{t("ratioHint")}</p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ca-date">{t("exDate")}</Label>
-                <DatePicker
-                  id="ca-date"
-                  label={t("exDate")}
-                  value={exDate}
-                  onChange={(e) => setExDate(e.target.value)}
+                <Label htmlFor="merger-in">{t("mergerInQty")}</Label>
+                <Input
+                  id="merger-in"
+                  inputMode="decimal"
+                  value={inQty}
+                  onChange={(e) => setInQty(e.target.value)}
                   required
                 />
               </div>
             </div>
-          )}
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="merger-date">{t("mergerDate")}</Label>
+              <DatePicker
+                id="merger-date"
+                label={t("mergerDate")}
+                value={executedAt}
+                onChange={(e) => setExecutedAt(e.target.value)}
+                required
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={taxable}
+                onChange={(e) => setTaxable(e.target.checked)}
+                className="size-4"
+              />
+              {t("mergerTaxable")}
+            </label>
+            {taxable && (
+              <div className="space-y-1.5">
+                <Label htmlFor="merger-value">{t("mergerMarketValue")}</Label>
+                <Input
+                  id="merger-value"
+                  inputMode="decimal"
+                  value={marketValue}
+                  onChange={(e) => setMarketValue(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">{t("mergerMarketValueHint")}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="ca-ratio">{t("ratio")}</Label>
+              <Input
+                id="ca-ratio"
+                inputMode="decimal"
+                value={ratio}
+                onChange={(e) => setRatio(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">{t("ratioHint")}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ca-date">{t("exDate")}</Label>
+              <DatePicker
+                id="ca-date"
+                label={t("exDate")}
+                value={exDate}
+                onChange={(e) => setExDate(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+        )}
 
         {!useFooterPortal && (
           <div

@@ -107,9 +107,10 @@ export function NewEntryTabs({
       )}
       {visibleTabs.includes("corporate-action") && (
         <TabsContent value="corporate-action" className="space-y-4">
-          {picker}
           <RecordCorporateAction
             portfolioId={portfolioId}
+            portfolios={portfolios}
+            onPortfolioChange={setPortfolioId}
             stickyFooter={stickyFooter}
             isAdmin={isAdmin}
           />
