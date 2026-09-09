@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.11](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.10...v0.1.11) (2026-09-09)
+
+
+### Bug Fixes
+
+* **web:** container-scope Holdings sidebar cards, standardize table toolbars ([#714](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/714)) ([5c13ea5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5c13ea51836a43d035f3e453027187b86d3113ec))
+* **web:** increase sidebar sticky top offset to clear 62px header ([#712](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/712)) ([2423560](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2423560e89b79fd389e500b589a5f4482edef8b7))
+* **web:** remove open-trade chevron, adapt detail sheet for open trades ([#711](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/711)) ([0edd2d1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0edd2d18e9369af971b56bd7821fa535d080d6dd)), closes [#696](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/696)
+
 ## [0.1.10](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.9...v0.1.10) (2026-09-08)
 
 
