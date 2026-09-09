@@ -6,6 +6,8 @@ import type { HoldingValuation } from "@portfolio/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HoldingsTable } from "@/components/holdings-table";
 import { TableToolbar, TOOLBAR_FILTERS, ToolbarSearch } from "@/components/table-toolbar";
+import { CHIP_BASE, CHIP_INACTIVE } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 /**
  * The "Positions" section on Holdings — the asset-class tabs + table, plus (unlike the
@@ -93,7 +95,18 @@ export function PositionsPanel({
                   <TabsTrigger
                     key={key}
                     value={key}
-                    className="rounded-full border border-border bg-card px-3.5 py-[7px] text-xs font-semibold text-foreground data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none"
+                    // Radix drives the active state via `data-state`, a CSS attribute
+                    // selector rather than a JS boolean — so unlike the other three
+                    // toolbars' `cn(CHIP_BASE, active ? CHIP_ACTIVE : CHIP_INACTIVE)`,
+                    // the base/inactive spec is shared from ui/table.tsx but the
+                    // active-state override still needs its own literal
+                    // `data-[state=active]:` variants (Tailwind can't derive those from
+                    // a runtime CHIP_ACTIVE string).
+                    className={cn(
+                      CHIP_BASE,
+                      CHIP_INACTIVE,
+                      "data-[state=active]:border-transparent data-[state=active]:bg-pill data-[state=active]:font-bold data-[state=active]:text-white data-[state=active]:shadow-none",
+                    )}
                   >
                     {key === "all" ? t("all") : tc(key)}
                   </TabsTrigger>
