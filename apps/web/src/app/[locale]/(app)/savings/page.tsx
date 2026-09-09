@@ -145,7 +145,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
         </div>
 
         {/* ── Sidebar: stat cards (sticky on wide containers) ── */}
-        <div className="@xl:sticky @xl:top-4 @xl:order-last">
+        <div className="@xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
           <div className="grid grid-cols-1 space-y-2.5 sm:space-y-4">
             <StatCard label={t("totalContributed")} value={m(Number(c.netContributed))} />
             <StatCard

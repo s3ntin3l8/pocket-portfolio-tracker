@@ -356,7 +356,7 @@ export default async function HoldingsPage({
 
         {/* ── Sidebar: allocation + region/currency (sticky on wide containers) ── */}
         {allocation && (
-          <div className="space-y-3.5 @xl:sticky @xl:top-4 @xl:order-last">
+          <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
             {allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
               <AllocationCard
                 slices={allocation.byAssetClass
