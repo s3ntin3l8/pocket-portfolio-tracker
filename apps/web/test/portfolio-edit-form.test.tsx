@@ -64,11 +64,10 @@ describe("PortfolioEditForm", () => {
     deletePortfolio.mockClear();
   });
 
-  it("renders the three design cards: BASICS, ACCOUNT DETAILS, ACCOUNTING OPTIONS", () => {
+  it("renders the form fields", () => {
     renderForm();
-    expect(screen.getByText(t.sectionBasics)).toBeInTheDocument();
-    expect(screen.getByText(t.sectionAccount)).toBeInTheDocument();
-    expect(screen.getByText(t.sectionAccounting)).toBeInTheDocument();
+    expect(screen.getByLabelText(t.name)).toBeInTheDocument();
+    expect(screen.getByLabelText(t.accountHolder)).toBeInTheDocument();
   });
 
   it("creates a portfolio (non-TR/IBKR brokerage) and navigates back on Create", async () => {

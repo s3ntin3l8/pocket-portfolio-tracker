@@ -1158,6 +1158,7 @@
     "mergerSubmit": "Catat merger",
     "mergerNeedInstruments": "Pilih instrumen lama dan baru.",
     "mergerNeedPortfolio": "Pilih portofolio dulu.",
+    "portfolio": "Portofolio",
     "mergerError": "Tidak dapat mencatat merger. Periksa kolom dan coba lagi.",
     "edit": "Ubah",
     "delete": "Hapus",
