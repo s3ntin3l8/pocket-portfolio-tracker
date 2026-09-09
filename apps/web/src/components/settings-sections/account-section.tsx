@@ -38,9 +38,11 @@ export async function AccountSection({
             <DisplayCurrency current={me?.displayCurrency ?? ""} />
           </div>
           <div className="p-4">
+            <p className="mb-2 text-xs font-semibold text-text-2">{t("language")}</p>
             <LocaleSwitcher />
           </div>
           <div className="p-4">
+            <p className="mb-2 text-xs font-semibold text-text-2">{t("appearance")}</p>
             <ThemeSwitcher />
           </div>
         </div>

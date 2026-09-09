@@ -36,6 +36,7 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
             </p>
           </div>
           <div className="p-4">
+            <p className="mb-2 text-xs font-semibold text-text-2">{t("investingCostBasisLabel")}</p>
             <PreferenceChips
               variant="wide"
               prefKey="costBasisMode"
