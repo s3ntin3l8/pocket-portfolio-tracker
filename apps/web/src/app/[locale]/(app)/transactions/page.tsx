@@ -6,7 +6,7 @@ import { ExportCsvButton } from "@/components/export-csv-button";
 import { ExportDocumentsButton } from "@/components/export-documents-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { RecentImportsSection } from "@/components/recent-imports-section";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageTitle } from "@/components/page-header";
 import {
   getSelectedPortfolioId,
   loadImports,
@@ -188,16 +188,7 @@ export default async function TransactionsPage({
     </>
   );
 
-  const displayCount = total;
-  const heading = (
-    <div className="space-y-1">
-      <PageHeaderSetter title={t("title")} />
-      <PageTitle>{t("title")}</PageTitle>
-      <p className="text-sm font-medium text-text-2">
-        {displayCount > 0 ? t("subtitleCount", { count: displayCount }) : t("subtitle")}
-      </p>
-    </div>
-  );
+  const heading = <PageTitle>{t("title")}</PageTitle>;
 
   // No page-number navigation — replaced with a "Load more" button inside the table
   // component that fetches the next server page and appends progressively.

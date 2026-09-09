@@ -28,7 +28,7 @@ import {
   anomalyLabel,
   type AnomalyTranslator,
 } from "@/lib/utils";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageTitle } from "@/components/page-header";
 import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
 
 const CLASS_TABS = [
@@ -184,18 +184,10 @@ export default async function HoldingsPage({
   );
 
   const Heading = (
-    <div className="space-y-1">
-      <PageHeaderSetter title={t("title")} />
-      <PageTitle>
-        <span className="sm:hidden">{t("titleMobile")}</span>
-        <span className="hidden sm:inline">{t("title")}</span>
-      </PageTitle>
-      <p className="text-sm text-muted-foreground">
-        {result.status === "ok" && holdings.length > 0
-          ? t(currency === "IDR" ? "subtitleCountIdx" : "subtitleCount", { count: holdings.length })
-          : t("subtitle")}
-      </p>
-    </div>
+    <PageTitle>
+      <span className="sm:hidden">{t("titleMobile")}</span>
+      <span className="hidden sm:inline">{t("title")}</span>
+    </PageTitle>
   );
 
   if (result.status === "unavailable") {

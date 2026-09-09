@@ -365,16 +365,6 @@ export function TransactionsTable({
     <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
       {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
       <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
-        {!bannerDismissed && (
-          <AnomalyBanner
-            anomalies={anomalies}
-            flaggedCount={flaggedCount}
-            showFlagged={showFlagged}
-            onToggleFlagged={() => setShowFlagged((v) => !v)}
-            onDismiss={() => setBannerDismissed(true)}
-          />
-        )}
-
         {showFilterBanners && allBanner && (
           <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
         )}
@@ -397,6 +387,19 @@ export function TransactionsTable({
               headingLabel={tBanner(activeBannerMode === "buy" ? "mostBought" : "mostSold")}
             />
           )}
+      </div>
+
+      {/* ── Main column: alerts + controls + table ── */}
+      <div className="space-y-3">
+        {!bannerDismissed && (
+          <AnomalyBanner
+            anomalies={anomalies}
+            flaggedCount={flaggedCount}
+            showFlagged={showFlagged}
+            onToggleFlagged={() => setShowFlagged((v) => !v)}
+            onDismiss={() => setBannerDismissed(true)}
+          />
+        )}
         {showFilterBanners &&
           portfolioAnomalies
             .filter(
@@ -415,10 +418,6 @@ export function TransactionsTable({
                 />
               );
             })}
-      </div>
-
-      {/* ── Main column: controls + table ── */}
-      <div className="space-y-3">
         <FilterBar
           typeFilter={typeFilter}
           showFlagged={showFlagged}
