@@ -30,9 +30,6 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
   const t = useTranslations("Trades");
   const locale = useLocale();
   const { sortKey, sortDir, toggle, sort } = useTableSort<Trade>(COLS);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  // Closed trades open the detail sheet (matches the design); open positions have no
-  // exit date/price, so they keep the inline leg-expansion below instead.
   const [detailTrade, setDetailTrade] = useState<Trade | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
@@ -59,14 +56,6 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
         .reduce((s, tr) => s + Number(tr.realizedPnL), 0),
     [trades],
   );
-
-  const toggleRow = (key: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
 
   return (
     <div className="space-y-3">
@@ -176,9 +165,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                     key={tradeKey(tr)}
                     tr={tr}
                     currency={currency}
-                    expanded={expanded}
                     onDetail={setDetailTrade}
-                    onToggle={toggleRow}
                   />
                 ))}
               </TableBody>
