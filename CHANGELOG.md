@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.11...v0.1.12) (2026-09-09)
+
+
+### Bug Fixes
+
+* **web:** make merger portfolio picker onChange required, add coverage tests ([b829a0d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b829a0d7b7936bc35f686f102a61f17ea48c3922)), closes [#719](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/719)
+* **web:** move alert banners to main column, drop redundant desktop page titles ([#718](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/718)) ([21c031a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/21c031affd42e7f3493ea4b647e173e85d3900ba))
+* **web:** move income stat cards + cash interest to sidebar, seasonality full width ([#717](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/717)) ([5eb68dd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5eb68ddcb68b848828184718cb92343b52b67c9d))
+* **web:** standardize add modal visuals — flat fields, merger-only picker, consistent radius ([f2a59f0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f2a59f0dbc637047fb256e2d393b97e2dedeba42))
+* **web:** standardize add modal visuals — flat fields, merger-only picker, consistent radius ([8d32e57](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8d32e572d71e66bf8a1935d3ef5da6c7fbd9dd09)), closes [#692](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/692)
+* **web:** unify settings/admin visual style — sleeker layout without card boxes ([#715](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/715)) ([3368383](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3368383cabe1e773ff603400b1f479060e6622c1))
+
 ## [0.1.11](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.10...v0.1.11) (2026-09-09)
 
 
