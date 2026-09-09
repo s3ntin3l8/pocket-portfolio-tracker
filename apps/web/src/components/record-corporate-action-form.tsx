@@ -132,8 +132,10 @@ export function RecordCorporateActionForm({
   portfolioId?: string;
   /** Available portfolios for the merger portfolio picker. */
   portfolios?: PickablePortfolio[];
-  /** Called when the user picks a different portfolio in the merger picker. */
-  onPortfolioChange?: (id: string) => void;
+  /** Called when the user picks a different portfolio in the merger picker. Required
+   *  when `portfolios` is supplied — without it the picker would silently no-op and
+   *  submit would fail `mergerNeedPortfolio` (#719 review). */
+  onPortfolioChange: (id: string) => void;
   onSuccess?: () => void;
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;
@@ -323,7 +325,7 @@ export function RecordCorporateActionForm({
             <PortfolioPicker
               portfolios={portfolios}
               value={portfolioId ?? ""}
-              onChange={onPortfolioChange ?? (() => {})}
+              onChange={onPortfolioChange}
               ariaLabel={t("portfolio")}
               triggerClassName="w-full sm:max-w-xs"
             />

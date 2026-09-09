@@ -5,6 +5,7 @@ import {
   RecordCorporateActionForm,
   type RecordCorpActionClient,
 } from "../src/components/record-corporate-action-form";
+import type { PickablePortfolio } from "../src/components/portfolio-picker";
 import type { Instrument } from "@portfolio/api-client";
 import messages from "../messages/en.json";
 
@@ -80,6 +81,7 @@ function renderForm(
       <RecordCorporateActionForm
         client={client}
         portfolioId={portfolioId}
+        onPortfolioChange={vi.fn()}
         onSuccess={onSuccess}
         isAdmin={isAdmin}
       />
@@ -254,9 +256,107 @@ describe("RecordCorporateActionForm", () => {
   it("wraps the submit button in a sticky footer when stickyFooter is set", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
-        <RecordCorporateActionForm client={makeClient()} onSuccess={vi.fn()} stickyFooter isAdmin />
+        <RecordCorporateActionForm
+          client={makeClient()}
+          onPortfolioChange={vi.fn()}
+          onSuccess={vi.fn()}
+          stickyFooter
+          isAdmin
+        />
       </NextIntlClientProvider>,
     );
     expect(screen.getByRole("button", { name: m.submit }).closest(".sticky")).not.toBeNull();
+  });
+
+  it("renders the portfolio picker for mergers when multiple portfolios are available", () => {
+    const portfolios: PickablePortfolio[] = [
+      { id: "p1", name: "Portfolio 1", brokerage: "DKB", accountHolder: "Alice" },
+      { id: "p2", name: "Portfolio 2", brokerage: "IBKR", accountHolder: "Bob" },
+    ];
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <RecordCorporateActionForm
+          client={makeClient()}
+          portfolioId="p1"
+          portfolios={portfolios}
+          onPortfolioChange={vi.fn()}
+          onSuccess={vi.fn()}
+          isAdmin
+        />
+      </NextIntlClientProvider>,
+    );
+    // Default for admin is "split" — picker must NOT show yet
+    expect(screen.queryByLabelText(m.portfolio)).not.toBeInTheDocument();
+
+    // Switch to merger — picker appears
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "merger" } });
+    expect(screen.getByLabelText(m.portfolio)).toBeInTheDocument();
+    expect(screen.getByText("Portfolio 1")).toBeInTheDocument();
+  });
+
+  it("does not render the portfolio picker for mergers with a single portfolio", () => {
+    const portfolios: PickablePortfolio[] = [
+      { id: "p1", name: "Only Portfolio", brokerage: "DKB", accountHolder: "Alice" },
+    ];
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <RecordCorporateActionForm
+          client={makeClient()}
+          portfolioId="p1"
+          portfolios={portfolios}
+          onPortfolioChange={vi.fn()}
+          onSuccess={vi.fn()}
+          isAdmin
+        />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "merger" } });
+    expect(screen.queryByLabelText(m.portfolio)).not.toBeInTheDocument();
+  });
+
+  it("does not render the portfolio picker for non-merger types even with multiple portfolios", () => {
+    const portfolios: PickablePortfolio[] = [
+      { id: "p1", name: "Portfolio 1", brokerage: "DKB", accountHolder: "Alice" },
+      { id: "p2", name: "Portfolio 2", brokerage: "IBKR", accountHolder: "Bob" },
+    ];
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <RecordCorporateActionForm
+          client={makeClient()}
+          portfolioId="p1"
+          portfolios={portfolios}
+          onPortfolioChange={vi.fn()}
+          onSuccess={vi.fn()}
+          isAdmin
+        />
+      </NextIntlClientProvider>,
+    );
+    // Default type is "split" for admin — picker must not show
+    expect(screen.queryByLabelText(m.portfolio)).not.toBeInTheDocument();
+  });
+
+  it("calls onPortfolioChange when the user picks a different portfolio in the merger picker", () => {
+    const portfolios: PickablePortfolio[] = [
+      { id: "p1", name: "Portfolio 1", brokerage: "DKB", accountHolder: "Alice" },
+      { id: "p2", name: "Portfolio 2", brokerage: "IBKR", accountHolder: "Bob" },
+    ];
+    const onPortfolioChange = vi.fn();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <RecordCorporateActionForm
+          client={makeClient()}
+          portfolioId="p1"
+          portfolios={portfolios}
+          onPortfolioChange={onPortfolioChange}
+          onSuccess={vi.fn()}
+          isAdmin
+        />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "merger" } });
+    // Open the dropdown (Radix trigger needs keyDown, not click) and select the second portfolio
+    fireEvent.keyDown(screen.getByLabelText(m.portfolio), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: /Portfolio 2/ }));
+    expect(onPortfolioChange).toHaveBeenCalledWith("p2");
   });
 });

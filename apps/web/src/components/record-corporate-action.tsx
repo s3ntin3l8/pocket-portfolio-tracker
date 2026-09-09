@@ -17,12 +17,13 @@ export function RecordCorporateAction({
   portfolioId?: string;
   /** Available portfolios for the merger portfolio picker. */
   portfolios?: PickablePortfolio[];
-  /** Called when the user picks a different portfolio in the merger picker. */
-  onPortfolioChange?: (id: string) => void;
+  /** Called when the user picks a different portfolio in the merger picker. Required
+   *  when `portfolios` is supplied — see `RecordCorporateActionForm`. */
+  onPortfolioChange: (id: string) => void;
   /** See `AddTransactionForm` — sheet contexts only. */
   stickyFooter?: boolean;
   isAdmin?: boolean;
-} = {}) {
+}) {
   const api = useApiClient();
   const router = useRouter();
   return (
