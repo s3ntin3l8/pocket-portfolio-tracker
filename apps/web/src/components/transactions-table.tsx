@@ -362,35 +362,12 @@ export function TransactionsTable({
   const showEmpty = visibleRows.length === 0;
 
   return (
-    <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
-      {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
-      <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
-        {showFilterBanners && allBanner && (
-          <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
-        )}
-        {showFilterBanners && incomeBanner && (
-          <IncomeFilterBanner
-            data={incomeBanner}
-            projectedLabel={tBanner("projected12mo")}
-            bySourceLabel={tBanner("bySource")}
-          />
-        )}
-        {showFilterBanners &&
-          tradeBanner &&
-          (activeBannerMode === "buy" || activeBannerMode === "sell") && (
-            <TradeFilterBanner
-              data={tradeBanner}
-              averageLabel={tBanner("averageOrder")}
-              averageNote={tBanner(
-                activeBannerMode === "buy" ? "capitalDeployed" : "capitalReturned",
-              )}
-              headingLabel={tBanner(activeBannerMode === "buy" ? "mostBought" : "mostSold")}
-            />
-          )}
-      </div>
-
-      {/* ── Main column: alerts + controls + table ── */}
-      <div className="space-y-3">
+    <>
+      {/* ── Alerts: above the grid so they're DOM-first on mobile (single column)
+      and lead the main column above the controls on desktop. Previously these
+      lived at the top of the sidebar rail — alerts vs stat summaries were
+      visually mixed, and on mobile the stat summaries now render below them. */}
+      <div className="mb-3 space-y-3">
         {!bannerDismissed && (
           <AnomalyBanner
             anomalies={anomalies}
@@ -418,113 +395,145 @@ export function TransactionsTable({
                 />
               );
             })}
-        <FilterBar
-          typeFilter={typeFilter}
-          showFlagged={showFlagged}
-          flaggedCount={flaggedCount}
-          onToggleFlagged={() => setShowFlagged((v) => !v)}
-          yearOptions={yearOptions}
-          yearFilterProp={yearFilterProp}
-          onNavigateWithParam={navigateWithParam}
-          draftCount={draftCount}
-          draftFilter={draftFilter}
-          onDraftFilterChange={(v) => setDraftFilter(v)}
-          searchQuery={searchQuery}
-          onSearchChange={(v) => {
-            const params = new URLSearchParams(searchParams.toString());
-            if (v) {
-              params.set("q", v);
-            } else {
-              params.delete("q");
-            }
-            params.set("page", "1");
-            router.push(`${pathname}?${params.toString()}`);
-          }}
-          actions={actions}
-        />
+      </div>
 
-        <SelectionBar
-          selectionMode={selectionMode}
-          selectedCount={selected.size}
-          selectedDraftCount={selectedDraftIds.length}
-          canReassign={canReassign}
-          canMerge={canMerge}
-          busy={busy}
-          confirming={confirming}
-          onClearSelection={clearSelection}
-          onBatchConfirmDrafts={() => onBatchResolve("confirm")}
-          onBatchDiscardDrafts={() => onBatchResolve("discard")}
-          onReassign={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
-          onMerge={() => setMergeRows([selectedRows[0], selectedRows[1]])}
-          onRequestDelete={() => setConfirming(true)}
-          onConfirmDelete={onBatchDelete}
-          onCancelDelete={() => setConfirming(false)}
-        />
-
-        <ReassignMergeDialogs
-          reassignRows={reassignRows}
-          onCloseReassign={() => setReassignRows(null)}
-          portfolios={portfolios}
-          onConfirmReassign={doReassign}
-          mergeRows={mergeRows}
-          onCloseMerge={() => setMergeRows(null)}
-          onMerged={() => {
-            setMergeRows(null);
-            clearSelection();
-            router.refresh();
-          }}
-        />
-
-        {showFlagged && flaggedLoading ? (
-          <div className="flex justify-center py-10">
-            <Spinner size="md" />
-          </div>
-        ) : (
-          <>
-            <DesktopTable
-              rows={windowedRows}
-              selectionMode={selectionMode}
-              selected={selected}
-              anomalyByTxId={anomalyByTxId}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onToggleSort={toggleSort}
-              showPortfolio={showPortfolio}
-              groupByMonth={groupByMonth}
-              colSpan={colSpan}
-              monthFmt={monthFmt}
-              longPressHandlers={longPressHandlers}
-              onRowActivate={onRowActivate}
-              onToggle={toggle}
-              onToggleAll={toggleAll}
-              allSelected={allSelected}
-              onEnterSelectionMode={() => setSelectionMode(true)}
-              hasActiveFilter={hasActiveFilter}
-              showEmpty={showEmpty}
+      <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
+        {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
+        <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+          {showFilterBanners && allBanner && (
+            <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
+          )}
+          {showFilterBanners && incomeBanner && (
+            <IncomeFilterBanner
+              data={incomeBanner}
+              projectedLabel={tBanner("projected12mo")}
+              bySourceLabel={tBanner("bySource")}
             />
+          )}
+          {showFilterBanners &&
+            tradeBanner &&
+            (activeBannerMode === "buy" || activeBannerMode === "sell") && (
+              <TradeFilterBanner
+                data={tradeBanner}
+                averageLabel={tBanner("averageOrder")}
+                averageNote={tBanner(
+                  activeBannerMode === "buy" ? "capitalDeployed" : "capitalReturned",
+                )}
+                headingLabel={tBanner(activeBannerMode === "buy" ? "mostBought" : "mostSold")}
+              />
+            )}
+        </div>
 
-            <MobileView
-              dayGroups={dayGroups}
-              selectionMode={selectionMode}
-              selected={selected}
-              anomalyByTxId={anomalyByTxId}
-              longPressHandlers={longPressHandlers}
-              onRowActivate={onRowActivate}
-              hasActiveFilter={hasActiveFilter}
-              showEmpty={showEmpty}
-            />
-          </>
-        )}
+        {/* ── Main column: controls + table ── */}
+        <div className="space-y-3">
+          <FilterBar
+            typeFilter={typeFilter}
+            showFlagged={showFlagged}
+            flaggedCount={flaggedCount}
+            onToggleFlagged={() => setShowFlagged((v) => !v)}
+            yearOptions={yearOptions}
+            yearFilterProp={yearFilterProp}
+            onNavigateWithParam={navigateWithParam}
+            draftCount={draftCount}
+            draftFilter={draftFilter}
+            onDraftFilterChange={(v) => setDraftFilter(v)}
+            searchQuery={searchQuery}
+            onSearchChange={(v) => {
+              const params = new URLSearchParams(searchParams.toString());
+              if (v) {
+                params.set("q", v);
+              } else {
+                params.delete("q");
+              }
+              params.set("page", "1");
+              router.push(`${pathname}?${params.toString()}`);
+            }}
+            actions={actions}
+          />
 
-        <LoadMoreSection
-          hasVisibleRows={visibleRows.length > 0}
-          hasMore={hasMore}
-          loadingMore={loadingMore}
-          windowedCount={windowedRows.length}
-          sortedTotal={sortedRows.length}
-          total={showFlagged ? undefined : total}
-          onLoadMore={() => handleLoadMore(sortedRows.length)}
-        />
+          <SelectionBar
+            selectionMode={selectionMode}
+            selectedCount={selected.size}
+            selectedDraftCount={selectedDraftIds.length}
+            canReassign={canReassign}
+            canMerge={canMerge}
+            busy={busy}
+            confirming={confirming}
+            onClearSelection={clearSelection}
+            onBatchConfirmDrafts={() => onBatchResolve("confirm")}
+            onBatchDiscardDrafts={() => onBatchResolve("discard")}
+            onReassign={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
+            onMerge={() => setMergeRows([selectedRows[0], selectedRows[1]])}
+            onRequestDelete={() => setConfirming(true)}
+            onConfirmDelete={onBatchDelete}
+            onCancelDelete={() => setConfirming(false)}
+          />
+
+          <ReassignMergeDialogs
+            reassignRows={reassignRows}
+            onCloseReassign={() => setReassignRows(null)}
+            portfolios={portfolios}
+            onConfirmReassign={doReassign}
+            mergeRows={mergeRows}
+            onCloseMerge={() => setMergeRows(null)}
+            onMerged={() => {
+              setMergeRows(null);
+              clearSelection();
+              router.refresh();
+            }}
+          />
+
+          {showFlagged && flaggedLoading ? (
+            <div className="flex justify-center py-10">
+              <Spinner size="md" />
+            </div>
+          ) : (
+            <>
+              <DesktopTable
+                rows={windowedRows}
+                selectionMode={selectionMode}
+                selected={selected}
+                anomalyByTxId={anomalyByTxId}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggleSort={toggleSort}
+                showPortfolio={showPortfolio}
+                groupByMonth={groupByMonth}
+                colSpan={colSpan}
+                monthFmt={monthFmt}
+                longPressHandlers={longPressHandlers}
+                onRowActivate={onRowActivate}
+                onToggle={toggle}
+                onToggleAll={toggleAll}
+                allSelected={allSelected}
+                onEnterSelectionMode={() => setSelectionMode(true)}
+                hasActiveFilter={hasActiveFilter}
+                showEmpty={showEmpty}
+              />
+
+              <MobileView
+                dayGroups={dayGroups}
+                selectionMode={selectionMode}
+                selected={selected}
+                anomalyByTxId={anomalyByTxId}
+                longPressHandlers={longPressHandlers}
+                onRowActivate={onRowActivate}
+                hasActiveFilter={hasActiveFilter}
+                showEmpty={showEmpty}
+              />
+            </>
+          )}
+
+          <LoadMoreSection
+            hasVisibleRows={visibleRows.length > 0}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            windowedCount={windowedRows.length}
+            sortedTotal={sortedRows.length}
+            total={showFlagged ? undefined : total}
+            onLoadMore={() => handleLoadMore(sortedRows.length)}
+          />
+        </div>
       </div>
 
       <TransactionDetailSheet
@@ -559,6 +568,6 @@ export function TransactionsTable({
           if (!o) setEditTx(null);
         }}
       />
-    </div>
+    </>
   );
 }

@@ -1307,9 +1307,6 @@
   "Holdings": {
     "title": "Kepemilikan",
     "titleMobile": "Portofolio",
-    "subtitle": "Setiap posisi di seluruh portofolio Anda.",
-    "subtitleCount": "{count} posisi terbuka · harga langsung",
-    "subtitleCountIdx": "{count} posisi terbuka · harga IDX langsung",
     "instrument": "Instrumen",
     "quantity": "Jumlah",
     "avgCost": "Rata-rata biaya",
@@ -1364,7 +1361,6 @@
   },
   "Transactions": {
     "title": "Aktivitas",
-    "subtitle": "Setiap beli, jual, dividen, dan arus kas.",
     "filterScope": "Cakupan",
     "filterAll": "Semua",
     "filterInvestments": "Investasi saja",
@@ -1496,7 +1492,6 @@
       "chipIssues": "Perlu ditinjau · {count}",
       "allTime": "Sepanjang waktu"
     },
-    "subtitleCount": "{count} transaksi",
     "transactionCol": "Transaksi",
     "price": "Harga",
     "breakdown": "Rincian",

@@ -184,10 +184,17 @@ export default async function HoldingsPage({
   );
 
   const Heading = (
-    <PageTitle>
-      <span className="sm:hidden">{t("titleMobile")}</span>
-      <span className="hidden sm:inline">{t("title")}</span>
-    </PageTitle>
+    <>
+      <PageTitle>
+        <span className="sm:hidden">{t("titleMobile")}</span>
+        <span className="hidden sm:inline">{t("title")}</span>
+      </PageTitle>
+      {/* On md+ the sidebar nav highlights the active page, so the mobile-only
+      `PageTitle` (which is `md:hidden`) leaves the document with no h1 — break the
+      a11y outline for sighted users too. Keep an sr-only h1 for screen readers and
+      document outline tooling; visually the topbar carries no duplicate title. */}
+      <h1 className="sr-only">{t("title")}</h1>
+    </>
   );
 
   if (result.status === "unavailable") {

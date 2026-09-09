@@ -188,7 +188,16 @@ export default async function TransactionsPage({
     </>
   );
 
-  const heading = <PageTitle>{t("title")}</PageTitle>;
+  const heading = (
+    <>
+      <PageTitle>{t("title")}</PageTitle>
+      {/* On md+ the sidebar nav highlights the active page, so the mobile-only
+      `PageTitle` (which is `md:hidden`) leaves the document with no h1 — break the
+      a11y outline for sighted users too. Keep an sr-only h1 for screen readers and
+      document outline tooling; visually the topbar carries no duplicate title. */}
+      <h1 className="sr-only">{t("title")}</h1>
+    </>
+  );
 
   // No page-number navigation — replaced with a "Load more" button inside the table
   // component that fetches the next server page and appends progressively.

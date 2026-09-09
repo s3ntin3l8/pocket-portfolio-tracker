@@ -1309,9 +1309,6 @@
   "Holdings": {
     "title": "Holdings",
     "titleMobile": "Portfolio",
-    "subtitle": "Every position across your portfolios.",
-    "subtitleCount": "{count} open positions · live prices",
-    "subtitleCountIdx": "{count} open positions · live IDX prices",
     "instrument": "Instrument",
     "quantity": "Quantity",
     "avgCost": "Avg cost",
@@ -1366,7 +1363,6 @@
   },
   "Transactions": {
     "title": "Activity",
-    "subtitle": "Every buy, sell, dividend and cash flow.",
     "filterScope": "Scope",
     "filterAll": "All",
     "filterInvestments": "Investments only",
@@ -1498,7 +1494,6 @@
       "chipIssues": "Needs review · {count}",
       "allTime": "All time"
     },
-    "subtitleCount": "{count} transactions",
     "transactionCol": "Transaction",
     "price": "Price",
     "breakdown": "Breakdown",

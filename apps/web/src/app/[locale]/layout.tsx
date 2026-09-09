@@ -67,12 +67,15 @@ export const viewport: Viewport = {
   ],
   // Draw into the display cutout / safe areas; insets are reclaimed in the shell.
   viewportFit: "cover",
-  // Chrome Android: resize the visual viewport when the URL bar shows/hides so a
-  // fixed `bottom-0` element (the mobile BottomNav) stays anchored to the actually-
-  // visible area instead of being hidden behind the toolbar. `resizes-visual` only
-  // moves the visual viewport — the layout viewport (and page layout) stays put,
-  // so fixed elements just track the visible bottom without triggering reflow.
-  interactiveWidget: "resizes-visual",
+  // Chrome Android: shrink the layout viewport (not just the visual one) when the
+  // URL bar shows/hides, so the page reflows instead of the URL bar overlaying
+  // content. `resizes-visual` (the UA default — a no-op when set explicitly) only
+  // resizes the visual viewport, which doesn't help here: fixed elements anchor
+  // against the *layout* viewport, so the BottomNav's `bottom-0` would still sit
+  // under the toolbar. `resizes-content` is the value that actually shrinks the
+  // layout viewport, keeping `100dvh` and `bottom-0` honest about the visible area.
+  // Trade-off: every URL-bar toggle triggers a layout reflow.
+  interactiveWidget: "resizes-content",
 };
 
 export function generateStaticParams() {
