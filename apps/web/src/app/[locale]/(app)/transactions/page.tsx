@@ -6,7 +6,7 @@ import { ExportCsvButton } from "@/components/export-csv-button";
 import { ExportDocumentsButton } from "@/components/export-documents-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { RecentImportsSection } from "@/components/recent-imports-section";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageTitle } from "@/components/page-header";
 import {
   getSelectedPortfolioId,
   loadImports,
@@ -188,15 +188,21 @@ export default async function TransactionsPage({
     </>
   );
 
-  const displayCount = total;
   const heading = (
-    <div className="space-y-1">
-      <PageHeaderSetter title={t("title")} />
+    <>
       <PageTitle>{t("title")}</PageTitle>
-      <p className="text-sm font-medium text-text-2">
-        {displayCount > 0 ? t("subtitleCount", { count: displayCount }) : t("subtitle")}
-      </p>
-    </div>
+      {/* On md+ the sidebar nav highlights the active page, so the mobile-only
+      `PageTitle` (which is `md:hidden`) leaves the document with no h1 — break the
+      a11y outline. Keep an sr-only h1 for screen readers and document outline
+      tooling; visually the topbar carries no duplicate title. `max-md:hidden`
+      below md (where `PageTitle` is the visible h1) and `md:sr-only` at md+
+      (desktop SR users). NOT `hidden md:sr-only`: `hidden` pins `display:none`
+      at every breakpoint, and Tailwind v4's `sr-only` recipe never sets
+      `display`, so it can't undo `hidden` — that combination silently kills the
+      h1 in the accessibility tree. `max-md:` scopes the `display:none` to
+      below-md only. */}
+      <h1 className="max-md:hidden md:sr-only">{t("title")}</h1>
+    </>
   );
 
   // No page-number navigation — replaced with a "Load more" button inside the table
