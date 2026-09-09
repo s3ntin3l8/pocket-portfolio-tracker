@@ -363,7 +363,7 @@ export default async function InstrumentPage({
         </div>
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
-        <div className="space-y-6 @xl:sticky @xl:top-4 @xl:order-last">
+        <div className="space-y-6 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
           <h2 className="text-lg font-semibold">{t("position")}</h2>
           {hasPosition && holding ? (
             <div className="grid grid-cols-1 gap-2.5 sm:gap-4">

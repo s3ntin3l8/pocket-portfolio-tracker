@@ -132,16 +132,16 @@ export function SettingsShell({
       {flush ? (
         // No explicit height/overflow: unlike the mock's fixed 88vh modal panel, this
         // shell also mounts in normal page flow (the real, non-modal `/admin` route) where
-        // a viewport-height rail would fight natural scrolling. `sticky top-4 self-start`
-        // (same as the "cards" rail) keeps it in view without assuming a bounded ancestor.
-        <div className="hidden md:sticky md:top-4 md:flex md:flex-col md:gap-0.5 md:self-start md:border-r md:border-border md:bg-card-2 md:p-3">
+        // a viewport-height rail would fight natural scrolling. `sticky top-[calc(…)] self-start`
+        // (same as the "cards" rail) clears the 62px header + safe-area-inset-top.
+        <div className="hidden md:sticky md:top-[calc(70px+env(safe-area-inset-top))] md:flex md:flex-col md:gap-0.5 md:self-start md:border-r md:border-border md:bg-card-2 md:p-3">
           {railTop}
           {railLinks}
           {railExtra}
           {railBottom}
         </div>
       ) : (
-        <div className="hidden md:sticky md:top-4 md:flex md:flex-col md:gap-3 md:self-start">
+        <div className="hidden md:sticky md:top-[calc(70px+env(safe-area-inset-top))] md:flex md:flex-col md:gap-3 md:self-start">
           {railTop}
           <nav className={cn("rounded-[18px] bg-card p-2", CARD_SHADOW)}>
             {railLinks}

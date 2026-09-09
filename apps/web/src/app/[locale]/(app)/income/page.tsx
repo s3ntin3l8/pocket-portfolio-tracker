@@ -271,7 +271,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
 
         {/* ── Sidebar: allocation donut (sticky on wide containers) ── */}
         {classSlices.length > 0 && (
-          <div className="@xl:sticky @xl:top-4 @xl:order-last">
+          <div className="@xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
             <Card>
               <CardHeader>
                 <CardTitle>{t("byClassTitle")}</CardTitle>
