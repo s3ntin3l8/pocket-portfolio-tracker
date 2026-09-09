@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Card, CardContent } from "@/components/ui/card";
 import { AdminStorageForm } from "@/components/admin-storage-form";
 import { SectionHeader } from "@/components/section-header";
 import { PageHeaderSetter } from "@/components/page-header";
@@ -25,15 +24,11 @@ export default async function AdminStoragePage({
       <PageHeaderSetter title={t("storage")} backHref="/admin" />
       <SectionHeader title={t("storage")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("storageHint")}</p>
-      <Card>
-        <CardContent className="p-5">
-          {result.status === "ok" ? (
-            <AdminStorageForm initial={result.storage} />
-          ) : (
-            <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
-          )}
-        </CardContent>
-      </Card>
+      {result.status === "ok" ? (
+        <AdminStorageForm initial={result.storage} />
+      ) : (
+        <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+      )}
     </>
   );
 }
