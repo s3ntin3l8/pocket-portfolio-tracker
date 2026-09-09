@@ -1,16 +1,13 @@
 import { getTranslations } from "next-intl/server";
-import { Card, CardContent } from "@/components/ui/card";
 import { PreferenceChips } from "@/components/preference-chips";
 import { BenchmarkSettingsForm } from "@/components/settings-sections/benchmark-settings-form";
 import { RetirementAgeForm } from "@/components/settings-sections/retirement-age-form";
 import type { UserPreferences } from "@portfolio/api-client";
 
 /**
- * The Settings "Investing" section — real chip controls (`ProfileSettings.dc.html`'s
- * `taxChips`/`cbChips`) backed by the global `user_preferences.taxRegime`/
- * `costBasisMode` columns. The "Tax code" chip here and the Tax page's DE/ID toggle
- * write the exact same preference (`PreferenceChips`), so flipping either one updates
- * both — see the Tax page's "Tax regime · applies everywhere, also in Settings" label.
+ * The Settings "Investing" section — real chip controls backed by the global
+ * `user_preferences.taxRegime`/`costBasisMode` columns. Tax regime and cost basis
+ * are grouped into one block; retirement and benchmarks are separate.
  */
 export async function InvestingSection({ prefs }: { prefs: UserPreferences | null }) {
   const t = await getTranslations("Settings");
@@ -18,13 +15,13 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
   const costBasisMode = prefs?.costBasisMode ?? "purchase_price";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("investingTaxLabel")}
         </p>
-        <Card>
-          <CardContent className="p-4">
+        <div className="divide-y divide-line overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="p-4">
             <PreferenceChips
               variant="wide"
               prefKey="taxRegime"
@@ -37,16 +34,9 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
             <p className="mt-2.5 px-0.5 text-xs text-muted-foreground">
               {taxRegime === "ID" ? t("investingTaxNoteId") : t("investingTaxNoteDe")}
             </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
-          {t("investingCostBasisLabel")}
-        </p>
-        <Card>
-          <CardContent className="p-4">
+          </div>
+          <div className="p-4">
+            <p className="mb-2 text-xs font-semibold text-text-2">{t("investingCostBasisLabel")}</p>
             <PreferenceChips
               variant="wide"
               prefKey="costBasisMode"
@@ -59,33 +49,33 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
             <p className="mt-2.5 px-0.5 text-xs text-muted-foreground">
               {t("investingCostBasisNote")}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <div>
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("retirementLabel")}
         </p>
-        <Card>
-          <CardContent className="p-4">
+        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="p-4">
             <RetirementAgeForm age={prefs?.retirementAge ?? null} />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <div>
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
           {t("benchmarkLabel")}
         </p>
-        <Card>
-          <CardContent className="p-4">
+        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="p-4">
             <BenchmarkSettingsForm
               symbols={prefs?.benchmarkSymbols ?? []}
               rate={prefs?.riskFreeRate ?? null}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

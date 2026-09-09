@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Card, CardContent } from "@/components/ui/card";
 import { AdminImportSettings } from "@/components/admin-import-settings";
 import { SectionHeader } from "@/components/section-header";
 import { PageHeaderSetter } from "@/components/page-header";
@@ -25,15 +24,11 @@ export default async function AdminImportsPage({
       <PageHeaderSetter title={t("importStrategy")} backHref="/admin" />
       <SectionHeader title={t("importStrategy")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("importStrategyHint")}</p>
-      <Card>
-        <CardContent className="p-5">
-          {result.status === "ok" ? (
-            <AdminImportSettings initialStrategy={result.strategy} />
-          ) : (
-            <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
-          )}
-        </CardContent>
-      </Card>
+      {result.status === "ok" ? (
+        <AdminImportSettings initialStrategy={result.strategy} />
+      ) : (
+        <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+      )}
     </>
   );
 }
