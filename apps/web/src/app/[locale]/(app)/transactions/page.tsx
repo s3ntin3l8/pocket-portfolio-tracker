@@ -193,9 +193,11 @@ export default async function TransactionsPage({
       <PageTitle>{t("title")}</PageTitle>
       {/* On md+ the sidebar nav highlights the active page, so the mobile-only
       `PageTitle` (which is `md:hidden`) leaves the document with no h1 — break the
-      a11y outline for sighted users too. Keep an sr-only h1 for screen readers and
-      document outline tooling; visually the topbar carries no duplicate title. */}
-      <h1 className="sr-only">{t("title")}</h1>
+      a11y outline. Keep an sr-only h1 for screen readers and document outline
+      tooling; visually the topbar carries no duplicate title. `hidden md:sr-only`
+      (not plain `sr-only`) because `PageTitle` is the visible h1 below md — without
+      the `hidden`, mobile would announce "Activity" twice from two consecutive h1s. */}
+      <h1 className="hidden md:sr-only">{t("title")}</h1>
     </>
   );
 
