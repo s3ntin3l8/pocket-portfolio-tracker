@@ -134,45 +134,9 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     <div className="space-y-5">
       {heading}
 
-      {/* ── Stat cards: horizontal strip on desktop ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard
-          label={t("thisYear")}
-          value={m(thisFullYear)}
-          delta={
-            deltaPct !== null
-              ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
-              : undefined
-          }
-          deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
-        />
-        <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
-        <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
-        <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
-        <StatCard
-          label={t("payments")}
-          value={String(s.paymentCount)}
-          delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
-        {/* ── Main column: interest + charts + timeline ── */}
+        {/* ── Main column: charts + summary + calendar + timeline ── */}
         <div className="space-y-5">
-          {/* Cash interest — a standalone subtotal (per user decision), not folded into
-              the dividend/coupon headline above. Hidden entirely when there's none. */}
-          {Number(s.interest.lifetime) > 0 && (
-            <CashInterestLine
-              label={t("cashInterest")}
-              ytdLabel={t("thisYear")}
-              ttmLabel={t("ttm")}
-              lifetimeLabel={t("lifetime")}
-              ytd={m(Number(s.interest.ytd))}
-              ttm={m(Number(s.interest.ttm))}
-              lifetime={m(Number(s.interest.lifetime))}
-            />
-          )}
-
           {s.byYear.length > 0 && (
             <Card>
               <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1.5 pb-2">
@@ -185,73 +149,76 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
             </Card>
           )}
 
-          {/* Desktop: these summary cards arrange in a two-column grid (reference). */}
-          <div className="grid gap-4 @2xl:grid-cols-2 @2xl:items-start">
-            {s.monthly.length > 0 && (
-              <Card>
-                {/* Tight header so the heatmap's dynamic subtitle sits right under the title. */}
-                <CardHeader className="pb-2">
-                  <CardTitle>{t("seasonalityTitle")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <IncomeHeatmap monthly={s.monthly} currency={currency} />
-                </CardContent>
-              </Card>
-            )}
-            {s.byInstrument.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("topContributorsTitle")}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {s.byInstrument.slice(0, 8).map((c) => (
-                    <div key={c.instrumentId ?? c.symbol ?? "—"} className="space-y-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className={TABLE_LABEL}>{c.symbol ?? "—"}</span>
-                          {(c.displayName ?? c.name) && (
-                            <span className={cn("ml-2 truncate", TABLE_SUBLABEL)}>
-                              {c.displayName ?? c.name}
-                            </span>
-                          )}
+          {/* Seasonality heatmap — full width for better readability. */}
+          {s.monthly.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle>{t("seasonalityTitle")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <IncomeHeatmap monthly={s.monthly} currency={currency} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Summary cards in a two-column grid. */}
+          {(s.byInstrument.length > 0 || s.yields.length > 0 || s.byCurrency.length > 1) && (
+            <div className="grid gap-4 @2xl:grid-cols-2 @2xl:items-start">
+              {s.byInstrument.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("topContributorsTitle")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {s.byInstrument.slice(0, 8).map((c) => (
+                      <div key={c.instrumentId ?? c.symbol ?? "—"} className="space-y-1">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className={TABLE_LABEL}>{c.symbol ?? "—"}</span>
+                            {(c.displayName ?? c.name) && (
+                              <span className={cn("ml-2 truncate", TABLE_SUBLABEL)}>
+                                {c.displayName ?? c.name}
+                              </span>
+                            )}
+                          </div>
+                          <span className={cn("shrink-0", TABLE_VALUE_STRONG)}>
+                            {m(Number(c.total))}{" "}
+                            <span className="text-text-mute">({formatPercent(c.pct, locale)})</span>
+                          </span>
                         </div>
-                        <span className={cn("shrink-0", TABLE_VALUE_STRONG)}>
-                          {m(Number(c.total))}{" "}
-                          <span className="text-text-mute">({formatPercent(c.pct, locale)})</span>
-                        </span>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${Math.max(2, c.pct * 100)}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.max(2, c.pct * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-            {s.yields.length > 0 && (
-              <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <CardTitle>{t("yieldTitle")}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-0 pb-0">
-                  <YieldsTable rows={s.yields} />
-                </CardContent>
-              </Card>
-            )}
-            {s.byCurrency.length > 1 && (
-              <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <CardTitle>{t("currencyTitle")}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-0 pb-0">
-                  <ByCurrencyTable rows={s.byCurrency} displayCurrency={currency} />
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+              {s.yields.length > 0 && (
+                <Card className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle>{t("yieldTitle")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-0 pb-0">
+                    <YieldsTable rows={s.yields} />
+                  </CardContent>
+                </Card>
+              )}
+              {s.byCurrency.length > 1 && (
+                <Card className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle>{t("currencyTitle")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-0 pb-0">
+                    <ByCurrencyTable rows={s.byCurrency} displayCurrency={currency} />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
           {/* Payments calendar (forward-looking, getquin-style) — sits above the timeline
               so the user's primary question ("what's paying me next?") has the most
@@ -269,9 +236,40 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           )}
         </div>
 
-        {/* ── Sidebar: allocation donut (sticky on wide containers) ── */}
-        {classSlices.length > 0 && (
-          <div className="@xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+        {/* ── Sidebar: stat cards + cash interest + allocation donut (sticky on wide containers) ── */}
+        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+          <StatCard
+            label={t("thisYear")}
+            value={m(thisFullYear)}
+            delta={
+              deltaPct !== null
+                ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
+                : undefined
+            }
+            deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
+          />
+          <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
+          <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
+          <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
+          <StatCard
+            label={t("payments")}
+            value={String(s.paymentCount)}
+            delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
+          />
+
+          {Number(s.interest.lifetime) > 0 && (
+            <CashInterestLine
+              label={t("cashInterest")}
+              ytdLabel={t("thisYear")}
+              ttmLabel={t("ttm")}
+              lifetimeLabel={t("lifetime")}
+              ytd={m(Number(s.interest.ytd))}
+              ttm={m(Number(s.interest.ttm))}
+              lifetime={m(Number(s.interest.lifetime))}
+            />
+          )}
+
+          {classSlices.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>{t("byClassTitle")}</CardTitle>
@@ -280,8 +278,8 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                 <AllocationDonut data={classSlices} currency={currency} showPercent={false} />
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
