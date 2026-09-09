@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
@@ -80,8 +80,28 @@ const open: Trade = {
   totalReturn: "2600",
   totalReturnPct: 0.0578,
   annualizedPct: null,
-  // An interim partial sell before the position fully closed — still an "open" trade,
-  // but it carries a leg (used to exercise the inline row-expansion below).
+  legs: [],
+  instrument: {
+    symbol: "BBCA",
+    name: "BCA",
+    displayName: null,
+    assetClass: "equity",
+    unit: "shares",
+    market: "IDX",
+    sector: null,
+    sectorWeights: null,
+    countryWeights: null,
+    country: null,
+    industry: null,
+  },
+};
+
+const openWithRealized: Trade = {
+  ...open,
+  instrumentId: "i-partial",
+  realizedPnL: "100",
+  totalReturn: "2700",
+  totalReturnPct: 0.06,
   legs: [
     {
       acqDate: "2021-02-01",
@@ -96,8 +116,8 @@ const open: Trade = {
     },
   ],
   instrument: {
-    symbol: "BBCA",
-    name: "BCA",
+    symbol: "PARTIAL",
+    name: "Partial",
     displayName: null,
     assetClass: "equity",
     unit: "shares",
@@ -129,11 +149,19 @@ describe("TradesTable", () => {
 
   it("opens the trade detail sheet from the mobile card for a closed trade", () => {
     renderTable([closed]);
-    // Both the desktop table and mobile list render in jsdom (Tailwind's responsive
-    // classes don't hide elements without real CSS) — the mobile occurrence is the
-    // second "TLKM" link, and clicking it bubbles to the card's onClick.
-    fireEvent.click(screen.getAllByText("TLKM")[1]);
+    // Both desktop + mobile render in jsdom — the detail buttons appear twice (one
+    // per breakpoint). Click the mobile card's detail button (second match).
+    const detailButtons = screen.getAllByRole("button", { name: /detail/i });
+    fireEvent.click(detailButtons[detailButtons.length - 1]);
     expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
+  });
+
+  it("opens the trade detail sheet from the mobile card for an open trade", () => {
+    renderTable([open]);
+    const detailButtons = screen.getAllByRole("button", { name: /detail/i });
+    fireEvent.click(detailButtons[detailButtons.length - 1]);
+    // Header reads "Open since {entryDate}" for open trades.
+    expect(screen.getByText(/Open since 2021-02-01/)).toBeInTheDocument();
   });
 
   describe("status chips + search", () => {
@@ -186,59 +214,76 @@ describe("TradesTable", () => {
     });
   });
 
-  describe("leg expansion via keyboard-reachable button", () => {
-    it("expands an open trade to reveal its matched legs via a keyboard-reachable button", () => {
-      renderTable([open]);
-      // Leg detail is hidden until the row is expanded.
-      expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
-      // The whole-row onClick is gone — the only keyboard-reachable trigger is the
-      // dedicated button in the symbol cell.
-      fireEvent.click(screen.getByRole("button", { name: /legs/i }));
-      expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
-    });
-
-    it("collapses an open trade to hide its matched legs via the same button", () => {
-      renderTable([open]);
-      const button = screen.getByRole("button", { name: /legs/i });
-      fireEvent.click(button);
-      expect(screen.getByText("2021-02-01 → 2021-03-01")).toBeTruthy();
-      fireEvent.click(button);
-      expect(screen.queryByText("2021-02-01 → 2021-03-01")).toBeNull();
-    });
-
-    it("toggles the button's aria-label between expand and collapse", () => {
-      renderTable([open]);
-      const button = screen.getByRole("button", { name: /show.*legs|legs/i });
-      // Initially collapsed → the label advertises the expand action.
-      expect(button.getAttribute("aria-label")).toMatch(/show|expand/i);
-      fireEvent.click(button);
-      expect(button.getAttribute("aria-label")).toMatch(/hide|collapse/i);
-    });
-
-    it("does not render a leg-expand button for a closed trade", () => {
-      renderTable([closed]);
-      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
-    });
-
-    it("does not render a leg-expand button for an open trade with no legs", () => {
-      const openNoLegs: Trade = { ...open, legs: [] };
-      renderTable([openNoLegs]);
-      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
-    });
-  });
-
   describe("detail-sheet open via keyboard-reachable button", () => {
     it("opens the trade detail sheet via a keyboard-reachable button for a closed trade", () => {
       renderTable([closed]);
-      // Whole-row onClick is gone — the only keyboard-reachable trigger is a dedicated
-      // button. Sheet header reads "Closed 2021-06-01".
-      fireEvent.click(screen.getByRole("button", { name: /detail/i }));
+      fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
       expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
     });
 
-    it("does not render a detail button for an open trade (open trades use leg expansion instead)", () => {
+    it("opens the trade detail sheet for an open trade via the same button", () => {
       renderTable([open]);
-      expect(screen.queryByRole("button", { name: /detail/i })).toBeNull();
+      fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
+      // Open-trade header reads "Open since {entryDate}" (no realized exit).
+      expect(screen.getByText(/Open since 2021-02-01/)).toBeInTheDocument();
+    });
+
+    it("does not render a leg-expand button for any trade (leg expansion was removed)", () => {
+      renderTable([open, closed]);
+      // The old expand/collapse legs labels no longer exist anywhere.
+      expect(screen.queryByRole("button", { name: /legs/i })).toBeNull();
+    });
+
+    it("does not render a left-side chevron for an open trade", () => {
+      renderTable([open]);
+      // The old layout put a decorative ChevronRight at absolute -left-4 inside the
+      // instrument cell for open trades; that element is gone. We assert absence of any
+      // element positioned with `-left-` anywhere in the document.
+      expect(document.querySelectorAll("[class*='-left-']").length).toBe(0);
+    });
+  });
+
+  describe("open trade detail sheet content", () => {
+    it("shows total return as hero for open trades (not realized P&L)", () => {
+      renderTable([open]);
+      fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).getAllByText("Total return").length).toBeGreaterThanOrEqual(1);
+      expect(within(dialog).queryByText("Realized P&L")).toBeNull();
+    });
+
+    it("shows realized P&L row in breakdown when open trade has interim partial sell", () => {
+      renderTable([openWithRealized]);
+      fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
+      const dialog = screen.getByRole("dialog");
+      const realizedRows = within(dialog).getAllByText("Realized P&L");
+      expect(realizedRows.length).toBe(1);
+    });
+
+    it("hides 'Income while held' card for open trades (dividends shown in breakdown instead)", () => {
+      renderTable([open]);
+      fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).queryByText("Income while held")).toBeNull();
+      expect(within(dialog).getByText("Dividends collected")).toBeInTheDocument();
+    });
+  });
+
+  describe("long symbol names", () => {
+    it("renders long symbol names fully visible inside the constrained symbol column", () => {
+      const longSymbol: Trade = {
+        ...closed,
+        instrumentId: "i-long",
+        instrument: {
+          ...closed.instrument!,
+          symbol: "ISHARES-CORE-MSCI-WORLD",
+        },
+      };
+      renderTable([longSymbol]);
+      // The symbol link should be in the DOM and its truncate class is fine — what
+      // matters is the container width lets it breathe (180px, with Badge outside).
+      // We assert the full symbol text is rendered (truncation is CSS-only).
+      expect(screen.getAllByText("ISHARES-CORE-MSCI-WORLD").length).toBeGreaterThan(0);
     });
   });
 

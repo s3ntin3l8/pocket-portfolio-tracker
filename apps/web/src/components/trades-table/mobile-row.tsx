@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
+import { ChevronRight } from "lucide-react";
 import type { Trade } from "@portfolio/api-client";
 import { TABLE_LABEL, TABLE_SUBLABEL, TABLE_SUBVALUE } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -27,14 +28,7 @@ export function MobileRow({
     days >= 365 ? `${(days / 365).toFixed(1)}${t("yearsAbbr")}` : `${days}${t("daysAbbr")}`;
 
   return (
-    <div
-      key={tradeKey(tr)}
-      className={cn(
-        "flex items-start justify-between gap-3 p-4",
-        tr.status === "closed" && "cursor-pointer",
-      )}
-      onClick={() => tr.status === "closed" && onSelect(tr)}
-    >
+    <div key={tradeKey(tr)} className="flex items-start justify-between gap-3 p-4">
       <div className="flex min-w-0 items-start gap-2.5">
         <InstrumentLogo
           label={tr.instrument?.symbol ?? tr.instrumentId}
@@ -64,22 +58,32 @@ export function MobileRow({
           </div>
         </div>
       </div>
-      <div className="text-right tabular">
-        <div className={cn("text-sm font-bold", toneClass(ret))}>{signed(ret)}</div>
-        {tr.totalReturnPct !== null && (
-          <div className={cn(TABLE_SUBVALUE, toneClass(ret))}>
-            {formatPercent(tr.totalReturnPct, locale)}
-          </div>
-        )}
-        {tr.annualizedPct !== null && (
-          <div
-            className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}
-            title={t("annualizedTooltip")}
-          >
-            {formatPercent(tr.annualizedPct, locale)}
-            {t("annualizedAbbr")}
-          </div>
-        )}
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <button
+          type="button"
+          aria-label={t("showTradeDetail")}
+          onClick={() => onSelect(tr)}
+          className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
+        <div className="text-right tabular">
+          <div className={cn("text-sm font-bold", toneClass(ret))}>{signed(ret)}</div>
+          {tr.totalReturnPct !== null && (
+            <div className={cn(TABLE_SUBVALUE, toneClass(ret))}>
+              {formatPercent(tr.totalReturnPct, locale)}
+            </div>
+          )}
+          {tr.annualizedPct !== null && (
+            <div
+              className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}
+              title={t("annualizedTooltip")}
+            >
+              {formatPercent(tr.annualizedPct, locale)}
+              {t("annualizedAbbr")}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

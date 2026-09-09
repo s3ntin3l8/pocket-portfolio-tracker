@@ -7,9 +7,10 @@ import { monogram, tintFor } from "@/lib/brokerages";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 
 interface TradeDetailSheetProps {
-  /** The closed trade to show detail for; null renders nothing. Only closed trades are
-   *  expected here — open positions have no exit date/price and keep the table's inline
-   *  leg-expansion instead (see `TradesTable`). */
+  /** The trade to show detail for; null renders nothing. Accepts both open and closed
+   *  trades — the header, hero, breakdown, and details row set adapt to status.
+   *  Closed trades surface realized P&L as the hero; open trades surface total return
+   *  (unrealized P&L + dividends) instead. */
   trade: Trade | null;
   /** Display currency — matches every money field on `Trade` except avgEntryPrice/
    *  avgExitPrice, which are in the trade's own (cost) currency. */
@@ -76,9 +77,9 @@ function Row({
  * (Proceeds, Cost basis, Realized P&L) — still exact (Proceeds − Cost = Realized).
  *
  * Also: every colored field in the sheet (hero, breakdown P&L, Return, Annualized, Total
- * return incl. income) shares ONE tone derived from the sign of `realizedPnL` — matching
- * the design's own `td.color`/`td.totalColor` reuse — rather than each field coloring by
- * its own sign.
+ * return incl. income) shares ONE tone derived from the sign of the hero value
+ * (realized P&L for closed trades, total return for open) — matching the design's own
+ * `td.color`/`td.totalColor` reuse — rather than each field coloring by its own sign.
  */
 export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeDetailSheetProps) {
   const t = useTranslations("Trades");
@@ -88,11 +89,17 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
 
   const symbol = trade.instrument?.symbol ?? trade.instrumentId.slice(0, 8);
   const name = trade.instrument?.name ?? "";
+  const isOpen = trade.status === "open";
 
   const realized = Number(trade.realizedPnL);
-  const tone: "up" | "down" = realized >= 0 ? "up" : "down";
   const invested = Number(trade.invested);
-  const realizedPct = invested > 0 ? realized / invested : null;
+  const unrealized = Number(trade.unrealizedPnL);
+  const totalReturn = Number(trade.totalReturn);
+  // Closed: tone follows realized P&L (final number). Open: follows total return
+  // (the live number — unrealized + dividends).
+  const hero = isOpen ? totalReturn : realized;
+  const tone: "up" | "down" = hero >= 0 ? "up" : "down";
+  const heroPct = invested > 0 ? hero / invested : null;
 
   const proceedsTotal = trade.legs.reduce((s, l) => s + Number(l.proceeds), 0);
   const costTotal = trade.legs.reduce((s, l) => s + Number(l.cost), 0);
@@ -125,13 +132,15 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
           </div>
           <p className="mb-4 text-sm text-muted-foreground">
             {name ? `${name} · ` : ""}
-            {t("detail.closed", { date: trade.exitDate ?? "—" })}
+            {isOpen
+              ? t("detail.openSince", { date: trade.entryDate })
+              : t("detail.closed", { date: trade.exitDate ?? "—" })}
           </p>
 
-          {/* Hero */}
+          {/* Hero — realized P&L for closed, total return for open (unrealized + dividends) */}
           <div className="py-4 text-center">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              {t("detail.realizedPnl")}
+              {isOpen ? t("detail.totalReturn") : t("detail.realizedPnl")}
             </p>
             <p
               className={cn(
@@ -139,7 +148,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
                 tone === "up" ? "text-success" : "text-destructive",
               )}
             >
-              {signed(realized)}
+              {signed(hero)}
             </p>
             <p className="mt-2">
               <span
@@ -148,25 +157,57 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
                   tone === "up" ? "text-success" : "text-destructive",
                 )}
               >
-                {pct(realizedPct)} · {heldLabel(trade.holdingDays)} {t("detail.held")}
+                {pct(heroPct)} · {heldLabel(trade.holdingDays)} {t("detail.held")}
               </span>
             </p>
           </div>
 
-          {/* Breakdown */}
+          {/* Breakdown — proceeds/cost for closed (back-derives realized); invested/
+              unrealized/dividends for open (sums to total return). */}
           <h3 className="mb-2 mt-2 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
             {t("detail.breakdown")}
           </h3>
           <div className="overflow-hidden rounded-2xl border border-border">
-            <Row label={t("detail.proceeds")} value={money(proceedsTotal)} />
-            <Row label={t("detail.costBasis")} value={`− ${money(costTotal)}`} divider />
-            <Row
-              label={t("detail.realizedPnlRow")}
-              value={signed(realized)}
-              bold
-              tone={tone}
-              divider
-            />
+            {isOpen ? (
+              <>
+                <Row label={t("detail.invested")} value={money(invested)} />
+                <Row
+                  label={t("detail.unrealizedPnl")}
+                  value={signed(unrealized)}
+                  divider
+                  tone={unrealized >= 0 ? "up" : "down"}
+                />
+                {realized !== 0 && (
+                  <Row
+                    label={t("detail.realizedPnlRow")}
+                    value={signed(realized)}
+                    divider
+                    tone={realized > 0 ? "up" : "down"}
+                  />
+                )}
+                {hasDividends && (
+                  <Row
+                    label={t("detail.dividendsCollected")}
+                    value={money(Number(trade.dividends))}
+                    tone="up"
+                    divider
+                  />
+                )}
+                <Row label={t("detail.totalReturn")} value={signed(totalReturn)} bold tone={tone} />
+              </>
+            ) : (
+              <>
+                <Row label={t("detail.proceeds")} value={money(proceedsTotal)} />
+                <Row label={t("detail.costBasis")} value={`− ${money(costTotal)}`} divider />
+                <Row
+                  label={t("detail.realizedPnlRow")}
+                  value={signed(realized)}
+                  bold
+                  tone={tone}
+                  divider
+                />
+              </>
+            )}
           </div>
 
           {/* Trade details */}
@@ -183,24 +224,29 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
               value={formatMoney(Number(trade.avgEntryPrice), trade.currency, locale)}
               divider
             />
-            <Row
-              label={t("detail.avgSellPrice")}
-              value={
-                trade.avgExitPrice !== null
-                  ? formatMoney(Number(trade.avgExitPrice), trade.currency, locale)
-                  : "—"
-              }
-              divider
-            />
+            {!isOpen && (
+              <>
+                <Row
+                  label={t("detail.avgSellPrice")}
+                  value={
+                    trade.avgExitPrice !== null
+                      ? formatMoney(Number(trade.avgExitPrice), trade.currency, locale)
+                      : "—"
+                  }
+                  divider
+                />
+                <Row label={t("detail.sold")} value={trade.exitDate ?? "—"} divider />
+                <Row label={t("detail.return")} value={pct(heroPct)} tone={tone} divider />
+                <Row label={t("annualized")} value={pct(trade.annualizedPct)} tone={tone} divider />
+              </>
+            )}
             <Row label={t("detail.bought")} value={trade.entryDate} divider />
-            <Row label={t("detail.sold")} value={trade.exitDate ?? "—"} divider />
             <Row label={t("detail.holdingPeriod")} value={heldLabel(trade.holdingDays)} divider />
-            <Row label={t("detail.return")} value={pct(realizedPct)} tone={tone} divider />
-            <Row label={t("annualized")} value={pct(trade.annualizedPct)} tone={tone} divider />
           </div>
 
-          {/* Income while held — only when the trade collected a dividend */}
-          {hasDividends && (
+          {/* Income while held — only for closed trades with dividends. Open trades
+              already surface dividends in the breakdown above. */}
+          {hasDividends && !isOpen && (
             <>
               <h3 className="mb-2 mt-5 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 {t("detail.incomeWhileHeld")}
