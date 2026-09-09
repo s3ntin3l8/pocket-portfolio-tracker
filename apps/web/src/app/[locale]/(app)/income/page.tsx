@@ -237,7 +237,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
         </div>
 
         {/* ── Sidebar: stat cards + cash interest + allocation donut (sticky on wide containers) ── */}
-        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+        <div className="order-first space-y-3.5 @xl:order-last @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto">
           <StatCard
             label={t("thisYear")}
             value={m(thisFullYear)}
