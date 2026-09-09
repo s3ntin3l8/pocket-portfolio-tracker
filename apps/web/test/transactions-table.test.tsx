@@ -1549,11 +1549,9 @@ describe("TransactionsTable", () => {
   });
 
   describe("text search", () => {
-    // Two search inputs exist in the DOM at once — one inline for mobile (kept out of
-    // the filter Sheet, #625 review finding 5) and one for the sm:+ toolbar — CSS-hidden
-    // per viewport, not conditionally rendered, so both are always present in JSDOM.
-    // Same pattern as noResults/empty below. They share FilterBar's one `localQuery`
-    // state, so either input reflects the same value.
+    // One shared search input (ToolbarSearch, part of the standardized TableToolbar
+    // scaffold) reflows between a mobile and desktop width via CSS rather than
+    // rendering twice — see components/table-toolbar.tsx.
     function getSearchInputs() {
       return screen.getAllByPlaceholderText(messages.Transactions.searchPlaceholder);
     }
@@ -1561,7 +1559,7 @@ describe("TransactionsTable", () => {
     it("renders a search input", () => {
       renderFilterTable();
       const inputs = getSearchInputs();
-      expect(inputs.length).toBe(2);
+      expect(inputs.length).toBe(1);
       inputs.forEach((input) => expect(input).toBeInTheDocument());
     });
 
@@ -1605,12 +1603,12 @@ describe("TransactionsTable", () => {
 
     it("clearing the search via the X button restores all rows", () => {
       renderFilterTable({ searchQuery: "BBCA" });
-      // The clear button should be visible (mobile + desktop copies) when a search
-      // query is active — see the note on getSearchInputs above.
+      // The clear button should be visible (single shared copy, see getSearchInputs
+      // above) when a search query is active.
       const clearButtons = screen.getAllByRole("button", {
         name: messages.Transactions.searchClear,
       });
-      expect(clearButtons.length).toBe(2);
+      expect(clearButtons.length).toBe(1);
       clearButtons.forEach((button) => expect(button).toBeInTheDocument());
     });
 

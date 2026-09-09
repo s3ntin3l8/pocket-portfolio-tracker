@@ -71,4 +71,11 @@ export const TABLE_VALUE = "tabular text-right text-[13px] font-medium";
 export const TABLE_VALUE_STRONG = "tabular text-right text-[13px] font-bold";
 export const TABLE_SUBVALUE = "text-[11px] font-semibold";
 
+// Shared filter-chip pill spec, used by the toolbar filter rows above a table (Activity,
+// Trades, Income, Holdings' asset-class tabs). Compose with `cn()`:
+// `cn(CHIP_BASE, active ? CHIP_ACTIVE : CHIP_INACTIVE)`.
+export const CHIP_BASE = "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs";
+export const CHIP_ACTIVE = "bg-pill font-bold text-white";
+export const CHIP_INACTIVE = "border border-border bg-card font-semibold text-foreground";
+
 export { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell };

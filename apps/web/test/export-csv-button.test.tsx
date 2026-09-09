@@ -29,4 +29,22 @@ describe("ExportCsvButton", () => {
     renderBtn([]);
     expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
   });
+
+  it("forwards a passed className onto the rendered button", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ExportCsvButton
+          filename="x.csv"
+          headers={["a"]}
+          rows={[["1"]]}
+          label="Export CSV"
+          iconOnly
+          className="shrink-0 md:size-8"
+        />
+      </NextIntlClientProvider>,
+    );
+    const button = screen.getByRole("button", { name: "Export CSV" });
+    expect(button.className).toContain("shrink-0");
+    expect(button.className).toContain("md:size-8");
+  });
 });

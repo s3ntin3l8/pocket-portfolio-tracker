@@ -18,12 +18,14 @@ export function ExportCsvButton({
   rows,
   label,
   iconOnly = false,
+  className,
 }: {
   filename: string;
   headers: string[];
   rows: (string | number)[][];
   label: string;
   iconOnly?: boolean;
+  className?: string;
 }) {
   function download() {
     const blob = new Blob([toCsv(headers, rows)], {
@@ -48,6 +50,7 @@ export function ExportCsvButton({
         disabled={rows.length === 0}
         aria-label={label}
         title={label}
+        className={className}
       >
         <Download className="size-4" />
       </Button>
@@ -55,7 +58,7 @@ export function ExportCsvButton({
   }
 
   return (
-    <Button variant="outline" onClick={download} disabled={rows.length === 0}>
+    <Button variant="outline" onClick={download} disabled={rows.length === 0} className={className}>
       <Download className="size-4" />
       {label}
     </Button>

@@ -2,7 +2,7 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Search, X, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DropdownMenu,
@@ -10,7 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { CHIP_BASE, CHIP_ACTIVE, CHIP_INACTIVE } from "@/components/ui/table";
+import { TableToolbar, TOOLBAR_FILTERS, ToolbarSearch } from "@/components/table-toolbar";
 import { formatMoney, cn } from "@/lib/utils";
 import {
   IncomeEventsTable,
@@ -231,106 +232,97 @@ export function IncomeTimeline({
         </div>
       </div>
 
-      {/* Filters — chips + year dropdown + search (same reference pattern as the
-          Activity/transactions and Trades pages). */}
-      <div className="mt-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden">
-          {(
-            [
-              ["all", t("filter_all")],
-              ["received", t("legendReceived")],
-              ["forecast", t("legendForecast")],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setStatusFilter(key)}
-              aria-pressed={statusFilter === key}
-              className={cn(
-                "whitespace-nowrap rounded-full px-3.5 py-[7px] text-xs",
-                statusFilter === key
-                  ? "bg-pill font-bold text-white"
-                  : "border border-border bg-card font-semibold text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-          {yearOptions.length > 1 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+      {/* Filters — chips + year dropdown + group-by + search (same standardized toolbar
+          shape as the Activity/transactions and Trades pages). */}
+      <div className="mt-3">
+        <TableToolbar
+          filters={
+            <div className={TOOLBAR_FILTERS}>
+              {(
+                [
+                  ["all", t("filter_all")],
+                  ["received", t("legendReceived")],
+                  ["forecast", t("legendForecast")],
+                ] as const
+              ).map(([key, label]) => (
                 <button
+                  key={key}
                   type="button"
-                  aria-label={t("filterYear")}
-                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  onClick={() => setStatusFilter(key)}
+                  aria-pressed={statusFilter === key}
+                  className={cn(CHIP_BASE, statusFilter === key ? CHIP_ACTIVE : CHIP_INACTIVE)}
                 >
-                  {yearFilter === "all" ? t("allYears") : yearFilter}
-                  <ChevronDown className="size-3.5 shrink-0 text-text-3" />
+                  {label}
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[9rem]">
-                {["all", ...yearOptions].map((y) => (
-                  <DropdownMenuItem
-                    key={y}
-                    onSelect={() => {
-                      setYearFilter(y);
-                      if (y !== "all") setExpanded((prev) => new Set(prev).add(y));
-                    }}
-                    className="justify-between gap-3"
-                  >
-                    {y === "all" ? t("allYears") : y}
-                    {yearFilter === y && <Check className="size-4 text-primary" />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-text-3">{t("groupByLabel")}</span>
-          {(
-            [
-              [false, t("groupByDate")],
-              [true, t("groupByInstrument")],
-            ] as const
-          ).map(([val, label]) => (
-            <button
-              key={String(val)}
-              type="button"
-              onClick={() => setGroupByInstrument(val)}
-              aria-pressed={groupByInstrument === val}
-              className={cn(
-                "whitespace-nowrap rounded-full px-3 py-[5px] text-[11px]",
-                groupByInstrument === val
-                  ? "bg-pill font-bold text-white"
-                  : "border border-border bg-card font-semibold text-foreground",
+              ))}
+              {yearOptions.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t("filterYear")}
+                      className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      {yearFilter === "all" ? t("allYears") : yearFilter}
+                      <ChevronDown className="size-3.5 shrink-0 text-text-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[9rem]">
+                    {["all", ...yearOptions].map((y) => (
+                      <DropdownMenuItem
+                        key={y}
+                        onSelect={() => {
+                          setYearFilter(y);
+                          if (y !== "all") setExpanded((prev) => new Set(prev).add(y));
+                        }}
+                        className="justify-between gap-3"
+                      >
+                        {y === "all" ? t("allYears") : y}
+                        {yearFilter === y && <Check className="size-4 text-primary" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex items-center sm:ml-auto">
-          <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder={t("searchPlaceholder")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-8 w-full pl-7 pr-7 text-xs sm:w-44"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label={t("searchClear")}
-              className="absolute right-2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+              {/* Group-by is a display mode, not a filter — a distinct, smaller pill
+                  pair kept last so the search still lands at the far right. */}
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="whitespace-nowrap text-[11px] font-semibold text-text-3">
+                  {t("groupByLabel")}
+                </span>
+                {(
+                  [
+                    [false, t("groupByDate")],
+                    [true, t("groupByInstrument")],
+                  ] as const
+                ).map(([val, label]) => (
+                  <button
+                    key={String(val)}
+                    type="button"
+                    onClick={() => setGroupByInstrument(val)}
+                    aria-pressed={groupByInstrument === val}
+                    className={cn(
+                      "whitespace-nowrap rounded-full px-3 py-[5px] text-[11px]",
+                      groupByInstrument === val
+                        ? "bg-pill font-bold text-white"
+                        : "border border-border bg-card font-semibold text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          }
+          search={
+            <ToolbarSearch
+              value={query}
+              onChange={setQuery}
+              placeholder={t("searchPlaceholder")}
+              clearLabel={t("searchClear")}
+            />
+          }
+        />
       </div>
 
       {timelineGroups.length === 0 && !nextOlder ? (

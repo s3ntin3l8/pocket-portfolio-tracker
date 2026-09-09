@@ -64,6 +64,7 @@ export function TransactionsTable({
   portfolioId,
   total,
   instrumentId,
+  actions,
 }: {
   rows: TxRow[];
   showPortfolio?: boolean;
@@ -83,6 +84,9 @@ export function TransactionsTable({
   portfolioId?: string;
   total?: number;
   instrumentId?: string;
+  /** Export CSV / export documents buttons — rendered in the filter toolbar, right of
+   *  the search input. Optional: the `instruments/[id]` embed doesn't pass one. */
+  actions?: React.ReactNode;
 }) {
   const ta = useTranslations("Anomalies");
   const locale = useLocale();
@@ -437,6 +441,7 @@ export function TransactionsTable({
             params.set("page", "1");
             router.push(`${pathname}?${params.toString()}`);
           }}
+          actions={actions}
         />
 
         <SelectionBar
