@@ -58,9 +58,11 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
       }
       if (pnlFilter !== "all") {
         const ret = Number(tr.totalReturn);
-        if (ret === 0) return true;
-        if (pnlFilter === "gain" && ret < 0) return false;
-        if (pnlFilter === "loss" && ret > 0) return false;
+        // Neutrals (ret === 0) pass through both Gain and Loss chips; fall through
+        // to the text-search check below rather than returning early so the user
+        // can still narrow neutrals by symbol/name.
+        if (ret < 0 && pnlFilter === "gain") return false;
+        if (ret > 0 && pnlFilter === "loss") return false;
       }
       if (!q) return true;
       const symbol = tr.instrument?.symbol?.toLowerCase() ?? "";

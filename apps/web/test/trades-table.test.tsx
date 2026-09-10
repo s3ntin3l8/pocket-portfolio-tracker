@@ -354,6 +354,18 @@ describe("TradesTable", () => {
       clickPnlChip("Loss");
       expect(screen.getAllByText("FLAT").length).toBeGreaterThan(0);
     });
+
+    it("the text-search query still filters neutrals (no early-return bypass)", () => {
+      // The PnL filter must not skip the symbol/name search check on neutrals;
+      // otherwise a mismatching query leaves neutrals visible.
+      renderTable([gainer, loser, neutral]);
+      clickPnlChip("Gain");
+      fireEvent.change(screen.getByPlaceholderText("Search trades…"), {
+        target: { value: "tlkm" },
+      });
+      expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
+      expect(screen.queryByText("FLAT")).toBeNull();
+    });
   });
 
   describe("year filter (entry OR exit)", () => {
