@@ -35,10 +35,13 @@ cash** with live IDX prices and a real-time gold ticker.
   auth; self-host on Proxmox is the exit path. Local dev via `docker-compose.yml`
   (Postgres + MinIO + optional Ollama, project `pocket-dev`) — deliberately a separate
   compose project from `docker-compose.prod.yml` (project `pocket-portfolio-tracker`,
-  the deployed `api`+`web` stack), so a bare `docker compose` in the repo root can never
+  the deployed `api`+`web` stack, pull-only — both images come from GHCR rather than
+  being built on the deploy host; `make prod-build` is the escape hatch for testing
+  unmerged changes locally), so a bare `docker compose` in the repo root can never
   see or touch a live deployment. Always invoke the prod stack via `-f
-docker-compose.prod.yml --env-file .env.prod` (or `make prod`/`prod-down`/`prod-logs`/
-  `prod-ps`) — never add a `name:` to either file without checking both together.
+docker-compose.prod.yml --env-file .env.prod` (or `make prod`/`prod-build`/`prod-down`/
+  `prod-logs`/`prod-ps`) — never add a `name:` to either compose file without checking
+  both together.
 
 ## Commands
 
@@ -189,8 +192,10 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
 [`s3ntin3l8/.github`](https://github.com/s3ntin3l8/.github): `ci-cd.yml` runs
 **ci-node** at the root (so root scripts fan out via Turbo: lint, typecheck, build)
 plus a self-contained **test-python** job (pytest over `services/api/python`, the
-vendored pytr extraction tests — not covered by ci-node), then **docker-publish**
-(root `Dockerfile`, builds `@portfolio/api`) once both test jobs pass. Tests run
+vendored pytr extraction tests — not covered by ci-node), then two parallel
+**docker-publish** jobs (root `Dockerfile` → `@portfolio/api`, and `apps/web/Dockerfile`
+→ `@portfolio/web`) once both test jobs pass. `release-please.yml` mirrors the same
+two-image publish on releases. Tests run
 **sharded 4-way** (`test-shards: "4"`) via `test:coverage:sharded` — the same Vitest
 coverage run as `test:coverage`, but with `coverage.thresholds` disabled per-shard
 (a single shard's inherently-partial coverage would otherwise trip the 70% gate); the

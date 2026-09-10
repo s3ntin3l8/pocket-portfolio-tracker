@@ -1,0 +1,34 @@
+# Override of docker-compose.prod.yml for `make prod-build` — the typical `make prod`
+# pulls both images from GHCR, but for testing an unmerged change on the deploy host
+# without pushing to main, this override re-adds the local `build:` blocks for both
+# services so `docker compose up -d --build` rebuilds in place.
+#
+# Loaded as a second `-f` file by the Makefile's `prod-build` target, so all other
+# configuration (networks, Traefik labels, env, volumes) still comes from
+# docker-compose.prod.yml. Compose merges services by name — `build:` and `image:`
+# coexist after the merge (compose does not drop the base file's `image:`); the local
+# build result is simply tagged with that same GHCR name. `pull_policy: build` below
+# is what actually keeps this override from also doing a redundant registry pull
+# before building.
+#
+# NOT used by `make prod`. Keep this file in lockstep with the relevant pieces of
+# docker-compose.prod.yml if either Dockerfile path or build args change.
+name: pocket-portfolio-tracker
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      # NEXT_PUBLIC_LOGODEV_TOKEN (logo.dev publishable key, inlined into the client
+      # bundle) is read from .env.prod here as a local-build convenience — in CI it
+      # comes from the repo's NEXT_PUBLIC_LOGODEV_TOKEN Actions variable.
+      args:
+        NEXT_PUBLIC_LOGODEV_TOKEN: ${NEXT_PUBLIC_LOGODEV_TOKEN:-}
+    pull_policy: build

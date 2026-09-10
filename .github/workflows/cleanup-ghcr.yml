@@ -12,3 +12,13 @@ jobs:
     uses: s3ntin3l8/.github/.github/workflows/ghcr-cleanup.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
     with:
       package-name: "${{ github.event.repository.name }}"
+
+  cleanup-web:
+    # Second package published by ci-cd.yml's `build-docker-web` job. Without this
+    # job, `sha-<shortsha>` tags on the web image accumulate forever — the
+    # cleanup workflow's untagged-prune leaves them alone (they're genuinely tagged).
+    permissions:
+      packages: write
+    uses: s3ntin3l8/.github/.github/workflows/ghcr-cleanup.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
+    with:
+      package-name: "${{ github.event.repository.name }}-web"
