@@ -327,7 +327,10 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     const allowanceAnnual = sum((h) => Number(h.allowanceUsage?.allowanceAnnual ?? 0));
     const realizedGains = sum((h) => Number(h.allowanceUsage?.realizedGainsAdjusted ?? 0));
     const incomeYtd = sum((h) => Number(h.allowanceUsage?.incomeYtd ?? 0));
-    const usedPct = allowanceAnnual > 0 ? Math.round((usedYtd / allowanceAnnual) * 100) : 0;
+    const usedPct =
+      allowanceAnnual > 0
+        ? Math.max(0, Math.min(100, Math.round((usedYtd / allowanceAnnual) * 100)))
+        : 0;
 
     cards.push(
       <ReportCard
@@ -343,6 +346,25 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         }
         value={m(usedYtd)}
         caption={t("tax.caption")}
+        splitBar={
+          allowanceAnnual > 0
+            ? [
+                {
+                  pct: usedPct,
+                  color: "#7C5CFC",
+                  label: t("tax.tooltipUsed"),
+                  amount: m(usedYtd),
+                },
+                {
+                  pct: Math.max(0, 100 - usedPct),
+                  color: "#7C5CFC",
+                  striped: true,
+                  label: t("tax.tooltipAllowance"),
+                  amount: m(allowanceAnnual),
+                },
+              ]
+            : undefined
+        }
         metrics={[
           { label: t("tax.metricRealized"), value: mc(realizedGains) },
           { label: t("tax.metricIncome"), value: mc(incomeYtd) },

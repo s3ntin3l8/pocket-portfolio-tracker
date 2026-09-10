@@ -231,7 +231,7 @@ export function AdminProvidersForm({
                               {t("credentialSet")}
                             </button>
                           )}
-                          {editable && p.configured && (
+                          {editable && p.configured ? (
                             <button
                               type="button"
                               onClick={() => setEditingId(editing ? null : p.id)}
@@ -240,7 +240,9 @@ export function AdminProvidersForm({
                             >
                               <Pencil className="size-[15px]" />
                             </button>
-                          )}
+                          ) : editable ? (
+                            <span className="size-[30px] shrink-0" />
+                          ) : null}
                         </div>
                       </div>
                       {editing && (

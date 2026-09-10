@@ -308,4 +308,151 @@ describe("TradesTable", () => {
       expect(routerPush).not.toHaveBeenCalled();
     });
   });
+
+  describe("P&L filter (gain/loss chips)", () => {
+    const gainer: Trade = { ...closed, instrumentId: "i-win", totalReturn: "500" };
+    const loser: Trade = {
+      ...closed,
+      instrumentId: "i-lose",
+      totalReturn: "-200",
+      instrument: { ...closed.instrument!, symbol: "LOSE" },
+    };
+    const neutral: Trade = {
+      ...closed,
+      instrumentId: "i-flat",
+      totalReturn: "0",
+      instrument: { ...closed.instrument!, symbol: "FLAT" },
+    };
+
+    function clickPnlChip(name: string) {
+      // Two chip groups share "All"; disambiguate by scoping to the second one (P&L).
+      const buttons = screen.getAllByRole("button", { name });
+      const pnlAll = buttons[buttons.length - 1];
+      fireEvent.click(pnlAll);
+    }
+
+    it("Gain chip hides losing trades", () => {
+      renderTable([gainer, loser]);
+      clickPnlChip("Gain");
+      expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
+      expect(screen.queryByText("LOSE")).toBeNull();
+    });
+
+    it("Loss chip hides winning trades", () => {
+      renderTable([gainer, loser]);
+      clickPnlChip("Loss");
+      expect(screen.getAllByText("LOSE").length).toBeGreaterThan(0);
+      expect(screen.queryByText("TLKM")).toBeNull();
+    });
+
+    it("neutral trades (totalReturn === 0) stay visible under both Gain and Loss", () => {
+      // Number("") === 0 and open/partial rounding can produce totalReturn "0" or
+      // "" — neutrals must not disappear from either chip's filtered view.
+      renderTable([gainer, loser, neutral]);
+      clickPnlChip("Gain");
+      expect(screen.getAllByText("FLAT").length).toBeGreaterThan(0);
+      clickPnlChip("Loss");
+      expect(screen.getAllByText("FLAT").length).toBeGreaterThan(0);
+    });
+
+    it("the text-search query still filters neutrals (no early-return bypass)", () => {
+      // The PnL filter must not skip the symbol/name search check on neutrals;
+      // otherwise a mismatching query leaves neutrals visible.
+      renderTable([gainer, loser, neutral]);
+      clickPnlChip("Gain");
+      fireEvent.change(screen.getByPlaceholderText("Search trades…"), {
+        target: { value: "tlkm" },
+      });
+      expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
+      expect(screen.queryByText("FLAT")).toBeNull();
+    });
+  });
+
+  describe("year filter (entry OR exit)", () => {
+    const crossYearTrade: Trade = {
+      ...closed,
+      instrumentId: "i-cross",
+      entryDate: "2020-11-15",
+      exitDate: "2021-02-15",
+      totalReturn: "100",
+      instrument: { ...closed.instrument!, symbol: "CROSS" },
+    };
+    const otherClosed: Trade = {
+      ...closed,
+      instrumentId: "i-other",
+      entryDate: "2019-01-01",
+      exitDate: "2019-06-01",
+      totalReturn: "50",
+      instrument: { ...closed.instrument!, symbol: "OTHER" },
+    };
+    const openCrossYear: Trade = {
+      ...open,
+      instrumentId: "i-open-cross",
+      entryDate: "2022-12-10",
+      exitDate: null,
+      totalReturn: "500",
+      instrument: { ...open.instrument!, symbol: "OPENCROSS" },
+    };
+    const otherOpen: Trade = {
+      ...open,
+      instrumentId: "i-open-other",
+      entryDate: "2023-05-01",
+      exitDate: null,
+      totalReturn: "200",
+      instrument: { ...open.instrument!, symbol: "OTHEROPEN" },
+    };
+    const sameYear: Trade = {
+      ...closed,
+      instrumentId: "i-same",
+      entryDate: "2021-03-01",
+      exitDate: "2021-04-01",
+      instrument: { ...closed.instrument!, symbol: "SAME" },
+    };
+
+    function openYearMenu() {
+      // Radix dropdown opens via keyboard/Enter, not a plain click+query.
+      fireEvent.keyDown(screen.getByRole("button", { name: "Year" }), { key: "Enter" });
+    }
+
+    it("matches when entry year equals the filter, regardless of exit year", () => {
+      renderTable([crossYearTrade, otherClosed]);
+      openYearMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: "2020" }));
+      expect(screen.getAllByText("CROSS").length).toBeGreaterThan(0);
+    });
+
+    it("matches when exit year equals the filter, regardless of entry year", () => {
+      renderTable([crossYearTrade, otherClosed]);
+      openYearMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: "2021" }));
+      expect(screen.getAllByText("CROSS").length).toBeGreaterThan(0);
+    });
+
+    it("hides the trade when neither entry nor exit year matches", () => {
+      // Dropdown options are derived from union of all entry/exit years across the
+      // rendered rows — add a third trade so we get a year that CROSS can't match.
+      const third: Trade = {
+        ...closed,
+        instrumentId: "i-third",
+        entryDate: "2022-01-01",
+        exitDate: "2022-12-31",
+        instrument: { ...closed.instrument!, symbol: "THIRD" },
+      };
+      renderTable([crossYearTrade, sameYear, third]);
+      openYearMenu();
+      // CROSS's entry=2020, exit=2021 — picking 2022 hides it (neither matches).
+      fireEvent.click(screen.getByRole("menuitem", { name: "2022" }));
+      expect(screen.queryByText("CROSS")).toBeNull();
+      expect(screen.getAllByText("THIRD").length).toBeGreaterThan(0);
+    });
+
+    it("includes open trades whose entry year matches", () => {
+      // Two open trades from different years so the year dropdown appears.
+      renderTable([openCrossYear, otherOpen]);
+      openYearMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: "2022" }));
+      expect(screen.getAllByText("OPENCROSS").length).toBeGreaterThan(0);
+      expect(screen.queryByText("OTHEROPEN")).toBeNull();
+    });
+  });
 });

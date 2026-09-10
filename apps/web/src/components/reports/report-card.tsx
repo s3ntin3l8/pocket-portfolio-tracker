@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/card";
 import { TrendChip, type TrendTone } from "@/components/reports/trend-chip";
-import { MiniSplitBar } from "@/components/reports/mini-split-bar";
+import { MiniSplitBar, type MiniSplitBarSegment } from "@/components/reports/mini-split-bar";
 import { TwoStatFooter } from "@/components/reports/two-stat-footer";
 
 /**
@@ -32,7 +32,7 @@ export function ReportCard({
   trend?: { label: string; tone: TrendTone; arrow?: boolean };
   value: string;
   caption: string;
-  splitBar?: Array<{ pct: number; color: string }>;
+  splitBar?: MiniSplitBarSegment[];
   metrics: Array<{ label: string; value: string; color?: string }>;
   href: string;
   openLabel: string;

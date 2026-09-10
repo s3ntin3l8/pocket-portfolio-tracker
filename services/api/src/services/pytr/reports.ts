@@ -65,7 +65,7 @@ export async function fetchReportDocuments(opts: {
         taxYear: ref?.taxYear ?? null,
         buf,
         mimeType,
-        originalFilename: `${docId}.pdf`,
+        originalFilename: ref?.title ? `${ref.title}.pdf` : `${docId}.pdf`,
         source: "pytr",
         sourceEventId: ref?.eventId ?? docId,
       });

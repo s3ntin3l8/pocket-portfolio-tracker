@@ -2,6 +2,7 @@ import type { Trade } from "@portfolio/api-client";
 import type { ColDef } from "@/lib/table-sort";
 
 export type StatusFilter = "all" | "open" | "closed";
+export type PnlFilter = "all" | "gain" | "loss";
 
 export const COLS: ColDef<Trade>[] = [
   { key: "instrument", get: (t) => t.instrument?.symbol ?? "", type: "text" },

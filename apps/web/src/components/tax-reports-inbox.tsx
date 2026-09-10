@@ -130,21 +130,17 @@ export function TaxReportsInbox({
   // with exactly one, portfolioId is already set from initialPortfolioId and stays fixed.
   const portfolioPicker =
     portfolios.length > 1 ? (
-      <div className="space-y-1.5">
-        <span className="block text-sm font-medium">{t("portfolioPicker")}</span>
-        <PortfolioPicker
-          portfolios={portfolios}
-          value={portfolioId}
-          onChange={setPortfolioId}
-          ariaLabel={t("portfolioPicker")}
-          triggerClassName="w-full sm:max-w-xs"
-        />
-      </div>
+      <PortfolioPicker
+        portfolios={portfolios}
+        value={portfolioId}
+        onChange={setPortfolioId}
+        ariaLabel={t("portfolioPicker")}
+        triggerClassName="h-8"
+      />
     ) : null;
 
   const uploadButton = (
-    <div className="space-y-2">
-      {portfolioPicker}
+    <>
       <input
         ref={fileInputRef}
         type="file"
@@ -164,7 +160,7 @@ export function TaxReportsInbox({
       {portfolios.length === 0 && (
         <p className="text-xs text-muted-foreground">{t("noPortfolio")}</p>
       )}
-    </div>
+    </>
   );
 
   if (documents.length === 0) {
@@ -174,7 +170,12 @@ export function TaxReportsInbox({
           icon={FileText}
           title={t("emptyTitle")}
           description={t("emptyBody")}
-          action={uploadButton}
+          action={
+            <div className="flex items-center gap-3">
+              {portfolioPicker}
+              {uploadButton}
+            </div>
+          }
         />
       </div>
     );
@@ -182,8 +183,8 @@ export function TaxReportsInbox({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+      <div className="flex items-center gap-3">
+        {portfolioPicker}
         {uploadButton}
       </div>
 
