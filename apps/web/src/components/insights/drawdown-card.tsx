@@ -27,7 +27,8 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
           <span
             className={cn("font-semibold", currDdpct < 0 ? "text-destructive" : "text-success")}
           >
-            {isUnderwater ? t("stillUnderwater") : formatPercent(currDdpct, locale)}
+            {formatPercent(currDdpct, locale)}
+            {isUnderwater && <span className="text-text-3"> · {t("stillUnderwater")}</span>}
           </span>
         </span>
       </div>

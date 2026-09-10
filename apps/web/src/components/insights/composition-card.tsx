@@ -9,10 +9,12 @@ export function CompositionCard({
   allocation,
   currency,
   holdings,
+  portfolioId,
 }: {
   allocation: AllocationBreakdown;
   currency: string;
   holdings?: HoldingValuation[];
+  portfolioId?: string;
 }) {
   const t = useTranslations("Insights.composition");
 
@@ -22,7 +24,12 @@ export function CompositionCard({
         <p className="text-sm font-semibold">{t("title")}</p>
         <ConcentrationBadge label={allocation.concentration.label} />
       </div>
-      <AllocationTabs allocation={allocation} currency={currency} holdings={holdings} />
+      <AllocationTabs
+        allocation={allocation}
+        currency={currency}
+        holdings={holdings}
+        portfolioId={portfolioId}
+      />
     </Card>
   );
 }

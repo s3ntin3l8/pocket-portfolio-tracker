@@ -235,6 +235,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                 allocation={allocation}
                 currency={summary.displayCurrency}
                 holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
+                portfolioId={selectedId ?? undefined}
               />
             )}
           </div>

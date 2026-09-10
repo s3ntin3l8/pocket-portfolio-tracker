@@ -328,7 +328,9 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     const realizedGains = sum((h) => Number(h.allowanceUsage?.realizedGainsAdjusted ?? 0));
     const incomeYtd = sum((h) => Number(h.allowanceUsage?.incomeYtd ?? 0));
     const usedPct =
-      allowanceAnnual > 0 ? Math.min(100, Math.round((usedYtd / allowanceAnnual) * 100)) : 0;
+      allowanceAnnual > 0
+        ? Math.max(0, Math.min(100, Math.round((usedYtd / allowanceAnnual) * 100)))
+        : 0;
 
     cards.push(
       <ReportCard
@@ -354,7 +356,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
                   amount: m(usedYtd),
                 },
                 {
-                  pct: 100 - usedPct,
+                  pct: Math.max(0, 100 - usedPct),
                   color: "#7C5CFC",
                   striped: true,
                   label: t("tax.tooltipAllowance"),

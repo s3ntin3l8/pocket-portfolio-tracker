@@ -58,8 +58,9 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
       }
       if (pnlFilter !== "all") {
         const ret = Number(tr.totalReturn);
-        if (pnlFilter === "gain" && ret <= 0) return false;
-        if (pnlFilter === "loss" && ret >= 0) return false;
+        if (ret === 0) return true;
+        if (pnlFilter === "gain" && ret < 0) return false;
+        if (pnlFilter === "loss" && ret > 0) return false;
       }
       if (!q) return true;
       const symbol = tr.instrument?.symbol?.toLowerCase() ?? "";

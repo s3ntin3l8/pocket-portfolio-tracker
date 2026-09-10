@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AllocationDonut } from "./allocation-donut";
+import { TargetDialog, type TargetSlice } from "@/components/allocation/target-dialog";
 import { getDrillDownInstruments, type DrillDownDimension } from "@/lib/sector-drilldown";
 import type { AllocationBreakdown, DriftRow, HoldingValuation } from "@portfolio/api-client";
 
@@ -53,6 +54,7 @@ interface TabBodyProps {
   total: number;
   drift?: Record<string, DriftRow[]>;
   onSliceClick?: (key: string) => void;
+  portfolioId?: string;
 }
 
 function TabBody({
@@ -63,8 +65,14 @@ function TabBody({
   total,
   drift,
   onSliceClick,
+  portfolioId,
 }: TabBodyProps) {
   const dimDrift = drift?.[dimension];
+  const targetSlices: TargetSlice[] = slices.map((s) => ({
+    key: s.key,
+    label: s.label,
+    actualPct: s.actualPct,
+  }));
 
   return (
     <div>
@@ -81,6 +89,14 @@ function TabBody({
       {dimDrift && dimDrift.length > 0 && (
         <DriftHint drift={dimDrift} dimensionLabel={dimensionLabel} />
       )}
+      <div className="flex justify-end mt-2">
+        <TargetDialog
+          portfolioId={portfolioId}
+          dimension={dimension}
+          dimensionLabel={dimensionLabel}
+          slices={targetSlices}
+        />
+      </div>
     </div>
   );
 }
@@ -150,11 +166,13 @@ export function AllocationTabs({
   currency,
   drift,
   holdings,
+  portfolioId,
 }: {
   allocation: AllocationBreakdown;
   currency: string;
   drift?: Record<string, DriftRow[]>;
   holdings?: HoldingValuation[];
+  portfolioId?: string;
 }) {
   const t = useTranslations("Dashboard");
   const ta = useTranslations("AssetClass");
@@ -242,6 +260,7 @@ export function AllocationTabs({
         total={total}
         drift={drift}
         onSliceClick={holdings ? handleSliceClick(dimension) : undefined}
+        portfolioId={portfolioId}
       />
     );
   };
