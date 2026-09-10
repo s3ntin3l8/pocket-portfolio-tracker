@@ -32,6 +32,12 @@
 # tag does NOT roll back the migration — pin IMAGE_TAG to a release tag (`latest`,
 # `0.1.8`) if you want release-cadence deploys instead of every-commit deploys.
 #
+# CAUTION on atomicity: `api` and `web` are published by two independent CI jobs
+# (build-docker / build-docker-web). If one fails, `edge` advances for one image and not
+# the other, and the next `make prod` deploys a skewed pair — e.g. a web bundle built
+# against an API commit from a different point in time. Pin IMAGE_TAG to a `sha-<shortsha>`
+# common to both images if you need them in lockstep.
+#
 # Secrets are declared explicitly per service via `${VAR}` substitution from .env.prod
 # (which docker compose loads for variable substitution only), not a blanket `env_file:`
 # shared by both containers — `web` has no business holding DB_ENCRYPTION_KEY/
