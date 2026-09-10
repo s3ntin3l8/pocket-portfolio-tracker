@@ -211,7 +211,7 @@ function TaxHolderOverviewDe({
       <CoverageCard allowanceUsage={u} money={money} locale={locale} t={t} />
 
       {accountHolderId && (
-        <LossCarryforwardEditor holderId={accountHolderId} currentYear={entry.year} t={t} />
+        <LossCarryforwardEditor holderId={accountHolderId} currentYear={entry.year} />
       )}
 
       <Card className="overflow-hidden rounded-2xl">

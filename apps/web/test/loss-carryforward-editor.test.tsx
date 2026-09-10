@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
-import type { TaxTranslator } from "../src/components/tax/tax-cards";
 
 const refresh = vi.fn();
 const getLossCarryforward = vi.fn(async () => ({ taxYear: 2026, entries: [] }));
@@ -16,27 +15,10 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { LossCarryforwardEditor } from "../src/components/tax/loss-carryforward-editor";
 
-function makeT(): TaxTranslator {
-  const tax = messages.Tax as unknown as Record<string, unknown>;
-  return (key, values) => {
-    let val: unknown = tax;
-    for (const part of key.split(".")) {
-      val = (val as Record<string, unknown> | undefined)?.[part];
-    }
-    if (typeof val !== "string") return key;
-    if (!values) return val;
-    return val.replace(/\{(\w+)\}/g, (_, k: string) =>
-      values[k] !== undefined ? String(values[k]) : `{${k}}`,
-    );
-  };
-}
-
-const t = makeT();
-
 function renderEditor(currentYear = 2026) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <LossCarryforwardEditor holderId="holder-1" currentYear={currentYear} t={t} />
+      <LossCarryforwardEditor holderId="holder-1" currentYear={currentYear} />
     </NextIntlClientProvider>,
   );
 }

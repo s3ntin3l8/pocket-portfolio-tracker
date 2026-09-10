@@ -53,7 +53,7 @@ export function UpdateProfileForm({
   }
 
   return (
-    <form onSubmit={submit} className="max-w-md space-y-4">
+    <form onSubmit={submit} className="space-y-4">
       {error && (
         <div
           role="alert"

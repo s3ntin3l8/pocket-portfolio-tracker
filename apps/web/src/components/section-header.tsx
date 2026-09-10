@@ -4,10 +4,11 @@ import { Link } from "@/i18n/navigation";
 /**
  * Section title used by every Settings/Admin sub-route's content. On mobile it's a
  * back-arrow + title row (the rail is hidden there, so this is the only way back to the
- * section's landing menu). On desktop the topbar owns the title (via PageHeaderSetter),
+ * section's landing menu). On desktop the topbar owns the title (via `PageHeaderSetter`),
  * so the entire SectionHeader is hidden — the back-link and h1 both duplicate topbar
  * chrome there. Shared by `/settings/*` and `/admin/*` (see `SettingsShell`) so every
- * section reads consistently regardless of which tree it's in.
+ * section reads consistently regardless of which tree it's in. Both trees include
+ * `PageHeaderSetter` so the desktop topbar always has a heading.
  */
 export function SectionHeader({ title, backHref }: { title: string; backHref: string }) {
   return (

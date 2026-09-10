@@ -211,35 +211,37 @@ export function AdminProvidersForm({
                             />
                           </div>
                         </div>
-                        {p.configured && (
-                          <Switch
-                            checked={p.enabled}
-                            onCheckedChange={() => toggle(p.id)}
-                            aria-label={p.enabled ? t("enabled") : t("disabled")}
-                          />
-                        )}
-                        {/* Suppressed (not just disabled) without encryption — matches the
-                            old dialog-based cell, which offered no editor trigger at all
-                            in that case; `ProviderKeySubline` already explains why. */}
-                        {!p.configured && editable && (
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(p.id)}
-                            className="shrink-0 whitespace-nowrap rounded-[9px] bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary"
-                          >
-                            {t("credentialSet")}
-                          </button>
-                        )}
-                        {editable && p.configured && (
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(editing ? null : p.id)}
-                            aria-label={t("editCredential")}
-                            className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-background text-text-2 hover:text-foreground"
-                          >
-                            <Pencil className="size-[15px]" />
-                          </button>
-                        )}
+                        <div className="flex shrink-0 items-center gap-2">
+                          {p.configured && (
+                            <Switch
+                              checked={p.enabled}
+                              onCheckedChange={() => toggle(p.id)}
+                              aria-label={p.enabled ? t("enabled") : t("disabled")}
+                            />
+                          )}
+                          {/* Suppressed (not just disabled) without encryption — matches the
+                              old dialog-based cell, which offered no editor trigger at all
+                              in that case; `ProviderKeySubline` already explains why. */}
+                          {!p.configured && editable && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(p.id)}
+                              className="whitespace-nowrap rounded-[9px] bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary"
+                            >
+                              {t("credentialSet")}
+                            </button>
+                          )}
+                          {editable && p.configured && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(editing ? null : p.id)}
+                              aria-label={t("editCredential")}
+                              className="flex size-[30px] items-center justify-center rounded-[9px] bg-background text-text-2 hover:text-foreground"
+                            >
+                              <Pencil className="size-[15px]" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {editing && (
                         <CredentialEditorPanel
