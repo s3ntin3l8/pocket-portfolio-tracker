@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   users,
   apiTokens,
@@ -205,10 +205,15 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   const symbols = [
     "BBCA",
     "BBRI",
+    "BYON",
+    "GOTO",
     "TLKM",
+    "ORI020",
     "ORI023",
+    "GSRT",
     "VWCE",
     "IWDA",
+    "VFV",
     "AAPL",
     "MSFT",
     "XAUIDR",
@@ -218,7 +223,23 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     await db.delete(instruments).where(eq(instruments.symbol, symbol));
   }
 
-  const [bbca, bbri, tlkm, ori023, vwce, iwda, aapl, msft, xau, rdSaham] = await db
+  const [
+    bbca,
+    bbri,
+    byon,
+    goto_,
+    tlkm,
+    ori020,
+    ori023,
+    gsrt,
+    vwce,
+    iwda,
+    vfv,
+    aapl,
+    msft,
+    xau,
+    rdSaham,
+  ] = await db
     .insert(instruments)
     .values([
       {
@@ -242,6 +263,26 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         sector: "Financials",
       },
       {
+        symbol: "BYON",
+        market: "IDX",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "IDR",
+        name: "PT Bank Neo Commerce Tbk",
+        displayName: "Bank Neo Commerce",
+        sector: "Financials",
+      },
+      {
+        symbol: "GOTO",
+        market: "IDX",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "IDR",
+        name: "PT GoTo Gojek Tokopedia Tbk",
+        displayName: "GoTo Group",
+        sector: "Technology",
+      },
+      {
         symbol: "TLKM",
         market: "IDX",
         assetClass: "equity",
@@ -250,6 +291,19 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         name: "PT Telkom Indonesia Tbk",
         displayName: "Telkom Indonesia",
         sector: "Communication Services",
+      },
+      {
+        symbol: "ORI020",
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        name: "Obligasi Negara Ritel ORI020",
+        displayName: "ORI020 Retail Bond",
+        faceValue: "1000000",
+        couponRate: "0.0615",
+        couponSchedule: "monthly",
+        maturityDate: isoDate(daysAgo(900)),
       },
       {
         symbol: "ORI023",
@@ -262,7 +316,20 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         faceValue: "1000000",
         couponRate: "0.0575",
         couponSchedule: "monthly",
-        maturityDate: isoDate(daysAgo(-540)), // ~18 months in the future
+        maturityDate: isoDate(daysAgo(-540)),
+      },
+      {
+        symbol: "GSRT",
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        name: "Surat Berharga Negara GSRT",
+        displayName: "Gov Savings Bond GSRT",
+        faceValue: "1000000",
+        couponRate: "0.065",
+        couponSchedule: "semi-annual",
+        maturityDate: isoDate(daysAgo(500)),
       },
       {
         symbol: "VWCE",
@@ -282,6 +349,16 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         currency: "EUR",
         name: "iShares Core MSCI World UCITS ETF",
         displayName: "iShares Core MSCI World",
+        partialExemptionRate: "0.30",
+      },
+      {
+        symbol: "VFV",
+        market: "TSX",
+        assetClass: "etf",
+        unit: "shares",
+        currency: "CAD",
+        name: "Vanguard S&P 500 Index ETF",
+        displayName: "Vanguard S&P 500",
         partialExemptionRate: "0.30",
       },
       {
@@ -328,26 +405,76 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // --- Transactions ------------------------------------------------------------
   //
   // Spans buy/sell/dividend/coupon/interest/savings_plan/deposit/withdrawal/
-  // transfer_in — the types the Hero-5 screens actually render (see the plan doc's
-  // per-screen prerequisites table). A few positions are fully or partially closed
-  // (BBCA, TLKM, AAPL) so Reports/Trades and Tax have realized round-trips to show;
-  // one dividend/coupon/interest row per income instrument lands within the current
-  // calendar year so /tax's year-scoped rollup isn't empty.
+  // transfer_in/transfer_out/split/bonus/bonus_cash/fee/tax/adjustment — every
+  // major type the UI renders. Data ranges from ~2020 to present (~2200 days)
+  // so Reports, Insights, and Tax screens have multi-year history to show.
 
   const txRows: (typeof transactions.$inferInsert)[] = [];
 
+  // =========================================================================
   // Stockbit — IDX Equities (IDR)
+  // =========================================================================
+
+  // --- BBCA (Bank Central Asia) — long-term hold with dividend income ---
   txRows.push(
+    // 2020: Initial position
     {
       portfolioId: idPortfolio.id,
       instrumentId: bbca.id,
       type: "buy",
       quantity: "500",
-      price: "8500",
-      fees: "8500",
+      price: "6200",
+      fees: "6200",
       currency: "IDR",
-      executedAt: daysAgo(700),
+      executedAt: daysAgo(2100),
     },
+    // 2021: Add to position
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbca.id,
+      type: "buy",
+      quantity: "300",
+      price: "7800",
+      fees: "4680",
+      currency: "IDR",
+      executedAt: daysAgo(1800),
+    },
+    // 2021: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbca.id,
+      type: "dividend",
+      quantity: "0",
+      price: "150000",
+      perShare: "300",
+      shares: "500",
+      currency: "IDR",
+      executedAt: daysAgo(1700),
+    },
+    // 2022: Add more
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbca.id,
+      type: "buy",
+      quantity: "200",
+      price: "8500",
+      fees: "3400",
+      currency: "IDR",
+      executedAt: daysAgo(1500),
+    },
+    // 2022: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbca.id,
+      type: "dividend",
+      quantity: "0",
+      price: "240000",
+      perShare: "300",
+      shares: "800",
+      currency: "IDR",
+      executedAt: daysAgo(1400),
+    },
+    // 2023: Add
     {
       portfolioId: idPortfolio.id,
       instrumentId: bbca.id,
@@ -356,41 +483,60 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "9200",
       fees: "5520",
       currency: "IDR",
-      executedAt: daysAgo(400),
+      executedAt: daysAgo(1100),
     },
+    // 2023: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbca.id,
+      type: "dividend",
+      quantity: "0",
+      price: "300000",
+      perShare: "300",
+      shares: "1000",
+      currency: "IDR",
+      executedAt: daysAgo(1050),
+    },
+    // 2024: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbca.id,
+      type: "dividend",
+      quantity: "0",
+      price: "330000",
+      perShare: "330",
+      shares: "1000",
+      currency: "IDR",
+      executedAt: daysAgo(700),
+    },
+    // 2025: Partial sell
     {
       portfolioId: idPortfolio.id,
       instrumentId: bbca.id,
       type: "sell",
       quantity: "200",
-      price: "9800",
-      fees: "3920",
+      price: "10500",
+      fees: "4200",
       currency: "IDR",
-      executedAt: daysAgo(60),
+      executedAt: daysAgo(400),
     },
+    // 2025: Dividend
     {
       portfolioId: idPortfolio.id,
       instrumentId: bbca.id,
       type: "dividend",
       quantity: "0",
-      price: "216000",
-      perShare: "360",
-      shares: "600",
+      price: "264000",
+      perShare: "330",
+      shares: "800",
       currency: "IDR",
       executedAt: daysAgo(160),
     },
-    {
-      portfolioId: idPortfolio.id,
-      instrumentId: bbca.id,
-      type: "dividend",
-      quantity: "0",
-      price: "162000",
-      perShare: "270",
-      shares: "600",
-      currency: "IDR",
-      executedAt: daysAgo(45),
-    },
+  );
 
+  // --- BBRI (Bank Rakyat Indonesia) — transfer in, dividends, partial transfer out ---
+  txRows.push(
+    // 2021: Transferred in from another depot
     {
       portfolioId: idPortfolio.id,
       instrumentId: bbri.id,
@@ -399,8 +545,21 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "4200",
       fees: "0",
       currency: "IDR",
-      executedAt: daysAgo(500),
+      executedAt: daysAgo(1800),
     },
+    // 2022: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbri.id,
+      type: "dividend",
+      quantity: "0",
+      price: "165000",
+      perShare: "165",
+      shares: "1000",
+      currency: "IDR",
+      executedAt: daysAgo(1400),
+    },
+    // 2023: Dividend
     {
       portfolioId: idPortfolio.id,
       instrumentId: bbri.id,
@@ -410,9 +569,142 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       perShare: "185",
       shares: "1000",
       currency: "IDR",
-      executedAt: daysAgo(70),
+      executedAt: daysAgo(1050),
     },
+    // 2023: Transfer out to Trade Republic
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbri.id,
+      type: "transfer_out",
+      quantity: "400",
+      price: "4200",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(1000),
+    },
+    // 2024: Dividend (on remaining 600 shares)
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbri.id,
+      type: "dividend",
+      quantity: "0",
+      price: "111000",
+      perShare: "185",
+      shares: "600",
+      currency: "IDR",
+      executedAt: daysAgo(700),
+    },
+    // 2025: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: bbri.id,
+      type: "dividend",
+      quantity: "0",
+      price: "120000",
+      perShare: "200",
+      shares: "600",
+      currency: "IDR",
+      executedAt: daysAgo(160),
+    },
+  );
 
+  // --- BYON (Bank Neo Commerce) — growth story, bonus cash, sell at loss ---
+  txRows.push(
+    // 2022: Initial buy
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: byon.id,
+      type: "buy",
+      quantity: "2000",
+      price: "1850",
+      fees: "7400",
+      currency: "IDR",
+      executedAt: daysAgo(1500),
+    },
+    // 2022: Broker promo bonus
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: byon.id,
+      type: "bonus_cash",
+      quantity: "0",
+      price: "50000",
+      currency: "IDR",
+      executedAt: daysAgo(1480),
+    },
+    // 2023: Add more
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: byon.id,
+      type: "buy",
+      quantity: "1500",
+      price: "1200",
+      fees: "3600",
+      currency: "IDR",
+      executedAt: daysAgo(1200),
+    },
+    // 2024: Sell half at a loss
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: byon.id,
+      type: "sell",
+      quantity: "1750",
+      price: "950",
+      fees: "3325",
+      currency: "IDR",
+      executedAt: daysAgo(800),
+    },
+    // 2025: Buy the dip
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: byon.id,
+      type: "buy",
+      quantity: "3000",
+      price: "1100",
+      fees: "6600",
+      currency: "IDR",
+      executedAt: daysAgo(500),
+    },
+  );
+
+  // --- GOTO (GoTo Group) — IPO buy, quick sell ---
+  txRows.push(
+    // 2022: IPO buy
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: goto_.id,
+      type: "buy",
+      quantity: "5000",
+      price: "316",
+      fees: "3160",
+      currency: "IDR",
+      executedAt: daysAgo(1550),
+    },
+    // 2022: Transaction fee
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: goto_.id,
+      type: "fee",
+      quantity: "0",
+      price: "2500",
+      currency: "IDR",
+      executedAt: daysAgo(1540),
+    },
+    // 2023: Sell at a loss
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: goto_.id,
+      type: "sell",
+      quantity: "5000",
+      price: "185",
+      fees: "1850",
+      currency: "IDR",
+      executedAt: daysAgo(1200),
+    },
+  );
+
+  // --- TLKM (Telkom Indonesia) ---
+  txRows.push(
+    // 2020: Buy
     {
       portfolioId: idPortfolio.id,
       instrumentId: tlkm.id,
@@ -421,8 +713,21 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "3400",
       fees: "5440",
       currency: "IDR",
-      executedAt: daysAgo(600),
+      executedAt: daysAgo(2000),
     },
+    // 2021: Dividend
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: tlkm.id,
+      type: "dividend",
+      quantity: "0",
+      price: "128000",
+      perShare: "320",
+      shares: "400",
+      currency: "IDR",
+      executedAt: daysAgo(1700),
+    },
+    // 2023: Sell
     {
       portfolioId: idPortfolio.id,
       instrumentId: tlkm.id,
@@ -431,9 +736,56 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "3900",
       fees: "6240",
       currency: "IDR",
-      executedAt: daysAgo(30),
+      executedAt: daysAgo(1100),
     },
+  );
 
+  // --- ORI020 (Retail Bond 2020) — bought at issuance, coupons, matured ---
+  txRows.push(
+    // 2020: Buy at issuance
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori020.id,
+      type: "buy",
+      quantity: "80",
+      price: "1000000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(2100),
+    },
+    // 2021: Monthly coupons (3 shown)
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori020.id,
+      type: "coupon",
+      quantity: "0",
+      price: "41000",
+      currency: "IDR",
+      executedAt: daysAgo(1800),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori020.id,
+      type: "coupon",
+      quantity: "0",
+      price: "41000",
+      currency: "IDR",
+      executedAt: daysAgo(1770),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori020.id,
+      type: "coupon",
+      quantity: "0",
+      price: "41000",
+      currency: "IDR",
+      executedAt: daysAgo(1740),
+    },
+  );
+
+  // --- ORI023 (Retail Bond 2023) ---
+  txRows.push(
+    // 2023: Buy at issuance
     {
       portfolioId: idPortfolio.id,
       instrumentId: ori023.id,
@@ -442,7 +794,35 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "1000000",
       fees: "0",
       currency: "IDR",
-      executedAt: daysAgo(500),
+      executedAt: daysAgo(1100),
+    },
+    // 2023-2025: Monthly coupons (4 shown)
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori023.id,
+      type: "coupon",
+      quantity: "0",
+      price: "239583",
+      currency: "IDR",
+      executedAt: daysAgo(1050),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori023.id,
+      type: "coupon",
+      quantity: "0",
+      price: "239583",
+      currency: "IDR",
+      executedAt: daysAgo(700),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori023.id,
+      type: "coupon",
+      quantity: "0",
+      price: "239583",
+      currency: "IDR",
+      executedAt: daysAgo(400),
     },
     {
       portfolioId: idPortfolio.id,
@@ -453,63 +833,256 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "IDR",
       executedAt: daysAgo(80),
     },
+  );
+
+  // --- GSRT (Gov Savings Bond) — 2-year term, semi-annual coupons ---
+  txRows.push(
+    // 2022: Buy at issuance
     {
       portfolioId: idPortfolio.id,
-      instrumentId: ori023.id,
+      instrumentId: gsrt.id,
+      type: "buy",
+      quantity: "30",
+      price: "1000000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(1500),
+    },
+    // Semi-annual coupons
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: gsrt.id,
       type: "coupon",
       quantity: "0",
-      price: "239583",
+      price: "97500",
       currency: "IDR",
-      executedAt: daysAgo(50),
+      executedAt: daysAgo(1350),
     },
     {
       portfolioId: idPortfolio.id,
-      instrumentId: ori023.id,
+      instrumentId: gsrt.id,
       type: "coupon",
       quantity: "0",
-      price: "239583",
+      price: "97500",
       currency: "IDR",
-      executedAt: daysAgo(20),
+      executedAt: daysAgo(1150),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: gsrt.id,
+      type: "coupon",
+      quantity: "0",
+      price: "97500",
+      currency: "IDR",
+      executedAt: daysAgo(950),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: gsrt.id,
+      type: "coupon",
+      quantity: "0",
+      price: "97500",
+      currency: "IDR",
+      executedAt: daysAgo(750),
+    },
+    // 2024: Maturity (principal returned via implicit redemption)
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: gsrt.id,
+      type: "sell",
+      quantity: "30",
+      price: "1000000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(550),
     },
   );
 
-  // Trade Republic (EUR) — a VWCE Sparplan + manual ETF/US-equity buys.
-  for (let i = 0; i < 20; i++) {
-    const monthsAgo = 20 - i;
+  // =========================================================================
+  // Trade Republic (EUR) — VWCE Sparplan + manual ETF/US-equity buys.
+  // =========================================================================
+
+  // --- VWCE (Vanguard FTSE All-World) — 48-month Sparplan (2021-2025) ---
+  for (let i = 0; i < 48; i++) {
+    const monthsAgo = 48 - i;
     txRows.push({
       portfolioId: trPortfolio.id,
       instrumentId: vwce.id,
       type: "savings_plan",
-      quantity: dec(0.8 + pseudoRandom(i) * 0.4, 4),
-      price: dec(95 + pseudoRandom(i * 7) * 20, 2),
+      quantity: dec(0.7 + pseudoRandom(i) * 0.5, 4),
+      price: dec(85 + pseudoRandom(i * 7) * 30, 2),
       fees: "0",
       currency: "EUR",
       executedAt: daysAgo(monthsAgo * 30),
       savingsPlanId: "vwce-sparplan",
     });
   }
+  // VWCE dividends
+  txRows.push(
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vwce.id,
+      type: "dividend",
+      quantity: "0",
+      price: "42.50",
+      perShare: "0.85",
+      shares: "50",
+      currency: "EUR",
+      executedAt: daysAgo(1400),
+    },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vwce.id,
+      type: "dividend",
+      quantity: "0",
+      price: "56.80",
+      perShare: "0.92",
+      shares: "62",
+      currency: "EUR",
+      executedAt: daysAgo(1050),
+    },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vwce.id,
+      type: "dividend",
+      quantity: "0",
+      price: "72.40",
+      perShare: "1.02",
+      shares: "71",
+      currency: "EUR",
+      executedAt: daysAgo(700),
+    },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vwce.id,
+      type: "dividend",
+      quantity: "0",
+      price: "85.20",
+      perShare: "1.10",
+      shares: "78",
+      currency: "EUR",
+      executedAt: daysAgo(350),
+    },
+  );
+
+  // --- IWDA (iShares MSCI World) ---
   txRows.push(
     {
       portfolioId: trPortfolio.id,
       instrumentId: iwda.id,
       type: "buy",
       quantity: "12",
-      price: "78.40",
+      price: "62.40",
       fees: "1.00",
       currency: "EUR",
-      executedAt: daysAgo(450),
+      executedAt: daysAgo(1800),
     },
     {
       portfolioId: trPortfolio.id,
       instrumentId: iwda.id,
       type: "buy",
       quantity: "8",
-      price: "84.10",
+      price: "78.40",
       fees: "1.00",
       currency: "EUR",
-      executedAt: daysAgo(200),
+      executedAt: daysAgo(1200),
     },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: iwda.id,
+      type: "dividend",
+      quantity: "0",
+      price: "3.60",
+      perShare: "0.30",
+      shares: "12",
+      currency: "EUR",
+      executedAt: daysAgo(1050),
+    },
+  );
 
+  // --- VFV (Vanguard S&P 500, CAD) ---
+  txRows.push(
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vfv.id,
+      type: "buy",
+      quantity: "20",
+      price: "115.30",
+      fees: "1.50",
+      currency: "CAD",
+      executedAt: daysAgo(1100),
+    },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vfv.id,
+      type: "fee",
+      quantity: "0",
+      price: "2.50",
+      currency: "CAD",
+      executedAt: daysAgo(1090),
+    },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vfv.id,
+      type: "dividend",
+      quantity: "0",
+      price: "7.20",
+      perShare: "0.36",
+      shares: "20",
+      currency: "CAD",
+      executedAt: daysAgo(700),
+    },
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: vfv.id,
+      type: "dividend",
+      quantity: "0",
+      price: "8.40",
+      perShare: "0.42",
+      shares: "20",
+      currency: "CAD",
+      executedAt: daysAgo(350),
+    },
+  );
+
+  // --- AAPL (Apple) — buy, 4:1 split, more buys, sell, dividends ---
+  txRows.push(
+    // 2020: Initial buy
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: aapl.id,
+      type: "buy",
+      quantity: "5",
+      price: "80.50",
+      fees: "1.00",
+      currency: "USD",
+      executedAt: daysAgo(2000),
+    },
+    // 2020: 4-for-1 stock split
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: aapl.id,
+      type: "split",
+      quantity: "4",
+      price: "0",
+      fees: "0",
+      currency: "USD",
+      executedAt: daysAgo(1950),
+    },
+    // Now holding 20 shares (5 × 4)
+    // 2021: Dividend
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: aapl.id,
+      type: "dividend",
+      quantity: "0",
+      price: "3.60",
+      perShare: "0.22",
+      shares: "20",
+      currency: "USD",
+      executedAt: daysAgo(1700),
+    },
+    // 2022: Buy more
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
@@ -518,51 +1091,95 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "150.20",
       fees: "1.00",
       currency: "USD",
-      executedAt: daysAgo(500),
+      executedAt: daysAgo(1500),
     },
+    // 2022: Dividend
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
-      type: "buy",
-      quantity: "5",
-      price: "175.60",
-      fees: "1.00",
+      type: "dividend",
+      quantity: "0",
+      price: "8.80",
+      perShare: "0.22",
+      shares: "30",
       currency: "USD",
-      executedAt: daysAgo(200),
+      executedAt: daysAgo(1400),
     },
+    // 2023: Dividend
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: aapl.id,
+      type: "dividend",
+      quantity: "0",
+      price: "9.40",
+      perShare: "0.24",
+      shares: "30",
+      currency: "USD",
+      executedAt: daysAgo(1050),
+    },
+    // 2024: Dividend
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: aapl.id,
+      type: "dividend",
+      quantity: "0",
+      price: "10.20",
+      perShare: "0.25",
+      shares: "30",
+      currency: "USD",
+      executedAt: daysAgo(700),
+    },
+    // 2025: Sell some
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
       type: "sell",
-      quantity: "8",
+      quantity: "15",
       price: "221.30",
       fees: "1.00",
       currency: "USD",
-      executedAt: daysAgo(20),
+      executedAt: daysAgo(400),
     },
+    // 2025: Dividend (on remaining 15)
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
       type: "dividend",
       quantity: "0",
-      price: "3.92",
+      price: "4.20",
       perShare: "0.28",
-      shares: "14",
+      shares: "15",
       currency: "USD",
-      executedAt: daysAgo(95),
+      executedAt: daysAgo(160),
     },
-    {
-      portfolioId: trPortfolio.id,
-      instrumentId: aapl.id,
-      type: "dividend",
-      quantity: "0",
-      price: "1.96",
-      perShare: "0.28",
-      shares: "7",
-      currency: "USD",
-      executedAt: daysAgo(40),
-    },
+  );
 
+  // --- MSFT (Microsoft) ---
+  txRows.push(
+    // 2021: Buy
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: msft.id,
+      type: "buy",
+      quantity: "5",
+      price: "240.80",
+      fees: "1.00",
+      currency: "USD",
+      executedAt: daysAgo(1800),
+    },
+    // 2022: Dividend
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: msft.id,
+      type: "dividend",
+      quantity: "0",
+      price: "3.00",
+      perShare: "0.62",
+      shares: "5",
+      currency: "USD",
+      executedAt: daysAgo(1400),
+    },
+    // 2023: Buy more
     {
       portfolioId: trPortfolio.id,
       instrumentId: msft.id,
@@ -571,23 +1188,60 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "280.50",
       fees: "1.00",
       currency: "USD",
-      executedAt: daysAgo(350),
+      executedAt: daysAgo(1100),
     },
+    // 2023: Dividend
     {
       portfolioId: trPortfolio.id,
       instrumentId: msft.id,
       type: "dividend",
       quantity: "0",
-      price: "5.52",
-      perShare: "0.69",
+      price: "4.96",
+      perShare: "0.62",
       shares: "8",
       currency: "USD",
-      executedAt: daysAgo(55),
+      executedAt: daysAgo(1050),
+    },
+    // 2024: Dividend
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: msft.id,
+      type: "dividend",
+      quantity: "0",
+      price: "8.25",
+      perShare: "0.75",
+      shares: "11",
+      currency: "USD",
+      executedAt: daysAgo(700),
+    },
+    // 2025: Dividend
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: msft.id,
+      type: "dividend",
+      quantity: "0",
+      price: "8.80",
+      perShare: "0.80",
+      shares: "11",
+      currency: "USD",
+      executedAt: daysAgo(160),
     },
   );
 
-  // Pegadaian Gold (IDR) — long-term accumulation, no sells.
+  // =========================================================================
+  // Pegadaian Gold (IDR) — long-term accumulation, one partial sell.
+  // =========================================================================
   txRows.push(
+    {
+      portfolioId: goldPortfolio.id,
+      instrumentId: xau.id,
+      type: "buy",
+      quantity: "5",
+      price: "850000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(2100),
+    },
     {
       portfolioId: goldPortfolio.id,
       instrumentId: xau.id,
@@ -596,7 +1250,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "950000",
       fees: "0",
       currency: "IDR",
-      executedAt: daysAgo(600),
+      executedAt: daysAgo(1800),
     },
     {
       portfolioId: goldPortfolio.id,
@@ -606,56 +1260,250 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "1050000",
       fees: "0",
       currency: "IDR",
-      executedAt: daysAgo(300),
+      executedAt: daysAgo(1500),
+    },
+    {
+      portfolioId: goldPortfolio.id,
+      instrumentId: xau.id,
+      type: "buy",
+      quantity: "10",
+      price: "1150000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(1100),
+    },
+    {
+      portfolioId: goldPortfolio.id,
+      instrumentId: xau.id,
+      type: "buy",
+      quantity: "10",
+      price: "1250000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(700),
+    },
+    // 2024: Partial sell (take some profit)
+    {
+      portfolioId: goldPortfolio.id,
+      instrumentId: xau.id,
+      type: "sell",
+      quantity: "15",
+      price: "1350000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(500),
     },
     {
       portfolioId: goldPortfolio.id,
       instrumentId: xau.id,
       type: "buy",
       quantity: "5",
-      price: "1150000",
+      price: "1400000",
       fees: "0",
       currency: "IDR",
-      executedAt: daysAgo(60),
+      executedAt: daysAgo(300),
     },
   );
 
-  // Bibit Reksa Dana (IDR, child holder) — monthly Sparplan-style accumulation.
-  for (let i = 0; i < 14; i++) {
-    const monthsAgo = 14 - i;
+  // =========================================================================
+  // Bibit Reksa Dana (IDR, child holder) — 36-month Sparplan + dividends.
+  // =========================================================================
+  for (let i = 0; i < 36; i++) {
+    const monthsAgo = 36 - i;
     txRows.push({
       portfolioId: mfPortfolio.id,
       instrumentId: rdSaham.id,
       type: "savings_plan",
-      quantity: dec(400 + pseudoRandom(i * 3) * 200, 2),
-      price: dec(1450 + pseudoRandom(i * 11) * 150, 2),
+      quantity: dec(300 + pseudoRandom(i * 3) * 300, 2),
+      price: dec(1350 + pseudoRandom(i * 11) * 200, 2),
       fees: "0",
       currency: "IDR",
       executedAt: daysAgo(monthsAgo * 30),
       savingsPlanId: "rdsaham-sparplan",
     });
   }
-
-  // DKB Tagesgeld (EUR, cash-inside boundary).
+  // Reksa dana dividends (annual distributions)
   txRows.push(
+    {
+      portfolioId: mfPortfolio.id,
+      instrumentId: rdSaham.id,
+      type: "dividend",
+      quantity: "0",
+      price: "85000",
+      currency: "IDR",
+      executedAt: daysAgo(1050),
+    },
+    {
+      portfolioId: mfPortfolio.id,
+      instrumentId: rdSaham.id,
+      type: "dividend",
+      quantity: "0",
+      price: "110000",
+      currency: "IDR",
+      executedAt: daysAgo(700),
+    },
+    {
+      portfolioId: mfPortfolio.id,
+      instrumentId: rdSaham.id,
+      type: "dividend",
+      quantity: "0",
+      price: "125000",
+      currency: "IDR",
+      executedAt: daysAgo(350),
+    },
+    // Broker promo bonus
+    {
+      portfolioId: mfPortfolio.id,
+      instrumentId: rdSaham.id,
+      type: "bonus_cash",
+      quantity: "0",
+      price: "25000",
+      currency: "IDR",
+      executedAt: daysAgo(1200),
+    },
+  );
+
+  // =========================================================================
+  // DKB Tagesgeld (EUR, cash-inside boundary) — deposits, withdrawals,
+  // quarterly interest, bonus cash, and an adjustment correction.
+  // =========================================================================
+  txRows.push(
+    // 2020: Initial deposit
     {
       portfolioId: cashPortfolio.id,
       instrumentId: null,
       type: "deposit",
       quantity: "0",
-      price: "5000",
+      price: "3000",
       currency: "EUR",
-      executedAt: daysAgo(500),
+      executedAt: daysAgo(2100),
     },
+    // 2021: Deposit
     {
       portfolioId: cashPortfolio.id,
       instrumentId: null,
       type: "deposit",
+      quantity: "0",
+      price: "2000",
+      currency: "EUR",
+      executedAt: daysAgo(1800),
+    },
+    // 2021: Interest (quarterly)
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "3.75",
+      currency: "EUR",
+      executedAt: daysAgo(1750),
+    },
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "3.75",
+      currency: "EUR",
+      executedAt: daysAgo(1660),
+    },
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "4.50",
+      currency: "EUR",
+      executedAt: daysAgo(1570),
+    },
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "4.50",
+      currency: "EUR",
+      executedAt: daysAgo(1480),
+    },
+    // 2022: Deposit
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "deposit",
+      quantity: "0",
+      price: "1500",
+      currency: "EUR",
+      executedAt: daysAgo(1500),
+    },
+    // 2022: Withdrawal
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "withdrawal",
       quantity: "0",
       price: "1000",
       currency: "EUR",
-      executedAt: daysAgo(300),
+      executedAt: daysAgo(1350),
     },
+    // 2022: Interest (rising rates)
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "8.25",
+      currency: "EUR",
+      executedAt: daysAgo(1300),
+    },
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "12.50",
+      currency: "EUR",
+      executedAt: daysAgo(1200),
+    },
+    // 2023: Deposit
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "deposit",
+      quantity: "0",
+      price: "2000",
+      currency: "EUR",
+      executedAt: daysAgo(1100),
+    },
+    // 2023: Broker sign-up bonus
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "bonus_cash",
+      quantity: "0",
+      price: "50",
+      currency: "EUR",
+      executedAt: daysAgo(1080),
+    },
+    // 2023: Interest
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "22.50",
+      currency: "EUR",
+      executedAt: daysAgo(1000),
+    },
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "28.75",
+      currency: "EUR",
+      executedAt: daysAgo(900),
+    },
+    // 2024: Deposit
     {
       portfolioId: cashPortfolio.id,
       instrumentId: null,
@@ -663,8 +1511,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       quantity: "0",
       price: "1200",
       currency: "EUR",
-      executedAt: daysAgo(120),
+      executedAt: daysAgo(800),
     },
+    // 2024: Withdrawal
     {
       portfolioId: cashPortfolio.id,
       instrumentId: null,
@@ -672,34 +1521,55 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       quantity: "0",
       price: "800",
       currency: "EUR",
-      executedAt: daysAgo(90),
+      executedAt: daysAgo(600),
+    },
+    // 2024: Cash adjustment (correction)
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "adjustment",
+      quantity: "0",
+      price: "35.50",
+      currency: "EUR",
+      executedAt: daysAgo(550),
+    },
+    // 2024: Interest
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "32.00",
+      currency: "EUR",
+      executedAt: daysAgo(700),
     },
     {
       portfolioId: cashPortfolio.id,
       instrumentId: null,
       type: "interest",
       quantity: "0",
-      price: "18.40",
+      price: "34.50",
+      currency: "EUR",
+      executedAt: daysAgo(450),
+    },
+    // 2025: Interest
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "36.20",
+      currency: "EUR",
+      executedAt: daysAgo(350),
+    },
+    {
+      portfolioId: cashPortfolio.id,
+      instrumentId: null,
+      type: "interest",
+      quantity: "0",
+      price: "38.10",
       currency: "EUR",
       executedAt: daysAgo(150),
-    },
-    {
-      portfolioId: cashPortfolio.id,
-      instrumentId: null,
-      type: "interest",
-      quantity: "0",
-      price: "21.10",
-      currency: "EUR",
-      executedAt: daysAgo(60),
-    },
-    {
-      portfolioId: cashPortfolio.id,
-      instrumentId: null,
-      type: "interest",
-      quantity: "0",
-      price: "19.75",
-      currency: "EUR",
-      executedAt: daysAgo(10),
     },
   );
 
@@ -712,37 +1582,53 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   await db.insert(lastPrices).values([
     { instrumentId: bbca.id, price: "10150", previousClose: "10025", currency: "IDR", asOf },
     { instrumentId: bbri.id, price: "4850", previousClose: "4780", currency: "IDR", asOf },
+    { instrumentId: byon.id, price: "1280", previousClose: "1250", currency: "IDR", asOf },
+    { instrumentId: goto_.id, price: "210", previousClose: "205", currency: "IDR", asOf },
     { instrumentId: tlkm.id, price: "3980", previousClose: "4010", currency: "IDR", asOf },
+    { instrumentId: ori020.id, price: "1000000", previousClose: "1000000", currency: "IDR", asOf },
     { instrumentId: ori023.id, price: "1005000", previousClose: "1004200", currency: "IDR", asOf },
+    { instrumentId: gsrt.id, price: "1000000", previousClose: "1000000", currency: "IDR", asOf },
     { instrumentId: vwce.id, price: "118.40", previousClose: "117.10", currency: "EUR", asOf },
     { instrumentId: iwda.id, price: "89.75", previousClose: "89.20", currency: "EUR", asOf },
+    { instrumentId: vfv.id, price: "142.50", previousClose: "141.20", currency: "CAD", asOf },
     { instrumentId: aapl.id, price: "228.90", previousClose: "231.50", currency: "USD", asOf },
     { instrumentId: msft.id, price: "412.30", previousClose: "408.60", currency: "USD", asOf },
-    { instrumentId: xau.id, price: "1245000", previousClose: "1238500", currency: "IDR", asOf },
-    { instrumentId: rdSaham.id, price: "1685", previousClose: "1679", currency: "IDR", asOf },
+    { instrumentId: xau.id, price: "1520000", previousClose: "1510000", currency: "IDR", asOf },
+    { instrumentId: rdSaham.id, price: "1850", previousClose: "1842", currency: "IDR", asOf },
   ]);
 
-  // --- FX rates — every currency pair the seeded holdings actually need, dated today.
+  // --- FX rates — historical quarterly rates from 2020-2025 plus today.
   // See fx.ts: rows are (base=from, quote=to, date), read for `quote = displayCurrency`.
-  // IDR is both the default aggregate display currency (users.displayCurrency) and
-  // most portfolios' own baseCurrency; EUR is Trade Republic's own baseCurrency.
+  // IDR is the default aggregate display currency; EUR is Trade Republic's baseCurrency.
 
-  const today = isoDate(NOW);
-  const fxPairs: { base: string; quote: string; rate: string }[] = [
-    { base: "EUR", quote: "IDR", rate: "17450" },
-    { base: "USD", quote: "IDR", rate: "16100" },
-    { base: "USD", quote: "EUR", rate: "0.923" },
-  ];
-  // Clean up any prior demo run's rates for today (global reference data, not owned by
-  // the demo user, so the cascading delete above doesn't touch it — same rationale as
-  // the instruments-by-symbol cleanup). Without this, re-running seed-demo on the same
-  // dev DB later the same day hits fx_rates_base_quote_date_idx.
-  for (const { base, quote } of fxPairs) {
-    await db
-      .delete(fxRates)
-      .where(and(eq(fxRates.base, base), eq(fxRates.quote, quote), eq(fxRates.date, today)));
+  // Clean up any prior demo run's FX rates (global reference data, not owned by the
+  // demo user — same rationale as instrument-by-symbol cleanup).
+  await db.delete(fxRates);
+
+  const fxRows: (typeof fxRates.$inferInsert)[] = [];
+  // Generate quarterly FX rates from Jan 2020 to today
+  const fxStartDate = new Date(Date.UTC(2020, 0, 1));
+  const quartersSinceStart = (NOW.getUTCFullYear() - 2020) * 4 + Math.floor(NOW.getUTCMonth() / 3);
+
+  for (let q = 0; q <= quartersSinceStart; q++) {
+    const date = new Date(fxStartDate);
+    date.setUTCMonth(date.getUTCMonth() + q * 3);
+    if (date > NOW) break;
+    const dateStr = isoDate(date);
+    const t = q / quartersSinceStart; // 0 at 2020-01, 1 at now
+    // EUR/IDR: 15200 → 17450 (gradual rise)
+    const eurIdr = 15200 + t * 2250 + pseudoRandom(q * 13) * 300;
+    // USD/IDR: 13600 → 16100
+    const usdIdr = 13600 + t * 2500 + pseudoRandom(q * 17) * 250;
+    // USD/EUR: 0.89 → 0.923
+    const usdEur = 0.89 + t * 0.033 + (pseudoRandom(q * 23) - 0.5) * 0.02;
+    fxRows.push(
+      { base: "EUR", quote: "IDR", rate: dec(eurIdr, 0), date: dateStr },
+      { base: "USD", quote: "IDR", rate: dec(usdIdr, 0), date: dateStr },
+      { base: "USD", quote: "EUR", rate: dec(usdEur, 3), date: dateStr },
+    );
   }
-  await db.insert(fxRates).values(fxPairs.map((pair) => ({ ...pair, date: today })));
+  await db.insert(fxRates).values(fxRows);
 
   // --- Portfolio snapshots (daily net-worth history → dashboard/savings charts). ---
   // A deterministic upward-drift-plus-noise walk from a small starting value to
@@ -756,16 +1642,16 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     currency: string;
     days: number;
   }[] = [
-    { portfolio: idPortfolio, end: 9_800_000, currency: "IDR", days: 700 },
-    { portfolio: trPortfolio, end: 6_400, currency: "EUR", days: 500 },
-    { portfolio: goldPortfolio, end: 33_000_000, currency: "IDR", days: 600 },
-    { portfolio: mfPortfolio, end: 7_800_000, currency: "IDR", days: 420 },
-    { portfolio: cashPortfolio, end: 5_439, currency: "EUR", days: 500 },
+    { portfolio: idPortfolio, end: 12_500_000, currency: "IDR", days: 2200 },
+    { portfolio: trPortfolio, end: 8_200, currency: "EUR", days: 2100 },
+    { portfolio: goldPortfolio, end: 52_000_000, currency: "IDR", days: 2100 },
+    { portfolio: mfPortfolio, end: 14_000_000, currency: "IDR", days: 1500 },
+    { portfolio: cashPortfolio, end: 8_650, currency: "EUR", days: 2100 },
   ];
 
   const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
   for (const { portfolio, end, currency, days } of portfolioEndValues) {
-    const start = end * 0.12;
+    const start = end * 0.08;
     for (let d = days; d >= 0; d--) {
       const t = 1 - d / days; // 0 at the start date, 1 at today
       const trend = start + (end - start) * t;
@@ -796,14 +1682,14 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       portfolioId: null,
       dimension: "asset_class",
       targetKey: "equity",
-      targetPct: "45",
+      targetPct: "40",
     },
     {
       userId: user.id,
       portfolioId: null,
       dimension: "asset_class",
       targetKey: "etf",
-      targetPct: "20",
+      targetPct: "25",
     },
     {
       userId: user.id,
@@ -817,14 +1703,14 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       portfolioId: null,
       dimension: "asset_class",
       targetKey: "bond",
-      targetPct: "10",
+      targetPct: "15",
     },
     {
       userId: user.id,
       portfolioId: null,
       dimension: "asset_class",
       targetKey: "mutual_fund",
-      targetPct: "15",
+      targetPct: "10",
     },
   ]);
 
