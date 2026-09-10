@@ -391,8 +391,12 @@ export function TransactionsTable({
         </div>
 
         {/* ── Main column: alerts + controls + table ── */}
-        <div className="space-y-3">
-          <div data-testid="transactions-alerts" className="space-y-3 max-md:order-first">
+        {/* On mobile, order-first ensures alerts render above the sidebar's stat banners
+        (the sidebar is DOM-first but has no mobile order override). On @xl+, the grid
+        places the main column left and the sidebar right via @xl:order-last, so the
+        order utility has no effect. */}
+        <div className="space-y-3 max-md:order-first">
+          <div data-testid="transactions-alerts" className="space-y-3">
             {!bannerDismissed && (
               <AnomalyBanner
                 anomalies={anomalies}

@@ -9,6 +9,7 @@ import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
 import { AllocationCard } from "@/components/holdings/allocation-card";
 import { PortfolioValueCard, type Tone } from "@/components/holdings/portfolio-value-card";
+import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { PositionsPanel } from "@/components/holdings/positions-panel";
 import {
   loadHoldings,
@@ -363,6 +364,10 @@ export default async function HoldingsPage({
                 locale,
               )}
               todayPct={(() => {
+                // Day-change %: the day's move over the prior close's book value. Securities
+                // that lack a previous close contribute nothing to either totalDayChange or
+                // (via a null/0 market value) totalMarketValue, so `market − change` is the
+                // priced book's opening base. Guard a non-positive base.
                 const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
                 return base > 0
                   ? formatPercent(Number(summary.totalDayChange) / base, locale)
@@ -382,16 +387,19 @@ export default async function HoldingsPage({
                   }))}
                 currency={summary.displayCurrency}
                 total={Number(summary.netWorth)}
-                regionTitle={t("byRegion")}
-                currencyTitle={t("byCurrency")}
-                regionRows={allocation.byRegion
-                  .filter((s) => Number(s.value) > 0)
-                  .map((s) => ({ key: s.key, label: tr(s.key), pct: s.pct }))}
-                currencyRows={allocation.byCurrency
-                  .filter((s) => Number(s.value) > 0)
-                  .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
               />
             )}
+
+            <RegionCurrencyCard
+              regionTitle={t("byRegion")}
+              currencyTitle={t("byCurrency")}
+              regionRows={allocation.byRegion
+                .filter((s) => Number(s.value) > 0)
+                .map((s) => ({ key: s.key, label: tr(s.key), pct: s.pct }))}
+              currencyRows={allocation.byCurrency
+                .filter((s) => Number(s.value) > 0)
+                .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
+            />
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { AllocationCard } from "../src/components/holdings/allocation-card";
 import { PortfolioValueCard } from "../src/components/holdings/portfolio-value-card";
+import { RegionCurrencyCard } from "../src/components/holdings/region-currency-card";
 
 function withIntl(children: React.ReactNode) {
   return (
@@ -60,7 +61,7 @@ describe("PortfolioValueCard", () => {
 });
 
 describe("AllocationCard", () => {
-  it("renders the donut and region/currency sections", () => {
+  it("renders the donut legend items", () => {
     render(
       withIntl(
         <AllocationCard
@@ -70,20 +71,27 @@ describe("AllocationCard", () => {
           ]}
           currency="IDR"
           total={1000}
-          regionTitle="By region"
-          currencyTitle="By currency"
-          regionRows={[
-            { key: "Asia", label: "Asia", pct: 62.4 },
-            { key: "Europe", label: "Europe", pct: 37.6 },
-          ]}
-          currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
         />,
       ),
     );
-    // Donut legend items
     expect(screen.getByText("Stocks")).toBeInTheDocument();
     expect(screen.getByText("Gold")).toBeInTheDocument();
-    // Region/currency sections
+  });
+});
+
+describe("RegionCurrencyCard", () => {
+  it("renders both sections with their rows", () => {
+    render(
+      <RegionCurrencyCard
+        regionTitle="By region"
+        currencyTitle="By currency"
+        regionRows={[
+          { key: "Asia", label: "Asia", pct: 62.4 },
+          { key: "Europe", label: "Europe", pct: 37.6 },
+        ]}
+        currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
+      />,
+    );
     expect(screen.getByText("By region")).toBeInTheDocument();
     expect(screen.getByText("By currency")).toBeInTheDocument();
     expect(screen.getByText("Asia")).toBeInTheDocument();
@@ -92,19 +100,14 @@ describe("AllocationCard", () => {
     expect(screen.getByText("100.0%")).toBeInTheDocument();
   });
 
-  it("shows a dash placeholder for an empty region column", () => {
+  it("shows a dash placeholder for an empty column", () => {
     render(
-      withIntl(
-        <AllocationCard
-          slices={[{ key: "equity", label: "Stocks", value: 1 }]}
-          currency="IDR"
-          total={1}
-          regionTitle="By region"
-          currencyTitle="By currency"
-          regionRows={[]}
-          currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
-        />,
-      ),
+      <RegionCurrencyCard
+        regionTitle="By region"
+        currencyTitle="By currency"
+        regionRows={[]}
+        currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
+      />,
     );
     expect(screen.getAllByText("—")).toHaveLength(1);
   });
