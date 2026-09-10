@@ -59,8 +59,37 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@97c5eecedf68f54a7382bfba4405791b070600a7 # docker-publish-multi-image PR #61
     with:
       image-name: "s3ntin3l8/${{ github.event.repository.name }}"
       push-edge: ${{ github.event_name == 'push' }}
+    secrets: inherit
+
+  build-docker-web:
+    needs: [test-node, test-python]
+    # Mirror of `build-docker` for the web app image (`apps/web/Dockerfile`). Runs in
+    # parallel with the API build — the shared workflow namespaces cache/artifact paths
+    # per image-name, so they don't collide. Both images publish to GHCR with the same
+    # tag scheme (edge + sha-<shortsha> on push to main; release semver/latest via the
+    # release-please workflow below). `docker-compose.prod.yml` then pulls both instead
+    # of building on the deploy host.
+    #
+    # `NEXT_PUBLIC_LOGODEV_TOKEN` is a publishable, endpoint-restricted logo.dev key
+    # that gets inlined into the *public* client bundle at build time — there's no
+    # secret-keeping concern, but we still pass it as a repo *variable* rather than
+    # inlining it in the workflow. Build args land in image history regardless of
+    # GitHub secret masking, and keeping the token out of the workflow file makes
+    # rotation a one-place edit (repo settings).
+    if: ${{ github.event_name == 'push' }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@97c5eecedf68f54a7382bfba4405791b070600a7 # docker-publish-multi-image PR #61
+    with:
+      image-name: "s3ntin3l8/${{ github.event.repository.name }}-web"
+      push-edge: ${{ github.event_name == 'push' }}
+      dockerfile: "apps/web/Dockerfile"
+      build-args: |
+        NEXT_PUBLIC_LOGODEV_TOKEN=${{ vars.NEXT_PUBLIC_LOGODEV_TOKEN }}
     secrets: inherit

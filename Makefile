@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-down prod-logs prod-ps dev-clean-legacy-volumes
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
 
 # Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
 # docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
@@ -8,6 +8,11 @@
 # so all three prod targets stay in lockstep instead of repeating the flags.
 COMPOSE_DEV := docker compose -f docker-compose.yml
 COMPOSE_PROD := docker compose -f docker-compose.prod.yml --env-file .env.prod
+# `prod` pulls both images from GHCR (IMAGE_TAG defaults to `edge`); `prod-build`
+# composes the production stack with a tiny override that re-adds local `build:`
+# blocks, for testing an unmerged change on the deploy host without pushing to
+# main. Override file lives at docker-compose.prod.build.yml.
+COMPOSE_PROD_BUILD := docker compose -f docker-compose.prod.yml -f docker-compose.prod.build.yml --env-file .env.prod
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -34,7 +39,7 @@ services: ## Start local Postgres + MinIO (optional — dev defaults to PGlite +
 services-down: ## Stop local backing services
 	$(COMPOSE_DEV) down
 
-prod: ## Build and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
+prod: ## Pull images from GHCR and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
 	@if [ -z "$$($(COMPOSE_PROD) ps -aq 2>/dev/null)" ]; then \
 		echo "warning: no existing 'pocket-portfolio-tracker' project containers found."; \
 		echo "If you expected this to adopt a running deployment, double-check the project"; \
@@ -42,7 +47,20 @@ prod: ## Build and start the production stack (docker-compose.prod.yml; requires
 		echo "this creates a fresh stack with empty volumes. Ctrl-C within 5s to abort."; \
 		sleep 5; \
 	fi
-	$(COMPOSE_PROD) up -d --build
+	# Explicit `pull` surfaces registry/auth errors before we tear down the running
+	# stack. `pull_policy: always` on both services means `up -d` alone would also
+	# pull, but doing it here keeps "did we get the new image?" answerable from
+	# exit code without inspecting recreated containers.
+	$(COMPOSE_PROD) pull
+	$(COMPOSE_PROD) up -d
+
+prod-build: ## Build images locally instead of pulling from GHCR (escape hatch for testing unmerged changes on the host)
+	@if [ -z "$$($(COMPOSE_PROD_BUILD) ps -aq 2>/dev/null)" ]; then \
+		echo "warning: no existing 'pocket-portfolio-tracker' project containers found."; \
+		echo "This will create a fresh stack with empty volumes. Ctrl-C within 5s to abort."; \
+		sleep 5; \
+	fi
+	$(COMPOSE_PROD_BUILD) up -d --build
 
 prod-down: ## Stop the production stack
 	$(COMPOSE_PROD) down

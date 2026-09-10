@@ -17,8 +17,20 @@
 # Usage:
 #   cp .env.example .env.prod              # fill in Supabase / Authentik / provider secrets
 #   docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 # (or: `make prod` — see the Makefile)
+#
+# Both `api` and `web` are pulled from GHCR rather than built on the deploy host.
+# The repo's CI publishes them on every push to `main` (tags: `edge`, `sha-<shortsha>`)
+# and on Release Please releases (tags: `<version>`, `<major>.<minor>`, `latest`).
+# Pick the tag with IMAGE_TAG in `.env.prod` — default is `edge`. To test an unmerged
+# change on the host without pushing to main, use `make prod-build` (override that
+# re-adds the local `build:` blocks for both services — see docker-compose.prod.build.yml).
+#
+# CAUTION on `edge`: the API applies migrations at container startup, so any merge to
+# `main` mutates prod's schema on the next `make prod`. Rolling back to an older `sha-`
+# tag does NOT roll back the migration — pin IMAGE_TAG to a release tag (`latest`,
+# `0.1.8`) if you want release-cadence deploys instead of every-commit deploys.
 #
 # Secrets are declared explicitly per service via `${VAR}` substitution from .env.prod
 # (which docker compose loads for variable substitution only), not a blanket `env_file:`
@@ -48,9 +60,14 @@ name: pocket-portfolio-tracker
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Pulled from GHCR — built & published by `.github/workflows/ci-cd.yml`'s
+    # `build-docker` job on every push to main, and on Release Please releases.
+    # Override IMAGE_TAG in .env.prod to pin to a release (`latest`, `0.1.8`) or a
+    # specific sha (`sha-<shortsha>`). `pull_policy: always` means a bare
+    # `docker compose up -d` always picks up the latest matching tag — important
+    # for `edge`, less so for semver pins but harmless.
+    image: ghcr.io/s3ntin3l8/pocket-portfolio-tracker:${IMAGE_TAG:-edge}
+    pull_policy: always
     restart: unless-stopped
     networks:
       - backend
@@ -102,14 +119,14 @@ services:
       - apilogs:/app/logs
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      # Publishable logo.dev key (instrument-logo.tsx) — must be supplied as a build arg,
-      # not just runtime `environment:` below, because NEXT_PUBLIC_* vars are inlined into
-      # the client bundle at `next build` time, not read at container-start time.
-      args:
-        NEXT_PUBLIC_LOGODEV_TOKEN: ${NEXT_PUBLIC_LOGODEV_TOKEN}
+    # Pulled from GHCR — built & published by `.github/workflows/ci-cd.yml`'s
+    # `build-docker-web` job. `NEXT_PUBLIC_LOGODEV_TOKEN` (logo.dev publishable key,
+    # baked into the client bundle by Next.js at build time) is supplied as a build
+    # arg in CI from the repo's `NEXT_PUBLIC_LOGODEV_TOKEN` Actions variable — it is
+    # intentionally NOT read here at runtime. Set the variable in repo settings if
+    # the web image's logo lookups fall back to monograms (instrument-logo.tsx).
+    image: ghcr.io/s3ntin3l8/pocket-portfolio-tracker-web:${IMAGE_TAG:-edge}
+    pull_policy: always
     restart: unless-stopped
     networks:
       - backend

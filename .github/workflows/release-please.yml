@@ -19,9 +19,26 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@97c5eecedf68f54a7382bfba4405791b070600a7 # docker-publish-multi-image PR #61
     with:
       image-name: "s3ntin3l8/${{ github.event.repository.name }}"
       push-release: true
       release-tag: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
+
+  build-docker-web:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@97c5eecedf68f54a7382bfba4405791b070600a7 # docker-publish-multi-image PR #61
+    with:
+      image-name: "s3ntin3l8/${{ github.event.repository.name }}-web"
+      push-release: true
+      release-tag: ${{ needs.release-please.outputs.tag_name }}
+      dockerfile: "apps/web/Dockerfile"
+      build-args: |
+        NEXT_PUBLIC_LOGODEV_TOKEN=${{ vars.NEXT_PUBLIC_LOGODEV_TOKEN }}
     secrets: inherit
