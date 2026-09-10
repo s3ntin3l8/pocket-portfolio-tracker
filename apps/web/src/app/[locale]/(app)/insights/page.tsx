@@ -114,31 +114,54 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <PageTitle>{t("title")}</PageTitle>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-4">
-          <div
-            className="rounded-2xl p-6 text-white"
-            style={{ background: "linear-gradient(135deg,#11211a,#1d3a2c)" }}
-          >
-            <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
-            <p className="tabular mt-1 text-[36px] font-extrabold leading-none sm:text-[40px]">
-              {summary.xirr !== null ? formatPercent(summary.xirr, locale) : "—"}
-            </p>
-            <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">
-              {t("xirr.caption", { year: sinceYear })}
-            </p>
-          </div>
+      <div
+        className="rounded-2xl p-6 text-white"
+        style={{ background: "linear-gradient(135deg,#11211a,#1d3a2c)" }}
+      >
+        <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
+        <p className="tabular mt-1 text-[36px] font-extrabold leading-none sm:text-[40px]">
+          {summary.xirr !== null ? formatPercent(summary.xirr, locale) : "—"}
+        </p>
+        <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">
+          {t("xirr.caption", { year: sinceYear })}
+        </p>
+      </div>
 
+      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+        {/* ── Main column: detailed analysis ── */}
+        <div className="space-y-5">
           <RebalancingCard
             portfolioId={selectedId ?? undefined}
             slices={assetClassSlices}
             drift={summary.drift?.asset_class}
           />
+
+          {allocation && (
+            <CompositionCard
+              allocation={allocation}
+              currency={summary.displayCurrency}
+              holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
+            />
+          )}
+
+          {insightsData && insightsData.yearlyReturns.length > 0 && (
+            <YearlyReturnsCard
+              rows={insightsData.yearlyReturns}
+              symbols={prefs?.benchmarkSymbols ?? []}
+              currency={summary.displayCurrency}
+              locale={locale}
+            />
+          )}
+
+          {insightsData && insightsData.concentrationTrend.length > 0 && (
+            <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
+          )}
         </div>
 
-        <div className="space-y-4">
+        {/* ── Sidebar: overview metrics (sticky on wide containers) ── */}
+        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
           {allocation && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("concentration.label")}</p>
                 <p className="tabular mt-1 text-[22px] font-extrabold leading-none">
@@ -210,45 +233,21 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
               locale={locale}
             />
           )}
+
+          {insightsData && (
+            <>
+              <DrawdownCard drawdown={insightsData.drawdown} locale={locale} />
+              <VolatilityCard volatility={insightsData.volatility} />
+              <StreaksCard streaks={insightsData.streaks} locale={locale} />
+              <BenchmarkCard
+                benchmark={insightsData.benchmark ?? null}
+                symbols={prefs?.benchmarkSymbols ?? []}
+                locale={locale}
+              />
+            </>
+          )}
         </div>
       </div>
-
-      {allocation && (
-        <CompositionCard
-          allocation={allocation}
-          currency={summary.displayCurrency}
-          holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
-        />
-      )}
-
-      {insightsData && insightsData.yearlyReturns.length > 0 && (
-        <YearlyReturnsCard
-          rows={insightsData.yearlyReturns}
-          symbols={prefs?.benchmarkSymbols ?? []}
-          currency={summary.displayCurrency}
-          locale={locale}
-        />
-      )}
-
-      {insightsData && (
-        <section className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <DrawdownCard drawdown={insightsData.drawdown} locale={locale} />
-            <VolatilityCard volatility={insightsData.volatility} />
-            <StreaksCard streaks={insightsData.streaks} locale={locale} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BenchmarkCard
-              benchmark={insightsData.benchmark ?? null}
-              symbols={prefs?.benchmarkSymbols ?? []}
-              locale={locale}
-            />
-            {insightsData.concentrationTrend.length > 0 && (
-              <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
-            )}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

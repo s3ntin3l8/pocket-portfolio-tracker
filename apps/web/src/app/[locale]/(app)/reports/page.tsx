@@ -400,7 +400,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <header className="space-y-1">
         <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>

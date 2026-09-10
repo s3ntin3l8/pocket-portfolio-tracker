@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useApiClient } from "@/lib/api";
@@ -10,17 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import type { TaxTranslator } from "@/components/tax/tax-cards";
 
 export function LossCarryforwardEditor({
   holderId,
   currentYear,
-  t,
 }: {
   holderId: string;
   currentYear: number;
-  t: TaxTranslator;
 }) {
+  const t = useTranslations("Tax");
   const api = useApiClient();
   const router = useRouter();
   // `taxYear` is the year the carry-forward is *applied in* (see
