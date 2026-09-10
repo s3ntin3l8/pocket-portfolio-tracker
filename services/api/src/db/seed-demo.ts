@@ -785,6 +785,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       executedAt: daysAgo(1740),
     },
     // 2024: Bond matured (maturityDate daysAgo(900)) — principal redeemed at face
+    // a few days after the maturity exDate, so the sell post-dates the maturity.
     {
       portfolioId: idPortfolio.id,
       instrumentId: ori020.id,
@@ -793,7 +794,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       price: "1000000",
       fees: "0",
       currency: "IDR",
-      executedAt: daysAgo(905),
+      executedAt: daysAgo(895),
     },
   );
 
@@ -931,16 +932,18 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       savingsPlanId: "vwce-sparplan",
     });
   }
-  // VWCE dividends
+  // VWCE dividends — `shares` reflects position at the dividend date, not the
+  // final ~45.6 total. (Strictly, VWCE is accumulating and wouldn't pay these in
+  // reality; we keep the rows for screenshot coverage of the dividend UI.)
   txRows.push(
     {
       portfolioId: trPortfolio.id,
       instrumentId: vwce.id,
       type: "dividend",
       quantity: "0",
-      price: "42.50",
+      price: "0.85",
       perShare: "0.85",
-      shares: "50",
+      shares: "1",
       currency: "EUR",
       executedAt: daysAgo(1400),
     },
@@ -949,9 +952,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: vwce.id,
       type: "dividend",
       quantity: "0",
-      price: "56.80",
+      price: "12.88",
       perShare: "0.92",
-      shares: "62",
+      shares: "14",
       currency: "EUR",
       executedAt: daysAgo(1050),
     },
@@ -960,9 +963,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: vwce.id,
       type: "dividend",
       quantity: "0",
-      price: "72.40",
+      price: "25.50",
       perShare: "1.02",
-      shares: "71",
+      shares: "25",
       currency: "EUR",
       executedAt: daysAgo(700),
     },
@@ -971,9 +974,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: vwce.id,
       type: "dividend",
       quantity: "0",
-      price: "85.20",
+      price: "40.70",
       perShare: "1.10",
-      shares: "78",
+      shares: "37",
       currency: "EUR",
       executedAt: daysAgo(350),
     },
@@ -1006,9 +1009,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: iwda.id,
       type: "dividend",
       quantity: "0",
-      price: "3.60",
+      price: "6.00",
       perShare: "0.30",
-      shares: "12",
+      shares: "20",
       currency: "EUR",
       executedAt: daysAgo(1050),
     },
@@ -1216,21 +1219,21 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: msft.id,
       type: "dividend",
       quantity: "0",
-      price: "4.96",
+      price: "8.06",
       perShare: "0.62",
-      shares: "8",
+      shares: "13",
       currency: "USD",
       executedAt: daysAgo(1050),
     },
-    // 2024: Dividend
+    // 2024: Dividend (position 13: 5 buy @1800 + 8 buy @1100, no sells)
     {
       portfolioId: trPortfolio.id,
       instrumentId: msft.id,
       type: "dividend",
       quantity: "0",
-      price: "8.25",
+      price: "9.75",
       perShare: "0.75",
-      shares: "11",
+      shares: "13",
       currency: "USD",
       executedAt: daysAgo(700),
     },
@@ -1240,9 +1243,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: msft.id,
       type: "dividend",
       quantity: "0",
-      price: "8.80",
+      price: "10.40",
       perShare: "0.80",
-      shares: "11",
+      shares: "13",
       currency: "USD",
       executedAt: daysAgo(160),
     },
