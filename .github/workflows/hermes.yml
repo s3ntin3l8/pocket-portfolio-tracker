@@ -13,8 +13,14 @@ name: Hermes (review)
 # IMPORTANT: do NOT add `synchronize` back. It re-triggers a fresh review on
 # EVERY subsequent push, which on a PR under active iteration is an unbounded
 # review loop (each review's comments prompt more commits, each commit fires
-# another review...). `ready_for_review` is safe to keep alongside `opened` --
-# it fires at most once per PR (the draft->ready transition), not on every push.
+# another review...). `ready_for_review` is safe to keep alongside `opened`:
+# a draft can flip to ready and back to draft and ready again, firing this
+# event more than once, but repeat `ready_for_review` events are bounded by
+# the reusable workflow's own "Guard against re-trigger (auto mode only)"
+# step, which skips the run once this bot already has a non-dismissed
+# review on the PR -- that guard was actually broken until
+# s3ntin3l8/.github#54 (a `gh api --jq --arg` invocation that silently
+# failed and always reported "no prior review found"), fixed there.
 #
 # SECURITY: this repo is public and the reusable workflow runs on a self-hosted
 # runner. For a `pull_request` event, GitHub runs the workflow FILE from the PR's
@@ -43,12 +49,16 @@ on:
 
 jobs:
   auto-review:
+    # NOTE: excluding by PR *author* (github.event.pull_request.user.login),
+    # not github.actor -- on `ready_for_review`, github.actor is whoever
+    # clicked "Ready for review", which is not necessarily who opened the
+    # PR. Author-based exclusion keeps working on both trigger types.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 's3ntin3l8-hermes[bot]' &&
-      github.actor != 'dependabot[bot]' &&
-      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.user.login != 's3ntin3l8-hermes[bot]' &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'github-actions[bot]' &&
       github.event.pull_request.draft == false &&
       !startsWith(github.event.pull_request.head.ref, 'mullion/task-')
     permissions:
