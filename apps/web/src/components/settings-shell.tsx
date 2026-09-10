@@ -115,7 +115,7 @@ export function SettingsShell({
         {railBottom}
       </div>
 
-      <div className="mx-auto min-w-0 max-w-2xl">
+      <div className="min-w-0 max-w-2xl">
         {isIndex && (
           <div className="space-y-4 md:hidden">
             {landingTop}
