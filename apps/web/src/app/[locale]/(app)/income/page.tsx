@@ -289,7 +289,9 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                       {c.currency}
                     </span>
                     <span className="tabular shrink-0 text-[13px] font-bold text-text-2">
-                      {((Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100).toFixed(1)}%
+                      {Number(s.lifetimeTotal) > 0
+                        ? `${((Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100).toFixed(1)}%`
+                        : "—"}
                     </span>
                   </div>
                 ))}

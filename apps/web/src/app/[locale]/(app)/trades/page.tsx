@@ -139,40 +139,44 @@ export default async function TradesPage({
                 <CardTitle>{t("realizedByYearChartTitle")}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div
-                  className="flex items-end justify-between gap-2 overflow-hidden"
-                  style={{ height: 140 }}
-                >
-                  {log.realizedByYear.map((r) => {
-                    const amount = Number(r.amount);
-                    const pct = Math.max(4, (Math.abs(amount) / maxAbsYear) * 100);
-                    return (
-                      <div
-                        key={r.year}
-                        className="flex h-full flex-1 flex-col items-center gap-1.5"
-                      >
-                        <span
-                          className={cn(
-                            "tabular text-xs font-bold",
-                            amount >= 0 ? "text-success" : "text-destructive",
-                          )}
+                {log.realizedByYear.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("noRealized")}</p>
+                ) : (
+                  <div
+                    className="flex items-end justify-between gap-2 overflow-hidden"
+                    style={{ height: 140 }}
+                  >
+                    {log.realizedByYear.map((r) => {
+                      const amount = Number(r.amount);
+                      const pct = Math.max(4, (Math.abs(amount) / maxAbsYear) * 100);
+                      return (
+                        <div
+                          key={r.year}
+                          className="flex h-full flex-1 flex-col items-center gap-1.5"
                         >
-                          {formatSignedMoney(amount, currency, locale)}
-                        </span>
-                        <div className="flex w-full flex-1 items-end justify-center">
-                          <div
+                          <span
                             className={cn(
-                              "w-full max-w-10 rounded-t-[4px]",
-                              amount >= 0 ? "bg-success" : "bg-destructive",
+                              "tabular text-xs font-bold",
+                              amount >= 0 ? "text-success" : "text-destructive",
                             )}
-                            style={{ height: `${pct}%` }}
-                          />
+                          >
+                            {formatSignedMoney(amount, currency, locale)}
+                          </span>
+                          <div className="flex w-full flex-1 items-end justify-center">
+                            <div
+                              className={cn(
+                                "w-full max-w-10 rounded-t-[4px]",
+                                amount >= 0 ? "bg-success" : "bg-destructive",
+                              )}
+                              style={{ height: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{r.year}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{r.year}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
