@@ -87,7 +87,6 @@
   },
   "Reports": {
     "title": "Reports",
-    "subtitle": "Statements you can open and export",
     "open": "Open",
     "income": {
       "title": "Income",
@@ -173,7 +172,6 @@
   },
   "Insights": {
     "title": "Insights",
-    "subtitle": "How your wealth is working",
     "allocation": {
       "title": "Allocation & concentration",
       "desc": "How your capital is spread across asset classes, regions and currencies."
@@ -1339,8 +1337,6 @@
     },
     "byRegion": "By region",
     "byCurrency": "By currency",
-    "positionsSectionMobile": "Holdings",
-    "positionsSectionDesktop": "Positions",
     "sparklineRange": "Range",
     "sparklineRangeAria": "Price range {range}"
   },

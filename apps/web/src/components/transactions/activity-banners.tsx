@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
 
-const CARD = "rounded-2xl bg-card p-[22px] shadow-card";
+const CARD = "@container rounded-2xl bg-card p-[22px] shadow-card";
 
 const TONE_CLASS: Record<"up" | "down" | "neutral", string> = {
   up: "text-success",
@@ -71,7 +71,7 @@ export function AllFilterBanner({
 }) {
   return (
     <div className={CARD}>
-      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 @xl:grid-cols-3 @xl:gap-4">
         {data.tiles.map((t, i) => (
           <StatBlock
             key={i}
@@ -107,7 +107,7 @@ export function IncomeFilterBanner({
 }) {
   return (
     <div className={CARD}>
-      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xl:grid-cols-3 @xl:items-center">
+      <div className="grid grid-cols-1 gap-2.5 @xl:grid-cols-3 @xl:items-center @xl:gap-4">
         <StatBlock
           label={projectedLabel}
           value={data.projected}
@@ -141,7 +141,7 @@ export function TradeFilterBanner({
 }) {
   return (
     <div className={CARD}>
-      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xl:grid-cols-3 @xl:items-center">
+      <div className="grid grid-cols-1 gap-2.5 @xl:grid-cols-3 @xl:items-center @xl:gap-4">
         <StatBlock label={averageLabel} value={data.avg} sub={averageNote} tone="neutral" />
         <Breakdown label={headingLabel}>
           {data.bySymbol.map((m, i) => (

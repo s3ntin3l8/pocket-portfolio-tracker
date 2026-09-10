@@ -78,11 +78,6 @@ export function PositionsPanel({
 
   return (
     <div className="space-y-3">
-      <h2 className="text-base font-bold">
-        <span className="sm:hidden">{t("positionsSectionMobile")}</span>
-        <span className="hidden sm:inline">{t("positionsSectionDesktop")}</span>
-      </h2>
-
       <Tabs defaultValue="all">
         <TableToolbar
           filters={
