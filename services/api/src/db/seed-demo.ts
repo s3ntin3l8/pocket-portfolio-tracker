@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   users,
   apiTokens,
@@ -12,6 +12,7 @@ import {
   fxRates,
   portfolioSnapshots,
   allocationTargets,
+  corporateActions,
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
@@ -405,9 +406,11 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // --- Transactions ------------------------------------------------------------
   //
   // Spans buy/sell/dividend/coupon/interest/savings_plan/deposit/withdrawal/
-  // transfer_in/transfer_out/split/bonus/bonus_cash/fee/tax/adjustment — every
-  // major type the UI renders. Data ranges from ~2020 to present (~2200 days)
-  // so Reports, Insights, and Tax screens have multi-year history to show.
+  // transfer_in/transfer_out/bonus_cash/fee/tax/adjustment — every major type
+  // the UI renders except `split` (which is modeled via `corporate_actions`
+  // rows below — a `split` transaction is a no-op in the engine and was removed).
+  // Data ranges from ~2020 to present (~2200 days) so Reports, Insights, and
+  // Tax screens have multi-year history to show.
 
   const txRows: (typeof transactions.$inferInsert)[] = [];
 
@@ -753,13 +756,13 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "IDR",
       executedAt: daysAgo(2100),
     },
-    // 2021: Monthly coupons (3 shown)
+    // 2021: Monthly coupons — 80 units × 1,000,000 × 6.15% / 12 = 410,000 IDR each
     {
       portfolioId: idPortfolio.id,
       instrumentId: ori020.id,
       type: "coupon",
       quantity: "0",
-      price: "41000",
+      price: "410000",
       currency: "IDR",
       executedAt: daysAgo(1800),
     },
@@ -768,7 +771,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: ori020.id,
       type: "coupon",
       quantity: "0",
-      price: "41000",
+      price: "410000",
       currency: "IDR",
       executedAt: daysAgo(1770),
     },
@@ -777,9 +780,20 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: ori020.id,
       type: "coupon",
       quantity: "0",
-      price: "41000",
+      price: "410000",
       currency: "IDR",
       executedAt: daysAgo(1740),
+    },
+    // 2024: Bond matured (maturityDate daysAgo(900)) — principal redeemed at face
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: ori020.id,
+      type: "sell",
+      quantity: "80",
+      price: "1000000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(905),
     },
   );
 
@@ -848,13 +862,13 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "IDR",
       executedAt: daysAgo(1500),
     },
-    // Semi-annual coupons
+    // Semi-annual coupons — 30 units × 1,000,000 × 6.5% / 2 = 975,000 IDR each
     {
       portfolioId: idPortfolio.id,
       instrumentId: gsrt.id,
       type: "coupon",
       quantity: "0",
-      price: "97500",
+      price: "975000",
       currency: "IDR",
       executedAt: daysAgo(1350),
     },
@@ -863,7 +877,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: gsrt.id,
       type: "coupon",
       quantity: "0",
-      price: "97500",
+      price: "975000",
       currency: "IDR",
       executedAt: daysAgo(1150),
     },
@@ -872,7 +886,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: gsrt.id,
       type: "coupon",
       quantity: "0",
-      price: "97500",
+      price: "975000",
       currency: "IDR",
       executedAt: daysAgo(950),
     },
@@ -881,7 +895,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       instrumentId: gsrt.id,
       type: "coupon",
       quantity: "0",
-      price: "97500",
+      price: "975000",
       currency: "IDR",
       executedAt: daysAgo(750),
     },
@@ -998,6 +1012,20 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "EUR",
       executedAt: daysAgo(1050),
     },
+    // 2025: Vorabpauschale advance lump-sum fund tax (German-only, fires
+    // annually on accumulating ETFs). `kind: "vorabpauschale"` is what the
+    // trade-log uses to net it against future realized gains.
+    {
+      portfolioId: trPortfolio.id,
+      instrumentId: iwda.id,
+      type: "tax",
+      kind: "vorabpauschale",
+      quantity: "0",
+      price: "0",
+      vorabBase: "2.45",
+      currency: "EUR",
+      executedAt: daysAgo(580),
+    },
   );
 
   // --- VFV (Vanguard S&P 500, CAD) ---
@@ -1058,25 +1086,17 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "USD",
       executedAt: daysAgo(2000),
     },
-    // 2020: 4-for-1 stock split
-    {
-      portfolioId: trPortfolio.id,
-      instrumentId: aapl.id,
-      type: "split",
-      quantity: "4",
-      price: "0",
-      fees: "0",
-      currency: "USD",
-      executedAt: daysAgo(1950),
-    },
+    // 2020: 4-for-1 stock split — applied via corporate_actions row below
+    // (engine reads splits from the corporate_actions table, not transactions;
+    // a `split` transaction row is a no-op and breaks the position's qty math).
     // Now holding 20 shares (5 × 4)
-    // 2021: Dividend
+    // 2021: Dividend (0.22 × 20 = 4.40)
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
       type: "dividend",
       quantity: "0",
-      price: "3.60",
+      price: "4.40",
       perShare: "0.22",
       shares: "20",
       currency: "USD",
@@ -1093,37 +1113,37 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "USD",
       executedAt: daysAgo(1500),
     },
-    // 2022: Dividend
+    // 2022: Dividend (0.22 × 30 = 6.60)
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
       type: "dividend",
       quantity: "0",
-      price: "8.80",
+      price: "6.60",
       perShare: "0.22",
       shares: "30",
       currency: "USD",
       executedAt: daysAgo(1400),
     },
-    // 2023: Dividend
+    // 2023: Dividend (0.24 × 30 = 7.20)
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
       type: "dividend",
       quantity: "0",
-      price: "9.40",
+      price: "7.20",
       perShare: "0.24",
       shares: "30",
       currency: "USD",
       executedAt: daysAgo(1050),
     },
-    // 2024: Dividend
+    // 2024: Dividend (0.25 × 30 = 7.50)
     {
       portfolioId: trPortfolio.id,
       instrumentId: aapl.id,
       type: "dividend",
       quantity: "0",
-      price: "10.20",
+      price: "7.50",
       perShare: "0.25",
       shares: "30",
       currency: "USD",
@@ -1167,13 +1187,13 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       currency: "USD",
       executedAt: daysAgo(1800),
     },
-    // 2022: Dividend
+    // 2022: Dividend (0.62 × 5 = 3.10)
     {
       portfolioId: trPortfolio.id,
       instrumentId: msft.id,
       type: "dividend",
       quantity: "0",
-      price: "3.00",
+      price: "3.10",
       perShare: "0.62",
       shares: "5",
       currency: "USD",
@@ -1579,6 +1599,20 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // see MARKET_DATA_TTL_MS in the orchestrator env) + previous close for day-change. ---
 
   const asOf = NOW;
+
+  // --- Corporate actions (stock splits, mergers, etc.) ---
+  // The engine applies splits via this table — `ev.ca.ratio` in holdings.ts,
+  // lots.ts, and trade-log/compute.ts — not via transaction rows. A `split`
+  // transaction is a no-op (QTY_AFFECTING_TYPES in holdings.ts excludes it).
+  // Without this row, AAPL would be 5 + 10 − 15 = 0 shares (position closed,
+  // no partial position left for the report/trade-log screens to show).
+  await db.insert(corporateActions).values({
+    instrumentId: aapl.id,
+    type: "split",
+    ratio: "4",
+    exDate: isoDate(daysAgo(1950)),
+    terms: "4-for-1 stock split",
+  });
   await db.insert(lastPrices).values([
     { instrumentId: bbca.id, price: "10150", previousClose: "10025", currency: "IDR", asOf },
     { instrumentId: bbri.id, price: "4850", previousClose: "4780", currency: "IDR", asOf },
@@ -1597,18 +1631,38 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     { instrumentId: rdSaham.id, price: "1850", previousClose: "1842", currency: "IDR", asOf },
   ]);
 
-  // --- FX rates — historical quarterly rates from 2020-2025 plus today.
-  // See fx.ts: rows are (base=from, quote=to, date), read for `quote = displayCurrency`.
-  // IDR is the default aggregate display currency; EUR is Trade Republic's baseCurrency.
+  // --- FX rates — quarterly history 2020-today for every currency pair the
+  // seeded holdings actually need. See fx.ts: rows are (base=from, quote=to,
+  // date), read for `quote = displayCurrency`. IDR is the default aggregate
+  // display currency; EUR/USD/CAD are the foreign currencies any holding has.
 
-  // Clean up any prior demo run's FX rates (global reference data, not owned by the
-  // demo user — same rationale as instrument-by-symbol cleanup).
-  await db.delete(fxRates);
+  const today = isoDate(NOW);
+
+  // Scope cleanup to only the pairs this seed owns — the table is global
+  // reference data shared with other users/devs on a shared dev DB, so
+  // `delete(fxRates)` would nuke everyone else's cache.
+  const seededPairs = [
+    { base: "EUR", quote: "IDR" },
+    { base: "USD", quote: "IDR" },
+    { base: "USD", quote: "EUR" },
+    { base: "CAD", quote: "IDR" },
+    { base: "CAD", quote: "EUR" },
+  ];
+  for (const { base, quote } of seededPairs) {
+    await db.delete(fxRates).where(and(eq(fxRates.base, base), eq(fxRates.quote, quote)));
+  }
 
   const fxRows: (typeof fxRates.$inferInsert)[] = [];
   // Generate quarterly FX rates from Jan 2020 to today
   const fxStartDate = new Date(Date.UTC(2020, 0, 1));
   const quartersSinceStart = (NOW.getUTCFullYear() - 2020) * 4 + Math.floor(NOW.getUTCMonth() / 3);
+
+  // Track the latest end-of-series rate per pair so we can stamp today's row
+  // even when today doesn't fall on a quarter start (getFxRates does
+  // eq(date, today) — a quarter-start-only seed would leave the live path
+  // with no cached rate on the ~110 non-quarter-start days/year and fall
+  // back to a live provider fetch).
+  const latestByPair = new Map<string, string>();
 
   for (let q = 0; q <= quartersSinceStart; q++) {
     const date = new Date(fxStartDate);
@@ -1622,11 +1676,32 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     const usdIdr = 13600 + t * 2500 + pseudoRandom(q * 17) * 250;
     // USD/EUR: 0.89 → 0.923
     const usdEur = 0.89 + t * 0.033 + (pseudoRandom(q * 23) - 0.5) * 0.02;
+    // CAD/IDR: 10500 → 11900
+    const cadIdr = 10500 + t * 1400 + pseudoRandom(q * 29) * 200;
+    // CAD/EUR: 0.65 → 0.68
+    const cadEur = 0.65 + t * 0.03 + (pseudoRandom(q * 31) - 0.5) * 0.015;
+    const row = (base: string, quote: string, rate: string) => {
+      const key = `${base}:${quote}`;
+      latestByPair.set(key, rate);
+      return { base, quote, rate, date: dateStr };
+    };
     fxRows.push(
-      { base: "EUR", quote: "IDR", rate: dec(eurIdr, 0), date: dateStr },
-      { base: "USD", quote: "IDR", rate: dec(usdIdr, 0), date: dateStr },
-      { base: "USD", quote: "EUR", rate: dec(usdEur, 3), date: dateStr },
+      row("EUR", "IDR", dec(eurIdr, 0)),
+      row("USD", "IDR", dec(usdIdr, 0)),
+      row("USD", "EUR", dec(usdEur, 3)),
+      row("CAD", "IDR", dec(cadIdr, 0)),
+      row("CAD", "EUR", dec(cadEur, 3)),
     );
+  }
+
+  // Stamp today's row for every pair using the end-of-series rate, so the
+  // live path's eq(date, today) lookup hits on any day, not just quarter starts.
+  for (const { base, quote } of seededPairs) {
+    const key = `${base}:${quote}`;
+    const rate = latestByPair.get(key);
+    if (rate && !fxRows.some((r) => r.base === base && r.quote === quote && r.date === today)) {
+      fxRows.push({ base, quote, rate, date: today });
+    }
   }
   await db.insert(fxRates).values(fxRows);
 
@@ -1642,11 +1717,18 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     currency: string;
     days: number;
   }[] = [
-    { portfolio: idPortfolio, end: 12_500_000, currency: "IDR", days: 2200 },
-    { portfolio: trPortfolio, end: 8_200, currency: "EUR", days: 2100 },
-    { portfolio: goldPortfolio, end: 52_000_000, currency: "IDR", days: 2100 },
-    { portfolio: mfPortfolio, end: 14_000_000, currency: "IDR", days: 1500 },
-    { portfolio: cashPortfolio, end: 8_650, currency: "EUR", days: 2100 },
+    // Stockbit: BBCA(1100@10.15k) + BBRI(600@4.85k) + BYON(4750@1.28k) + ORI023(50@1.005M)
+    //   ≈ 70.4M IDR (ORI020 matured and was redeemed; GOTO/TLKM/GSRT fully sold)
+    { portfolio: idPortfolio, end: 70_500_000, currency: "IDR", days: 2200 },
+    // TR: VWCE(45.6@118.40) + IWDA(20@89.75) + AAPL(15@228.90 USD→EUR)
+    //   + MSFT(13@412.30 USD→EUR) + VFV(20@142.50 CAD→EUR) ≈ 17.2k EUR
+    { portfolio: trPortfolio, end: 17_500, currency: "EUR", days: 2100 },
+    // Gold: 40g × 1.52M ≈ 60.8M IDR
+    { portfolio: goldPortfolio, end: 61_000_000, currency: "IDR", days: 2100 },
+    // Reksa dana: ~36 monthly buys × ~450 units × 1,850 ≈ 30M IDR
+    { portfolio: mfPortfolio, end: 30_000_000, currency: "IDR", days: 1500 },
+    // DKB cash: 9700 deposits − 1800 withdrawals + ~228 interest + 50 bonus + 35.5 adj ≈ 8,213 EUR
+    { portfolio: cashPortfolio, end: 8_300, currency: "EUR", days: 2100 },
   ];
 
   const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
