@@ -52,7 +52,11 @@ jobs:
     # NOTE: excluding by PR *author* (github.event.pull_request.user.login),
     # not github.actor -- on `ready_for_review`, github.actor is whoever
     # clicked "Ready for review", which is not necessarily who opened the
-    # PR. Author-based exclusion keeps working on both trigger types.
+    # PR. Author-based exclusion keeps working on both trigger types. This
+    # bot-author list and the mullion/task-* exclusion below are also now
+    # enforced centrally inside the reusable workflow itself (as of
+    # s3ntin3l8/.github#54) -- this copy is defense-in-depth, same as the
+    # fork guard already is, not the only line of defense.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
