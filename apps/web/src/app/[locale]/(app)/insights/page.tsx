@@ -223,19 +223,21 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
 
         {/* ── Main column: detailed analysis ── */}
         <div className="space-y-5">
-          <RebalancingCard
-            portfolioId={selectedId ?? undefined}
-            slices={assetClassSlices}
-            drift={summary.drift?.asset_class}
-          />
-
-          {allocation && (
-            <CompositionCard
-              allocation={allocation}
-              currency={summary.displayCurrency}
-              holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
+          <div className="grid grid-cols-1 gap-5 @lg:grid-cols-2">
+            <RebalancingCard
+              portfolioId={selectedId ?? undefined}
+              slices={assetClassSlices}
+              drift={summary.drift?.asset_class}
             />
-          )}
+
+            {allocation && (
+              <CompositionCard
+                allocation={allocation}
+                currency={summary.displayCurrency}
+                holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
+              />
+            )}
+          </div>
 
           {insightsData && insightsData.yearlyReturns.length > 0 && (
             <YearlyReturnsCard

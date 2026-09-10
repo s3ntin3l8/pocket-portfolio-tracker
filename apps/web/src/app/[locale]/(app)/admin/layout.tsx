@@ -106,11 +106,6 @@ export default async function AdminLayout({
     <SettingsShell
       navItems={navItems}
       indexHref="/admin"
-      railTop={
-        <div className="px-2.5 pb-2 pt-0.5 text-[10px] font-bold uppercase tracking-[.06em] text-text-3">
-          {t("title")}
-        </div>
-      }
       landingTop={
         <div className="mb-4 flex items-center gap-3">
           <Link

@@ -62,7 +62,7 @@ export default async function SettingsPortfoliosPage({
             description={te("unavailableBody")}
           />
         ) : result.portfolios.length > 0 ? (
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3.5 sm:grid-cols-2">
             {result.portfolios.map(({ portfolio, netWorth }) => {
               const isTrBound = portfolio.id === trPortfolioId;
               const isTrConnected = isTrBound && connection?.status === "connected";

@@ -343,6 +343,25 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         }
         value={m(usedYtd)}
         caption={t("tax.caption")}
+        splitBar={
+          allowanceAnnual > 0
+            ? [
+                {
+                  pct: usedPct,
+                  color: "#7C5CFC",
+                  label: t("tax.tooltipUsed"),
+                  amount: m(usedYtd),
+                },
+                {
+                  pct: 100 - usedPct,
+                  color: "#7C5CFC",
+                  striped: true,
+                  label: t("tax.tooltipAllowance"),
+                  amount: m(allowanceAnnual),
+                },
+              ]
+            : undefined
+        }
         metrics={[
           { label: t("tax.metricRealized"), value: mc(realizedGains) },
           { label: t("tax.metricIncome"), value: mc(incomeYtd) },

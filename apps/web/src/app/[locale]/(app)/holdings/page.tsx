@@ -378,6 +378,7 @@ export default async function HoldingsPage({
 
             {allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
               <AllocationCard
+                title={t("byAssetClass")}
                 slices={allocation.byAssetClass
                   .filter((s) => Number(s.value) > 0)
                   .map((s) => ({

@@ -133,25 +133,34 @@ export function RebalancingCard({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-bold">{t("title")}</h2>
         <div className="flex items-center gap-2">
-          {hasTargets && !editing && (
-            <span className="rounded-lg bg-warning/15 px-[9px] py-1 text-[11px] font-bold text-warning">
+          {hasTargets && (
+            <span
+              className={cn(
+                "rounded-lg px-[9px] py-1 text-[11px] font-bold",
+                editing ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warning",
+              )}
+            >
               {t("drift", { pct: maxAbsDrift.toFixed(1) })}
             </span>
           )}
-          {!editing && (
-            <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={startEdit}>
-              <Pencil className="size-3" />
-              {t("edit")}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn("h-7 gap-1 text-xs", editing && "pointer-events-none opacity-50")}
+            onClick={startEdit}
+            disabled={editing}
+          >
+            <Pencil className="size-3" />
+            {t("edit")}
+          </Button>
         </div>
       </div>
 
-      {!editing && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          {t("subtitle", { status: onTarget ? t("statusOnTarget") : t("statusDrifting") })}
-        </p>
-      )}
+      <p className="mt-1 text-xs text-muted-foreground">
+        {editing
+          ? t("editSubtitle")
+          : t("subtitle", { status: onTarget ? t("statusOnTarget") : t("statusDrifting") })}
+      </p>
 
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
 
@@ -161,14 +170,14 @@ export function RebalancingCard({
             <Spinner size="md" className="text-muted-foreground" />
           </div>
         ) : (
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-2">
             {rows.map((row, i) => (
-              <div key={row.key} className="flex items-center gap-3">
+              <div key={row.key} className="flex items-center gap-2 text-sm">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
                   style={{ background: COLORS[i % COLORS.length] }}
                 />
-                <span className="flex-1 text-sm">{row.label}</span>
+                <span className="flex-1">{row.label}</span>
                 <div className="flex w-24 items-center gap-1">
                   <Input
                     type="number"
@@ -177,7 +186,7 @@ export function RebalancingCard({
                     step={0.1}
                     value={row.targetPct === 0 ? "" : String(row.targetPct)}
                     placeholder="0"
-                    className="h-7 text-right tabular text-sm"
+                    className="h-6 px-2 text-right tabular text-sm"
                     onChange={(e) => updateRow(row.key, e.target.value)}
                   />
                   <span className="shrink-0 text-sm text-muted-foreground">%</span>
@@ -185,37 +194,49 @@ export function RebalancingCard({
               </div>
             ))}
 
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={resetToDefault}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground"
-              >
-                {t("reset")}
-              </button>
-              <span
-                className={cn(
-                  "text-xs tabular",
-                  sumOk ? "text-muted-foreground" : "font-medium text-destructive",
-                )}
-              >
-                {td("total")}: {total.toFixed(1)}% {!sumOk && td("mustEqual100")}
-              </span>
-            </div>
+            <div className="rounded-lg border border-border px-3 py-2">
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={resetToDefault}
+                  className="font-medium text-muted-foreground hover:text-foreground"
+                >
+                  {t("reset")}
+                </button>
+                <span
+                  className={cn(
+                    "tabular",
+                    sumOk ? "text-muted-foreground" : "font-medium text-destructive",
+                  )}
+                >
+                  {td("total")}: {total.toFixed(1)}% {!sumOk && td("mustEqual100")}
+                </span>
+              </div>
 
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
-                {td("cancel")}
-              </Button>
-              <Button size="sm" onClick={handleSave} disabled={!sumOk || saving}>
-                {saving ? <Spinner size="sm" className="mr-1" /> : null}
-                {td("save")}
-              </Button>
+              <div className="mt-2 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setEditing(false)}
+                >
+                  {td("cancel")}
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleSave}
+                  disabled={!sumOk || saving}
+                >
+                  {saving ? <Spinner size="sm" className="mr-1" /> : null}
+                  {td("save")}
+                </Button>
+              </div>
             </div>
           </div>
         )
       ) : (
-        <div className="mt-3 space-y-2.5">
+        <div className="mt-3 space-y-2">
           {slices.map((s, i) => {
             const d = driftByKey.get(s.key);
             return (
@@ -249,9 +270,11 @@ export function RebalancingCard({
 
           {!hasTargets && <p className="text-xs text-muted-foreground">{t("noTargets")}</p>}
 
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-            <Info className="mt-0.5 size-3.5 shrink-0" />
-            <span>{t("note")}</span>
+          <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+              <span>{t("note")}</span>
+            </div>
           </div>
         </div>
       )}

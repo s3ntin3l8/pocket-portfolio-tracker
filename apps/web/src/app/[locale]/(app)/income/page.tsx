@@ -9,7 +9,6 @@ import { IncomeHeatmap } from "@/components/charts/income-heatmap";
 import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
 import { YieldsTable } from "@/components/income/yields-table";
-import { ByCurrencyTable } from "@/components/income/by-currency-table";
 import { TABLE_LABEL, TABLE_SUBLABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
 import { IncomeTimeline } from "@/components/income/income-timeline";
 import { CashInterestLine } from "@/components/income/cash-interest-line";
@@ -207,16 +206,6 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                   </CardContent>
                 </Card>
               )}
-              {s.byCurrency.length > 1 && (
-                <Card className="overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <CardTitle>{t("currencyTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-0 pb-0">
-                    <ByCurrencyTable rows={s.byCurrency} displayCurrency={currency} />
-                  </CardContent>
-                </Card>
-              )}
             </div>
           )}
 
@@ -270,14 +259,42 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           )}
 
           {classSlices.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("byClassTitle")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AllocationDonut data={classSlices} currency={currency} showPercent={false} />
-              </CardContent>
-            </Card>
+            <div className="@container rounded-[18px] bg-card px-6 py-5 shadow-card">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+                {t("byClassTitle")}
+              </p>
+              <AllocationDonut
+                data={classSlices}
+                currency={currency}
+                total={Number(s.lifetimeTotal)}
+              />
+            </div>
+          )}
+
+          {s.byCurrency.length > 1 && (
+            <div className="@container rounded-[18px] bg-card px-6 py-5 shadow-card">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+                {t("currencyTitle")}
+              </p>
+              <div className="grid grid-cols-1 gap-x-5 gap-y-2.5 @sm:grid-cols-2 @sm:gap-x-7 @lg:grid-cols-3">
+                {s.byCurrency.map((c, i) => (
+                  <div key={c.currency} className="flex items-center gap-[9px]">
+                    <span
+                      className="size-[9px] shrink-0 rounded-[2px]"
+                      style={{
+                        background: `var(--color-chart-${(i % 5) + 1})`,
+                      }}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                      {c.currency}
+                    </span>
+                    <span className="tabular shrink-0 text-[13px] font-bold text-text-2">
+                      {((Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

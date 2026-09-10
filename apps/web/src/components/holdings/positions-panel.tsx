@@ -80,6 +80,7 @@ export function PositionsPanel({
     <div className="space-y-3">
       <Tabs defaultValue="all">
         <TableToolbar
+          key="toolbar"
           filters={
             // Holdings has no mobile filter Sheet to hold the tabs, so — unlike
             // Activity's TOOLBAR_FILTERS_DESKTOP_ONLY — chips stay visible (and

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { PiggyBank, Info } from "lucide-react";
 import {
@@ -45,27 +46,46 @@ export function ContributionsChart({
 
   // Attempt the full overlay merge. Uses the day-resolution series so the contributed
   // step lands on the actual transaction day, aligned with the daily value line.
-  const merged = mergeContributionValue(dailySeries, valueHistory);
+  const merged = useMemo(
+    () => mergeContributionValue(dailySeries, valueHistory),
+    [dailySeries, valueHistory],
+  );
+
+  // Derive per-point band fields for the overlay path.
+  // At every x exactly one of gain/loss is non-zero, so stacking
+  // floor + gain + loss places the filled area correctly.
+  const overlayData = useMemo(
+    () =>
+      merged.map((p) => {
+        const floor = Math.min(p.value, p.contributed);
+        return {
+          date: p.date,
+          contributed: p.contributed,
+          value: p.value,
+          floor,
+          gain: Math.max(0, p.value - p.contributed),
+          loss: Math.max(0, p.contributed - p.value),
+        };
+      }),
+    [merged],
+  );
+
+  // Running total as a prefix sum for the degraded path.
+  const degradedPoints = useMemo(() => {
+    return series.reduce<{ date: string; close: string }[]>((acc, s) => {
+      const prev = acc.length > 0 ? Number(acc[acc.length - 1]!.close) : 0;
+      acc.push({ date: s.month, close: (prev + Number(s.contributed)).toString() });
+      return acc;
+    }, []);
+  }, [series]);
+
+  const isOverlay = overlayData.length >= 2;
+
+  const money = (v: number) => formatMoney(v, currency, locale);
 
   // ── OVERLAY PATH ─────────────────────────────────────────────────────────
-  if (merged.length >= 2) {
-    // Derive per-point band fields.
-    // At every x exactly one of gain/loss is non-zero, so stacking
-    // floor + gain + loss places the filled area correctly.
-    const data = merged.map((p) => {
-      const floor = Math.min(p.value, p.contributed);
-      return {
-        date: p.date,
-        contributed: p.contributed,
-        value: p.value,
-        floor,
-        gain: Math.max(0, p.value - p.contributed),
-        loss: Math.max(0, p.contributed - p.value),
-      };
-    });
-
-    const money = (v: number) => formatMoney(v, currency, locale);
-    const lastPoint = data[data.length - 1];
+  if (isOverlay) {
+    const lastPoint = overlayData[overlayData.length - 1];
     const invested = lastPoint.contributed;
     const nowWorth = lastPoint.value;
     const gain = nowWorth - invested;
@@ -75,7 +95,7 @@ export function ContributionsChart({
         {/* Legend lives in the card header (right of the title) — see the Savings page. */}
         <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <ComposedChart data={overlayData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 {/* Transparent base so the band starts at the lower of the two lines */}
                 <linearGradient id="cv-floor" x1="0" y1="0" x2="0" y2="1">
@@ -184,16 +204,7 @@ export function ContributionsChart({
   // No value history — fall back to the legacy single-series chart plus an
   // info note so the user knows why the overlay is missing.
 
-  // Running total as a prefix sum (same logic as before).
-  const points = series.map((s, i) => ({
-    date: s.month,
-    close: series
-      .slice(0, i + 1)
-      .reduce((sum, x) => sum + Number(x.contributed), 0)
-      .toString(),
-  }));
-
-  if (points.length < 2) {
+  if (degradedPoints.length < 2) {
     return (
       <EmptyState icon={PiggyBank} title={te("historyTitle")} description={te("historyBody")} />
     );
@@ -201,7 +212,7 @@ export function ContributionsChart({
 
   return (
     <div className="space-y-2">
-      <PriceChart data={points} currency={currency} />
+      <PriceChart data={degradedPoints} currency={currency} />
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0" />
         {t("chartValueUnavailable")}

@@ -22,6 +22,9 @@ export interface ContributionValuePoint {
  *   of that exact date — so the contributed step lands on the actual transaction
  *   day rather than the first day of its month.
  *
+ * Both inputs are sorted ascending by date, so we use a two-pointer forward
+ * scan for O(N+M) time complexity.
+ *
  * Returns an empty array when `valueHistory` has fewer than 2 points so callers
  * can fall back to the degraded single-series path.
  */
@@ -41,22 +44,25 @@ export function mergeContributionValue(
     entries.push([s.date, running]);
   }
 
-  /**
-   * Return the cumulative contribution as of a given date by forward-filling the
-   * last entry with date ≤ the target, or 0 before the first entry.
-   */
-  function cumulativeAt(date: string): number {
-    let last = 0;
-    for (const [d, v] of entries) {
-      if (d <= date) last = v;
-      else break;
+  // Two-pointer forward scan: both entries and valueHistory are sorted ascending.
+  // For each valueHistory point, advance the entries pointer until we find the
+  // last entry with date <= the value date. This guarantees O(N+M) total time.
+  const result: ContributionValuePoint[] = [];
+  let j = 0;
+  let lastContributed = 0;
+
+  for (const p of valueHistory) {
+    // Advance j while entries[j].date <= p.date
+    while (j < entries.length && entries[j][0] <= p.date) {
+      lastContributed = entries[j][1];
+      j++;
     }
-    return last;
+    result.push({
+      date: p.date,
+      contributed: lastContributed,
+      value: Number(p.netWorth),
+    });
   }
 
-  return valueHistory.map((p) => ({
-    date: p.date,
-    contributed: cumulativeAt(p.date),
-    value: Number(p.netWorth),
-  }));
+  return result;
 }

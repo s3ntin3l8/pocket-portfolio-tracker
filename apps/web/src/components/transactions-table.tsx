@@ -366,7 +366,7 @@ export function TransactionsTable({
       <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
         {/* @xl:pt-1: aligns the first banner's top edge with the filter bar in the main column — the sidebar's sticky offset (70px) places it slightly higher than the first interactive row, and 4px of top padding closes that gap. */}
-        <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:pt-1">
+        <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:pt-4">
           {showFilterBanners && allBanner && (
             <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
           )}

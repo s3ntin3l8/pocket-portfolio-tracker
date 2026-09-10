@@ -16,7 +16,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { TradeDetailSheet } from "@/components/trade-detail-sheet";
 import { formatSignedMoney, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
-import { type StatusFilter, COLS, tradeKey } from "./trades-table/constants";
+import { type StatusFilter, type PnlFilter, COLS, tradeKey } from "./trades-table/constants";
 import { FilterBar } from "./trades-table/filter-bar";
 import { DesktopRow } from "./trades-table/desktop-row";
 import { MobileRow } from "./trades-table/mobile-row";
@@ -32,20 +32,41 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
   const { sortKey, sortDir, toggle, sort } = useTableSort<Trade>(COLS);
   const [detailTrade, setDetailTrade] = useState<Trade | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [yearFilter, setYearFilter] = useState<string | null>(null);
+  const [pnlFilter, setPnlFilter] = useState<PnlFilter>("all");
   const [query, setQuery] = useState("");
 
   const signed = (n: number) => formatSignedMoney(n, currency, locale);
+
+  const yearOptions = useMemo(() => {
+    const years = new Set<string>();
+    for (const tr of trades) {
+      if (tr.entryDate) years.add(tr.entryDate.slice(0, 4));
+      if (tr.exitDate) years.add(tr.exitDate.slice(0, 4));
+    }
+    return [...years].sort().reverse();
+  }, [trades]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return trades.filter((tr) => {
       if (statusFilter !== "all" && tr.status !== statusFilter) return false;
+      if (yearFilter) {
+        const entryYear = tr.entryDate?.slice(0, 4);
+        const exitYear = tr.exitDate?.slice(0, 4);
+        if (entryYear !== yearFilter && exitYear !== yearFilter) return false;
+      }
+      if (pnlFilter !== "all") {
+        const ret = Number(tr.totalReturn);
+        if (pnlFilter === "gain" && ret <= 0) return false;
+        if (pnlFilter === "loss" && ret >= 0) return false;
+      }
       if (!q) return true;
       const symbol = tr.instrument?.symbol?.toLowerCase() ?? "";
       const name = (tr.instrument?.displayName ?? tr.instrument?.name ?? "").toLowerCase();
       return symbol.includes(q) || name.includes(q);
     });
-  }, [trades, statusFilter, query]);
+  }, [trades, statusFilter, yearFilter, pnlFilter, query]);
   const visible = useMemo(() => sort(filtered), [filtered, sort]);
 
   // Totals footer — closed trades only (an open position's realized P&L isn't final).
@@ -62,6 +83,11 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
       <FilterBar
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
+        yearFilter={yearFilter}
+        setYearFilter={setYearFilter}
+        yearOptions={yearOptions}
+        pnlFilter={pnlFilter}
+        setPnlFilter={setPnlFilter}
         query={query}
         setQuery={setQuery}
       />

@@ -150,128 +150,142 @@ function TaxHolderOverviewDe({
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
-        <EstimatedTaxHero
-          label={t("hero.estimatedTax", { year: entry.year })}
-          value={moneyCompact(estimatedTax)}
-          description={t("hero.estimatedTaxDesc", { rate: ratePct, taxable: money(taxable) })}
-        />
-        <StatCard
-          label={t("hero.fsaUsed")}
-          value={money(u.usedYtd)}
-          delta={t("hero.fsaUsedDesc", { allowance: money(u.allowanceAnnual) })}
-        />
-        <StatCard
-          label={t("hero.realizedGains")}
-          value={money(u.realizedGainsAdjusted)}
-          delta={t("hero.realizedGainsDesc", { count: 0 })}
-        />
-        <StatCard
-          label={t("hero.dividendsYtd")}
-          value={money(u.incomeYtd)}
-          delta={t("hero.dividendsYtdDesc", { allowance: money(u.allowanceAnnual) })}
-        />
-      </div>
+      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+        {/* ── Main column: hero + detailed cards ── */}
+        <div className="space-y-5">
+          <EstimatedTaxHero
+            label={t("hero.estimatedTax", { year: entry.year })}
+            value={moneyCompact(estimatedTax)}
+            description={t("hero.estimatedTaxDesc", { rate: ratePct, taxable: money(taxable) })}
+          />
 
-      <VorabpauschaleRow allowanceUsage={u} money={money} t={t} />
+          <VorabpauschaleRow allowanceUsage={u} money={money} t={t} />
 
-      {distribution && <DistributionCard distribution={distribution} money={money} t={t} />}
+          {distribution && <DistributionCard distribution={distribution} money={money} t={t} />}
 
-      {hasForecast && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarClock className="size-4" />
-              {t("forecast.label")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-xs text-muted-foreground">{t("forecast.disclaimer")}</p>
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
-              <StatCard
-                label={t("forecast.label")}
-                value={money(u.forecastIncomeRestOfYear)}
-                delta={t("forecast.labelDesc")}
-              />
-              <StatCard
-                label={t("forecast.projectedUsed")}
-                value={money(u.projectedUsedFullYear)}
-                delta={t("forecast.projectedUsedDesc")}
-              />
-              <StatCard
-                label={t("forecast.projectedRemaining")}
-                value={money(u.projectedRemaining)}
-                delta={`${t("forecast.projectedTaxSaving")}: ${money(u.projectedTaxSavingAvailable)}`}
+          {hasForecast && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarClock className="size-4" />
+                  {t("forecast.label")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">{t("forecast.disclaimer")}</p>
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+                  <StatCard
+                    label={t("forecast.label")}
+                    value={money(u.forecastIncomeRestOfYear)}
+                    delta={t("forecast.labelDesc")}
+                  />
+                  <StatCard
+                    label={t("forecast.projectedUsed")}
+                    value={money(u.projectedUsedFullYear)}
+                    delta={t("forecast.projectedUsedDesc")}
+                  />
+                  <StatCard
+                    label={t("forecast.projectedRemaining")}
+                    value={money(u.projectedRemaining)}
+                    delta={`${t("forecast.projectedTaxSaving")}: ${money(u.projectedTaxSavingAvailable)}`}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <CoverageCard allowanceUsage={u} money={money} locale={locale} t={t} />
+
+          {accountHolderId && (
+            <LossCarryforwardEditor holderId={accountHolderId} currentYear={entry.year} />
+          )}
+
+          <Card className="overflow-hidden rounded-2xl">
+            <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 text-[15px] font-bold">
+                  <TrendingUp className="size-4" />
+                  {t("harvest.title")}
+                </h2>
+                <p className="mt-0.5 text-xs font-medium text-text-2">
+                  {hasForecast ? t("harvest.subtitle") : t("harvest.subtitleNoForecast")}
+                </p>
+              </div>
+              <span
+                className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#7C5CFC]"
+                style={{ backgroundColor: "rgba(124,92,252,.16)" }}
+              >
+                {entry.currency}
+              </span>
+            </div>
+
+            <div className="px-[22px] pb-1.5 pt-3.5">
+              <AllowanceSummaryBoxes
+                usedPct={usedPct}
+                allowanceAnnual={u.allowanceAnnual}
+                usedYtd={u.usedYtd}
+                remaining={u.remaining}
+                taxSavingAvailable={u.taxSavingAvailable}
+                taxable={taxable.toString()}
+                estimatedTax={estimatedTax.toString()}
+                money={money}
+                t={t}
               />
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      <CoverageCard allowanceUsage={u} money={money} locale={locale} t={t} />
+            {harvestSuggestions.length > 0 ? (
+              <>
+                <p className="px-[22px] pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                  {t("harvest.positionsEyebrow")}
+                </p>
+                <div>
+                  {harvestSuggestions.map((s) => (
+                    <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
+                  ))}
+                </div>
+                <HarvestSummaryNote
+                  suggestions={harvestSuggestions}
+                  combined={combinedHarvest}
+                  money={money}
+                  t={t}
+                />
+              </>
+            ) : (
+              <p className="px-[22px] pb-5 pt-1 text-sm text-muted-foreground">
+                {t("harvest.none")}
+              </p>
+            )}
+          </Card>
 
-      {accountHolderId && (
-        <LossCarryforwardEditor holderId={accountHolderId} currentYear={entry.year} />
-      )}
-
-      <Card className="overflow-hidden rounded-2xl">
-        <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-[15px] font-bold">
-              <TrendingUp className="size-4" />
-              {t("harvest.title")}
-            </h2>
-            <p className="mt-0.5 text-xs font-medium text-text-2">
-              {hasForecast ? t("harvest.subtitle") : t("harvest.subtitleNoForecast")}
-            </p>
-          </div>
-          <span
-            className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#7C5CFC]"
-            style={{ backgroundColor: "rgba(124,92,252,.16)" }}
-          >
-            {entry.currency}
-          </span>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("footnote", { rate: ratePct, allowance: money(u.allowanceAnnual) })}
+          </p>
         </div>
 
-        <div className="px-[22px] pb-1.5 pt-3.5">
-          <AllowanceSummaryBoxes
-            usedPct={usedPct}
-            allowanceAnnual={u.allowanceAnnual}
-            usedYtd={u.usedYtd}
-            remaining={u.remaining}
-            taxSavingAvailable={u.taxSavingAvailable}
-            taxable={taxable.toString()}
-            estimatedTax={estimatedTax.toString()}
-            money={money}
-            t={t}
+        {/* ── Sidebar: KPI stat cards (sticky on wide containers) ── */}
+        <div className="min-w-0 space-y-2.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last sm:space-y-4">
+          <StatCard
+            label={t("hero.fsaUsed")}
+            value={money(u.usedYtd)}
+            delta={t("hero.fsaUsedDesc", { allowance: money(u.allowanceAnnual) })}
+          />
+          <StatCard
+            label={t("hero.realizedGains")}
+            value={money(u.realizedGainsAdjusted)}
+            delta={t("hero.realizedGainsDesc", { count: 0 })}
+          />
+          <StatCard
+            label={t("hero.dividendsYtd")}
+            value={money(u.incomeYtd)}
+            delta={t("hero.dividendsYtdDesc", { allowance: money(u.allowanceAnnual) })}
+          />
+          <StatCard
+            label={t("taxSavingAvailable")}
+            value={money(u.taxSavingAvailable)}
+            delta={t("taxSavingAvailableDesc", { remaining: money(u.remaining) })}
           />
         </div>
-
-        {harvestSuggestions.length > 0 ? (
-          <>
-            <p className="px-[22px] pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-text-3">
-              {t("harvest.positionsEyebrow")}
-            </p>
-            <div>
-              {harvestSuggestions.map((s) => (
-                <HarvestRow key={s.instrumentId} s={s} money={money} t={t} />
-              ))}
-            </div>
-            <HarvestSummaryNote
-              suggestions={harvestSuggestions}
-              combined={combinedHarvest}
-              money={money}
-              t={t}
-            />
-          </>
-        ) : (
-          <p className="px-[22px] pb-5 pt-1 text-sm text-muted-foreground">{t("harvest.none")}</p>
-        )}
-      </Card>
-
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        {t("footnote", { rate: ratePct, allowance: money(u.allowanceAnnual) })}
-      </p>
+      </div>
     </>
   );
 }

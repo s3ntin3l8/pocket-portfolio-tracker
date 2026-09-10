@@ -81,7 +81,8 @@ describe("TaxReportsInbox", () => {
         { id: "p2", name: "Second", brokerage: null, accountHolder: null },
       ],
     });
-    expect(screen.getByText(messages.TaxReports.portfolioPicker)).toBeInTheDocument();
+    // Portfolio picker renders a dropdown trigger showing the selected portfolio name
+    expect(screen.getByText("Main")).toBeInTheDocument();
   });
 
   it("disables upload and shows guidance when there's no portfolio to upload into", () => {

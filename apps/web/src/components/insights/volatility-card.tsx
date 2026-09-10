@@ -32,8 +32,8 @@ export function VolatilityCard({ volatility }: { volatility: InsightsVolatility 
           </span>
         )}
       </div>
-      <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-        <Info className="mt-0.5 size-3.5 shrink-0" />
+      <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-[11px] text-muted-foreground">
+        <Info className="mt-0.5 size-3 shrink-0" />
         <span>{t("note")}</span>
       </div>
     </Card>

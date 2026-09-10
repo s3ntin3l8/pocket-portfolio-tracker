@@ -65,6 +65,7 @@ describe("AllocationCard", () => {
     render(
       withIntl(
         <AllocationCard
+          title="By asset class"
           slices={[
             { key: "equity", label: "Stocks", value: 700 },
             { key: "gold", label: "Gold", value: 300 },

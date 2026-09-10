@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AllocationDonut } from "./allocation-donut";
-import { TargetDialog, type TargetSlice } from "@/components/allocation/target-dialog";
 import { getDrillDownInstruments, type DrillDownDimension } from "@/lib/sector-drilldown";
 import type { AllocationBreakdown, DriftRow, HoldingValuation } from "@portfolio/api-client";
 
@@ -53,7 +52,6 @@ interface TabBodyProps {
   currency: string;
   total: number;
   drift?: Record<string, DriftRow[]>;
-  portfolioId?: string;
   onSliceClick?: (key: string) => void;
 }
 
@@ -64,15 +62,9 @@ function TabBody({
   currency,
   total,
   drift,
-  portfolioId,
   onSliceClick,
 }: TabBodyProps) {
   const dimDrift = drift?.[dimension];
-  const targetSlices: TargetSlice[] = slices.map((s) => ({
-    key: s.key,
-    label: s.label,
-    actualPct: s.actualPct,
-  }));
 
   return (
     <div>
@@ -89,14 +81,6 @@ function TabBody({
       {dimDrift && dimDrift.length > 0 && (
         <DriftHint drift={dimDrift} dimensionLabel={dimensionLabel} />
       )}
-      <div className="flex justify-end mt-2">
-        <TargetDialog
-          portfolioId={portfolioId}
-          dimension={dimension}
-          dimensionLabel={dimensionLabel}
-          slices={targetSlices}
-        />
-      </div>
     </div>
   );
 }
@@ -156,8 +140,7 @@ function DimensionDrillDown({
  * card header, supplied by the parent.
  *
  * When `drift` is provided (user has saved targets), each tab shows a compact
- * drift hint and a "Set targets" trigger button.
- * When `portfolioId` is provided, targets are portfolio-scoped; otherwise aggregate.
+ * drift hint.
  *
  * When `holdings` is provided, clicking a donut slice drills into a sub-donut
  * showing the instruments that contribute to that bucket.
@@ -166,13 +149,11 @@ export function AllocationTabs({
   allocation,
   currency,
   drift,
-  portfolioId,
   holdings,
 }: {
   allocation: AllocationBreakdown;
   currency: string;
   drift?: Record<string, DriftRow[]>;
-  portfolioId?: string;
   holdings?: HoldingValuation[];
 }) {
   const t = useTranslations("Dashboard");
@@ -260,7 +241,6 @@ export function AllocationTabs({
         currency={currency}
         total={total}
         drift={drift}
-        portfolioId={portfolioId}
         onSliceClick={holdings ? handleSliceClick(dimension) : undefined}
       />
     );
@@ -268,25 +248,13 @@ export function AllocationTabs({
 
   return (
     <Tabs defaultValue="class" onValueChange={handleTabChange}>
-      <TabsList className="mb-3 flex w-full">
-        <TabsTrigger value="class" className="flex-1">
-          {t("allocationTabClass")}
-        </TabsTrigger>
-        <TabsTrigger value="currency" className="flex-1">
-          {t("allocationTabCurrency")}
-        </TabsTrigger>
-        <TabsTrigger value="region" className="flex-1">
-          {t("allocationTabRegion")}
-        </TabsTrigger>
-        <TabsTrigger value="country" className="flex-1">
-          {t("allocationTabCountry")}
-        </TabsTrigger>
-        <TabsTrigger value="sector" className="flex-1">
-          {t("allocationTabSector")}
-        </TabsTrigger>
-        <TabsTrigger value="industry" className="flex-1">
-          {t("allocationTabIndustry")}
-        </TabsTrigger>
+      <TabsList className="mb-3 flex w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <TabsTrigger value="class">{t("allocationTabClass")}</TabsTrigger>
+        <TabsTrigger value="currency">{t("allocationTabCurrency")}</TabsTrigger>
+        <TabsTrigger value="region">{t("allocationTabRegion")}</TabsTrigger>
+        <TabsTrigger value="country">{t("allocationTabCountry")}</TabsTrigger>
+        <TabsTrigger value="sector">{t("allocationTabSector")}</TabsTrigger>
+        <TabsTrigger value="industry">{t("allocationTabIndustry")}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="class">
