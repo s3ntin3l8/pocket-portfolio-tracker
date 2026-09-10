@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.13](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.12...v0.1.13) (2026-09-10)
+
+
+### Features
+
+* **deploy:** pull prod images from GHCR; publish web image from CI ([#728](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/728)) ([bdf0015](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bdf0015c583a4f0d498689994d0b202067b5f2ac))
+* expand seed-demo data to cover 2020-2025 ([#727](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/727)) ([07d48ec](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/07d48ecf861a4cb929a5c318e3f299e2797b4062))
+
+
+### Bug Fixes
+
+* exclude bot-authored PRs by author, not actor; correct guard comment ([#722](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/722)) ([3ca4cf1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3ca4cf1d95f9af8667785084b1aa2ca8722c704f))
+* resolve remaining UI nits — key warning, centering, portfolio grid, admin heading, toggle layout ([#725](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/725)) ([4f0d709](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4f0d70920ab8a8ffbfd1355dac5f9862ede895c8))
+* resolve UI nits across settings, admin, insights, activity, reports, and tax ([#724](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/724)) ([febcb96](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/febcb96d11a825dc0c2a0f3002b50a641b1885ff))
+* **ui:** refine sidebar layouts, chart placement, and card styling across pages ([#726](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/726)) ([807dd76](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/807dd765734e325c380fba5bf8347fa5ad566785))
+* **ui:** standardize holdings sidebar, banners, and page headers ([#721](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/721)) ([0fb43cd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0fb43cd53267ac6ecff6710766d47202d2a6398e))
+
 ## [0.1.12](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.11...v0.1.12) (2026-09-09)
 
 
