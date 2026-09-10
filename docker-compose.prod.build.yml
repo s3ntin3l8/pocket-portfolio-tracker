@@ -5,16 +5,22 @@
 #
 # Loaded as a second `-f` file by the Makefile's `prod-build` target, so all other
 # configuration (networks, Traefik labels, env, volumes) still comes from
-# docker-compose.prod.yml. Compose merges services by name — the `build:` here
-# replaces the `image:` from the base file for matching services only.
+# docker-compose.prod.yml. Compose merges services by name — `build:` and `image:`
+# coexist after the merge (compose does not drop the base file's `image:`); the local
+# build result is simply tagged with that same GHCR name. `pull_policy: build` below
+# is what actually keeps this override from also doing a redundant registry pull
+# before building.
 #
 # NOT used by `make prod`. Keep this file in lockstep with the relevant pieces of
 # docker-compose.prod.yml if either Dockerfile path or build args change.
+name: pocket-portfolio-tracker
+
 services:
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    pull_policy: build
 
   web:
     build:
@@ -25,3 +31,4 @@ services:
       # comes from the repo's NEXT_PUBLIC_LOGODEV_TOKEN Actions variable.
       args:
         NEXT_PUBLIC_LOGODEV_TOKEN: ${NEXT_PUBLIC_LOGODEV_TOKEN:-}
+    pull_policy: build

@@ -39,6 +39,10 @@ services: ## Start local Postgres + MinIO (optional — dev defaults to PGlite +
 services-down: ## Stop local backing services
 	$(COMPOSE_DEV) down
 
+# Explicit `pull` surfaces registry/auth errors before we tear down the running stack.
+# `pull_policy: always` on both services means `up -d` alone would also pull, but doing
+# it here keeps "did we get the new image?" answerable from exit code without
+# inspecting recreated containers.
 prod: ## Pull images from GHCR and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
 	@if [ -z "$$($(COMPOSE_PROD) ps -aq 2>/dev/null)" ]; then \
 		echo "warning: no existing 'pocket-portfolio-tracker' project containers found."; \
@@ -47,10 +51,6 @@ prod: ## Pull images from GHCR and start the production stack (docker-compose.pr
 		echo "this creates a fresh stack with empty volumes. Ctrl-C within 5s to abort."; \
 		sleep 5; \
 	fi
-	# Explicit `pull` surfaces registry/auth errors before we tear down the running
-	# stack. `pull_policy: always` on both services means `up -d` alone would also
-	# pull, but doing it here keeps "did we get the new image?" answerable from
-	# exit code without inspecting recreated containers.
 	$(COMPOSE_PROD) pull
 	$(COMPOSE_PROD) up -d
 
