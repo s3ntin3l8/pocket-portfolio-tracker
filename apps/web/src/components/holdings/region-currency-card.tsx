@@ -12,14 +12,6 @@ interface Row {
   pct: number;
 }
 
-// Transcribed from `Pocket Prototype.dc.html`: section head 600 11px uppercase .04em
-// text-3 mb-12px; rows gap-10px, 9×9 2px-radius square swatch, label 600 13px,
-// pct 700 13px text-2. Rows flow into a responsive 1/2/3-column grid so a wide desktop
-// card fills its width instead of stacking every entry in one tall column (which left the
-// short currency list mostly empty and pushed the % far from its label). Breakpoints are
-// container-relative (`@sm`/`@lg`, not `sm`/`lg`) since this card lives in a fixed ~272px
-// sidebar on Holdings — at that width it resolves to a single full-width column, so a
-// label like "Indonesia" renders in full instead of the `truncate` below clipping it.
 function Section({ title, rows }: { title: string; rows: Row[] }) {
   return (
     <div className="min-w-0">
@@ -49,10 +41,12 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
 }
 
 /**
- * Always-visible "By region / By currency" allocation lists on Holdings — reads off the
- * same `AllocationBreakdown.byRegion` / `.byCurrency` dimensions `AllocationTabs` already
- * consumes for its Region/Currency tabs; no separate API call. The two sections stack
- * vertically, each spanning the full card width, so their rows can flow into columns.
+ * "By region / By currency" allocation lists on Holdings — reads off the same
+ * `AllocationBreakdown.byRegion` / `.byCurrency` dimensions the AllocationTabs
+ * already consumes for its Region/Currency tabs; no separate API call.
+ *
+ * Rendered outside the asset-class gate so these sections survive even when a
+ * portfolio holds only non-classified instruments (no `byAssetClass` slices).
  */
 export function RegionCurrencyCard({
   regionTitle,

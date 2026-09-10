@@ -363,43 +363,6 @@ export function TransactionsTable({
 
   return (
     <>
-      {/* ── Alerts: above the grid so they're DOM-first on mobile (single column)
-      and lead the main column above the controls on desktop. Previously these
-      lived at the top of the sidebar rail — alerts vs stat summaries were
-      visually mixed, and on mobile the stat summaries now render below them.
-      `data-testid` locks the mobile DOM order against regressions — the
-      AnomalyBanner + reconciliation banners MUST render before the stat
-      summaries, otherwise alerts lose their visual lead. */}
-      <div data-testid="transactions-alerts" className="mb-3 space-y-3">
-        {!bannerDismissed && (
-          <AnomalyBanner
-            anomalies={anomalies}
-            flaggedCount={flaggedCount}
-            showFlagged={showFlagged}
-            onToggleFlagged={() => setShowFlagged((v) => !v)}
-            onDismiss={() => setBannerDismissed(true)}
-          />
-        )}
-        {showFilterBanners &&
-          portfolioAnomalies
-            .filter(
-              (a) => !dismissedRecon.has(`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`),
-            )
-            .map((a) => {
-              const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
-              return (
-                <ReconciliationBanner
-                  key={key}
-                  title={ta("reconciliationTitle")}
-                  detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-                  tag={ta("portfolioTag")}
-                  dismissLabel={ta("dismiss")}
-                  onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(key))}
-                />
-              );
-            })}
-      </div>
-
       <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
         <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
@@ -427,8 +390,41 @@ export function TransactionsTable({
             )}
         </div>
 
-        {/* ── Main column: controls + table ── */}
-        <div className="space-y-3">
+        {/* ── Main column: alerts + controls + table ── */}
+        {/* On mobile, order-first ensures alerts render above the sidebar's stat banners
+        (the sidebar is DOM-first but has no mobile order override). On @xl+, the grid
+        places the main column left and the sidebar right via @xl:order-last, so the
+        order utility has no effect. */}
+        <div className="space-y-3 max-md:order-first">
+          <div data-testid="transactions-alerts" className="space-y-3">
+            {!bannerDismissed && (
+              <AnomalyBanner
+                anomalies={anomalies}
+                flaggedCount={flaggedCount}
+                showFlagged={showFlagged}
+                onToggleFlagged={() => setShowFlagged((v) => !v)}
+                onDismiss={() => setBannerDismissed(true)}
+              />
+            )}
+            {showFilterBanners &&
+              portfolioAnomalies
+                .filter(
+                  (a) => !dismissedRecon.has(`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`),
+                )
+                .map((a) => {
+                  const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
+                  return (
+                    <ReconciliationBanner
+                      key={key}
+                      title={ta("reconciliationTitle")}
+                      detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
+                      tag={ta("portfolioTag")}
+                      dismissLabel={ta("dismiss")}
+                      onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(key))}
+                    />
+                  );
+                })}
+          </div>
           <FilterBar
             typeFilter={typeFilter}
             showFlagged={showFlagged}

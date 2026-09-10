@@ -404,7 +404,6 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
       <header className="space-y-1">
         <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </header>
 
       {cards.length > 0 ? (

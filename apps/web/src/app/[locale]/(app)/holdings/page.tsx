@@ -7,12 +7,14 @@ import { ExportCsvButton } from "@/components/export-csv-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
-import { AllocationCard, type Tone } from "@/components/holdings/allocation-card";
+import { AllocationCard } from "@/components/holdings/allocation-card";
+import { PortfolioValueCard, type Tone } from "@/components/holdings/portfolio-value-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { PositionsPanel } from "@/components/holdings/positions-panel";
 import {
   loadHoldings,
   loadAnomalies,
+  loadNetworthAnomalies,
   loadNetWorth,
   loadNetWorthHistory,
   loadPreferences,
@@ -80,7 +82,10 @@ export default async function HoldingsPage({
   // in parallel with loadPreferences; only the two that do (loadHoldings, loadNetWorth)
   // wait on it.
   const prefsPromise = loadPreferences();
-  const anomaliesPromise = loadAnomalies(portfolioParam);
+  // Use the aggregate net-worth anomaly endpoint when no single portfolio is
+  // selected — matches how Activity/Transactions loads anomalies for the
+  // all-portfolios view. Per-portfolio anomalies only work with a specific ID.
+  const anomaliesPromise = portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies();
   const historyPromise = loadNetWorthHistory(HERO_INITIAL_RANGE);
   const selectedIdPromise = getSelectedPortfolioId();
   const mePromise = loadMe();
@@ -327,9 +332,50 @@ export default async function HoldingsPage({
           />
         </div>
 
-        {/* ── Sidebar: allocation + region/currency (sticky on wide containers) ── */}
+        {/* ── Sidebar: value stats + allocation donut (sticky on wide containers) ── */}
         {allocation && (
           <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+            <PortfolioValueCard
+              totalLabel={t("allocation.totalLabel")}
+              totalValueFormatted={formatMoney(
+                Number(summary.netWorth),
+                summary.displayCurrency,
+                locale,
+              )}
+              allTimeLabel={t("allocation.allTimeLabel")}
+              allTimeAmount={formatSignedMoney(
+                Number(summary.totalUnrealizedPnL),
+                summary.displayCurrency,
+                locale,
+              )}
+              allTimePct={
+                Number(summary.totalCost) > 0
+                  ? formatPercent(
+                      Number(summary.totalUnrealizedPnL) / Number(summary.totalCost),
+                      locale,
+                    )
+                  : null
+              }
+              allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
+              todayLabel={t("allocation.todayLabel")}
+              todayAmount={formatSignedMoney(
+                Number(summary.totalDayChange),
+                summary.displayCurrency,
+                locale,
+              )}
+              todayPct={(() => {
+                // Day-change %: the day's move over the prior close's book value. Securities
+                // that lack a previous close contribute nothing to either totalDayChange or
+                // (via a null/0 market value) totalMarketValue, so `market − change` is the
+                // priced book's opening base. Guard a non-positive base.
+                const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
+                return base > 0
+                  ? formatPercent(Number(summary.totalDayChange) / base, locale)
+                  : null;
+              })()}
+              todayTone={toneOf(Number(summary.totalDayChange))}
+            />
+
             {allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
               <AllocationCard
                 slices={allocation.byAssetClass
@@ -341,44 +387,6 @@ export default async function HoldingsPage({
                   }))}
                 currency={summary.displayCurrency}
                 total={Number(summary.netWorth)}
-                totalLabel={t("allocation.totalLabel")}
-                totalValueFormatted={formatMoney(
-                  Number(summary.netWorth),
-                  summary.displayCurrency,
-                  locale,
-                )}
-                allTimeLabel={t("allocation.allTimeLabel")}
-                allTimeAmount={formatSignedMoney(
-                  Number(summary.totalUnrealizedPnL),
-                  summary.displayCurrency,
-                  locale,
-                )}
-                allTimePct={
-                  Number(summary.totalCost) > 0
-                    ? formatPercent(
-                        Number(summary.totalUnrealizedPnL) / Number(summary.totalCost),
-                        locale,
-                      )
-                    : null
-                }
-                allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
-                todayLabel={t("allocation.todayLabel")}
-                todayAmount={formatSignedMoney(
-                  Number(summary.totalDayChange),
-                  summary.displayCurrency,
-                  locale,
-                )}
-                todayPct={(() => {
-                  // Day-change %: the day's move over the prior close's book value. Securities
-                  // that lack a previous close contribute nothing to either totalDayChange or
-                  // (via a null/0 market value) totalMarketValue, so `market − change` is the
-                  // priced book's opening base. Guard a non-positive base.
-                  const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
-                  return base > 0
-                    ? formatPercent(Number(summary.totalDayChange) / base, locale)
-                    : null;
-                })()}
-                todayTone={toneOf(Number(summary.totalDayChange))}
               />
             )}
 

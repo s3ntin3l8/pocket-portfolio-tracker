@@ -70,7 +70,6 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <header className="space-y-1">
           <PageHeaderSetter title={t("title")} />
           <PageTitle>{t("title")}</PageTitle>
-          <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         </header>
         <EmptyState
           icon={Scale}
@@ -113,7 +112,6 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
       <header className="space-y-1">
         <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">

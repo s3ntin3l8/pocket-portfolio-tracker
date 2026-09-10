@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { AllocationCard } from "../src/components/holdings/allocation-card";
+import { PortfolioValueCard } from "../src/components/holdings/portfolio-value-card";
 import { RegionCurrencyCard } from "../src/components/holdings/region-currency-card";
 
 function withIntl(children: React.ReactNode) {
@@ -13,17 +14,11 @@ function withIntl(children: React.ReactNode) {
   );
 }
 
-describe("AllocationCard", () => {
-  it("renders the title and the desktop-only totals column", () => {
+describe("PortfolioValueCard", () => {
+  it("renders total value, all-time and today stats", () => {
     render(
       withIntl(
-        <AllocationCard
-          slices={[
-            { key: "equity", label: "Stocks", value: 700 },
-            { key: "gold", label: "Gold", value: 300 },
-          ]}
-          currency="IDR"
-          total={1000}
+        <PortfolioValueCard
           totalLabel="Total value"
           totalValueFormatted="Rp 1.000.000"
           allTimeLabel="All-time"
@@ -39,7 +34,6 @@ describe("AllocationCard", () => {
     );
     expect(screen.getByText("Total value")).toBeInTheDocument();
     expect(screen.getByText("Rp 1.000.000")).toBeInTheDocument();
-    // Both performance columns render their EUR amount over their % gain.
     expect(screen.getByText("+Rp 120.000")).toBeInTheDocument();
     expect(screen.getByText("+12.0%")).toBeInTheDocument();
     expect(screen.getByText("+Rp 5.000")).toBeInTheDocument();
@@ -49,10 +43,7 @@ describe("AllocationCard", () => {
   it("omits the % line when a percent is null but still shows the amount", () => {
     render(
       withIntl(
-        <AllocationCard
-          slices={[{ key: "equity", label: "Stocks", value: 1 }]}
-          currency="IDR"
-          total={1}
+        <PortfolioValueCard
           totalLabel="Total value"
           totalValueFormatted="Rp 1"
           allTimeLabel="All-time"
@@ -64,14 +55,32 @@ describe("AllocationCard", () => {
         />,
       ),
     );
-    // Amount still renders; the null percent simply omits its line (no "—" placeholder).
     expect(screen.getAllByText("Rp 0").length).toBeGreaterThan(0);
     expect(screen.queryByText("%")).toBeNull();
   });
 });
 
+describe("AllocationCard", () => {
+  it("renders the donut legend items", () => {
+    render(
+      withIntl(
+        <AllocationCard
+          slices={[
+            { key: "equity", label: "Stocks", value: 700 },
+            { key: "gold", label: "Gold", value: 300 },
+          ]}
+          currency="IDR"
+          total={1000}
+        />,
+      ),
+    );
+    expect(screen.getByText("Stocks")).toBeInTheDocument();
+    expect(screen.getByText("Gold")).toBeInTheDocument();
+  });
+});
+
 describe("RegionCurrencyCard", () => {
-  it("renders both columns with their rows", () => {
+  it("renders both sections with their rows", () => {
     render(
       <RegionCurrencyCard
         regionTitle="By region"

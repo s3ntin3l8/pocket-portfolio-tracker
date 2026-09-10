@@ -30,6 +30,7 @@ export function HeroOverlayChart({ points }: { points: HeroOverlayPoint[] }) {
             strokeWidth={1.8}
             strokeDasharray="5 3"
             dot={false}
+            connectNulls
             isAnimationActive={false}
           />
           <Line
