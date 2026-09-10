@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminStats } from "@/components/admin-stats";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { loadMe, loadAdminStats } from "@/lib/server-api";
 
 export default async function AdminDatabasePage({
@@ -20,6 +21,7 @@ export default async function AdminDatabasePage({
 
   return (
     <>
+      <PageHeaderSetter title={t("stats")} backHref="/admin" />
       <SectionHeader title={t("stats")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("statsHint")}</p>
       {result.status === "ok" ? (

@@ -128,38 +128,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
       </div>
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
-        {/* ── Main column: detailed analysis ── */}
-        <div className="space-y-5">
-          <RebalancingCard
-            portfolioId={selectedId ?? undefined}
-            slices={assetClassSlices}
-            drift={summary.drift?.asset_class}
-          />
-
-          {allocation && (
-            <CompositionCard
-              allocation={allocation}
-              currency={summary.displayCurrency}
-              holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
-            />
-          )}
-
-          {insightsData && insightsData.yearlyReturns.length > 0 && (
-            <YearlyReturnsCard
-              rows={insightsData.yearlyReturns}
-              symbols={prefs?.benchmarkSymbols ?? []}
-              currency={summary.displayCurrency}
-              locale={locale}
-            />
-          )}
-
-          {insightsData && insightsData.concentrationTrend.length > 0 && (
-            <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
-          )}
-        </div>
-
-        {/* ── Sidebar: overview metrics (sticky on wide containers) ── */}
-        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+        {/* ── Sidebar: overview metrics. DOM-first so overview metrics render near
+        the top on mobile (matching the pre-sidebar position after the XIRR hero);
+        @xl:order-last visually moves it right on desktop. Overflow capped so the
+        rail doesn't eat the entire viewport when stacked deep. ── */}
+        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
           {allocation && (
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card p-4 shadow-card">
@@ -245,6 +218,36 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                 locale={locale}
               />
             </>
+          )}
+        </div>
+
+        {/* ── Main column: detailed analysis ── */}
+        <div className="space-y-5">
+          <RebalancingCard
+            portfolioId={selectedId ?? undefined}
+            slices={assetClassSlices}
+            drift={summary.drift?.asset_class}
+          />
+
+          {allocation && (
+            <CompositionCard
+              allocation={allocation}
+              currency={summary.displayCurrency}
+              holdings={holdingsView.status === "ok" ? holdingsView.holdings : undefined}
+            />
+          )}
+
+          {insightsData && insightsData.yearlyReturns.length > 0 && (
+            <YearlyReturnsCard
+              rows={insightsData.yearlyReturns}
+              symbols={prefs?.benchmarkSymbols ?? []}
+              currency={summary.displayCurrency}
+              locale={locale}
+            />
+          )}
+
+          {insightsData && insightsData.concentrationTrend.length > 0 && (
+            <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
           )}
         </div>
       </div>

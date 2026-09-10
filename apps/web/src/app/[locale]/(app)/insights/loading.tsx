@@ -39,7 +39,7 @@ export default function Loading() {
           </Card>
         </div>
 
-        <div className="space-y-3.5">
+        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <Card className="rounded-2xl">
               <div className="space-y-2 p-4">

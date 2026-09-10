@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminVisionProviders } from "@/components/admin-vision-providers";
 import { SectionHeader } from "@/components/section-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import { loadMe, loadAdminVisionProviders } from "@/lib/server-api";
 
 export default async function AdminVisionPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -16,6 +17,7 @@ export default async function AdminVisionPage({ params }: { params: Promise<{ lo
 
   return (
     <>
+      <PageHeaderSetter title={t("visionProviders")} backHref="/admin" />
       <SectionHeader title={t("visionProviders")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("visionProvidersHint")}</p>
       {result.status === "ok" ? (
