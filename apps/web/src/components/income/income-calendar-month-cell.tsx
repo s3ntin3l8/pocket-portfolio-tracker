@@ -70,7 +70,7 @@ function MonthLogo({
     <button
       type="button"
       {...listeners}
-      aria-label={`${label} — ${payments.length} ${payments.length === 1 ? "payment" : "payments"}`}
+      aria-label={`${label} — ${t("calendarDayEvents", { count: payments.length })}`}
       className={cn(
         "inline-flex cursor-pointer items-center justify-center rounded-md bg-muted transition-opacity",
         "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",

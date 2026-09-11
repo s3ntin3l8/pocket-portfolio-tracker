@@ -154,10 +154,12 @@ describe("IncomeCalendar", () => {
     expect(second.classList.contains("border-line")).toBe(true);
   });
 
-  it("renders the gradient fade overlay", () => {
+  it("conditionally renders the gradient fade overlay only when the strip overflows", () => {
     wrap(UPCOMING);
+    // In jsdom the strip doesn't actually overflow (all 12 month columns fit),
+    // so the gradient fade should NOT be rendered.
     const gradient = document.querySelector(".bg-gradient-to-l.from-card");
-    expect(gradient).toBeTruthy();
+    expect(gradient).toBeNull();
   });
 
   it("tooltip shows instrument symbol, formatted date, status, and amount on hover", () => {

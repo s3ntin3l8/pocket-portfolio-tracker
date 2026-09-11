@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations, useLocale } from "next-intl";
 import type { UpcomingPayment } from "@portfolio/api-client";
@@ -25,20 +25,20 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
   const locale = useLocale();
   const tip = useChartTooltip<CalendarTooltipContent>();
 
-  const months = useMemo<MonthBucket[]>(() => {
+  const { months, droppedCount } = useMemo<{ months: MonthBucket[]; droppedCount: number }>(() => {
     const now = new Date();
     const currentYear = now.getUTCFullYear();
     const currentMonth = now.getUTCMonth();
     const monthFmt = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
 
     // Build 12 rolling buckets.
-    const buckets: MonthBucket[] = [];
+    const months: MonthBucket[] = [];
     for (let i = 0; i < 12; i++) {
       const d = new Date(Date.UTC(currentYear, currentMonth + i, 1));
       const year = d.getUTCFullYear();
       const monthIdx = d.getUTCMonth();
       const key = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
-      buckets.push({
+      months.push({
         key,
         label: monthFmt.format(d),
         year,
@@ -48,17 +48,21 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
     }
 
     // Dispatch upcoming payments into their matching bucket, grouped by instrument.
+    let droppedCount = 0;
     for (const p of upcoming) {
       const [y, m] = p.date.split("-").map(Number);
       const key = `${y}-${String(m).padStart(2, "0")}`;
-      const bucket = buckets.find((b) => b.key === key);
-      if (!bucket) continue;
+      const bucket = months.find((b) => b.key === key);
+      if (!bucket) {
+        droppedCount++;
+        continue;
+      }
       const existing = bucket.payments.get(p.instrumentId) ?? [];
       existing.push(p);
       bucket.payments.set(p.instrumentId, existing);
     }
 
-    return buckets;
+    return { months, droppedCount };
   }, [upcoming, locale]);
 
   // Year range label — e.g. "2026–2027" when the strip crosses a year boundary.
@@ -68,6 +72,24 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
     const last = months[months.length - 1].year;
     return first === last ? String(first) : `${first}–${last}`;
   }, [months]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+
+  const checkOverflow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setHasOverflow(el.scrollWidth > el.clientWidth + 1);
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [checkOverflow, upcoming]);
 
   return (
     <div className="rounded-2xl bg-card p-[22px] shadow-card">
@@ -79,22 +101,30 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
       {/* ── 12-month horizontal strip ── */}
       <div className="relative">
         {/* Gradient fade on the right edge — hints at scrollable overflow.
-            pointer-events-none so it doesn't intercept clicks/scrolls. */}
-        <div
-          className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-8
-                     bg-gradient-to-l from-card to-transparent"
-          aria-hidden
-        />
-        <div className="flex overflow-x-auto scrollbar-none">
+            pointer-events-none so it doesn't intercept clicks/scrolls.
+            Only rendered when the strip actually overflows. */}
+        {hasOverflow && (
+          <div
+            className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-8
+                       bg-gradient-to-l from-card to-transparent"
+            aria-hidden
+          />
+        )}
+        <div ref={scrollRef} className="flex overflow-x-auto scrollbar-none">
           {months.map((m, i) => (
             <IncomeCalendarMonthCell key={m.key} month={m} monthIdx={i} locale={locale} tip={tip} />
           ))}
         </div>
       </div>
 
-      {/* ── Footer: year range ── */}
+      {/* ── Footer: year range + truncation hint ── */}
       <div className="mt-2.5 text-[10px] font-semibold text-text-2">
         <span className="tabular">{yearRange}</span>
+        {droppedCount > 0 && (
+          <span className="ml-2 text-text-mute">
+            {t("calendarMoreAfter", { count: droppedCount })}
+          </span>
+        )}
       </div>
 
       {/* ── Tooltip portal ── */}

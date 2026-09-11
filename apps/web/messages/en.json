@@ -517,7 +517,9 @@
     "calendarLegendProjected": "Projected",
     "calendarLegendGrown": "Projected +",
     "calendarLegendAnnounced": "Announced",
-    "calendarLegendPaid": "Paid"
+    "calendarLegendPaid": "Paid",
+    "calendarDayEvents": "{count, plural, one {# payment} other {# payments}}",
+    "calendarMoreAfter": "+{count} more after this window"
   },
   "Savings": {
     "title": "Savings",
