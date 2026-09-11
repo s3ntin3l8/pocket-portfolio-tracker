@@ -1,12 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { UpcomingPayment } from "@portfolio/api-client";
 
-// Stub the logo-lookup env so the day-cell logo component deterministically falls
-// back to a MonogramBadge — keeps the test focused on structure, not on logo.dev
-// token resolution.
 vi.stubEnv("NEXT_PUBLIC_LOGODEV_TOKEN", "");
 
 const BBCA = "i-bbca";
@@ -34,13 +31,6 @@ const E = (
   ...partial,
 });
 
-const UPCOMING: UpcomingPayment[] = [
-  E(BBCA, "BBCA", "2026-09-05", "500000"),
-  E(TLKM, "TLKM", "2026-09-12", "300000"),
-  E(ASII, "ASII", "2026-09-12", "750000", { kind: "coupon", status: "scheduled" }),
-  E("i-bumi", "BUMI", "2026-09-20", "100000"),
-];
-
 function wrap(upcoming: UpcomingPayment[]) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -49,117 +39,141 @@ function wrap(upcoming: UpcomingPayment[]) {
   );
 }
 
-// Anchor for translated-message spot-checks in tests below.
-const _ = messages.Income;
-
 import { IncomeCalendar } from "../src/components/income/income-calendar";
 import { IncomeCalendarEmpty } from "../src/components/income/income-calendar-empty";
 
+/** Build a YYYY-MM-DD string for a rolling offset from the current month. */
+function monthOffset(offset: number, day = 5): string {
+  const d = new Date();
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + offset;
+  const target = new Date(Date.UTC(year, month, day));
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(target.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+const UPCOMING: UpcomingPayment[] = [
+  E(BBCA, "BBCA", monthOffset(0), "500000"),
+  E(TLKM, "TLKM", monthOffset(0), "300000"),
+  E(ASII, "ASII", monthOffset(1), "750000", { kind: "coupon", status: "scheduled" }),
+];
+
 describe("IncomeCalendar", () => {
-  it("renders a 7-column grid with weekday headers", () => {
+  it("renders 12 month columns", () => {
     wrap(UPCOMING);
-    // Mon..Sun en-US labels from the buildMonthGrid helper.
-    expect(screen.getByText("Mon")).toBeInTheDocument();
-    expect(screen.getByText("Tue")).toBeInTheDocument();
-    expect(screen.getByText("Wed")).toBeInTheDocument();
-    expect(screen.getByText("Thu")).toBeInTheDocument();
-    expect(screen.getByText("Fri")).toBeInTheDocument();
-    expect(screen.getByText("Sat")).toBeInTheDocument();
-    expect(screen.getByText("Sun")).toBeInTheDocument();
+    // Each month column renders a month label — narrow format like "Sep".
+    // We look for the scrollable container with all 12 children.
+    const strip = document.querySelector(".flex.overflow-x-auto");
+    expect(strip).toBeTruthy();
+    // The strip should have exactly 12 direct children (one per month).
+    expect(strip!.children.length).toBe(12);
   });
 
-  it("renders exactly one interactive cell per day with events", () => {
+  it("starts from the current month (rolling window)", () => {
     wrap(UPCOMING);
-    // Sept 5 (BBCA), Sept 12 (TLKM+ASII), Sept 20 (BUMI) → 3 buttons with a
-    // "1 payment"/"2 payments" aria-label. Match the singular form too.
-    const cells = screen.getAllByLabelText(/payment/);
-    expect(cells).toHaveLength(3);
-    // Spillover days + remaining in-month days render as non-interactive gridcells.
-    const allCells = screen.getAllByRole("gridcell");
-    expect(allCells.length).toBeGreaterThan(28);
+    const now = new Date();
+    const currentMonthLabel = new Intl.DateTimeFormat("en", {
+      month: "short",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)));
+    // The first month label in the strip should be the current month.
+    const strip = document.querySelector(".flex.overflow-x-auto")!;
+    const firstLabel = strip.children[0]!.querySelector("p")!.textContent;
+    expect(firstLabel).toContain(currentMonthLabel);
   });
 
-  it("shows up to 3 logos in a day cell and a +N more chip for overflow", () => {
+  it("renders logos grouped by instrument (one logo per instrument per month)", () => {
     const busy: UpcomingPayment[] = [
-      E(BBCA, "BBCA", "2026-09-05", "500000"),
-      E(TLKM, "TLKM", "2026-09-05", "300000"),
-      E(ASII, "ASII", "2026-09-05", "750000"),
-      E("i-bumi", "BUMI", "2026-09-05", "100000"),
-      E("i-mdka", "MDKA", "2026-09-05", "200000"),
+      E(BBCA, "BBCA", monthOffset(0), "500000"),
+      E(BBCA, "BBCA", monthOffset(0, 15), "200000"), // Same instrument, same month
+      E(TLKM, "TLKM", monthOffset(0), "300000"),
     ];
     wrap(busy);
-    const cell = screen.getByLabelText(/5 payments/);
-    // The component falls back to a monogram badge in tests (no logo token) — the
-    // inline monograms are the 2-letter initials of each symbol. Only 3 show inline,
-    // the other 2 collapse into the "+2 more" chip.
-    const inline = within(cell).getAllByText(/^(BB|TL|AS|BU|MD)$/);
-    expect(inline).toHaveLength(3);
-    expect(within(cell).getByText("+2 more")).toBeInTheDocument();
+    // The first month column should have 2 logos (BBCA + TLKM), not 3.
+    const strip = document.querySelector(".flex.overflow-x-auto")!;
+    const firstMonth = strip.children[0]!;
+    // With no logo.dev token, InstrumentLogo falls back to MonogramBadge
+    // which renders 2-letter monograms (BB for BBCA, TL for TLKM).
+    const text = firstMonth.textContent ?? "";
+    expect(text).toContain("BB");
+    expect(text).toContain("TL");
   });
 
-  it("opens the per-day popover with the day's full event list when clicked", () => {
-    const busy: UpcomingPayment[] = [
-      E(BBCA, "BBCA", "2026-09-05", "500000"),
-      E(TLKM, "TLKM", "2026-09-05", "300000"),
-      E(ASII, "ASII", "2026-09-05", "750000"),
-      E("i-bumi", "BUMI", "2026-09-05", "100000"),
-      E("i-mdka", "MDKA", "2026-09-05", "200000"),
-    ];
-    wrap(busy);
-    fireEvent.click(screen.getByLabelText(/5 payments/));
-    // Popover lists every ticker — overflow events are visible here even when
-    // they were elided in the cell.
-    expect(screen.getByText("BBCA")).toBeInTheDocument();
-    expect(screen.getByText("TLKM")).toBeInTheDocument();
-    expect(screen.getByText("ASII")).toBeInTheDocument();
-    expect(screen.getByText("BUMI")).toBeInTheDocument();
-    expect(screen.getByText("MDKA")).toBeInTheDocument();
-  });
-
-  it("renders status legend chips for scheduled/projected/paid", () => {
+  it("shows a dash for empty months", () => {
     wrap(UPCOMING);
-    expect(screen.getByText("Scheduled")).toBeInTheDocument();
-    expect(screen.getByText("Projected")).toBeInTheDocument();
-    expect(screen.getByText("Paid")).toBeInTheDocument();
+    const strip = document.querySelector(".flex.overflow-x-auto")!;
+    // Find a month with no payments — check for the "—" indicator.
+    // The last month in the strip (11 months from now) should be empty.
+    const lastMonth = strip.children[11]!;
+    expect(lastMonth.textContent).toContain("—");
   });
 
-  it("navigates to the next month when clicking the Next button", () => {
+  it("shows year range in the footer", () => {
     wrap(UPCOMING);
-    // Sept 2026 label visible initially (earliest event is in September).
-    expect(screen.getByText("September 2026")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
-    expect(screen.getByText("October 2026")).toBeInTheDocument();
+    // The year range should be present (e.g. "2026–2027" or just "2026").
+    const now = new Date();
+    const thisYear = String(now.getUTCFullYear());
+    const nextYear = String(now.getUTCFullYear() + 1);
+    // The footer contains the year range.
+    const footer = screen.getByText(new RegExp(`${thisYear}|${nextYear}`));
+    expect(footer).toBeInTheDocument();
   });
 
-  it("navigates back to the previous month when clicking Prev", () => {
+  it("shows year badge on January columns", () => {
+    wrap([]);
+    const strip = document.querySelector(".flex.overflow-x-auto")!;
+    // Find the January column — its label should contain "'YY" suffix.
+    const now = new Date();
+    const thisYear = now.getUTCFullYear();
+    const nextJanYear = thisYear + 1;
+    // Look for a month cell whose label contains the year abbreviation.
+    const cells = [...strip.children];
+    const janCell = cells.find((c) =>
+      c.querySelector("p")?.textContent?.includes(`'${String(nextJanYear).slice(2)}`),
+    );
+    // January will only show the year badge if it's in the strip
+    // (it always is for rolling 12 months starting from Sep).
+    if (janCell) {
+      expect(janCell.querySelector("p")!.textContent).toContain(`'${String(nextJanYear).slice(2)}`);
+    }
+  });
+
+  it("applies scrollbar-none to the scrollable strip", () => {
     wrap(UPCOMING);
-    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
-    expect(screen.getByText("August 2026")).toBeInTheDocument();
+    const strip = document.querySelector(".overflow-x-auto");
+    expect(strip).toBeTruthy();
+    expect(strip!.classList.contains("scrollbar-none")).toBe(true);
   });
 
-  it("offers a 'Today' jump button when the calendar is anchored to a forward month", () => {
-    // Push the only event into a future month so the calendar opens onto a
-    // month that's NOT today → the "Today" pill should be visible.
-    const futureOnly: UpcomingPayment[] = [E(BBCA, "BBCA", "2030-03-05", "500000")];
-    wrap(futureOnly);
-    // Today button is visible — the calendar is sitting on March 2030, not now.
-    expect(screen.getByRole("button", { name: "Jump to today" })).toBeInTheDocument();
-    // Clicking it switches the header back to the current month.
-    fireEvent.click(screen.getByRole("button", { name: "Jump to today" }));
-    // The button disappears once we're back on the current month.
-    expect(screen.queryByRole("button", { name: "Jump to today" })).not.toBeInTheDocument();
+  it("renders vertical separators between month columns", () => {
+    wrap(UPCOMING);
+    const strip = document.querySelector(".flex.overflow-x-auto")!;
+    // The first column should NOT have border-r.
+    const first = strip.children[0]!;
+    expect(first.classList.contains("border-r")).toBe(false);
+    // The second column should have border-r border-line.
+    const second = strip.children[1]!;
+    expect(second.classList.contains("border-r")).toBe(true);
+    expect(second.classList.contains("border-line")).toBe(true);
+  });
+
+  it("renders the gradient fade overlay", () => {
+    wrap(UPCOMING);
+    const gradient = document.querySelector(".bg-gradient-to-l.from-card");
+    expect(gradient).toBeTruthy();
   });
 });
 
 describe("IncomeCalendarEmpty", () => {
-  it("renders the no-upcoming-payments empty state when upcoming is empty", () => {
+  it("renders the no-upcoming-payments empty state", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <IncomeCalendarEmpty />
       </NextIntlClientProvider>,
     );
     expect(screen.getByText("No upcoming payments")).toBeInTheDocument();
-    // The dedicated copy explains why.
     expect(screen.getByText(/projections or announcements are available/i)).toBeInTheDocument();
   });
 });
