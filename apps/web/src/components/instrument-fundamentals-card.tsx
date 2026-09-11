@@ -81,7 +81,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
         <CardHeader>
           <CardTitle>{t("fundamentalsTitle")}</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
+        <CardContent className="@container grid grid-cols-2 gap-2.5 sm:gap-4 @md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[74px]" />
           ))}
@@ -195,7 +195,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
       </CardHeader>
       <CardContent className="space-y-5">
         {stats.length > 0 && (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
+          <div className="@container grid grid-cols-2 gap-2.5 sm:gap-4 @md:grid-cols-4">
             {stats.map((s) => (
               <StatCard key={s.label} label={s.label} value={s.value} />
             ))}

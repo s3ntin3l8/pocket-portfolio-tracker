@@ -168,6 +168,11 @@ export default async function InstrumentPage({
 
   const { instrument, history, corporateActions } = data;
 
+  // Prefer the provider-enriched presentation name (`Apple Inc.`) over the raw
+  // broker/import `name` (which can be a description or just the ticker). The hero + the
+  // desktop topbar both render this string, so it must be the user-facing form.
+  const heroName = instrument.displayName ?? instrument.name;
+
   // Your position in this instrument (null / zero-quantity = not held in the active scope).
   const holding = scope.holding;
   const hasPosition = holding !== null && Number(holding.quantity) !== 0;
@@ -196,7 +201,7 @@ export default async function InstrumentPage({
 
   return (
     <div className="space-y-6">
-      <PageHeaderSetter title={instrument.name} backHref="/holdings" />
+      <PageHeaderSetter title={heroName} backHref="/holdings" />
       <div className="flex items-start gap-3">
         {back}
         {/* Instrument hero: logo chip + name as the primary heading, symbol + asset class +
@@ -211,7 +216,7 @@ export default async function InstrumentPage({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <PageTitle className="truncate">{instrument.name}</PageTitle>
+            <PageTitle className="truncate">{heroName}</PageTitle>
             {isAdmin && (
               <InstrumentEditDialog instrument={instrument}>
                 <Button variant="ghost" size="icon" aria-label={t("edit")}>
@@ -263,7 +268,7 @@ export default async function InstrumentPage({
             <InstrumentFundamentalsCard instrumentId={id} />
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
             {lots.length > 0 && (
               <Card>
                 <CardHeader>
@@ -375,7 +380,7 @@ export default async function InstrumentPage({
         </div>
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
-        <div className="space-y-6 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+        <div className="space-y-6 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto @xl:order-last">
           <Card>
             <CardHeader>
               <CardTitle>{t("position")}</CardTitle>

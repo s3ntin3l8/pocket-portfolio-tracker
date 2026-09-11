@@ -614,6 +614,10 @@ export interface Instrument {
   unit: string;
   currency: string;
   name: string;
+  /** Provider-enriched presentation name (e.g. "Apple Inc."); null until resolved by the
+   *  sector-enrichment job. When present, prefer `displayName ?? name` for any user-facing
+   *  label — `name` is the raw broker/import string and may not be human-readable. */
+  displayName?: string | null;
   /** Bond-specific fields (null for non-bonds) — already present on the API row,
    *  surfaced here for the instrument detail page's "upcoming income" line. */
   couponRate?: string | null;
