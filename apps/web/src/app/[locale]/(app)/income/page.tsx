@@ -245,6 +245,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
               label={t("payments")}
               value={String(s.paymentCount)}
               delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
+              className="col-span-2 @xl:col-span-1"
             />
           </div>
 
