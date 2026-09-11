@@ -26,7 +26,9 @@ export function StatCard({
     <Card className={className}>
       <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
         <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{label}</p>
-        <p className="tabular mt-1 text-[15px] font-extrabold sm:text-xl lg:text-[26px]">{value}</p>
+        <p className="tabular mt-1 truncate min-w-0 text-[15px] font-extrabold sm:text-xl lg:text-[26px]">
+          {value}
+        </p>
         {delta && (
           <p
             className={cn(

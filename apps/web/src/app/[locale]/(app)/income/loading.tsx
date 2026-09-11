@@ -54,7 +54,7 @@ export default function Loading() {
             </div>
           </Card>
         </div>
-        <div className="grid grid-cols-1 space-y-2.5 sm:space-y-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @xl:grid-cols-1">
           <Card>
             <div className="space-y-2 p-6">
               <Skeleton className="h-3 w-2/3" />

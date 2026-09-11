@@ -36,8 +36,8 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
 
   return (
     <>
-      {/* Desktop: 5-column table. CSS hides it below `md`. */}
-      <div className="hidden md:block">
+      {/* Desktop: 5-column table. CSS hides it below the Card's container `md` query. */}
+      <div className="hidden @md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -132,7 +132,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
       {/* Mobile: compact card list — no badge, instrument + yield% on line 1,
           trailing/value/YoC inline on line 2. The same sorted array feeds this
           view, so changing sort on desktop re-orders the mobile cards too. */}
-      <div className="md:hidden">
+      <div className="@md:hidden">
         <div className="divide-y divide-line">
           {sorted.map((y) => (
             <Link
