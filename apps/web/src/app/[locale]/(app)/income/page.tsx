@@ -162,7 +162,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
 
           {/* Summary cards in a two-column grid. */}
           {(s.byInstrument.length > 0 || s.yields.length > 0 || s.byCurrency.length > 1) && (
-            <div className="grid gap-4 @2xl:grid-cols-2 @2xl:items-start">
+            <div className="@container grid gap-4 @2xl:grid-cols-2 @2xl:items-start">
               {s.byInstrument.length > 0 && (
                 <Card>
                   <CardHeader>
@@ -197,7 +197,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                 </Card>
               )}
               {s.yields.length > 0 && (
-                <Card className="@container overflow-hidden">
+                <Card className="overflow-hidden">
                   <CardHeader className="pb-2">
                     <CardTitle>{t("yieldTitle")}</CardTitle>
                   </CardHeader>
