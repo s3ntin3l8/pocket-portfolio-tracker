@@ -197,7 +197,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                 </Card>
               )}
               {s.yields.length > 0 && (
-                <Card>
+                <Card className="@container overflow-hidden">
                   <CardHeader className="pb-2">
                     <CardTitle>{t("yieldTitle")}</CardTitle>
                   </CardHeader>
