@@ -197,7 +197,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                 </Card>
               )}
               {s.yields.length > 0 && (
-                <Card className="overflow-hidden">
+                <Card>
                   <CardHeader className="pb-2">
                     <CardTitle>{t("yieldTitle")}</CardTitle>
                   </CardHeader>
@@ -227,24 +227,26 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
 
         {/* ── Sidebar: stat cards + cash interest + allocation donut (sticky on wide containers) ── */}
         <div className="order-first space-y-3.5 @xl:order-last @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto">
-          <StatCard
-            label={t("thisYear")}
-            value={m(thisFullYear)}
-            delta={
-              deltaPct !== null
-                ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
-                : undefined
-            }
-            deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
-          />
-          <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
-          <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
-          <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
-          <StatCard
-            label={t("payments")}
-            value={String(s.paymentCount)}
-            delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
-          />
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @xl:grid-cols-1">
+            <StatCard
+              label={t("thisYear")}
+              value={m(thisFullYear)}
+              delta={
+                deltaPct !== null
+                  ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
+                  : undefined
+              }
+              deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
+            />
+            <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
+            <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
+            <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
+            <StatCard
+              label={t("payments")}
+              value={String(s.paymentCount)}
+              delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
+            />
+          </div>
 
           {Number(s.interest.lifetime) > 0 && (
             <CashInterestLine
