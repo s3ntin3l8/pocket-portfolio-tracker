@@ -18,10 +18,10 @@ function paymentLabel(payment: Pick<UpcomingPayment, "displayName" | "name" | "s
 
 const STATUS_DOTS: Record<UpcomingPayment["status"], string> = {
   scheduled: "#0D9488",
-  projected: "#0E9F6E",
-  grown: "#0E9F6E",
-  announced: "#0D9488",
-  paid: "#0E9F6E",
+  announced: "#3B82F6",
+  projected: "#F59E0B",
+  grown: "#8B5CF6",
+  paid: "#22C55E",
 };
 
 export type MonthBucket = {
@@ -62,7 +62,7 @@ function MonthLogo({
       };
     });
 
-  const isProjected = rep.status === "projected" || rep.status === "grown";
+  const isProjected = payments.some((p) => p.status === "projected" || p.status === "grown");
 
   const listeners = tip.bind({ title: label, rows });
 
