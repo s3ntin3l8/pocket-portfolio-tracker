@@ -213,7 +213,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
               so the user's primary question ("what's paying me next?") has the most
               prominent slot. Renders its own empty state when `upcoming` is empty. */}
           {s.upcoming.length > 0 ? (
-            <IncomeCalendar upcoming={s.upcoming} currency={currency} />
+            <IncomeCalendar upcoming={s.upcoming} />
           ) : (
             <IncomeCalendarEmpty />
           )}

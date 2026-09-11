@@ -1,182 +1,154 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useTranslations, useLocale } from "next-intl";
-import { toDateKey } from "@portfolio/core";
 import type { UpcomingPayment } from "@portfolio/api-client";
-import { buildMonthGrid } from "@/lib/calendar";
-import { IncomeCalendarHeader } from "./income-calendar-header";
-import { IncomeCalendarDay } from "./income-calendar-day";
+import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
+import { useChartTooltip } from "@/components/ui/use-chart-tooltip";
+import {
+  IncomeCalendarMonthCell,
+  type MonthBucket,
+  type CalendarTooltipContent,
+} from "./income-calendar-month-cell";
 
 /**
- * Forward-looking monthly wall-calendar visualisation for the Income page. Sits
- * above the existing timeline card; built around the existing
- * `upcoming: UpcomingPayment[]` payload so there are no new API routes.
+ * Rolling 12-month payment calendar — replaces the old day-grid calendar with
+ * a compact horizontal strip. All 12 months sit in a single row on desktop;
+ * below `@xl` the strip scrolls horizontally with a gradient fade hint.
  *
- * Behaviour:
- * - Defaults the visible month to "the month containing the earliest upcoming
- *   event", or today (UTC) when the array is empty — the latter is handled by
- *   the page (it renders `<IncomeCalendarEmpty/>` instead and never mounts us).
- * - Each day cell renders up to 3 logos + a "+N more" chip; popover lists them
- *   all.
- * - The month grid is rebuilt from the pure `buildMonthGrid` helper on viewMonth
- *   change so cell positions stay correct across locale-aware week starts.
+ * Props are intentionally identical to the old calendar so the page's
+ * `upcoming.length > 0` guard still works unchanged.
  */
-export function IncomeCalendar({
-  upcoming,
-  currency,
-}: {
-  upcoming: UpcomingPayment[];
-  currency: string;
-}) {
+export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
   const t = useTranslations("Income");
   const locale = useLocale();
+  const tip = useChartTooltip<CalendarTooltipContent>();
 
-  // Anchor the visible month on the earliest upcoming event so the user opens
-  // onto something useful (e.g. next-quarter coupon → next quarter's first
-  // month). Fall back to today's month (UTC) when the array is empty
-  // (defensive — the page guards this externally). Subsequent user navigation
-  // overrides this default until the page remounts.
-  const [viewMonth, setViewMonth] = useState<{ year: number; month: number }>(() => {
-    const today = new Date();
-    if (upcoming.length === 0) {
-      return { year: today.getUTCFullYear(), month: today.getUTCMonth() };
+  const { months, droppedCount } = useMemo<{ months: MonthBucket[]; droppedCount: number }>(() => {
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth();
+    const monthFmt = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
+
+    // Build 12 rolling buckets.
+    const months: MonthBucket[] = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(currentYear, currentMonth + i, 1));
+      const year = d.getUTCFullYear();
+      const monthIdx = d.getUTCMonth();
+      const key = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
+      months.push({
+        key,
+        label: monthFmt.format(d),
+        year,
+        isFirstOfYear: monthIdx === 0,
+        payments: new Map(),
+      });
     }
-    // `upcoming` is already sorted ascending by date server-side
-    // (income-helpers.ts's `buildIncomeStats`), so the first element is the earliest.
-    const [y, m] = upcoming[0].date.split("-").map(Number);
-    return { year: y, month: m - 1 };
-  });
 
-  const grid = useMemo(
-    () => buildMonthGrid(viewMonth.year, viewMonth.month, locale),
-    [viewMonth, locale],
-  );
-
-  const monthLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat(locale, {
-        month: "long",
-        year: "numeric",
-        timeZone: "UTC",
-      }).format(new Date(Date.UTC(viewMonth.year, viewMonth.month, 1))),
-    [viewMonth, locale],
-  );
-
-  // Index events by date for O(1) cell lookup. The current month + the next
-  // 12 months always contain the relevant events; we hash everything for
-  // simplicity — the array is small (typical: tens of items, rare > 200).
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, UpcomingPayment[]>();
-    for (const e of upcoming) {
-      const list = map.get(e.date) ?? [];
-      list.push(e);
-      map.set(e.date, list);
+    // Dispatch upcoming payments into their matching bucket, grouped by instrument.
+    let droppedCount = 0;
+    for (const p of upcoming) {
+      const [y, m] = p.date.split("-").map(Number);
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      const bucket = months.find((b) => b.key === key);
+      if (!bucket) {
+        droppedCount++;
+        continue;
+      }
+      const existing = bucket.payments.get(p.instrumentId) ?? [];
+      existing.push(p);
+      bucket.payments.set(p.instrumentId, existing);
     }
-    return map;
-  }, [upcoming]);
 
-  const today = new Date();
-  const todayKey = toDateKey(today);
-  const isCurrentMonth =
-    today.getUTCFullYear() === viewMonth.year && today.getUTCMonth() === viewMonth.month;
+    return { months, droppedCount };
+  }, [upcoming, locale]);
 
-  function shift(delta: number) {
-    setViewMonth(({ year, month }) => {
-      const d = new Date(Date.UTC(year, month + delta, 1));
-      return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
-    });
-  }
+  // Year range label — e.g. "2026–2027" when the strip crosses a year boundary.
+  const yearRange = useMemo(() => {
+    if (months.length === 0) return "";
+    const first = months[0].year;
+    const last = months[months.length - 1].year;
+    return first === last ? String(first) : `${first}–${last}`;
+  }, [months]);
 
-  function jumpToToday() {
-    setViewMonth({ year: today.getUTCFullYear(), month: today.getUTCMonth() });
-  }
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
 
-  // Always allow navigation; the calendar is purely forward-looking by data
-  // shape (upcoming has no past), but a user may still want to flip back to
-  // confirm exactly when a payment lands.
-  const canGoPrev = true;
-  const canGoNext = true;
+  const checkOverflow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setHasOverflow(el.scrollWidth > el.clientWidth + 1);
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [checkOverflow, upcoming]);
 
   return (
     <div className="rounded-2xl bg-card p-[22px] shadow-card">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-bold">{t("calendarTitle")}</h2>
-          <p className="mt-0.5 text-xs font-medium text-text-2">{t("calendarSubtitle")}</p>
+      <div className="mb-3">
+        <h2 className="text-base font-bold">{t("calendarTitle")}</h2>
+        <p className="mt-0.5 text-xs font-medium text-text-2">{t("calendarSubtitle")}</p>
+      </div>
+
+      {/* ── 12-month horizontal strip ── */}
+      <div className="relative">
+        {/* Gradient fade on the right edge — hints at scrollable overflow.
+            pointer-events-none so it doesn't intercept clicks/scrolls.
+            Only rendered when the strip actually overflows. */}
+        {hasOverflow && (
+          <div
+            className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-8
+                       bg-gradient-to-l from-card to-transparent"
+            aria-hidden
+          />
+        )}
+        <div ref={scrollRef} className="flex overflow-x-auto scrollbar-none">
+          {months.map((m, i) => (
+            <IncomeCalendarMonthCell key={m.key} month={m} monthIdx={i} locale={locale} tip={tip} />
+          ))}
         </div>
       </div>
 
-      <div className="space-y-3">
-        <IncomeCalendarHeader
-          monthLabel={monthLabel}
-          canGoPrev={canGoPrev}
-          canGoNext={canGoNext}
-          isCurrentMonth={isCurrentMonth}
-          onPrev={() => shift(-1)}
-          onNext={() => shift(1)}
-          onToday={jumpToToday}
-        />
-
-        <div
-          role="grid"
-          aria-label={monthLabel}
-          className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-text-3"
-        >
-          {grid.weekdayLabels.map((label, i) => (
-            <div key={`${label}-${i}`} role="columnheader" className="pb-1">
-              {label}
-            </div>
-          ))}
-          {grid.days.map((cell) => (
-            <div key={cell.dateKey} role="presentation">
-              <IncomeCalendarDay
-                cell={cell}
-                events={eventsByDay.get(cell.dateKey) ?? []}
-                currency={currency}
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Compact legend — one row of status chips so the calendar stays
-            scannable without spelling out the meaning of every paid/announced/
-            projected state inline. Mirrors the timeline card's legend styling. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[10px] font-semibold text-text-2">
-          <span className="flex items-center gap-1.5">
-            <span
-              className="size-2 rounded-[3px]"
-              style={{
-                // Matches STATUS_TONES.scheduled's bg in income-calendar-day-popover.tsx —
-                // keep these in sync (no shared constant yet) so the legend swatch and the
-                // popover's status badge for the same status never drift apart.
-                backgroundColor: "rgba(13,148,136,.14)",
-                border: "1.5px solid #0D9488",
-              }}
-            />
-            {t("calendarLegendScheduled")}
+      {/* ── Footer: year range + truncation hint ── */}
+      <div className="mt-2.5 text-[10px] font-semibold text-text-2">
+        <span className="tabular">{yearRange}</span>
+        {droppedCount > 0 && (
+          <span className="ml-2 text-text-mute">
+            {t("calendarMoreAfter", { count: droppedCount })}
           </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className="size-2 rounded-[3px]"
-              style={{
-                backgroundColor: "rgba(16,163,114,.12)",
-                border: "1.5px dashed #0E9F6E",
-              }}
-            />
-            {t("calendarLegendProjected")}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-[3px] bg-success" />
-            {t("calendarLegendPaid")}
-          </span>
-        </div>
-        {/* A hidden marker so a screen-reader user can confirm what today is when
-            the today cell isn't in view (we still surface it via the cell grid). */}
-        <span className="sr-only">
-          {todayKey} · {t("calendarToday")}
-        </span>
+        )}
       </div>
+
+      {/* ── Tooltip portal ── */}
+      {tip.open &&
+        tip.content &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: tip.y,
+              left: tip.x,
+              zIndex: 60,
+              pointerEvents: "none",
+            }}
+          >
+            <ChartTooltipPanel
+              title={tip.content.title}
+              rows={tip.content.rows}
+              onSize={tip.setSize}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
