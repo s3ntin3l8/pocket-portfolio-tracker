@@ -196,21 +196,22 @@ export default async function InstrumentPage({
 
   return (
     <div className="space-y-6">
-      <PageHeaderSetter title={instrument.symbol} backHref="/holdings" />
-      <div className="flex items-center gap-3">
+      <PageHeaderSetter title={instrument.name} backHref="/holdings" />
+      <div className="flex items-start gap-3">
         {back}
-        {/* Reference detail header: instrument logo/monogram chip + symbol + class badge. */}
+        {/* Instrument hero: logo chip + name as the primary heading, symbol + asset class +
+            market + currency on the secondary line. Desktop topbar renders the name via
+            PageHeaderSetter above, so this row stays mobile-first without duplicating it. */}
         <InstrumentLogo
           label={instrument.symbol}
           symbol={instrument.symbol}
           market={instrument.market}
           assetClass={instrument.assetClass}
-          className="size-11 rounded-[13px] text-sm"
+          className="size-11 shrink-0 rounded-[13px] text-sm"
         />
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <PageTitle>{instrument.symbol}</PageTitle>
-            <Badge variant="outline">{tc(instrument.assetClass)}</Badge>
+            <PageTitle className="truncate">{instrument.name}</PageTitle>
             {isAdmin && (
               <InstrumentEditDialog instrument={instrument}>
                 <Button variant="ghost" size="icon" aria-label={t("edit")}>
@@ -219,15 +220,26 @@ export default async function InstrumentPage({
               </InstrumentEditDialog>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {instrument.name} · {instrument.market} · {instrument.currency}
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground/80">{instrument.symbol}</span>
+            <Badge variant="outline" className="font-normal">
+              {tc(instrument.assetClass)}
+            </Badge>
+            <span aria-hidden>·</span>
+            <span>{instrument.market}</span>
+            <span aria-hidden>·</span>
+            <span>{instrument.currency}</span>
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[1fr_320px] @xl:items-start">
-        {/* ── Main column: price chart + fundamentals + lots + transactions ── */}
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[minmax(0,1fr)_300px] @xl:items-start">
+        {/* ── Main column: price chart + fundamentals + lots + transactions ──
+            `min-w-0` is the standard grid-item reset: without it, a child sized to its
+            intrinsic content (chart, wide table) can blow past the 1fr track and produce
+            a horizontal scrollbar on the page — which is what the old layout was doing
+            once the fundamentals card or the DesktopTable had more columns than fit. */}
+        <div className="space-y-6 min-w-0">
           <Card>
             <CardHeader>
               <CardTitle>{t("priceHistory")}</CardTitle>
@@ -251,7 +263,7 @@ export default async function InstrumentPage({
             <InstrumentFundamentalsCard instrumentId={id} />
           )}
 
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {lots.length > 0 && (
               <Card>
                 <CardHeader>
@@ -364,45 +376,59 @@ export default async function InstrumentPage({
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
         <div className="space-y-6 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
-          <h2 className="text-lg font-semibold">{t("position")}</h2>
-          {hasPosition && holding ? (
-            <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
-              <StatCard
-                label={t("marketValueLabel")}
-                value={
-                  marketValueDisplay !== null
-                    ? formatMoney(marketValueDisplay, scope.displayCurrency, locale)
-                    : "—"
-                }
-              />
-              <StatCard
-                label={t("quantityLabel")}
-                value={qtyFmt.format(Number(holding.quantity))}
-              />
-              <StatCard
-                label={t("avgCostLabel")}
-                value={formatMoney(
-                  Number(holding.avgCost),
-                  holding.currency ?? instrument.currency,
-                  locale,
-                )}
-              />
-              <StatCard
-                label={t("unrealizedPnl")}
-                value={
-                  pnlDisplay !== null ? formatMoney(pnlDisplay, scope.displayCurrency, locale) : "—"
-                }
-                delta={pnlPct !== undefined ? formatPercent(pnlPct, locale) : undefined}
-                deltaTone={pnlDisplay === null ? "neutral" : pnlDisplay >= 0 ? "up" : "down"}
-              />
-              <StatCard
-                label={t("portfolioWeightLabel")}
-                value={portfolioWeight !== null ? `${(portfolioWeight * 100).toFixed(1)}%` : "—"}
-              />
-            </div>
-          ) : (
-            <EmptyState icon={Wallet} title={t("noPosition")} description={t("noPositionBody")} />
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("position")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {hasPosition && holding ? (
+                <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
+                  <StatCard
+                    label={t("marketValueLabel")}
+                    value={
+                      marketValueDisplay !== null
+                        ? formatMoney(marketValueDisplay, scope.displayCurrency, locale)
+                        : "—"
+                    }
+                  />
+                  <StatCard
+                    label={t("quantityLabel")}
+                    value={qtyFmt.format(Number(holding.quantity))}
+                  />
+                  <StatCard
+                    label={t("avgCostLabel")}
+                    value={formatMoney(
+                      Number(holding.avgCost),
+                      holding.currency ?? instrument.currency,
+                      locale,
+                    )}
+                  />
+                  <StatCard
+                    label={t("unrealizedPnl")}
+                    value={
+                      pnlDisplay !== null
+                        ? formatMoney(pnlDisplay, scope.displayCurrency, locale)
+                        : "—"
+                    }
+                    delta={pnlPct !== undefined ? formatPercent(pnlPct, locale) : undefined}
+                    deltaTone={pnlDisplay === null ? "neutral" : pnlDisplay >= 0 ? "up" : "down"}
+                  />
+                  <StatCard
+                    label={t("portfolioWeightLabel")}
+                    value={
+                      portfolioWeight !== null ? `${(portfolioWeight * 100).toFixed(1)}%` : "—"
+                    }
+                  />
+                </div>
+              ) : (
+                <EmptyState
+                  icon={Wallet}
+                  title={t("noPosition")}
+                  description={t("noPositionBody")}
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

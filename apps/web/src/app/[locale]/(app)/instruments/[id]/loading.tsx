@@ -15,8 +15,8 @@ export default function Loading() {
           <Skeleton className="h-3 w-48" />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[1fr_320px] @xl:items-start">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[minmax(0,1fr)_300px] @xl:items-start">
+        <div className="space-y-6 min-w-0">
           <Card>
             <div className="space-y-3 p-6">
               <Skeleton className="h-5 w-1/3" />
@@ -34,7 +34,7 @@ export default function Loading() {
               </div>
             </div>
           </Card>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
               <div className="space-y-3 p-6">
                 <Skeleton className="h-5 w-1/3" />
