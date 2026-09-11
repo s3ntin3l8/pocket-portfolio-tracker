@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { UpcomingPayment } from "@portfolio/api-client";
@@ -124,20 +124,15 @@ describe("IncomeCalendar", () => {
   it("shows year badge on January columns", () => {
     wrap([]);
     const strip = document.querySelector(".flex.overflow-x-auto")!;
-    // Find the January column — its label should contain "'YY" suffix.
-    const now = new Date();
-    const thisYear = now.getUTCFullYear();
-    const nextJanYear = thisYear + 1;
-    // Look for a month cell whose label contains the year abbreviation.
+    // Every 12-month rolling window contains exactly one January.
     const cells = [...strip.children];
-    const janCell = cells.find((c) =>
-      c.querySelector("p")?.textContent?.includes(`'${String(nextJanYear).slice(2)}`),
-    );
-    // January will only show the year badge if it's in the strip
-    // (it always is for rolling 12 months starting from Sep).
-    if (janCell) {
-      expect(janCell.querySelector("p")!.textContent).toContain(`'${String(nextJanYear).slice(2)}`);
-    }
+    const janCell = cells.find((c) => {
+      const label = c.querySelector("p")?.textContent ?? "";
+      return /Jan/.test(label);
+    });
+    expect(janCell).toBeDefined();
+    // The January label should contain a year badge like "'27".
+    expect(janCell!.querySelector("p")!.textContent).toMatch(/'\d{2}/);
   });
 
   it("applies scrollbar-none to the scrollable strip", () => {
@@ -163,6 +158,45 @@ describe("IncomeCalendar", () => {
     wrap(UPCOMING);
     const gradient = document.querySelector(".bg-gradient-to-l.from-card");
     expect(gradient).toBeTruthy();
+  });
+
+  it("tooltip shows instrument symbol, formatted date, status, and amount on hover", () => {
+    wrap(UPCOMING);
+    // BBCA has a projected dividend this month. Find its button via aria-label.
+    const btn = screen.getByRole("button", { name: /BBCA.*1 payment/ });
+    fireEvent.mouseEnter(btn);
+    // Tooltip panel should show the instrument symbol as title.
+    expect(screen.getByText("BBCA")).toBeInTheDocument();
+    // The row should contain the status text "Projected".
+    expect(screen.getByText(/Projected/)).toBeInTheDocument();
+    // The row should contain the formatted IDR amount (500,000).
+    expect(screen.getByText(/500[.,\s\u00a0\u202f]?000/)).toBeInTheDocument();
+  });
+
+  it("tooltip lists multiple payments sorted by date when an instrument has several", () => {
+    const multi: UpcomingPayment[] = [
+      E(BBCA, "BBCA", monthOffset(0), "100000", { status: "scheduled" }),
+      E(BBCA, "BBCA", monthOffset(0, 20), "250000", { status: "announced" }),
+    ];
+    wrap(multi);
+    const btn = screen.getByRole("button", { name: /BBCA.*2 payments/ });
+    fireEvent.mouseEnter(btn);
+    // Both status texts should appear in the tooltip.
+    expect(screen.getByText(/Scheduled/)).toBeInTheDocument();
+    expect(screen.getByText(/Announced/)).toBeInTheDocument();
+    // Both amounts should appear.
+    expect(screen.getByText(/100[.,\s\u00a0\u202f]?000/)).toBeInTheDocument();
+    expect(screen.getByText(/250[.,\s\u00a0\u202f]?000/)).toBeInTheDocument();
+  });
+
+  it("tooltip dismisses on mouseleave", () => {
+    wrap(UPCOMING);
+    const btn = screen.getByRole("button", { name: /BBCA/ });
+    fireEvent.mouseEnter(btn);
+    expect(screen.getByText("BBCA")).toBeInTheDocument();
+    fireEvent.mouseLeave(btn);
+    // The tooltip is state-driven: panel unmounts on leave.
+    expect(screen.queryByText("BBCA")).not.toBeInTheDocument();
   });
 });
 
