@@ -67,8 +67,10 @@ function MonthLogo({
   const listeners = tip.bind({ title: label, rows });
 
   return (
-    <span
+    <button
+      type="button"
       {...listeners}
+      aria-label={`${label} — ${payments.length} ${payments.length === 1 ? "payment" : "payments"}`}
       className={cn(
         "inline-flex cursor-pointer items-center justify-center rounded-md bg-muted transition-opacity",
         "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
@@ -82,7 +84,7 @@ function MonthLogo({
         assetClass={rep.assetClass}
         className="!size-5 !rounded-md"
       />
-    </span>
+    </button>
   );
 }
 

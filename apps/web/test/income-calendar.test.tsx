@@ -34,7 +34,7 @@ const E = (
 function wrap(upcoming: UpcomingPayment[]) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <IncomeCalendar upcoming={upcoming} currency="IDR" />
+      <IncomeCalendar upcoming={upcoming} />
     </NextIntlClientProvider>,
   );
 }

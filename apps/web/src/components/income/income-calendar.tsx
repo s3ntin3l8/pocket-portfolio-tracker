@@ -20,13 +20,7 @@ import {
  * Props are intentionally identical to the old calendar so the page's
  * `upcoming.length > 0` guard still works unchanged.
  */
-export function IncomeCalendar({
-  upcoming,
-  currency: _currency,
-}: {
-  upcoming: UpcomingPayment[];
-  currency: string;
-}) {
+export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
   const t = useTranslations("Income");
   const locale = useLocale();
   const tip = useChartTooltip<CalendarTooltipContent>();
@@ -88,7 +82,7 @@ export function IncomeCalendar({
             pointer-events-none so it doesn't intercept clicks/scrolls. */}
         <div
           className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-8
-                     bg-gradient-to-l from-card to-transparent max-md:hidden"
+                     bg-gradient-to-l from-card to-transparent"
           aria-hidden
         />
         <div className="flex overflow-x-auto scrollbar-none">
