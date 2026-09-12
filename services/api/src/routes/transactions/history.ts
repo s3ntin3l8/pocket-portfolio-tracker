@@ -20,6 +20,7 @@ import {
   fetchBenchmarkPrices,
   getBenchmarkPrices,
   computeBenchmarkIndex,
+  carryForwardBenchmark,
 } from "../../services/benchmark.js";
 
 export function registerHistoryRoutes(app: FastifyInstance) {
@@ -111,20 +112,16 @@ export function registerHistoryRoutes(app: FastifyInstance) {
               }
             }
             const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
-            if (refreshedBm.size > 1) {
+            if (refreshedBm.size >= 1) {
               const bmPrices = bmDates
                 .filter((d) => refreshedBm.has(d))
                 .map((d) => ({ date: d, close: refreshedBm.get(d)! }));
               const bmIndex = computeBenchmarkIndex(bmPrices);
               const bmById = new Map(bmIndex.map((p) => [p.date, p]));
-              for (const p of result) {
-                const bp = bmById.get(p.date);
-                if (bp) {
-                  (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkIndex =
-                    bp.index;
-                  (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkPct = bp.pct;
-                }
-              }
+              carryForwardBenchmark(
+                result as { date: string; benchmarkIndex?: string; benchmarkPct?: string }[],
+                bmById,
+              );
             }
           }
           return result;
@@ -341,19 +338,16 @@ export function registerHistoryRoutes(app: FastifyInstance) {
           }
         }
         const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
-        if (refreshedBm.size > 1) {
+        if (refreshedBm.size >= 1) {
           const bmPrices = bmDates
             .filter((d) => refreshedBm.has(d))
             .map((d) => ({ date: d, close: refreshedBm.get(d)! }));
           const bmIndex = computeBenchmarkIndex(bmPrices);
           const bmById = new Map(bmIndex.map((p) => [p.date, p]));
-          for (const p of result) {
-            const bp = bmById.get(p.date);
-            if (bp) {
-              (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkIndex = bp.index;
-              (p as { benchmarkIndex?: string; benchmarkPct?: string }).benchmarkPct = bp.pct;
-            }
-          }
+          carryForwardBenchmark(
+            result as { date: string; benchmarkIndex?: string; benchmarkPct?: string }[],
+            bmById,
+          );
         }
       }
 

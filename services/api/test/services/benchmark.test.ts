@@ -4,6 +4,7 @@ import {
   getUserBenchmarkConfig,
   getUserBenchmarkSymbols,
   getBenchmarkPricesMulti,
+  carryForwardBenchmark,
 } from "../../src/services/benchmark.js";
 import { buildApp } from "../../src/app.js";
 import { users, userBenchmarkSymbols, benchmarkPrices } from "@portfolio/db";
@@ -403,5 +404,78 @@ describe("getBenchmarkPricesMulti", () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+describe("carryForwardBenchmark", () => {
+  it("carries Friday's value through Saturday and Sunday gaps", () => {
+    const result = [
+      { date: "2026-01-05", benchmarkIndex: undefined, benchmarkPct: undefined },
+      { date: "2026-01-06", benchmarkIndex: undefined, benchmarkPct: undefined },
+      { date: "2026-01-07", benchmarkIndex: undefined, benchmarkPct: undefined },
+      { date: "2026-01-08", benchmarkIndex: undefined, benchmarkPct: undefined },
+      { date: "2026-01-09", benchmarkIndex: undefined, benchmarkPct: undefined },
+      { date: "2026-01-10", benchmarkIndex: undefined, benchmarkPct: undefined },
+      { date: "2026-01-11", benchmarkIndex: undefined, benchmarkPct: undefined },
+    ];
+    const bmById = new Map([["2026-01-09", { date: "2026-01-09", index: "100.00", pct: "0" }]]);
+
+    carryForwardBenchmark(result, bmById);
+
+    expect(result[0].benchmarkPct).toBeUndefined();
+    expect(result[1].benchmarkPct).toBeUndefined();
+    expect(result[2].benchmarkPct).toBeUndefined();
+    expect(result[3].benchmarkPct).toBeUndefined();
+    expect(result[4].benchmarkPct).toBe("0");
+    expect(result[5].benchmarkPct).toBe("0");
+    expect(result[6].benchmarkPct).toBe("0");
+  });
+
+  it("updates the carried value when a new match appears mid-series", () => {
+    const result: { date: string; benchmarkIndex?: string; benchmarkPct?: string }[] = [
+      { date: "2026-01-09" },
+      { date: "2026-01-10" },
+      { date: "2026-01-11" },
+      { date: "2026-01-12" },
+    ];
+    const bmById = new Map([
+      ["2026-01-09", { date: "2026-01-09", index: "100.00", pct: "0" }],
+      ["2026-01-12", { date: "2026-01-12", index: "103.00", pct: "3.00" }],
+    ]);
+
+    carryForwardBenchmark(result, bmById);
+
+    expect(result[0].benchmarkPct).toBe("0");
+    expect(result[1].benchmarkPct).toBe("0");
+    expect(result[2].benchmarkPct).toBe("0");
+    expect(result[3].benchmarkPct).toBe("3.00");
+  });
+
+  it("leaves pre-benchmark dates untouched", () => {
+    const result: { date: string; benchmarkIndex?: string; benchmarkPct?: string }[] = [
+      { date: "2026-01-01" },
+      { date: "2026-01-02" },
+      { date: "2026-01-09" },
+    ];
+    const bmById = new Map([["2026-01-09", { date: "2026-01-09", index: "100.00", pct: "0" }]]);
+
+    carryForwardBenchmark(result, bmById);
+
+    expect(result[0].benchmarkPct).toBeUndefined();
+    expect(result[1].benchmarkPct).toBeUndefined();
+    expect(result[2].benchmarkPct).toBe("0");
+  });
+
+  it("does nothing when bmById is empty", () => {
+    const result: { date: string; benchmarkIndex?: string; benchmarkPct?: string }[] = [
+      { date: "2026-01-09" },
+      { date: "2026-01-10" },
+    ];
+    const bmById = new Map();
+
+    carryForwardBenchmark(result, bmById);
+
+    expect(result[0].benchmarkPct).toBeUndefined();
+    expect(result[1].benchmarkPct).toBeUndefined();
   });
 });

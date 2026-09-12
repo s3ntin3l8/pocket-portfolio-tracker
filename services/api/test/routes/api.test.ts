@@ -2566,6 +2566,12 @@ describe("auth + portfolios + transactions", () => {
     }
 
     // Simulate refreshDividends with TwelveData/EODHD (returns future announced dividends)
+    // Use dates relative to today so the test doesn't break when run on/after a hardcoded date.
+    const today = new Date();
+    const nextMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 12));
+    const twoMonths = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 12));
+    const futureDate1 = toDateKey(nextMonth);
+    const futureDate2 = toDateKey(twoMonths);
     await app.db.insert(dividendEvents).values([
       {
         instrumentId: msft.id,
@@ -2606,7 +2612,7 @@ describe("auth + portfolios + transactions", () => {
       // Future announced — trigger instrumentsWithAnnounced path
       {
         instrumentId: msft.id,
-        exDate: "2026-09-12",
+        exDate: futureDate1,
         amountPerShare: "0.80",
         currency: "USD",
         status: "announced",
@@ -2615,7 +2621,7 @@ describe("auth + portfolios + transactions", () => {
       },
       {
         instrumentId: msft.id,
-        exDate: "2026-12-12",
+        exDate: futureDate2,
         amountPerShare: "0.80",
         currency: "USD",
         status: "announced",

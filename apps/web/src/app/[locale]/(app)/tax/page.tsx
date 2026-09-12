@@ -1,5 +1,4 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Suspense } from "react";
 import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ReportHeader } from "@/components/report-header";
@@ -18,11 +17,11 @@ import {
   type TaxTranslator,
 } from "@/components/tax/tax-cards";
 import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
-import { loadNetworthTax, loadPreferences } from "@/lib/server-api";
+import { loadNetworthTax, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 import type { TaxSummaryHolderWithCarryForward } from "@/lib/server-api/_shared";
 import { harvestSummary } from "@portfolio/core";
-import { TaxDetailSection, TaxDetailSkeleton } from "./tax-detail-section";
+import { TaxHolderDetailDE, TaxHolderSectionId } from "./tax-detail-section";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -45,6 +44,7 @@ export default async function TaxPage({
   const regime = prefs?.taxRegime ?? "DE";
 
   const holders = await loadNetworthTax(year, regime);
+  const detailByHolder = await loadTaxYearDetail(holders, year);
 
   if (TIMING) {
     // eslint-disable-next-line react-hooks/purity
@@ -99,23 +99,53 @@ export default async function TaxPage({
     );
   }
 
+  const hasMultipleHolders = holders.length > 1;
+
   return (
     <div className="space-y-5">
       {Heading}
-      {holders.map((entry) => (
-        <section key={entry.holder.id} className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Landmark className="size-5 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">
-              {entry.holder.name || t("defaultHolderName")} — {entry.year}
-            </h2>
-          </div>
-          {regime === "DE" && <TaxHolderOverviewDe entry={entry} locale={locale} t={t} />}
-        </section>
-      ))}
-      <Suspense fallback={<TaxDetailSkeleton />}>
-        <TaxDetailSection holders={holders} year={year} locale={locale} />
-      </Suspense>
+      {holders.map((entry, idx) => {
+        const detail = detailByHolder.get(entry.holder.id) ?? null;
+        const currency = regime === "ID" ? (detail?.currency ?? entry.currency) : entry.currency;
+        const money = (n: string | number) => formatMoney(Number(n), currency, locale);
+        const isLast = idx === holders.length - 1;
+
+        return (
+          <section
+            key={entry.holder.id}
+            className={`space-y-4${hasMultipleHolders && !isLast ? " border-b border-border pb-5" : ""}`}
+          >
+            <div className="flex items-center gap-2">
+              <Landmark className="size-5 text-muted-foreground" />
+              <h2 className="text-lg font-semibold">
+                {entry.holder.name || t("defaultHolderName")} — {entry.year}
+              </h2>
+            </div>
+            {regime === "DE" && (
+              /* When TaxHolderOverviewDe returns null (no allowance data), children
+                 are also suppressed — detail tables intentionally not rendered. */
+              <TaxHolderOverviewDe entry={entry} locale={locale} t={t}>
+                <TaxHolderDetailDE
+                  detail={detail}
+                  currency={currency}
+                  locale={locale}
+                  year={entry.year}
+                />
+              </TaxHolderOverviewDe>
+            )}
+            {regime === "ID" && (
+              <TaxHolderSectionId
+                detail={detail}
+                money={money}
+                currency={currency}
+                locale={locale}
+                year={entry.year}
+                t={t}
+              />
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -124,10 +154,12 @@ function TaxHolderOverviewDe({
   entry,
   locale,
   t,
+  children,
 }: {
   entry: TaxSummaryHolderWithCarryForward;
   locale: string;
   t: TaxTranslator;
+  children?: React.ReactNode;
 }) {
   const currency = entry.currency;
   const money = (n: string | number) => formatMoney(Number(n), currency, locale);
@@ -260,6 +292,7 @@ function TaxHolderOverviewDe({
           <p className="text-xs text-muted-foreground leading-relaxed">
             {t("footnote", { rate: ratePct, allowance: money(u.allowanceAnnual) })}
           </p>
+          {children}
         </div>
 
         {/* ── Sidebar: KPI stat cards (sticky on wide containers) ── */}
