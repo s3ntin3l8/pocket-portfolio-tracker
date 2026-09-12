@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.14](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.13...v0.1.14) (2026-09-12)
+
+
+### Features
+
+* **income:** replace day-grid calendar with rolling 12-month logo strip ([#729](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/729)) ([b974d0b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b974d0b5e4dae5a693522eab9d82075f6a1cea29))
+
+
+### Bug Fixes
+
+* benchmark chart gaps, tax report holder grouping, activity page alignment ([#733](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/733)) ([f7f044f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f7f044fe023d90ca397c32f3a83bc0cc57682683))
+* **income:** responsive stat card grid, yields table threshold, and truncation ([#730](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/730)) ([5e1501b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5e1501bd44d02d390666c5d1635145fe67663570))
+* **instrument-detail:** reorganize layout, hero header, and main/sidebar split ([#731](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/731)) ([1e355ae](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1e355aefb36f802d41d456f4f6e1b19509373b34))
+
 ## [0.1.13](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.12...v0.1.13) (2026-09-10)
 
 
