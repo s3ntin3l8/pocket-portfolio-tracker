@@ -1,6 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { StatCard } from "@/components/stat-card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EstimatedTaxHero, type TaxTranslator } from "@/components/tax/tax-cards";
 import {
   DividendsTable,
@@ -9,101 +8,47 @@ import {
   IdByYearTable,
 } from "@/components/tax/tax-tables";
 import { DisposalTable, IdSalesTable } from "@/components/tax/disposal-table";
-import { loadTaxYearDetail, loadPreferences, type TaxYearDetail } from "@/lib/server-api";
+import { loadPreferences, type TaxYearDetail } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
-import type { TaxSummaryHolder } from "@portfolio/api-client";
 import type { IndonesianFinalTax } from "@portfolio/core";
 
-export function TaxDetailSkeleton() {
-  return (
-    <div className="space-y-4">
-      {[0, 1].map((i) => (
-        <div key={i} className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Skeleton className="h-64 rounded-xl" />
-            <Skeleton className="h-64 rounded-xl" />
-          </div>
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export async function TaxDetailSection({
-  holders,
-  year,
+/** Per-holder DE detail tables (DisposalTable + DividendsTable + ByYearTable). */
+export function TaxHolderDetailDE({
+  detail,
+  currency,
   locale,
+  year,
 }: {
-  holders: TaxSummaryHolder[];
-  year?: number;
+  detail: TaxYearDetail | null;
+  currency: string;
   locale: string;
+  year: number;
 }) {
-  setRequestLocale(locale);
-  const t = await getTranslations("Tax");
-  const prefs = await loadPreferences();
-  const regime = prefs?.taxRegime ?? "DE";
-  const detailByHolder = await loadTaxYearDetail(holders, year);
-
+  if (!detail) return null;
   return (
     <>
-      {holders.map((entry) => {
-        const detail = detailByHolder.get(entry.holder.id) ?? null;
-        const currency = regime === "ID" ? (detail?.currency ?? entry.currency) : entry.currency;
-        const money = (n: string | number) => formatMoney(Number(n), currency, locale);
-
-        if (regime === "ID") {
-          return (
-            <section key={entry.holder.id} className="space-y-4">
-              <TaxHolderSectionId
-                detail={detail}
-                money={money}
-                currency={currency}
-                locale={locale}
-                year={entry.year}
-                t={t}
-              />
-            </section>
-          );
-        }
-
-        return (
-          <section key={entry.holder.id} className="space-y-4">
-            {detail && (
-              <>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <DisposalTable
-                    rows={detail.disposals}
-                    totalProceeds={detail.totalProceeds}
-                    totalGain={detail.totalGain}
-                    currency={currency}
-                    locale={locale}
-                    year={entry.year}
-                  />
-                  <DividendsTable
-                    rows={detail.dividendRows}
-                    totalsByCurrency={detail.dividendTotalsByCurrency}
-                    locale={locale}
-                    year={entry.year}
-                  />
-                </div>
-                <ByYearTable rows={detail.byYear} currency={currency} locale={locale} />
-              </>
-            )}
-          </section>
-        );
-      })}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DisposalTable
+          rows={detail.disposals}
+          totalProceeds={detail.totalProceeds}
+          totalGain={detail.totalGain}
+          currency={currency}
+          locale={locale}
+          year={year}
+        />
+        <DividendsTable
+          rows={detail.dividendRows}
+          totalsByCurrency={detail.dividendTotalsByCurrency}
+          locale={locale}
+          year={year}
+        />
+      </div>
+      <ByYearTable rows={detail.byYear} currency={currency} locale={locale} />
     </>
   );
 }
 
-function TaxHolderSectionId({
+export function TaxHolderSectionId({
   detail,
   money,
   currency,

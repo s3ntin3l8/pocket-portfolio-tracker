@@ -227,6 +227,29 @@ export function computeBenchmarkIndex(
   return indexed.map((p) => ({ date: p.date, index: p.index, pct: p.pct }));
 }
 
+/**
+ * Carry-forward benchmark values to portfolio dates that lack a direct match.
+ * Walks `result` in ascending date order, assigning the last known benchmark
+ * index/pct to each point until a new match is found. Dates before the first
+ * benchmark price are left untouched (no fields set).
+ */
+export function carryForwardBenchmark(
+  result: { date: string; benchmarkIndex?: string; benchmarkPct?: string }[],
+  bmById: Map<string, BenchmarkIndexPoint>,
+): void {
+  let lastBp: BenchmarkIndexPoint | undefined;
+  for (const p of result) {
+    const bp = bmById.get(p.date);
+    if (bp) {
+      lastBp = bp;
+    }
+    if (lastBp) {
+      p.benchmarkIndex = lastBp.index;
+      p.benchmarkPct = lastBp.pct;
+    }
+  }
+}
+
 export function computeActiveReturn(
   portfolioIndex: { date: string; pct: string }[],
   benchmarkIndex: { date: string; pct: string }[],
