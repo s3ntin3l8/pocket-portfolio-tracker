@@ -198,7 +198,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
     }
 
     const pfs = await app.db
-      .select({ id: portfolios.id, includeInAggregate: portfolios.includeInAggregate })
+      .select({ id: portfolios.id })
       .from(portfolios)
       .where(
         holderId != null
@@ -207,13 +207,17 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       );
     if (pfs.length === 0) return [];
 
+    // "All portfolios" means every portfolio the user owns — matches /networth and
+    // /insights. `include`/`exclude` remain as ad hoc, request-scoped overrides (not
+    // currently sent by the web client); there is no persisted aggregate-membership
+    // flag anymore (see the removal of `portfolios.includeInAggregate`).
     const pfIds = (() => {
       const inc = includeParam.split(",").filter(Boolean);
       const exc = excludeParam.split(",").filter(Boolean);
       if (inc.length > 0) {
         return pfs.filter((p) => inc.includes(p.id)).map((p) => p.id);
       }
-      return pfs.filter((p) => p.includeInAggregate && !exc.includes(p.id)).map((p) => p.id);
+      return pfs.filter((p) => !exc.includes(p.id)).map((p) => p.id);
     })();
     if (pfIds.length === 0) return [];
 

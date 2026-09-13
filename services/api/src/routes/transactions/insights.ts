@@ -44,7 +44,6 @@ export function registerInsightsRoutes(app: FastifyInstance) {
       const pfs = await app.db
         .select({
           id: portfolios.id,
-          includeInAggregate: portfolios.includeInAggregate,
           cashCounted: portfolios.cashCounted,
         })
         .from(portfolios)
@@ -110,16 +109,31 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         }
 
         const allFlows: { date: string; marketValue: string; effectiveFlow: string }[][] = [];
-        for (const [, pfRows] of perPortfolio) {
+        // Keyed by portfolioId — reused below for the per-year NAV so it shares the exact
+        // same FX conversion as the chained TWR index, instead of recomputing from raw rows.
+        const convertedByPortfolio = new Map<
+          string,
+          { date: string; marketValue: string; netWorth: string }[]
+        >();
+        for (const [pfId, pfRows] of perPortfolio) {
           const converted = pfRows.map((r) => {
             const fx = makeFxRateFn(ratesByDate.get(r.date) ?? {}, display);
             return {
               date: r.date,
               marketValue: convert(r.marketValue ?? "0", r.currency, display, fx),
               effectiveFlow: convert(r.effectiveFlow ?? "0", r.currency, display, fx),
+              netWorth: convert(r.netWorth ?? "0", r.currency, display, fx),
             };
           });
           allFlows.push(converted);
+          convertedByPortfolio.set(
+            pfId,
+            converted.map((c) => ({
+              date: c.date,
+              marketValue: c.marketValue,
+              netWorth: c.netWorth,
+            })),
+          );
         }
 
         const aggregated = aggregateValueFlows(allFlows);
@@ -130,31 +144,33 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         // rest of /insights. The new compute is bounded by the per-year table
         // size (≤ ~years since first snapshot) so it's a negligible cost on top
         // of the chained-index work.
-        const perPortfolioForYearly = [...perPortfolio.entries()].map(([id, rows]) => ({
-          id,
-          flows: rows.map((r) => ({
-            date: r.date,
-            marketValue: r.marketValue ?? "0",
-            currency: r.currency,
-          })),
+        const perPortfolioForYearly = [...convertedByPortfolio.entries()].map(([pfId, rows]) => ({
+          id: pfId,
+          // netWorth (not marketValue) so the same figure that /networth uses as the
+          // hero XIRR's terminal inflow is what seeds the per-year opening/closing NAV —
+          // it is already cashCounted-aware at the snapshot level (packages/core/src/
+          // valuation.ts: cash is only added when the portfolio is cashCounted AND has
+          // an explicit cash movement), so no further branching is needed here.
+          flows: rows.map((r) => ({ date: r.date, marketValue: r.netWorth, currency: display })),
         }));
-        const boundaryFlowsForYearly = await loadBoundaryFlowsForUser(
-          app,
-          id,
-          pfs.map((p) => p.id),
-          display,
-          // Default to "inside" — the per-year table tracks the user's real
-          // cash deposits/withdrawals, not the kind-aware invested-capital view.
-          "inside",
-        );
+        // Each portfolio's flows are computed under its OWN boundary (cashCounted ?
+        // "inside" : "outside") and unioned — mirrors /networth's hero XIRR (networth.ts)
+        // so the two numbers are computed from the same cash-flow universe per portfolio,
+        // rather than /insights hardcoding "inside" for every portfolio regardless of its
+        // own boundary flag.
+        const insidePfIds = pfs.filter((p) => p.cashCounted).map((p) => p.id);
+        const outsidePfIds = pfs.filter((p) => !p.cashCounted).map((p) => p.id);
+        const [insideFlows, outsideFlows] = await Promise.all([
+          loadBoundaryFlowsForUser(app, id, insidePfIds, display, "inside"),
+          loadBoundaryFlowsForUser(app, id, outsidePfIds, display, "outside"),
+        ]);
+        const boundaryFlowsForYearly = [...insideFlows, ...outsideFlows];
         const yearlyReturns = await computeInsightsYearlyReturns({
           app,
           userId: id,
           aggregatedFlows: aggregated,
           perPortfolio: perPortfolioForYearly,
           boundaryFlows: boundaryFlowsForYearly,
-          displayCurrency: display,
-          ratesByDate,
         });
 
         // ── Drawdown ───────────────────────────────────────────────────
@@ -243,6 +259,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
             app,
             pfs.map((p) => p.id),
             dates,
+            display,
           );
 
         return {

@@ -485,8 +485,6 @@ export interface Portfolio {
   accountNumber: string | null;
   /** IBAN, matched alongside accountNumber for import auto-detect, or null. */
   iban: string | null;
-  /** When false, this portfolio is excluded from the aggregate net-worth/performance view. */
-  includeInAggregate: boolean;
   /** Whether cash is inside this portfolio's investment boundary. `true` = savings/
    * deposit account (contribution = net external cash, net worth includes cash);
    * `false` = mixed/invest-only (contribution = net invested capital, cash excluded). */
@@ -1185,8 +1183,18 @@ export interface InsightsResponse {
   streaks: InsightsStreaks;
   benchmark: InsightsBenchmark | null;
   concentrationTrend: ConcentrationPoint[];
-  bestWorstMonthly: { best: PeriodMover | null; worst: PeriodMover | null };
-  bestWorstYearly: { best: PeriodMover | null; worst: PeriodMover | null };
+  bestWorstMonthly: {
+    best: PeriodMover | null;
+    worst: PeriodMover | null;
+    /** Set to "stale_prices" when best/worst are null because at least one otherwise-
+     *  qualifying instrument's price feed hasn't updated recently enough to compare. */
+    reason: "stale_prices" | null;
+  };
+  bestWorstYearly: {
+    best: PeriodMover | null;
+    worst: PeriodMover | null;
+    reason: "stale_prices" | null;
+  };
   /**
    * Per-calendar-year portfolio TWR / XIRR plus each selected benchmark's TWR
    * and the active return (portfolio TWR − benchmark TWR). Ordered oldest →

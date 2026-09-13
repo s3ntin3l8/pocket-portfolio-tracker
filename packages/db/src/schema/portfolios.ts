@@ -17,7 +17,6 @@ export const portfolios = pgTable(
     brokerage: text("brokerage"),
     accountNumber: text("account_number"),
     iban: text("iban"),
-    includeInAggregate: boolean("include_in_aggregate").notNull().default(true),
     cashCounted: boolean("cash_counted").notNull().default(false),
     allowNegativeCash: boolean("allow_negative_cash").notNull().default(false),
     documentRetention: boolean("document_retention").notNull().default(false),

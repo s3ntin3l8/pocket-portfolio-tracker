@@ -1,4 +1,4 @@
-import { inArray, isNotNull, lt } from "drizzle-orm";
+import { desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import {
   cashFlow,
   convert,
@@ -41,8 +41,60 @@ export async function recordDailySnapshots(
 ): Promise<number> {
   const date = toDateKey(now);
   const pfs = await db.select().from(portfolios);
+  // Skip portfolios with zero transactions — writing a `marketValue: 0, effectiveFlow:
+  // 0` row for them every day is what turns "a portfolio's transactions were moved
+  // elsewhere" into an ever-growing run of fake €0 history that /insights later reads
+  // as real performance (see the "Leona" incident). Matches the `FROM transactions`
+  // shape `backfillStalePortfolios` already uses to decide what's worth touching.
+  const withTxRows = await db
+    .selectDistinct({ portfolioId: transactions.portfolioId })
+    .from(transactions)
+    .where(isNotNull(transactions.portfolioId));
+  const portfoliosWithTx = new Set(withTxRows.map((r) => r.portfolioId));
+
   let count = 0;
   for (const p of pfs) {
+    if (!portfoliosWithTx.has(p.id)) {
+      // A portfolio that never had transactions never had a snapshot either — nothing to
+      // terminate, skip entirely. But one whose transactions were REMOVED (it has prior,
+      // non-zero snapshot history) needs exactly ONE final marketValue:0 row: aggregateValueFlows
+      // (packages/core/src/twr.ts) needs an explicit zero to recognize "this leg has ended" —
+      // an absent row is read as "hasn't reported today yet" and its last value is carried
+      // forward into the aggregate INDEFINITELY, not as a termination. Writing this once and
+      // then never again (the zero row itself is the signal it's already terminated) is what
+      // keeps this from becoming the same unbounded-growth problem this skip exists to fix.
+      //
+      // This gate assumes the only way the MOST RECENT row reaches marketValue:0 is via
+      // this exact terminal write. A stray zero row from an unrelated source (e.g. a
+      // one-off manual backfill) would be indistinguishable from "already terminated" and
+      // permanently stop writes for this portfolio — harmless while it has zero
+      // transactions (there's nothing real to miss), but worth knowing if this portfolio
+      // ever gets transactions again, since the `portfoliosWithTx` check above (not this
+      // one) is what re-admits it to the normal valuation path once it does.
+      const [lastSnap] = await db
+        .select({ marketValue: portfolioSnapshots.marketValue })
+        .from(portfolioSnapshots)
+        .where(eq(portfolioSnapshots.portfolioId, p.id))
+        .orderBy(desc(portfolioSnapshots.date))
+        .limit(1);
+      if (!lastSnap || Number(lastSnap.marketValue) === 0) continue;
+      await db
+        .insert(portfolioSnapshots)
+        .values({
+          portfolioId: p.id,
+          date,
+          netWorth: "0",
+          marketValue: "0",
+          effectiveFlow: "0",
+          currency: p.baseCurrency,
+        })
+        .onConflictDoUpdate({
+          target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
+          set: { netWorth: "0", marketValue: "0", effectiveFlow: "0", currency: p.baseCurrency },
+        });
+      count++;
+      continue;
+    }
     const { summary, coreTxns, metaById } = await valuePortfolio(
       db,
       marketData,

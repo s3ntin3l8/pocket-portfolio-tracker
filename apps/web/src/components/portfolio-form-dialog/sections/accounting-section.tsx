@@ -8,20 +8,16 @@ export function AccountingSection({
   cashCounted,
   allowNegativeCash,
   documentRetention,
-  includeInAggregate,
   onCashCountedChange,
   onAllowNegativeCashChange,
   onDocumentRetentionChange,
-  onIncludeInAggregateChange,
 }: {
   cashCounted: boolean;
   allowNegativeCash: boolean;
   documentRetention: boolean;
-  includeInAggregate: boolean;
   onCashCountedChange: (v: boolean) => void;
   onAllowNegativeCashChange: (v: boolean) => void;
   onDocumentRetentionChange: (v: boolean) => void;
-  onIncludeInAggregateChange: (v: boolean) => void;
 }) {
   const t = useTranslations("PortfolioForm");
   // Distinct per mount so two form hosts (e.g. a Sheet open over a full-page form) never
@@ -52,13 +48,6 @@ export function AccountingSection({
         hint={t("documentRetentionHint")}
         checked={documentRetention}
         onCheckedChange={onDocumentRetentionChange}
-      />
-      <ToggleRow
-        id={`${uid}-includeInAggregate`}
-        label={t("includeInAggregate")}
-        hint={t("includeInAggregateHint")}
-        checked={includeInAggregate}
-        onCheckedChange={onIncludeInAggregateChange}
       />
     </div>
   );

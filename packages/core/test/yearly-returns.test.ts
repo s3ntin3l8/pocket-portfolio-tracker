@@ -200,6 +200,84 @@ describe("computeYearlyReturns", () => {
     expect(rows[0].portfolioXirr).toBeNull();
   });
 
+  it("anchors a year's TWR to the PRIOR year's close, not the first point within the year", () => {
+    // 2024 ends at index 110. 2025 has a gap: its first observed point (Jan 5) is
+    // already at 115 — a real move that happened between Dec 31 and Jan 5. The old
+    // "first point within the year" convention would silently drop that move.
+    const pfIndex: IndexPoint[] = [
+      ...linearIndex("2024-01-02", "2024-12-31", 100, 110),
+      ...linearIndex("2025-01-05", "2025-12-31", 115, 120),
+    ];
+    const rows = computeYearlyReturns({
+      pfIndex,
+      pfFlowsByYear: new Map(),
+      pfEndNavByYear: new Map(),
+      benchmarks: [],
+      asOf: d("2025-12-31"),
+    });
+    // Old behaviour would compute (120/115 - 1) ≈ +4.35%; anchoring to the prior
+    // year's close of 110 correctly captures the Dec 31 → Jan 5 move too.
+    expect(Number(rows[1].portfolioTwr)).toBeCloseTo(120 / 110 - 1, 4);
+    expect(Number(rows[1].portfolioTwr)).not.toBeCloseTo(120 / 115 - 1, 4);
+  });
+
+  it("falls back to the year's first point when there is no prior year (inception year)", () => {
+    const pfIndex: IndexPoint[] = linearIndex("2024-03-01", "2024-12-31", 100, 110);
+    const rows = computeYearlyReturns({
+      pfIndex,
+      pfFlowsByYear: new Map(),
+      pfEndNavByYear: new Map(),
+      benchmarks: [],
+      asOf: d("2024-12-31"),
+    });
+    expect(Number(rows[0].portfolioTwr)).toBeCloseTo(0.1, 4);
+  });
+
+  it("seeds XIRR with an opening-NAV outflow from the PRIOR year's closing NAV", () => {
+    // 2024 closes at NAV 30000 (no flows needed for this test — 2024 itself is out
+    // of scope). 2025 takes 2000 of deposits and ends at 36000: a modest real
+    // return, not the ~250%+ XIRR the missing opening NAV would otherwise imply.
+    const pfIndex: IndexPoint[] = [
+      ...linearIndex("2024-01-02", "2024-12-31", 100, 110),
+      ...linearIndex("2025-01-02", "2025-12-31", 110, 132), // scale mirrors 30000→36000
+    ];
+    const endNavByYear = new Map<number, string>([
+      [2024, "30000"],
+      [2025, "36000"],
+    ]);
+    const flowsByYear = new Map<number, YearlyPortfolioFlow[]>([
+      [2025, [flow(-2000, "2025-06-15")]], // a deposit is a cash OUTFLOW from the investor's pocket
+    ]);
+    const rows = computeYearlyReturns({
+      pfIndex,
+      pfFlowsByYear: flowsByYear,
+      pfEndNavByYear: endNavByYear,
+      benchmarks: [],
+      asOf: d("2025-12-31"),
+    });
+    const xirr2025 = Number(rows[1].portfolioXirr);
+    expect(xirr2025).not.toBeNull();
+    // Without the opening NAV, flows=[-2000] + terminal +36000 alone would solve to
+    // an absurd rate (only ~half a year of "capital" explaining a 36000 balance).
+    // With the €30000 opening NAV counted, the year's real return is modest.
+    expect(xirr2025).toBeLessThan(0.5);
+    expect(xirr2025).toBeGreaterThan(-0.5);
+  });
+
+  it("the inception year (no prior year in the NAV map) is unaffected by the opening-NAV seed", () => {
+    const pfIndex: IndexPoint[] = linearIndex("2024-01-02", "2024-12-31", 100, 110);
+    const rows = computeYearlyReturns({
+      pfIndex,
+      pfFlowsByYear: new Map([[2024, [flow(-1000, "2024-01-02")]]]),
+      pfEndNavByYear: new Map([[2024, "1100"]]),
+      benchmarks: [],
+      asOf: d("2024-12-31"),
+    });
+    // Identical to the pre-existing "computes portfolio XIRR" case above — no
+    // pfEndNavByYear.get(2023) entry means opening NAV is 0, today's behaviour.
+    expect(Number(rows[0].portfolioXirr!)).toBeCloseTo(0.1, 1);
+  });
+
   it("marks the current calendar year (matches asOf.getUTCFullYear) as isCurrentYear", () => {
     const pfIndex: IndexPoint[] = [
       ...linearIndex("2024-01-02", "2024-12-31", 100, 110),

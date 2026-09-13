@@ -216,6 +216,7 @@
       "best": "Best performer",
       "worst": "Worst performer",
       "empty": "Not enough day-change data yet.",
+      "staleData": "Some prices haven't updated recently — comparison unavailable.",
       "monthlyTitle": "This month",
       "monthlyTimeframe": "MTD",
       "yearlyTitle": "This year",
@@ -618,7 +619,6 @@
     "born": "Born {year}",
     "cashIn": "Cash counted",
     "docsKept": "Docs kept",
-    "excluded": "Excluded from aggregate",
     "newPortfolioHint": "Manual, Trade Republic or IBKR"
   },
   "AccountHolders": {
@@ -688,8 +688,6 @@
     "deleteRelatedNote": "Related documents, loans and history are also removed. This cannot be undone.",
     "confirmDelete": "Delete",
     "cancel": "Cancel",
-    "includeInAggregate": "Include in net-worth aggregate",
-    "includeInAggregateHint": "Count this portfolio toward your total net worth.",
     "cashCounted": "Cash is part of this portfolio",
     "cashCountedHint": "Count idle cash toward net worth — for savings/deposit accounts, not brokerage or checking.",
     "allowNegativeCash": "Allow transient negative cash",

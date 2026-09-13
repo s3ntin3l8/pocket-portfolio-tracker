@@ -12,7 +12,6 @@ export type EditablePortfolio = Pick<
   | "brokerage"
   | "accountNumber"
   | "iban"
-  | "includeInAggregate"
   | "cashCounted"
   | "allowNegativeCash"
   | "documentRetention"

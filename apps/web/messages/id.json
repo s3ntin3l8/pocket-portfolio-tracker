@@ -216,6 +216,7 @@
       "best": "Kinerja terbaik",
       "worst": "Kinerja terburuk",
       "empty": "Data perubahan harian belum cukup.",
+      "staleData": "Beberapa harga belum diperbarui baru-baru ini — perbandingan tidak tersedia.",
       "monthlyTitle": "Bulan ini",
       "monthlyTimeframe": "MTD",
       "yearlyTitle": "Tahun ini",
@@ -626,7 +627,6 @@
     "born": "Lahir {year}",
     "cashIn": "Kas termasuk",
     "docsKept": "Dokumen disimpan",
-    "excluded": "Dikecualikan dari agregat",
     "newPortfolioHint": "Manual, Trade Republic, atau IBKR"
   },
   "AccountHolders": {
@@ -696,8 +696,6 @@
     "deleteRelatedNote": "Dokumen, pinjaman, dan riwayat terkait juga akan dihapus. Tindakan ini tidak dapat dibatalkan.",
     "confirmDelete": "Hapus",
     "cancel": "Batal",
-    "includeInAggregate": "Sertakan dalam agregat kekayaan bersih",
-    "includeInAggregateHint": "Hitung portofolio ini dalam total nilai bersih Anda.",
     "cashCounted": "Kas adalah bagian dari portofolio ini",
     "cashCountedHint": "Hitung kas menganggur sebagai nilai bersih — untuk rekening tabungan/deposito, bukan broker.",
     "allowNegativeCash": "Izinkan saldo kas negatif sementara",

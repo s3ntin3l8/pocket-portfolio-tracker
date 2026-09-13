@@ -18,8 +18,16 @@
  *   - PERIOD_LOSS_MAX_PCT (90%):  A long-only equity cannot lose more than
  *     100%, so a >90% monthly/yearly loss is near-total wipeout and likely
  *     a unit-mismatch artifact (price → 0).
+ *   - MAX_PRICE_CARRY_FORWARD_DAYS (10): a "latest price on or before date X"
+ *     lookup that finds nothing within this window is treated as NO price,
+ *     not a plausible last-known value — beyond ~2 trading weeks (covers
+ *     ordinary weekends/holidays with room to spare) a price feed that has
+ *     stopped updating for an instrument should exclude it from movers/
+ *     concentration weighting rather than silently reporting a stale 0.00%
+ *     move or an outdated weight.
  */
 
 export const SINGLE_DAY_MAX_PCT = 50;
 export const PERIOD_GAIN_MAX_PCT = 200;
 export const PERIOD_LOSS_MAX_PCT = 90;
+export const MAX_PRICE_CARRY_FORWARD_DAYS = 10;

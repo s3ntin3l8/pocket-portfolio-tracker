@@ -214,7 +214,6 @@ export function OnboardingFlow() {
         baseCurrency: currency,
         cashCounted,
         accountHolderId: holderId,
-        includeInAggregate: true,
         allowNegativeCash: false,
         documentRetention: false,
       };

@@ -183,27 +183,53 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
             />
           )}
 
-          {insightsData?.bestWorstMonthly.best && insightsData?.bestWorstMonthly.worst && (
+          {insightsData && (
             <BestWorstCard
-              best={periodToMover(insightsData.bestWorstMonthly.best)}
-              worst={periodToMover(insightsData.bestWorstMonthly.worst)}
+              best={
+                insightsData.bestWorstMonthly.best
+                  ? periodToMover(insightsData.bestWorstMonthly.best)
+                  : null
+              }
+              worst={
+                insightsData.bestWorstMonthly.worst
+                  ? periodToMover(insightsData.bestWorstMonthly.worst)
+                  : null
+              }
               title={t("bestWorst.monthlyTitle")}
               timeframeLabel={t("bestWorst.monthlyTimeframe")}
               bestLabel={t("bestWorst.best")}
               worstLabel={t("bestWorst.worst")}
               locale={locale}
+              staleMessage={
+                insightsData.bestWorstMonthly.reason === "stale_prices"
+                  ? t("bestWorst.staleData")
+                  : undefined
+              }
             />
           )}
 
-          {insightsData?.bestWorstYearly.best && insightsData?.bestWorstYearly.worst && (
+          {insightsData && (
             <BestWorstCard
-              best={periodToMover(insightsData.bestWorstYearly.best)}
-              worst={periodToMover(insightsData.bestWorstYearly.worst)}
+              best={
+                insightsData.bestWorstYearly.best
+                  ? periodToMover(insightsData.bestWorstYearly.best)
+                  : null
+              }
+              worst={
+                insightsData.bestWorstYearly.worst
+                  ? periodToMover(insightsData.bestWorstYearly.worst)
+                  : null
+              }
               title={t("bestWorst.yearlyTitle")}
               timeframeLabel={t("bestWorst.yearlyTimeframe")}
               bestLabel={t("bestWorst.best")}
               worstLabel={t("bestWorst.worst")}
               locale={locale}
+              staleMessage={
+                insightsData.bestWorstYearly.reason === "stale_prices"
+                  ? t("bestWorst.staleData")
+                  : undefined
+              }
             />
           )}
 

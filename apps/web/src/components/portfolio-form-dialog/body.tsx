@@ -118,7 +118,6 @@ export function PortfolioFormBody({
           cashCounted={f.cashCounted}
           allowNegativeCash={f.allowNegativeCash}
           documentRetention={f.documentRetention}
-          includeInAggregate={f.includeInAggregate}
           onNameChange={f.setName}
           onBrokerageChange={f.setBrokerage}
           onAccountHolderChange={f.setAccountHolderId}
@@ -132,7 +131,6 @@ export function PortfolioFormBody({
           onCashCountedChange={f.setCashCounted}
           onAllowNegativeCashChange={f.setAllowNegativeCash}
           onDocumentRetentionChange={f.setDocumentRetention}
-          onIncludeInAggregateChange={f.setIncludeInAggregate}
         />
       </form>
 

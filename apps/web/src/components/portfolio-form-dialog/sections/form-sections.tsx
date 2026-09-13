@@ -40,7 +40,6 @@ export function PortfolioFormSections({
   cashCounted,
   allowNegativeCash,
   documentRetention,
-  includeInAggregate,
   // Setters
   onNameChange,
   onBrokerageChange,
@@ -55,7 +54,6 @@ export function PortfolioFormSections({
   onCashCountedChange,
   onAllowNegativeCashChange,
   onDocumentRetentionChange,
-  onIncludeInAggregateChange,
 }: {
   name: string;
   brokerage: string;
@@ -80,7 +78,6 @@ export function PortfolioFormSections({
   cashCounted: boolean;
   allowNegativeCash: boolean;
   documentRetention: boolean;
-  includeInAggregate: boolean;
   onNameChange: (v: string) => void;
   onBrokerageChange: (v: string) => void;
   onAccountHolderChange: (v: string) => void;
@@ -94,7 +91,6 @@ export function PortfolioFormSections({
   onCashCountedChange: (v: boolean) => void;
   onAllowNegativeCashChange: (v: boolean) => void;
   onDocumentRetentionChange: (v: boolean) => void;
-  onIncludeInAggregateChange: (v: boolean) => void;
 }) {
   const t = useTranslations("PortfolioForm");
   // Distinct per mount — see the matching note in accounting-section.tsx.
@@ -272,11 +268,9 @@ export function PortfolioFormSections({
         cashCounted={cashCounted}
         allowNegativeCash={allowNegativeCash}
         documentRetention={documentRetention}
-        includeInAggregate={includeInAggregate}
         onCashCountedChange={onCashCountedChange}
         onAllowNegativeCashChange={onAllowNegativeCashChange}
         onDocumentRetentionChange={onDocumentRetentionChange}
-        onIncludeInAggregateChange={onIncludeInAggregateChange}
       />
     </div>
   );

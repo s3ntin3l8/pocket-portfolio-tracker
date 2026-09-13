@@ -21,7 +21,6 @@ const BASE = {
   brokerage: null,
   accountNumber: null,
   iban: null,
-  includeInAggregate: true,
   cashCounted: false,
   allowNegativeCash: false,
   documentRetention: false,

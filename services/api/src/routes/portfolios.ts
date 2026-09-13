@@ -61,7 +61,6 @@ export async function portfoliosRoute(app: FastifyInstance) {
         brokerage: input.brokerage ?? null,
         accountNumber: input.accountNumber ?? null,
         iban: input.iban ?? null,
-        includeInAggregate: input.includeInAggregate,
         cashCounted: input.cashCounted,
         allowNegativeCash: input.allowNegativeCash,
         documentRetention: input.documentRetention,
