@@ -151,6 +151,17 @@ export interface AdminJob {
   lastStatus: "completed" | "failed" | null;
   /** Whether this job supports a force flag that bypasses caches/stale checks. */
   supportsForce?: boolean;
+  /**
+   * In-flight work for this queue right now (active + queued job rows), so an operator
+   * can tell a long-running trigger apart from one that silently failed. 0 when idle.
+   */
+  inProgress?: number;
+  /**
+   * Fan-out progress for a job that dispatches per-portfolio work onto a separate queue
+   * (currently only backfill-stale-history, onto backfill-portfolio) — active + queued
+   * count on that queue. Absent for jobs with no fan-out.
+   */
+  fanOutRemaining?: number;
 }
 
 /** Response from GET /admin/jobs. */

@@ -1,7 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { sql } from "drizzle-orm";
 import { adminAuditLog } from "@portfolio/db";
-import { JOB_DESCRIPTORS, getActiveBoss, triggerJob } from "../../services/scheduler.js";
+import {
+  JOB_DESCRIPTORS,
+  BACKFILL_STALE_QUEUE,
+  BACKFILL_PORTFOLIO_QUEUE,
+  getActiveBoss,
+  triggerJob,
+} from "../../services/scheduler.js";
 
 export function registerJobsRoutes(app: FastifyInstance) {
   app.get("/admin/jobs", { preHandler: app.requireAdmin }, async () => {
@@ -12,25 +18,36 @@ export function registerJobsRoutes(app: FastifyInstance) {
       name: string;
       lastRunAt: string | null;
       lastStatus: "completed" | "failed" | null;
+      inProgress: number;
     };
 
     let liveRows: JobRow[] = [];
+    // backfill-stale-history fans out onto backfill-portfolio (see #745); track that
+    // queue's in-flight count too even though it's not itself a JOB_DESCRIPTOR (it isn't
+    // directly user-triggerable) so the admin UI can show real fan-out progress instead
+    // of the trigger silently looking "done" the moment the planner job completes.
+    let fanOutRemaining = 0;
     if (schedulerAvailable) {
       try {
-        const queueNames: string[] = JOB_DESCRIPTORS.map((j) => j.name);
+        const queueNames: string[] = [
+          ...JOB_DESCRIPTORS.map((j) => j.name),
+          BACKFILL_PORTFOLIO_QUEUE,
+        ];
         type JobStatusRow = {
           name: string;
           last_completed: string | null;
           last_failed: string | null;
+          in_progress: number;
         };
         const rawResult = await app.db.execute<JobStatusRow>(sql`
           SELECT
             name,
             MAX(completed_on) FILTER (WHERE state = 'completed') AS last_completed,
-            MAX(completed_on) FILTER (WHERE state = 'failed')    AS last_failed
+            MAX(completed_on) FILTER (WHERE state = 'failed')    AS last_failed,
+            COUNT(*) FILTER (WHERE state IN ('active', 'created', 'retry')) AS in_progress
           FROM pgboss.job
           WHERE name IN ${queueNames}
-            AND completed_on > NOW() - INTERVAL '30 days'
+            AND (completed_on > NOW() - INTERVAL '30 days' OR completed_on IS NULL)
           GROUP BY name
         `);
         const rows: JobStatusRow[] = Array.isArray(rawResult)
@@ -39,11 +56,14 @@ export function registerJobsRoutes(app: FastifyInstance) {
         liveRows = rows.map((r) => {
           const c = r.last_completed ? new Date(r.last_completed).toISOString() : null;
           const f = r.last_failed ? new Date(r.last_failed).toISOString() : null;
-          if (!c && !f) return { name: r.name, lastRunAt: null, lastStatus: null };
+          const inProgress = Number(r.in_progress) || 0;
+          if (!c && !f) return { name: r.name, lastRunAt: null, lastStatus: null, inProgress };
           const lastRunAt = c && f ? (c > f ? c : f) : (c ?? f);
           const lastStatus: "completed" | "failed" = c && (!f || c >= f) ? "completed" : "failed";
-          return { name: r.name, lastRunAt, lastStatus };
+          return { name: r.name, lastRunAt, lastStatus, inProgress };
         });
+        fanOutRemaining =
+          liveRows.find((r) => r.name === BACKFILL_PORTFOLIO_QUEUE)?.inProgress ?? 0;
       } catch (err) {
         app.log.warn({ err }, "admin jobs status query failed");
       }
@@ -59,6 +79,8 @@ export function registerJobsRoutes(app: FastifyInstance) {
       supportsForce: (d as { supportsForce?: boolean }).supportsForce ?? false,
       lastRunAt: liveMap.get(d.name)?.lastRunAt ?? null,
       lastStatus: liveMap.get(d.name)?.lastStatus ?? null,
+      inProgress: liveMap.get(d.name)?.inProgress ?? 0,
+      ...(d.name === BACKFILL_STALE_QUEUE ? { fanOutRemaining } : {}),
     }));
 
     return { schedulerAvailable, jobs };
@@ -74,10 +96,19 @@ export function registerJobsRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: "unknown_job" });
       }
 
-      const queryForce = (request.query as Record<string, string> | null)?.force;
-      const bodyForce = (request.body as Record<string, unknown> | null)?.force;
-      const force = Boolean(queryForce === "1" || queryForce === "true" || bodyForce);
-      const payload: Record<string, unknown> = force ? { force: true } : {};
+      const query = request.query as Record<string, string> | null;
+      const body = request.body as Record<string, unknown> | null;
+      const force = Boolean(query?.force === "1" || query?.force === "true" || body?.force);
+      // Optional scope for force mode (currently only meaningful to backfill-stale-history,
+      // see #745) — a full re-backfill of every user's every portfolio is what exceeded
+      // pg-boss's handler timeout at platform scale; scoping to one user is the cheap
+      // escape hatch for "I just need to re-check my own data" without touching everyone.
+      const userId =
+        typeof query?.userId === "string" ? query.userId : (body?.userId as string | undefined);
+      const payload: Record<string, unknown> = {
+        ...(force ? { force: true } : {}),
+        ...(userId ? { userId } : {}),
+      };
 
       const result = await triggerJob(name, payload);
       if (!result.queued) {
@@ -88,10 +119,10 @@ export function registerJobsRoutes(app: FastifyInstance) {
         actorSub: request.user!.authSub,
         action: "trigger_job",
         target: name,
-        meta: force ? { force: true } : null,
+        meta: Object.keys(payload).length > 0 ? payload : null,
       });
 
-      return { queued: true, name, ...(force ? { force: true } : {}) };
+      return { queued: true, name, ...payload };
     },
   );
 }

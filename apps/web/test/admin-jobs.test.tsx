@@ -133,7 +133,8 @@ describe("AdminJobs", () => {
     vi.useFakeTimers();
     const job = makeJob({ lastRunAt: "2026-06-22T10:00:00.000Z" });
 
-    // Poll always returns the same lastRunAt (job never finishes in this test).
+    // Poll always returns the same lastRunAt and no in-flight counts (job never finishes,
+    // and never reports progress either) — the timeout ceiling is the only way out.
     mockGetAdminJobs.mockResolvedValue({
       schedulerAvailable: true,
       jobs: [{ ...job, lastRunAt: "2026-06-22T10:00:00.000Z" }],
@@ -144,15 +145,41 @@ describe("AdminJobs", () => {
       fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobRunNow }));
     });
 
-    // Advance through MAX_POLLS (10) polls.  Each advanceTimersByTimeAsync fires
+    // Advance through MAX_POLLS (40) polls. Each advanceTimersByTimeAsync fires
     // the interval callback and awaits the async body (getAdminJobs + setPending).
     await act(async () => {
-      for (let i = 0; i < 11; i++) {
+      for (let i = 0; i < 41; i++) {
         await vi.advanceTimersByTimeAsync(3500);
       }
     });
 
     expect(screen.getByText(messages.Admin.jobPollTimedOut)).toBeInTheDocument();
+  });
+
+  it("shows fan-out progress ('N portfolios remaining') instead of a flat Queued while a force re-run's per-portfolio backfill is in flight (#745)", async () => {
+    vi.useFakeTimers();
+    const job = makeJob({
+      name: "backfill-stale-history",
+      label: "Backfill stale history",
+      lastRunAt: "2026-06-22T10:00:00.000Z",
+      supportsForce: true,
+    });
+
+    mockGetAdminJobs.mockResolvedValue({
+      schedulerAvailable: true,
+      jobs: [{ ...job, lastRunAt: "2026-06-22T10:00:00.000Z", fanOutRemaining: 3 }],
+    });
+    renderJobs([job]);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: messages.Admin.jobForce }));
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3500);
+    });
+
+    expect(screen.getByText("3 portfolios remaining")).toBeInTheDocument();
   });
 
   it("shows error when trigger fails", async () => {

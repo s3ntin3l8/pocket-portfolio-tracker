@@ -65,13 +65,26 @@ export class MarketDataService {
     return [];
   }
 
-  async getHistoryFrom(ref: InstrumentRef, fromDate: string): Promise<Candle[]> {
+  /**
+   * `allowMaxFallback` (default `true`) controls the "no provider returned candles for
+   * this window" fallback below. A caller doing a tail-only heal (only the gap since a
+   * known-good date is missing; see issue #737) wants `false` — an empty window there
+   * means "no new candles since then", not "this instrument has no history at all", and
+   * falling back to a full-range `getHistory(ref, "max")` call on every such miss is what
+   * let a permanently dead feed re-trigger an unbounded provider fetch every sweep run.
+   */
+  async getHistoryFrom(
+    ref: InstrumentRef,
+    fromDate: string,
+    opts: { allowMaxFallback?: boolean } = {},
+  ): Promise<Candle[]> {
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getHistoryFrom) continue;
       this.opts.onCall?.(provider.name);
       const candles = (await provider.getHistoryFrom(ref, fromDate)) ?? [];
       if (candles.length > 0) return candles;
     }
+    if (opts.allowMaxFallback === false) return [];
     // Fallback: try getHistory with max range if no provider supports getHistoryFrom
     return this.getHistory(ref, "max");
   }

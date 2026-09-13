@@ -25,9 +25,18 @@
  *     stopped updating for an instrument should exclude it from movers/
  *     concentration weighting rather than silently reporting a stale 0.00%
  *     move or an outdated weight.
+ *   - DEAD_FEED_MISS_THRESHOLD (7): consecutive backfill attempts that return
+ *     zero candles for an instrument before the nightly sweep stops treating
+ *     it as "temporarily lagging" and starts treating it as a feed with
+ *     nothing left to give. At one attempt per nightly sweep run, 7 misses is
+ *     about a week — long enough to ride out a genuine provider outage, short
+ *     enough that a truly dead symbol stops re-triggering a full-range
+ *     provider fetch every single night. See services/api's backfill sweep
+ *     and issue #737.
  */
 
 export const SINGLE_DAY_MAX_PCT = 50;
 export const PERIOD_GAIN_MAX_PCT = 200;
 export const PERIOD_LOSS_MAX_PCT = 90;
 export const MAX_PRICE_CARRY_FORWARD_DAYS = 10;
+export const DEAD_FEED_MISS_THRESHOLD = 7;

@@ -24,6 +24,7 @@ export {
   RECOMPUTE_SINGLETON_SECONDS,
   BACKFILL_STALE_QUEUE,
   BACKFILL_STALE_CRON,
+  BACKFILL_PORTFOLIO_QUEUE,
   INSTRUMENT_META_SINGLETON_SECONDS,
 } from "./scheduler/config.js";
 
@@ -37,6 +38,7 @@ export {
   enqueueIbkrSync,
   enqueueTrSync,
   enqueueRecompute,
+  enqueueBackfillPortfolio,
   enqueueInstrumentMetadata,
   usesPglite,
 } from "./scheduler/enqueue.js";
@@ -57,7 +59,7 @@ import { syncIbkrConnection } from "./ibkr/sync.js";
 import { backfillPortfolioHistory, backfillStalePortfolios } from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 import { resetStaleSyncFlags } from "./scheduler/cleanup.js";
-import { setActiveBoss, usesPglite } from "./scheduler/enqueue.js";
+import { setActiveBoss, usesPglite, enqueueBackfillPortfolio } from "./scheduler/enqueue.js";
 import {
   QUEUE,
   SCHEDULE_CRON,
@@ -81,6 +83,9 @@ import {
   RECOMPUTE_QUEUE,
   BACKFILL_STALE_QUEUE,
   BACKFILL_STALE_CRON,
+  BACKFILL_STALE_QUEUE_OPTIONS,
+  BACKFILL_PORTFOLIO_QUEUE,
+  BACKFILL_PORTFOLIO_QUEUE_OPTIONS,
 } from "./scheduler/config.js";
 
 /**
@@ -343,32 +348,71 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   });
   await boss.schedule(GC_RECEIPTS_QUEUE, GC_RECEIPTS_CRON);
 
+  // Per-portfolio backfill work, fanned out from backfill-stale-history below. Each
+  // portfolio gets its own pg-boss job (own expiry budget, independent retry, visible
+  // pgboss.job row) instead of one global job whose 900s handler timeout a force run at
+  // platform scale blows through on the very first invocation. See issue #745.
+  await boss.createQueue(BACKFILL_PORTFOLIO_QUEUE, BACKFILL_PORTFOLIO_QUEUE_OPTIONS);
+  await boss.updateQueue(BACKFILL_PORTFOLIO_QUEUE, BACKFILL_PORTFOLIO_QUEUE_OPTIONS);
+  await boss.work(BACKFILL_PORTFOLIO_QUEUE, async (jobs) => {
+    for (const job of jobs) {
+      const { portfolioId, fromDate, tailOnly } = job.data as {
+        portfolioId: string;
+        fromDate?: string;
+        tailOnly?: boolean;
+      };
+      try {
+        const result = await backfillPortfolioHistory(
+          getDb(),
+          await getMarketData(),
+          app.config.MARKET_DATA_TTL_MS,
+          portfolioId,
+          { fromDate, tailOnly },
+        );
+        await flushUsage();
+        app.log.info({ portfolioId, fromDate, tailOnly, ...result }, "backfill-portfolio complete");
+      } catch (err) {
+        app.log.error({ err, portfolioId, fromDate, tailOnly }, "backfill-portfolio failed");
+        throw err; // let pg-boss record a genuine failure instead of a false "completed"
+      }
+    }
+  });
+
   // Self-healing sweep: find portfolios whose snapshot history doesn't reach back to
-  // inception (pre-existing portfolios that pre-date the backfill engine) and run a
-  // full inception backfill. Near-no-op once every portfolio is healed; continues to
-  // catch any portfolio that is imported but never mutated.
-  await boss.createQueue(BACKFILL_STALE_QUEUE);
+  // inception (pre-existing portfolios that pre-date the backfill engine) and enqueue a
+  // per-portfolio backfill onto BACKFILL_PORTFOLIO_QUEUE for each one that needs it.
+  // Near-no-op once every portfolio is healed; continues to catch any portfolio that is
+  // imported but never mutated. Now just a planner (two queries + N enqueues), so it
+  // needs far less than the 900s default — see BACKFILL_STALE_QUEUE_OPTIONS.
+  await boss.createQueue(BACKFILL_STALE_QUEUE, BACKFILL_STALE_QUEUE_OPTIONS);
+  await boss.updateQueue(BACKFILL_STALE_QUEUE, BACKFILL_STALE_QUEUE_OPTIONS);
   await boss.work(BACKFILL_STALE_QUEUE, async (jobs) => {
-    // jobs[0].data may carry { force: true } when triggered from the admin panel
-    // to rebuild all portfolios from inception (one-shot heal after a bug fix).
-    const force =
-      Array.isArray(jobs) && jobs.length > 0
-        ? Boolean((jobs[0]?.data as Record<string, unknown> | null)?.force)
-        : false;
+    // Any job in a batched delivery carrying { force: true } (or { userId }) triggers a
+    // full re-backfill — reading only jobs[0] silently dropped these flags on the rest
+    // of a batch.
+    const jobDatas = jobs.map((j) => j.data as Record<string, unknown> | null);
+    const force = jobDatas.some((d) => Boolean(d?.force));
+    const userId = jobDatas.find((d) => typeof d?.userId === "string")?.userId as
+      string | undefined;
     try {
       const result = await backfillStalePortfolios(
         getDb(),
         await getMarketData(),
         app.config.MARKET_DATA_TTL_MS,
-        { force },
+        {
+          force,
+          userId,
+          enqueue: (portfolioId, fromDate, tailOnly) =>
+            enqueueBackfillPortfolio(portfolioId, fromDate, tailOnly),
+        },
       );
-      await flushUsage();
       app.log.info(
-        { scanned: result.scanned, healed: result.healed, force },
+        { scanned: result.scanned, queued: result.queued, force, userId },
         "backfill-stale-history complete",
       );
     } catch (err) {
-      app.log.error({ err }, "backfill-stale-history failed");
+      app.log.error({ err, force, userId }, "backfill-stale-history failed");
+      throw err; // let pg-boss record a genuine failure instead of a false "completed"
     }
   });
   await boss.schedule(BACKFILL_STALE_QUEUE, BACKFILL_STALE_CRON);

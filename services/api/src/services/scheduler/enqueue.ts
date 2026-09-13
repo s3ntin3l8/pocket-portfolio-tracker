@@ -1,5 +1,7 @@
 import type { PgBoss } from "pg-boss";
 import {
+  BACKFILL_PORTFOLIO_QUEUE,
+  BACKFILL_PORTFOLIO_SINGLETON_SECONDS,
   IBKR_SYNC_QUEUE,
   INSTRUMENT_META_QUEUE,
   INSTRUMENT_META_SINGLETON_SECONDS,
@@ -7,6 +9,11 @@ import {
   RECOMPUTE_SINGLETON_SECONDS,
   TR_SYNC_QUEUE,
 } from "./config.js";
+
+/** How long a trigger-job dedup key stands: long enough to absorb a double-click or an
+ * admin trigger landing on top of the same job's own cron firing, short enough that a
+ * genuinely repeated manual trigger a minute later isn't silently swallowed. */
+const TRIGGER_SINGLETON_SECONDS = 30;
 
 let activeBoss: PgBoss | null = null;
 
@@ -37,7 +44,10 @@ export async function triggerJob(
   payload: Record<string, unknown> = {},
 ): Promise<{ queued: boolean }> {
   if (!activeBoss) return { queued: false };
-  await activeBoss.send(name, payload);
+  await activeBoss.send(name, payload, {
+    singletonKey: name,
+    singletonSeconds: TRIGGER_SINGLETON_SECONDS,
+  });
   return { queued: true };
 }
 
@@ -83,6 +93,33 @@ export async function enqueueRecompute(portfolioId: string, fromDate: string): P
       RECOMPUTE_QUEUE,
       { portfolioId, fromDate },
       { singletonKey: portfolioId, singletonSeconds: RECOMPUTE_SINGLETON_SECONDS },
+    );
+  } catch {
+    // non-fatal
+  }
+}
+
+/**
+ * Enqueue a per-portfolio backfill onto BACKFILL_PORTFOLIO_QUEUE, deduplicated per
+ * portfolio so a force sweep landing on top of an already-queued/running heal for the
+ * same portfolio collapses instead of duplicating. `fromDate`/`tailOnly` mirror
+ * `BackfillOptions` (undefined `fromDate` means "from inception"; `tailOnly` suppresses
+ * the max-range provider fallback for a heal that's only chasing the trailing edge).
+ * No-op when pg-boss is unavailable (PGlite / tests) — callers that need the work done
+ * synchronously (tests, direct sweep calls without an enqueuer) fall back to calling
+ * `backfillPortfolioHistory` inline instead.
+ */
+export async function enqueueBackfillPortfolio(
+  portfolioId: string,
+  fromDate?: string,
+  tailOnly?: boolean,
+): Promise<void> {
+  if (!activeBoss) return;
+  try {
+    await activeBoss.send(
+      BACKFILL_PORTFOLIO_QUEUE,
+      { portfolioId, fromDate, tailOnly },
+      { singletonKey: portfolioId, singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS },
     );
   } catch {
     // non-fatal
