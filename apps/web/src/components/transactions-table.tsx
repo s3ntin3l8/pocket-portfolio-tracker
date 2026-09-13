@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useApiClient } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
-import { bannerAnomalies, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
+import { bannerAnomalies, anomalyLabel, cn, type AnomalyTranslator } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import { useLongPressSelect } from "@/lib/use-long-press-select";
 import { toast } from "sonner";
@@ -363,22 +363,26 @@ export function TransactionsTable({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 @xl:grid-cols-[1fr_320px] @xl:items-start">
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-4 @xl:items-start",
+          showFilterBanners && "@xl:grid-cols-[1fr_320px]",
+        )}
+      >
         {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
-        <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:pt-3">
-          {showFilterBanners && allBanner && (
-            <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
-          )}
-          {showFilterBanners && incomeBanner && (
-            <IncomeFilterBanner
-              data={incomeBanner}
-              projectedLabel={tBanner("projected12mo")}
-              bySourceLabel={tBanner("bySource")}
-            />
-          )}
-          {showFilterBanners &&
-            tradeBanner &&
-            (activeBannerMode === "buy" || activeBannerMode === "sell") && (
+        {showFilterBanners && (
+          <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+            {allBanner && (
+              <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
+            )}
+            {incomeBanner && (
+              <IncomeFilterBanner
+                data={incomeBanner}
+                projectedLabel={tBanner("projected12mo")}
+                bySourceLabel={tBanner("bySource")}
+              />
+            )}
+            {tradeBanner && (activeBannerMode === "buy" || activeBannerMode === "sell") && (
               <TradeFilterBanner
                 data={tradeBanner}
                 averageLabel={tBanner("averageOrder")}
@@ -388,14 +392,15 @@ export function TransactionsTable({
                 headingLabel={tBanner(activeBannerMode === "buy" ? "mostBought" : "mostSold")}
               />
             )}
-        </div>
+          </div>
+        )}
 
         {/* ── Main column: alerts + controls + table ── */}
         {/* On mobile, order-first ensures alerts render above the sidebar's stat banners
         (the sidebar is DOM-first but has no mobile order override). On @xl+, the grid
         places the main column left and the sidebar right via @xl:order-last, so the
         order utility has no effect. */}
-        <div className="space-y-3 max-md:order-first">
+        <div className="space-y-3 min-w-0 max-md:order-first">
           <div data-testid="transactions-alerts" className="space-y-3">
             {!bannerDismissed && (
               <AnomalyBanner

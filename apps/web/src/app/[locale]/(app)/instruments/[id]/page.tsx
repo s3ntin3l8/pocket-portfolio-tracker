@@ -169,9 +169,13 @@ export default async function InstrumentPage({
   const { instrument, history, corporateActions } = data;
 
   // Prefer the provider-enriched presentation name (`Apple Inc.`) over the raw
-  // broker/import `name` (which can be a description or just the ticker). The hero + the
+  // broker/import `name` (which can be a description or just the ticker). Some providers
+  // set `displayName = symbol`, so fall back to `name` when they match. The hero + the
   // desktop topbar both render this string, so it must be the user-facing form.
-  const heroName = instrument.displayName ?? instrument.name;
+  const heroName =
+    instrument.displayName && instrument.displayName !== instrument.symbol
+      ? instrument.displayName
+      : instrument.name;
 
   // Your position in this instrument (null / zero-quantity = not held in the active scope).
   const holding = scope.holding;
