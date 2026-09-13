@@ -124,12 +124,10 @@ export function HeroGlanceCard({
           {snapshot.hasBenchmark && (
             <span>
               <span
-                className="mr-1 inline-block align-middle"
+                className="mr-1 inline-block h-[2px] w-3 align-middle"
                 style={{
-                  borderTop: "2px dashed #FFD24A",
-                  background: "transparent",
-                  width: 12,
-                  height: 0,
+                  backgroundImage:
+                    "repeating-linear-gradient(90deg, #FFD24A 0 5px, transparent 5px 8px)",
                 }}
               />
               {t("legendBenchmark", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}
