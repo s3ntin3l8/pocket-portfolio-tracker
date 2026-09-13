@@ -24,6 +24,7 @@ import {
   clampAssetClass,
   unitForClass,
   goldSymbolFromLabel,
+  couponRatePercentToFraction,
 } from "./constants";
 
 export type { SelectableType, TxType };
@@ -302,10 +303,6 @@ export function useTransactionForm({
       });
       return created.id;
     }
-    const couponRateFraction = (() => {
-      const n = Number(couponRatePercent);
-      return couponRatePercent.trim() === "" || !Number.isFinite(n) ? undefined : String(n / 100);
-    })();
     const created = await client.createInstrument({
       symbol: symbol.trim(),
       market: discoveredMarket ?? marketForAssetClass(assetClass),
@@ -318,7 +315,7 @@ export function useTransactionForm({
       ...(assetClass === "bond"
         ? {
             faceValue: faceValue.trim() || undefined,
-            couponRate: couponRateFraction,
+            couponRate: couponRatePercentToFraction(couponRatePercent),
             couponSchedule: couponSchedule as
               "monthly" | "quarterly" | "semiannual" | "annual" | undefined,
             maturityDate: maturityDate || undefined,

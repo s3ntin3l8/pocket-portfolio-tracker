@@ -144,7 +144,11 @@ export async function valuePortfolio(
   // would silently clobber a manual value. `instruments.manualPrice` is its own column
   // for exactly that reason.
   for (const i of instrumentRows) {
-    if (i.manualPrice && !prices[i.id]) {
+    // Number(...) > 0, not the string truthiness `i.manualPrice &&` would give: the
+    // route schema already rejects 0/negative on write, but checking the invariant
+    // again here keeps it enforced locally even if a future caller writes the column
+    // directly.
+    if (i.manualPrice && Number(i.manualPrice) > 0 && !prices[i.id]) {
       prices[i.id] = { price: i.manualPrice, currency: i.currency };
     }
   }

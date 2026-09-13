@@ -55,8 +55,7 @@ export function InstrumentManualPriceCard({ instrument }: { instrument: Instrume
     }
     setBusy(true);
     try {
-      const absolute = ((faceValue * parsedPct) / 100).toString();
-      await api.setManualPrice(instrument.id, absolute);
+      await api.setManualPrice(instrument.id, previewAbsolute!.toString());
       router.refresh();
       toast.success(t("manualPriceSaved"));
     } catch {
