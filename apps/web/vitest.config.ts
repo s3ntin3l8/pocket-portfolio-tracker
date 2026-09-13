@@ -1,11 +1,18 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+
+const pkg = (name: string) =>
+  path.resolve(import.meta.dirname, `../../packages/${name}/src/index.ts`);
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      // Resolve workspace packages to their TS source so tests need no prior build.
+      { find: "@portfolio/api-client", replacement: pkg("api-client") },
+      { find: "@portfolio/core", replacement: pkg("core") },
       // More-specific stubs must come before the broad `@` alias so Vite matches them first.
       // next-intl/navigation calls next/navigation which can't resolve in jsdom.
       {
