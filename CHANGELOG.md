@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.15](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.14...v0.1.15) (2026-09-13)
+
+
+### Bug Fixes
+
+* **insights:** correct aggregate TWR artifacts, per-year XIRR, and stale-price movers ([#738](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/738)) ([5646e08](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5646e08135684508d43b081041739c2e3569b409))
+* **nav:** stop dialogs from permanently hiding the mobile bottom nav ([#734](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/734)) ([190b158](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/190b158a704cbfd476d89c6307c582df0b4e0837))
+* UI polish — instrument name, sidebar alignment, transactions width, benchmark legend ([#742](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/742)) ([2a6ec3b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2a6ec3bcf364c394145b27c68c5ac6edb3190ae9))
+
 ## [0.1.14](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.13...v0.1.14) (2026-09-12)
 
 
