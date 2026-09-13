@@ -22,12 +22,26 @@ export interface ProjectedCoupon {
   currency: string;
 }
 
-const PERIODS_PER_YEAR: Record<string, number> = {
+export const PERIODS_PER_YEAR: Record<string, number> = {
   annual: 1,
   semiannual: 2,
   quarterly: 4,
   monthly: 12,
 };
+
+/**
+ * Normalize a free-text `couponSchedule` value into one of `PERIODS_PER_YEAR`'s keys.
+ * The DB column is `text`, not an enum, so historical/typo'd values ("semi-annual",
+ * "Semi Annual") must resolve rather than silently mis-fall-through to the `?? 2`
+ * default at a different rate than intended. Unknown/empty input keeps that same
+ * semiannual default so existing behavior for unset schedules is unchanged.
+ */
+export function normalizeCouponSchedule(raw: string | null | undefined): string {
+  const key = (raw ?? "").toLowerCase().replace(/[\s_-]+/g, "");
+  if (key in PERIODS_PER_YEAR) return key;
+  if (key === "biannual") return "semiannual";
+  return "semiannual";
+}
 
 export function projectCoupons(
   positions: BondPosition[],
@@ -44,7 +58,7 @@ export function projectCoupons(
 
   const out: ProjectedCoupon[] = [];
   for (const p of positions) {
-    const periods = PERIODS_PER_YEAR[p.couponSchedule ?? "semiannual"] ?? 2;
+    const periods = PERIODS_PER_YEAR[normalizeCouponSchedule(p.couponSchedule)];
     const intervalMonths = 12 / periods;
     if (intervalMonths <= 0) continue;
 

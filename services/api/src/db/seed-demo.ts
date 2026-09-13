@@ -329,7 +329,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         displayName: "Gov Savings Bond GSRT",
         faceValue: "1000000",
         couponRate: "0.065",
-        couponSchedule: "semi-annual",
+        couponSchedule: "semiannual",
         maturityDate: isoDate(daysAgo(500)),
       },
       {

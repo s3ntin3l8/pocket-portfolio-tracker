@@ -60,6 +60,22 @@ tests they have no real price source. Adding live coverage for these means addin
 (see [Adding a provider](#adding-a-provider)). `crypto` is now served by CoinGecko + Yahoo, and
 gold **spot** by Twelve Data + GoldAPI + Yahoo.
 
+For Indonesian government retail bonds/sukuk (ORI/SR series) specifically, no schedulable
+secondary-market price feed could be found: Bibit's unauthenticated fund catalogue (used for
+reksa-dana NAV, below) doesn't cover SBN; Bareksa's `/v2/sbn/products` endpoint exists but is
+per-user-token-gated; the official PHEI/IBPA fair-price data is a paid subscription; and
+bank-published indicative-price PDFs (e.g. CIMB Niaga) have no stable "latest" URL. Instead,
+a bond values at **par (face value) by default**, or at a **user-maintained manual price**
+(`instruments.manualPrice`/`manualPriceAt`, set via `PUT /instruments/:id/manual-price`,
+read in `valuePortfolio()` ahead of the par fallback — see `services/api/src/services/valuation.ts`)
+when the holder pastes in a current secondary-market quote. **Known limitation:** the manual
+price only feeds current valuation; the historical `prices` series backfilled at par
+(`services/api/src/services/backfill/core.ts`) is untouched, so the instrument's sparkline
+chart and any concentration/movers insight reading `prices` directly stay flat at par even
+after a manual price is set. Daily snapshots do pick it up correctly going forward, since
+they call `valuePortfolio()`. A real live provider, should a schedulable source ever surface,
+would close both this gap and the manual-maintenance burden at once.
+
 ## Priority & fallback
 
 Default priorities come from `PROVIDER_REGISTRY` registration order

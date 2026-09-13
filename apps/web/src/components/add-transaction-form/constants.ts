@@ -83,7 +83,8 @@ export function clampAssetClass(value: string): (typeof ASSET_CLASSES)[number] {
 
 export function unitForClass(assetClass: string): "shares" | "grams" | "units" {
   if (assetClass === "gold") return "grams";
-  if (assetClass === "mutual_fund" || assetClass === "crypto") return "units";
+  if (assetClass === "mutual_fund" || assetClass === "crypto" || assetClass === "bond")
+    return "units";
   return "shares";
 }
 

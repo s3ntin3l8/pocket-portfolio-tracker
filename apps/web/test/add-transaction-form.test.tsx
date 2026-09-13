@@ -423,6 +423,70 @@ describe("AddTransactionForm", () => {
     );
   });
 
+  it("creates a bond instrument with terms — percent-in coupon rate converts to a fraction", async () => {
+    const bondInstrument: Instrument = {
+      ...INSTRUMENT,
+      id: "b1",
+      symbol: "SR021T3",
+      market: "IDX",
+      assetClass: "bond",
+      unit: "units",
+      name: "Sukuk Negara Ritel seri SR021T3",
+      faceValue: "1000000",
+      couponRate: "0.0635",
+      couponSchedule: "monthly",
+      maturityDate: "2027-09-10",
+    };
+    const client = makeClient({ createInstrument: vi.fn(async () => bondInstrument) });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    fireEvent.change(screen.getByLabelText(m.symbol), {
+      target: { value: "sr021t3" },
+    });
+    fireEvent.change(screen.getByLabelText(m.name), {
+      target: { value: "Sukuk Negara Ritel seri SR021T3" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondFaceValueLabel), {
+      target: { value: "1000000" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondCouponRateLabel), {
+      target: { value: "6.35" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondCouponSchedule), {
+      target: { value: "monthly" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondMaturityDate), {
+      target: { value: "2027-09-10" },
+    });
+    fireEvent.change(screen.getByLabelText(m.quantity), {
+      target: { value: "10" },
+    });
+    fireEvent.change(screen.getByLabelText(m.price), {
+      target: { value: "1000000" },
+    });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createInstrument).toHaveBeenCalled());
+    // The percent→fraction inverse is the assertion that matters: typing "6.35" in the
+    // percent-labeled field must send couponRate "0.0635", not "6.35" or "635".
+    expect(client.createInstrument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: "SR021T3",
+        assetClass: "bond",
+        unit: "units",
+        faceValue: "1000000",
+        couponRate: "0.0635",
+        couponSchedule: "monthly",
+        maturityDate: "2027-09-10",
+      }),
+    );
+  });
+
   it("records a bond coupon against a new instrument (no quantity/fees)", async () => {
     const client = makeClient();
     renderForm(client);

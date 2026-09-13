@@ -15,9 +15,35 @@ type Instrument = typeof instruments.$inferSelect;
 function instrumentUpgrade(
   existing: Instrument,
   input: Omit<InstrumentInput, "isin" | "wkn"> & { isin?: string | null; wkn?: string | null },
-): Partial<Pick<Instrument, "symbol" | "assetClass" | "market" | "currency" | "isin" | "wkn">> {
+): Partial<
+  Pick<
+    Instrument,
+    | "symbol"
+    | "assetClass"
+    | "market"
+    | "currency"
+    | "isin"
+    | "wkn"
+    | "faceValue"
+    | "couponRate"
+    | "couponSchedule"
+    | "maturityDate"
+  >
+> {
   const set: Partial<
-    Pick<Instrument, "symbol" | "assetClass" | "market" | "currency" | "isin" | "wkn">
+    Pick<
+      Instrument,
+      | "symbol"
+      | "assetClass"
+      | "market"
+      | "currency"
+      | "isin"
+      | "wkn"
+      | "faceValue"
+      | "couponRate"
+      | "couponSchedule"
+      | "maturityDate"
+    >
   > = {};
   // Replace an ISIN-as-symbol with a real ticker (but never the reverse).
   if (isIsin(existing.symbol) && !isIsin(input.symbol)) set.symbol = input.symbol;
@@ -48,6 +74,27 @@ function instrumentUpgrade(
   // Back-fill missing ISIN/WKN when the input carries one.
   if (!existing.isin && input.isin) set.isin = input.isin;
   if (!existing.wkn && input.wkn) set.wkn = input.wkn;
+  // Back-fill bond terms — but ONLY when the existing column is null (never overwrite a
+  // value another user or import already set) and ONLY when the EXISTING row is already
+  // a bond. Deliberately checking `existing`, not `input`: `instrumentInputSchema` only
+  // accepts bond fields when `input.assetClass === "bond"`, so gating on
+  // `input.assetClass === "bond"` (as an earlier version of this guard did) is always
+  // true whenever there's anything to back-fill — it can never distinguish "an
+  // unrelated equity/fund row collided by (symbol, market) with a bond input" from "both
+  // sides are genuinely a bond," which is exactly the case this guard exists to reject.
+  // `instruments` is shared reference data across users, so this is deliberately a
+  // one-way upgrade, matching every other rule in this function; correcting a wrong
+  // value goes through the admin-gated PATCH /instruments/:id route.
+  if (existing.assetClass === "bond") {
+    if (existing.faceValue == null && input.faceValue !== undefined)
+      set.faceValue = input.faceValue;
+    if (existing.couponRate == null && input.couponRate !== undefined)
+      set.couponRate = input.couponRate;
+    if (existing.couponSchedule == null && input.couponSchedule !== undefined)
+      set.couponSchedule = input.couponSchedule;
+    if (existing.maturityDate == null && input.maturityDate !== undefined)
+      set.maturityDate = input.maturityDate;
+  }
   return set;
 }
 
@@ -167,6 +214,14 @@ export async function findOrCreateInstrument(
       name: input.name,
       isin: input.isin ?? null,
       wkn: input.wkn ?? null,
+      ...(input.assetClass === "bond"
+        ? {
+            faceValue: input.faceValue ?? null,
+            couponRate: input.couponRate ?? null,
+            couponSchedule: input.couponSchedule ?? null,
+            maturityDate: input.maturityDate ?? null,
+          }
+        : {}),
     })
     .returning();
   return created;
@@ -186,6 +241,10 @@ export async function updateInstrument(
     name?: string;
     assetClass?: string;
     market?: string;
+    faceValue?: string | null;
+    couponRate?: string | null;
+    couponSchedule?: string | null;
+    maturityDate?: string | null;
   },
 ): Promise<Instrument | "conflict" | "not_found"> {
   const [existing] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
@@ -216,9 +275,49 @@ export async function updateInstrument(
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.assetClass !== undefined) set.assetClass = patch.assetClass;
   if (patch.market !== undefined) set.market = patch.market;
+  if (patch.faceValue !== undefined) set.faceValue = patch.faceValue;
+  if (patch.couponRate !== undefined) set.couponRate = patch.couponRate;
+  if (patch.couponSchedule !== undefined) set.couponSchedule = patch.couponSchedule;
+  if (patch.maturityDate !== undefined) set.maturityDate = patch.maturityDate;
 
   if (Object.keys(set).length === 0) return existing;
 
   const [updated] = await db.update(instruments).set(set).where(eq(instruments.id, id)).returning();
+  return updated ?? existing;
+}
+
+/**
+ * Set or clear an instrument's user-maintained manual price (absolute, per-unit, in the
+ * instrument's own currency). Substitutes for a live market-data provider on asset
+ * classes none of them serve — e.g. Indonesian retail bonds/sukuk, where no schedulable
+ * secondary-market feed exists (see docs/data_providers.md). Read in valuePortfolio()
+ * ahead of the bond par fallback; NOT admin-gated — like POST /instruments, maintaining a
+ * price for a series you hold is a normal, load-bearing action, not reference-data
+ * curation. `instruments` is shared across users, so this does change valuation for
+ * everyone holding the series — that's an accepted, deliberate consequence.
+ *
+ * Known limitation: only `valuePortfolio()`'s CURRENT valuation reads this column.
+ * `services/api/src/services/backfill/core.ts` still writes a flat par series into the
+ * `prices` table for the instrument's whole history, so anything reading `prices`
+ * directly instead of going through valuePortfolio — the sparkline chart
+ * (`services/sparklines.ts`) and the concentration/movers insight
+ * (`routes/transactions/insights/concentration.ts`) — stays at par even after a manual
+ * price is set. Daily snapshots (`services/snapshots.ts`) DO call `valuePortfolio` and
+ * so pick up the manual price correctly going forward. Propagating a manual price into
+ * `prices`/history is real follow-up work, not done here.
+ */
+export async function setManualPrice(
+  db: DB,
+  id: string,
+  price: string | null,
+): Promise<Instrument | "not_found"> {
+  const [existing] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
+  if (!existing) return "not_found";
+
+  const [updated] = await db
+    .update(instruments)
+    .set({ manualPrice: price, manualPriceAt: price === null ? null : new Date() })
+    .where(eq(instruments.id, id))
+    .returning();
   return updated ?? existing;
 }

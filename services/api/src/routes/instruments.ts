@@ -2,8 +2,17 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { asc, eq, ilike, or, count } from "drizzle-orm";
 import { instruments, providerSettings } from "@portfolio/db";
-import { assetClassSchema, instrumentInputSchema } from "@portfolio/schema";
-import { findOrCreateInstrument, updateInstrument } from "../services/instruments.js";
+import {
+  assetClassSchema,
+  couponScheduleSchema,
+  decimalString,
+  instrumentInputSchema,
+} from "@portfolio/schema";
+import {
+  findOrCreateInstrument,
+  setManualPrice,
+  updateInstrument,
+} from "../services/instruments.js";
 import { getMarketData, goldSources, getBorseFrankfurt } from "../services/market-data.js";
 import { cacheKey } from "./helpers.js";
 import { withDerivationCache, createStore } from "../lib/derivation-cache.js";
@@ -32,8 +41,23 @@ const patchInstrumentSchema = z.object({
   name: z.string().min(1).optional(),
   assetClass: assetClassSchema.optional(),
   market: z.string().min(1).optional(),
+  // Bond terms — nullable so an admin can clear a wrong value. Same units as
+  // instrumentInputSchema: faceValue is per-unit nominal, couponRate is a fraction.
+  faceValue: z.string().nullable().optional(),
+  couponRate: z.string().nullable().optional(),
+  couponSchedule: couponScheduleSchema.nullable().optional(),
+  maturityDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")
+    .nullable()
+    .optional(),
 });
 const enrichQuerySchema = z.object({ q: z.string().trim().min(1) });
+const manualPriceSchema = z.object({
+  price: decimalString.nullable().refine((v) => v === null || Number(v) > 0, {
+    message: "price must be a positive number",
+  }),
+});
 
 export async function instrumentsRoute(app: FastifyInstance) {
   // Search instruments (shared reference data) for the manual-entry picker.
@@ -295,6 +319,23 @@ export async function instrumentsRoute(app: FastifyInstance) {
       const result = await updateInstrument(app.db, request.params.id, patch);
       if (result === "not_found") return reply.code(404).send({ error: "instrument_not_found" });
       if (result === "conflict") return reply.code(409).send({ error: "identifier_conflict" });
+      return result;
+    },
+  );
+
+  // Set/clear a user-maintained manual price — the substitute for a live market-data
+  // provider on asset classes none of them serve (Indonesian retail bonds today; see
+  // docs/data_providers.md). Deliberately NOT admin-gated, unlike PATCH above: this is a
+  // normal action for maintaining a holding's value, not reference-data curation — same
+  // rationale as leaving POST /instruments open. `instruments` is shared reference data,
+  // so setting it changes valuation for every user holding the series.
+  app.put<{ Params: { id: string } }>(
+    "/instruments/:id/manual-price",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { price } = manualPriceSchema.parse(request.body);
+      const result = await setManualPrice(app.db, request.params.id, price);
+      if (result === "not_found") return reply.code(404).send({ error: "instrument_not_found" });
       return result;
     },
   );

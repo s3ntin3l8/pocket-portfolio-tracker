@@ -1599,6 +1599,145 @@ describe("auth + portfolios + transactions", () => {
     expect(bond.marketValue).toBe("5000000"); // 5 units × 1,000,000
   });
 
+  it("a bond created via POST /instruments (not a raw DB insert) is priced at par and counted in net worth", async () => {
+    // Regression guard for the gap this feature closes: before the write path existed,
+    // instrumentInputSchema silently stripped faceValue/couponRate/couponSchedule/
+    // maturityDate, so an app-created bond had faceValue=null, never got a par price,
+    // and vanished from summary.netWorth entirely (excluded, not shown at cost).
+    const t = await token("bond-writepath-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Bonds WP", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const created = (
+      await app.inject({
+        method: "POST",
+        url: "/instruments",
+        headers: auth(t),
+        payload: {
+          symbol: "SR021T3-WP", // not in the fixture → no market price, must fall to par
+          market: "IDX",
+          assetClass: "bond",
+          unit: "units",
+          currency: "IDR",
+          name: "Sukuk Negara Ritel seri SR021T3",
+          faceValue: "1000000",
+          couponRate: "0.0635",
+          couponSchedule: "monthly",
+          maturityDate: "2027-09-10",
+        },
+      })
+    ).json();
+    expect(created.faceValue).toBe("1000000"); // the write path actually persisted it
+
+    await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions`,
+      headers: auth(t),
+      payload: {
+        type: "buy",
+        instrumentId: created.id,
+        quantity: "10",
+        price: "1000000",
+        currency: "IDR",
+        executedAt: "2026-01-10T00:00:00.000Z",
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/summary`,
+      headers: auth(t),
+    });
+    const summary = res.json();
+    const bond = summary.holdings.find(
+      (h: { instrumentId: string }) => h.instrumentId === created.id,
+    );
+    expect(bond).toBeDefined();
+    expect(bond.marketValue).toBe("10000000"); // 10 units × 1,000,000, at par
+    // Included in net worth, not silently excluded like an unpriced holding.
+    expect(Number(summary.netWorth)).toBeGreaterThanOrEqual(10_000_000);
+  });
+
+  it("a manual price overrides par valuation, and clearing it reverts to par", async () => {
+    const t = await token("bond-manual-price-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Bonds MP", baseCurrency: "IDR" },
+      })
+    ).json().id;
+
+    const created = (
+      await app.inject({
+        method: "POST",
+        url: "/instruments",
+        headers: auth(t),
+        payload: {
+          symbol: "SR031T3-MP", // not in the fixture → no market price
+          market: "IDX",
+          assetClass: "bond",
+          unit: "units",
+          currency: "IDR",
+          name: "Sukuk Negara Ritel seri SR031T3",
+          faceValue: "1000000",
+        },
+      })
+    ).json();
+
+    await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions`,
+      headers: auth(t),
+      payload: {
+        type: "buy",
+        instrumentId: created.id,
+        quantity: "10",
+        price: "1000000",
+        currency: "IDR",
+        executedAt: "2026-01-10T00:00:00.000Z",
+      },
+    });
+
+    async function summaryFor(id: string) {
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/summary`,
+        headers: auth(t),
+      });
+      return res.json().holdings.find((h: { instrumentId: string }) => h.instrumentId === id);
+    }
+
+    // Before any manual price: valued at par.
+    expect((await summaryFor(created.id)).marketValue).toBe("10000000");
+
+    // Set a manual price at 101.35% of nominal → 10,135,000 total for 10 units.
+    const setRes = await app.inject({
+      method: "PUT",
+      url: `/instruments/${created.id}/manual-price`,
+      headers: auth(t),
+      payload: { price: "1013500" },
+    });
+    expect(setRes.statusCode).toBe(200);
+    expect((await summaryFor(created.id)).marketValue).toBe("10135000");
+
+    // Clearing it reverts to par.
+    await app.inject({
+      method: "PUT",
+      url: `/instruments/${created.id}/manual-price`,
+      headers: auth(t),
+      payload: { price: null },
+    });
+    expect((await summaryFor(created.id)).marketValue).toBe("10000000");
+  });
+
   it("converts a non-base-currency holding via cached FX into the display currency", async () => {
     const { fxRates } = await import("@portfolio/db");
     const t = await token("fx-user");

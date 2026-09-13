@@ -14,6 +14,9 @@ export type AssetClass = z.infer<typeof assetClassSchema>;
 export const unitSchema = z.enum(["shares", "grams", "units"]);
 export type Unit = z.infer<typeof unitSchema>;
 
+export const couponScheduleSchema = z.enum(["monthly", "quarterly", "semiannual", "annual"]);
+export type CouponSchedule = z.infer<typeof couponScheduleSchema>;
+
 export const transactionTypeSchema = z.enum([
   "buy",
   "sell",

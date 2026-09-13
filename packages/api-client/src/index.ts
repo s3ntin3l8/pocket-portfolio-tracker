@@ -628,10 +628,18 @@ export interface Instrument {
    *  label — `name` is the raw broker/import string and may not be human-readable. */
   displayName?: string | null;
   /** Bond-specific fields (null for non-bonds) — already present on the API row,
-   *  surfaced here for the instrument detail page's "upcoming income" line. */
+   *  surfaced here for the instrument detail page's "upcoming income" line.
+   *  `faceValue` is the PER-UNIT nominal; `couponRate` is a fraction (0.0635), not
+   *  a percent. */
+  faceValue?: string | null;
   couponRate?: string | null;
   couponSchedule?: string | null;
   maturityDate?: string | null;
+  /** User-maintained current price (absolute, per-unit, instrument currency) — the
+   *  substitute for a live market-data provider on asset classes none serve. Overrides
+   *  the bond par fallback when set; `manualPriceAt` is its as-of timestamp. */
+  manualPrice?: string | null;
+  manualPriceAt?: string | null;
 }
 
 /** An instrument result from the global search — extends the catalog record with
@@ -2518,7 +2526,8 @@ export function createApiClient(config: ApiClientConfig) {
       request<InstrumentFundamentals | null>("GET", `/instruments/${id}/fundamentals`),
     createInstrument: (input: InstrumentInput) =>
       request<Instrument>("POST", "/instruments", input),
-    /** Update an instrument's identifiers (ISIN, WKN, symbol, name, assetClass, market). */
+    /** Update an instrument's identifiers (ISIN, WKN, symbol, name, assetClass, market)
+     *  and/or bond terms (admin-gated). */
     updateInstrument: (
       id: string,
       patch: {
@@ -2528,8 +2537,16 @@ export function createApiClient(config: ApiClientConfig) {
         name?: string;
         assetClass?: string;
         market?: string;
+        faceValue?: string | null;
+        couponRate?: string | null;
+        couponSchedule?: string | null;
+        maturityDate?: string | null;
       },
     ) => request<Instrument>("PATCH", `/instruments/${id}`, patch),
+    /** Set (or, with `price: null`, clear) an instrument's manual price — not
+     *  admin-gated, unlike updateInstrument's bond-terms patch. */
+    setManualPrice: (id: string, price: string | null) =>
+      request<Instrument>("PUT", `/instruments/${id}/manual-price`, { price }),
     /** On-demand Börse Frankfurt enrichment — returns results with ISIN + WKN. */
     enrichInstruments: (q: string) =>
       request<InstrumentSearchResult[]>("GET", `/instruments/enrich?q=${encodeURIComponent(q)}`),

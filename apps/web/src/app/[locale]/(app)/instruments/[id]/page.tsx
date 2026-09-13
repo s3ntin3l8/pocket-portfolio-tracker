@@ -18,6 +18,7 @@ import { InstrumentLogo } from "@/components/instrument-logo";
 import { InstrumentPriceCard } from "@/components/instrument-price-card";
 import { InstrumentFundamentalsCard } from "@/components/instrument-fundamentals-card";
 import { InstrumentIncomeCard } from "@/components/instrument-income-card";
+import { InstrumentManualPriceCard } from "@/components/instrument-manual-price-card";
 import { CorporateActionsManager } from "@/components/corporate-actions-manager";
 import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 import { TransactionsTable, type TxRow } from "@/components/transactions-table";
@@ -321,6 +322,9 @@ export default async function InstrumentPage({
                   : null
               }
             />
+            {instrument.assetClass === "bond" && (
+              <InstrumentManualPriceCard instrument={instrument} />
+            )}
           </div>
 
           {/* Flat heading + TransactionsTable, matching Activity's own layout exactly (#585) —
