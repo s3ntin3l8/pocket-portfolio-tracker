@@ -136,7 +136,12 @@ export async function enqueueBackfillPortfolio(
       { singletonKey: portfolioId, singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS },
     );
     return true;
-  } catch {
+  } catch (err) {
+    // The count alone (SweepResult.enqueueFailed) doesn't say WHY a send failed — no
+    // fastify logger is threaded through this module, so this is the only place the
+    // actual error is ever seen. console.error, not console.warn: a real backfill
+    // silently never got enqueued for this portfolio.
+    console.error(`[backfill] enqueue failed for portfolio ${portfolioId}:`, err);
     return false;
   }
 }
