@@ -112,6 +112,9 @@ export function registerJobsRoutes(app: FastifyInstance) {
 
       const result = await triggerJob(name, payload);
       if (!result.queued) {
+        if (result.alreadyInFlight) {
+          return reply.code(409).send({ error: "already_in_flight" });
+        }
         return reply.code(503).send({ error: "scheduler_unavailable" });
       }
 

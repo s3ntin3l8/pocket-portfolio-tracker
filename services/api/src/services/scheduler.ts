@@ -406,8 +406,20 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
             enqueueBackfillPortfolio(portfolioId, fromDate, tailOnly),
         },
       );
+      if (result.enqueueFailed > 0) {
+        app.log.warn(
+          { scanned: result.scanned, queued: result.queued, enqueueFailed: result.enqueueFailed },
+          "backfill-stale-history: some portfolios failed to enqueue",
+        );
+      }
       app.log.info(
-        { scanned: result.scanned, queued: result.queued, force, userId },
+        {
+          scanned: result.scanned,
+          queued: result.queued,
+          enqueueFailed: result.enqueueFailed,
+          force,
+          userId,
+        },
         "backfill-stale-history complete",
       );
     } catch (err) {

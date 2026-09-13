@@ -197,13 +197,52 @@ describe("backfill dead-feed handling (#737, #745)", () => {
     const result = await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
       enqueue: async (portfolioId, fromDate, tailOnly) => {
         enqueued.push({ portfolioId, fromDate, tailOnly });
+        return true;
       },
     });
 
     expect(enqueued.some((e) => e.portfolioId === pf.id)).toBe(true);
     expect(result.healed).toBe(0);
     expect(result.queued).toBeGreaterThan(0);
+    expect(result.enqueueFailed).toBe(0);
     expect(result.portfolios).toHaveLength(0);
+  });
+
+  it("counts a failed enqueue send separately from a successful one", async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({
+        authSub: "dead-feed-enqueue-fail-user",
+        email: "dead-feed-enqueue-fail@example.com",
+      })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Enqueue Fails", baseCurrency: "USD", cashCounted: false })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: null,
+        type: "deposit",
+        quantity: "0",
+        price: "100",
+        fees: "0",
+        currency: "USD",
+        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
+      },
+    ]);
+
+    // Simulates a DB hiccup on the send — enqueueBackfillPortfolio returns false in this
+    // case (issue found in PR #746 review: the sweep used to count this as `queued`
+    // regardless of the actual send outcome).
+    const result = await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
+      enqueue: async () => false,
+    });
+
+    expect(result.queued).toBe(0);
+    expect(result.enqueueFailed).toBeGreaterThan(0);
   });
 
   it("scopes the sweep to a single user via opts.userId", async () => {
@@ -252,6 +291,7 @@ describe("backfill dead-feed handling (#737, #745)", () => {
       userId: u1.id,
       enqueue: async (portfolioId) => {
         enqueued.push(portfolioId);
+        return true;
       },
     });
 

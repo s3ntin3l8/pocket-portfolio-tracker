@@ -23,8 +23,16 @@ export interface SweepResult {
   scanned: number;
   /** Backfilled inline (no `opts.enqueue` supplied) — same meaning as before #745. */
   healed: number;
-  /** Enqueued onto BACKFILL_PORTFOLIO_QUEUE via `opts.enqueue` instead of run inline. */
+  /** Actually enqueued onto BACKFILL_PORTFOLIO_QUEUE via `opts.enqueue`. */
   queued: number;
+  /**
+   * `opts.enqueue` returned `false` (send failed — e.g. a DB hiccup) for this many
+   * portfolios. `queued` only counts confirmed sends, so a caller distinguishing
+   * "planned N heals, actually enqueued fewer" from a clean run should check this
+   * rather than infer it from `scanned − queued` (which also includes portfolios
+   * that didn't need healing at all).
+   */
+  enqueueFailed: number;
   /** Populated only for portfolios healed inline (`opts.enqueue` not supplied). */
   portfolios: Array<{ portfolioId: string; result: BackfillResult }>;
 }
@@ -35,10 +43,12 @@ export interface SweepOptions {
   userId?: string;
   /**
    * When supplied, the sweep enqueues each portfolio's backfill onto
-   * BACKFILL_PORTFOLIO_QUEUE instead of running it inline — see issue #745. Direct callers
-   * (tests, dev scripts) that omit this keep today's synchronous behavior.
+   * BACKFILL_PORTFOLIO_QUEUE instead of running it inline — see issue #745. Returns
+   * whether the enqueue actually succeeded (the sweep is the sole delivery mechanism for
+   * the whole fan-out, so a swallowed send failure here must not be counted as `queued`).
+   * Direct callers (tests, dev scripts) that omit this keep today's synchronous behavior.
    */
-  enqueue?: (portfolioId: string, fromDate?: string, tailOnly?: boolean) => Promise<void>;
+  enqueue?: (portfolioId: string, fromDate?: string, tailOnly?: boolean) => Promise<boolean>;
 }
 
 /** Whole days between two YYYY-MM-DD date keys (b − a). */
@@ -213,7 +223,13 @@ export async function backfillStalePortfolios(
         return isTrailingStale(r.portfolioId);
       });
 
-  const result: SweepResult = { scanned: rows.length, healed: 0, queued: 0, portfolios: [] };
+  const result: SweepResult = {
+    scanned: rows.length,
+    healed: 0,
+    queued: 0,
+    enqueueFailed: 0,
+    portfolios: [],
+  };
 
   for (const { portfolioId, inception, earliestSnapshot } of toHeal) {
     if (!portfolioId || !inception) continue;
@@ -229,8 +245,9 @@ export async function backfillStalePortfolios(
     const tailOnly = !needsFullHeal && Boolean(fromDate);
 
     if (opts.enqueue) {
-      await opts.enqueue(portfolioId, fromDate, tailOnly);
-      result.queued++;
+      const ok = await opts.enqueue(portfolioId, fromDate, tailOnly);
+      if (ok) result.queued++;
+      else result.enqueueFailed++;
       continue;
     }
 

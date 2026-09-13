@@ -208,15 +208,15 @@ export async function backfillPortfolioHistory(
 
     if (candles.length === 0) {
       unpriced.push(instr.id);
+      // Plain human-readable line, deliberately NOT JSON — a hand-rolled object with a
+      // string `level` field looks like a pino log line but isn't one (pino's own
+      // `level` is numeric), so a log pipeline filtering on `level >= 40` would silently
+      // drop it. This function has no logger threaded through it (called from contexts
+      // that range from the scheduler, which has one, to direct test calls, which don't),
+      // so a plain console.warn is the honest option rather than a line that fakes being
+      // structured without actually being parseable as such.
       console.warn(
-        JSON.stringify({
-          level: "warn",
-          msg: "[backfill] no price history for instrument; skipping",
-          instrumentId: instr.id,
-          symbol: instr.symbol,
-          market: instr.market,
-          tailOnly: opts.tailOnly ?? false,
-        }),
+        `[backfill] no price history for instrument ${instr.id} (${instr.symbol}/${instr.market}, tailOnly=${opts.tailOnly ?? false}); skipping`,
       );
     } else {
       const earliest = candles[0]!.date;

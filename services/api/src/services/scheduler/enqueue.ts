@@ -36,18 +36,27 @@ export { usesPglite };
 
 /**
  * Enqueue a manual run of a named job queue.
- * Returns `{ queued: true }` on success, `{ queued: false }` when pg-boss is unavailable.
- * An optional `payload` object is forwarded as the job data (e.g. `{ force: true }`).
+ * Returns `{ queued: true }` on success, `{ queued: false }` when pg-boss is unavailable
+ * OR when this exact trigger already has one in flight (`alreadyInFlight: true` — see
+ * below). An optional `payload` object is forwarded as the job data (e.g. `{ force: true }`).
  */
 export async function triggerJob(
   name: string,
   payload: Record<string, unknown> = {},
-): Promise<{ queued: boolean }> {
+): Promise<{ queued: boolean; alreadyInFlight?: boolean }> {
   if (!activeBoss) return { queued: false };
-  await activeBoss.send(name, payload, {
-    singletonKey: name,
+  const jobId = await activeBoss.send(name, payload, {
+    // The dedup key includes the payload, not just `name` — a "force" trigger must not
+    // silently collide with (and no-op behind) a plain trigger of the same job fired
+    // moments earlier, or vice versa. Only a genuinely identical repeat within the
+    // window collapses.
+    singletonKey: `${name}:${JSON.stringify(payload)}`,
     singletonSeconds: TRIGGER_SINGLETON_SECONDS,
   });
+  // pg-boss's send() returns null on a singleton-key collision — no job was actually
+  // created. Reporting `queued: true` here would let the caller write a misleading
+  // "triggered" audit log entry for a request that silently did nothing.
+  if (jobId === null) return { queued: false, alreadyInFlight: true };
   return { queued: true };
 }
 
@@ -105,24 +114,30 @@ export async function enqueueRecompute(portfolioId: string, fromDate: string): P
  * same portfolio collapses instead of duplicating. `fromDate`/`tailOnly` mirror
  * `BackfillOptions` (undefined `fromDate` means "from inception"; `tailOnly` suppresses
  * the max-range provider fallback for a heal that's only chasing the trailing edge).
- * No-op when pg-boss is unavailable (PGlite / tests) — callers that need the work done
- * synchronously (tests, direct sweep calls without an enqueuer) fall back to calling
- * `backfillPortfolioHistory` inline instead.
+ *
+ * Returns whether the send actually succeeded. Unlike `enqueueRecompute`/
+ * `enqueueInstrumentMetadata` (a debounce over an otherwise-idempotent nightly job, where
+ * swallowing a send failure is harmless), this is the SOLE delivery mechanism for the
+ * whole backfill fan-out — the caller (`backfillStalePortfolios`) counts this return value
+ * into `SweepResult.queued`/`enqueueFailed` so a DB hiccup mid-loop shows up as a real
+ * count instead of a "queued: N" log that overclaims how many portfolios were actually
+ * enqueued.
  */
 export async function enqueueBackfillPortfolio(
   portfolioId: string,
   fromDate?: string,
   tailOnly?: boolean,
-): Promise<void> {
-  if (!activeBoss) return;
+): Promise<boolean> {
+  if (!activeBoss) return false;
   try {
     await activeBoss.send(
       BACKFILL_PORTFOLIO_QUEUE,
       { portfolioId, fromDate, tailOnly },
       { singletonKey: portfolioId, singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS },
     );
+    return true;
   } catch {
-    // non-fatal
+    return false;
   }
 }
 
