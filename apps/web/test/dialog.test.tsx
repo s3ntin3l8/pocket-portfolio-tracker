@@ -196,6 +196,52 @@ describe("full-screen overlay registration", () => {
     expect(screen.getByTestId("nav-probe")).toHaveTextContent("visible");
   });
 
+  // Regression test: found live — BottomNav was hidden on every route because
+  // `AddTransactionMenu` (mounted app-wide by AppShell) renders `<DialogContent>`
+  // unconditionally as a child of `<Dialog open={addOpen}>`, not gated behind
+  // `open && (...)` the way every other test in this file writes it. Registration used
+  // to live in `DialogContent`'s own component body, which mounts as soon as `Dialog`
+  // renders regardless of `open` — only the Portal/Content subtree Radix itself gates
+  // on `open`. This harness reproduces that exact shape (DialogContent as Dialog's
+  // direct, always-rendered child) rather than the conditional-render shape the other
+  // tests below use, which never exercised the bug.
+  it("stays visible when DialogContent is a closed Dialog's unconditional child", () => {
+    render(
+      <FullScreenOverlayProvider>
+        <NavProbe />
+        <Dialog open={false}>
+          <DialogContent>
+            <DialogTitle>T</DialogTitle>
+          </DialogContent>
+        </Dialog>
+      </FullScreenOverlayProvider>,
+    );
+    expect(screen.getByTestId("nav-probe")).toHaveTextContent("visible");
+  });
+
+  it("hides once that same closed Dialog opens, same unconditional-child shape", () => {
+    function Harness({ open }: { open: boolean }) {
+      return (
+        <FullScreenOverlayProvider>
+          <NavProbe />
+          <Dialog open={open}>
+            <DialogContent>
+              <DialogTitle>T</DialogTitle>
+            </DialogContent>
+          </Dialog>
+        </FullScreenOverlayProvider>
+      );
+    }
+    const { rerender } = render(<Harness open={false} />);
+    expect(screen.getByTestId("nav-probe")).toHaveTextContent("visible");
+
+    rerender(<Harness open={true} />);
+    expect(screen.getByTestId("nav-probe")).toHaveTextContent("hidden");
+
+    rerender(<Harness open={false} />);
+    expect(screen.getByTestId("nav-probe")).toHaveTextContent("visible");
+  });
+
   it("reports open while a fullScreenOnMobile DialogContent is mounted, and closes on unmount", () => {
     function Harness({ open }: { open: boolean }) {
       return (

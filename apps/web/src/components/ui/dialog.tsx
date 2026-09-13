@@ -59,6 +59,22 @@ const SIZE_CLASS_STATIC: Record<DialogSize, string> = {
   xl: "max-w-[1080px]",
 };
 
+/** Registers this dialog as an open full-screen overlay (BottomNav hides itself while
+ *  any is registered — see the hook's doc comment for why). Deliberately rendered INSIDE
+ *  `DialogPrimitive.Content`, not from `DialogContent`'s own body: `Dialog.Root` renders
+ *  its children whether or not it's open, so registering there kept the nav hidden on
+ *  every route that merely *declares* a dialog — e.g. `AddTransactionMenu`, mounted by
+ *  `AppShell` on every page, whose `<Dialog open={false}>` still mounted `DialogContent`.
+ *  Only the Portal/Content subtree is gated by Radix's `Presence`, so mount lifetime here
+ *  really is open lifetime — as long as no caller passes `forceMount` through `...props`
+ *  to `DialogPrimitive.Content` below (nothing does today; `Presence` honors
+ *  `forceMount || context.open`, so a future `forceMount` caller would keep this marker
+ *  mounted, and the nav hidden, while closed — the same bug class this fixes). */
+function FullScreenOverlayMarker() {
+  useFullScreenOverlayRegistration(true);
+  return null;
+}
+
 function DialogContent({
   className,
   children,
@@ -105,13 +121,6 @@ function DialogContent({
   const structured = Boolean(mobileHeader || hasFooter);
   const [footerEl, setFooterEl] = React.useState<HTMLDivElement | null>(null);
 
-  // Registers only while mounted with fullScreenOnMobile — Radix only mounts
-  // Dialog.Content while its Root is open (no forceMount here), so mount lifetime IS
-  // open lifetime. BottomNav hides itself while any instance is registered — see the
-  // hook's doc comment for why (a full-screen task overlay isn't a place to leave tab
-  // navigation reachable).
-  useFullScreenOverlayRegistration(fullScreenOnMobile);
-
   const body = structured ? (
     <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
   ) : (
@@ -152,6 +161,7 @@ function DialogContent({
         )}
         {...props}
       >
+        {fullScreenOnMobile && <FullScreenOverlayMarker />}
         {fullScreenOnMobile && mobileHeader && (
           <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 md:hidden">
             <DialogPrimitive.Close

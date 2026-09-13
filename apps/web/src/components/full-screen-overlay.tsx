@@ -63,10 +63,22 @@ export function useAnyFullScreenOverlayOpen(): boolean {
 }
 
 /** Call unconditionally from a component that should count as an open full-screen
- *  overlay for as long as it's mounted with `active` true. Radix only mounts
- *  `Dialog.Content` while its `Root` is open (no `forceMount` here), so mount lifetime
- *  IS open lifetime — no separate `open` prop needed. No-ops outside a
- *  `FullScreenOverlayProvider`. */
+ *  overlay for as long as it's mounted with `active` true — no separate `open` prop
+ *  needed, mount lifetime alone drives registration. No-ops outside a
+ *  `FullScreenOverlayProvider`.
+ *
+ *  IMPORTANT: only call this from *inside* a Radix `Presence`-gated subtree (e.g.
+ *  `DialogPrimitive.Content`'s own children), never from a wrapper component that's a
+ *  sibling of or ancestor to that gate. `Dialog.Root` renders its children whether or
+ *  not it's open — a wrapper like `DialogContent` mounts (and this hook fires) as soon
+ *  as `<Dialog open={false}>` renders, not just when it opens. That bug hid `BottomNav`
+ *  on every route that merely declared a dialog, since `AppShell` mounts
+ *  `AddTransactionMenu` (and its `<Dialog>`) everywhere. See `FullScreenOverlayMarker`
+ *  in `ui/dialog.tsx` for the fix shape: a marker component rendered as a child of
+ *  `DialogPrimitive.Content`, not called from `DialogContent`'s own body. Note that
+ *  Presence-gating itself relies on `forceMount` staying unset on that `Content` —
+ *  `forceMount` would keep a Presence-gated subtree mounted regardless of `open`, same
+ *  as this hook's whole premise assumes it isn't. */
 export function useFullScreenOverlayRegistration(active: boolean) {
   const ctx = useContext(FullScreenOverlayContext);
   const id = useId();
