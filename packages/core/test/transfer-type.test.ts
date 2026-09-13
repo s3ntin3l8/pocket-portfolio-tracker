@@ -290,6 +290,40 @@ describe("boundaryFlowPoints — inside boundary", () => {
       { amount: 200, date: txns[1].executedAt },
     ]);
   });
+
+  it("deposit/withdrawal net fees, matching contributionStats (this is a deliberate change from the old services/api flows.ts, which used raw price)", () => {
+    const txns = [
+      tx({
+        type: "deposit",
+        instrumentId: null,
+        quantity: "0",
+        price: "500",
+        fees: "5",
+        executedAt: new Date("2022-01-01"),
+      }),
+      tx({
+        type: "withdrawal",
+        instrumentId: null,
+        quantity: "0",
+        price: "200",
+        fees: "2",
+        executedAt: new Date("2022-02-01"),
+      }),
+    ];
+    const points = boundaryFlowPoints(txns, "inside", "EUR", fx);
+    // Deposit lands net of fees (495, not 500); withdrawal costs the fee on top (202).
+    expect(points).toEqual([
+      { amount: -495, date: txns[0].executedAt },
+      { amount: 202, date: txns[1].executedAt },
+    ]);
+    const s = contributionStats({ txns, displayCurrency: "EUR", boundary: "inside" });
+    expect(-points.filter((p) => p.amount < 0).reduce((a, p) => a + p.amount, 0)).toBe(
+      Number(s.totalContributed),
+    );
+    expect(points.filter((p) => p.amount > 0).reduce((a, p) => a + p.amount, 0)).toBe(
+      Number(s.totalWithdrawn),
+    );
+  });
 });
 
 describe("boundaryFlowPoints — outside boundary", () => {

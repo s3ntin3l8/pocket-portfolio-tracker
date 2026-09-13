@@ -138,11 +138,16 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   (stays excluded, unchanged) via an explicit `hasEverPriced` callback — collapsing that
   distinction would make a genuinely-priced holding with an ordinary data gap bounce to cost and
   back on every reveal, corrupting the TWR index with a fake single-day return. The live/daily
-  valuation path (`services/api/src/services/valuation.ts`) has no such distinction to make (no
-  "series" to bounce in a single-point valuation) — any miss there always falls back to cost.
-  Both paths share one staleness threshold, `MAX_PRICE_CARRY_FORWARD_DAYS`
-  (`packages/core/src/sanity-gates.ts`) — they used to disagree (7 vs. 10 days) before issue
-  #744 unified them.
+  valuation path (`services/api/src/services/valuation.ts`, feeding `recordDailySnapshots`) makes
+  no such distinction — any miss there always falls back to cost, so a feed recovering after a
+  stale gap DOES still bounce that one day's snapshot from cost to market value. This is a
+  smaller, accepted artifact (cost is a much closer approximation than the pre-#744 zero), not a
+  claim that the live path is immune to bouncing — `portfolio_snapshots` is itself a series the
+  history chart reads, same as the backfill's. Replicating `hasEverPriced`'s full gap-vs-never
+  distinction there was judged not worth the complexity for a single day's number; revisit if it
+  proves visibly wrong in practice. Both paths share one staleness threshold,
+  `MAX_PRICE_CARRY_FORWARD_DAYS` (`packages/core/src/sanity-gates.ts`) — they used to disagree
+  (7 vs. 10 days) before issue #744 unified them.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

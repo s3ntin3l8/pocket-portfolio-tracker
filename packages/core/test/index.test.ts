@@ -893,6 +893,66 @@ describe("aggregatePortfolios", () => {
     expect(out.netWorth).toBe("0");
     expect(out.holdings).toEqual([]);
   });
+
+  it("flags the merged holding valuedAtCost when EITHER portfolio's leg was (issue #744)", () => {
+    const baseHolding = {
+      instrumentId: "i1",
+      quantity: "10",
+      avgCost: "100",
+      costBasis: "1000",
+      realizedPnL: "0",
+      price: null,
+      currency: null,
+      marketValue: null,
+      unrealizedPnL: null,
+      costBasisDisplay: "1000",
+      previousClose: null,
+      dayChange: null,
+      dayChangePct: null,
+    };
+    // Portfolio A holds i1 priced normally; portfolio B holds the same instrument with
+    // no usable price (valued at cost).
+    const a = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          price: "150",
+          currency: "IDR",
+          marketValue: "1500",
+          unrealizedPnL: "500",
+          marketValueDisplay: "1500",
+          unrealizedPnLDisplay: "500",
+        },
+      ],
+    });
+    const b = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          marketValueDisplay: "1000",
+          unrealizedPnLDisplay: "0",
+          valuedAtCost: true,
+        },
+      ],
+    });
+
+    const merged = aggregatePortfolios([a, b], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(merged.valuedAtCost).toBe(true);
+
+    // Symmetric: order shouldn't matter.
+    const mergedReversed = aggregatePortfolios([b, a], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(mergedReversed.valuedAtCost).toBe(true);
+
+    // Two normally-priced legs merge to no flag at all (not `false`).
+    const bothPriced = aggregatePortfolios([a, a], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(bothPriced.valuedAtCost).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
