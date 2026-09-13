@@ -63,6 +63,14 @@ export async function recordDailySnapshots(
       // forward into the aggregate INDEFINITELY, not as a termination. Writing this once and
       // then never again (the zero row itself is the signal it's already terminated) is what
       // keeps this from becoming the same unbounded-growth problem this skip exists to fix.
+      //
+      // This gate assumes the only way the MOST RECENT row reaches marketValue:0 is via
+      // this exact terminal write. A stray zero row from an unrelated source (e.g. a
+      // one-off manual backfill) would be indistinguishable from "already terminated" and
+      // permanently stop writes for this portfolio — harmless while it has zero
+      // transactions (there's nothing real to miss), but worth knowing if this portfolio
+      // ever gets transactions again, since the `portfoliosWithTx` check above (not this
+      // one) is what re-admits it to the normal valuation path once it does.
       const [lastSnap] = await db
         .select({ marketValue: portfolioSnapshots.marketValue })
         .from(portfolioSnapshots)

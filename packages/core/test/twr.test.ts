@@ -659,7 +659,7 @@ describe("aggregateValueFlows: an implausible non-zero row is carried forward, n
     expect(Number(index[2].pct)).toBeGreaterThan(0);
   });
 
-  it("accepts a new baseline after MAX_IMPLAUSIBLE_STREAK consecutive implausible days, instead of freezing forever", () => {
+  it("accepts a new baseline after MAX_IMPLAUSIBLE_STREAK_BEFORE_REANCHOR consecutive implausible days, instead of freezing forever", () => {
     // Leg B settles at a genuinely new, distant price level (a real rebase, or a
     // provider correction) that never lands back within range of the pre-gap anchor —
     // without an escape hatch, every subsequent day would be judged against the same
@@ -684,6 +684,46 @@ describe("aggregateValueFlows: an implausible non-zero row is carried forward, n
     expect(aggregated[4].marketValue).toBe("2000");
     // Day 6: judged against the NEW baseline (2000), not the old one — accepted as +1%.
     expect(aggregated[5].marketValue).toBe("2020");
+  });
+
+  // Regression guard documenting how the two guard layers compose: the per-leg
+  // reanchor path (above) accepts a leg's raw value UNCONDITIONALLY on the 4th
+  // consecutive implausible day, with no magnitude check of its own — it exists to
+  // stop a leg from freezing forever, not to bound how large the reanchor jump can
+  // be. That means a large-enough reanchor can still push the AGGREGATE's own
+  // day-over-day move past chainIndex's SINGLE_DAY_MAX_PCT guard, even though
+  // aggregateValueFlows let the (very real, per-leg-accepted) value through. This
+  // is intentional layering, not a gap: aggregateValueFlows's job is to stop a
+  // SINGLE leg's artifact from corrupting every OTHER leg's genuine return on the
+  // same day; chainIndex's own guard is what still protects the final index from
+  // an extreme aggregate-level move, from whatever source.
+  it("lets chainIndex's own guard catch an aggregate-level move produced by a per-leg reanchor", () => {
+    const legA: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "10000", effectiveFlow: "10000" },
+      { date: "2026-01-02", marketValue: "10000", effectiveFlow: "0" },
+      { date: "2026-01-03", marketValue: "10000", effectiveFlow: "0" },
+      { date: "2026-01-04", marketValue: "10000", effectiveFlow: "0" },
+      { date: "2026-01-05", marketValue: "10000", effectiveFlow: "0" },
+    ];
+    // Leg B rebases to a value 10x its old anchor — implausible every day until the
+    // reanchor fires on the 4th consecutive implausible day (2026-01-05).
+    const legB: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "10000", effectiveFlow: "10000" },
+      { date: "2026-01-02", marketValue: "100000", effectiveFlow: "0" },
+      { date: "2026-01-03", marketValue: "100000", effectiveFlow: "0" },
+      { date: "2026-01-04", marketValue: "100000", effectiveFlow: "0" },
+      { date: "2026-01-05", marketValue: "100000", effectiveFlow: "0" },
+    ];
+
+    const aggregated = aggregateValueFlows([legA, legB]);
+    // Day 5: legB's reanchor is accepted as-is by aggregateValueFlows — the
+    // aggregate now reflects the full jump (10000 + 100000), not a bounded one.
+    expect(aggregated[4].marketValue).toBe("110000");
+
+    const index = chainIndex(aggregated);
+    // But chainIndex's own aggregate-level guard rejects that day's implied
+    // ~450% move and holds the index at its prior level instead of compounding it.
+    expect(index[3].index).toBe(index[4].index);
   });
 });
 

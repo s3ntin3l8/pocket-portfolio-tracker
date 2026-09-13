@@ -273,7 +273,7 @@ export function chainIndex(
  *   portfolio's disappearance from the aggregate is flow-neutral rather than read as a −100%
  *   return. A later reappearance (this leg's value coming back from zero) is accepted
  *   unconditionally, mirroring `chainIndex`'s own reset-proof handling of `prevMv.isZero()`.
- * - **Implausible for more than MAX_IMPLAUSIBLE_STREAK consecutive days**: the carried-forward
+ * - **Implausible for more than MAX_IMPLAUSIBLE_STREAK_BEFORE_REANCHOR consecutive days**: the carried-forward
  *   anchor is deliberately never updated on a single implausible day (so a one-day glitch that
  *   recovers doesn't drag the baseline along with it), but that alone would freeze a leg forever
  *   if it never lands back within range of the pre-glitch anchor — a genuine large move, or a
@@ -291,14 +291,18 @@ export function aggregateValueFlows(
 
   // A leg stuck rejecting every day against a stale anchor would freeze forever if a
   // genuine, sustained move (a correction, a provider fix, a real rebase) never lands
-  // back within range of that old anchor — see MAX_IMPLAUSIBLE_STREAK below.
+  // back within range of that old anchor — see MAX_IMPLAUSIBLE_STREAK_BEFORE_REANCHOR below.
   //
   // Deliberate trade-off: once the streak limit is hit, a leg still frozen on genuinely
   // bad data (not a real move) will un-freeze into that bad value instead of staying
   // frozen. Bounded wrongness (at most this many days of an artifact reaching the
   // aggregate) was chosen over unbounded freezing (a leg silently vanishing from the
   // aggregate forever) — do not "fix" this back to freezing indefinitely.
-  const MAX_IMPLAUSIBLE_STREAK = 3;
+  //
+  // Named "before reanchor" rather than "max streak": the comparison below is
+  // `implausibleStreak > N`, so a streak of exactly N is still rejected and
+  // reanchoring happens on the (N+1)th consecutive implausible day.
+  const MAX_IMPLAUSIBLE_STREAK_BEFORE_REANCHOR = 3;
 
   for (const series of perPortfolio) {
     const byRawDate = new Map(series.map((p) => [p.date, p]));
@@ -345,7 +349,7 @@ export function aggregateValueFlows(
         implausibleStreak = 0;
       } else {
         implausibleStreak++;
-        if (implausibleStreak > MAX_IMPLAUSIBLE_STREAK) {
+        if (implausibleStreak > MAX_IMPLAUSIBLE_STREAK_BEFORE_REANCHOR) {
           // Sustained implausibility relative to the OLD anchor is more likely a genuine
           // new price level than an ongoing artifact — accept it as the new baseline
           // rather than freezing this leg's contribution forever. Without this, a
