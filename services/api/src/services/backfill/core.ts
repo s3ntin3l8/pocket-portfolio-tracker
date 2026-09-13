@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import {
   corporateActions,
@@ -230,11 +230,18 @@ export async function backfillPortfolioHistory(
       }
     }
 
+    // Atomic increment (not read-then-write instr.priceFeedMissCount + 1) — two
+    // backfill-portfolio workers processing different portfolios that happen to share
+    // this instrument (a common ETF/mutual fund) could otherwise both read the same
+    // starting count and last-write-wins, under-counting the miss streak.
     await db
       .update(instruments)
       .set(
         candles.length === 0
-          ? { priceFeedMissCount: instr.priceFeedMissCount + 1, priceFeedLastMissAt: new Date() }
+          ? {
+              priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
+              priceFeedLastMissAt: new Date(),
+            }
           : { priceFeedMissCount: 0, priceFeedLastMissAt: null },
       )
       .where(eq(instruments.id, instr.id));

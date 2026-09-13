@@ -354,7 +354,14 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   // platform scale blows through on the very first invocation. See issue #745.
   await boss.createQueue(BACKFILL_PORTFOLIO_QUEUE, BACKFILL_PORTFOLIO_QUEUE_OPTIONS);
   await boss.updateQueue(BACKFILL_PORTFOLIO_QUEUE, BACKFILL_PORTFOLIO_QUEUE_OPTIONS);
-  await boss.work(BACKFILL_PORTFOLIO_QUEUE, async (jobs) => {
+  // batchSize pinned to 1 (pg-boss's own default, made explicit here): the loop below
+  // re-throws per job so pg-boss records a genuine per-portfolio failure instead of a
+  // false "completed" — that only marks the ONE failing job as failed rather than
+  // cascading to every portfolio in the batch as long as batchSize stays 1. Bumping it
+  // without also making the loop batch-safe (per-job try/catch that tracks failures
+  // without re-throwing, or pg-boss's `perJobResults` API) would let one bad portfolio
+  // re-fail its unrelated batch-mates on every retry.
+  await boss.work(BACKFILL_PORTFOLIO_QUEUE, { batchSize: 1 }, async (jobs) => {
     for (const job of jobs) {
       const { portfolioId, fromDate, tailOnly } = job.data as {
         portfolioId: string;

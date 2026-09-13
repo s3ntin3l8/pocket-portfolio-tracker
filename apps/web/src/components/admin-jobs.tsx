@@ -173,13 +173,17 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
             continue;
           }
 
-          // Reset the timeout counter on forward progress, so a long but genuinely
-          // advancing fan-out (#745's per-portfolio backfill) never reads as stuck.
-          const priorRemaining = (entry.inProgress ?? 0) + (entry.fanOutRemaining ?? 0);
-          pollCounts.current[name] =
-            pollCounts.current[name] === undefined || remaining < priorRemaining
-              ? 0
-              : pollCounts.current[name] + 1;
+          // Reset the timeout counter whenever the backend reports ANY in-flight/fan-out
+          // work, not just when that count has strictly decreased since the last poll —
+          // a large force re-run's hundreds of portfolios can hold a flat or even
+          // temporarily rising `remaining` for many polls in a row while genuinely
+          // working (they don't drain one at a time in lockstep with our 3s interval).
+          // Requiring a decrease made a real large fan-out false-timeout at MAX_POLLS
+          // even though the server was actively reporting progress the whole time. The
+          // counter only ever advances when `remaining` is 0 (i.e. the server reports no
+          // tracked work at all) — that's the "older API build or genuinely wedged" case
+          // MAX_POLLS' own doc comment describes.
+          pollCounts.current[name] = remaining > 0 ? 0 : (pollCounts.current[name] ?? 0) + 1;
 
           next[name] =
             pollCounts.current[name] >= MAX_POLLS

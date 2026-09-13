@@ -104,7 +104,11 @@ export function registerJobsRoutes(app: FastifyInstance) {
       // pg-boss's handler timeout at platform scale; scoping to one user is the cheap
       // escape hatch for "I just need to re-check my own data" without touching everyone.
       const userId =
-        typeof query?.userId === "string" ? query.userId : (body?.userId as string | undefined);
+        typeof query?.userId === "string"
+          ? query.userId
+          : typeof body?.userId === "string"
+            ? body.userId
+            : undefined;
       const payload: Record<string, unknown> = {
         ...(force ? { force: true } : {}),
         ...(userId ? { userId } : {}),
