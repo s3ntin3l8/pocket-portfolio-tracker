@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.16](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.15...v0.1.16) (2026-09-13)
+
+
+### Features
+
+* **bonds:** support Indonesian retail bonds/sukuk end to end ([#751](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/751)) ([24116bc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/24116bc5ea3b9ac8a0d1983158b9be2f41f0afa9))
+
+
+### Bug Fixes
+
+* **backfill:** chunk force re-run into per-portfolio jobs, guard dead feeds ([#746](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/746)) ([95060f5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/95060f5a5aca21c30bf9df90938dce99e619cccb))
+* **core:** value transfers and unpriced holdings correctly ([#747](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/747)) ([9c2d8ed](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9c2d8ed57c825ca3ecbedebc076c0d9988aef809))
+
 ## [0.1.15](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.14...v0.1.15) (2026-09-13)
 
 
