@@ -415,6 +415,78 @@ describe("contribution analytics", () => {
     expect(c.totalReturnPct).toBeCloseTo(0.4, 10);
   });
 
+  it("total return values transfer_in/transfer_out at cost, not at cashFlow()'s ~0 (issue #736)", async () => {
+    const t = await token("transferer");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    overrideMarketData(new MarketDataService([new FixtureProvider({ BBCA: "9500", XFER: "150" })]));
+    const [xfer] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "XFER",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Transfer Co",
+      })
+      .returning();
+
+    const pf = await createPortfolio(t, "Transfers"); // cash-outside (default)
+    // transfer_in 5 @ 100 (cost 500, contributed capital at carried cost);
+    // sell 3 @ 150 (proceeds 450, cost-of-sold 300 → realized 150);
+    // 50 cash dividend;
+    // transfer_out 1 @ running avg cost 100 (capital leaving the boundary, no P&L);
+    // 1 share left @ fixture 150 → MV 150.
+    await postTx(t, pf, {
+      type: "transfer_in",
+      instrumentId: xfer.id,
+      quantity: "5",
+      price: "100",
+      currency: "IDR",
+      executedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await postTx(t, pf, {
+      type: "sell",
+      instrumentId: xfer.id,
+      quantity: "3",
+      price: "150",
+      currency: "IDR",
+      executedAt: "2026-02-01T00:00:00.000Z",
+    });
+    await postTx(t, pf, {
+      type: "dividend",
+      instrumentId: xfer.id,
+      quantity: "0",
+      price: "50",
+      currency: "IDR",
+      executedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await postTx(t, pf, {
+      type: "transfer_out",
+      instrumentId: xfer.id,
+      quantity: "1",
+      price: "0",
+      currency: "IDR",
+      executedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/contributions`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    // Contributed = transfer_in at cost (500); net = 500 − 300 (sell) − 100 (transfer_out) = 100.
+    expect(c.totalContributed).toBe("500");
+    expect(c.netContributed).toBe("100");
+    expect(c.currentValue).toBe("150");
+    // Total return: proceeds (450) + dividend (50) + transfer_out at cost (100) − contributed (500),
+    // plus current value (150): (150 + 600 − 500) / 500 = 0.5. Before #736's fix, transfer_out was
+    // valued via cashFlow() (≈0, since price/fees are both 0), so this would have read 0.3 —
+    // undercounting the capital the transfer actually removed from the boundary.
+    expect(c.totalReturnPct).toBeCloseTo(0.5, 10);
+  });
+
   it("total return excludes cash interest (flow-derived, not totalIncome); null for cash-inside", async () => {
     const t = await token("interest");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });

@@ -922,6 +922,13 @@ export interface HoldingValuation extends Holding {
   costBasisDisplay: string;
   /** Unrealized P&L in the display currency (null when unpriced). */
   unrealizedPnLDisplay: string | null;
+  /**
+   * True when this holding has no usable market price and is valued at cost basis
+   * instead (`marketValueDisplay === costBasisDisplay`, `unrealizedPnLDisplay === "0"`) —
+   * issue #744. Undefined for a normally-priced holding; the UI should disclose this
+   * (e.g. a "shown at cost" badge) rather than let it read as a real, flat market value.
+   */
+  valuedAtCost?: boolean;
   previousClose: string | null;
   dayChange: string | null;
   dayChangePct: string | null;

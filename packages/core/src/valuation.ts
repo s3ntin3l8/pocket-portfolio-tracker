@@ -27,6 +27,18 @@ export interface HoldingValuation extends Holding {
   costBasisDisplay: string;
   /** Unrealized P&L in the display currency (null when unpriced). */
   unrealizedPnLDisplay: string | null;
+  /**
+   * True when this holding has no usable market price — never priced, or priced
+   * but too stale to carry forward (the caller drops a quote past
+   * `MAX_PRICE_CARRY_FORWARD_DAYS` before it ever reaches `summarizePortfolio`,
+   * so both cases arrive here identically as "no quote") — and is therefore valued
+   * at cost basis instead: `marketValueDisplay`/`costBasisDisplay` are equal and
+   * `unrealizedPnLDisplay` is "0". Nothing economic happened on the day a feed
+   * goes silent, so valuing at 0 would understate net worth by the whole cost
+   * basis, not by the unknown gain/loss since purchase (issue #744). Undefined
+   * for a normally-priced holding.
+   */
+  valuedAtCost?: boolean;
   /** Prior session's close (instrument currency), when known. */
   previousClose: string | null;
   /** Today's value change for the position (instrument currency), when known. */
@@ -145,8 +157,14 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     );
 
     if (!quote) {
-      // No market price — cost basis is kept in its native cost currency and is not
-      // summed into totalCost; value/P&L are unknown.
+      // No usable market price — value at cost basis rather than 0 (issue #744).
+      // totalCost/totalMarketValue/exposure all advance together so this holding
+      // contributes exactly 0 to totalUnrealizedPnL, not a phantom loss of its whole
+      // cost basis. price/dayChange/dayChangePct stay null — genuinely unknown, not 0.
+      const costBasisDisplay = convert(cbStr, costCcy, input.displayCurrency, fx);
+      totalCost = totalCost.add(new Decimal(costBasisDisplay));
+      totalMarketValue = totalMarketValue.add(new Decimal(costBasisDisplay));
+      addExposure(costCcy, costBasisDisplay);
       return {
         ...h,
         costBasis: cbStr,
@@ -155,12 +173,13 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
         currency: null,
         marketValue: null,
         unrealizedPnL: null,
-        marketValueDisplay: null,
-        costBasisDisplay: cbStr,
-        unrealizedPnLDisplay: null,
+        marketValueDisplay: costBasisDisplay,
+        costBasisDisplay,
+        unrealizedPnLDisplay: "0",
         previousClose: null,
         dayChange: null,
         dayChangePct: null,
+        valuedAtCost: true,
       };
     }
 
@@ -371,6 +390,10 @@ export function aggregatePortfolios(
         previousClose: h.previousClose ?? ex.previousClose,
         dayChange: addNullable(ex.dayChange, h.dayChange),
         dayChangePct: h.dayChangePct ?? ex.dayChangePct,
+        // Two portfolios holding the same instrument could disagree (one still has a
+        // usable price, the other doesn't) — true if EITHER contributed an at-cost
+        // valuation, so the merged total is flagged whenever any part of it is.
+        valuedAtCost: ex.valuedAtCost || h.valuedAtCost || undefined,
         // Merge lots from both portfolios (acquisition order, oldest first). Undefined
         // on both sides stays undefined; either side present yields a merged array.
         lots:

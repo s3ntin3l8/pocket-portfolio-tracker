@@ -43,6 +43,35 @@ describe("HeroGlanceCard", () => {
     expect(screen.getByText(/IDR\s*1,050,000/)).toBeInTheDocument();
   });
 
+  it("discloses when the total includes a holding valued at cost (issue #744)", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1m"
+          hasValuedAtCostHoldings
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(/shown at cost/)).toBeInTheDocument();
+  });
+
+  it("omits the disclosure when every holding is normally priced", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1m"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByText(/shown at cost/)).not.toBeInTheDocument();
+  });
+
   it("derives pill 1 from TWR pct (not absolute currency delta) and adds pill 2 from benchmark", () => {
     // Seeded with portfolio pct 0 → 10 (pill 1 reads +10%) and benchmark pct 0 → 8
     // (pill 2 reads +8% vs S&P 500).

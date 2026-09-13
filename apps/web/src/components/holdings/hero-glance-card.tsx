@@ -27,6 +27,7 @@ export function HeroGlanceCard({
   initialRange,
   selectedId = null,
   benchmarkSymbol = "^GSPC",
+  hasValuedAtCostHoldings = false,
 }: {
   netWorth: string;
   currency: string;
@@ -38,8 +39,16 @@ export function HeroGlanceCard({
    *  page already calls `loadPreferences()` and threads the symbol down so the
    *  pill + legend labels track the line the chart is actually drawing. */
   benchmarkSymbol?: string | null;
+  /**
+   * True when at least one holding contributing to `netWorth` has no market price
+   * and is valued at cost basis instead (issue #744). Surfaced as a small note under
+   * the headline figure — the same at-cost holdings are individually badged in
+   * `HoldingsTable`; this discloses that the *total* is affected too.
+   */
+  hasValuedAtCostHoldings?: boolean;
 }) {
   const t = useTranslations("Holdings.hero");
+  const tHoldings = useTranslations("Holdings");
   const tr = useTranslations("Chart.range");
   const tb = useTranslations("Insights.benchmark");
   const locale = useLocale();
@@ -79,6 +88,11 @@ export function HeroGlanceCard({
       <p className="tabular mt-1 text-[34px] font-extrabold leading-tight sm:text-[36px]">
         {formatMoney(Number(netWorth), currency, locale)}
       </p>
+      {hasValuedAtCostHoldings && (
+        <p className="mt-0.5 text-[11px] font-medium text-white/70">
+          {tHoldings("heroValuedAtCostNote")}
+        </p>
+      )}
 
       {hasDelta && closeDelta !== null && (
         <div className="mt-2 flex flex-wrap items-center gap-2">

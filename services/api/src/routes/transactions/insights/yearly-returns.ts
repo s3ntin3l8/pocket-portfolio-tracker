@@ -198,6 +198,9 @@ export async function loadBoundaryFlowsForUser(
       instrumentId: transactions.instrumentId,
       executedAt: transactions.executedAt,
       portfolioId: transactions.portfolioId,
+      // Without this, archived/draft/cash_neutral rows arrived in core with
+      // `status: undefined` and slipped past its status guards entirely (issue #736).
+      status: transactions.status,
     })
     .from(transactions)
     .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))

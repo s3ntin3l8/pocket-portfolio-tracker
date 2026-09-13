@@ -108,13 +108,41 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   securities only, cash excluded from net worth. Never mix boundaries (cash in the value but
   not the contribution, or vice versa) — that manufactures phantom gains. Income (dividends/
   interest/coupons, `saveback`, bonus shares) is return, never contribution; `transfer_in` is
-  contributed capital at its carried cost basis. Lives in
-  `packages/core/src/contributions.ts` + the `boundaryFlows`/`summarizePortfolio` plumbing.
+  contributed capital at its carried cost basis. Lives in `packages/core/src/contributions.ts`'s
+  `walkInsideDays`/`walkOutsideDays` (the shared boundary walk) + `summarizePortfolio`.
+  `boundaryFlowPoints` (that walk's per-transaction projection) and `transferFlowPoints` (just
+  its transfer-sourced points) are exported for XIRR-style consumers — see the next bullet.
 - **`transfer_in` / `transfer_out` are first-class transaction types** (since PR #309,
   migration 0044). Depot-to-depot share transfers (Depotübertrag): cash-neutral, shares move
   at carried cost basis — no P&L on `transfer_out` (not a disposal). This replaces the legacy
-  `bonus`+`kind:"transfer_in"` sub-type pattern (those rows should be migrated). Inside-
-  boundary: `transfer_in` is an inflow at carried cost; outside-boundary: at avg cost.
+  `bonus`+`kind:"transfer_in"` sub-type pattern (those rows should be migrated). Inside-boundary:
+  `transfer_in` is an inflow at carried cost, `transfer_out` an outflow at carried cost —
+  `boundaryFlowPoints(txns, "inside", …)` is the complete, correct flow list for XIRR here, since
+  cost-basis and cash-received valuation coincide for deposit/withdrawal/transfer_in/transfer_out.
+  Outside-boundary: `transfer_in` at gross cost, `transfer_out` at running average cost — but
+  `boundaryFlowPoints(txns, "outside", …)` values a `sell` at cost-of-sold and excludes dividends
+  entirely (contribution tracking, not cash flow), so an XIRR-style consumer must NOT delegate to
+  it wholesale there; compose non-transfer rows via `cashFlow()` (proceeds, income included) with
+  `transferFlowPoints(txns, "outside", …)` for the transfer rows instead — see
+  `services/api/src/routes/transactions/shared/flows.ts`. Getting this distinction wrong is
+  exactly how #736 (transfers valued at ≈0) happened, and re-collapsing the two is how a second,
+  different bug (dropping realized gains/dividends from `totalReturnPct`) would happen next.
+- **A holding with no usable market price is valued at cost basis, not skipped/zero.**
+  Nothing economic happened on the day a price feed goes silent, so treating it as worth 0
+  understates net worth by the whole cost basis, not by the (unknown) gain/loss since purchase.
+  Applies in `summarizePortfolio`/`netWorth` (`packages/core`) and in the historical backfill's
+  day-by-day reconstruction (`buildDailyValueFlows`, `services/api/src/services/backfill/core.ts`)
+  — `HoldingValuation.valuedAtCost` / `PortfolioSummary.holdings[].valuedAtCost` flags it for the
+  UI to disclose. The historical path additionally distinguishes "never priced at all" (cost
+  fallback) from "priced before, but this particular gap exceeds the carry-forward window"
+  (stays excluded, unchanged) via an explicit `hasEverPriced` callback — collapsing that
+  distinction would make a genuinely-priced holding with an ordinary data gap bounce to cost and
+  back on every reveal, corrupting the TWR index with a fake single-day return. The live/daily
+  valuation path (`services/api/src/services/valuation.ts`) has no such distinction to make (no
+  "series" to bounce in a single-point valuation) — any miss there always falls back to cost.
+  Both paths share one staleness threshold, `MAX_PRICE_CARRY_FORWARD_DAYS`
+  (`packages/core/src/sanity-gates.ts`) — they used to disagree (7 vs. 10 days) before issue
+  #744 unified them.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

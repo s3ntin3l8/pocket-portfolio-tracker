@@ -62,12 +62,19 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   // Non-zero cash entries to render as pinned rows (one per currency).
   const cashEntries = Object.entries(cash ?? {}).filter(([, v]) => Number(v) !== 0);
 
+  // Holdings with no market price at all are valued at cost basis rather than skipped
+  // (issue #744) — marketValueDisplay is non-null for these too, so they already flow
+  // into the totals below like any priced holding. Surfaced via a footer note + a
+  // per-row badge so the total doesn't silently read as a real market value.
+  const valuedAtCostCount = rows.filter((h) => h.valuedAtCost).length;
+
   // Column totals across the (already class-filtered) visible rows. Market value and
-  // P&L sum only the priced holdings — unpriced ones (marketValueDisplay === null) are
-  // skipped, matching how net worth ignores instruments without a live quote. The total
-  // P&L % is taken against summed cost basis so it stays consistent with the rows.
-  // Cash is included in the value total (assumes cash currency == display currency,
-  // true for virtually all cash-counted portfolios; no FX conversion is applied).
+  // P&L sum every holding that has a value at all — priced or valued at cost; a holding
+  // with neither (no price AND no cost basis) still has marketValueDisplay === null and
+  // is skipped. The total P&L % is taken against summed cost basis so it stays
+  // consistent with the rows. Cash is included in the value total (assumes cash
+  // currency == display currency, true for virtually all cash-counted portfolios; no
+  // FX conversion is applied).
   const totals = rows.reduce(
     (acc, h) => {
       if (h.marketValueDisplay !== null) acc.value += Number(h.marketValueDisplay);
@@ -190,6 +197,14 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                   </TableCell>
                   <TableCell className={TABLE_VALUE_STRONG}>
                     {h.marketValueDisplay !== null ? display(Number(h.marketValueDisplay)) : "—"}
+                    {h.valuedAtCost && (
+                      <span
+                        title={t("valuedAtCostTooltip")}
+                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase text-text-mute"
+                      >
+                        {t("valuedAtCostBadge")}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className={cn(TABLE_VALUE_STRONG, pnlColor)}>
                     {pnl === null ? "—" : formatSignedMoney(pnl, currency, locale)}
@@ -236,6 +251,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             </TableRow>
           </TableFooter>
         </Table>
+        {valuedAtCostCount > 0 && (
+          <p className="mt-2 text-[11px] font-medium text-text-mute">
+            {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
+          </p>
+        )}
       </div>
 
       {/* ── Mobile list (< md) ── reference row: badge, symbol over "name · quantity",
@@ -277,6 +297,14 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               <div className="shrink-0 text-right tabular">
                 <div className="text-sm font-bold">
                   {h.marketValueDisplay !== null ? display(Number(h.marketValueDisplay)) : "—"}
+                  {h.valuedAtCost && (
+                    <span
+                      title={t("valuedAtCostTooltip")}
+                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[8px] font-bold uppercase text-text-mute"
+                    >
+                      {t("valuedAtCostBadge")}
+                    </span>
+                  )}
                 </div>
                 <div className={cn("text-xs font-bold", pnlColor)}>
                   {pct !== null ? formatPercent(pct / 100, locale) : "—"}
@@ -315,6 +343,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             </div>
           </div>
         </div>
+        {valuedAtCostCount > 0 && (
+          <p className="px-4 py-2 text-[11px] font-medium text-text-mute">
+            {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
+          </p>
+        )}
       </div>
     </>
   );

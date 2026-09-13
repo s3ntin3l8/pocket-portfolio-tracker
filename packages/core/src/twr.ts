@@ -90,9 +90,23 @@ export interface BuildDailyValueFlowsInput {
   dates: string[];
   /**
    * Returns the split-adjusted close and its native currency for an instrument on a date.
-   * Return null if the instrument has no price on that date (excluded from MV).
+   * Return null if the instrument has no usable price on that date (excluded from MV,
+   * unless {@link hasEverPriced} says it should fall back to cost — see there).
    */
   priceAt: (instrumentId: string, date: string) => { close: string; currency: string } | null;
+  /**
+   * Whether the instrument has ANY stored price at or before this date, independent of
+   * `priceAt`'s own staleness/carry-forward bound. Used only to decide what a null from
+   * `priceAt` MEANS: `false` here means the instrument has never had a price up to this
+   * point — nothing economic happened when its feed went silent, so it's valued at cost
+   * basis instead of excluded (issue #744). `true` means `priceAt`'s own carry-forward
+   * already looked and declined to fill this date (a gap larger than its bound) — that
+   * keeps today's exclude-from-MV semantics unchanged, since a genuinely-priced
+   * instrument with a data gap dropping to cost and bouncing back on the next price
+   * would be a new artifact on instruments that were never the problem. Omit to preserve
+   * pre-#744 behavior (every null from `priceAt` excludes the holding from MV).
+   */
+  hasEverPriced?: (instrumentId: string, date: string) => boolean;
   /** Returns an FxRateFn for converting any currency to baseCurrency on the given date. */
   fxAt: (date: string) => FxRateFn;
   baseCurrency: string;
@@ -116,6 +130,7 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     corporateActions,
     dates,
     priceAt,
+    hasEverPriced,
     fxAt,
     baseCurrency,
     kindOf,
@@ -139,14 +154,22 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     const asOf = new Date(`${date}T23:59:59.999Z`);
     const holdings = computeHoldings(transactions, corporateActions, asOf);
 
-    // Market value: Σ qty × adjustedClose × FX, skipping unpriced instruments.
+    // Market value: Σ qty × adjustedClose × FX. An instrument with no usable price
+    // AND no price at all before this date is valued at cost basis instead of
+    // excluded (issue #744) — see hasEverPriced's doc comment for why an in-series
+    // gap is deliberately NOT treated the same way.
     let mv = ZERO;
     for (const h of holdings) {
       if (D(h.quantity).isZero()) continue;
       const p = priceAt(h.instrumentId, date);
-      if (p === null) continue;
-      const holdingMv = marketValue(h.quantity, p.close);
-      mv = mv.add(D(convert(holdingMv, p.currency, baseCurrency, fx)));
+      if (p !== null) {
+        const holdingMv = marketValue(h.quantity, p.close);
+        mv = mv.add(D(convert(holdingMv, p.currency, baseCurrency, fx)));
+        continue;
+      }
+      if (h.costCurrency && hasEverPriced && !hasEverPriced(h.instrumentId, date)) {
+        mv = mv.add(D(convert(h.costBasis, h.costCurrency, baseCurrency, fx)));
+      }
     }
 
     // Effective flow: -Σ cashFlow(tx) for qualifying txns whose flow lands on this date.

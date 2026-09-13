@@ -61,8 +61,11 @@ export {
 export {
   contributionStats,
   mergeContributionStats,
+  boundaryFlowPoints,
+  transferFlowPoints,
   type ContributionInput,
   type ContributionStats,
+  type BoundaryFlowPoint,
 } from "./contributions.js";
 export {
   forecastSeries,

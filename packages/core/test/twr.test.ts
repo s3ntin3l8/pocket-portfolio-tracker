@@ -773,3 +773,124 @@ describe("aggregateValueFlows: a leg going to exact zero is booked as an outflow
     expect(aggregated[2].effectiveFlow).toBe("5000");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. buildDailyValueFlows: never-priced holdings valued at cost (issue #744)
+// ---------------------------------------------------------------------------
+
+describe("buildDailyValueFlows: never-priced holding valued at cost (issue #744)", () => {
+  const PRICED = "inst-baseline-priced";
+  const UNPRICED = "inst-never-priced";
+  const DATES = ["2026-01-01", "2026-01-02", "2026-01-03"];
+
+  // A stable baseline holding bought before the test window, so it contributes a flat
+  // 10,000 MV and zero flow across all three test dates — isolating UNPRICED's own
+  // contribution to the index.
+  const baseline = tx({
+    instrumentId: PRICED,
+    type: "buy",
+    quantity: "10",
+    price: "1000",
+    executedAt: new Date("2025-12-01"),
+  });
+
+  it("contributes cost basis to marketValue instead of being excluded, keeping the index flat when no real gain has occurred", () => {
+    const unpriced = tx({
+      instrumentId: UNPRICED,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      executedAt: new Date("2026-01-01"),
+    });
+
+    const flows = buildDailyValueFlows({
+      transactions: [baseline, unpriced],
+      corporateActions: [],
+      dates: DATES,
+      priceAt: (id, date) => {
+        if (id === PRICED) return { close: "1000", currency: "IDR" };
+        if (id === UNPRICED && date === "2026-01-03") return { close: "100", currency: "IDR" };
+        return null; // UNPRICED has no price on 01-01/01-02
+      },
+      // UNPRICED has never had a price before 01-03 (its first raw candle).
+      hasEverPriced: (id, date) => id === PRICED || date >= "2026-01-03",
+      fxAt: noFx,
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+    });
+
+    // Every day: 10,000 (PRICED) + 1,000 (UNPRICED, at cost basis on 01-01/01-02, then
+    // at its revealed price — which happens to equal cost, so no real gain occurred).
+    expect(flows.map((f) => f.marketValue)).toEqual(["11000", "11000", "11000"]);
+
+    const index = chainIndex(flows);
+    // No artificial jump when the price is revealed on 01-03 — the reveal price equals
+    // cost, so nothing economic happened; the index must stay flat throughout.
+    for (const pt of index) expect(Number(pt.index)).toBeCloseTo(100, 6);
+  });
+
+  it("without hasEverPriced (pre-#744 behavior), the same reveal manufactures a fake return", () => {
+    const unpriced = tx({
+      instrumentId: UNPRICED,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      executedAt: new Date("2026-01-01"),
+    });
+
+    const flows = buildDailyValueFlows({
+      transactions: [baseline, unpriced],
+      corporateActions: [],
+      dates: DATES,
+      priceAt: (id, date) => {
+        if (id === PRICED) return { close: "1000", currency: "IDR" };
+        if (id === UNPRICED && date === "2026-01-03") return { close: "100", currency: "IDR" };
+        return null;
+      },
+      // hasEverPriced omitted — UNPRICED is simply excluded until priced, exactly
+      // like every consumer behaved before #744.
+      fxAt: noFx,
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+    });
+
+    expect(flows.map((f) => f.marketValue)).toEqual(["10000", "10000", "11000"]);
+
+    const index = chainIndex(flows);
+    // The 01-03 reveal reads as a genuine +10% single-day return on the WHOLE
+    // portfolio, even though the only thing that happened is a feed starting to
+    // cover an instrument that was there — and priced at cost — all along.
+    expect(Number(index[2].index)).toBeCloseTo(110, 6);
+  });
+
+  it("an in-series gap (previously priced, temporarily missing) stays excluded — not cost — so a real instrument doesn't bounce", () => {
+    const gapped = tx({
+      instrumentId: UNPRICED,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      executedAt: new Date("2026-01-01"),
+    });
+
+    const flows = buildDailyValueFlows({
+      transactions: [baseline, gapped],
+      corporateActions: [],
+      dates: DATES,
+      priceAt: (id, date) => {
+        if (id === PRICED) return { close: "1000", currency: "IDR" };
+        // UNPRICED priced on 01-01, gap on 01-02, priced again on 01-03.
+        if (id === UNPRICED && date !== "2026-01-02") return { close: "100", currency: "IDR" };
+        return null;
+      },
+      // Priced at least once at/before every date in range — a gap, not "never priced".
+      hasEverPriced: (id) => id === PRICED || id === UNPRICED,
+      fxAt: noFx,
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+    });
+
+    // 01-02: UNPRICED excluded (not valued at cost) — unchanged from pre-#744 behavior,
+    // since it HAS been priced before; only "never priced at all" gets the cost fallback.
+    expect(flows.map((f) => f.marketValue)).toEqual(["11000", "10000", "11000"]);
+  });
+});
