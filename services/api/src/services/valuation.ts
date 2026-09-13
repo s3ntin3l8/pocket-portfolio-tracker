@@ -10,6 +10,7 @@ import {
   type PortfolioSummary,
   toDateKey,
   type TradeLog,
+  MAX_PRICE_CARRY_FORWARD_DAYS,
 } from "@portfolio/core";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
@@ -144,9 +145,12 @@ export async function valuePortfolio(
 
   // Historical-price fallback: carry forward the last known close for held
   // instruments whose live price lookup returned null (cache miss + provider
-  // miss — market holiday, provider outage, etc).  A 7-day staleness cap
+  // miss — market holiday, provider outage, etc). MAX_PRICE_CARRY_FORWARD_DAYS
   // ensures a genuinely delisted instrument eventually reverts to unpriced
-  // rather than being carried forever at a stale value.
+  // (and falls back to cost basis in summarizePortfolio — issue #744) rather
+  // than being carried forever at a stale value. Same threshold the historical
+  // backfill uses for its own forward-fill (services/backfill/core.ts) — issue
+  // #744 also unified the two, which used to disagree (7 vs 10 days).
   {
     const today = toDateKey(now);
     const missingIds = instrumentIds.filter((id) => !prices[id]);
@@ -163,7 +167,7 @@ export async function valuePortfolio(
         seen.add(row.instrumentId);
         const rowMs = new Date(`${row.date}T00:00:00.000Z`).getTime();
         const daysAgo = (todayMs - rowMs) / 86_400_000;
-        if (daysAgo <= 7) {
+        if (daysAgo <= MAX_PRICE_CARRY_FORWARD_DAYS) {
           prices[row.instrumentId] = { price: row.close, currency: row.currency };
         }
       }

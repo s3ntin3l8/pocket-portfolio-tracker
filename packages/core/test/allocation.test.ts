@@ -493,20 +493,24 @@ describe("allocationBreakdown — missing metadata graceful fallback", () => {
 // ---------------------------------------------------------------------------
 
 describe("allocationBreakdown — unpriced holdings", () => {
-  it("holding without a price is excluded from all dimensions", () => {
+  it("holding without a price is valued at cost basis, not excluded (issue #744)", () => {
     const summary = summarizePortfolio({
       transactions: [
         tx({ instrumentId: BBCA, type: "buy", quantity: "100", price: "9000", currency: "IDR" }),
         tx({ instrumentId: null, type: "deposit", price: "9000", quantity: "1", currency: "IDR" }),
       ],
-      prices: {}, // no prices → BBCA unpriced
+      prices: {}, // no prices → BBCA has no market price, valued at cost (900,000 IDR)
       displayCurrency: "IDR",
       cashCounted: true,
     });
     const result = allocationBreakdown(summary, instruments);
-    // Only cash in the breakdown (holdings unpriced → excluded)
-    expect(result.byAssetClass.map((s) => s.key)).not.toContain("equity");
-    expect(result.topHoldings).toHaveLength(0);
+    // BBCA still shows up, at cost — dropping it would understate net worth by its
+    // whole cost basis, which is exactly the artifact #744 fixed.
+    expect(result.byAssetClass.map((s) => s.key)).toContain("equity");
+    const equity = result.byAssetClass.find((s) => s.key === "equity")!;
+    expect(equity.value).toBe("900000"); // 100 × 9000 cost basis
+    expect(result.topHoldings).toHaveLength(1);
+    expect(result.topHoldings[0]!.instrumentId).toBe(BBCA);
   });
 });
 

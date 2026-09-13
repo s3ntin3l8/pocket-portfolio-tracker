@@ -17,6 +17,7 @@ import {
   netWorth,
   splitAdjustmentFactor,
   toDateKey,
+  MAX_PRICE_CARRY_FORWARD_DAYS,
   type PriceSeriesKind,
 } from "@portfolio/core";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
@@ -342,16 +343,40 @@ export async function backfillPortfolioHistory(
     return "realSeries";
   }
 
+  // Forward-fill each instrument's sparse raw candles across the full date grid, but
+  // bounded to MAX_PRICE_CARRY_FORWARD_DAYS (issue #744) — beyond that, a carried price
+  // is a stale artifact, not a plausible value, so the fill lapses and priceAt returns
+  // null again (same threshold the live/daily valuation path uses, see
+  // services/valuation.ts). earliestPricedDate tracks the first RAW (un-filled) candle
+  // per instrument, so hasEverPriced below can distinguish "never priced at all" (cost
+  // fallback) from "priced before, but this particular gap exceeds the carry-forward
+  // bound" (excluded from MV, unchanged from pre-#744 behavior — see buildDailyValueFlows'
+  // hasEverPriced doc comment for why the two are NOT treated the same).
   const filledPrices = new Map<string, Map<string, { close: string; currency: string }>>();
+  const earliestPricedDate = new Map<string, string>();
   for (const [instrId, dateMap] of rawPrices) {
+    const sortedRawDates = [...dateMap.keys()].sort();
+    if (sortedRawDates.length > 0) earliestPricedDate.set(instrId, sortedRawDates[0]!);
+
     const filled = new Map<string, { close: string; currency: string }>();
     let last: { close: string; currency: string } | null = null;
+    let lastMs = 0;
     for (const date of dateGrid) {
       const candle = dateMap.get(date);
-      if (candle) last = candle;
-      if (last) filled.set(date, last);
+      if (candle) {
+        last = candle;
+        lastMs = new Date(`${date}T00:00:00.000Z`).getTime();
+      }
+      if (!last) continue;
+      const daysSince = (new Date(`${date}T00:00:00.000Z`).getTime() - lastMs) / 86_400_000;
+      if (daysSince <= MAX_PRICE_CARRY_FORWARD_DAYS) filled.set(date, last);
     }
     filledPrices.set(instrId, filled);
+  }
+
+  function hasEverPriced(instrId: string, date: string): boolean {
+    const earliest = earliestPricedDate.get(instrId);
+    return earliest !== undefined && earliest <= date;
   }
 
   function priceAt(instrId: string, date: string): { close: string; currency: string } | null {
@@ -375,6 +400,7 @@ export async function backfillPortfolioHistory(
     corporateActions: coreCas,
     dates: dateGrid,
     priceAt,
+    hasEverPriced,
     fxAt,
     baseCurrency,
     kindOf,
@@ -398,6 +424,7 @@ export async function backfillPortfolioHistory(
       cash,
       displayCurrency: baseCurrency,
       fx,
+      hasEverPriced: (instrId) => hasEverPriced(instrId, flow.date),
     });
 
     await db

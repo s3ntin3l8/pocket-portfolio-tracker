@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js";
 import { D } from "./decimal.js";
-import { isAcquisitionType } from "./categorization.js";
+import { isAcquisitionType, isTransferType } from "./categorization.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction } from "./types.js";
@@ -112,36 +112,82 @@ function isExternalAcquisition(tx: CoreTransaction): boolean {
 
 /**
  * Cash amount of a securities transfer landing inside the boundary (at carried cost).
- * Fees reduce the net value (mirror of acquisitionCost but named for clarity here).
+ * Fees add to the carried basis, same as an acquisition's cost basis (`qty × price + fees`)
+ * — a transfer's fee is a real cost incurred to move the shares, not something that
+ * reduces what "landed".
  */
 function transferInflow(tx: CoreTransaction, fx: FxRateFn, display: string): Decimal {
   const gross = D(tx.quantity).abs().mul(D(tx.price)).add(D(tx.fees));
   return D(convert(gross.toString(), tx.currency, display, fx));
 }
 
-/** Per-day {inflow, outflow} when cash is INSIDE the boundary: net external cash. */
-function insideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
+/**
+ * A single dated, signed cash-flow crossing the boundary, in XIRR convention: negative =
+ * capital entering the boundary (a contribution), positive = capital leaving it (a
+ * withdrawal/return of capital). This is the per-transaction view of the same walk
+ * {@link insideDays}/{@link outsideDays} do at day resolution — kept in lockstep with
+ * them (see {@link walkInsideDays}/{@link walkOutsideDays}) so contributions and the
+ * transfer valuation both come from one boundary walk, never two divergent ones.
+ * `isTransfer` tags points sourced from `transfer_in`/`transfer_out` (or the legacy
+ * `bonus`+`kind:"transfer_in"` pattern) so {@link transferFlowPoints} can pull just
+ * those out — the walk's cost-basis valuation for a transfer is correct for every
+ * consumer, but its cost-basis valuation of a `sell` (used for contribution tracking)
+ * is NOT the same thing a cash-flow-based consumer like XIRR needs (that wants sale
+ * proceeds, not cost-of-sold) — see `services/api`'s `flows.ts` for how the two are
+ * composed back together.
+ */
+interface FlowPoint {
+  date: Date;
+  amount: Decimal;
+  isTransfer: boolean;
+}
+
+interface DayWalkResult {
+  days: Map<string, FlowAgg>;
+  points: FlowPoint[];
+}
+
+/**
+ * Walks the INSIDE-boundary rules (net external cash) once, producing both the
+ * day-bucketed view {@link insideDays} needs and the per-transaction point view
+ * {@link boundaryFlowPoints} needs — same amounts, same inclusion rules, two shapes.
+ */
+function walkInsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): DayWalkResult {
   const months = new Map<string, FlowAgg>();
+  const points: FlowPoint[] = [];
   for (const tx of txns) {
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
     if (tx.type === "deposit") {
-      m.inflow = m.inflow.add(depositInflow(tx, fx, display));
+      const amount = depositInflow(tx, fx, display);
+      m.inflow = m.inflow.add(amount);
+      points.push({ date: tx.executedAt, amount: amount.neg(), isTransfer: false });
     } else if (tx.type === "withdrawal") {
-      m.outflow = m.outflow.add(withdrawalOutflow(tx, fx, display));
+      const amount = withdrawalOutflow(tx, fx, display);
+      m.outflow = m.outflow.add(amount);
+      points.push({ date: tx.executedAt, amount, isTransfer: false });
     } else if (tx.type === "transfer_in") {
       // Inbound transfer: shares arrive at carried cost — that value crosses the boundary
       // as contributed capital (same logic as a deposit for an inside-boundary portfolio).
-      m.inflow = m.inflow.add(transferInflow(tx, fx, display));
+      const amount = transferInflow(tx, fx, display);
+      m.inflow = m.inflow.add(amount);
+      points.push({ date: tx.executedAt, amount: amount.neg(), isTransfer: true });
     } else if (tx.type === "transfer_out") {
       // Outbound transfer: capital leaves the boundary at carried cost basis.
-      m.outflow = m.outflow.add(transferInflow(tx, fx, display));
+      const amount = transferInflow(tx, fx, display);
+      m.outflow = m.outflow.add(amount);
+      points.push({ date: tx.executedAt, amount, isTransfer: true });
     } else {
       continue;
     }
     months.set(key, m);
   }
-  return months;
+  return { days: months, points };
+}
+
+/** Per-day {inflow, outflow} when cash is INSIDE the boundary: net external cash. */
+function insideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
+  return walkInsideDays(txns, fx, display).days;
 }
 
 /**
@@ -152,7 +198,7 @@ function insideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map
  * All real acquisitions (incl. broker-credited ones) build the average-cost pool;
  * only externally-funded ones count toward `inflow`.
  */
-function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
+function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): DayWalkResult {
   const sorted = [...txns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
   // Pool is denominated in costCurrency (the trade currency of the instrument's
   // buys) — mirror of computeHoldings. Mixing currencies for one instrument is
@@ -190,6 +236,7 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
   }
   const pool = new Map<string, { qty: Decimal; cost: Decimal; costCurrency: string }>();
   const months = new Map<string, FlowAgg>();
+  const points: FlowPoint[] = [];
 
   for (const tx of sorted) {
     if (!tx.instrumentId) continue;
@@ -221,7 +268,14 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
       p.cost = p.cost.add(gross);
       if (isExternalAcquisition(tx)) {
         // Convert from costCurrency to display only at the inflow boundary.
-        m.inflow = m.inflow.add(D(convert(gross.toString(), tx.currency, display, fx)));
+        const amount = D(convert(gross.toString(), tx.currency, display, fx));
+        m.inflow = m.inflow.add(amount);
+        // isExternalAcquisition only returns true here for transfer_in or the legacy
+        // bonus+kind:"transfer_in" pattern (buy/savings_plan are always external and
+        // therefore not transfers) — see isExternalAcquisition's own branches.
+        const isTransfer =
+          isTransferType(tx.type) || (tx.type === "bonus" && tx.kind === "transfer_in");
+        points.push({ date: tx.executedAt, amount: amount.neg(), isTransfer });
       }
     } else if (tx.type === "transfer_out") {
       // Outbound transfer removes from the avg-cost pool and counts as outflow
@@ -236,9 +290,9 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
       // Convert from costCurrency → display (B4 fix). Previously this used
       // `tx.currency` (= depot base), which double-converted when the pool was in
       // display, or silently zero-converted when the depot base equalled display.
-      m.outflow = m.outflow.add(
-        D(convert(costOfTransferred.toString(), p.costCurrency, display, fx)),
-      );
+      const amount = D(convert(costOfTransferred.toString(), p.costCurrency, display, fx));
+      m.outflow = m.outflow.add(amount);
+      points.push({ date: tx.executedAt, amount, isTransfer: true });
     } else if (tx.type === "sell") {
       const p = pool.get(tx.instrumentId);
       const sellQty = p ? Decimal.min(D(tx.quantity).abs(), p.qty) : D(0);
@@ -251,12 +305,98 @@ function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Ma
       // A merger's sell leg removes the old position but returns no capital — the
       // basis moves into the new instrument's buy leg. Draw the pool, skip outflow.
       if (tx.kind !== "merger" && p) {
-        m.outflow = m.outflow.add(D(convert(costOfSold.toString(), p.costCurrency, display, fx)));
+        const amount = D(convert(costOfSold.toString(), p.costCurrency, display, fx));
+        m.outflow = m.outflow.add(amount);
+        points.push({ date: tx.executedAt, amount, isTransfer: false });
       }
     }
     months.set(key, m);
   }
-  return months;
+  return { days: months, points };
+}
+
+/** Per-day {inflow, outflow} when cash is OUTSIDE the boundary: net invested
+ * capital. See {@link walkOutsideDays} for the full rules. */
+function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
+  return walkOutsideDays(txns, fx, display).days;
+}
+
+/** One dated, signed cash-flow crossing a portfolio's investment boundary, in XIRR
+ * convention (negative = contribution, positive = withdrawal/return of capital). */
+export interface BoundaryFlowPoint {
+  amount: number;
+  date: Date;
+}
+
+/**
+ * Per-transaction view of the SAME boundary walk {@link contributionStats} uses
+ * ({@link walkInsideDays}/{@link walkOutsideDays}) — one dated, signed amount per
+ * included transaction instead of a day-bucketed total. Values every row the way
+ * `contributionStats` does: a `transfer_in` at carried cost, a `transfer_out` at
+ * carried cost (inside) / running average cost (outside), a `sell` at cost-of-sold
+ * (outside only — contributions track capital still deployed, not cash proceeds).
+ *
+ * **On the inside boundary this IS the complete, correct XIRR flow list** — deposit/
+ * withdrawal/transfer_in/transfer_out are the only rows that ever cross an
+ * inside boundary, and cost-basis valuation and cash-received valuation coincide for
+ * all four (a deposit's cash-in *is* its cost). Consumers that need the inside
+ * boundary's flows for XIRR/`totalReturnPct` can call this directly (as `flows.ts`
+ * does).
+ *
+ * **On the outside boundary this is NOT the XIRR flow list** — a `sell` valued at
+ * cost-of-sold discards the realized gain, and dividends aren't part of the walk at
+ * all (they're return, never contribution — CLAUDE.md). A cash-flow-based consumer
+ * (XIRR, `totalReturnPct`) needs sells at proceeds and dividends included; only the
+ * *transfer* rows in this walk are what such a consumer was getting wrong before
+ * (valued ≈0 via `cashFlow()` — issue #736). Use {@link transferFlowPoints} to pull
+ * just those out and compose them with a proceeds/income-based flow list for the
+ * non-transfer rows — see `services/api`'s `flows.ts`.
+ */
+export function boundaryFlowPoints(
+  txns: CoreTransaction[],
+  boundary: "inside" | "outside",
+  displayCurrency: string,
+  fx: FxRateFn,
+): BoundaryFlowPoint[] {
+  // Archived + draft rows are excluded from every derivation — mirror contributionStats.
+  const relevant = txns.filter((t) => t.status !== "archived" && t.status !== "draft");
+  const { points } =
+    boundary === "outside"
+      ? walkOutsideDays(relevant, fx, displayCurrency)
+      : walkInsideDays(relevant, fx, displayCurrency);
+  return points
+    .slice()
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((p) => ({ amount: Number(p.amount.toString()), date: p.date }));
+}
+
+/**
+ * Just the transfer-sourced points (`transfer_in`/`transfer_out`, or the legacy
+ * `bonus`+`kind:"transfer_in"` pattern) from the same boundary walk
+ * {@link boundaryFlowPoints} draws on — valued at carried/average cost, which is
+ * correct for a transfer on EITHER boundary (a transfer moves shares, not cash; cost
+ * basis is the only meaningful "amount" for it). Exists so a cash-flow-based consumer
+ * on the outside boundary (XIRR, `totalReturnPct`) can take its non-transfer rows from
+ * a proceeds/income-based valuation (`cashFlow()`) and its transfer rows from here,
+ * rather than getting transfers wrong (as `cashFlow()` does — issue #736) or getting
+ * every other row wrong (as delegating wholesale to {@link boundaryFlowPoints} would).
+ */
+export function transferFlowPoints(
+  txns: CoreTransaction[],
+  boundary: "inside" | "outside",
+  displayCurrency: string,
+  fx: FxRateFn,
+): BoundaryFlowPoint[] {
+  const relevant = txns.filter((t) => t.status !== "archived" && t.status !== "draft");
+  const { points } =
+    boundary === "outside"
+      ? walkOutsideDays(relevant, fx, displayCurrency)
+      : walkInsideDays(relevant, fx, displayCurrency);
+  return points
+    .filter((p) => p.isTransfer)
+    .slice()
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((p) => ({ amount: Number(p.amount.toString()), date: p.date }));
 }
 
 /**

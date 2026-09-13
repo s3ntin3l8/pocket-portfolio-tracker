@@ -174,7 +174,7 @@ describe("recordDailySnapshots", () => {
     expect(rows[0].netWorth).toBe("36000");
   });
 
-  it("leaves a held instrument unpriced when last close is older than 7 days", async () => {
+  it("values a held instrument at cost when its last close is too stale to carry forward (issue #744)", async () => {
     const db = getDb();
     const [u] = await db
       .insert(users)
@@ -226,7 +226,7 @@ describe("recordDailySnapshots", () => {
       },
     ]);
 
-    // Seed historical price for B — 30 days ago (beyond 7-day cap).
+    // Seed historical price for B — 30 days ago (beyond MAX_PRICE_CARRY_FORWARD_DAYS).
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
     await db.insert(prices).values({
@@ -247,8 +247,80 @@ describe("recordDailySnapshots", () => {
       .from(portfolioSnapshots)
       .where(eq(portfolioSnapshots.portfolioId, p.id));
     expect(rows).toHaveLength(1);
-    // Only A contributes: 10×1100 = 11,000. B is too stale → unpriced.
-    expect(rows[0].marketValue).toBe("11000");
+    // A priced normally: 10×1100 = 11,000. B's 30-day-old close is too stale to carry
+    // forward, so it's valued at cost basis instead of dropped (issue #744):
+    // 10×2000 = 20,000. Total = 31,000 — dropping it would understate net worth by
+    // exactly its cost, not by the (unknown) gain/loss since purchase.
+    expect(rows[0].marketValue).toBe("31000");
+  });
+
+  it("values a NEVER-priced held instrument at cost, not zero (issue #744)", async () => {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "never-priced-user", email: "never-priced@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "NeverPriced", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+    const [instA] = await db
+      .insert(instruments)
+      .values({
+        symbol: "FRESHC",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Fresh C (priced)",
+      })
+      .returning();
+    const [instB] = await db
+      .insert(instruments)
+      .values({
+        symbol: "NEVERB",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Never priced B",
+      })
+      .returning();
+
+    await db.insert(transactions).values([
+      {
+        portfolioId: p.id,
+        instrumentId: instA.id,
+        type: "buy",
+        quantity: "10",
+        price: "1000",
+        currency: "IDR",
+        executedAt: new Date("2026-01-10"),
+      },
+      {
+        portfolioId: p.id,
+        instrumentId: instB.id,
+        type: "buy",
+        quantity: "10",
+        price: "2000",
+        currency: "IDR",
+        executedAt: new Date("2026-01-10"),
+      },
+    ]);
+    // No prices row for B at all — the feed has never covered it (e.g. MWOF, issue #744).
+
+    const svc = new MarketDataService([new FixtureProvider({ FRESHC: "1100" })]);
+    const now = new Date();
+
+    const count = await recordDailySnapshots(db, svc, 10_000, now);
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    const rows = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, p.id));
+    expect(rows).toHaveLength(1);
+    // A priced normally: 10×1100 = 11,000. B has never had a price → valued at cost
+    // basis: 10×2000 = 20,000. Total = 31,000, not 11,000.
+    expect(rows[0].marketValue).toBe("31000");
   });
 
   // Regression guard for the "Leona" incident: a portfolio with zero transactions

@@ -136,6 +136,21 @@ describe("HoldingsTable", () => {
     expect(screen.getAllByText(/16,000/).length).toBeGreaterThan(0);
   });
 
+  it("badges and footnotes a holding valued at cost (no market price — issue #744)", () => {
+    const atCost = { ...makeHolding("MWOF", "10", "100"), valuedAtCost: true as const };
+    renderTable({ rows: [makeHolding("ZZYX", "50", "200"), atCost] });
+    // Badge appears next to the at-cost holding's value (desktop + mobile).
+    expect(screen.getAllByText("At cost").length).toBeGreaterThan(0);
+    // Footer discloses how many rows are affected.
+    expect(screen.getAllByText(/1 holding shown at cost/).length).toBeGreaterThan(0);
+  });
+
+  it("does not badge or footnote a normally-priced holding", () => {
+    renderTable();
+    expect(screen.queryByText("At cost")).not.toBeInTheDocument();
+    expect(screen.queryByText(/shown at cost/)).not.toBeInTheDocument();
+  });
+
   it("does not render a Cash row when no cash prop is provided", () => {
     renderTable();
     expect(screen.queryByText("Cash")).not.toBeInTheDocument();
@@ -207,6 +222,39 @@ describe("HoldingsTable", () => {
   it("omits the sparkline for a holding with no series data", () => {
     const { container } = renderTable({ rows: [makeHolding("AAPL", "10", "1500")] });
     expect(container.querySelector("polyline")).toBeNull();
+  });
+
+  describe("valuedAtCost disclosure (#744)", () => {
+    it("renders an at-cost badge next to a holding valued at cost, but not for a normally-priced one", () => {
+      const atCost: HoldingValuation = { ...makeHolding("MWOF", "10", "100"), valuedAtCost: true };
+      renderTable({ rows: [atCost, makeHolding("AAPL", "10", "1500")] });
+      expect(screen.getAllByText("At cost").length).toBeGreaterThan(0);
+    });
+
+    it("does not render an at-cost badge or footer note when no holding is valued at cost", () => {
+      renderTable();
+      expect(screen.queryByText("At cost")).not.toBeInTheDocument();
+      expect(screen.queryByText(/shown at cost/)).not.toBeInTheDocument();
+    });
+
+    it("renders a footer note counting how many holdings are valued at cost", () => {
+      const atCost: HoldingValuation = { ...makeHolding("MWOF", "10", "100"), valuedAtCost: true };
+      renderTable({ rows: [atCost, makeHolding("AAPL", "10", "1500")] });
+      expect(screen.getAllByText(/1 holding shown at cost/).length).toBeGreaterThan(0);
+    });
+
+    it("still includes the at-cost holding's value in the footer total", () => {
+      // MWOF: valued at cost 1000 (10 × 100 avgCost, via marketValueDisplay override below).
+      const atCost: HoldingValuation = {
+        ...makeHolding("MWOF", "10", "100"),
+        price: null,
+        marketValue: null,
+        marketValueDisplay: "1000",
+        valuedAtCost: true,
+      };
+      renderTable({ rows: [atCost] });
+      expect(screen.getAllByText(/1,000/).length).toBeGreaterThan(0);
+    });
   });
 
   describe("keyboard accessibility", () => {

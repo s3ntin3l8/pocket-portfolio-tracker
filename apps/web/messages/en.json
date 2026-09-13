@@ -1319,6 +1319,10 @@
     "searchPlaceholder": "Search holdings…",
     "searchClear": "Clear search",
     "noResults": "No holdings match your search.",
+    "valuedAtCostBadge": "At cost",
+    "valuedAtCostTooltip": "No market price available — shown at cost basis, not market value.",
+    "valuedAtCostFooterNote": "Includes {count, plural, one {1 holding} other {# holdings}} shown at cost (no market price available).",
+    "heroValuedAtCostNote": "Includes one or more holdings shown at cost (no market price available).",
     "hero": {
       "label": "Total portfolio value",
       "periodPast": "past {range}",

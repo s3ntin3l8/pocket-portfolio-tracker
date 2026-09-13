@@ -795,5 +795,71 @@ describe("GET /insights", () => {
       expect(xirr).toBeGreaterThan(0);
       expect(xirr).toBeLessThan(0.5);
     });
+
+    // Regression guard for issue #736's `status` fix: loadBoundaryFlowsForUser's select
+    // used to omit `status`, so archived/draft rows arrived in core with `status:
+    // undefined` and slipped past every guard that checks for it — silently counting a
+    // huge archived deposit as a real cash flow into the per-year XIRR.
+    it("excludes an archived deposit from the year's XIRR flows", async () => {
+      const t = await token("insights-yearly-xirr-archived-user");
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Archived Flow Test", baseCurrency: "IDR", cashCounted: true },
+      });
+      const portfolioId = create.json().id;
+
+      await app.db.insert(portfolioSnapshots).values({
+        portfolioId,
+        date: "2025-12-31",
+        netWorth: "30000",
+        marketValue: "30000",
+        effectiveFlow: "30000",
+        currency: "IDR",
+      });
+
+      await app.db.insert(transactions).values([
+        {
+          portfolioId,
+          type: "deposit",
+          price: "2000",
+          currency: "IDR",
+          executedAt: new Date("2026-06-15"),
+        },
+        // A huge archived deposit — must NOT count as a real cash flow. Before the
+        // `status` fix, this would have solved for an absurd XIRR instead of the
+        // ~13% real return the same-shaped non-archived test above expects.
+        {
+          portfolioId,
+          type: "deposit",
+          price: "5000000",
+          currency: "IDR",
+          executedAt: new Date("2026-07-01"),
+          status: "archived",
+        },
+      ]);
+      await app.db.insert(portfolioSnapshots).values({
+        portfolioId,
+        date: "2026-12-31",
+        netWorth: "36000",
+        marketValue: "36000",
+        effectiveFlow: "6000",
+        currency: "IDR",
+      });
+
+      const res = await app.inject({ method: "GET", url: "/insights?range=all", headers: auth(t) });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+
+      const row2026 = body.yearlyReturns.find((r: { year: number }) => r.year === 2026);
+      expect(row2026).toBeTruthy();
+      expect(row2026.portfolioXirr).not.toBeNull();
+      const xirr = Number(row2026.portfolioXirr);
+      // Same real ~13% year as the non-archived case — the archived 5,000,000 deposit
+      // must not move this number at all.
+      expect(xirr).toBeGreaterThan(0);
+      expect(xirr).toBeLessThan(0.5);
+    });
   });
 });

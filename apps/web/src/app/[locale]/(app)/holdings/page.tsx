@@ -306,6 +306,7 @@ export default async function HoldingsPage({
           initialRange={HERO_INITIAL_RANGE}
           selectedId={selectedId}
           benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
+          hasValuedAtCostHoldings={summary.holdings.some((h) => h.valuedAtCost)}
         />
       )}
 

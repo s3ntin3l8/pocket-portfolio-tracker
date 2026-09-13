@@ -1325,6 +1325,10 @@
     "searchPlaceholder": "Cari kepemilikan…",
     "searchClear": "Hapus pencarian",
     "noResults": "Tidak ada kepemilikan yang cocok dengan pencarian Anda.",
+    "valuedAtCostBadge": "Nilai biaya",
+    "valuedAtCostTooltip": "Harga pasar tidak tersedia — ditampilkan berdasarkan biaya perolehan, bukan nilai pasar.",
+    "valuedAtCostFooterNote": "Termasuk {count, plural, other {# kepemilikan}} yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
+    "heroValuedAtCostNote": "Termasuk satu atau lebih kepemilikan yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
     "hero": {
       "label": "Total nilai portofolio",
       "periodPast": "{range} terakhir",

@@ -323,7 +323,7 @@ describe("summarizePortfolio", () => {
       mk({ type: "buy", quantity: "100", price: "9500", executedAt: new Date("2026-01-02") }),
       mk({ type: "buy", quantity: "100", price: "10500", executedAt: new Date("2026-01-03") }),
       mk({ type: "sell", quantity: "50", price: "11000", executedAt: new Date("2026-01-04") }),
-      // unpriced holding — returned but excluded from market-value totals
+      // unpriced holding — returned, valued at cost basis (issue #744), not excluded
       mk({
         type: "buy",
         instrumentId: I2,
@@ -347,15 +347,19 @@ describe("summarizePortfolio", () => {
     expect(h1.dayChange).toBeNull(); // priced, but no previous close given
 
     const h2 = summary.holdings.find((h) => h.instrumentId === I2)!;
-    expect(h2.marketValue).toBeNull(); // no price
+    expect(h2.marketValue).toBeNull(); // native market value stays unknown
+    expect(h2.marketValueDisplay).toBe("1000"); // valued at cost basis, not 0
+    expect(h2.unrealizedPnLDisplay).toBe("0");
+    expect(h2.valuedAtCost).toBe(true);
+    expect(h1.valuedAtCost).toBeUndefined();
 
     // 5,000,000 - 950,000 - 1,050,000 + 550,000 - 1,000 (the I2 buy)
     expect(summary.cash.IDR).toBe("3549000");
-    expect(summary.totalCost).toBe("1500000"); // priced holdings only
-    expect(summary.totalMarketValue).toBe("1650000");
-    expect(summary.totalUnrealizedPnL).toBe("150000");
+    expect(summary.totalCost).toBe("1501000"); // 1,500,000 priced + 1,000 at-cost
+    expect(summary.totalMarketValue).toBe("1651000"); // 1,650,000 priced + 1,000 at-cost
+    expect(summary.totalUnrealizedPnL).toBe("150000"); // I2 contributes 0 either side
     expect(summary.totalRealizedPnL).toBe("50000");
-    expect(summary.netWorth).toBe("5199000"); // 1,650,000 + 3,549,000
+    expect(summary.netWorth).toBe("5200000"); // 1,650,000 + 1,000 + 3,549,000
   });
 
   it("excludes cash from net worth when cashCounted is false (cash-outside boundary)", () => {
@@ -474,11 +478,33 @@ describe("summarizePortfolio", () => {
     expect(h2.costBasisDisplay).toBe("16000000");
     expect(h2.unrealizedPnLDisplay).toBe("1600000"); // 17.6M − 16M
 
-    // Unpriced: value/P&L unknown; cost basis falls back to native (best effort).
+    // Unpriced: native market value/P&L unknown, but valued at cost basis (issue #744) —
+    // same currency here, so display equals native.
     const h1 = summary.holdings.find((h) => h.instrumentId === I1)!;
-    expect(h1.marketValueDisplay).toBeNull();
-    expect(h1.unrealizedPnLDisplay).toBeNull();
+    expect(h1.marketValueDisplay).toBe("1500");
+    expect(h1.unrealizedPnLDisplay).toBe("0");
     expect(h1.costBasisDisplay).toBe(h1.costBasis); // "1500"
+    expect(h1.valuedAtCost).toBe(true);
+  });
+
+  it("does not fall back to cost when there's no cost basis either (dividend on a non-held instrument)", () => {
+    // A dividend-only row never sets costCurrency (no price-bearing trade) — matches
+    // netWorth()'s own `h.costCurrency` guard, so the two functions agree on this edge
+    // case instead of summarizePortfolio silently rendering a zero-value row as
+    // valuedAtCost.
+    const I3 = "inst-3";
+    const summary = summarizePortfolio({
+      transactions: [
+        mk({ type: "dividend", instrumentId: I3, quantity: "0", price: "80", currency: "IDR" }),
+      ],
+      prices: {},
+      displayCurrency: "IDR",
+    });
+    const h3 = summary.holdings.find((h) => h.instrumentId === I3)!;
+    expect(h3.costCurrency).toBeNull();
+    expect(h3.marketValueDisplay).toBeNull();
+    expect(h3.unrealizedPnLDisplay).toBeNull();
+    expect(h3.valuedAtCost).toBeUndefined();
   });
 
   it("breaks exposure down by currency (holdings + cash) in display currency", () => {
@@ -886,6 +912,66 @@ describe("aggregatePortfolios", () => {
     const out = aggregatePortfolios([], "IDR");
     expect(out.netWorth).toBe("0");
     expect(out.holdings).toEqual([]);
+  });
+
+  it("flags the merged holding valuedAtCost when EITHER portfolio's leg was (issue #744)", () => {
+    const baseHolding = {
+      instrumentId: "i1",
+      quantity: "10",
+      avgCost: "100",
+      costBasis: "1000",
+      realizedPnL: "0",
+      price: null,
+      currency: null,
+      marketValue: null,
+      unrealizedPnL: null,
+      costBasisDisplay: "1000",
+      previousClose: null,
+      dayChange: null,
+      dayChangePct: null,
+    };
+    // Portfolio A holds i1 priced normally; portfolio B holds the same instrument with
+    // no usable price (valued at cost).
+    const a = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          price: "150",
+          currency: "IDR",
+          marketValue: "1500",
+          unrealizedPnL: "500",
+          marketValueDisplay: "1500",
+          unrealizedPnLDisplay: "500",
+        },
+      ],
+    });
+    const b = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          marketValueDisplay: "1000",
+          unrealizedPnLDisplay: "0",
+          valuedAtCost: true,
+        },
+      ],
+    });
+
+    const merged = aggregatePortfolios([a, b], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(merged.valuedAtCost).toBe(true);
+
+    // Symmetric: order shouldn't matter.
+    const mergedReversed = aggregatePortfolios([b, a], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(mergedReversed.valuedAtCost).toBe(true);
+
+    // Two normally-priced legs merge to no flag at all (not `false`).
+    const bothPriced = aggregatePortfolios([a, a], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(bothPriced.valuedAtCost).toBeUndefined();
   });
 });
 
