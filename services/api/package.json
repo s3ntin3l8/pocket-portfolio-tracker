@@ -61,6 +61,6 @@
     "form-auto-content": "^3.2.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.0"
   }
 }
