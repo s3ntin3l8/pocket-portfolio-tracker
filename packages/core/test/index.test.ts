@@ -487,6 +487,26 @@ describe("summarizePortfolio", () => {
     expect(h1.valuedAtCost).toBe(true);
   });
 
+  it("does not fall back to cost when there's no cost basis either (dividend on a non-held instrument)", () => {
+    // A dividend-only row never sets costCurrency (no price-bearing trade) — matches
+    // netWorth()'s own `h.costCurrency` guard, so the two functions agree on this edge
+    // case instead of summarizePortfolio silently rendering a zero-value row as
+    // valuedAtCost.
+    const I3 = "inst-3";
+    const summary = summarizePortfolio({
+      transactions: [
+        mk({ type: "dividend", instrumentId: I3, quantity: "0", price: "80", currency: "IDR" }),
+      ],
+      prices: {},
+      displayCurrency: "IDR",
+    });
+    const h3 = summary.holdings.find((h) => h.instrumentId === I3)!;
+    expect(h3.costCurrency).toBeNull();
+    expect(h3.marketValueDisplay).toBeNull();
+    expect(h3.unrealizedPnLDisplay).toBeNull();
+    expect(h3.valuedAtCost).toBeUndefined();
+  });
+
   it("breaks exposure down by currency (holdings + cash) in display currency", () => {
     const summary = summarizePortfolio({
       transactions: [

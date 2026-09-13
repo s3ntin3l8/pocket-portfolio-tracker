@@ -157,14 +157,36 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     );
 
     if (!quote) {
-      // No usable market price — value at cost basis rather than 0 (issue #744).
-      // totalCost/totalMarketValue/exposure all advance together so this holding
-      // contributes exactly 0 to totalUnrealizedPnL, not a phantom loss of its whole
-      // cost basis. price/dayChange/dayChangePct stay null — genuinely unknown, not 0.
-      const costBasisDisplay = convert(cbStr, costCcy, input.displayCurrency, fx);
-      totalCost = totalCost.add(new Decimal(costBasisDisplay));
-      totalMarketValue = totalMarketValue.add(new Decimal(costBasisDisplay));
-      addExposure(costCcy, costBasisDisplay);
+      if (h.costCurrency) {
+        // No usable market price, but a real cost basis to fall back to — value at
+        // cost instead of 0 (issue #744). totalCost/totalMarketValue/exposure all
+        // advance together so this holding contributes exactly 0 to totalUnrealizedPnL,
+        // not a phantom loss of its whole cost basis. price/dayChange/dayChangePct stay
+        // null — genuinely unknown, not 0.
+        const costBasisDisplay = convert(cbStr, h.costCurrency, input.displayCurrency, fx);
+        totalCost = totalCost.add(new Decimal(costBasisDisplay));
+        totalMarketValue = totalMarketValue.add(new Decimal(costBasisDisplay));
+        addExposure(h.costCurrency, costBasisDisplay);
+        return {
+          ...h,
+          costBasis: cbStr,
+          avgCost,
+          price: null,
+          currency: null,
+          marketValue: null,
+          unrealizedPnL: null,
+          marketValueDisplay: costBasisDisplay,
+          costBasisDisplay,
+          unrealizedPnLDisplay: "0",
+          previousClose: null,
+          dayChange: null,
+          dayChangePct: null,
+          valuedAtCost: true,
+        };
+      }
+      // No price AND no cost currency at all (e.g. a pure-dividend row, or a zero-price
+      // transfer_in with no basis filled in yet — #736's known limitation) — genuinely
+      // nothing to value. Matches netWorth()'s own `h.costCurrency` guard.
       return {
         ...h,
         costBasis: cbStr,
@@ -173,13 +195,12 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
         currency: null,
         marketValue: null,
         unrealizedPnL: null,
-        marketValueDisplay: costBasisDisplay,
-        costBasisDisplay,
-        unrealizedPnLDisplay: "0",
+        marketValueDisplay: null,
+        costBasisDisplay: cbStr,
+        unrealizedPnLDisplay: null,
         previousClose: null,
         dayChange: null,
         dayChangePct: null,
-        valuedAtCost: true,
       };
     }
 
