@@ -21,14 +21,19 @@ export interface ComputeYearlyReturnsArgs {
   userId: string;
   /** Per-portfolio display-currency flows (marketValue + effectiveFlow) — already aggregated by the caller. */
   aggregatedFlows: { date: string; marketValue: string; effectiveFlow: string }[];
-  /** Per-portfolio display-currency NAV (used to compute year-end balances for XIRR). */
+  /**
+   * Per-portfolio display-currency NAV (net worth — already FX-converted and
+   * cashCounted-aware by the caller), used to compute year-end/opening balances
+   * for XIRR.
+   */
   perPortfolio: { id: string; flows: { date: string; marketValue: string; currency: string }[] }[];
-  /** All boundary flows (in display currency) for this aggregate set, used to seed per-year XIRR. */
+  /**
+   * All boundary flows (in display currency) for this aggregate set, used to seed
+   * per-year XIRR. The caller is responsible for computing each portfolio's flows
+   * under its OWN boundary (cashCounted ? "inside" : "outside") before unioning —
+   * this function treats the list as already boundary-correct.
+   */
   boundaryFlows: { amount: string; date: Date }[];
-  /** Display currency the flows are denominated in. */
-  displayCurrency: string;
-  /** Per-date FX rate map from currency → displayCurrency. */
-  ratesByDate: Map<string, Record<string, string>>;
 } /**
  * Compute per-year portfolio and benchmark returns for the Insights page.
  *
@@ -54,17 +59,7 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     }[];
   }[]
 > {
-  const {
-    app,
-    userId,
-    aggregatedFlows,
-    perPortfolio,
-    boundaryFlows: bflows,
-    displayCurrency,
-    ratesByDate,
-  } = args;
-  void displayCurrency;
-  void ratesByDate;
+  const { app, userId, aggregatedFlows, perPortfolio, boundaryFlows: bflows } = args;
   const db = app.db;
 
   // Portfolio index = same chainIndex the rest of /insights uses.
@@ -82,9 +77,11 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     flowsByYear.set(year, arr);
   }
 
-  // Compute per-year end NAV (in display currency) by summing the last snapshot
-  // of each year across all portfolios. NAV = sum of per-portfolio marketValue
-  // (already display-currency) at the last snapshot of the year.
+  // Compute per-year end NAV (in display currency) by summing the last snapshot of
+  // each year across all portfolios. `pf.flows[].marketValue` actually carries each
+  // portfolio's NAV (net worth — see ComputeYearlyReturnsArgs.perPortfolio); the field
+  // name is inherited from the shared per-portfolio flow shape. `computeYearlyReturns`
+  // also reads this same map at `year - 1` as each year's OPENING NAV.
   const endNavByYear = new Map<number, string>();
   for (const year of new Set(pfIndex.map((p) => Number(p.date.slice(0, 4))))) {
     const lastByPortfolio = new Map<string, { date: string; marketValue: string }>();
@@ -160,11 +157,6 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     });
   }
 
-  // fxAt signature: (date) => FxRateFn. The core helper doesn't actually use fxAt
-  // (TWR is ratio-based; FX cancels out), but we keep the wiring for the future
-  // when an "FX-adjusted benchmark return in display currency" might be wanted.
-  void ratesByDate;
-
   return computeYearlyReturns({
     pfIndex,
     pfFlowsByYear: flowsByYear,
@@ -175,11 +167,17 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
 }
 
 /**
- * Load the boundary flows for a set of portfolios in a target display currency.
- * Wraps the shared `boundaryFlows` helper (which already handles the kind-aware
- * "inside" vs. "outside" semantics defined in CONTRIBUTING.md) so the per-year
- * XIRR is computed against the same cash-flow source as `/contributions` and
- * the rest of the insights cards.
+ * Load the boundary flows for a set of portfolios in a target display currency,
+ * under a single `boundary` mode. Wraps the shared `boundaryFlows` helper (which
+ * already handles the kind-aware "inside" vs. "outside" semantics defined in
+ * CONTRIBUTING.md) so the per-year XIRR is computed against the same cash-flow
+ * source as `/contributions` and the rest of the insights cards.
+ *
+ * A caller whose portfolios don't all share one boundary (i.e. a mix of
+ * `cashCounted` true/false) must call this once per boundary group and union the
+ * results — see `registerInsightsRoutes`'s `insidePfIds`/`outsidePfIds` split,
+ * which mirrors how `/networth`'s hero XIRR computes each portfolio's flows
+ * under its own boundary before concatenating them.
  */
 export async function loadBoundaryFlowsForUser(
   app: FastifyInstance,

@@ -250,28 +250,126 @@ export function chainIndex(
 }
 
 /**
- * Sum per-portfolio (marketValue, effectiveFlow) series across portfolios per date,
- * then sort by date. Use this before `chainIndex` for the aggregate view — you cannot
- * average per-portfolio indices.
+ * Sum per-portfolio (marketValue, effectiveFlow) series across portfolios per date, over the
+ * UNION of dates any portfolio has a point on, then sort by date. Use this before `chainIndex`
+ * for the aggregate view — you cannot average per-portfolio indices.
+ *
+ * Each portfolio's own series is sanitized against its own history BEFORE summing (not after,
+ * unlike `chainIndex`'s aggregate-level guard) — a single portfolio's data artifact must not
+ * corrupt every other portfolio's genuine return on the same day:
+ *
+ * - **Missing row** (no point for this portfolio on a date another portfolio has a point on):
+ *   carry the portfolio's last known value forward, contributing zero flow. Before the
+ *   portfolio's first-ever point it contributes nothing at all (unchanged from prior
+ *   behaviour) — that is not a gap, the portfolio simply doesn't exist yet.
+ * - **Present but implausible row** (day-over-day change exceeds `maxSingleDayReturn` given
+ *   the row's own recorded flow — same threshold `chainIndex` uses): also carried forward, and
+ *   the row's flow is dropped too — a bad row's flow isn't trustworthy either. This is what a
+ *   stale/missing price for a single instrument in one portfolio looks like (e.g. a snapshot
+ *   recorded at a small fraction of its true value that later recovers).
+ * - **Present, implausible, AND exactly zero**: treated as a genuine termination (the position
+ *   was liquidated, or its transactions were deleted/moved out) rather than a data artifact —
+ *   the prior value is booked as an *outflow* on this date instead of carried forward, so the
+ *   portfolio's disappearance from the aggregate is flow-neutral rather than read as a −100%
+ *   return. A later reappearance (this leg's value coming back from zero) is accepted
+ *   unconditionally, mirroring `chainIndex`'s own reset-proof handling of `prevMv.isZero()`.
+ * - **Implausible for more than MAX_IMPLAUSIBLE_STREAK consecutive days**: the carried-forward
+ *   anchor is deliberately never updated on a single implausible day (so a one-day glitch that
+ *   recovers doesn't drag the baseline along with it), but that alone would freeze a leg forever
+ *   if it never lands back within range of the pre-glitch anchor — a genuine large move, or a
+ *   price feed resuming at a rebased level, would never be re-accepted. After the streak limit,
+ *   the current value is accepted as the new baseline unconditionally.
  */
-export function aggregateValueFlows(perPortfolio: DailyValueFlow[][]): DailyValueFlow[] {
+export function aggregateValueFlows(
+  perPortfolio: DailyValueFlow[][],
+  maxSingleDayReturn: number = SINGLE_DAY_MAX_PCT / 100,
+): DailyValueFlow[] {
+  const dates = [...new Set(perPortfolio.flatMap((series) => series.map((p) => p.date)))].sort();
+
   const byDate = new Map<string, { mv: Decimal; flow: Decimal }>();
+  for (const date of dates) byDate.set(date, { mv: ZERO, flow: ZERO });
+
+  // A leg stuck rejecting every day against a stale anchor would freeze forever if a
+  // genuine, sustained move (a correction, a provider fix, a real rebase) never lands
+  // back within range of that old anchor — see MAX_IMPLAUSIBLE_STREAK below.
+  //
+  // Deliberate trade-off: once the streak limit is hit, a leg still frozen on genuinely
+  // bad data (not a real move) will un-freeze into that bad value instead of staying
+  // frozen. Bounded wrongness (at most this many days of an artifact reaching the
+  // aggregate) was chosen over unbounded freezing (a leg silently vanishing from the
+  // aggregate forever) — do not "fix" this back to freezing indefinitely.
+  const MAX_IMPLAUSIBLE_STREAK = 3;
+
   for (const series of perPortfolio) {
-    for (const point of series) {
-      const ex = byDate.get(point.date) ?? { mv: ZERO, flow: ZERO };
-      byDate.set(point.date, {
-        mv: ex.mv.add(D(point.marketValue)),
-        flow: ex.flow.add(D(point.effectiveFlow)),
-      });
+    const byRawDate = new Map(series.map((p) => [p.date, p]));
+    let lastGoodMv: Decimal | null = null;
+    let implausibleStreak = 0;
+
+    for (const date of dates) {
+      const raw = byRawDate.get(date);
+      const entry = byDate.get(date)!;
+
+      if (!raw) {
+        // No point for this portfolio today. Carry its last known value forward once it
+        // exists; before its first-ever point it simply isn't part of the aggregate yet.
+        if (lastGoodMv !== null) entry.mv = entry.mv.add(lastGoodMv);
+        continue;
+      }
+
+      const mv = D(raw.marketValue);
+      const flow = D(raw.effectiveFlow);
+
+      if (lastGoodMv === null || lastGoodMv.isZero()) {
+        // First point ever for this leg, or resuming after a termination: no meaningful
+        // prior baseline to sanity-check against (dividing by zero) — accept as-is.
+        entry.mv = entry.mv.add(mv);
+        entry.flow = entry.flow.add(flow);
+        lastGoodMv = mv;
+        implausibleStreak = 0;
+        continue;
+      }
+
+      const rt = mv.sub(flow).div(lastGoodMv).sub(1);
+      const growth = D(1).add(rt);
+      const plausible = growth.gt(0) && rt.abs().lte(maxSingleDayReturn);
+
+      if (plausible) {
+        entry.mv = entry.mv.add(mv);
+        entry.flow = entry.flow.add(flow);
+        lastGoodMv = mv;
+        implausibleStreak = 0;
+      } else if (mv.isZero()) {
+        // Genuine termination: book the prior value as an outflow rather than as a return.
+        entry.flow = entry.flow.sub(lastGoodMv);
+        lastGoodMv = ZERO;
+        implausibleStreak = 0;
+      } else {
+        implausibleStreak++;
+        if (implausibleStreak > MAX_IMPLAUSIBLE_STREAK) {
+          // Sustained implausibility relative to the OLD anchor is more likely a genuine
+          // new price level than an ongoing artifact — accept it as the new baseline
+          // rather than freezing this leg's contribution forever. Without this, a
+          // multi-day gap that resolves to a value outside ±50% of the pre-gap anchor
+          // (a real large move, or the price feed resuming at a rebased level) would
+          // never recover.
+          entry.mv = entry.mv.add(mv);
+          entry.flow = entry.flow.add(flow);
+          lastGoodMv = mv;
+          implausibleStreak = 0;
+        } else {
+          // Implausible non-zero value: a data artifact. Carry the last known value
+          // forward and drop this row's flow — an untrustworthy row's flow isn't
+          // trustworthy either.
+          entry.mv = entry.mv.add(lastGoodMv);
+        }
+      }
     }
   }
-  return [...byDate.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([date, { mv, flow }]) => ({
-      date,
-      marketValue: mv.toString(),
-      effectiveFlow: flow.toString(),
-    }));
+
+  return dates.map((date) => {
+    const { mv, flow } = byDate.get(date)!;
+    return { date, marketValue: mv.toString(), effectiveFlow: flow.toString() };
+  });
 }
 
 /** Alias: chain-index the summed aggregate flows. Same as chainIndex. */

@@ -82,7 +82,6 @@ export default async function SettingsPortfoliosPage({
               if (portfolio.taxAllowanceAnnual != null) {
                 flags.push(`FSA €${Math.round(Number(portfolio.taxAllowanceAnnual))}`);
               }
-              if (!portfolio.includeInAggregate) flags.push(t("excluded"));
 
               return (
                 <Card

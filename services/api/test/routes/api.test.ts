@@ -3705,7 +3705,7 @@ describe("auth + portfolios + transactions", () => {
     expect(bad.json().error).toBe("holder_not_found");
   });
 
-  it("filters /networth/history by holderId (composes with includeInAggregate)", async () => {
+  it("filters /networth/history by holderId", async () => {
     const t = await token("holder-history");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });
 

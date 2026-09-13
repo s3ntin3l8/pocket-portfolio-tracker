@@ -576,3 +576,160 @@ describe("TWR: artifact guard drops implausible single-day moves", () => {
     expect(Number(index[2].index)).toBeCloseTo(121, 6);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. aggregateValueFlows: per-leg sanitization before summing (regression for
+//     the /insights "all portfolios" aggregate artifacts).
+// ---------------------------------------------------------------------------
+
+describe("aggregateValueFlows: a missing row is carried forward, not zeroed", () => {
+  it("does not crash the aggregate when one portfolio has a gap day another portfolio doesn't", () => {
+    const seriesA: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "1010", effectiveFlow: "0" }, // +1%
+      { date: "2026-01-03", marketValue: "1020", effectiveFlow: "0" }, // +~1%
+    ];
+    // Portfolio B has no row at all for 2026-01-02 (e.g. a missed snapshot run).
+    const seriesB: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "500", effectiveFlow: "500" },
+      { date: "2026-01-03", marketValue: "520", effectiveFlow: "0" },
+    ];
+
+    const aggregated = aggregateValueFlows([seriesA, seriesB]);
+
+    expect(aggregated.map((p) => p.date)).toEqual(["2026-01-01", "2026-01-02", "2026-01-03"]);
+    // Day 2: A's real 1010 + B carried forward at its last known 500, zero flow.
+    expect(aggregated[1].marketValue).toBe("1510");
+    expect(aggregated[1].effectiveFlow).toBe("0");
+    // Day 3: both portfolios have real rows again.
+    expect(aggregated[2].marketValue).toBe("1540");
+
+    // The gap must not read as a crash-and-recover in the chained index.
+    const index = chainIndex(aggregated);
+    expect(Number(index[1].pct)).toBeCloseTo(0.6667, 3); // ≈ +1% on A's 2/3 share
+    expect(Number(index[2].pct)).toBeGreaterThan(Number(index[1].pct));
+  });
+
+  it("a portfolio contributes nothing before its own first point, never a synthetic zero", () => {
+    const seriesA: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "1010", effectiveFlow: "0" },
+    ];
+    // Portfolio B doesn't exist until day 2.
+    const seriesB: DailyValueFlow[] = [
+      { date: "2026-01-02", marketValue: "500", effectiveFlow: "500" },
+    ];
+
+    const aggregated = aggregateValueFlows([seriesA, seriesB]);
+
+    expect(aggregated[0].marketValue).toBe("1000"); // B absent, not a "0" row
+    expect(aggregated[1].marketValue).toBe("1510"); // B's first point counted once it exists
+    expect(aggregated[1].effectiveFlow).toBe("500"); // B's inflow explains its own appearance
+  });
+});
+
+describe("aggregateValueFlows: an implausible non-zero row is carried forward, not summed", () => {
+  it("a stale/missing-price dip in one leg does not corrupt the other legs' real returns", () => {
+    const seriesA: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "10000", effectiveFlow: "10000" },
+      { date: "2026-01-02", marketValue: "10100", effectiveFlow: "0" }, // +1%
+      { date: "2026-01-03", marketValue: "10200", effectiveFlow: "0" }, // +~1%
+    ];
+    // Leg B: 1000 → 5 (a ~99.5% implausible dip, not zero) → 1010 (recovers).
+    const seriesB: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "5", effectiveFlow: "0" },
+      { date: "2026-01-03", marketValue: "1010", effectiveFlow: "0" },
+    ];
+
+    const aggregated = aggregateValueFlows([seriesA, seriesB]);
+
+    // Day 2: B's implausible "5" is dropped; B's last known value (1000) carries forward.
+    expect(aggregated[1].marketValue).toBe("11100"); // 10100 + 1000, not 10105
+    expect(aggregated[1].effectiveFlow).toBe("0");
+    // Day 3: B's 1010 is plausible relative to its carried baseline (1000, +1%) and is accepted.
+    expect(aggregated[2].marketValue).toBe("11210"); // 10200 + 1010
+
+    const index = chainIndex(aggregated);
+    // No day should have been dropped by chainIndex's own aggregate-level guard —
+    // the per-leg sanitization already absorbed the artifact. Day 2's move is just
+    // A's own +1% weighted by A's 10000/11000 share of the prior total (≈ +0.91%),
+    // not a collapse from B's implausible "5".
+    expect(Number(index[1].pct)).toBeCloseTo(0.9091, 3);
+    expect(Number(index[2].pct)).toBeGreaterThan(0);
+  });
+
+  it("accepts a new baseline after MAX_IMPLAUSIBLE_STREAK consecutive implausible days, instead of freezing forever", () => {
+    // Leg B settles at a genuinely new, distant price level (a real rebase, or a
+    // provider correction) that never lands back within range of the pre-gap anchor —
+    // without an escape hatch, every subsequent day would be judged against the same
+    // stale 1000 anchor and rejected forever, even though B's OWN day-over-day moves
+    // after the rebase are perfectly ordinary (2000 → 2020 → 2040, +1%/day).
+    const seriesB: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "1000", effectiveFlow: "1000" },
+      { date: "2026-01-02", marketValue: "2000", effectiveFlow: "0" }, // implausible (1/3)
+      { date: "2026-01-03", marketValue: "2000", effectiveFlow: "0" }, // implausible (2/3)
+      { date: "2026-01-04", marketValue: "2000", effectiveFlow: "0" }, // implausible (3/3)
+      { date: "2026-01-05", marketValue: "2000", effectiveFlow: "0" }, // streak > 3 → accepted as new baseline
+      { date: "2026-01-06", marketValue: "2020", effectiveFlow: "0" }, // +1% vs the NEW baseline → plausible
+    ];
+
+    const aggregated = aggregateValueFlows([seriesB]);
+
+    // Days 2–4: still frozen at the old anchor (1000) while the streak builds.
+    expect(aggregated[1].marketValue).toBe("1000");
+    expect(aggregated[2].marketValue).toBe("1000");
+    expect(aggregated[3].marketValue).toBe("1000");
+    // Day 5: the 4th consecutive implausible day — the new value is finally accepted.
+    expect(aggregated[4].marketValue).toBe("2000");
+    // Day 6: judged against the NEW baseline (2000), not the old one — accepted as +1%.
+    expect(aggregated[5].marketValue).toBe("2020");
+  });
+});
+
+describe("aggregateValueFlows: a leg going to exact zero is booked as an outflow, not a −100% return", () => {
+  it("does not read a portfolio's transactions being removed as an aggregate crash", () => {
+    const seriesA: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "30000", effectiveFlow: "30000" },
+      { date: "2026-01-02", marketValue: "30300", effectiveFlow: "0" }, // +1%
+      { date: "2026-01-03", marketValue: "30603", effectiveFlow: "0" }, // +1%
+    ];
+    // Leg B ("Leona"): real history, then its transactions are removed — the snapshot
+    // writer records a genuine marketValue: 0, effectiveFlow: 0 from that day on.
+    const seriesB: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "18000", effectiveFlow: "18000" },
+      { date: "2026-01-02", marketValue: "18582", effectiveFlow: "0" },
+      { date: "2026-01-03", marketValue: "0", effectiveFlow: "0" },
+    ];
+
+    const aggregated = aggregateValueFlows([seriesA, seriesB]);
+
+    // Day 3: B contributes 0 market value but books its prior 18582 as an outflow —
+    // not a return — so the aggregate flow goes negative rather than mv silently dropping.
+    expect(aggregated[2].marketValue).toBe("30603"); // A only; B's 0 does not subtract anything extra
+    expect(aggregated[2].effectiveFlow).toBe("-18582");
+
+    const index = chainIndex(aggregated);
+    // Day 3 pct must reflect only A's real +1% move on its own share of the prior
+    // total, not a −36%-style collapse from B vanishing.
+    expect(Number(index[2].pct)).toBeGreaterThan(Number(index[1].pct));
+    expect(Number(index[2].pct) - Number(index[1].pct)).toBeLessThan(2);
+  });
+
+  it("accepts a leg reappearing from zero unconditionally, mirroring chainIndex's own reset handling", () => {
+    const seriesB: DailyValueFlow[] = [
+      { date: "2026-01-01", marketValue: "18582", effectiveFlow: "18582" },
+      { date: "2026-01-02", marketValue: "0", effectiveFlow: "0" }, // termination
+      { date: "2026-01-03", marketValue: "5000", effectiveFlow: "5000" }, // new transactions
+    ];
+
+    const aggregated = aggregateValueFlows([seriesB]);
+
+    expect(aggregated[1].marketValue).toBe("0");
+    expect(aggregated[1].effectiveFlow).toBe("-18582");
+    // The reappearance is not sanity-checked against the zero baseline (would be a
+    // divide-by-zero) — it's accepted as-is, fully explained by its own inflow.
+    expect(aggregated[2].marketValue).toBe("5000");
+    expect(aggregated[2].effectiveFlow).toBe("5000");
+  });
+});

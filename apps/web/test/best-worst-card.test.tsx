@@ -41,4 +41,39 @@ describe("BestWorstCard", () => {
     expect(screen.getByText("Worst performer")).toBeInTheDocument();
     expect(screen.getByText("-1.80%")).toBeInTheDocument();
   });
+
+  it("renders a stale-price message instead of rows when best/worst are null and a message is given", () => {
+    render(
+      <BestWorstCard
+        best={null}
+        worst={null}
+        title="This month"
+        timeframeLabel="MTD"
+        bestLabel="Best performer"
+        worstLabel="Worst performer"
+        locale="en"
+        staleMessage="Some prices haven't updated recently — comparison unavailable."
+      />,
+    );
+    expect(screen.getByText("This month")).toBeInTheDocument();
+    expect(
+      screen.getByText("Some prices haven't updated recently — comparison unavailable."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Best performer")).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when best/worst are null and no stale message is given", () => {
+    const { container } = render(
+      <BestWorstCard
+        best={null}
+        worst={null}
+        title="This month"
+        timeframeLabel="MTD"
+        bestLabel="Best performer"
+        worstLabel="Worst performer"
+        locale="en"
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });

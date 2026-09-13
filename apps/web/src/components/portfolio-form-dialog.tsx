@@ -125,7 +125,6 @@ export function PortfolioFormDialog({
               cashCounted={f.cashCounted}
               allowNegativeCash={f.allowNegativeCash}
               documentRetention={f.documentRetention}
-              includeInAggregate={f.includeInAggregate}
               onNameChange={f.setName}
               onBrokerageChange={f.setBrokerage}
               onAccountHolderChange={f.setAccountHolderId}
@@ -139,7 +138,6 @@ export function PortfolioFormDialog({
               onCashCountedChange={f.setCashCounted}
               onAllowNegativeCashChange={f.setAllowNegativeCash}
               onDocumentRetentionChange={f.setDocumentRetention}
-              onIncludeInAggregateChange={f.setIncludeInAggregate}
             />
 
             {/* Delete is a rare, deliberate action — unlike the primary button above, it

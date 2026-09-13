@@ -14,13 +14,21 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { instruments, portfolios, portfolioSnapshots, transactions, users } from "@portfolio/db";
+import {
+  instruments,
+  portfolios,
+  portfolioSnapshots,
+  prices,
+  transactions,
+  users,
+} from "@portfolio/db";
 import {
   MarketDataService,
   type MarketDataProvider,
   type InstrumentRef,
   type Candle,
 } from "@portfolio/market-data";
+import { toDateKey } from "@portfolio/core";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import { backfillPortfolioHistory, backfillStalePortfolios } from "../../src/services/backfill.js";
 
@@ -269,6 +277,17 @@ describe("backfillStalePortfolios — force option", () => {
 
     // First, run a proper backfill to heal the portfolio.
     await backfillPortfolioHistory(db, svc2, 10_000, forcePortfolioId);
+
+    // FORCE_CANDLES only covers early Feb 2026 — WeekdayCandleProvider doesn't extend
+    // an equity's price series to "today" the way the flat bond/mutual_fund paths do.
+    // This test is isolating the from-inception skip check, not trailing staleness, so
+    // seed one fresh price directly to keep the portfolio non-trailing-stale too.
+    await db.insert(prices).values({
+      instrumentId: forceInstrId,
+      date: toDateKey(new Date()),
+      close: "5400",
+      currency: "EUR",
+    });
 
     // Corrupt the Saturday snapshot to simulate a pre-fix zero row.
     await db

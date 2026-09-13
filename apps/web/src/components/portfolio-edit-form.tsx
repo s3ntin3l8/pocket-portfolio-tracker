@@ -81,7 +81,6 @@ export function PortfolioEditForm({
           cashCounted={f.cashCounted}
           allowNegativeCash={f.allowNegativeCash}
           documentRetention={f.documentRetention}
-          includeInAggregate={f.includeInAggregate}
           onNameChange={f.setName}
           onBrokerageChange={f.setBrokerage}
           onAccountHolderChange={f.setAccountHolderId}
@@ -95,7 +94,6 @@ export function PortfolioEditForm({
           onCashCountedChange={f.setCashCounted}
           onAllowNegativeCashChange={f.setAllowNegativeCash}
           onDocumentRetentionChange={f.setDocumentRetention}
-          onIncludeInAggregateChange={f.setIncludeInAggregate}
         />
 
         <div className="flex flex-col-reverse gap-2.5 pt-1 sm:flex-row sm:items-center sm:justify-end">

@@ -34,9 +34,6 @@ export function usePortfolioForm(
   const [brokerage, setBrokerage] = useState(portfolio?.brokerage ?? "");
   const [accountNumber, setAccountNumber] = useState(portfolio?.accountNumber ?? "");
   const [iban, setIban] = useState(portfolio?.iban ?? "");
-  const [includeInAggregate, setIncludeInAggregate] = useState(
-    portfolio?.includeInAggregate ?? true,
-  );
   const [cashCounted, setCashCounted] = useState(portfolio?.cashCounted ?? false);
   const [allowNegativeCash, setAllowNegativeCash] = useState(portfolio?.allowNegativeCash ?? false);
   const [documentRetention, setDocumentRetention] = useState(portfolio?.documentRetention ?? false);
@@ -129,7 +126,6 @@ export function usePortfolioForm(
       setBrokerage(portfolio?.brokerage ?? "");
       setAccountNumber(portfolio?.accountNumber ?? "");
       setIban(portfolio?.iban ?? "");
-      setIncludeInAggregate(portfolio?.includeInAggregate ?? true);
       setCashCounted(portfolio?.cashCounted ?? false);
       setAllowNegativeCash(portfolio?.allowNegativeCash ?? false);
       setDocumentRetention(portfolio?.documentRetention ?? false);
@@ -177,7 +173,6 @@ export function usePortfolioForm(
         brokerage: brokerage.trim() || null,
         accountNumber: accountNumber.trim() || null,
         iban: iban.trim() || null,
-        includeInAggregate,
         cashCounted,
         allowNegativeCash,
         documentRetention,
@@ -272,8 +267,6 @@ export function usePortfolioForm(
     setAccountNumber,
     iban,
     setIban,
-    includeInAggregate,
-    setIncludeInAggregate,
     cashCounted,
     setCashCounted,
     allowNegativeCash,

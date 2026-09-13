@@ -48,16 +48,39 @@ export function BestWorstCard({
   bestLabel,
   worstLabel,
   locale,
+  staleMessage,
 }: {
-  best: Mover;
-  worst: Mover;
+  best: Mover | null;
+  worst: Mover | null;
   title: string;
   /** Explicit basis for the mover pct (e.g. "24h") — this card is always a day-change view. */
   timeframeLabel: string;
   bestLabel: string;
   worstLabel: string;
   locale: string;
+  /**
+   * Message to show in place of the mover rows when `best`/`worst` are null because
+   * at least one otherwise-qualifying instrument's price is too stale to compare — a
+   * more specific signal than the card simply not rendering at all. Omit (or leave
+   * undefined) to render nothing when null, matching the card's original behaviour.
+   */
+  staleMessage?: string;
 }) {
+  if (!best || !worst) {
+    if (!staleMessage) return null;
+    return (
+      <Card className="space-y-3 p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">{title}</h2>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            {timeframeLabel}
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground">{staleMessage}</p>
+      </Card>
+    );
+  }
+
   return (
     <Card className="space-y-3 p-5">
       <div className="flex items-center justify-between">

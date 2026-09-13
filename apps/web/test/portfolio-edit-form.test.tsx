@@ -37,7 +37,6 @@ const PORTFOLIO: EditablePortfolio = {
   brokerage: "BCA Sekuritas",
   accountNumber: null,
   iban: null,
-  includeInAggregate: true,
   cashCounted: false,
   allowNegativeCash: false,
   documentRetention: false,

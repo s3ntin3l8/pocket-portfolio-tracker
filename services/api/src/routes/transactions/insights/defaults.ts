@@ -20,8 +20,8 @@ export function emptyInsightsResponse() {
     },
     benchmark: null,
     concentrationTrend: [],
-    bestWorstMonthly: { best: null, worst: null },
-    bestWorstYearly: { best: null, worst: null },
+    bestWorstMonthly: { best: null, worst: null, reason: null },
+    bestWorstYearly: { best: null, worst: null, reason: null },
     yearlyReturns: [],
   } as const;
 }

@@ -54,7 +54,6 @@ const PORTFOLIO = {
   brokerage: "Trade Republic",
   accountNumber: null,
   iban: null,
-  includeInAggregate: true,
   cashCounted: false,
   allowNegativeCash: false,
   documentRetention: false,

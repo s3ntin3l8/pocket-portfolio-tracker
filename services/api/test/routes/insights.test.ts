@@ -357,6 +357,101 @@ describe("GET /insights", () => {
       expect(body.bestWorstYearly.worst.pct).toBeCloseTo(-0.4, 6);
     });
 
+    // Regression guard: a tie among FRESHLY priced movers is a genuine (if unlikely)
+    // result, not a data problem — it must not be mislabeled `reason: "stale_prices"`,
+    // which would tell the user something is wrong with their price feed when nothing is.
+    it("returns null best/worst with no reason when fresh-priced movers genuinely tie", async () => {
+      const t = await token("insights-genuine-tie-user");
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Tie Test", baseCurrency: "IDR" },
+      });
+      const portfolioId = create.json().id;
+
+      const [instA] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "TIEA",
+          name: "Instrument A",
+          assetClass: "equity",
+          unit: "shares",
+          market: "IDX",
+          sector: null,
+          currency: "IDR",
+        })
+        .returning({ id: instruments.id });
+      const [instB] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "TIEB",
+          name: "Instrument B",
+          assetClass: "equity",
+          unit: "shares",
+          market: "IDX",
+          sector: null,
+          currency: "IDR",
+        })
+        .returning({ id: instruments.id });
+
+      await app.db.insert(transactions).values([
+        {
+          portfolioId,
+          instrumentId: instA.id,
+          type: "buy",
+          quantity: "10",
+          price: "100",
+          currency: "IDR",
+          executedAt: new Date("2025-12-15"),
+        },
+        {
+          portfolioId,
+          instrumentId: instB.id,
+          type: "buy",
+          quantity: "20",
+          price: "50",
+          currency: "IDR",
+          executedAt: new Date("2025-12-15"),
+        },
+      ]);
+
+      // Both instruments move by the exact same +50%, both freshly priced at period end.
+      await app.db.insert(prices).values([
+        { instrumentId: instA.id, date: "2025-12-15", close: "100", currency: "IDR" },
+        { instrumentId: instA.id, date: "2026-01-31", close: "150", currency: "IDR" },
+        { instrumentId: instB.id, date: "2025-12-15", close: "50", currency: "IDR" },
+        { instrumentId: instB.id, date: "2026-01-31", close: "75", currency: "IDR" },
+      ]);
+
+      await app.db.insert(portfolioSnapshots).values([
+        {
+          portfolioId,
+          date: "2026-01-01",
+          netWorth: "2000",
+          marketValue: "2000",
+          effectiveFlow: "2000",
+          currency: "IDR",
+        },
+        {
+          portfolioId,
+          date: "2026-01-31",
+          netWorth: "2500",
+          marketValue: "2500",
+          effectiveFlow: "0",
+          currency: "IDR",
+        },
+      ]);
+
+      const res = await app.inject({ method: "GET", url: "/insights?range=all", headers: auth(t) });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+
+      expect(body.bestWorstMonthly.best).toBeNull();
+      expect(body.bestWorstMonthly.worst).toBeNull();
+      expect(body.bestWorstMonthly.reason).toBeNull();
+    });
+
     it("split-adjusts period returns so a 2:1 split doesn't look like -50%", async () => {
       const t = await token("insights-split-user");
       const create = await app.inject({
@@ -535,6 +630,170 @@ describe("GET /insights", () => {
       expect(body.bestWorstMonthly.worst).toBeNull();
       expect(body.bestWorstYearly.best).toBeNull();
       expect(body.bestWorstYearly.worst).toBeNull();
+    });
+
+    // Regression guard for the reported anomaly: two positions whose price feed
+    // stopped updating weeks ago must NOT be reported as "best" and "worst" at a
+    // fabricated 0.00% (start price === end price only because both resolve to the
+    // same frozen carry-forward) while a position with genuinely fresh data exists.
+    it("excludes instruments whose price hasn't updated in weeks from best/worst, rather than reporting a frozen 0.00%", async () => {
+      const t = await token("insights-stale-price-user");
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Stale Price Test", baseCurrency: "IDR" },
+      });
+      const portfolioId = create.json().id;
+
+      const [stale1] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "STALE1",
+          name: "Stale One",
+          assetClass: "equity",
+          unit: "shares",
+          market: "IDX",
+          sector: null,
+          currency: "IDR",
+        })
+        .returning({ id: instruments.id });
+      const [stale2] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "STALE2",
+          name: "Stale Two",
+          assetClass: "equity",
+          unit: "shares",
+          market: "IDX",
+          sector: null,
+          currency: "IDR",
+        })
+        .returning({ id: instruments.id });
+      const [fresh] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "FRESH",
+          name: "Fresh One",
+          assetClass: "equity",
+          unit: "shares",
+          market: "IDX",
+          sector: null,
+          currency: "IDR",
+        })
+        .returning({ id: instruments.id });
+
+      for (const inst of [stale1, stale2, fresh]) {
+        await app.db.insert(transactions).values({
+          portfolioId,
+          instrumentId: inst.id,
+          type: "buy",
+          quantity: "10",
+          price: "100",
+          currency: "IDR",
+          executedAt: new Date("2025-12-01"),
+        });
+      }
+
+      // stale1/stale2: last price update is 2025-12-01 — 76 days before the "as of
+      // now" date below, far past MAX_PRICE_CARRY_FORWARD_DAYS. Both would resolve
+      // to the SAME frozen close for both the period-start and period-end lookup,
+      // i.e. an identical, fabricated 0.00% move under the old (ungated) behaviour.
+      await app.db.insert(prices).values([
+        { instrumentId: stale1.id, date: "2025-12-01", close: "100", currency: "IDR" },
+        { instrumentId: stale2.id, date: "2025-12-01", close: "50", currency: "IDR" },
+        // fresh: a real move, with an up-to-date price right at period end.
+        { instrumentId: fresh.id, date: "2026-02-01", close: "100", currency: "IDR" },
+        { instrumentId: fresh.id, date: "2026-02-14", close: "95", currency: "IDR" },
+      ]);
+
+      await app.db.insert(portfolioSnapshots).values([
+        {
+          portfolioId,
+          date: "2026-02-01",
+          netWorth: "3000",
+          marketValue: "3000",
+          effectiveFlow: "3000",
+          currency: "IDR",
+        },
+        {
+          portfolioId,
+          date: "2026-02-15",
+          netWorth: "2950",
+          marketValue: "2950",
+          effectiveFlow: "0",
+          currency: "IDR",
+        },
+      ]);
+
+      const res = await app.inject({ method: "GET", url: "/insights?range=all", headers: auth(t) });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+
+      // Only one instrument (fresh) has current-enough data — fewer than 2 qualifying
+      // movers means the card is correctly suppressed rather than pairing two stale
+      // 0.00% instruments as "best" and "worst". The reason is surfaced so the UI can
+      // say why, rather than the card silently vanishing with no explanation.
+      expect(body.bestWorstMonthly.best).toBeNull();
+      expect(body.bestWorstMonthly.worst).toBeNull();
+      expect(body.bestWorstMonthly.reason).toBe("stale_prices");
+    });
+  });
+
+  describe("per-year XIRR", () => {
+    // Regression guard for the reported anomaly: a portfolio already worth 30000 on
+    // Jan 1 that takes a 2000 deposit and ends the year at 36000 is a modest real
+    // return (~13%), not the >250% XIRR produced when the opening NAV is omitted
+    // from the cash-flow vector (the year's flows alone — a single -2000 outflow
+    // against a +36000 terminal inflow — would solve for an absurd rate).
+    it("seeds the year's XIRR with the PRIOR year's closing NAV as an opening outflow", async () => {
+      const t = await token("insights-yearly-xirr-user");
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Yearly XIRR Test", baseCurrency: "IDR", cashCounted: true },
+      });
+      const portfolioId = create.json().id;
+
+      // 2025: a single snapshot establishes the prior year's closing NAV (30000).
+      await app.db.insert(portfolioSnapshots).values({
+        portfolioId,
+        date: "2025-12-31",
+        netWorth: "30000",
+        marketValue: "30000",
+        effectiveFlow: "30000",
+        currency: "IDR",
+      });
+
+      // 2026: a 2000 deposit, ending the year at 36000.
+      await app.db.insert(transactions).values({
+        portfolioId,
+        type: "deposit",
+        price: "2000",
+        currency: "IDR",
+        executedAt: new Date("2026-06-15"),
+      });
+      await app.db.insert(portfolioSnapshots).values({
+        portfolioId,
+        date: "2026-12-31",
+        netWorth: "36000",
+        marketValue: "36000",
+        effectiveFlow: "6000",
+        currency: "IDR",
+      });
+
+      const res = await app.inject({ method: "GET", url: "/insights?range=all", headers: auth(t) });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+
+      const row2026 = body.yearlyReturns.find((r: { year: number }) => r.year === 2026);
+      expect(row2026).toBeTruthy();
+      expect(row2026.portfolioXirr).not.toBeNull();
+      const xirr = Number(row2026.portfolioXirr);
+      // A real ~13% year, not the 250%+ the missing opening NAV used to produce.
+      expect(xirr).toBeGreaterThan(0);
+      expect(xirr).toBeLessThan(0.5);
     });
   });
 });
