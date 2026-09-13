@@ -135,8 +135,26 @@ export async function valuePortfolio(
   const prices = await getCachedQuotes(db, marketData, refs, ttlMs);
   const tPrices = performance.now();
 
-  // Bonds without a live market price are valued at par (face value) — the v1
-  // default; tradable ORI/SR market prices can override via a provider later.
+  // Manual price override: for asset classes with no live market-data provider (no
+  // provider serves `bond` today — see docs/data_providers.md — and no schedulable
+  // secondary-market feed exists for Indonesian retail SR/ORI, see the PR discussion),
+  // a user-maintained current price takes precedence over par. Deliberately NOT written
+  // into `lastPrices`/`prices` — those are the provider cache, rewritten wholesale on
+  // every TTL refresh (getCachedQuotes/upsertLastPrices) and by refreshHeldPrices, which
+  // would silently clobber a manual value. `instruments.manualPrice` is its own column
+  // for exactly that reason.
+  for (const i of instrumentRows) {
+    // Number(...) > 0, not the string truthiness `i.manualPrice &&` would give: the
+    // route schema already rejects 0/negative on write, but checking the invariant
+    // again here keeps it enforced locally even if a future caller writes the column
+    // directly.
+    if (i.manualPrice && Number(i.manualPrice) > 0 && !prices[i.id]) {
+      prices[i.id] = { price: i.manualPrice, currency: i.currency };
+    }
+  }
+
+  // Bonds without a live market price or a manual price are valued at par (face value) —
+  // the v1 default; a manual price (above) or a future live provider can override it.
   for (const i of instrumentRows) {
     if (i.assetClass === "bond" && i.faceValue && !prices[i.id]) {
       prices[i.id] = { price: i.faceValue, currency: i.currency };

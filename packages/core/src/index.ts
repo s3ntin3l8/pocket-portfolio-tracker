@@ -35,7 +35,13 @@ export {
   financingByInstrument,
 } from "./loans.js";
 export { inferIntervalMonths, MIN_PAYMENTS_FOR_GROWTH, computeGrowthFactor } from "./growth.js";
-export { projectCoupons, type BondPosition, type ProjectedCoupon } from "./coupons.js";
+export {
+  projectCoupons,
+  normalizeCouponSchedule,
+  PERIODS_PER_YEAR,
+  type BondPosition,
+  type ProjectedCoupon,
+} from "./coupons.js";
 export { projectDividends, projectNextYearDividends, type ProjectedDividend } from "./dividends.js";
 export {
   trailingIncomeByInstrument,

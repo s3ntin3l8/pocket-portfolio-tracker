@@ -85,6 +85,14 @@ export function AddTransactionForm({
       goldSourceList={form.goldSourceList}
       goldMarket={form.goldMarket}
       setGoldMarket={form.setGoldMarket}
+      faceValue={form.faceValue}
+      setFaceValue={form.setFaceValue}
+      couponRatePercent={form.couponRatePercent}
+      setCouponRatePercent={form.setCouponRatePercent}
+      couponSchedule={form.couponSchedule}
+      setCouponSchedule={form.setCouponSchedule}
+      maturityDate={form.maturityDate}
+      setMaturityDate={form.setMaturityDate}
       customOpen={form.customOpen}
       onToggleCustom={() => form.setCustomOpen((o) => !o)}
       t={form.t}

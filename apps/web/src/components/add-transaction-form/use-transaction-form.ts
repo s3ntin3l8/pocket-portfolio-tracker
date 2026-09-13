@@ -24,6 +24,7 @@ import {
   clampAssetClass,
   unitForClass,
   goldSymbolFromLabel,
+  couponRatePercentToFraction,
 } from "./constants";
 
 export type { SelectableType, TxType };
@@ -139,6 +140,14 @@ export function useTransactionForm({
 
   const [goldSourceList, setGoldSourceList] = useState<GoldSource[]>([]);
   const [goldMarket, setGoldMarket] = useState("");
+
+  // Bond terms, custom-instrument path only. `couponRatePercent` is percent-in
+  // ("6.35") — resolveInstrumentId divides by 100 before sending `couponRate` (a
+  // fraction, matching the stored/rendered convention elsewhere in the app).
+  const [faceValue, setFaceValue] = useState("");
+  const [couponRatePercent, setCouponRatePercent] = useState("");
+  const [couponSchedule, setCouponSchedule] = useState("monthly");
+  const [maturityDate, setMaturityDate] = useState("");
 
   // "Can't find it? Add a custom instrument" collapsible (instrument-field.tsx) — closed
   // by default, per the v2 design; opened automatically when editing an existing
@@ -303,6 +312,15 @@ export function useTransactionForm({
       name: name.trim() || symbol.trim(),
       isin: isin ?? undefined,
       wkn: wkn ?? undefined,
+      ...(assetClass === "bond"
+        ? {
+            faceValue: faceValue.trim() || undefined,
+            couponRate: couponRatePercentToFraction(couponRatePercent),
+            couponSchedule: couponSchedule as
+              "monthly" | "quarterly" | "semiannual" | "annual" | undefined,
+            maturityDate: maturityDate || undefined,
+          }
+        : {}),
     });
     return created.id;
   }
@@ -422,6 +440,14 @@ export function useTransactionForm({
     goldSourceList,
     goldMarket,
     setGoldMarket,
+    faceValue,
+    setFaceValue,
+    couponRatePercent,
+    setCouponRatePercent,
+    couponSchedule,
+    setCouponSchedule,
+    maturityDate,
+    setMaturityDate,
     busy,
     error,
     isTrade,

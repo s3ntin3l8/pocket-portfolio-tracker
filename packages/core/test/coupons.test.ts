@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectCoupons, type BondPosition } from "../src/index.js";
+import { projectCoupons, normalizeCouponSchedule, type BondPosition } from "../src/index.js";
 
 const d = (iso: string) => new Date(iso);
 
@@ -60,5 +60,71 @@ describe("projectCoupons — today's UTC date inclusion (S5 boundary)", () => {
     const rows = projectCoupons([bond({ maturityDate: "2027-09-07" })], d("2027-01-01"), NOW);
     expect(rows.some((r) => r.date === TODAY_KEY)).toBe(true);
     expect(rows.some((r) => r.date === "2027-09-07")).toBe(false);
+  });
+});
+
+describe("normalizeCouponSchedule", () => {
+  it("passes through exact keys unchanged", () => {
+    expect(normalizeCouponSchedule("monthly")).toBe("monthly");
+    expect(normalizeCouponSchedule("quarterly")).toBe("quarterly");
+    expect(normalizeCouponSchedule("semiannual")).toBe("semiannual");
+    expect(normalizeCouponSchedule("annual")).toBe("annual");
+  });
+
+  it("normalizes the historical 'semi-annual' seed value to 'semiannual'", () => {
+    expect(normalizeCouponSchedule("semi-annual")).toBe("semiannual");
+  });
+
+  it("normalizes separator and casing variants", () => {
+    expect(normalizeCouponSchedule("semi_annual")).toBe("semiannual");
+    expect(normalizeCouponSchedule("SEMIANNUAL")).toBe("semiannual");
+    expect(normalizeCouponSchedule("Monthly")).toBe("monthly");
+    expect(normalizeCouponSchedule("bi-annual")).toBe("semiannual");
+  });
+
+  it("falls back to semiannual for null, empty, or unknown input", () => {
+    expect(normalizeCouponSchedule(null)).toBe("semiannual");
+    expect(normalizeCouponSchedule(undefined)).toBe("semiannual");
+    expect(normalizeCouponSchedule("")).toBe("semiannual");
+    expect(normalizeCouponSchedule("garbage")).toBe("semiannual");
+  });
+});
+
+describe("projectCoupons — monthly schedule (Indonesian retail SR/ORI convention)", () => {
+  it("projects 12 coupons/year at faceValue × quantity × couponRate / 12", () => {
+    // SR021T3-shaped position: Rp 1,000,000 nominal, 10 units, 6.35% p.a., monthly.
+    const srBond: BondPosition = {
+      instrumentId: "sr021t3",
+      symbol: "SR021T3",
+      name: "Sukuk Negara Ritel seri SR021T3",
+      quantity: "10",
+      faceValue: "1000000",
+      couponRate: "0.0635",
+      couponSchedule: "monthly",
+      maturityDate: "2027-09-10",
+      currency: "IDR",
+    };
+    const rows = projectCoupons([srBond], 12, new Date("2026-09-13T00:00:00.000Z"));
+    expect(rows).toHaveLength(12);
+    // 1,000,000 × 10 × 0.0635 / 12 = 52916.666...
+    for (const r of rows) {
+      expect(Number(r.amount)).toBeCloseTo(52916.6666667, 4);
+    }
+  });
+
+  it("normalizes a mis-cased/hyphenated monthly schedule the same way", () => {
+    const srBond: BondPosition = {
+      instrumentId: "sr021t3",
+      symbol: "SR021T3",
+      name: "Sukuk Negara Ritel seri SR021T3",
+      quantity: "10",
+      faceValue: "1000000",
+      couponRate: "0.0635",
+      couponSchedule: "Monthly",
+      maturityDate: "2027-09-10",
+      currency: "IDR",
+    };
+    const rows = projectCoupons([srBond], 12, new Date("2026-09-13T00:00:00.000Z"));
+    expect(rows).toHaveLength(12);
   });
 });

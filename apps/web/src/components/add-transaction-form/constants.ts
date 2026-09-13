@@ -83,7 +83,8 @@ export function clampAssetClass(value: string): (typeof ASSET_CLASSES)[number] {
 
 export function unitForClass(assetClass: string): "shares" | "grams" | "units" {
   if (assetClass === "gold") return "grams";
-  if (assetClass === "mutual_fund" || assetClass === "crypto") return "units";
+  if (assetClass === "mutual_fund" || assetClass === "crypto" || assetClass === "bond")
+    return "units";
   return "shares";
 }
 
@@ -94,4 +95,11 @@ export function goldSymbolFromLabel(label: string): string {
     .replace(/[^A-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "GOLD";
+}
+
+/** Percent-in ("6.35") -> fraction-out ("0.0635"), the bond coupon-rate convention
+ *  documented in instrument-field.tsx. Blank/non-numeric input yields undefined. */
+export function couponRatePercentToFraction(percent: string): string | undefined {
+  const n = Number(percent);
+  return percent.trim() === "" || !Number.isFinite(n) ? undefined : String(n / 100);
 }

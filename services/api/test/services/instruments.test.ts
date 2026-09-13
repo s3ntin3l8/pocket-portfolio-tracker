@@ -315,6 +315,107 @@ describe("findOrCreateInstrument", () => {
     );
     expect(created.market).toBe("PE"); // graceful fallback
   });
+
+  // --- Bond terms (Indonesian retail SR/ORI support) ---
+
+  const bondBase = {
+    market: "IDX",
+    assetClass: "bond" as const,
+    unit: "units" as const,
+    currency: "IDR",
+  };
+
+  it("persists bond terms on create", async () => {
+    const created = await findOrCreateInstrument(getDb(), {
+      ...bondBase,
+      symbol: "SR021T3",
+      name: "Sukuk Negara Ritel seri SR021T3",
+      faceValue: "1000000",
+      couponRate: "0.0635",
+      couponSchedule: "monthly" as const,
+      maturityDate: "2027-09-10",
+    });
+    expect(created.faceValue).toBe("1000000");
+    expect(created.couponRate).toBe("0.0635");
+    expect(created.couponSchedule).toBe("monthly");
+    expect(created.maturityDate).toBe("2027-09-10");
+  });
+
+  it("backfills bond terms on an existing row whose columns are null", async () => {
+    await getDb()
+      .insert(instruments)
+      .values({ ...bondBase, symbol: "SR022T3", name: "SR022T3" });
+
+    const healed = await findOrCreateInstrument(getDb(), {
+      ...bondBase,
+      symbol: "SR022T3",
+      name: "SR022T3",
+      faceValue: "1000000",
+      couponRate: "0.06",
+      couponSchedule: "monthly" as const,
+      maturityDate: "2028-01-10",
+    });
+    expect(healed.faceValue).toBe("1000000");
+    expect(healed.couponRate).toBe("0.06");
+  });
+
+  it("does not overwrite existing non-null bond terms", async () => {
+    await getDb()
+      .insert(instruments)
+      .values({
+        ...bondBase,
+        symbol: "SR023T3",
+        name: "SR023T3",
+        faceValue: "1000000",
+        couponRate: "0.0555",
+        couponSchedule: "monthly",
+        maturityDate: "2028-06-10",
+      });
+
+    const unchanged = await findOrCreateInstrument(getDb(), {
+      ...bondBase,
+      symbol: "SR023T3",
+      name: "SR023T3",
+      faceValue: "9999999", // a would-be typo from a second user
+      couponRate: "0.9",
+    });
+    expect(unchanged.faceValue).toBe("1000000");
+    expect(unchanged.couponRate).toBe("0.0555");
+  });
+
+  it("does not stamp bond terms onto an existing non-bond row when a bond input collides by (symbol, market)", async () => {
+    // The vulnerable path: instrumentInputSchema only ever carries bond fields when
+    // input.assetClass is "bond" — so a guard written as
+    // `existing.assetClass === "bond" || input.assetClass === "bond"` is always true
+    // whenever there's anything to back-fill, and never actually distinguishes "an
+    // unrelated equity row collided with a bond input" from "both sides are a bond".
+    // This must gate on `existing.assetClass`, not `input.assetClass`.
+    await getDb().insert(instruments).values({
+      market: "IDX",
+      assetClass: "equity",
+      unit: "shares",
+      currency: "IDR",
+      symbol: "BBCA-ZZZ",
+      name: "Bank Central Asia",
+    });
+
+    const result = await findOrCreateInstrument(getDb(), {
+      symbol: "BBCA-ZZZ", // fat-fingered collision with the existing equity row
+      market: "IDX",
+      assetClass: "bond", // attacker/typo input IS a bond — this is the exploitable case
+      unit: "units",
+      currency: "IDR",
+      name: "Bank Central Asia",
+      faceValue: "1000000",
+      couponRate: "0.05",
+    });
+    // The bond-terms columns must stay untouched regardless of what instrumentUpgrade's
+    // separate, pre-existing asset-class-refinement rule does with `assetClass` itself
+    // (that rule predates this feature and is out of scope here — see the block above
+    // in instrumentUpgrade()).
+    expect(result.faceValue).toBeNull();
+    expect(result.couponRate).toBeNull();
+  });
 });
 
 describe("updateInstrument", () => {
@@ -369,5 +470,56 @@ describe("updateInstrument", () => {
       wkn: "A1T8FV",
     });
     expect(result).toBe("not_found");
+  });
+
+  it("updates bond terms on an existing row", async () => {
+    const [row] = await getDb()
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "ORI024",
+        name: "ORI024",
+      })
+      .returning();
+
+    const updated = await updateInstrument(getDb(), row.id, {
+      faceValue: "1000000",
+      couponRate: "0.062",
+      couponSchedule: "monthly",
+      maturityDate: "2029-03-10",
+    });
+    expect(updated).not.toBe("not_found");
+    expect(updated).not.toBe("conflict");
+    if (typeof updated !== "string") {
+      expect(updated.faceValue).toBe("1000000");
+      expect(updated.couponRate).toBe("0.062");
+      expect(updated.couponSchedule).toBe("monthly");
+      expect(updated.maturityDate).toBe("2029-03-10");
+    }
+  });
+
+  it("clears a bond term when patched with null", async () => {
+    const [row] = await getDb()
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "ORI025",
+        name: "ORI025",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    const updated = await updateInstrument(getDb(), row.id, { faceValue: null });
+    expect(updated).not.toBe("not_found");
+    expect(updated).not.toBe("conflict");
+    if (typeof updated !== "string") {
+      expect(updated.faceValue).toBeNull();
+    }
   });
 });

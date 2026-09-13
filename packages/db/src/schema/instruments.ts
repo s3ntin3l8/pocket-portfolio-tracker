@@ -48,6 +48,14 @@ export const instruments = pgTable(
      */
     priceFeedMissCount: integer("price_feed_miss_count").notNull().default(0),
     priceFeedLastMissAt: timestamp("price_feed_last_miss_at", { withTimezone: true }),
+    // User-maintained current price, absolute per-unit (same currency as the instrument),
+    // for asset classes with no live market-data provider (e.g. Indonesian retail
+    // bonds/sukuk — no schedulable secondary-market feed exists, see
+    // docs/data_providers.md). Read in valuePortfolio() BEFORE the bond par fallback, so
+    // it overrides par when set; never written by the provider cache (which would
+    // clobber it on the next refresh — see services/api/src/services/price-cache.ts).
+    manualPrice: numeric("manual_price"),
+    manualPriceAt: timestamp("manual_price_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

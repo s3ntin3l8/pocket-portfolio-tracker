@@ -9,9 +9,11 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Field } from "./field";
+import { unitForClass } from "./constants";
 
 const ASSET_CLASSES = ["equity", "gold", "bond", "mutual_fund", "etf", "crypto"] as const;
 const UNITS = ["shares", "grams", "units"] as const;
+const COUPON_SCHEDULES = ["monthly", "quarterly", "semiannual", "annual"] as const;
 
 interface InstrumentFieldProps {
   /** Edit mode only (v2 design): wraps the field in a `bg-card-2` inset box instead of
@@ -39,6 +41,14 @@ interface InstrumentFieldProps {
   goldSourceList: GoldSource[];
   goldMarket: string;
   setGoldMarket: (v: string) => void;
+  faceValue: string;
+  setFaceValue: (v: string) => void;
+  couponRatePercent: string;
+  setCouponRatePercent: (v: string) => void;
+  couponSchedule: string;
+  setCouponSchedule: (v: string) => void;
+  maturityDate: string;
+  setMaturityDate: (v: string) => void;
   customOpen: boolean;
   onToggleCustom: () => void;
   t: (key: string) => string;
@@ -74,6 +84,14 @@ export function InstrumentField({
   goldSourceList,
   goldMarket,
   setGoldMarket,
+  faceValue,
+  setFaceValue,
+  couponRatePercent,
+  setCouponRatePercent,
+  couponSchedule,
+  setCouponSchedule,
+  maturityDate,
+  setMaturityDate,
   customOpen,
   onToggleCustom,
   t,
@@ -204,13 +222,7 @@ export function InstrumentField({
                     onChange={(e) => {
                       const ac = e.target.value as (typeof ASSET_CLASSES)[number];
                       setAssetClass(ac);
-                      setUnit(
-                        ac === "gold"
-                          ? "grams"
-                          : ac === "mutual_fund" || ac === "crypto"
-                            ? "units"
-                            : "shares",
-                      );
+                      setUnit(unitForClass(ac));
                     }}
                   >
                     {ASSET_CLASSES.map((c) => (
@@ -277,6 +289,57 @@ export function InstrumentField({
                         </Select>
                       </Field>
                     </div>
+
+                    {assetClass === "bond" && (
+                      <>
+                        <Field label={t("bondFaceValueLabel")} htmlFor="tx-bond-face-value">
+                          <Input
+                            id="tx-bond-face-value"
+                            inputMode="decimal"
+                            value={faceValue}
+                            onChange={(e) => setFaceValue(e.target.value)}
+                            placeholder={t("bondFaceValuePlaceholder")}
+                          />
+                        </Field>
+                        <Field label={t("bondCouponRateLabel")} htmlFor="tx-bond-coupon-rate">
+                          <Input
+                            id="tx-bond-coupon-rate"
+                            inputMode="decimal"
+                            value={couponRatePercent}
+                            onChange={(e) => setCouponRatePercent(e.target.value)}
+                            placeholder="6.35"
+                          />
+                        </Field>
+                        <Field label={t("bondCouponSchedule")} htmlFor="tx-bond-coupon-schedule">
+                          <Select
+                            id="tx-bond-coupon-schedule"
+                            value={couponSchedule}
+                            onChange={(e) => setCouponSchedule(e.target.value)}
+                          >
+                            {COUPON_SCHEDULES.map((s) => (
+                              <option key={s} value={s}>
+                                {t(
+                                  `bondSchedule${s.charAt(0).toUpperCase()}${s.slice(1)}` as
+                                    | "bondScheduleMonthly"
+                                    | "bondScheduleQuarterly"
+                                    | "bondScheduleSemiannual"
+                                    | "bondScheduleAnnual",
+                                )}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label={t("bondMaturityDate")} htmlFor="tx-bond-maturity">
+                          <Input
+                            id="tx-bond-maturity"
+                            type="date"
+                            value={maturityDate}
+                            onChange={(e) => setMaturityDate(e.target.value)}
+                          />
+                        </Field>
+                        <p className="col-span-2 text-xs text-text-3">{t("bondNote")}</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
