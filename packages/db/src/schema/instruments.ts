@@ -6,6 +6,7 @@ import {
   date,
   jsonb,
   timestamp,
+  integer,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
@@ -40,6 +41,13 @@ export const instruments = pgTable(
     couponSchedule: text("coupon_schedule"),
     maturityDate: date("maturity_date"),
     partialExemptionRate: numeric("partial_exemption_rate"),
+    /**
+     * Consecutive backfill attempts that returned zero candles for this instrument.
+     * Resets to 0 on any successful fetch. Feeds the sweep's dead-feed backoff (see
+     * DEAD_FEED_MISS_THRESHOLD in @portfolio/core) — issue #737.
+     */
+    priceFeedMissCount: integer("price_feed_miss_count").notNull().default(0),
+    priceFeedLastMissAt: timestamp("price_feed_last_miss_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

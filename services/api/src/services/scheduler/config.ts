@@ -34,6 +34,35 @@ export const RECOMPUTE_SINGLETON_SECONDS = 30;
 
 export const BACKFILL_STALE_QUEUE = "backfill-stale-history";
 export const BACKFILL_STALE_CRON = "0 5 * * *";
+/**
+ * The sweep itself is now just a planner (two queries + N enqueues onto
+ * BACKFILL_PORTFOLIO_QUEUE below), so it needs far less than pg-boss's 900s default —
+ * a short expiry lets a stuck sweep fail fast and retry instead of holding a "running"
+ * job for 15 minutes. See issue #745.
+ */
+export const BACKFILL_STALE_QUEUE_OPTIONS = {
+  expireInSeconds: 300,
+  retryLimit: 1,
+  retryDelay: 60,
+  retryBackoff: true,
+} as const;
+
+/**
+ * Per-portfolio backfill work, fanned out from backfill-stale-history (and reused by
+ * on-demand recomputes that want a full historical re-backfill rather than a bounded
+ * fromDate window). Each portfolio gets its own pg-boss job: its own expiry budget,
+ * independent retry, and a `pgboss.job` row an operator can actually see progress on —
+ * instead of one global job whose 900s handler timeout is exceeded by the very first
+ * force run at platform scale. See issue #745.
+ */
+export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
+export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
+export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
+  expireInSeconds: 900,
+  retryLimit: 2,
+  retryDelay: 300,
+  retryBackoff: true,
+} as const;
 
 export const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60; // 6 hours
 

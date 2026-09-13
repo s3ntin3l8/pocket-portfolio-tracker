@@ -22,6 +22,7 @@ function formatRelative(iso: string | null): string {
 /** Design: capitalized "Completed"/"Failed" pills, distinct from the generic shadcn
  *  `Badge` (which showed the raw lowercase status in the old table layout). */
 function StatusBadge({ status }: { status: AdminJob["lastStatus"] }) {
+  const t = useTranslations("Admin");
   if (!status) return <span className="text-xs text-text-3">—</span>;
   const failed = status === "failed";
   return (
@@ -31,7 +32,7 @@ function StatusBadge({ status }: { status: AdminJob["lastStatus"] }) {
         failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
       )}
     >
-      {failed ? "Failed" : "Completed"}
+      {failed ? t("jobStatusFailed") : t("jobStatusCompleted")}
     </span>
   );
 }
@@ -99,10 +100,23 @@ function TriggerButton({ name, supportsForce, onTriggered, currentLastRunAt }: T
 interface PendingEntry {
   priorLastRunAt: string | null;
   timedOut?: boolean;
+  /** In-flight count on the job's own queue, as of the last poll. */
+  inProgress?: number;
+  /** For a job that fans out per-portfolio (backfill-stale-history → backfill-portfolio,
+   *  see #745): in-flight count on the fan-out queue, as of the last poll. */
+  fanOutRemaining?: number;
 }
 
 const POLL_INTERVAL_MS = 3_000;
-const MAX_POLLS = 10;
+/**
+ * Safety-net ceiling, not the expected completion time — a job that reports real
+ * inProgress/fanOutRemaining counts keeps polling past this as long as those counts are
+ * moving, since it means the harness knows it's still doing something. This only trips
+ * for a job that never reports progress at all (older API build) or one that's genuinely
+ * wedged. ~2 minutes at the 3s poll interval — long enough that a real force re-run's
+ * per-portfolio fan-out (#745) isn't mistaken for stuck.
+ */
+const MAX_POLLS = 40;
 
 interface AdminJobsProps {
   initialJobs: AdminJob[];
@@ -140,19 +154,41 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
         const next = { ...prev };
         for (const [name, entry] of Object.entries(prev)) {
           if (entry.timedOut) continue;
-          pollCounts.current[name] = (pollCounts.current[name] ?? 0) + 1;
           const freshJob = fresh?.find((j) => j.name === name);
-          const didTimeOut = pollCounts.current[name] >= MAX_POLLS;
 
-          if (didTimeOut) {
-            next[name] = { ...entry, timedOut: true };
-          } else if (!freshJob) {
+          if (!freshJob) {
             delete next[name];
             delete pollCounts.current[name];
-          } else if (freshJob.lastRunAt !== entry.priorLastRunAt) {
-            delete next[name];
-            delete pollCounts.current[name];
+            continue;
           }
+
+          const inProgress = freshJob.inProgress ?? 0;
+          const fanOutRemaining = freshJob.fanOutRemaining ?? 0;
+          const remaining = inProgress + fanOutRemaining;
+          const finished = remaining === 0 && freshJob.lastRunAt !== entry.priorLastRunAt;
+
+          if (finished) {
+            delete next[name];
+            delete pollCounts.current[name];
+            continue;
+          }
+
+          // Reset the timeout counter whenever the backend reports ANY in-flight/fan-out
+          // work, not just when that count has strictly decreased since the last poll —
+          // a large force re-run's hundreds of portfolios can hold a flat or even
+          // temporarily rising `remaining` for many polls in a row while genuinely
+          // working (they don't drain one at a time in lockstep with our 3s interval).
+          // Requiring a decrease made a real large fan-out false-timeout at MAX_POLLS
+          // even though the server was actively reporting progress the whole time. The
+          // counter only ever advances when `remaining` is 0 (i.e. the server reports no
+          // tracked work at all) — that's the "older API build or genuinely wedged" case
+          // MAX_POLLS' own doc comment describes.
+          pollCounts.current[name] = remaining > 0 ? 0 : (pollCounts.current[name] ?? 0) + 1;
+
+          next[name] =
+            pollCounts.current[name] >= MAX_POLLS
+              ? { ...entry, timedOut: true }
+              : { ...entry, inProgress, fanOutRemaining };
         }
         return next;
       });
@@ -196,7 +232,13 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
               <span className="text-xs text-text-3">·</span>
               <span aria-live="polite">
                 {isPending ? (
-                  <span className="text-xs font-bold text-primary">{t("jobQueued")}</span>
+                  <span className="text-xs font-bold text-primary">
+                    {entry?.fanOutRemaining
+                      ? t("jobFanOutRemaining", { count: entry.fanOutRemaining })
+                      : entry?.inProgress
+                        ? t("jobInProgress")
+                        : t("jobQueued")}
+                  </span>
                 ) : timedOut ? (
                   <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
                     {t("jobPollTimedOut")}

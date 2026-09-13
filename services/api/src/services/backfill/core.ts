@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import {
   corporateActions,
@@ -27,12 +27,23 @@ import { getFxRatesForDates, makeFxRateFn } from "../fx.js";
 export interface BackfillOptions {
   /** Only recompute snapshots on or after this date (ISO YYYY-MM-DD). */
   fromDate?: string;
+  /**
+   * This is a trailing-edge-only heal (history back to inception is already intact;
+   * only the gap since `fromDate` is missing). An empty `getHistoryFrom` result means
+   * "no new candles since then", not "fetch the whole history again" — skip the
+   * max-range provider fallback so a permanently dead feed doesn't trigger a full
+   * re-fetch on every sweep run. See issue #737.
+   */
+  tailOnly?: boolean;
 }
 
 export interface BackfillResult {
   instruments: number;
   days: number;
+  /** Instruments whose earliest available candle is later than their first-held date. */
   truncated: string[];
+  /** Instruments for which no price candle could be found at all this run. */
+  unpriced: string[];
 }
 
 export async function backfillPortfolioHistory(
@@ -47,7 +58,7 @@ export async function backfillPortfolioHistory(
     .from(transactions)
     .where(eq(transactions.portfolioId, portfolioId));
 
-  if (txRows.length === 0) return { instruments: 0, days: 0, truncated: [] };
+  if (txRows.length === 0) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
 
   const [pf] = await db
     .select({ cashCounted: portfolios.cashCounted })
@@ -61,7 +72,7 @@ export async function backfillPortfolioHistory(
   const startDate = opts.fromDate && opts.fromDate > inceptionDate ? opts.fromDate : inceptionDate;
   const today = toDateKey(new Date());
 
-  if (startDate > today) return { instruments: 0, days: 0, truncated: [] };
+  if (startDate > today) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
 
   const instrIds = [
     ...new Set(txRows.map((r) => r.instrumentId).filter((x): x is string => x !== null)),
@@ -85,6 +96,7 @@ export async function backfillPortfolioHistory(
   }));
 
   const truncated: string[] = [];
+  const unpriced: string[] = [];
   const rawPrices = new Map<string, Map<string, { close: string; currency: string }>>();
 
   const goldBuybackByMarket = new Map<string, string>();
@@ -183,18 +195,30 @@ export async function backfillPortfolioHistory(
       isin: instr.isin ?? undefined,
     };
 
-    let candles = await marketData.getHistoryFrom(ref, fetchFrom).catch(() => []);
-    if (candles.length === 0) {
-      candles = await marketData.getHistory(ref, "max").catch(() => []);
-    }
+    // A tail-only heal's `fetchFrom` window is deliberately short (the gap since the last
+    // known price) — an empty result there means "no new candles since then", not "this
+    // instrument has no history". `allowMaxFallback: false` suppresses
+    // MarketDataService.getHistoryFrom's own internal full-range fallback in that case;
+    // falling back to a full-range fetch on every such miss is what let a permanently
+    // dead feed re-trigger an unbounded provider call every sweep run (issue #737). Only
+    // a from-inception heal wants the max-range fallback.
+    const candles = await marketData
+      .getHistoryFrom(ref, fetchFrom, { allowMaxFallback: !opts.tailOnly })
+      .catch(() => []);
 
     if (candles.length === 0) {
+      unpriced.push(instr.id);
+      // Plain human-readable line, deliberately NOT JSON — a hand-rolled object with a
+      // string `level` field looks like a pino log line but isn't one (pino's own
+      // `level` is numeric), so a log pipeline filtering on `level >= 40` would silently
+      // drop it. This function has no logger threaded through it (called from contexts
+      // that range from the scheduler, which has one, to direct test calls, which don't),
+      // so a plain console.warn is the honest option rather than a line that fakes being
+      // structured without actually being parseable as such.
       console.warn(
-        `[backfill] no price history for instrument ${instr.id} (${instr.symbol}/${instr.market}); skipping`,
+        `[backfill] no price history for instrument ${instr.id} (${instr.symbol}/${instr.market}, tailOnly=${opts.tailOnly ?? false}); skipping`,
       );
-    }
-
-    if (candles.length > 0) {
+    } else {
       const earliest = candles[0]!.date;
       if (earliest > firstHeldDate) {
         truncated.push(instr.id);
@@ -205,6 +229,22 @@ export async function backfillPortfolioHistory(
         }
       }
     }
+
+    // Atomic increment (not read-then-write instr.priceFeedMissCount + 1) — two
+    // backfill-portfolio workers processing different portfolios that happen to share
+    // this instrument (a common ETF/mutual fund) could otherwise both read the same
+    // starting count and last-write-wins, under-counting the miss streak.
+    await db
+      .update(instruments)
+      .set(
+        candles.length === 0
+          ? {
+              priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
+              priceFeedLastMissAt: new Date(),
+            }
+          : { priceFeedMissCount: 0, priceFeedLastMissAt: null },
+      )
+      .where(eq(instruments.id, instr.id));
   }
 
   if (instrIds.length > 0) {
@@ -382,5 +422,5 @@ export async function backfillPortfolioHistory(
     count++;
   }
 
-  return { instruments: instrRows.length, days: count, truncated };
+  return { instruments: instrRows.length, days: count, truncated, unpriced };
 }

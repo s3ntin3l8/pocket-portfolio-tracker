@@ -1,5 +1,7 @@
 import type { PgBoss } from "pg-boss";
 import {
+  BACKFILL_PORTFOLIO_QUEUE,
+  BACKFILL_PORTFOLIO_SINGLETON_SECONDS,
   IBKR_SYNC_QUEUE,
   INSTRUMENT_META_QUEUE,
   INSTRUMENT_META_SINGLETON_SECONDS,
@@ -7,6 +9,11 @@ import {
   RECOMPUTE_SINGLETON_SECONDS,
   TR_SYNC_QUEUE,
 } from "./config.js";
+
+/** How long a trigger-job dedup key stands: long enough to absorb a double-click or an
+ * admin trigger landing on top of the same job's own cron firing, short enough that a
+ * genuinely repeated manual trigger a minute later isn't silently swallowed. */
+const TRIGGER_SINGLETON_SECONDS = 30;
 
 let activeBoss: PgBoss | null = null;
 
@@ -29,15 +36,27 @@ export { usesPglite };
 
 /**
  * Enqueue a manual run of a named job queue.
- * Returns `{ queued: true }` on success, `{ queued: false }` when pg-boss is unavailable.
- * An optional `payload` object is forwarded as the job data (e.g. `{ force: true }`).
+ * Returns `{ queued: true }` on success, `{ queued: false }` when pg-boss is unavailable
+ * OR when this exact trigger already has one in flight (`alreadyInFlight: true` — see
+ * below). An optional `payload` object is forwarded as the job data (e.g. `{ force: true }`).
  */
 export async function triggerJob(
   name: string,
   payload: Record<string, unknown> = {},
-): Promise<{ queued: boolean }> {
+): Promise<{ queued: boolean; alreadyInFlight?: boolean }> {
   if (!activeBoss) return { queued: false };
-  await activeBoss.send(name, payload);
+  const jobId = await activeBoss.send(name, payload, {
+    // The dedup key includes the payload, not just `name` — a "force" trigger must not
+    // silently collide with (and no-op behind) a plain trigger of the same job fired
+    // moments earlier, or vice versa. Only a genuinely identical repeat within the
+    // window collapses.
+    singletonKey: `${name}:${JSON.stringify(payload)}`,
+    singletonSeconds: TRIGGER_SINGLETON_SECONDS,
+  });
+  // pg-boss's send() returns null on a singleton-key collision — no job was actually
+  // created. Reporting `queued: true` here would let the caller write a misleading
+  // "triggered" audit log entry for a request that silently did nothing.
+  if (jobId === null) return { queued: false, alreadyInFlight: true };
   return { queued: true };
 }
 
@@ -86,6 +105,44 @@ export async function enqueueRecompute(portfolioId: string, fromDate: string): P
     );
   } catch {
     // non-fatal
+  }
+}
+
+/**
+ * Enqueue a per-portfolio backfill onto BACKFILL_PORTFOLIO_QUEUE, deduplicated per
+ * portfolio so a force sweep landing on top of an already-queued/running heal for the
+ * same portfolio collapses instead of duplicating. `fromDate`/`tailOnly` mirror
+ * `BackfillOptions` (undefined `fromDate` means "from inception"; `tailOnly` suppresses
+ * the max-range provider fallback for a heal that's only chasing the trailing edge).
+ *
+ * Returns whether the send actually succeeded. Unlike `enqueueRecompute`/
+ * `enqueueInstrumentMetadata` (a debounce over an otherwise-idempotent nightly job, where
+ * swallowing a send failure is harmless), this is the SOLE delivery mechanism for the
+ * whole backfill fan-out — the caller (`backfillStalePortfolios`) counts this return value
+ * into `SweepResult.queued`/`enqueueFailed` so a DB hiccup mid-loop shows up as a real
+ * count instead of a "queued: N" log that overclaims how many portfolios were actually
+ * enqueued.
+ */
+export async function enqueueBackfillPortfolio(
+  portfolioId: string,
+  fromDate?: string,
+  tailOnly?: boolean,
+): Promise<boolean> {
+  if (!activeBoss) return false;
+  try {
+    await activeBoss.send(
+      BACKFILL_PORTFOLIO_QUEUE,
+      { portfolioId, fromDate, tailOnly },
+      { singletonKey: portfolioId, singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS },
+    );
+    return true;
+  } catch (err) {
+    // The count alone (SweepResult.enqueueFailed) doesn't say WHY a send failed — no
+    // fastify logger is threaded through this module, so this is the only place the
+    // actual error is ever seen. console.error, not console.warn: a real backfill
+    // silently never got enqueued for this portfolio.
+    console.error(`[backfill] enqueue failed for portfolio ${portfolioId}:`, err);
+    return false;
   }
 }
 

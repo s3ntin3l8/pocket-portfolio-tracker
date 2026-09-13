@@ -22,6 +22,7 @@ import {
   resolveCryptoIsin,
   PRICEABLE_FOREIGN_MARKETS,
   isKnownMarket,
+  type Candle,
   type InstrumentRef,
   type InstrumentSearchResult,
   type MarketDataProvider,
@@ -442,6 +443,41 @@ describe("MarketDataService", () => {
         currency: "EUR",
       }),
     ).toBeNull();
+  });
+
+  describe("getHistoryFrom max-range fallback (#737)", () => {
+    // A provider that implements getHistoryFrom but returns nothing for the requested
+    // window — the exact shape a permanently dead (or merely quiet) feed produces.
+    function makeQuietProvider(maxCandles: () => Candle[]): MarketDataProvider {
+      return {
+        name: "quiet",
+        supports: () => true,
+        getQuote: async () => null,
+        getHistoryFrom: async () => [],
+        getHistory: async () => maxCandles(),
+      };
+    }
+
+    it("falls back to getHistory('max') by default when getHistoryFrom returns nothing", async () => {
+      const svc = new MarketDataService([
+        makeQuietProvider(() => [{ date: "2020-01-01", close: "100", currency: "USD" }]),
+      ]);
+      const candles = await svc.getHistoryFrom(bbca, "2026-06-01");
+      expect(candles).toEqual([{ date: "2020-01-01", close: "100", currency: "USD" }]);
+    });
+
+    it("does NOT fall back when allowMaxFallback: false — a tail-only heal treats an empty window as 'nothing new', not 'fetch everything'", async () => {
+      let maxCallCount = 0;
+      const svc = new MarketDataService([
+        makeQuietProvider(() => {
+          maxCallCount++;
+          return [{ date: "2020-01-01", close: "100", currency: "USD" }];
+        }),
+      ]);
+      const candles = await svc.getHistoryFrom(bbca, "2026-06-01", { allowMaxFallback: false });
+      expect(candles).toEqual([]);
+      expect(maxCallCount).toBe(0);
+    });
   });
 });
 

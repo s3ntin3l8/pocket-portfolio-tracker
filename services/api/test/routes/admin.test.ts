@@ -499,6 +499,40 @@ describe("admin provider config", () => {
     expect(res.json()).toMatchObject({ error: "scheduler_unavailable" });
   });
 
+  it("POST /admin/jobs/:name/trigger returns 409 when the same trigger is already in flight", async () => {
+    const { setActiveBoss } = await import("../../src/services/scheduler/enqueue.js");
+    // Minimal fake reproducing pg-boss's own send() -> null on a singleton-key collision.
+    const activeKeys = new Set<string>();
+    setActiveBoss({
+      send: async (_name: string, _data: unknown, opts: { singletonKey?: string }) => {
+        const key = opts.singletonKey;
+        if (key !== undefined && activeKeys.has(key)) return null;
+        if (key !== undefined) activeKeys.add(key);
+        return "fake-job-id";
+      },
+    } as unknown as Parameters<typeof setActiveBoss>[0]);
+
+    try {
+      const t = await token("admin-jobs-409", [ADMIN_GROUP]);
+      const first = await app.inject({
+        method: "POST",
+        url: "/admin/jobs/refresh-prices/trigger",
+        headers: auth(t),
+      });
+      expect(first.statusCode).toBe(200);
+
+      const second = await app.inject({
+        method: "POST",
+        url: "/admin/jobs/refresh-prices/trigger",
+        headers: auth(t),
+      });
+      expect(second.statusCode).toBe(409);
+      expect(second.json()).toMatchObject({ error: "already_in_flight" });
+    } finally {
+      setActiveBoss(null);
+    }
+  });
+
   it("POST /admin/jobs/:name/trigger is forbidden for non-admins", async () => {
     const res = await app.inject({
       method: "POST",

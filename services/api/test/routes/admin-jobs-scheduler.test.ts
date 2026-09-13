@@ -120,4 +120,45 @@ describe("GET /admin/jobs — live pgboss query path (scheduler available)", () 
     expect(snapshot?.lastRunAt).toBeNull();
     expect(snapshot?.lastStatus).toBeNull();
   });
+
+  // #745: the two backfill handlers now rethrow on failure instead of swallowing it, so
+  // pg-boss should genuinely record `state: 'failed'` for a real failure — this pins that
+  // the route surfaces that truthfully rather than the old "Completed" pill regardless of
+  // outcome. Also covers the new in-flight/fan-out counters added alongside the rethrow.
+  it("surfaces a genuine failure and in-flight/fan-out counts for the backfill queues", async () => {
+    await app.db.execute(sql`
+      INSERT INTO pgboss.job (name, state, completed_on) VALUES
+        ('backfill-stale-history', 'failed', NOW() - INTERVAL '1 minute')
+    `);
+    await app.db.execute(sql`
+      INSERT INTO pgboss.job (name, state, completed_on) VALUES
+        ('backfill-portfolio', 'active', NULL),
+        ('backfill-portfolio', 'created', NULL),
+        ('backfill-portfolio', 'completed', NOW() - INTERVAL '1 minute')
+    `);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/jobs",
+      headers: auth(await token("admin-live-jobs-2", [ADMIN_GROUP])),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      jobs: {
+        name: string;
+        lastStatus: string | null;
+        inProgress?: number;
+        fanOutRemaining?: number;
+      }[];
+    };
+
+    const stale = body.jobs.find((j) => j.name === "backfill-stale-history");
+    expect(stale?.lastStatus).toBe("failed");
+    // Two backfill-portfolio rows (active + created) are still in flight.
+    expect(stale?.fanOutRemaining).toBe(2);
+
+    // backfill-portfolio itself is not a user-triggerable JOB_DESCRIPTOR, so it isn't in
+    // the response list directly — only surfaced via backfill-stale-history's fanOut.
+    expect(body.jobs.find((j) => j.name === "backfill-portfolio")).toBeUndefined();
+  });
 });
