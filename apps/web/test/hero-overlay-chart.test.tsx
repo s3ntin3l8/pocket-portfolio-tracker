@@ -24,14 +24,23 @@ vi.mock("recharts", () => ({
     <div data-testid={`line-${dataKey}`} data-stroke={stroke} data-dash={strokeDasharray ?? ""} />
   ),
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Tooltip: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="tooltip-stub">{children}</div>
+  ),
+  useIsTooltipActive: () => false,
+  useActiveTooltipLabel: () => undefined,
+  useActiveTooltipDataPoints: () => undefined,
 }));
 
 import { HeroOverlayChart } from "../src/components/charts/hero-overlay-chart";
 
-function renderChart(points: Array<{ date: string; portfolio: number; benchmark: number | null }>) {
+function renderChart(
+  points: Array<{ date: string; portfolio: number; benchmark: number | null }>,
+  opts: { isIntraday?: boolean } = {},
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <HeroOverlayChart points={points} />
+      <HeroOverlayChart points={points} isIntraday={opts.isIntraday ?? false} currency="USD" />
     </NextIntlClientProvider>,
   );
 }

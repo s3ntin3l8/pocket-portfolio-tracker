@@ -196,7 +196,11 @@ export function NetWorthHistoryChart({
         {intraday && data.length < 2 ? (
           collectingNote
         ) : data.length > 1 ? (
-          <HeroOverlayChart points={heroOverlayPoints ?? []} />
+          <HeroOverlayChart
+            points={heroOverlayPoints ?? []}
+            isIntraday={intraday}
+            currency={currency}
+          />
         ) : (
           <p className="py-8 text-center text-sm text-white/80">{te("historyTitle")}</p>
         )}
