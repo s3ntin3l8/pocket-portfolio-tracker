@@ -18,6 +18,14 @@ const MAX_SEARCH_RESULTS = 10;
 export interface MarketDataServiceOptions {
   /** Fired with the provider name immediately before each provider method invocation. */
   onCall?: (providerName: string) => void;
+  /**
+   * Fired when a provider method throws an error that the service is about to swallow
+   * (e.g. primary Yahoo 429 covered by a Twelve Data fallback). Without this, a primary
+   * outage covered by a fallback is invisible — the caller sees only the successful
+   * fallback result and never knows the primary was down. The hook is the place to log
+   * at warn level and/or increment an operational counter. Issue #749.
+   */
+  onProviderError?: (providerName: string, method: string, error: unknown) => void;
 }
 
 /**
@@ -56,12 +64,23 @@ export class MarketDataService {
   }
 
   async getHistory(ref: InstrumentRef, range: string): Promise<Candle[]> {
+    let lastError: unknown;
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getHistory) continue;
-      this.opts.onCall?.(provider.name);
-      const candles = (await provider.getHistory(ref, range)) ?? [];
-      if (candles.length > 0) return candles;
+      try {
+        this.opts.onCall?.(provider.name);
+        const candles = (await provider.getHistory(ref, range)) ?? [];
+        if (candles.length > 0) return candles;
+      } catch (err) {
+        lastError = err;
+        // The error is surfaced via onProviderError even when a later provider succeeds —
+        // a primary Yahoo outage covered by a fallback is operationally important and
+        // shouldn't be invisible (#749).
+        this.opts.onProviderError?.(provider.name, "getHistory", err);
+        // A failing/timing-out provider shouldn't block the fallback chain — try the next.
+      }
     }
+    if (lastError) throw lastError;
     return [];
   }
 
@@ -78,12 +97,23 @@ export class MarketDataService {
     fromDate: string,
     opts: { allowMaxFallback?: boolean } = {},
   ): Promise<Candle[]> {
+    let lastError: unknown;
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getHistoryFrom) continue;
-      this.opts.onCall?.(provider.name);
-      const candles = (await provider.getHistoryFrom(ref, fromDate)) ?? [];
-      if (candles.length > 0) return candles;
+      try {
+        this.opts.onCall?.(provider.name);
+        const candles = (await provider.getHistoryFrom(ref, fromDate)) ?? [];
+        if (candles.length > 0) return candles;
+      } catch (err) {
+        lastError = err;
+        this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
+        // A failing/timing-out provider shouldn't block the fallback chain — try the next.
+      }
     }
+    // A tail-only heal (allowMaxFallback: false) treats any all-failed/all-empty
+    // scenario as "nothing new" — but if a provider actually threw, surface that to
+    // the backfill layer so it can count it as an error (issue #749).
+    if (lastError && opts.allowMaxFallback === false) throw lastError;
     if (opts.allowMaxFallback === false) return [];
     // Fallback: try getHistory with max range if no provider supports getHistoryFrom
     return this.getHistory(ref, "max");

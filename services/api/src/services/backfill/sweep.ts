@@ -161,12 +161,13 @@ export async function backfillStalePortfolios(
 
   const today = toDateKey(now);
 
-  // #737 — a feed that has returned zero candles DEAD_FEED_MISS_THRESHOLD+ times in a row
-  // (tracked on `instruments.priceFeedMissCount`/`priceFeedLastMissAt`, updated by
-  // backfillPortfolioHistory on every fetch attempt) is past "temporarily lagging" and
-  // into "may have nothing left to give". Once past the threshold, only let it count
-  // toward staleness again once every DEAD_FEED_MISS_THRESHOLD days — otherwise one dead
-  // symbol keeps its whole portfolio marked stale (and re-fetched) every single night.
+  // #737 — a feed that has failed DEAD_FEED_MISS_THRESHOLD+ times in a row (tracked on
+  // `instruments.priceFeedMissCount`/`priceFeedLastMissAt`, updated by
+  // backfillPortfolioHistory on every fetch attempt — counts BOTH empty results and
+  // provider throws, see the comment in core.ts) is past "temporarily lagging" and into
+  // "may have nothing left to give". Once past the threshold, only let it count toward
+  // staleness again once every DEAD_FEED_MISS_THRESHOLD days — otherwise one dead symbol
+  // keeps its whole portfolio marked stale (and re-fetched) every single night.
   const feedHealthRows = currentlyHeldInstrIds.length
     ? await db
         .select({

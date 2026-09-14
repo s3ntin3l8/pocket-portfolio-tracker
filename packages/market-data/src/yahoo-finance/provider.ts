@@ -9,6 +9,7 @@ import type {
   MarketDataProvider,
   Quote,
 } from "../types.js";
+import { MarketDataError } from "../types.js";
 import {
   assetClassFromType,
   mapExchange,
@@ -112,7 +113,10 @@ export class YahooFinanceProvider implements MarketDataProvider {
       `${this.baseUrl}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`,
       { headers: this.defaultHeaders },
     );
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new MarketDataError(`Yahoo ${res.status} for ${symbol}`, this.name, res.status);
+    }
     const data = (await res.json()) as {
       chart?: { result?: ChartResult[] | null; error?: unknown };
     };
@@ -128,7 +132,10 @@ export class YahooFinanceProvider implements MarketDataProvider {
       )}?period1=${period1}&period2=${period2}&interval=1d`,
       { headers: this.defaultHeaders },
     );
-    if (!res.ok) return null;
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new MarketDataError(`Yahoo ${res.status} for ${symbol}`, this.name, res.status);
+    }
     const data = (await res.json()) as {
       chart?: { result?: ChartResult[] | null; error?: unknown };
     };

@@ -68,7 +68,19 @@ export async function getMarketData(): Promise<MarketDataService> {
     providers.push(new OpenFigiProvider({ apiKey: process.env.OPENFIGI_API_KEY }));
   }
   providers.push(new FixtureProvider());
-  service = new MarketDataService(providers, { onCall: recordCall });
+  service = new MarketDataService(providers, {
+    onCall: recordCall,
+    // A provider error covered by a fallback is invisible to the caller (#749) —
+    // log at warn level so a primary outage covered by a fallback is operationally
+    // visible. Plain console.warn rather than pino: this file has no logger threaded
+    // through it (getMarketData() is called from scheduler/test contexts that don't
+    // share a request-scoped logger), and the line carries enough context to be
+    // grep-able on its own.
+    onProviderError: (provider, method, err) =>
+      console.warn(
+        `[market-data] ${provider}.${method} failed; falling back: ${err instanceof Error ? err.message : String(err)}`,
+      ),
+  });
   return service;
 }
 

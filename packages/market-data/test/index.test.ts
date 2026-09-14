@@ -6,6 +6,7 @@ import {
   isIsin,
   isWkn,
   FixtureProvider,
+  MarketDataError,
   MarketDataService,
   TwelveDataProvider,
   GoldApiProvider,
@@ -29,11 +30,11 @@ import {
 } from "../src/index.js";
 
 function mockFetch(
-  responder: (url: string, init?: RequestInit) => { ok?: boolean; body: unknown },
+  responder: (url: string, init?: RequestInit) => { ok?: boolean; status?: number; body: unknown },
 ) {
   return (async (url: string, init?: RequestInit) => {
-    const { ok = true, body } = responder(url, init);
-    return { ok, status: ok ? 200 : 500, json: async () => body } as Response;
+    const { ok = true, status, body } = responder(url, init);
+    return { ok, status: status ?? (ok ? 200 : 500), json: async () => body } as Response;
   }) as unknown as typeof fetch;
 }
 
@@ -294,6 +295,44 @@ describe("MarketDataService", () => {
     };
     const svc = new MarketDataService([flaky, fallback]);
     expect((await svc.getQuote(bbca))?.price).toBe("9999");
+  });
+
+  it("fires onProviderError when a provider throws but a fallback succeeds (#749)", async () => {
+    // Without onProviderError, a primary Yahoo outage covered by a fallback is
+    // invisible — the caller sees only the successful fallback result and never
+    // knows the primary was down. The hook is the place to log at warn level or
+    // increment an operational counter.
+    const flaky: MarketDataProvider = {
+      name: "flaky",
+      supports: (ac) => ac === "equity",
+      getHistory: async () => {
+        throw new Error("fetch failed: 503 Service Unavailable");
+      },
+      getHistoryFrom: async () => {
+        throw new Error("fetch failed: 503 Service Unavailable");
+      },
+    };
+    const fallback: MarketDataProvider = {
+      name: "fallback",
+      supports: (ac) => ac === "equity",
+      getHistory: async () => [{ date: "2026-02-08", close: "9999" }],
+      getHistoryFrom: async () => [{ date: "2026-02-08", close: "9999" }],
+    };
+    const errors: { provider: string; method: string; error: unknown }[] = [];
+    const svc = new MarketDataService([flaky, fallback], {
+      onProviderError: (provider, method, error) => errors.push({ provider, method, error }),
+    });
+
+    expect((await svc.getHistory(bbca, "1mo"))[0].close).toBe("9999");
+    expect(errors).toEqual([{ provider: "flaky", method: "getHistory", error: expect.any(Error) }]);
+
+    expect((await svc.getHistoryFrom(bbca, "2026-02-08"))[0].close).toBe("9999");
+    expect(errors).toHaveLength(2);
+    expect(errors[1]).toEqual({
+      provider: "flaky",
+      method: "getHistoryFrom",
+      error: expect.any(Error),
+    });
   });
 
   it("getQuotes drops a throwing instrument instead of rejecting the whole batch", async () => {
@@ -694,9 +733,19 @@ describe("YahooFinanceProvider", () => {
     expect(candles[0].currency).toBeUndefined();
   });
 
-  it("returns null on a non-200 and empty history when unavailable", async () => {
+  it("throws MarketDataError on a non-200 non-404 response", async () => {
+    // Post-#749: providers throw on HTTP errors (except 404) so the backfill layer
+    // can distinguish transient failures from legitimate "no data" results.
     const provider = new YahooFinanceProvider({
       fetch: mockFetch(() => ({ ok: false, body: {} })),
+    });
+    await expect(provider.getQuote(bbca)).rejects.toThrow(MarketDataError);
+    await expect(provider.getHistory(bbca, "1mo")).rejects.toThrow(MarketDataError);
+  });
+
+  it("returns null / empty on a 404 (instrument not found)", async () => {
+    const provider = new YahooFinanceProvider({
+      fetch: mockFetch(() => ({ ok: false, status: 404, body: {} })),
     });
     expect(await provider.getQuote(bbca)).toBeNull();
     expect(await provider.getHistory(bbca, "1mo")).toEqual([]);
@@ -918,11 +967,11 @@ describe("TwelveDataProvider", () => {
     expect(gold[0].close).toBe("1000");
   });
 
-  it("returns [] history on a non-ok response", async () => {
+  it("throws MarketDataError on a non-200 non-404 history response (#749)", async () => {
     const provider = new TwelveDataProvider("key", {
       fetch: mockFetch(() => ({ ok: false, body: {} })),
     });
-    expect(await provider.getHistory(bbca)).toEqual([]);
+    await expect(provider.getHistory(bbca)).rejects.toThrow(MarketDataError);
   });
 });
 
