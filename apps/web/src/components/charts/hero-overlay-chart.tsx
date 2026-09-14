@@ -6,7 +6,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   useActiveTooltipDataPoints,
-  useActiveTooltipLabel,
   useIsTooltipActive,
 } from "recharts";
 import { useMemo } from "react";
@@ -50,7 +49,7 @@ export function HeroOverlayChart({
   return (
     <div data-testid="hero-overlay-chart" className="w-full" style={{ height: 74 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={points} margin={{ top: 16, right: 0, left: 0, bottom: 0 }}>
+        <ComposedChart data={points} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <Line
             type="monotone"
             dataKey="benchmark"
@@ -96,11 +95,6 @@ function HeroTooltip({
 }) {
   const t = useTranslations("Holdings.hero");
   const active = useIsTooltipActive();
-  // Touching `useActiveTooltipLabel` keeps the hook order stable if Recharts
-  // re-renders the tooltip wrapper at a different point in its lifecycle; we
-  // derive the title from `p.date` instead because day-grained `<XAxis>`/`<ComposedChart>`
-  // would otherwise surface a raw row index here.
-  useActiveTooltipLabel();
   const pointsData = useActiveTooltipDataPoints<HeroOverlayPoint>();
 
   const dateLabelFmt = useMemo(
@@ -153,7 +147,7 @@ function formatHeroDateLabel(
   if (!isIntraday) {
     if (!fmt) return raw;
     if (!/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw;
-    const d = new Date(raw);
+    const d = new Date(`${raw}T00:00:00`);
     return Number.isNaN(d.getTime()) ? raw : fmt.format(d);
   }
   return raw;
