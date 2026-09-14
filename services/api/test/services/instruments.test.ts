@@ -912,6 +912,67 @@ describe("setManualPrice", () => {
     const mpRow = rowsAfter.find((r) => r.close === "985000");
     expect(mpRow).toBeDefined();
   });
+
+  it("rejects manual price on a non-bond instrument (returns not_bond)", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "IDR",
+        symbol: "BBCA-NMP",
+        name: "BCA equity — manual price rejected",
+      })
+      .returning();
+
+    const result = await setManualPrice(db, row.id, "9500");
+    expect(result).toBe("not_bond");
+
+    // No prices row should have been written.
+    const rows = await db.select().from(prices).where(eq(prices.instrumentId, row.id));
+    expect(rows).toHaveLength(0);
+
+    // The instrument should not have been updated either.
+    const [fresh] = await db.select().from(instruments).where(eq(instruments.id, row.id)).limit(1);
+    expect(fresh!.manualPrice).toBeNull();
+  });
+
+  it("clearing on a non-bond instrument is rejected without deleting prices", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "IDR",
+        symbol: "TLKM-NMP",
+        name: "Telkom equity — clear rejected",
+      })
+      .returning();
+
+    // Insert genuine live-provider price rows.
+    await db.insert(prices).values([
+      { instrumentId: row.id, date: "2026-09-10", close: "3500", currency: "IDR" },
+      { instrumentId: row.id, date: "2026-09-11", close: "3520", currency: "IDR" },
+      { instrumentId: row.id, date: "2026-09-12", close: "3510", currency: "IDR" },
+    ]);
+
+    // Try to clear (price === null) — should be rejected.
+    const result = await setManualPrice(db, row.id, null);
+    expect(result).toBe("not_bond");
+
+    // Genuine live price rows must survive untouched.
+    const rows = await db
+      .select()
+      .from(prices)
+      .where(eq(prices.instrumentId, row.id))
+      .orderBy(prices.date);
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.close)).toEqual(["3500", "3520", "3510"]);
+  });
 });
 
 describe("materializeManualPriceRow", () => {
@@ -1023,6 +1084,28 @@ describe("materializeManualPriceRow", () => {
         symbol: "SR021T3-NOMP",
         name: "SR021T3 no manual price test",
         faceValue: "1000000",
+      })
+      .returning();
+
+    await materializeManualPriceRow(db, row.id);
+
+    const rows = await db.select().from(prices).where(eq(prices.instrumentId, row.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("is a no-op on a non-bond instrument", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "IDR",
+        symbol: "BBCA-MAT",
+        name: "BCA equity — materialize no-op",
+        manualPrice: "9500",
+        manualPriceAt: new Date(),
       })
       .returning();
 

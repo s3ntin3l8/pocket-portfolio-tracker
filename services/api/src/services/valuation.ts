@@ -145,11 +145,11 @@ export async function valuePortfolio(
   // would silently clobber a manual value. `instruments.manualPrice` is its own column
   // for exactly that reason.
   for (const i of instrumentRows) {
-    // Number(...) > 0, not the string truthiness `i.manualPrice &&` would give: the
-    // route schema already rejects 0/negative on write, but checking the invariant
-    // again here keeps it enforced locally even if a future caller writes the column
-    // directly.
-    if (i.manualPrice && Number(i.manualPrice) > 0 && !prices[i.id]) {
+    // Bonds only — setManualPrice's route/service gate restricts writes to bonds
+    // (see instruments.ts), so manualPrice on a non-bond is a legacy artifact. The
+    // Number(...) > 0 guard catches that defensively without applying the override
+    // to live-provider-served asset classes.
+    if (i.assetClass === "bond" && i.manualPrice && Number(i.manualPrice) > 0 && !prices[i.id]) {
       prices[i.id] = { price: i.manualPrice, currency: i.currency };
     }
   }
@@ -161,7 +161,7 @@ export async function valuePortfolio(
   // upsert per such instrument per read, which is negligible relative to the rest
   // of valuePortfolio's work.
   for (const i of instrumentRows) {
-    if (i.manualPrice && Number(i.manualPrice) > 0 && i.manualPriceAt) {
+    if (i.assetClass === "bond" && i.manualPrice && Number(i.manualPrice) > 0 && i.manualPriceAt) {
       await materializeManualPriceRow(db, i.id);
     }
   }

@@ -301,6 +301,7 @@ export async function updateInstrument(
 export async function materializeManualPriceRow(db: DB, id: string): Promise<void> {
   const [inst] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
   if (!inst) return;
+  if (inst.assetClass !== "bond") return;
   if (!inst.manualPrice || Number(inst.manualPrice) <= 0 || !inst.manualPriceAt) return;
 
   const dateKey = toDateKey(new Date(inst.manualPriceAt));
@@ -344,9 +345,16 @@ export async function setManualPrice(
   db: DB,
   id: string,
   price: string | null,
-): Promise<Instrument | "not_found"> {
+): Promise<Instrument | "not_found" | "not_bond"> {
   const [existing] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
   if (!existing) return "not_found";
+
+  // Gate to bonds only. Live-provider-served asset classes (equities, ETFs, crypto,
+  // mutual funds) should never need a manual price — setting one would mean the
+  // clear path deletes the entire genuine provider-served price series and re-inserts
+  // nothing (no faceValue). Bonds are the only asset class with no live provider and
+  // a stable per-unit fallback (par).
+  if (existing.assetClass !== "bond") return "not_bond";
 
   const now = price === null ? null : new Date();
   const [updated] = await db

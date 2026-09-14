@@ -112,7 +112,14 @@ export async function computeConcentrationSection(
     // (latestDate), prefer the manual price over any stored row.
     const manualPriceByInst = new Map<string, { close: string; currency: string; date: string }>();
     for (const inst of allInstRows) {
-      if (inst.manualPrice && Number(inst.manualPrice) > 0 && inst.manualPriceAt) {
+      // Bonds only — setManualPrice is bond-gated, so manualPrice on non-bonds is
+      // a legacy artifact. Don't override the live provider on equity/ETF/etc.
+      if (
+        inst.assetClass === "bond" &&
+        inst.manualPrice &&
+        Number(inst.manualPrice) > 0 &&
+        inst.manualPriceAt
+      ) {
         manualPriceByInst.set(inst.id, {
           close: inst.manualPrice,
           currency: inst.currency,
