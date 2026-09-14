@@ -1338,6 +1338,7 @@
       "periodAllTime": "all-time",
       "legendPortfolio": "Portfolio",
       "legendBenchmark": "{symbol}",
+      "tooltipBenchmark": "Benchmark",
       "benchmarkPillUnavailable": "—"
     },
     "allocation": {

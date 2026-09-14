@@ -1344,6 +1344,7 @@
       "periodAllTime": "sepanjang masa",
       "legendPortfolio": "Portofolio",
       "legendBenchmark": "{symbol}",
+      "tooltipBenchmark": "Benchmark",
       "benchmarkPillUnavailable": "—"
     },
     "allocation": {
