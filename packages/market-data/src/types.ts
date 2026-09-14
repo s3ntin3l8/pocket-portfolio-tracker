@@ -228,6 +228,28 @@ export interface MarketDataProvider {
   getFundamentals?(ref: InstrumentRef): Promise<InstrumentFundamentals | null>;
 }
 
+/**
+ * A provider-level HTTP error (non-OK response). Distinguishes transient / operational
+ * failures (429 rate-limit, 403 auth, 5xx server) from a legitimate "not found" (404),
+ * so callers can decide whether to retry / fall back vs. treat the instrument as having
+ * no data. Network-level throws (DNS, TCP, timeout) are plain Error instances — same
+ * as before.
+ *
+ * Thrown by providers on non-OK HTTP responses (except 404, which resolves `null`).
+ * Caught by MarketDataService to preserve the provider fallback chain; propagates
+ * to backfillPortfolioHistory where it increments `priceFeedErrorCount` — see #749.
+ */
+export class MarketDataError extends Error {
+  constructor(
+    message: string,
+    readonly provider: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "MarketDataError";
+  }
+}
+
 /** A 12-char ISIN: 2-letter country, 9 alphanumerics, 1 check digit. */
 export const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
 

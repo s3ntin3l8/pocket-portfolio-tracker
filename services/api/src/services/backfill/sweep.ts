@@ -161,24 +161,19 @@ export async function backfillStalePortfolios(
 
   const today = toDateKey(now);
 
-  // #737 — a feed that has returned zero candles DEAD_FEED_MISS_THRESHOLD+ times in a row
-  // (tracked on `instruments.priceFeedMissCount`/`priceFeedLastMissAt`, updated by
-  // backfillPortfolioHistory on every fetch attempt) is past "temporarily lagging" and
-  // into "may have nothing left to give". Once past the threshold, only let it count
-  // toward staleness again once every DEAD_FEED_MISS_THRESHOLD days — otherwise one dead
-  // symbol keeps its whole portfolio marked stale (and re-fetched) every single night.
-  // #749 — same applies to `priceFeedErrorCount`/`priceFeedLastErrorAt` for the
-  // provider-threw path: a feed that's been erroring every night (auth key revoked,
-  // provider outage) is just as much a problem as a delisted one, and should cool down
-  // the same way instead of keeping its portfolio in the nightly re-fetch loop.
+  // #737 — a feed that has failed DEAD_FEED_MISS_THRESHOLD+ times in a row (tracked on
+  // `instruments.priceFeedMissCount`/`priceFeedLastMissAt`, updated by
+  // backfillPortfolioHistory on every fetch attempt — counts BOTH empty results and
+  // provider throws, see the comment in core.ts) is past "temporarily lagging" and into
+  // "may have nothing left to give". Once past the threshold, only let it count toward
+  // staleness again once every DEAD_FEED_MISS_THRESHOLD days — otherwise one dead symbol
+  // keeps its whole portfolio marked stale (and re-fetched) every single night.
   const feedHealthRows = currentlyHeldInstrIds.length
     ? await db
         .select({
           id: instruments.id,
           priceFeedMissCount: instruments.priceFeedMissCount,
           priceFeedLastMissAt: instruments.priceFeedLastMissAt,
-          priceFeedErrorCount: instruments.priceFeedErrorCount,
-          priceFeedLastErrorAt: instruments.priceFeedLastErrorAt,
         })
         .from(instruments)
         .where(inArray(instruments.id, currentlyHeldInstrIds))
@@ -186,22 +181,9 @@ export async function backfillStalePortfolios(
   const feedHealthByInstr = new Map(feedHealthRows.map((r) => [r.id, r]));
   function isCoolingDownDeadFeed(instrumentId: string): boolean {
     const health = feedHealthByInstr.get(instrumentId);
-    if (!health) return false;
-    if (
-      health.priceFeedMissCount >= DEAD_FEED_MISS_THRESHOLD &&
-      health.priceFeedLastMissAt &&
-      daysBetween(toDateKey(health.priceFeedLastMissAt), today) < DEAD_FEED_MISS_THRESHOLD
-    ) {
-      return true;
-    }
-    if (
-      health.priceFeedErrorCount >= DEAD_FEED_MISS_THRESHOLD &&
-      health.priceFeedLastErrorAt &&
-      daysBetween(toDateKey(health.priceFeedLastErrorAt), today) < DEAD_FEED_MISS_THRESHOLD
-    ) {
-      return true;
-    }
-    return false;
+    if (!health || health.priceFeedMissCount < DEAD_FEED_MISS_THRESHOLD) return false;
+    if (!health.priceFeedLastMissAt) return false;
+    return daysBetween(toDateKey(health.priceFeedLastMissAt), today) < DEAD_FEED_MISS_THRESHOLD;
   }
 
   // Per portfolio, the OLDEST latest-price-date across its CURRENTLY HELD instruments —

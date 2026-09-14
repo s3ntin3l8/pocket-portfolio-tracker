@@ -6,6 +6,7 @@ import {
   isIsin,
   isWkn,
   FixtureProvider,
+  MarketDataError,
   MarketDataService,
   TwelveDataProvider,
   GoldApiProvider,
@@ -29,11 +30,11 @@ import {
 } from "../src/index.js";
 
 function mockFetch(
-  responder: (url: string, init?: RequestInit) => { ok?: boolean; body: unknown },
+  responder: (url: string, init?: RequestInit) => { ok?: boolean; status?: number; body: unknown },
 ) {
   return (async (url: string, init?: RequestInit) => {
-    const { ok = true, body } = responder(url, init);
-    return { ok, status: ok ? 200 : 500, json: async () => body } as Response;
+    const { ok = true, status, body } = responder(url, init);
+    return { ok, status: status ?? (ok ? 200 : 500), json: async () => body } as Response;
   }) as unknown as typeof fetch;
 }
 
@@ -694,9 +695,19 @@ describe("YahooFinanceProvider", () => {
     expect(candles[0].currency).toBeUndefined();
   });
 
-  it("returns null on a non-200 and empty history when unavailable", async () => {
+  it("throws MarketDataError on a non-200 non-404 response", async () => {
+    // Post-#749: providers throw on HTTP errors (except 404) so the backfill layer
+    // can distinguish transient failures from legitimate "no data" results.
     const provider = new YahooFinanceProvider({
       fetch: mockFetch(() => ({ ok: false, body: {} })),
+    });
+    await expect(provider.getQuote(bbca)).rejects.toThrow(MarketDataError);
+    await expect(provider.getHistory(bbca, "1mo")).rejects.toThrow(MarketDataError);
+  });
+
+  it("returns null / empty on a 404 (instrument not found)", async () => {
+    const provider = new YahooFinanceProvider({
+      fetch: mockFetch(() => ({ ok: false, status: 404, body: {} })),
     });
     expect(await provider.getQuote(bbca)).toBeNull();
     expect(await provider.getHistory(bbca, "1mo")).toEqual([]);

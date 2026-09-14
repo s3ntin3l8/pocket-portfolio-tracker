@@ -264,10 +264,19 @@ export async function backfillPortfolioHistory(
     // Atomic increment (not read-then-write instr.priceFeedMissCount + 1) — two
     // backfill-portfolio workers processing different portfolios that happen to share
     // this instrument (a common ETF/mutual fund) could otherwise both read the same
-    // starting count and last-write-wins, under-counting the miss streak. Three branches:
-    // hit (everything resets), miss (provider said "no data", count toward dead-feed),
-    // error (provider threw, count toward the parallel error-based cooldown so a feed
-    // that's been erroring every night also stops re-triggering an unbounded fetch).
+    // starting count and last-write-wins, under-counting the miss streak.
+    //
+    // priceFeedMissCount counts ALL failures (throw or empty result) — this is the
+    // counter that feeds the dead-feed cooldown. A feed alternating throw/miss must
+    // reach DEAD_FEED_MISS_THRESHOLD as fast as one that's consistently failing one
+    // way; pre-#749 everything went through the same `[]` path, so the total failure
+    // count was already the right number. Splitting the bookkeeping (error count =
+    // observability only) without changing the total keeps the threshold semantics
+    // unchanged (issue #749).
+    //
+    // priceFeedErrorCount tracks only the throw path for operational visibility —
+    // it's not used by the cooldown decision, but it tells an operator at a glance
+    // whether the failures are network/HTTP errors vs. legitimately empty feeds.
     await db
       .update(instruments)
       .set(
@@ -278,15 +287,16 @@ export async function backfillPortfolioHistory(
               priceFeedErrorCount: 0,
               priceFeedLastErrorAt: null,
             }
-          : fetchError
-            ? {
-                priceFeedErrorCount: sql`${instruments.priceFeedErrorCount} + 1`,
-                priceFeedLastErrorAt: new Date(),
-              }
-            : {
-                priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
-                priceFeedLastMissAt: new Date(),
-              },
+          : {
+              priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
+              priceFeedLastMissAt: new Date(),
+              ...(fetchError
+                ? {
+                    priceFeedErrorCount: sql`${instruments.priceFeedErrorCount} + 1`,
+                    priceFeedLastErrorAt: new Date(),
+                  }
+                : {}),
+            },
       )
       .where(eq(instruments.id, instr.id));
   }
