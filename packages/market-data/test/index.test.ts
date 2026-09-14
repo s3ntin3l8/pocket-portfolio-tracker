@@ -967,11 +967,11 @@ describe("TwelveDataProvider", () => {
     expect(gold[0].close).toBe("1000");
   });
 
-  it("returns [] history on a non-ok response", async () => {
+  it("throws MarketDataError on a non-200 non-404 history response (#749)", async () => {
     const provider = new TwelveDataProvider("key", {
       fetch: mockFetch(() => ({ ok: false, body: {} })),
     });
-    expect(await provider.getHistory(bbca)).toEqual([]);
+    await expect(provider.getHistory(bbca)).rejects.toThrow(MarketDataError);
   });
 });
 

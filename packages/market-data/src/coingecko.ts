@@ -1,12 +1,13 @@
 import { toDateKey } from "@portfolio/core";
-import type {
-  AssetClass,
-  Candle,
-  InstrumentRef,
-  InstrumentSearchResult,
-  MarketDataProvider,
-  ProviderUsage,
-  Quote,
+import {
+  MarketDataError,
+  type AssetClass,
+  type Candle,
+  type InstrumentRef,
+  type InstrumentSearchResult,
+  type MarketDataProvider,
+  type ProviderUsage,
+  type Quote,
 } from "./types.js";
 
 const TROY_OUNCE_GRAMS = 31.1034768;
@@ -149,7 +150,10 @@ export class CoinGeckoProvider implements MarketDataProvider {
       `/coins/${encodeURIComponent(id)}/market_chart?vs_currency=${encodeURIComponent(vs)}` +
         `&days=${rangeToDays(range)}&interval=daily`,
     );
-    if (!res.ok) return [];
+    if (res.status === 404) return [];
+    if (!res.ok) {
+      throw new MarketDataError(`CoinGecko ${res.status} for ${id}/${vs}`, this.name, res.status);
+    }
     const data = (await res.json()) as { prices?: [number, number][] };
     return (data.prices ?? [])
       .filter(([, close]) => close !== null && close !== undefined)

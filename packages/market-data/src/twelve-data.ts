@@ -1,13 +1,14 @@
 import { toDateKey } from "@portfolio/core";
-import type {
-  AssetClass,
-  Candle,
-  DividendEvent,
-  InstrumentRef,
-  InstrumentSearchResult,
-  MarketDataProvider,
-  ProviderUsage,
-  Quote,
+import {
+  MarketDataError,
+  type AssetClass,
+  type Candle,
+  type DividendEvent,
+  type InstrumentRef,
+  type InstrumentSearchResult,
+  type MarketDataProvider,
+  type ProviderUsage,
+  type Quote,
 } from "./types.js";
 import { assetClassFromType, mapExchange } from "./instrument-mapping.js";
 
@@ -172,7 +173,14 @@ export class TwelveDataProvider implements MarketDataProvider {
     const res = await this.doFetch(
       `${this.baseUrl}/time_series?${this.query(ref)}&interval=1day&outputsize=${range}&apikey=${this.apiKey}`,
     );
-    if (!res.ok) return [];
+    if (res.status === 404) return [];
+    if (!res.ok) {
+      throw new MarketDataError(
+        `TwelveData ${res.status} for ${this.query(ref)}`,
+        this.name,
+        res.status,
+      );
+    }
     const data = (await res.json()) as {
       values?: { datetime: string; close: string }[];
     };
