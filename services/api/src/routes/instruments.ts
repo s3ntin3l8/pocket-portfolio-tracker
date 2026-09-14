@@ -21,6 +21,7 @@ import {
   isFundamentalsStale,
 } from "../services/instrument-metadata.js";
 import type { InstrumentFundamentals } from "@portfolio/market-data";
+import { MarketDataError } from "@portfolio/market-data";
 
 const instrumentsCache = createStore<{
   rows: (typeof instruments.$inferSelect)[];
@@ -190,15 +191,40 @@ export async function instrumentsRoute(app: FastifyInstance) {
         return reply.code(404).send({ error: "instrument_not_found" });
       }
       const md = await getMarketData();
-      const result = await md.getHistory(
-        {
-          symbol: inst.symbol,
-          market: inst.market,
-          assetClass: inst.assetClass,
-          currency: inst.currency,
-        },
-        range,
-      );
+      let result: Awaited<ReturnType<typeof md.getHistory>>;
+      try {
+        result = await md.getHistory(
+          {
+            symbol: inst.symbol,
+            market: inst.market,
+            assetClass: inst.assetClass,
+            currency: inst.currency,
+          },
+          range,
+        );
+      } catch (err) {
+        // Pre-#749 this branch was unreachable because providers returned `null` on
+        // non-OK HTTP, so the live route always saw a `[]` (and rendered an empty
+        // chart). Post-#749 providers throw MarketDataError on non-OK, so a
+        // transient 429/5xx now surfaces as a 500 — restore the empty-chart
+        // behaviour for the user-facing endpoint. The backfill layer separately
+        // catches and counts provider errors against priceFeedErrorCount (issue
+        // #749), so the operational signal isn't lost.
+        if (err instanceof MarketDataError) {
+          request.log.warn(
+            { err, instrumentId: inst.id, range },
+            "price history fetch failed; returning empty chart",
+          );
+          request.timingMeta = {
+            instrumentId: request.params.id,
+            range,
+            found: true,
+            providerError: true,
+          };
+          return [];
+        }
+        throw err;
+      }
       request.timingMeta = { instrumentId: request.params.id, range, found: true };
       return result;
     },

@@ -297,6 +297,44 @@ describe("MarketDataService", () => {
     expect((await svc.getQuote(bbca))?.price).toBe("9999");
   });
 
+  it("fires onProviderError when a provider throws but a fallback succeeds (#749)", async () => {
+    // Without onProviderError, a primary Yahoo outage covered by a fallback is
+    // invisible — the caller sees only the successful fallback result and never
+    // knows the primary was down. The hook is the place to log at warn level or
+    // increment an operational counter.
+    const flaky: MarketDataProvider = {
+      name: "flaky",
+      supports: (ac) => ac === "equity",
+      getHistory: async () => {
+        throw new Error("fetch failed: 503 Service Unavailable");
+      },
+      getHistoryFrom: async () => {
+        throw new Error("fetch failed: 503 Service Unavailable");
+      },
+    };
+    const fallback: MarketDataProvider = {
+      name: "fallback",
+      supports: (ac) => ac === "equity",
+      getHistory: async () => [{ date: "2026-02-08", close: "9999" }],
+      getHistoryFrom: async () => [{ date: "2026-02-08", close: "9999" }],
+    };
+    const errors: { provider: string; method: string; error: unknown }[] = [];
+    const svc = new MarketDataService([flaky, fallback], {
+      onProviderError: (provider, method, error) => errors.push({ provider, method, error }),
+    });
+
+    expect((await svc.getHistory(bbca, "1mo"))[0].close).toBe("9999");
+    expect(errors).toEqual([{ provider: "flaky", method: "getHistory", error: expect.any(Error) }]);
+
+    expect((await svc.getHistoryFrom(bbca, "2026-02-08"))[0].close).toBe("9999");
+    expect(errors).toHaveLength(2);
+    expect(errors[1]).toEqual({
+      provider: "flaky",
+      method: "getHistoryFrom",
+      error: expect.any(Error),
+    });
+  });
+
   it("getQuotes drops a throwing instrument instead of rejecting the whole batch", async () => {
     const flaky: MarketDataProvider = {
       name: "flaky",

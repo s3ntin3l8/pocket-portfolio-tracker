@@ -56,6 +56,12 @@ export const instruments = pgTable(
      * how #749 happened: `.catch(() => [])` collapsed both into the same `[]` path, so a
      * feed that had been erroring for a week got the same cooldown as a truly delisted
      * one. Resets to 0 on any successful fetch (same lifetime rule as the miss counter).
+     *
+     * NOT incremented on XAU-spot fetch failures — those are shared across every
+     * gold-only portfolio and the error is logged at warn level only. Gold-only
+     * portfolios will therefore show `priceFeedErrorCount = 0` even during an extended
+     * XAU provider outage; grep logs for `provider error fetching XAU spot history` if
+     * you suspect a dead gold feed. Issue #749.
      */
     priceFeedErrorCount: integer("price_feed_error_count").notNull().default(0),
     priceFeedLastErrorAt: timestamp("price_feed_last_error_at", { withTimezone: true }),

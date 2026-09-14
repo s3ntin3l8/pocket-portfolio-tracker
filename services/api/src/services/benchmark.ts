@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { benchmarkPrices, userBenchmarkSymbols } from "@portfolio/db";
 import { chainIndex, type DailyValueFlow } from "@portfolio/core";
-import type { MarketDataService } from "@portfolio/market-data";
+import { MarketDataError, type MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 
 export interface BenchmarkIndexPoint {
@@ -119,7 +119,20 @@ export async function fetchBenchmarkPrices(
     assetClass: "equity" as const,
     currency: DEFAULT_BENCHMARK_CURRENCY,
   };
-  const candles = await marketData.getHistoryFrom(ref, fromDate);
+  let candles: Awaited<ReturnType<typeof marketData.getHistoryFrom>>;
+  try {
+    candles = await marketData.getHistoryFrom(ref, fromDate);
+  } catch (err) {
+    // Pre-#749 this was unreachable (providers returned `null` on non-OK HTTP, the
+    // service treated that as `[]`). Post-#749 providers throw MarketDataError on
+    // non-OK, and this function is called from three route handlers
+    // (transactions/history.ts:109, insights.ts:213, yearly-returns.ts:124) — a 500
+    // here would 500 whole page requests on a benchmark refresh error. Match the
+    // pre-#749 behaviour: silently skip on provider error so the page renders
+    // without the benchmark series rather than failing outright.
+    if (err instanceof MarketDataError) return;
+    throw err;
+  }
   if (!candles || candles.length === 0) return;
 
   const existing = new Map<string, boolean>();
