@@ -1,6 +1,8 @@
 /**
- * Tests for #745 (fan-out via `opts.enqueue`) and #737 (a permanently-dead price feed
- * must not re-trigger an unbounded provider fetch every sweep run).
+ * Tests for #745 (fan-out via `opts.enqueue`), #737 (a permanently-dead price feed
+ * must not re-trigger an unbounded provider fetch every sweep run), and #749 (a
+ * provider that THROWS — network error, rate limit, auth failure — is not the same as
+ * a provider that resolves with zero candles; they must be tracked separately).
  *
  * Coverage:
  * 1. `backfillPortfolioHistory({ tailOnly: true })` does NOT fall back to a max-range
@@ -12,6 +14,11 @@
  *    instrument that is past `DEAD_FEED_MISS_THRESHOLD` misses and still cooling down.
  * 4. `backfillStalePortfolios({ enqueue })` enqueues instead of running inline: `queued`
  *    increments, `healed` stays 0, `portfolios` stays empty.
+ * 5. #749 — a provider that THROWS increments `priceFeedErrorCount`/`priceFeedLastErrorAt`,
+ *    NOT `priceFeedMissCount`/`priceFeedLastMissAt`; a successful fetch resets BOTH
+ *    counters; the sweep's `isCoolingDownDeadFeed` checks both counters so a
+ *    persistently-erroring feed (e.g. auth-key revoked) gets the same cooldown as a
+ *    truly delisted one without polluting the miss counter that means "no data".
  */
 import { describe, it, expect, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
@@ -50,6 +57,56 @@ class GoneQuietProvider implements MarketDataProvider {
     if (ref.symbol !== this.symbol) return [];
     this.maxCallCount++;
     return [{ date: "2020-01-01", close: "100", currency: this.currency }];
+  }
+}
+
+/** Throws on every fetch — simulates a network error / rate-limit / auth failure
+ * (issue #749). Distinct from GoneQuietProvider: GoneQuietProvider resolves with `[]`,
+ * this one rejects with an Error. */
+class ThrowingProvider implements MarketDataProvider {
+  readonly name = "throwing";
+  constructor(
+    private readonly symbol: string,
+    private readonly message = "fetch failed: 503 Service Unavailable",
+  ) {}
+
+  supports(): boolean {
+    return true;
+  }
+  async getQuote(): Promise<null> {
+    return null;
+  }
+  async getHistoryFrom(_ref: InstrumentRef): Promise<Candle[]> {
+    if (!_ref) throw new Error("sanity");
+    throw new Error(this.message);
+  }
+  async getHistory(): Promise<Candle[]> {
+    throw new Error(this.message);
+  }
+}
+
+/** Throws for the configured symbol but resolves normally otherwise — lets a single
+ * test exercise the error-on-some-symbols path without taking down the whole provider. */
+class SelectiveThrowProvider implements MarketDataProvider {
+  readonly name = "selective-throw";
+  constructor(
+    private readonly throwsOn: string,
+    private readonly message = "auth key revoked",
+  ) {}
+
+  supports(): boolean {
+    return true;
+  }
+  async getQuote(): Promise<null> {
+    return null;
+  }
+  async getHistoryFrom(ref: InstrumentRef): Promise<Candle[]> {
+    if (ref.symbol === this.throwsOn) throw new Error(this.message);
+    return [{ date: "2020-01-01", close: "100", currency: ref.currency }];
+  }
+  async getHistory(ref: InstrumentRef): Promise<Candle[]> {
+    if (ref.symbol === this.throwsOn) throw new Error(this.message);
+    return [{ date: "2020-01-01", close: "100", currency: ref.currency }];
   }
 }
 
@@ -297,5 +354,225 @@ describe("backfill dead-feed handling (#737, #745)", () => {
 
     expect(enqueued).toContain(pf1.id);
     expect(enqueued).not.toContain(pf2.id);
+  });
+});
+
+describe("backfill error vs miss distinction (#749)", () => {
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("a provider throw increments priceFeedErrorCount, not priceFeedMissCount", async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "error-vs-miss-user", email: "error-vs-miss@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Error vs Miss", baseCurrency: "USD", cashCounted: false })
+      .returning();
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "ERRAPI",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "Erroring API Corp",
+      })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: instr.id,
+        type: "buy",
+        quantity: "1",
+        price: "50",
+        fees: "0",
+        currency: "USD",
+        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
+      },
+    ]);
+
+    const svc = new MarketDataService([new ThrowingProvider("ERRAPI")]);
+    const result = await backfillPortfolioHistory(db, svc, 10_000, pf.id, {
+      fromDate: "2026-06-01",
+      tailOnly: true,
+    });
+
+    expect(result.unpriced).toContain(instr.id);
+
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
+    // #749 — the throw must NOT increment the miss counter, or a transient outage would
+    // look identical to a permanently dead feed.
+    expect(row.priceFeedMissCount).toBe(0);
+    expect(row.priceFeedLastMissAt).toBeNull();
+    expect(row.priceFeedErrorCount).toBe(1);
+    expect(row.priceFeedLastErrorAt).not.toBeNull();
+  });
+
+  it("a successful fetch resets both miss and error counters", async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "error-recovery-user", email: "error-recovery@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Error Recovery", baseCurrency: "USD", cashCounted: false })
+      .returning();
+    // Pre-seed BOTH counters past their defaults so we can prove both reset on a hit.
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "RECOVERED",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "Recovered Corp",
+        priceFeedMissCount: 3,
+        priceFeedLastMissAt: new Date(),
+        priceFeedErrorCount: 5,
+        priceFeedLastErrorAt: new Date(),
+      })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: instr.id,
+        type: "buy",
+        quantity: "1",
+        price: "50",
+        fees: "0",
+        currency: "USD",
+        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
+      },
+    ]);
+
+    const provider = new SelectiveThrowProvider("OTHER-SYMBOL");
+    const svc = new MarketDataService([provider]);
+    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
+
+    const [row] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
+    expect(row.priceFeedMissCount).toBe(0);
+    expect(row.priceFeedLastMissAt).toBeNull();
+    expect(row.priceFeedErrorCount).toBe(0);
+    expect(row.priceFeedLastErrorAt).toBeNull();
+  });
+
+  it("the sweep stops marking a portfolio stale once its only stale instrument is past the error threshold and still cooling down", async () => {
+    // Mirror of the miss-based cooldown test above, but exercising the error-based
+    // cooldown path (#749) — a feed that's been throwing (e.g. auth key revoked) for a
+    // week should cool down the same way a truly delisted one does, without having to
+    // touch the miss counter to get there.
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "error-sweep-user", email: "error-sweep@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Error Sweep", baseCurrency: "USD", cashCounted: false })
+      .returning();
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "ERRORED",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "Errored Corp",
+        priceFeedErrorCount: DEAD_FEED_MISS_THRESHOLD,
+        priceFeedLastErrorAt: new Date(),
+      })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: instr.id,
+        type: "buy",
+        quantity: "1",
+        price: "50",
+        fees: "0",
+        currency: "USD",
+        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
+      },
+    ]);
+    // The only priced data point is far older than MAX_PRICE_CARRY_FORWARD_DAYS —
+    // without the error-cooldown exclusion, this portfolio would otherwise be flagged
+    // trailing-stale purely because of the erroring feed.
+    await db.insert(prices).values({
+      instrumentId: instr.id,
+      date: "2026-01-01",
+      close: "50",
+      currency: "USD",
+    });
+    await backfillPortfolioHistory(getDb(), new MarketDataService([]), 10_000, pf.id);
+
+    const svc = new MarketDataService([]);
+    const result = await backfillStalePortfolios(db, svc, 10_000, {});
+
+    expect(result.portfolios.find((p) => p.portfolioId === pf.id)).toBeUndefined();
+  });
+
+  it("the sweep still marks a portfolio stale when error count is below the threshold", async () => {
+    // Inverse of the cooldown test — errorCount < DEAD_FEED_MISS_THRESHOLD must NOT
+    // trigger the cooldown, so a fresh (sub-threshold) erroring feed still causes a
+    // nightly re-fetch. The feed only earns the cooldown once it has been failing
+    // consistently.
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "error-subthreshold-user", email: "error-subthreshold@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({
+        userId: u.id,
+        name: "Error Sub-Threshold",
+        baseCurrency: "USD",
+        cashCounted: false,
+      })
+      .returning();
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "SUBTHRESH",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "Sub-Threshold Corp",
+        priceFeedErrorCount: DEAD_FEED_MISS_THRESHOLD - 1,
+        priceFeedLastErrorAt: new Date(),
+      })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: instr.id,
+        type: "buy",
+        quantity: "1",
+        price: "50",
+        fees: "0",
+        currency: "USD",
+        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
+      },
+    ]);
+    await db.insert(prices).values({
+      instrumentId: instr.id,
+      date: "2026-01-01",
+      close: "50",
+      currency: "USD",
+    });
+    await backfillPortfolioHistory(getDb(), new MarketDataService([]), 10_000, pf.id);
+
+    const svc = new MarketDataService([]);
+    const result = await backfillStalePortfolios(db, svc, 10_000, {});
+
+    // The portfolio SHOULD appear as trailing-stale (daily price is far older than
+    // MAX_PRICE_CARRY_FORWARD_DAYS, errorCount hasn't yet hit the threshold to exclude
+    // it from staleness scoring).
+    expect(result.portfolios.find((p) => p.portfolioId === pf.id)).toBeDefined();
   });
 });

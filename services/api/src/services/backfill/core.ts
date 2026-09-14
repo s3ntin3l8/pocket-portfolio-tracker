@@ -20,7 +20,7 @@ import {
   MAX_PRICE_CARRY_FORWARD_DAYS,
   type PriceSeriesKind,
 } from "@portfolio/core";
-import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
+import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { toCoreTxns } from "../tx-core.js";
 import { getFxRatesForDates, makeFxRateFn } from "../fx.js";
@@ -124,7 +124,19 @@ export async function backfillPortfolioHistory(
       assetClass: "gold",
       currency: goldCurrency,
     };
-    const xauCandles = await marketData.getHistoryFrom(xauRef, startDate).catch(() => []);
+    // Distinct catch here (not `.catch(() => [])`) — a provider throw on the XAU spot
+    // fetch is an error, not a "no data" result, and silently conflating them with the
+    // empty-array path is exactly how #749 distinguished errors from misses for the
+    // per-instrument fetch below.
+    let xauCandles: Candle[];
+    try {
+      xauCandles = await marketData.getHistoryFrom(xauRef, startDate);
+    } catch (err) {
+      console.warn(
+        `[backfill] provider error fetching XAU spot history (${goldCurrency}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+      xauCandles = [];
+    }
     if (xauCandles.length > 0) {
       xauSpotHistory = new Map(xauCandles.map((c) => [c.date, c.close]));
     }
@@ -203,11 +215,24 @@ export async function backfillPortfolioHistory(
     // falling back to a full-range fetch on every such miss is what let a permanently
     // dead feed re-trigger an unbounded provider call every sweep run (issue #737). Only
     // a from-inception heal wants the max-range fallback.
-    const candles = await marketData
-      .getHistoryFrom(ref, fetchFrom, { allowMaxFallback: !opts.tailOnly })
-      .catch(() => []);
+    let candles: Candle[];
+    let fetchError: Error | null = null;
+    try {
+      candles = await marketData.getHistoryFrom(ref, fetchFrom, {
+        allowMaxFallback: !opts.tailOnly,
+      });
+    } catch (err) {
+      // Issue #749 — a throw here (network error, rate limit, auth failure) is a
+      // fundamentally different failure mode from "provider resolved with []": the
+      // former is a transient outage, the latter is a feed with nothing to give.
+      // Pre-#749 this branch collapsed into the empty-result path via `.catch(() => [])`,
+      // so a feed that had been erroring for a week got the same dead-feed cooldown
+      // treatment as a truly delisted one. Track the two paths separately.
+      fetchError = err instanceof Error ? err : new Error(String(err));
+      candles = [];
+    }
 
-    if (candles.length === 0) {
+    if (candles.length === 0 && !fetchError) {
       unpriced.push(instr.id);
       // Plain human-readable line, deliberately NOT JSON — a hand-rolled object with a
       // string `level` field looks like a pino log line but isn't one (pino's own
@@ -218,6 +243,11 @@ export async function backfillPortfolioHistory(
       // structured without actually being parseable as such.
       console.warn(
         `[backfill] no price history for instrument ${instr.id} (${instr.symbol}/${instr.market}, tailOnly=${opts.tailOnly ?? false}); skipping`,
+      );
+    } else if (fetchError) {
+      unpriced.push(instr.id);
+      console.warn(
+        `[backfill] provider error for instrument ${instr.id} (${instr.symbol}/${instr.market}): ${fetchError.message}; skipping`,
       );
     } else {
       const earliest = candles[0]!.date;
@@ -234,16 +264,29 @@ export async function backfillPortfolioHistory(
     // Atomic increment (not read-then-write instr.priceFeedMissCount + 1) — two
     // backfill-portfolio workers processing different portfolios that happen to share
     // this instrument (a common ETF/mutual fund) could otherwise both read the same
-    // starting count and last-write-wins, under-counting the miss streak.
+    // starting count and last-write-wins, under-counting the miss streak. Three branches:
+    // hit (everything resets), miss (provider said "no data", count toward dead-feed),
+    // error (provider threw, count toward the parallel error-based cooldown so a feed
+    // that's been erroring every night also stops re-triggering an unbounded fetch).
     await db
       .update(instruments)
       .set(
-        candles.length === 0
+        candles.length > 0
           ? {
-              priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
-              priceFeedLastMissAt: new Date(),
+              priceFeedMissCount: 0,
+              priceFeedLastMissAt: null,
+              priceFeedErrorCount: 0,
+              priceFeedLastErrorAt: null,
             }
-          : { priceFeedMissCount: 0, priceFeedLastMissAt: null },
+          : fetchError
+            ? {
+                priceFeedErrorCount: sql`${instruments.priceFeedErrorCount} + 1`,
+                priceFeedLastErrorAt: new Date(),
+              }
+            : {
+                priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
+                priceFeedLastMissAt: new Date(),
+              },
       )
       .where(eq(instruments.id, instr.id));
   }

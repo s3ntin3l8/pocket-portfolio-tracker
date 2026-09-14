@@ -167,12 +167,18 @@ export async function backfillStalePortfolios(
   // into "may have nothing left to give". Once past the threshold, only let it count
   // toward staleness again once every DEAD_FEED_MISS_THRESHOLD days — otherwise one dead
   // symbol keeps its whole portfolio marked stale (and re-fetched) every single night.
+  // #749 — same applies to `priceFeedErrorCount`/`priceFeedLastErrorAt` for the
+  // provider-threw path: a feed that's been erroring every night (auth key revoked,
+  // provider outage) is just as much a problem as a delisted one, and should cool down
+  // the same way instead of keeping its portfolio in the nightly re-fetch loop.
   const feedHealthRows = currentlyHeldInstrIds.length
     ? await db
         .select({
           id: instruments.id,
           priceFeedMissCount: instruments.priceFeedMissCount,
           priceFeedLastMissAt: instruments.priceFeedLastMissAt,
+          priceFeedErrorCount: instruments.priceFeedErrorCount,
+          priceFeedLastErrorAt: instruments.priceFeedLastErrorAt,
         })
         .from(instruments)
         .where(inArray(instruments.id, currentlyHeldInstrIds))
@@ -180,9 +186,22 @@ export async function backfillStalePortfolios(
   const feedHealthByInstr = new Map(feedHealthRows.map((r) => [r.id, r]));
   function isCoolingDownDeadFeed(instrumentId: string): boolean {
     const health = feedHealthByInstr.get(instrumentId);
-    if (!health || health.priceFeedMissCount < DEAD_FEED_MISS_THRESHOLD) return false;
-    if (!health.priceFeedLastMissAt) return false;
-    return daysBetween(toDateKey(health.priceFeedLastMissAt), today) < DEAD_FEED_MISS_THRESHOLD;
+    if (!health) return false;
+    if (
+      health.priceFeedMissCount >= DEAD_FEED_MISS_THRESHOLD &&
+      health.priceFeedLastMissAt &&
+      daysBetween(toDateKey(health.priceFeedLastMissAt), today) < DEAD_FEED_MISS_THRESHOLD
+    ) {
+      return true;
+    }
+    if (
+      health.priceFeedErrorCount >= DEAD_FEED_MISS_THRESHOLD &&
+      health.priceFeedLastErrorAt &&
+      daysBetween(toDateKey(health.priceFeedLastErrorAt), today) < DEAD_FEED_MISS_THRESHOLD
+    ) {
+      return true;
+    }
+    return false;
   }
 
   // Per portfolio, the OLDEST latest-price-date across its CURRENTLY HELD instruments —

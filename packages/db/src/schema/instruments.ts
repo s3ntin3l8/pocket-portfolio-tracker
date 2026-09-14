@@ -48,6 +48,17 @@ export const instruments = pgTable(
      */
     priceFeedMissCount: integer("price_feed_miss_count").notNull().default(0),
     priceFeedLastMissAt: timestamp("price_feed_last_miss_at", { withTimezone: true }),
+    /**
+     * Consecutive backfill fetch attempts that THREW (network error, rate limit,
+     * auth failure) rather than resolving with zero candles — tracked separately from
+     * `priceFeedMissCount` so a transient provider outage doesn't increment the miss
+     * counter toward the dead-feed threshold. An error that looks like a miss is exactly
+     * how #749 happened: `.catch(() => [])` collapsed both into the same `[]` path, so a
+     * feed that had been erroring for a week got the same cooldown as a truly delisted
+     * one. Resets to 0 on any successful fetch (same lifetime rule as the miss counter).
+     */
+    priceFeedErrorCount: integer("price_feed_error_count").notNull().default(0),
+    priceFeedLastErrorAt: timestamp("price_feed_last_error_at", { withTimezone: true }),
     // User-maintained current price, absolute per-unit (same currency as the instrument),
     // for asset classes with no live market-data provider (e.g. Indonesian retail
     // bonds/sukuk — no schedulable secondary-market feed exists, see
