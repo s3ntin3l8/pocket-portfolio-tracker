@@ -1,5 +1,5 @@
-import { and, eq, gte, lte } from "drizzle-orm";
-import { instruments, prices } from "@portfolio/db";
+import { and, eq } from "drizzle-orm";
+import { instruments, prices, transactions } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { isIsin, isKnownMarket, PRICEABLE_FOREIGN_MARKETS } from "@portfolio/market-data";
 import type { InstrumentInput } from "@portfolio/schema";
@@ -330,23 +330,29 @@ export async function setManualPrice(
         set: { close: price, currency: existing.currency },
       });
   } else if (price === null && existing.manualPrice && existing.manualPriceAt) {
-    // Clearing the manual price — delete all prices rows from manualPriceAt to
-    // today (inclusive) for this instrument, then restore par rows for the same
-    // range if the instrument has a faceValue. This is date-based (not value-
-    // based) so it can never accidentally wipe unrelated rows — and it handles
-    // earlier manual rows too, since they all fall within the manualPriceAt→today
-    // window.
-    const from = toDateKey(new Date(existing.manualPriceAt));
-    const to = toDateKey(new Date());
-    await db
-      .delete(prices)
-      .where(and(eq(prices.instrumentId, id), gte(prices.date, from), lte(prices.date, to)));
-    // Restore par rows for the cleared range so the sparkline/concentration
-    // series doesn't have a gap while waiting for the next backfill run.
+    // Clearing the manual price — delete ALL prices rows for this instrument
+    // and restore the full par history from firstHeld to today. This is the
+    // cleanest approach because: (1) backfill skips the entire bond while
+    // manualPrice is set, so all existing rows are either the manual row or
+    // stale; (2) we can't distinguish manual rows from each other (only the
+    // latest manualPriceAt is tracked), so deleting by date range starting at
+    // manualPriceAt would strand earlier manual rows outside the window.
+    const today = toDateKey(new Date());
+    await db.delete(prices).where(eq(prices.instrumentId, id));
+
     if (existing.faceValue) {
+      // Find firstHeld from transactions to determine the start of the par range.
+      const [firstTx] = await db
+        .select({ d: transactions.executedAt })
+        .from(transactions)
+        .where(eq(transactions.instrumentId, id))
+        .orderBy(transactions.executedAt)
+        .limit(1);
+      const firstHeld = firstTx ? toDateKey(firstTx.d) : today;
+
       const rows: { instrumentId: string; date: string; close: string; currency: string }[] = [];
-      const d = new Date(from);
-      const end = new Date(to);
+      const d = new Date(firstHeld);
+      const end = new Date(today);
       while (d <= end) {
         rows.push({
           instrumentId: id,

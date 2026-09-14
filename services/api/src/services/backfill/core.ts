@@ -141,20 +141,20 @@ export async function backfillPortfolioHistory(
     rawPrices.set(instr.id, instrPrices);
 
     if (instr.assetClass === "bond") {
+      // When a manual price is set, skip this bond entirely — the manual price
+      // row is the only meaningful data point, and writing par rows would
+      // overwrite it (or any historical manual rows from a previous set) via
+      // onConflictDoUpdate. Backfill will regenerate the full par history once
+      // the manual price is cleared.
+      if (instr.manualPrice && Number(instr.manualPrice) > 0) {
+        continue;
+      }
       if (instr.faceValue) {
-        const manualDate =
-          instr.manualPrice && Number(instr.manualPrice) > 0 && instr.manualPriceAt
-            ? toDateKey(new Date(instr.manualPriceAt))
-            : null;
         const d = new Date(fetchFrom);
         const end = new Date(today);
         while (d <= end) {
           const ds = toDateKey(d);
-          // Skip the manual-price date — setManualPrice wrote the user-set
-          // price here; overwriting it with par would silently revert it.
-          if (ds !== manualDate) {
-            instrPrices.set(ds, { close: instr.faceValue, currency: instr.currency });
-          }
+          instrPrices.set(ds, { close: instr.faceValue, currency: instr.currency });
           d.setUTCDate(d.getUTCDate() + 1);
         }
       }

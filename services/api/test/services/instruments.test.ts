@@ -604,8 +604,17 @@ describe("setManualPrice", () => {
     expect(allPriceRows[0]!.close).toBe("990000");
   });
 
-  it("clears the manual price and restores par at the manualPriceAt date", async () => {
+  it("clears the manual price and restores par from firstHeld", async () => {
     const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "mp-clear-user", email: "mp-clear@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "MP Clear", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+
     const [row] = await db
       .insert(instruments)
       .values({
@@ -619,10 +628,20 @@ describe("setManualPrice", () => {
       })
       .returning();
 
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: row.id,
+      type: "buy",
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
+
     const before = await setManualPrice(db, row.id, "985000");
     expect(before).not.toBe("not_found");
     if (typeof before === "string") return;
-    const oldDate = toDateKey(new Date(before.manualPriceAt!));
+    const mpDate = toDateKey(new Date(before.manualPriceAt!));
 
     await setManualPrice(db, row.id, null);
 
@@ -630,9 +649,19 @@ describe("setManualPrice", () => {
     const [restored] = await db
       .select()
       .from(prices)
-      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, oldDate)));
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
     expect(restored).toBeDefined();
     expect(restored!.close).toBe("1000000"); // par restored
+
+    // Par rows also exist from firstHeld (2026-06-01) to today.
+    const allRows = await db
+      .select()
+      .from(prices)
+      .where(eq(prices.instrumentId, row.id))
+      .orderBy(prices.date);
+    expect(allRows.length).toBeGreaterThan(1);
+    expect(allRows[0]!.date).toBe("2026-06-01");
+    expect(allRows[0]!.close).toBe("1000000");
   });
 
   it("returns not_found for unknown id", async () => {
@@ -640,8 +669,17 @@ describe("setManualPrice", () => {
     expect(result).toBe("not_found");
   });
 
-  it("clearing deletes by date range and restores par rows", async () => {
+  it("clearing deletes all prices and restores full par history", async () => {
     const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "mp-clear2-user", email: "mp-clear2@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "MP Clear2", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+
     const [row] = await db
       .insert(instruments)
       .values({
@@ -655,7 +693,17 @@ describe("setManualPrice", () => {
       })
       .returning();
 
-    // Manually insert a par row at a different date (simulating backfill output).
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: row.id,
+      type: "buy",
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
+
+    // Manually insert a par row at an earlier date (simulating backfill output).
     const parDate = "2026-06-01";
     await db
       .insert(prices)
@@ -667,24 +715,25 @@ describe("setManualPrice", () => {
     if (typeof before === "string") return;
     const mpDate = toDateKey(new Date(before.manualPriceAt!));
 
-    // Clear: should delete manualPriceAt row (by date) and restore par.
+    // Clear: should delete ALL prices and restore full par from firstHeld.
     await setManualPrice(db, row.id, null);
 
-    // The manualPriceAt date should now have a par row.
-    const [restored] = await db
+    // All rows are par from firstHeld (2026-06-01) to today.
+    const allRows = await db
       .select()
       .from(prices)
-      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
-    expect(restored).toBeDefined();
-    expect(restored!.close).toBe("1000000");
-
-    // The earlier par row at parDate is outside the clear range, preserved.
-    const [oldPar] = await db
-      .select()
-      .from(prices)
-      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, parDate)));
-    expect(oldPar).toBeDefined();
-    expect(oldPar!.close).toBe("1000000");
+      .where(eq(prices.instrumentId, row.id))
+      .orderBy(prices.date);
+    expect(allRows.length).toBeGreaterThan(1);
+    for (const r of allRows) {
+      expect(r.close).toBe("1000000");
+    }
+    // First row is at firstHeld.
+    expect(allRows[0]!.date).toBe(parDate);
+    // Manual price row at mpDate is now par.
+    const mpRow = allRows.find((r) => r.date === mpDate);
+    expect(mpRow).toBeDefined();
+    expect(mpRow!.close).toBe("1000000");
   });
 
   it("backfill does not clobber the manual-price row", async () => {
@@ -743,6 +792,15 @@ describe("setManualPrice", () => {
 
   it("clearing a manual price equal to par does not wipe the series", async () => {
     const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "mp-par-user", email: "mp-par@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "MP Par", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+
     const [row] = await db
       .insert(instruments)
       .values({
@@ -755,6 +813,16 @@ describe("setManualPrice", () => {
         faceValue: "1000000",
       })
       .returning();
+
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: row.id,
+      type: "buy",
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
 
     // Set manual price EQUAL to par (bond trading at par).
     const before = await setManualPrice(db, row.id, "1000000");
@@ -770,14 +838,77 @@ describe("setManualPrice", () => {
     expect(mpRow).toBeDefined();
     expect(mpRow!.close).toBe("1000000");
 
-    // Clear: should NOT wipe the series — par row is restored at mpDate.
+    // Clear: full par history is restored.
     await setManualPrice(db, row.id, null);
 
-    const [restored] = await db
+    const allRows = await db
       .select()
       .from(prices)
-      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
-    expect(restored).toBeDefined();
-    expect(restored!.close).toBe("1000000"); // par preserved
+      .where(eq(prices.instrumentId, row.id))
+      .orderBy(prices.date);
+    expect(allRows.length).toBeGreaterThan(1);
+    for (const r of allRows) {
+      expect(r.close).toBe("1000000");
+    }
+  });
+
+  it("backfill skips entire bond when manualPrice is set", async () => {
+    const db = getDb();
+
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "mp-skip-user", email: "mp-skip@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "MP Skip", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+
+    const [bond] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-SKIP",
+        name: "SR021T3 skip test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: bond.id,
+      type: "buy",
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
+
+    // First, backfill WITHOUT manual price — should write par rows.
+    const svc = new MarketDataService([new FixtureProvider()]);
+    await backfillPortfolioHistory(db, svc, 60_000, pf.id);
+
+    const rowsBefore = await db.select().from(prices).where(eq(prices.instrumentId, bond.id));
+    expect(rowsBefore.length).toBeGreaterThan(0); // par rows exist
+
+    // Set manual price — backfill should now skip this bond entirely.
+    await setManualPrice(db, bond.id, "985000");
+
+    // Run backfill again — should NOT overwrite the manual price row.
+    await backfillPortfolioHistory(db, svc, 60_000, pf.id);
+
+    const rowsAfter = await db
+      .select()
+      .from(prices)
+      .where(eq(prices.instrumentId, bond.id))
+      .orderBy(prices.date);
+    // Only the manual price row should exist; par rows from the first backfill
+    // are still there (backfill didn't touch them since it skipped the bond),
+    // but the manual price row is NOT overwritten to par.
+    const mpRow = rowsAfter.find((r) => r.close === "985000");
+    expect(mpRow).toBeDefined();
   });
 });
