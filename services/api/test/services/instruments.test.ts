@@ -8,6 +8,7 @@ import {
   findOrCreateInstrument,
   updateInstrument,
   setManualPrice,
+  materializeManualPriceRow,
 } from "../../src/services/instruments.js";
 import { backfillPortfolioHistory } from "../../src/services/backfill/core.js";
 
@@ -910,5 +911,186 @@ describe("setManualPrice", () => {
     // but the manual price row is NOT overwritten to par.
     const mpRow = rowsAfter.find((r) => r.close === "985000");
     expect(mpRow).toBeDefined();
+  });
+});
+
+describe("materializeManualPriceRow", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("writes a prices row for a legacy bond with manualPrice but no prices row", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-LEGACY",
+        name: "SR021T3 legacy manual price test",
+        faceValue: "1000000",
+        manualPrice: "985000",
+        manualPriceAt: new Date(),
+      })
+      .returning();
+
+    await materializeManualPriceRow(db, row.id);
+
+    const mpDate = toDateKey(row.manualPriceAt!);
+    const [priceRow] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
+    expect(priceRow).toBeDefined();
+    expect(priceRow!.close).toBe("985000");
+  });
+
+  it("overwrites a par row at manualPriceAt with the manual price", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-PAR-LEGACY",
+        name: "SR021T3 legacy par row test",
+        faceValue: "1000000",
+        manualPrice: "985000",
+        manualPriceAt: new Date(),
+      })
+      .returning();
+
+    // Simulate legacy backfill output: par row at manualPriceAt.
+    const mpDate = toDateKey(row.manualPriceAt!);
+    await db.insert(prices).values({
+      instrumentId: row.id,
+      date: mpDate,
+      close: "1000000",
+      currency: "IDR",
+    });
+
+    await materializeManualPriceRow(db, row.id);
+
+    const [priceRow] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
+    expect(priceRow).toBeDefined();
+    expect(priceRow!.close).toBe("985000"); // overwritten from par to manual
+  });
+
+  it("is idempotent when a matching row already exists", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-IDEMP",
+        name: "SR021T3 idempotent test",
+        faceValue: "1000000",
+        manualPrice: "985000",
+        manualPriceAt: new Date(),
+      })
+      .returning();
+
+    await materializeManualPriceRow(db, row.id);
+    await materializeManualPriceRow(db, row.id); // second call
+
+    const rows = await db.select().from(prices).where(eq(prices.instrumentId, row.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.close).toBe("985000");
+  });
+
+  it("is a no-op when manualPrice is not set", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-NOMP",
+        name: "SR021T3 no manual price test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    await materializeManualPriceRow(db, row.id);
+
+    const rows = await db.select().from(prices).where(eq(prices.instrumentId, row.id));
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("setManualPrice clear (chunked insert + transaction)", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("restores par rows across a large date range without hitting parameter limits", async () => {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "mp-chunk-user", email: "mp-chunk@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "MP Chunk", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-CHUNK",
+        name: "SR021T3 chunked clear test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    // 1500+ day holding to exercise the chunked insert (3+ chunks of 500).
+    const startMs = Date.UTC(2022, 0, 1);
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: row.id,
+      type: "buy",
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: new Date(startMs),
+    });
+
+    // Set manual price then clear — should restore par across the full range.
+    await setManualPrice(db, row.id, "985000");
+    await setManualPrice(db, row.id, null);
+
+    const rows = await db
+      .select()
+      .from(prices)
+      .where(eq(prices.instrumentId, row.id))
+      .orderBy(prices.date);
+    // The range is firstHeld (2022-01-01) to today — well over 1000 days,
+    // which exercises the chunked insert (3+ chunks of 500).
+    expect(rows.length).toBeGreaterThan(1000);
+    expect(rows[0]!.date).toBe(toDateKey(new Date(startMs)));
+    expect(rows[0]!.close).toBe("1000000");
+    expect(rows[rows.length - 1]!.close).toBe("1000000");
   });
 });

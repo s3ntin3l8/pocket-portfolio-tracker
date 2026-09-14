@@ -106,21 +106,41 @@ export async function computeConcentrationSection(
     // Manual-price override: for instruments with a user-set manualPrice (e.g. bonds
     // with no live provider), inject it into the price series so that the latest
     // `latestPriceBefore()` lookup returns the freshest available price for "as of now"
-    // claims (current month weight, period movers). Only applied when the manual price
-    // is more recent than the last stored `prices` row — a manual price set last month
-    // doesn't override today's live-captured price.
+    // claims (current month weight, period movers). Gated on "no stored row at
+    // manualPriceAt already carries the manual close" — not on date ordering — so
+    // legacy bonds (whose backfill wrote par every day including manualPriceAt, so the
+    // stored close at that date is par, not the manual value) still see the manual
+    // price. A manual price older than the last live-captured row is NOT injected
+    // here: live-wins, so the manual price only overrides if no fresh live row exists
+    // at or after manualPriceAt.
     for (const inst of allInstRows) {
       if (inst.manualPrice && Number(inst.manualPrice) > 0 && inst.manualPriceAt) {
         const manualDate = toDateKey(new Date(inst.manualPriceAt));
         const list = pricesByInst.get(inst.id) ?? [];
-        const lastStored = list.length > 0 ? list[list.length - 1]!.date : "";
-        if (manualDate > lastStored) {
-          if (!list.length || list[list.length - 1]!.date !== manualDate) {
-            list.push({ date: manualDate, close: inst.manualPrice, currency: inst.currency });
+        // Live-wins: if a row at or after manualDate already carries a non-manual
+        // value (live-captured), skip the injection.
+        let liveWins = false;
+        for (const row of list) {
+          if (row.date >= manualDate && row.close !== inst.manualPrice) {
+            liveWins = true;
+            break;
           }
         }
-        // Always re-set: the list may have been freshly created (?? []).
-        pricesByInst.set(inst.id, list);
+        if (!liveWins) {
+          // Remove any stale row at manualDate (par from legacy backfill) and append
+          // the manual price row.
+          const filtered = list.filter((r) => r.date !== manualDate);
+          filtered.push({
+            date: manualDate,
+            close: inst.manualPrice,
+            currency: inst.currency,
+          });
+          filtered.sort((a, b) => (a.date < b.date ? -1 : 1));
+          pricesByInst.set(inst.id, filtered);
+        } else {
+          // Always re-set: the list may have been freshly created (?? []).
+          pricesByInst.set(inst.id, list);
+        }
       }
     }
 

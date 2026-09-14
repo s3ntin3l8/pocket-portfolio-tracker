@@ -288,6 +288,37 @@ export async function updateInstrument(
 }
 
 /**
+ * Ensure a `prices` row exists at `manualPriceAt` for an instrument with a manual price
+ * set. One-time materialization for legacy data: bonds that had `manualPrice` set
+ * before this PR shipped (or via direct DB writes that bypassed `setManualPrice`) have
+ * a `manualPrice` column value but no corresponding `prices` row — backfill at the
+ * time would have written par for every day, so the manualPrice date holds a par row,
+ * and concentration's date-ordering guard skips the injection. Writing/updating the
+ * row here makes sparklines and concentration see the manual price immediately.
+ *
+ * Idempotent: a no-op when a matching row already exists.
+ */
+export async function materializeManualPriceRow(db: DB, id: string): Promise<void> {
+  const [inst] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
+  if (!inst) return;
+  if (!inst.manualPrice || Number(inst.manualPrice) <= 0 || !inst.manualPriceAt) return;
+
+  const dateKey = toDateKey(new Date(inst.manualPriceAt));
+  await db
+    .insert(prices)
+    .values({
+      instrumentId: id,
+      date: dateKey,
+      close: inst.manualPrice,
+      currency: inst.currency,
+    })
+    .onConflictDoUpdate({
+      target: [prices.instrumentId, prices.date],
+      set: { close: inst.manualPrice, currency: inst.currency },
+    });
+}
+
+/**
  * Set or clear an instrument's user-maintained manual price (absolute, per-unit, in the
  * instrument's own currency). Substitutes for a live market-data provider on asset
  * classes none of them serve — e.g. Indonesian retail bonds/sukuk, where no schedulable
@@ -297,11 +328,17 @@ export async function updateInstrument(
  * curation. `instruments` is shared across users, so this does change valuation for
  * everyone holding the series — that's an accepted, deliberate consequence.
  *
- * Also writes (or deletes) a `prices` row at `manualPriceAt` so that consumers that
- * read the historical price series directly — the sparkline chart (`sparklines.ts`) and
- * the concentration/movers insight (`concentration.ts`) — reflect the manual price as a
- * step-change at the date it was set. Multiple manual-price sets produce multiple
- * `prices` rows; clearing the price removes only the row matching the old `manualPriceAt`.
+ * Also writes a `prices` row at `manualPriceAt` so that consumers reading the historical
+ * price series directly — the sparkline chart (`sparklines.ts`) and the concentration/
+ * movers insight (`concentration.ts`) — reflect the manual price. Only a SINGLE manual
+ * price row exists at any time: same-day re-sets overwrite via `onConflictDoUpdate`,
+ * and clearing deletes ALL prices rows for the instrument and restores the full par
+ * history from firstHeld to today (chunked insert inside a transaction).
+ *
+ * Single-current-row semantics: setting a manual price replaces any previous manual
+ * price. Backfill (`backfill/core.ts`) skips the entire bond while `manualPrice` is set,
+ * so no par rows are written during that period — only the manual row exists. Clearing
+ * materializes the full par series so the sparkline/concentration series has no gap.
  */
 export async function setManualPrice(
   db: DB,
@@ -338,32 +375,45 @@ export async function setManualPrice(
     // latest manualPriceAt is tracked), so deleting by date range starting at
     // manualPriceAt would strand earlier manual rows outside the window.
     const today = toDateKey(new Date());
-    await db.delete(prices).where(eq(prices.instrumentId, id));
-
+    let firstHeld = today;
     if (existing.faceValue) {
-      // Find firstHeld from transactions to determine the start of the par range.
       const [firstTx] = await db
         .select({ d: transactions.executedAt })
         .from(transactions)
         .where(eq(transactions.instrumentId, id))
         .orderBy(transactions.executedAt)
         .limit(1);
-      const firstHeld = firstTx ? toDateKey(firstTx.d) : today;
-
-      const rows: { instrumentId: string; date: string; close: string; currency: string }[] = [];
-      const d = new Date(firstHeld);
-      const end = new Date(today);
-      while (d <= end) {
-        rows.push({
-          instrumentId: id,
-          date: toDateKey(d),
-          close: existing.faceValue,
-          currency: existing.currency,
-        });
-        d.setUTCDate(d.getUTCDate() + 1);
-      }
-      await db.insert(prices).values(rows).onConflictDoNothing();
+      if (firstTx) firstHeld = toDateKey(firstTx.d);
     }
+
+    // Wrap delete + chunked insert in a transaction so readers don't see a
+    // gap. Chunk size ~500 days keeps each INSERT well under Postgres' ~65k
+    // parameter limit (4 params per row × 500 = 2000).
+    const CHUNK_DAYS = 500;
+    await db.transaction(async (tx) => {
+      await tx.delete(prices).where(eq(prices.instrumentId, id));
+      if (existing.faceValue) {
+        const d = new Date(firstHeld);
+        const end = new Date(today);
+        while (d <= end) {
+          const chunkEnd = new Date(d);
+          chunkEnd.setUTCDate(chunkEnd.getUTCDate() + CHUNK_DAYS);
+          if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+          const rows: { instrumentId: string; date: string; close: string; currency: string }[] =
+            [];
+          while (d <= chunkEnd) {
+            rows.push({
+              instrumentId: id,
+              date: toDateKey(d),
+              close: existing.faceValue,
+              currency: existing.currency,
+            });
+            d.setUTCDate(d.getUTCDate() + 1);
+          }
+          await tx.insert(prices).values(rows).onConflictDoNothing();
+        }
+      }
+    });
   }
 
   return result;

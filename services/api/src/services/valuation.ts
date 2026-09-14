@@ -16,6 +16,7 @@ import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { getCachedQuotes } from "./price-cache.js";
 import { getFxRates, makeFxRateFn } from "./fx.js";
+import { materializeManualPriceRow } from "./instruments.js";
 import { toCoreTxns } from "./tx-core.js";
 import { logTiming } from "../lib/timing.js";
 import type { FastifyBaseLogger } from "fastify";
@@ -150,6 +151,18 @@ export async function valuePortfolio(
     // directly.
     if (i.manualPrice && Number(i.manualPrice) > 0 && !prices[i.id]) {
       prices[i.id] = { price: i.manualPrice, currency: i.currency };
+    }
+  }
+
+  // Materialize missing manual-price `prices` rows for legacy bonds whose
+  // `manualPrice` was set before this PR shipped (so no `prices` row exists at
+  // `manualPriceAt`). Idempotent — a no-op when a matching row already exists.
+  // Fires once per valuation per instrument with a manual price; the cost is one
+  // upsert per such instrument per read, which is negligible relative to the rest
+  // of valuePortfolio's work.
+  for (const i of instrumentRows) {
+    if (i.manualPrice && Number(i.manualPrice) > 0 && i.manualPriceAt) {
+      await materializeManualPriceRow(db, i.id);
     }
   }
 
