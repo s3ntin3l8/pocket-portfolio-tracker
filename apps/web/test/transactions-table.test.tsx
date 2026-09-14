@@ -1874,7 +1874,7 @@ describe("TransactionsTable", () => {
       vi.unstubAllGlobals();
     });
 
-    it("hides Load more when the draft filter is active and all drafts are visible", async () => {
+    it("keeps Load more visible when the draft filter is active but not all pages are loaded", async () => {
       const spy = vi.fn(async () => ({
         json: async () => ({ rows: PAGE2_DRAFT, total: 26 }),
       })) as unknown as typeof fetch;
@@ -1890,14 +1890,73 @@ describe("TransactionsTable", () => {
       fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
       await waitFor(() => expect(spy).toHaveBeenCalled());
 
-      // Switch to drafts filter.
+      // Switch to drafts filter — 1 draft loaded, but total (26) > accumulatedRows.length
+      // is now false (26 === 26), so Load more hides.
       fireEvent.change(
         screen.getByRole("combobox", { name: messages.Transactions.filterDraftLabel }),
         { target: { value: "drafts" } },
       );
 
-      // Only 1 draft exists; it's already loaded — Load more should be hidden.
+      // All pages loaded — Load more should be hidden.
       expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+
+      vi.unstubAllGlobals();
+    });
+
+    it("keeps Load more visible when drafts span multiple pages and not all are loaded", async () => {
+      // Page 1: 25 normal rows. Page 2: 15 drafts (total=40).
+      // Before loading page 2, accumulatedRows.length (25) < total (40) → Load More visible.
+      // After loading page 2, all drafts are accumulated → Load More hides.
+      const PAGE2_ONLY_DRAFTS: TxRow[] = Array.from({ length: 15 }, (_, i) => ({
+        id: `d25-${i}`,
+        portfolioId: "p1",
+        type: "buy" as const,
+        quantity: "1",
+        price: "50",
+        fees: "0",
+        tax: null,
+        fxRate: null,
+        currency: "IDR",
+        executedAt: `2026-02-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`,
+        source: "csv" as const,
+        status: "draft" as const,
+        instrument: { symbol: `D25-${i}`, name: `Draft page2 ${i}` },
+      }));
+
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: PAGE2_ONLY_DRAFTS, total: 40 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={PAGE1_ROWS} total={40} />
+        </NextIntlClientProvider>,
+      );
+
+      // Page 1 has 0 drafts — draft filter is hidden. Load more is visible because
+      // accumulatedRows.length (25) < total (40).
+      expect(screen.getByRole("button", { name: tb.loadMore })).toBeInTheDocument();
+
+      // Load page 2 (15 drafts).
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      await waitFor(() => expect(spy).toHaveBeenCalled());
+
+      // accumulatedRows.length (40) === total (40) → all pages loaded.
+      // The draft filter now appears (15 drafts accumulated).
+      const draftSelect = screen.getByRole("combobox", {
+        name: messages.Transactions.filterDraftLabel,
+      });
+
+      // Switch to drafts filter — all 15 drafts are loaded and visible.
+      fireEvent.change(draftSelect, { target: { value: "drafts" } });
+
+      // All drafts fit in one page (15 < PAGE_SIZE=25) → Load more hides.
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+
+      // But all 15 drafts ARE visible in the table.
+      const rows = screen.getAllByRole("row").slice(1);
+      expect(rows.length).toBe(15);
 
       vi.unstubAllGlobals();
     });
