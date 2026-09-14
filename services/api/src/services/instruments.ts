@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import { instruments } from "@portfolio/db";
+import { instruments, prices } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { isIsin, isKnownMarket, PRICEABLE_FOREIGN_MARKETS } from "@portfolio/market-data";
 import type { InstrumentInput } from "@portfolio/schema";
 import type { DB } from "../db/client.js";
@@ -296,15 +297,11 @@ export async function updateInstrument(
  * curation. `instruments` is shared across users, so this does change valuation for
  * everyone holding the series — that's an accepted, deliberate consequence.
  *
- * Known limitation: only `valuePortfolio()`'s CURRENT valuation reads this column.
- * `services/api/src/services/backfill/core.ts` still writes a flat par series into the
- * `prices` table for the instrument's whole history, so anything reading `prices`
- * directly instead of going through valuePortfolio — the sparkline chart
- * (`services/sparklines.ts`) and the concentration/movers insight
- * (`routes/transactions/insights/concentration.ts`) — stays at par even after a manual
- * price is set. Daily snapshots (`services/snapshots.ts`) DO call `valuePortfolio` and
- * so pick up the manual price correctly going forward. Propagating a manual price into
- * `prices`/history is real follow-up work, not done here.
+ * Also writes (or deletes) a `prices` row at `manualPriceAt` so that consumers that
+ * read the historical price series directly — the sparkline chart (`sparklines.ts`) and
+ * the concentration/movers insight (`concentration.ts`) — reflect the manual price as a
+ * step-change at the date it was set. Multiple manual-price sets produce multiple
+ * `prices` rows; clearing the price removes only the row matching the old `manualPriceAt`.
  */
 export async function setManualPrice(
   db: DB,
@@ -314,10 +311,29 @@ export async function setManualPrice(
   const [existing] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
   if (!existing) return "not_found";
 
+  const now = price === null ? null : new Date();
   const [updated] = await db
     .update(instruments)
-    .set({ manualPrice: price, manualPriceAt: price === null ? null : new Date() })
+    .set({ manualPrice: price, manualPriceAt: now })
     .where(eq(instruments.id, id))
     .returning();
-  return updated ?? existing;
+  const result = updated ?? existing;
+
+  if (price !== null && now) {
+    // Write a prices row at the manual-price date so sparklines/concentration pick it up.
+    const dateKey = toDateKey(now);
+    await db
+      .insert(prices)
+      .values({ instrumentId: id, date: dateKey, close: price, currency: existing.currency })
+      .onConflictDoUpdate({
+        target: [prices.instrumentId, prices.date],
+        set: { close: price, currency: existing.currency },
+      });
+  } else if (price === null && existing.manualPriceAt) {
+    // Clearing the manual price — remove the prices row for the old manualPriceAt date.
+    const oldDateKey = toDateKey(new Date(existing.manualPriceAt));
+    await db.delete(prices).where(and(eq(prices.instrumentId, id), eq(prices.date, oldDateKey)));
+  }
+
+  return result;
 }

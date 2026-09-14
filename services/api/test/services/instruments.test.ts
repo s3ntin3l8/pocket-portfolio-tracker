@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
-import { instruments } from "@portfolio/db";
+import { eq, and } from "drizzle-orm";
+import { instruments, prices } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
-import { findOrCreateInstrument, updateInstrument } from "../../src/services/instruments.js";
+import {
+  findOrCreateInstrument,
+  updateInstrument,
+  setManualPrice,
+} from "../../src/services/instruments.js";
 
 describe("findOrCreateInstrument", () => {
   beforeAll(async () => {
@@ -521,5 +526,114 @@ describe("updateInstrument", () => {
     if (typeof updated !== "string") {
       expect(updated.faceValue).toBeNull();
     }
+  });
+});
+
+describe("setManualPrice", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("sets a manual price and writes a prices row at manualPriceAt", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-MP",
+        name: "SR021T3 manual price test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    const result = await setManualPrice(db, row.id, "985000");
+    expect(result).not.toBe("not_found");
+    if (typeof result === "string") return;
+
+    expect(result.manualPrice).toBe("985000");
+    expect(result.manualPriceAt).not.toBeNull();
+
+    // A prices row should exist at the manualPriceAt date.
+    const priceDate = toDateKey(new Date(result.manualPriceAt!));
+    const [priceRow] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, priceDate)));
+    expect(priceRow).toBeDefined();
+    expect(priceRow!.close).toBe("985000");
+    expect(priceRow!.currency).toBe("IDR");
+  });
+
+  it("overwrites the prices row when manual price is set again on the same day", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-MP2",
+        name: "SR021T3 manual price overwrite test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    await setManualPrice(db, row.id, "985000");
+    const updated = await setManualPrice(db, row.id, "990000");
+    expect(updated).not.toBe("not_found");
+    if (typeof updated === "string") return;
+
+    expect(updated.manualPrice).toBe("990000");
+
+    // Same day → one prices row, updated in place via onConflictDoUpdate.
+    const allPriceRows = await db
+      .select()
+      .from(prices)
+      .where(eq(prices.instrumentId, row.id))
+      .orderBy(prices.date);
+    expect(allPriceRows).toHaveLength(1);
+    expect(allPriceRows[0]!.close).toBe("990000");
+  });
+
+  it("clears the prices row for the old manualPriceAt when price is cleared", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-MP3",
+        name: "SR021T3 manual price clear test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    const before = await setManualPrice(db, row.id, "985000");
+    expect(before).not.toBe("not_found");
+    if (typeof before === "string") return;
+    const oldDate = toDateKey(new Date(before.manualPriceAt!));
+
+    await setManualPrice(db, row.id, null);
+
+    // The prices row for the old manualPriceAt date should be deleted.
+    const [gone] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, oldDate)));
+    expect(gone).toBeUndefined();
+  });
+
+  it("returns not_found for unknown id", async () => {
+    const result = await setManualPrice(getDb(), "00000000-0000-0000-0000-000000000000", "100");
+    expect(result).toBe("not_found");
   });
 });

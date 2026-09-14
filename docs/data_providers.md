@@ -68,13 +68,14 @@ bank-published indicative-price PDFs (e.g. CIMB Niaga) have no stable "latest" U
 a bond values at **par (face value) by default**, or at a **user-maintained manual price**
 (`instruments.manualPrice`/`manualPriceAt`, set via `PUT /instruments/:id/manual-price`,
 read in `valuePortfolio()` ahead of the par fallback — see `services/api/src/services/valuation.ts`)
-when the holder pastes in a current secondary-market quote. **Known limitation:** the manual
-price only feeds current valuation; the historical `prices` series backfilled at par
-(`services/api/src/services/backfill/core.ts`) is untouched, so the instrument's sparkline
-chart and any concentration/movers insight reading `prices` directly stay flat at par even
-after a manual price is set. Daily snapshots do pick it up correctly going forward, since
-they call `valuePortfolio()`. A real live provider, should a schedulable source ever surface,
-would close both this gap and the manual-maintenance burden at once.
+when the holder pastes in a current secondary-market quote. Setting a manual price writes a
+`prices` row at the `manualPriceAt` date, so the sparkline chart shows a step-change from
+par to the manual price at the date it was set. The concentration/movers insight also
+consults `manualPrice` directly for "as of now" claims (current month weight, period
+movers), so those reflect the manual price immediately. Daily snapshots (`services/snapshots.ts`)
+call `valuePortfolio()` and pick up the manual price going forward. A real live provider,
+should a schedulable source ever surface, would close both this gap and the
+manual-maintenance burden at once.
 
 ## Priority & fallback
 

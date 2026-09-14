@@ -7,6 +7,7 @@ import {
   computeHoldings,
   splitAdjustmentFactor,
   convert,
+  toDateKey,
   PERIOD_GAIN_MAX_PCT,
   PERIOD_LOSS_MAX_PCT,
   MAX_PRICE_CARRY_FORWARD_DAYS,
@@ -101,6 +102,26 @@ export async function computeConcentrationSection(
       list.push({ date: p.date, close: p.close, currency: p.currency });
       pricesByInst.set(p.instrumentId, list);
     }
+
+    // Manual-price override: for instruments with a user-set manualPrice (e.g. bonds
+    // with no live provider), inject it into the price series so that the latest
+    // `latestPriceBefore()` lookup returns the freshest available price for "as of now"
+    // claims (current month weight, period movers). Only applied when the manual price
+    // is more recent than the last stored `prices` row — a manual price set last month
+    // doesn't override today's live-captured price.
+    for (const inst of allInstRows) {
+      if (inst.manualPrice && Number(inst.manualPrice) > 0 && inst.manualPriceAt) {
+        const manualDate = toDateKey(new Date(inst.manualPriceAt));
+        const list = pricesByInst.get(inst.id) ?? [];
+        const lastStored = list.length > 0 ? list[list.length - 1]!.date : "";
+        if (manualDate > lastStored) {
+          if (!list.length || list[list.length - 1]!.date !== manualDate) {
+            list.push({ date: manualDate, close: inst.manualPrice, currency: inst.currency });
+          }
+        }
+      }
+    }
+
     // The latest known price on or before `asOfDate` — a plain backward-looking lookup,
     // deliberately NOT staleness-gated here: a period-START anchor (monthStart/yearStart)
     // or an earlier month in the concentration trend legitimately finds a price from

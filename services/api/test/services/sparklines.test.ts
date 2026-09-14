@@ -57,4 +57,49 @@ describe("loadSparklines", () => {
     const db = await ensureDb();
     expect((await loadSparklines(db, [])).size).toBe(0);
   });
+
+  it("includes a manual-price prices row in the sparkline series", async () => {
+    const db = await ensureDb();
+    // Create a bond instrument with par-price history + a manual price row.
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "SPK-MANUAL",
+        market: "IDX",
+        assetClass: "bond",
+        currency: "IDR",
+        name: "SPK-MANUAL",
+      })
+      .returning();
+
+    const rows: { instrumentId: string; date: string; close: string; currency: string }[] = [];
+    // 5 days of par value
+    for (let i = 0; i < 5; i++) {
+      const date = toDateKey(new Date(Date.UTC(2026, 3, 1 + i)));
+      rows.push({ instrumentId: inst.id, date, close: "1000000", currency: "IDR" });
+    }
+    // Manual price step on day 6
+    rows.push({
+      instrumentId: inst.id,
+      date: toDateKey(new Date(Date.UTC(2026, 3, 6))),
+      close: "985000",
+      currency: "IDR",
+    });
+    // Par resumes on day 7
+    rows.push({
+      instrumentId: inst.id,
+      date: toDateKey(new Date(Date.UTC(2026, 3, 7))),
+      close: "1000000",
+      currency: "IDR",
+    });
+    await db.insert(prices).values(rows);
+
+    const map = await loadSparklines(db, [inst.id]);
+    const series = map.get(inst.id);
+    expect(series).toBeDefined();
+    // 7 closes total, all returned (under the 30-point cap).
+    expect(series).toHaveLength(7);
+    // The manual price step should be visible at index 5 (day 6, the 6th value).
+    expect(series![5]).toBe(985000);
+  });
 });
