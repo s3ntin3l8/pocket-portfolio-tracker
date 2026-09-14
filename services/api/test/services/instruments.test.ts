@@ -604,7 +604,7 @@ describe("setManualPrice", () => {
     expect(allPriceRows[0]!.close).toBe("990000");
   });
 
-  it("clears the prices row for the old manualPriceAt when price is cleared", async () => {
+  it("clears the manual price and restores par at the manualPriceAt date", async () => {
     const db = getDb();
     const [row] = await db
       .insert(instruments)
@@ -626,12 +626,13 @@ describe("setManualPrice", () => {
 
     await setManualPrice(db, row.id, null);
 
-    // The prices row for the old manualPriceAt date should be deleted.
-    const [gone] = await db
+    // Manual-price row is replaced with a par row at the same date.
+    const [restored] = await db
       .select()
       .from(prices)
       .where(and(eq(prices.instrumentId, row.id), eq(prices.date, oldDate)));
-    expect(gone).toBeUndefined();
+    expect(restored).toBeDefined();
+    expect(restored!.close).toBe("1000000"); // par restored
   });
 
   it("returns not_found for unknown id", async () => {
@@ -639,7 +640,7 @@ describe("setManualPrice", () => {
     expect(result).toBe("not_found");
   });
 
-  it("clearing removes only rows matching the manual price, not backfilled par rows", async () => {
+  it("clearing deletes by date range and restores par rows", async () => {
     const db = getDb();
     const [row] = await db
       .insert(instruments)
@@ -661,15 +662,29 @@ describe("setManualPrice", () => {
       .values({ instrumentId: row.id, date: parDate, close: "1000000", currency: "IDR" });
 
     // Set manual price (different from par).
-    await setManualPrice(db, row.id, "985000");
+    const before = await setManualPrice(db, row.id, "985000");
+    expect(before).not.toBe("not_found");
+    if (typeof before === "string") return;
+    const mpDate = toDateKey(new Date(before.manualPriceAt!));
 
-    // Clear: should remove the 985000 row but keep the 1000000 par row.
+    // Clear: should delete manualPriceAt row (by date) and restore par.
     await setManualPrice(db, row.id, null);
 
-    const remaining = await db.select().from(prices).where(eq(prices.instrumentId, row.id));
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]!.close).toBe("1000000");
-    expect(remaining[0]!.date).toBe(parDate);
+    // The manualPriceAt date should now have a par row.
+    const [restored] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
+    expect(restored).toBeDefined();
+    expect(restored!.close).toBe("1000000");
+
+    // The earlier par row at parDate is outside the clear range, preserved.
+    const [oldPar] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, parDate)));
+    expect(oldPar).toBeDefined();
+    expect(oldPar!.close).toBe("1000000");
   });
 
   it("backfill does not clobber the manual-price row", async () => {
@@ -724,5 +739,45 @@ describe("setManualPrice", () => {
       .where(and(eq(prices.instrumentId, bond.id), eq(prices.date, mpDate)));
     expect(mpRow).toBeDefined();
     expect(mpRow!.close).toBe("985000");
+  });
+
+  it("clearing a manual price equal to par does not wipe the series", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-PAR",
+        name: "SR021T3 par clear test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    // Set manual price EQUAL to par (bond trading at par).
+    const before = await setManualPrice(db, row.id, "1000000");
+    expect(before).not.toBe("not_found");
+    if (typeof before === "string") return;
+    const mpDate = toDateKey(new Date(before.manualPriceAt!));
+
+    // Verify the manual price row exists with value 1000000.
+    const [mpRow] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
+    expect(mpRow).toBeDefined();
+    expect(mpRow!.close).toBe("1000000");
+
+    // Clear: should NOT wipe the series — par row is restored at mpDate.
+    await setManualPrice(db, row.id, null);
+
+    const [restored] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, row.id), eq(prices.date, mpDate)));
+    expect(restored).toBeDefined();
+    expect(restored!.close).toBe("1000000"); // par preserved
   });
 });

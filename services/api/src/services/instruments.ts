@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { instruments, prices } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { isIsin, isKnownMarket, PRICEABLE_FOREIGN_MARKETS } from "@portfolio/market-data";
@@ -330,22 +330,34 @@ export async function setManualPrice(
         set: { close: price, currency: existing.currency },
       });
   } else if (price === null && existing.manualPrice && existing.manualPriceAt) {
-    // Clearing the manual price — remove ALL prices rows whose close matches
-    // the manual price value (not just the latest manualPriceAt date). This
-    // handles both: (a) the row at manualPriceAt, and (b) any earlier manual
-    // rows that happened to have the same value. Rows with a different close
-    // (e.g. backfilled par, or an earlier manual price at a different value)
-    // are left in place — the next backfill run will overwrite them with par
-    // via onConflictDoUpdate, restoring the series to its pre-manual state.
+    // Clearing the manual price — delete all prices rows from manualPriceAt to
+    // today (inclusive) for this instrument, then restore par rows for the same
+    // range if the instrument has a faceValue. This is date-based (not value-
+    // based) so it can never accidentally wipe unrelated rows — and it handles
+    // earlier manual rows too, since they all fall within the manualPriceAt→today
+    // window.
+    const from = toDateKey(new Date(existing.manualPriceAt));
+    const to = toDateKey(new Date());
     await db
       .delete(prices)
-      .where(
-        and(
-          eq(prices.instrumentId, id),
-          eq(prices.close, existing.manualPrice),
-          eq(prices.currency, existing.currency),
-        ),
-      );
+      .where(and(eq(prices.instrumentId, id), gte(prices.date, from), lte(prices.date, to)));
+    // Restore par rows for the cleared range so the sparkline/concentration
+    // series doesn't have a gap while waiting for the next backfill run.
+    if (existing.faceValue) {
+      const rows: { instrumentId: string; date: string; close: string; currency: string }[] = [];
+      const d = new Date(from);
+      const end = new Date(to);
+      while (d <= end) {
+        rows.push({
+          instrumentId: id,
+          date: toDateKey(d),
+          close: existing.faceValue,
+          currency: existing.currency,
+        });
+        d.setUTCDate(d.getUTCDate() + 1);
+      }
+      await db.insert(prices).values(rows).onConflictDoNothing();
+    }
   }
 
   return result;
