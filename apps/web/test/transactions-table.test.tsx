@@ -1750,4 +1750,186 @@ describe("TransactionsTable", () => {
       }
     });
   });
+
+  describe("draft filter across paginated pages", () => {
+    const PAGE1_ROWS: TxRow[] = Array.from({ length: 25 }, (_, i) => ({
+      id: `p1-${i}`,
+      portfolioId: "p1",
+      type: "buy" as const,
+      quantity: "1",
+      price: "100",
+      fees: "0",
+      tax: null,
+      fxRate: null,
+      currency: "IDR",
+      executedAt: `2026-01-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`,
+      source: "manual" as const,
+      instrument: { symbol: `NORM${i}`, name: `Normal ${i}` },
+    }));
+
+    const PAGE2_DRAFT: TxRow[] = [
+      {
+        id: "draft-p2-1",
+        portfolioId: "p1",
+        type: "buy",
+        quantity: "3",
+        price: "50",
+        fees: "0",
+        tax: null,
+        fxRate: null,
+        currency: "IDR",
+        executedAt: "2026-02-01T00:00:00.000Z",
+        source: "csv",
+        status: "draft",
+        instrument: { symbol: "DFT1", name: "Draft On Page 2" },
+      },
+    ];
+
+    it("shows the draft filter when drafts only exist on page 2+", async () => {
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: PAGE2_DRAFT, total: 26 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={PAGE1_ROWS} total={26} />
+        </NextIntlClientProvider>,
+      );
+
+      // Page 1 has zero drafts — the draft filter should NOT be visible initially.
+      expect(
+        screen.queryByRole("combobox", { name: messages.Transactions.filterDraftLabel }),
+      ).toBeNull();
+
+      // Load page 2 which contains a draft row.
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      await waitFor(() => expect(spy).toHaveBeenCalled());
+
+      // Now that the draft is accumulated, the filter must appear.
+      expect(
+        screen.getByRole("combobox", { name: messages.Transactions.filterDraftLabel }),
+      ).toBeInTheDocument();
+
+      vi.unstubAllGlobals();
+    });
+
+    it("shows the draft filter with the correct count after loading page 2", async () => {
+      const PAGE2_TWO_DRAFTS: TxRow[] = [
+        {
+          id: "draft-p2-1",
+          portfolioId: "p1",
+          type: "buy",
+          quantity: "3",
+          price: "50",
+          fees: "0",
+          tax: null,
+          fxRate: null,
+          currency: "IDR",
+          executedAt: "2026-02-01T00:00:00.000Z",
+          source: "csv",
+          status: "draft",
+          instrument: { symbol: "DFT1", name: "Draft 1" },
+        },
+        {
+          id: "draft-p2-2",
+          portfolioId: "p1",
+          type: "sell",
+          quantity: "1",
+          price: "200",
+          fees: "0",
+          tax: null,
+          fxRate: null,
+          currency: "IDR",
+          executedAt: "2026-02-02T00:00:00.000Z",
+          source: "csv",
+          status: "draft",
+          instrument: { symbol: "DFT2", name: "Draft 2" },
+        },
+      ];
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: PAGE2_TWO_DRAFTS, total: 27 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={PAGE1_ROWS} total={27} />
+        </NextIntlClientProvider>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      await waitFor(() => expect(spy).toHaveBeenCalled());
+
+      // The filter should show the correct draft count (2).
+      const draftSelect = screen.getByRole("combobox", {
+        name: messages.Transactions.filterDraftLabel,
+      });
+      expect(draftSelect).toBeInTheDocument();
+      expect(draftSelect).toHaveValue("all");
+      // The option text includes the count.
+      const draftOption = draftSelect.querySelector('option[value="drafts"]');
+      expect(draftOption?.textContent).toContain("2");
+
+      vi.unstubAllGlobals();
+    });
+
+    it("hides Load more when the draft filter is active and all drafts are visible", async () => {
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: PAGE2_DRAFT, total: 26 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={PAGE1_ROWS} total={26} />
+        </NextIntlClientProvider>,
+      );
+
+      // Load page 2.
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      await waitFor(() => expect(spy).toHaveBeenCalled());
+
+      // Switch to drafts filter.
+      fireEvent.change(
+        screen.getByRole("combobox", { name: messages.Transactions.filterDraftLabel }),
+        { target: { value: "drafts" } },
+      );
+
+      // Only 1 draft exists; it's already loaded — Load more should be hidden.
+      expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
+
+      vi.unstubAllGlobals();
+    });
+
+    it("batch-confirms draft rows loaded from page 2", async () => {
+      resolveDraftTransactions.mockClear();
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: PAGE2_DRAFT, total: 26 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={PAGE1_ROWS} total={26} portfolioId="p1" />
+        </NextIntlClientProvider>,
+      );
+
+      // Load page 2 containing the draft.
+      fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
+      await waitFor(() => expect(spy).toHaveBeenCalled());
+
+      // The draft row from page 2 is now accumulated — enter selection mode (no draft filter
+      // needed; both normal and draft rows are visible) and select the draft row directly.
+      enterSelectionMode("Draft On Page 2");
+      fireEvent.click(screen.getByLabelText(tb.selectAll));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(tb.confirmDrafts) }));
+
+      await waitFor(() =>
+        expect(resolveDraftTransactions).toHaveBeenCalledWith("p1", ["draft-p2-1"], "confirm"),
+      );
+
+      vi.unstubAllGlobals();
+    });
+  });
 });

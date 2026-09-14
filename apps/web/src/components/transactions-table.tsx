@@ -141,7 +141,10 @@ export function TransactionsTable({
       setSelected((prev) => new Set(prev).add(id));
     });
 
-  const draftCount = useMemo(() => rows.filter((r) => r.status === "draft").length, [rows]);
+  const draftCount = useMemo(
+    () => accumulatedRows.filter((r) => r.status === "draft").length,
+    [accumulatedRows],
+  );
 
   if (showFlagged && flaggedCount === 0) {
     setShowFlagged(false);
@@ -239,7 +242,7 @@ export function TransactionsTable({
     setBusy(true);
     try {
       const byPortfolio = new Map<string, string[]>();
-      for (const r of rows) {
+      for (const r of accumulatedRows) {
         if (!selected.has(r.id)) continue;
         const ids = byPortfolio.get(r.portfolioId) ?? [];
         ids.push(r.id);
@@ -259,15 +262,16 @@ export function TransactionsTable({
   }
 
   const selectedDraftIds = useMemo(
-    () => rows.filter((r) => selected.has(r.id) && r.status === "draft").map((r) => r.id),
-    [rows, selected],
+    () =>
+      accumulatedRows.filter((r) => selected.has(r.id) && r.status === "draft").map((r) => r.id),
+    [accumulatedRows, selected],
   );
 
   async function onBatchResolve(action: "confirm" | "discard") {
     setBusy(true);
     try {
       const byPortfolio = new Map<string, string[]>();
-      for (const r of rows) {
+      for (const r of accumulatedRows) {
         if (!selected.has(r.id) || r.status !== "draft") continue;
         const ids = byPortfolio.get(r.portfolioId) ?? [];
         ids.push(r.id);
@@ -296,7 +300,10 @@ export function TransactionsTable({
   }
 
   const canReassign = portfolios.length > 1;
-  const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
+  const selectedRows = useMemo(
+    () => accumulatedRows.filter((r) => selected.has(r.id)),
+    [accumulatedRows, selected],
+  );
   const canMerge =
     selectedRows.length === 2 && selectedRows[0].portfolioId === selectedRows[1].portfolioId;
 
@@ -334,7 +341,8 @@ export function TransactionsTable({
   const windowedRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount]);
   const hasMore = showFlagged
     ? sortedRows.length > windowedRows.length
-    : sortedRows.length > windowedRows.length || accumulatedRows.length < (total ?? 0);
+    : sortedRows.length > windowedRows.length ||
+      (draftFilter !== "drafts" && accumulatedRows.length < (total ?? 0));
   const groupByMonth = sortKey === null || sortKey === "date";
 
   const dayFmt = useMemo(
@@ -466,7 +474,7 @@ export function TransactionsTable({
             onClearSelection={clearSelection}
             onBatchConfirmDrafts={() => onBatchResolve("confirm")}
             onBatchDiscardDrafts={() => onBatchResolve("discard")}
-            onReassign={() => setReassignRows(rows.filter((r) => selected.has(r.id)))}
+            onReassign={() => setReassignRows(accumulatedRows.filter((r) => selected.has(r.id)))}
             onMerge={() => setMergeRows([selectedRows[0], selectedRows[1]])}
             onRequestDelete={() => setConfirming(true)}
             onConfirmDelete={onBatchDelete}
