@@ -1619,6 +1619,74 @@ describe("TransactionsTable", () => {
         expect(bulkDeleteTransactions).toHaveBeenCalledWith("p1", expect.arrayContaining(["off1"])),
       );
     });
+
+    it("draft count sources from flaggedRows in the flagged view (regression: Hermes flagged-view draftCount)", async () => {
+      // In the flagged view, draftCount should count drafts from flaggedRows (what the user
+      // sees), not from accumulatedRows (which may contain non-flagged drafts). Before the
+      // fix, draftCount always used accumulatedRows, making the draft-filter count and the
+      // setDraftFilter('all') auto-reset inconsistent with the selection source.
+      const DRAFT_FLAGGED: TxRow = {
+        ...ANOMALY_ROWS[0],
+        id: "draft-flag",
+        status: "draft",
+      };
+      // a1 is a normal flagged row; off-page draft-flag is also flagged.
+      const flaggedDraftAnomalies = [
+        {
+          code: "oversell" as const,
+          severity: "error" as const,
+          scope: "transaction" as const,
+          transactionId: "a1",
+        },
+        {
+          code: "oversell" as const,
+          severity: "error" as const,
+          scope: "transaction" as const,
+          transactionId: "draft-flag",
+        },
+      ];
+      // accumulatedRows contains an additional non-flagged draft (not in flaggedRows).
+      const NON_FLAGGED_DRAFT: TxRow = {
+        ...ANOMALY_ROWS[1],
+        id: "non-flagged-draft",
+        status: "draft",
+      };
+      listNetworthTransactionsByIds.mockImplementation(async (ids: string[]) => {
+        const fromAnomalyRows = ANOMALY_ROWS.filter((r) => ids.includes(r.id) && r.id !== "a1");
+        const a1 = ids.includes("a1") ? [{ ...ANOMALY_ROWS[0] }] : [];
+        const draftFlag = ids.includes("draft-flag") ? [DRAFT_FLAGGED] : [];
+        return [...a1, ...fromAnomalyRows, ...draftFlag];
+      });
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable
+            rows={[ANOMALY_ROWS[0], NON_FLAGGED_DRAFT]}
+            anomalies={flaggedDraftAnomalies}
+            showPortfolio={false}
+          />
+        </NextIntlClientProvider>,
+      );
+
+      // Before turning on "Show flagged only": accumulatedRows has 2 rows, 1 is a draft
+      // (NON_FLAGGED_DRAFT). draftCount = 1.
+      const draftSelect = screen.getByRole("combobox", {
+        name: messages.Transactions.filterDraftLabel,
+      });
+      expect(draftSelect.querySelector('option[value="drafts"]')?.textContent).toContain("1");
+
+      // Turn on "Show flagged only" — flaggedRows has a1 (normal) + draft-flag (draft).
+      // draftCount should now be 1 (draft-flag), not 2 (which it would be if sourced from
+      // accumulatedRows since NON_FLAGGED_DRAFT is also a draft but not flagged).
+      fireEvent.click(screen.getByRole("button", { name: messages.Anomalies.showFlagged }));
+      await waitFor(() => expect(screen.getAllByText("Bank Central Asia")).toHaveLength(2));
+
+      // Re-query the select after the re-render.
+      const draftSelectAfter = screen.getByRole("combobox", {
+        name: messages.Transactions.filterDraftLabel,
+      });
+      expect(draftSelectAfter.querySelector('option[value="drafts"]')?.textContent).toContain("1");
+    });
   });
 
   describe("text search", () => {
@@ -2060,6 +2128,56 @@ describe("TransactionsTable", () => {
       await waitFor(() =>
         expect(resolveDraftTransactions).toHaveBeenCalledWith("p1", ["draft-p2-1"], "confirm"),
       );
+
+      vi.unstubAllGlobals();
+    });
+
+    it("keeps Load more visible under the draft filter when total > accumulatedRows (non-draft rows remain on unloaded pages)", async () => {
+      // Scenario from Hermes' re-review: accumulatedRows.length < total (non-draft rows on
+      // unloaded pages) while all drafts are already accumulated. Under the draft filter,
+      // Load More must stay visible so the user can load more pages that might contain
+      // additional drafts. This proves the hasMore logic correctly keeps the
+      // server-fetch clause active even when the visible (filtered) window is already full.
+      const PAGE1_ONLY_DRAFTS: TxRow[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `pd-${i}`,
+        portfolioId: "p1",
+        type: "buy" as const,
+        quantity: "1",
+        price: "100",
+        fees: "0",
+        tax: null,
+        fxRate: null,
+        currency: "IDR",
+        executedAt: `2026-01-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`,
+        source: "csv" as const,
+        status: "draft" as const,
+        instrument: { symbol: `PD${i}`, name: `Page1Draft ${i}` },
+      }));
+
+      // total=30, but only 10 drafts on page 1 — 20 non-draft rows remain on unloaded pages.
+      // The draft filter shows only the 10 drafts, all fitting in the window. Load More must
+      // stay visible because total > accumulatedRows.length (non-draft pages may also contain
+      // drafts, and we can't know without loading).
+      const spy = vi.fn(async () => ({
+        json: async () => ({ rows: [], total: 30 }),
+      })) as unknown as typeof fetch;
+      vi.stubGlobal("fetch", spy);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={PAGE1_ONLY_DRAFTS} total={30} />
+        </NextIntlClientProvider>,
+      );
+
+      // Switch to drafts filter.
+      fireEvent.change(
+        screen.getByRole("combobox", { name: messages.Transactions.filterDraftLabel }),
+        { target: { value: "drafts" } },
+      );
+
+      // 10 drafts visible, all fit in one page — but total (30) > accumulatedRows (10),
+      // so Load More must stay visible to allow loading more pages.
+      expect(screen.getByRole("button", { name: tb.loadMore })).toBeInTheDocument();
 
       vi.unstubAllGlobals();
     });
