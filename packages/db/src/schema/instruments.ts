@@ -42,26 +42,41 @@ export const instruments = pgTable(
     maturityDate: date("maturity_date"),
     partialExemptionRate: numeric("partial_exemption_rate"),
     /**
-     * Consecutive backfill attempts that returned zero candles for this instrument.
-     * Resets to 0 on any successful fetch. Feeds the sweep's dead-feed backoff (see
-     * DEAD_FEED_MISS_THRESHOLD in @portfolio/core) — issue #737.
+     * Consecutive backfill attempts that FAILED for this instrument — a "failure" is
+     * either an empty candle array (provider resolved with nothing) OR a thrown error
+     * (network failure, rate limit, auth failure — see issue #749). Both paths bump
+     * this counter at the same rate, which is intentional: a feed alternating
+     * throw/miss must reach DEAD_FEED_MISS_THRESHOLD as fast as one that's consistently
+     * failing one way. Feeds the sweep's dead-feed backoff (see DEAD_FEED_MISS_THRESHOLD
+     * in @portfolio/core) — issue #737.
+     *
+     * NOT incremented on XAU-spot fetch failures — those are shared across every
+     * gold-only portfolio and the error is logged at warn level only. Gold-only
+     * portfolios will therefore show `priceFeedMissCount` only climbing for non-XAU
+     * instruments (or not at all if their only instruments are gold); grep logs for
+     * `provider error fetching XAU spot history` if you suspect a dead gold feed.
+     * Issue #749.
      */
     priceFeedMissCount: integer("price_feed_miss_count").notNull().default(0),
     priceFeedLastMissAt: timestamp("price_feed_last_miss_at", { withTimezone: true }),
     /**
-     * Consecutive backfill fetch attempts that THREW (network error, rate limit,
-     * auth failure) rather than resolving with zero candles — tracked separately from
-     * `priceFeedMissCount` so a transient provider outage doesn't increment the miss
-     * counter toward the dead-feed threshold. An error that looks like a miss is exactly
-     * how #749 happened: `.catch(() => [])` collapsed both into the same `[]` path, so a
-     * feed that had been erroring for a week got the same cooldown as a truly delisted
-     * one. Resets to 0 on any successful fetch (same lifetime rule as the miss counter).
+     * Observability-only counter — tracks the subset of `priceFeedMissCount`
+     * increments that were caused by provider THROWS (network error, rate limit,
+     * auth failure, etc.) rather than by a provider that resolved with zero candles.
+     * An error that looks like a miss is exactly how #749 happened: `.catch(() => [])`
+     * collapsed both into the same `[]` path, so a feed that had been erroring for a
+     * week got the same dead-feed cooldown treatment as a truly delisted one.
      *
-     * NOT incremented on XAU-spot fetch failures — those are shared across every
-     * gold-only portfolio and the error is logged at warn level only. Gold-only
-     * portfolios will therefore show `priceFeedErrorCount = 0` even during an extended
-     * XAU provider outage; grep logs for `provider error fetching XAU spot history` if
-     * you suspect a dead gold feed. Issue #749.
+     * Not used by the dead-feed cooldown (that decision reads `priceFeedMissCount`,
+     * which counts both throws and empties at the same rate — see the docblock
+     * above). The split is purely so an operator looking at a hot `priceFeedMissCount`
+     * can tell at a glance whether the failures are "provider says no data" vs.
+     * "provider is throwing 429s".
+     *
+     * Resets to 0 on any successful fetch (same lifetime rule as the miss counter).
+     *
+     * NOT incremented on XAU-spot fetch failures — see the `priceFeedMissCount`
+     * docblock for why. Issue #749.
      */
     priceFeedErrorCount: integer("price_feed_error_count").notNull().default(0),
     priceFeedLastErrorAt: timestamp("price_feed_last_error_at", { withTimezone: true }),
