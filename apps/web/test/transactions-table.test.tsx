@@ -1546,6 +1546,79 @@ describe("TransactionsTable", () => {
       expect(screen.queryByRole("alert")).toBeNull();
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
     });
+
+    it("batch-deletes a flagged row that's outside the accumulated window (regression: Hermes flagged-view edge case)", async () => {
+      // The flagged row `off1` is NOT in the initial `rows` (accumulatedRows). It only
+      // appears via the by-id fetch when "Show flagged only" is on. Before the fix,
+      // onBatchDelete iterated accumulatedRows and silently dropped it.
+      const OFF_PAGE_FLAGGED: TxRow = {
+        id: "off1",
+        portfolioId: "p1",
+        type: "sell",
+        quantity: "100",
+        price: "10",
+        fees: "0",
+        tax: null,
+        fxRate: null,
+        currency: "IDR",
+        executedAt: "2026-06-01T00:00:00.000Z",
+        source: "manual",
+        instrument: { symbol: "OFF1", name: "Off Page Flagged" },
+      };
+      const offPageAnomalies = [
+        // a1 (Bank Central Asia) is also flagged so it's visible in the flagged view alongside
+        // off1 — enterSelectionMode needs a row that's in the DOM to long-press.
+        {
+          code: "oversell" as const,
+          severity: "error" as const,
+          scope: "transaction" as const,
+          transactionId: "a1",
+        },
+        {
+          code: "oversell" as const,
+          severity: "error" as const,
+          scope: "transaction" as const,
+          transactionId: "off1",
+        },
+      ];
+      // The by-id fetch must return all requested rows so the flagged view shows both
+      // a1 (Bank Central Asia, in ANOMALY_ROWS) and off1 (only in the mock).
+      listNetworthTransactionsByIds.mockImplementation(async (ids: string[]) => {
+        const fromAnomalyRows = ANOMALY_ROWS.filter((r) => ids.includes(r.id));
+        const off1 = ids.includes("off1") ? [OFF_PAGE_FLAGGED] : [];
+        return [...fromAnomalyRows, ...off1];
+      });
+
+      bulkDeleteTransactions.mockClear();
+
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable
+            rows={ANOMALY_ROWS}
+            anomalies={offPageAnomalies}
+            showPortfolio={false}
+          />
+        </NextIntlClientProvider>,
+      );
+
+      // Turn on "Show flagged only" — the by-id fetch brings in `off1`.
+      fireEvent.click(screen.getByRole("button", { name: messages.Anomalies.showFlagged }));
+      await waitFor(() => expect(screen.getByText("Off Page Flagged")).toBeInTheDocument());
+
+      // Enter selection mode via long-press on a row that's in the DOM (Bank Central Asia
+      // is in ANOMALY_ROWS and visible in the flagged view). Then select-all picks up
+      // every visible row including off1 — which is NOT in accumulatedRows but IS in
+      // flaggedRows. The fix sources onBatchDelete from batchSourceRows (flaggedRows
+      // when showFlagged) so the delete call includes off1.
+      enterSelectionMode();
+      fireEvent.click(screen.getByLabelText(tb.selectAll));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(tb.delete) }));
+      fireEvent.click(screen.getByRole("button", { name: tb.confirm }));
+
+      await waitFor(() =>
+        expect(bulkDeleteTransactions).toHaveBeenCalledWith("p1", expect.arrayContaining(["off1"])),
+      );
+    });
   });
 
   describe("text search", () => {

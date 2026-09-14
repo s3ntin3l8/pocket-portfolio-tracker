@@ -204,6 +204,12 @@ export function TransactionsTable({
     );
   }, [accumulatedRows, showFlagged, anomalyByTxId, draftFilter, flaggedRows]);
 
+  // Batch/selection operations must source from the same set the user is looking at.
+  // When showFlagged is on, flaggedRows comes from an independent fetch by id (#562) and
+  // is not a subset of accumulatedRows — resolving ids against accumulatedRows would silently
+  // drop any selected flagged row that isn't in the currently loaded window.
+  const batchSourceRows = showFlagged ? (flaggedRows ?? []) : accumulatedRows;
+
   const hasActiveFilter =
     (searchQuery != null && searchQuery.length > 0) ||
     showFlagged ||
@@ -242,7 +248,7 @@ export function TransactionsTable({
     setBusy(true);
     try {
       const byPortfolio = new Map<string, string[]>();
-      for (const r of accumulatedRows) {
+      for (const r of batchSourceRows) {
         if (!selected.has(r.id)) continue;
         const ids = byPortfolio.get(r.portfolioId) ?? [];
         ids.push(r.id);
@@ -263,15 +269,15 @@ export function TransactionsTable({
 
   const selectedDraftIds = useMemo(
     () =>
-      accumulatedRows.filter((r) => selected.has(r.id) && r.status === "draft").map((r) => r.id),
-    [accumulatedRows, selected],
+      batchSourceRows.filter((r) => selected.has(r.id) && r.status === "draft").map((r) => r.id),
+    [batchSourceRows, selected],
   );
 
   async function onBatchResolve(action: "confirm" | "discard") {
     setBusy(true);
     try {
       const byPortfolio = new Map<string, string[]>();
-      for (const r of accumulatedRows) {
+      for (const r of batchSourceRows) {
         if (!selected.has(r.id) || r.status !== "draft") continue;
         const ids = byPortfolio.get(r.portfolioId) ?? [];
         ids.push(r.id);
@@ -301,8 +307,8 @@ export function TransactionsTable({
 
   const canReassign = portfolios.length > 1;
   const selectedRows = useMemo(
-    () => accumulatedRows.filter((r) => selected.has(r.id)),
-    [accumulatedRows, selected],
+    () => batchSourceRows.filter((r) => selected.has(r.id)),
+    [batchSourceRows, selected],
   );
   const canMerge =
     selectedRows.length === 2 && selectedRows[0].portfolioId === selectedRows[1].portfolioId;
@@ -473,7 +479,7 @@ export function TransactionsTable({
             onClearSelection={clearSelection}
             onBatchConfirmDrafts={() => onBatchResolve("confirm")}
             onBatchDiscardDrafts={() => onBatchResolve("discard")}
-            onReassign={() => setReassignRows(accumulatedRows.filter((r) => selected.has(r.id)))}
+            onReassign={() => setReassignRows(batchSourceRows.filter((r) => selected.has(r.id)))}
             onMerge={() => setMergeRows([selectedRows[0], selectedRows[1]])}
             onRequestDelete={() => setConfirming(true)}
             onConfirmDelete={onBatchDelete}
