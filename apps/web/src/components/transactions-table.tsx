@@ -341,8 +341,7 @@ export function TransactionsTable({
   const windowedRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount]);
   const hasMore = showFlagged
     ? sortedRows.length > windowedRows.length
-    : sortedRows.length > windowedRows.length ||
-      (draftFilter !== "drafts" && accumulatedRows.length < (total ?? 0));
+    : sortedRows.length > windowedRows.length || accumulatedRows.length < (total ?? 0);
   const groupByMonth = sortKey === null || sortKey === "date";
 
   const dayFmt = useMemo(
