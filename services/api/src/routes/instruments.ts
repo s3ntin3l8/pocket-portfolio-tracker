@@ -336,6 +336,7 @@ export async function instrumentsRoute(app: FastifyInstance) {
       const { price } = manualPriceSchema.parse(request.body);
       const result = await setManualPrice(app.db, request.params.id, price);
       if (result === "not_found") return reply.code(404).send({ error: "instrument_not_found" });
+      if (result === "not_bond") return reply.code(400).send({ error: "not_a_bond" });
       return result;
     },
   );

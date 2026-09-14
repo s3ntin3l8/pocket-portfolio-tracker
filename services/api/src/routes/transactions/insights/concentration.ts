@@ -7,6 +7,7 @@ import {
   computeHoldings,
   splitAdjustmentFactor,
   convert,
+  toDateKey,
   PERIOD_GAIN_MAX_PCT,
   PERIOD_LOSS_MAX_PCT,
   MAX_PRICE_CARRY_FORWARD_DAYS,
@@ -101,6 +102,32 @@ export async function computeConcentrationSection(
       list.push({ date: p.date, close: p.close, currency: p.currency });
       pricesByInst.set(p.instrumentId, list);
     }
+
+    // Manual-price override: for instruments with a user-set manualPrice (e.g. bonds
+    // with no live provider), use it DIRECTLY for "as of now" claims (current month
+    // weight, period movers END). We don't try to inject it into the `pricesByInst`
+    // series and let `latestPriceBefore()` pick it up — for legacy bonds the series
+    // contains synthetic backfill-par rows at/after manualPriceAt, so any backward-
+    // looking lookup would return a newer par row. Instead, for "as of now" only
+    // (latestDate), prefer the manual price over any stored row.
+    const manualPriceByInst = new Map<string, { close: string; currency: string; date: string }>();
+    for (const inst of allInstRows) {
+      // Bonds only — setManualPrice is bond-gated, so manualPrice on non-bonds is
+      // a legacy artifact. Don't override the live provider on equity/ETF/etc.
+      if (
+        inst.assetClass === "bond" &&
+        inst.manualPrice &&
+        Number(inst.manualPrice) > 0 &&
+        inst.manualPriceAt
+      ) {
+        manualPriceByInst.set(inst.id, {
+          close: inst.manualPrice,
+          currency: inst.currency,
+          date: toDateKey(new Date(inst.manualPriceAt)),
+        });
+      }
+    }
+
     // The latest known price on or before `asOfDate` — a plain backward-looking lookup,
     // deliberately NOT staleness-gated here: a period-START anchor (monthStart/yearStart)
     // or an earlier month in the concentration trend legitimately finds a price from
@@ -158,13 +185,29 @@ export async function computeConcentrationSection(
       for (const h of holdings) {
         const qty = Number(h.quantity);
         if (qty <= 0 || !h.instrumentId) continue;
-        const price = latestPriceBefore(h.instrumentId, asOfDate);
+        // For the CURRENT month, prefer manualPrice directly when set — the
+        // stored prices series for legacy bonds contains synthetic par rows that
+        // a backward lookup would prefer over the manual price. Earlier months
+        // are historical and unaffected: whatever was the last known price back
+        // then is, by definition, the correct value for that point in time.
+        let price: { date: string; close: string; currency: string } | null = null;
+        if (isCurrentMonth) {
+          price = manualPriceByInst.get(h.instrumentId) ?? null;
+        }
+        if (!price) {
+          price = latestPriceBefore(h.instrumentId, asOfDate);
+        }
         if (!price) continue;
         // Only the CURRENT month's weight is an "as of now" claim — a stale feed here
         // would silently hold a dead instrument's last-known weight steady forever.
         // Earlier months are historical and unaffected: whatever was the last known
         // price back then is, by definition, the correct value for that point in time.
-        if (isCurrentMonth && isStaleAsOfLatest(price.date)) continue;
+        if (
+          isCurrentMonth &&
+          !manualPriceByInst.has(h.instrumentId) &&
+          isStaleAsOfLatest(price.date)
+        )
+          continue;
         const mv = Number(
           convert((qty * Number(price.close)).toString(), price.currency, display, fx),
         );
@@ -215,13 +258,17 @@ export async function computeConcentrationSection(
       for (const instId of heldAtEnd.keys()) {
         if (!heldAtStartSet.has(instId)) continue;
         const priceStart = latestPriceBefore(instId, startDate);
-        const priceEnd = latestPriceBefore(instId, latestDate);
+        // Prefer manualPrice directly for the END price — legacy bonds have synthetic
+        // par rows at/after manualPriceAt in the stored series, so a backward lookup
+        // would return a newer par row instead of the manual price.
+        const priceEnd = manualPriceByInst.get(instId) ?? latestPriceBefore(instId, latestDate);
         if (!priceStart || !priceEnd || Number(priceStart.close) <= 0) continue;
         // The END price is an "as of right now" claim — if the feed hasn't updated in
         // MAX_PRICE_CARRY_FORWARD_DAYS, this instrument's move can't be reported at all
         // (excluded from the ranking, not defaulted to a fabricated 0.00%). The START
-        // price has no such requirement — it's a backward-looking anchor.
-        if (isStaleAsOfLatest(priceEnd.date)) {
+        // price has no such requirement — it's a backward-looking anchor. The manual
+        // price is treated as fresh — the user just set it, no staleness concern.
+        if (!manualPriceByInst.has(instId) && isStaleAsOfLatest(priceEnd.date)) {
           staleSkipped++;
           continue;
         }

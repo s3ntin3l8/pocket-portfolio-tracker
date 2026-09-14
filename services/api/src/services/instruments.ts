@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import { instruments } from "@portfolio/db";
+import { instruments, prices, transactions } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { isIsin, isKnownMarket, PRICEABLE_FOREIGN_MARKETS } from "@portfolio/market-data";
 import type { InstrumentInput } from "@portfolio/schema";
 import type { DB } from "../db/client.js";
@@ -287,6 +288,38 @@ export async function updateInstrument(
 }
 
 /**
+ * Ensure a `prices` row exists at `manualPriceAt` for an instrument with a manual price
+ * set. One-time materialization for legacy data: bonds that had `manualPrice` set
+ * before this PR shipped (or via direct DB writes that bypassed `setManualPrice`) have
+ * a `manualPrice` column value but no corresponding `prices` row — backfill at the
+ * time would have written par for every day, so the manualPrice date holds a par row,
+ * and concentration's date-ordering guard skips the injection. Writing/updating the
+ * row here makes sparklines and concentration see the manual price immediately.
+ *
+ * Idempotent: a no-op when a matching row already exists.
+ */
+export async function materializeManualPriceRow(db: DB, id: string): Promise<void> {
+  const [inst] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
+  if (!inst) return;
+  if (inst.assetClass !== "bond") return;
+  if (!inst.manualPrice || Number(inst.manualPrice) <= 0 || !inst.manualPriceAt) return;
+
+  const dateKey = toDateKey(new Date(inst.manualPriceAt));
+  await db
+    .insert(prices)
+    .values({
+      instrumentId: id,
+      date: dateKey,
+      close: inst.manualPrice,
+      currency: inst.currency,
+    })
+    .onConflictDoUpdate({
+      target: [prices.instrumentId, prices.date],
+      set: { close: inst.manualPrice, currency: inst.currency },
+    });
+}
+
+/**
  * Set or clear an instrument's user-maintained manual price (absolute, per-unit, in the
  * instrument's own currency). Substitutes for a live market-data provider on asset
  * classes none of them serve — e.g. Indonesian retail bonds/sukuk, where no schedulable
@@ -296,28 +329,100 @@ export async function updateInstrument(
  * curation. `instruments` is shared across users, so this does change valuation for
  * everyone holding the series — that's an accepted, deliberate consequence.
  *
- * Known limitation: only `valuePortfolio()`'s CURRENT valuation reads this column.
- * `services/api/src/services/backfill/core.ts` still writes a flat par series into the
- * `prices` table for the instrument's whole history, so anything reading `prices`
- * directly instead of going through valuePortfolio — the sparkline chart
- * (`services/sparklines.ts`) and the concentration/movers insight
- * (`routes/transactions/insights/concentration.ts`) — stays at par even after a manual
- * price is set. Daily snapshots (`services/snapshots.ts`) DO call `valuePortfolio` and
- * so pick up the manual price correctly going forward. Propagating a manual price into
- * `prices`/history is real follow-up work, not done here.
+ * Also writes a `prices` row at `manualPriceAt` so that consumers reading the historical
+ * price series directly — the sparkline chart (`sparklines.ts`) and the concentration/
+ * movers insight (`concentration.ts`) — reflect the manual price. Only a SINGLE manual
+ * price row exists at any time: same-day re-sets overwrite via `onConflictDoUpdate`,
+ * and clearing deletes ALL prices rows for the instrument and restores the full par
+ * history from firstHeld to today (chunked insert inside a transaction).
+ *
+ * Single-current-row semantics: setting a manual price replaces any previous manual
+ * price. Backfill (`backfill/core.ts`) skips the entire bond while `manualPrice` is set,
+ * so no par rows are written during that period — only the manual row exists. Clearing
+ * materializes the full par series so the sparkline/concentration series has no gap.
  */
 export async function setManualPrice(
   db: DB,
   id: string,
   price: string | null,
-): Promise<Instrument | "not_found"> {
+): Promise<Instrument | "not_found" | "not_bond"> {
   const [existing] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
   if (!existing) return "not_found";
 
+  // Gate to bonds only. Live-provider-served asset classes (equities, ETFs, crypto,
+  // mutual funds) should never need a manual price — setting one would mean the
+  // clear path deletes the entire genuine provider-served price series and re-inserts
+  // nothing (no faceValue). Bonds are the only asset class with no live provider and
+  // a stable per-unit fallback (par).
+  if (existing.assetClass !== "bond") return "not_bond";
+
+  const now = price === null ? null : new Date();
   const [updated] = await db
     .update(instruments)
-    .set({ manualPrice: price, manualPriceAt: price === null ? null : new Date() })
+    .set({ manualPrice: price, manualPriceAt: now })
     .where(eq(instruments.id, id))
     .returning();
-  return updated ?? existing;
+  const result = updated ?? existing;
+
+  if (price !== null && now) {
+    // Write a prices row at the manual-price date so sparklines/concentration pick it up.
+    const dateKey = toDateKey(now);
+    await db
+      .insert(prices)
+      .values({ instrumentId: id, date: dateKey, close: price, currency: existing.currency })
+      .onConflictDoUpdate({
+        target: [prices.instrumentId, prices.date],
+        set: { close: price, currency: existing.currency },
+      });
+  } else if (price === null && existing.manualPrice && existing.manualPriceAt) {
+    // Clearing the manual price — delete ALL prices rows for this instrument
+    // and restore the full par history from firstHeld to today. This is the
+    // cleanest approach because: (1) backfill skips the entire bond while
+    // manualPrice is set, so all existing rows are either the manual row or
+    // stale; (2) we can't distinguish manual rows from each other (only the
+    // latest manualPriceAt is tracked), so deleting by date range starting at
+    // manualPriceAt would strand earlier manual rows outside the window.
+    const today = toDateKey(new Date());
+    let firstHeld = today;
+    if (existing.faceValue) {
+      const [firstTx] = await db
+        .select({ d: transactions.executedAt })
+        .from(transactions)
+        .where(eq(transactions.instrumentId, id))
+        .orderBy(transactions.executedAt)
+        .limit(1);
+      if (firstTx) firstHeld = toDateKey(firstTx.d);
+    }
+
+    // Wrap delete + chunked insert in a transaction so readers don't see a
+    // gap. Chunk size ~500 days keeps each INSERT well under Postgres' ~65k
+    // parameter limit (4 params per row × 500 = 2000).
+    const CHUNK_DAYS = 500;
+    await db.transaction(async (tx) => {
+      await tx.delete(prices).where(eq(prices.instrumentId, id));
+      if (existing.faceValue) {
+        const d = new Date(firstHeld);
+        const end = new Date(today);
+        while (d <= end) {
+          const chunkEnd = new Date(d);
+          chunkEnd.setUTCDate(chunkEnd.getUTCDate() + CHUNK_DAYS);
+          if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+          const rows: { instrumentId: string; date: string; close: string; currency: string }[] =
+            [];
+          while (d <= chunkEnd) {
+            rows.push({
+              instrumentId: id,
+              date: toDateKey(d),
+              close: existing.faceValue,
+              currency: existing.currency,
+            });
+            d.setUTCDate(d.getUTCDate() + 1);
+          }
+          await tx.insert(prices).values(rows).onConflictDoNothing();
+        }
+      }
+    });
+  }
+
+  return result;
 }

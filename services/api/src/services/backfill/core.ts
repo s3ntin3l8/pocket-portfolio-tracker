@@ -141,6 +141,14 @@ export async function backfillPortfolioHistory(
     rawPrices.set(instr.id, instrPrices);
 
     if (instr.assetClass === "bond") {
+      // When a manual price is set, skip this bond entirely — the manual price
+      // row is the only meaningful data point, and writing par rows would
+      // overwrite it (or any historical manual rows from a previous set) via
+      // onConflictDoUpdate. Backfill will regenerate the full par history once
+      // the manual price is cleared.
+      if (instr.manualPrice && Number(instr.manualPrice) > 0) {
+        continue;
+      }
       if (instr.faceValue) {
         const d = new Date(fetchFrom);
         const end = new Date(today);
