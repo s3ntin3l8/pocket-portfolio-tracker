@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.17](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.16...v0.1.17) (2026-09-14)
+
+
+### Features
+
+* **web:** tooltip on the hero overlay chart ([#754](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/754)) ([8ae485a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8ae485a3b7b5cfac01c408f223d78eb353938ef8))
+
+
+### Bug Fixes
+
+* **backfill:** distinguish provider throws from empty results ([#749](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/749)) ([#759](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/759)) ([adebdd2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/adebdd23d9959c344afd8b159bd4e784ab5a416d))
+* **bonds:** propagate manual price into historical prices series ([#757](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/757)) ([045db5a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/045db5a557b3e9e28ea55c66237cac111546c800))
+* **web:** source draft/selection/batch ops from accumulated+flagged view in transactions table ([a0774b5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a0774b5e6ccbc085706528a4b5708dd3a381971a))
+
 ## [0.1.16](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.15...v0.1.16) (2026-09-13)
 
 
