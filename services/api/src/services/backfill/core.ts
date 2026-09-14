@@ -142,11 +142,19 @@ export async function backfillPortfolioHistory(
 
     if (instr.assetClass === "bond") {
       if (instr.faceValue) {
+        const manualDate =
+          instr.manualPrice && Number(instr.manualPrice) > 0 && instr.manualPriceAt
+            ? toDateKey(new Date(instr.manualPriceAt))
+            : null;
         const d = new Date(fetchFrom);
         const end = new Date(today);
         while (d <= end) {
           const ds = toDateKey(d);
-          instrPrices.set(ds, { close: instr.faceValue, currency: instr.currency });
+          // Skip the manual-price date — setManualPrice wrote the user-set
+          // price here; overwriting it with par would silently revert it.
+          if (ds !== manualDate) {
+            instrPrices.set(ds, { close: instr.faceValue, currency: instr.currency });
+          }
           d.setUTCDate(d.getUTCDate() + 1);
         }
       }

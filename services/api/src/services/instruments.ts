@@ -329,10 +329,23 @@ export async function setManualPrice(
         target: [prices.instrumentId, prices.date],
         set: { close: price, currency: existing.currency },
       });
-  } else if (price === null && existing.manualPriceAt) {
-    // Clearing the manual price — remove the prices row for the old manualPriceAt date.
-    const oldDateKey = toDateKey(new Date(existing.manualPriceAt));
-    await db.delete(prices).where(and(eq(prices.instrumentId, id), eq(prices.date, oldDateKey)));
+  } else if (price === null && existing.manualPrice && existing.manualPriceAt) {
+    // Clearing the manual price — remove ALL prices rows whose close matches
+    // the manual price value (not just the latest manualPriceAt date). This
+    // handles both: (a) the row at manualPriceAt, and (b) any earlier manual
+    // rows that happened to have the same value. Rows with a different close
+    // (e.g. backfilled par, or an earlier manual price at a different value)
+    // are left in place — the next backfill run will overwrite them with par
+    // via onConflictDoUpdate, restoring the series to its pre-manual state.
+    await db
+      .delete(prices)
+      .where(
+        and(
+          eq(prices.instrumentId, id),
+          eq(prices.close, existing.manualPrice),
+          eq(prices.currency, existing.currency),
+        ),
+      );
   }
 
   return result;

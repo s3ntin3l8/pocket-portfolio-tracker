@@ -119,6 +119,8 @@ export async function computeConcentrationSection(
             list.push({ date: manualDate, close: inst.manualPrice, currency: inst.currency });
           }
         }
+        // Always re-set: the list may have been freshly created (?? []).
+        pricesByInst.set(inst.id, list);
       }
     }
 

@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq, and } from "drizzle-orm";
-import { instruments, prices } from "@portfolio/db";
+import { instruments, prices, portfolios, transactions, users } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
+import { MarketDataService, FixtureProvider } from "@portfolio/market-data";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
   findOrCreateInstrument,
   updateInstrument,
   setManualPrice,
 } from "../../src/services/instruments.js";
+import { backfillPortfolioHistory } from "../../src/services/backfill/core.js";
 
 describe("findOrCreateInstrument", () => {
   beforeAll(async () => {
@@ -635,5 +637,92 @@ describe("setManualPrice", () => {
   it("returns not_found for unknown id", async () => {
     const result = await setManualPrice(getDb(), "00000000-0000-0000-0000-000000000000", "100");
     expect(result).toBe("not_found");
+  });
+
+  it("clearing removes only rows matching the manual price, not backfilled par rows", async () => {
+    const db = getDb();
+    const [row] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-CLR",
+        name: "SR021T3 clear selective test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    // Manually insert a par row at a different date (simulating backfill output).
+    const parDate = "2026-06-01";
+    await db
+      .insert(prices)
+      .values({ instrumentId: row.id, date: parDate, close: "1000000", currency: "IDR" });
+
+    // Set manual price (different from par).
+    await setManualPrice(db, row.id, "985000");
+
+    // Clear: should remove the 985000 row but keep the 1000000 par row.
+    await setManualPrice(db, row.id, null);
+
+    const remaining = await db.select().from(prices).where(eq(prices.instrumentId, row.id));
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.close).toBe("1000000");
+    expect(remaining[0]!.date).toBe(parDate);
+  });
+
+  it("backfill does not clobber the manual-price row", async () => {
+    const db = getDb();
+
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "mp-backfill-user", email: "mp-backfill@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "MP Backfill", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+
+    const [bond] = await db
+      .insert(instruments)
+      .values({
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        symbol: "SR021T3-BF",
+        name: "SR021T3 backfill test",
+        faceValue: "1000000",
+      })
+      .returning();
+
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: bond.id,
+      type: "buy",
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
+
+    // Set manual price today.
+    const result = await setManualPrice(db, bond.id, "985000");
+    expect(result).not.toBe("not_found");
+    if (typeof result === "string") return;
+    const mpDate = toDateKey(new Date(result.manualPriceAt!));
+
+    // Run backfill (bond flat-proxy path).
+    const svc = new MarketDataService([new FixtureProvider()]);
+    await backfillPortfolioHistory(db, svc, 60_000, pf.id);
+
+    // The manual-price row must survive the backfill.
+    const [mpRow] = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, bond.id), eq(prices.date, mpDate)));
+    expect(mpRow).toBeDefined();
+    expect(mpRow!.close).toBe("985000");
   });
 });
