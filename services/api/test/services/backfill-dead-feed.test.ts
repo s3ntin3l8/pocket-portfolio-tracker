@@ -22,7 +22,7 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { instruments, portfolios, prices, transactions, users } from "@portfolio/db";
+import { instruments, portfolios, prices, scrapedQuotes, transactions, users } from "@portfolio/db";
 import {
   MarketDataService,
   type MarketDataProvider,
@@ -637,5 +637,63 @@ describe("backfill error vs miss distinction (#749)", () => {
     // MAX_PRICE_CARRY_FORWARD_DAYS, missCount hasn't yet hit the threshold to exclude
     // it from staleness scoring).
     expect(result.portfolios.find((p) => p.portfolioId === pf.id)).toBeDefined();
+  });
+
+  it("logs XAU spot fetch errors distinctly without crashing the backfill", async () => {
+    // Covers the XAU spot history error catch block in core.ts (the5 missing codecov
+    // lines). When a gold instrument has a buyback row but the XAU spot fetch throws,
+    // the error is logged and the gold instrument is skipped — backfill continues for
+    // other instruments without crashing.
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "xau-error-user", email: "xau-error@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "XAU Error", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "ANTAM",
+        market: "ANTAM",
+        assetClass: "gold",
+        currency: "IDR",
+        name: "Antam Gold",
+      })
+      .returning();
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: instr.id,
+        type: "buy",
+        quantity: "10",
+        price: "1000000",
+        fees: "0",
+        currency: "IDR",
+        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
+      },
+    ]);
+    // Gold buyback row — triggers the XAU spot fetch path
+    await db.insert(scrapedQuotes).values({
+      key: "gold:antam-buyback",
+      value: "900000",
+      source: "test",
+    });
+
+    // Provider that throws specifically on XAU symbols (XAUIDR = the XAU spot pair)
+    const svc = new MarketDataService([
+      new SelectiveThrowProvider("XAUIDR", "XAU spot API timeout"),
+    ]);
+
+    // Must not throw — the XAU error is caught and logged
+    const result = await backfillPortfolioHistory(db, svc, 10_000, pf.id);
+
+    // The gold instrument is skipped silently (xauSpotHistory stays null after the
+    // error) — no prices row, but backfill completed without crashing.
+    expect(result.instruments).toBe(1);
+    const [priceRow] = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+    expect(priceRow).toBeUndefined();
   });
 });
