@@ -161,4 +161,39 @@ describe("GET /admin/jobs — live pgboss query path (scheduler available)", () 
     // the response list directly — only surfaced via backfill-stale-history's fanOut.
     expect(body.jobs.find((j) => j.name === "backfill-portfolio")).toBeUndefined();
   });
+
+  // #748: a cron-only queue always has a `created` row sitting in the queue waiting
+  // for the next worker tick — counting those as "in flight" misleads operators into
+  // thinking real work is happening. Verify that `created` rows for cron-only queues
+  // are excluded from the in-progress count, while `created` rows for user-triggerable
+  // queues (backfill-stale-history) still count.
+  it("excludes created-state rows from inProgress for cron-only queues", async () => {
+    await app.db.execute(sql`
+      INSERT INTO pgboss.job (name, state, completed_on) VALUES
+        ('refresh-prices', 'created', NULL),
+        ('refresh-prices', 'active',  NULL),
+        ('refresh-prices', 'retry',   NULL),
+        ('backfill-stale-history', 'created', NULL)
+    `);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/jobs",
+      headers: auth(await token("admin-live-jobs-cron", [ADMIN_GROUP])),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      jobs: { name: string; inProgress: number }[];
+    };
+
+    // refresh-prices is cron-only — only `active` and `retry` count, the `created`
+    // row is just queue backlog waiting for the next worker tick.
+    const prices = body.jobs.find((j) => j.name === "refresh-prices");
+    expect(prices?.inProgress).toBe(2);
+
+    // backfill-stale-history is user-triggerable — `created` counts because a freshly
+    // triggered job that hasn't started yet IS a meaningful signal.
+    const stale = body.jobs.find((j) => j.name === "backfill-stale-history");
+    expect(stale?.inProgress).toBe(1);
+  });
 });
