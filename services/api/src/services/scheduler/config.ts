@@ -75,9 +75,9 @@ export const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60; // 6 hours
  * fixed schedule (every 5 min, hourly, daily…) there is almost always at least
  * one `created` row sitting in the queue waiting for a worker — counting those
  * as "in flight" misleads operators into thinking real work is happening when
- * it isn't. Set this to true for cron-only queues; leave false (or omit) for
- * queues that can also be triggered on-demand, where a `created` row IS a
- * meaningful signal that a user's job hasn't started yet.
+ * it isn't. Set this to true for queues where the `created` backlog is
+ * schedule-dominated noise; leave false for queues where a `created` row
+ * signals a user's triggered job hasn't started yet.
  *
  * #105 note: `triggerJob()` only affects the replica that receives the request.
  *  In a multi-replica setup the pg-boss job is still enqueued in Postgres so any
