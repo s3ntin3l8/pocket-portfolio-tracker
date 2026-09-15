@@ -352,6 +352,33 @@ describe("useBackToClose", () => {
     expect(backSpy).toHaveBeenCalledTimes(1);
   });
 
+  // Regression test for review: the suppression flag must be drained even when
+  // router.push's pushState lands before the close effect runs (the marker is no
+  // longer on top). Without this, the flag leaks into the next open/close cycle
+  // and incorrectly suppresses an unrelated close.
+  it("consumes suppression flag even when marker is no longer on top (router.push landed first)", () => {
+    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const onOpenChange = vi.fn();
+    const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
+      initialProps: { open: false },
+    });
+    rerender({ open: true }); // pushes the marker
+
+    suppressNextHistoryBack(); // simulate GlobalSearch.navigate()
+    // Simulate router.push landing before the close effect — a new history entry
+    // sits on top of our marker.
+    window.history.pushState({}, "", "/instruments/42");
+
+    rerender({ open: false }); // close — marker isn't on top, but flag must still be drained
+    expect(backSpy).not.toHaveBeenCalled();
+
+    // Re-open and close normally — if the flag leaked, this close would be
+    // incorrectly suppressed too.
+    rerender({ open: true });
+    rerender({ open: false });
+    expect(backSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("consumeSuppressedBack is a read-and-reset one-shot", () => {
     expect(consumeSuppressedBack()).toBe(false);
     suppressNextHistoryBack();

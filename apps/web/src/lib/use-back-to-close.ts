@@ -117,7 +117,12 @@ export function useBackToClose(
     } else if (!open && wasOpen && pushedRef.current) {
       pushedRef.current = false;
       releaseMarker(id);
-      if (window.history.state?.backToCloseMarkerId === id && !consumeSuppressedBack()) {
+      // Consume the flag unconditionally: if `router.push`'s `pushState` landed
+      // before this effect ran, the marker is no longer on top and the check
+      // below would be short-circuited. Draining here prevents a stale flag from
+      // suppressing the next unrelated close — see `suppressNextHistoryBack`.
+      const suppressed = consumeSuppressedBack();
+      if (window.history.state?.backToCloseMarkerId === id && !suppressed) {
         // Skip `history.back()` when the close is paired with an intentional
         // navigation — see `suppressNextHistoryBack` in back-to-close-stack.ts.
         // The marker is still released above either way, so this close still
