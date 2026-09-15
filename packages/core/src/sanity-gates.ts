@@ -33,6 +33,17 @@
  *     enough that a truly dead symbol stops re-triggering a full-range
  *     provider fetch every single night. See services/api's backfill sweep
  *     and issue #737.
+ *   - XIRR_MAX_RATE (50): money-weighted returns (XIRR) can mathematically
+ *     converge on an astronomical rate when the cash-flow history contains a
+ *     very small (near-zero) early contribution followed by a much larger
+ *     terminal value — the solver is technically correct, but the result is
+ *     never a number an end-user should see (a real portfolio returning
+ *     >5000% annualized is essentially unheard of, and a smaller version of
+ *     the same artifact — "one ETF up 800% in 2 months" — is more usefully
+ *     reported as missing data than as a precise annualized rate). The cap
+ *     is applied inside `xirr()` so every consumer of the all-time XIRR
+ *     (`/insights` hero card, `/networth`, `/portfolios/:id/performance`)
+ *     gets the same null result for absurd rates. See issue #756.
  */
 
 export const SINGLE_DAY_MAX_PCT = 50;
@@ -40,3 +51,4 @@ export const PERIOD_GAIN_MAX_PCT = 200;
 export const PERIOD_LOSS_MAX_PCT = 90;
 export const MAX_PRICE_CARRY_FORWARD_DAYS = 10;
 export const DEAD_FEED_MISS_THRESHOLD = 7;
+export const XIRR_MAX_RATE = 50;

@@ -23,6 +23,7 @@ import { D } from "./decimal.js";
 import type { IndexPoint } from "./twr.js";
 import type { CashFlowPoint } from "./xirr.js";
 import { xirr } from "./xirr.js";
+import { XIRR_MAX_RATE } from "./sanity-gates.js";
 
 export interface YearlyReturnBenchmarkInput {
   symbol: string;
@@ -214,6 +215,11 @@ function computeYearlyXirr(
   all.push({ amount: nav.toString(), date: terminalDate });
 
   const rate = xirr(all);
-  if (!Number.isFinite(rate) || Math.abs(rate) > 50) return null;
+  // xirr() caps at XIRR_MAX_RATE; this guard is a belt-and-suspenders check that
+  // documents the per-year-XIRR intent. A single calendar year that produced a
+  // >5000% annualized rate is almost certainly a missing-cost-basis or near-zero
+  // opening-balance data artifact, not a real return — null it rather than
+  // poison the yearly-returns table.
+  if (!Number.isFinite(rate) || Math.abs(rate) > XIRR_MAX_RATE) return null;
   return String(rate);
 }

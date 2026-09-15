@@ -1,3 +1,5 @@
+import { XIRR_MAX_RATE } from "./sanity-gates.js";
+
 export interface CashFlowPoint {
   amount: number | string;
   date: Date;
@@ -21,7 +23,8 @@ function dNpv(rate: number, flows: NormFlow[]): number {
 /**
  * Money-weighted return (XIRR): the annualized rate that makes the net present
  * value of the dated cash flows zero. Newton-Raphson with a bisection fallback.
- * Returns NaN if there isn't at least one inflow and one outflow.
+ * Returns NaN if there isn't at least one inflow and one outflow, or if the
+ * converged rate is implausibly large (see `XIRR_MAX_RATE` in sanity-gates).
  */
 export function xirr(points: CashFlowPoint[], guess = 0.1): number {
   if (points.length < 2) return NaN;
@@ -43,7 +46,14 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
     if (!isFinite(f) || !isFinite(df) || Math.abs(df) < 1e-12) break;
     const next = rate - f / df;
     if (!isFinite(next) || next <= -0.999999) break;
-    if (Math.abs(next - rate) < 1e-9) return next;
+    if (Math.abs(next - rate) < 1e-9) {
+      // #756: Newton-Raphson can converge on a technically-correct but
+      // implausibly large rate when the cash-flow history contains a
+      // near-zero early contribution followed by a much larger terminal
+      // value. Cap at XIRR_MAX_RATE so the all-time XIRR never renders an
+      // absurd headline (e.g. +84,214%).
+      return Math.abs(next) > XIRR_MAX_RATE ? NaN : next;
+    }
     rate = next;
   }
 
@@ -56,7 +66,13 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
   for (let i = 0; i < 200; i++) {
     const mid = (lo + hi) / 2;
     const fm = npv(mid, flows);
-    if (Math.abs(fm) < 1e-9) return mid;
+    // #756: same cap as the Newton path. This branch fires only when Newton's
+    // iteration diverged (derivative underflow, overshoot below -1, or
+    // non-finite arithmetic at i=0) AND bisection happened to find the root
+    // exactly at `fm ≈ 0` before exhausting its 200 iterations. Keep the cap
+    // symmetric with the Newton path so the rate ceiling can't be bypassed
+    // by falling through to bisection.
+    if (Math.abs(fm) < 1e-9) return Math.abs(mid) > XIRR_MAX_RATE ? NaN : mid;
     if (flo * fm < 0) {
       hi = mid;
     } else {
@@ -64,5 +80,10 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
       flo = fm;
     }
   }
-  return (lo + hi) / 2;
+  const converged = (lo + hi) / 2;
+  // #756: cap on the exhausted-iteration bisection path. Same rationale:
+  // a bisection that converged within ±1e-9 on its bracket but couldn't
+  // reduce `fm` to under 1e-9 in 200 iterations (rare, but possible for
+  // very flat NPV curves near the root) should still respect the cap.
+  return Math.abs(converged) > XIRR_MAX_RATE ? NaN : converged;
 }
