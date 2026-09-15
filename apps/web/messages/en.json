@@ -1187,6 +1187,7 @@
     "hint": "Type to search instruments and transactions.",
     "searching": "Searching…",
     "noResults": "No results.",
+    "error": "Search failed. Please try again.",
     "groupInstruments": "Instruments",
     "groupTransactions": "Transactions",
     "catalogBadge": "catalog",

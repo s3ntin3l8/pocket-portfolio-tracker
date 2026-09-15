@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  consumeSuppressedBack,
   isMarkerRegistered,
   notePendingProgrammaticBack,
   registerMarker,
@@ -116,7 +117,11 @@ export function useBackToClose(
     } else if (!open && wasOpen && pushedRef.current) {
       pushedRef.current = false;
       releaseMarker(id);
-      if (window.history.state?.backToCloseMarkerId === id) {
+      if (window.history.state?.backToCloseMarkerId === id && !consumeSuppressedBack()) {
+        // Skip `history.back()` when the close is paired with an intentional
+        // navigation — see `suppressNextHistoryBack` in back-to-close-stack.ts.
+        // The marker is still released above either way, so this close still
+        // cleans up its own back-to-close bookkeeping.
         notePendingProgrammaticBack();
         window.history.back();
       }
@@ -129,6 +134,14 @@ export function useBackToClose(
   // an `onPop` for a component that's already gone.
   React.useEffect(() => {
     if (typeof window === "undefined" || !enabled) return;
-    return () => releaseMarker(id);
+    return () => {
+      releaseMarker(id);
+      // Defensive: if this instance is unmounted while the close-cleanup effect
+      // hasn't run yet (e.g. a navigate()-then-unmount race on a conditionally
+      // rendered overlay), drain any leftover programmatic-back suppression so
+      // the next instance's close still pops its marker normally. No-op when
+      // the flag is already clear.
+      consumeSuppressedBack();
+    };
   }, [enabled, id]);
 }

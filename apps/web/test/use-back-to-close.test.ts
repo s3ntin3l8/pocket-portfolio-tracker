@@ -2,7 +2,11 @@ import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useBackToClose } from "../src/lib/use-back-to-close";
-import { resetBackToCloseStackForTests } from "../src/lib/back-to-close-stack";
+import {
+  consumeSuppressedBack,
+  resetBackToCloseStackForTests,
+  suppressNextHistoryBack,
+} from "../src/lib/back-to-close-stack";
 
 // This repo's vitest config shares the module registry across every test within a file
 // (`isolate` resets per file, not per test) — required so a leftover stack entry,
@@ -323,5 +327,35 @@ describe("useBackToClose", () => {
     rerender({ open: true });
 
     expect(pushSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression test: closing a CommandDialog (search palette) to navigate to a result
+  // (router.push) used to call history.back() because the marker was still the top
+  // history entry when the close cleanup effect ran — silently cancelling the
+  // navigation. `suppressNextHistoryBack`, called synchronously before the close, lets
+  // the cleanup effect skip that history.back() without changing any other close path.
+  it("skips history.back() on close when suppressNextHistoryBack was set", () => {
+    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const onOpenChange = vi.fn();
+    const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
+      initialProps: { open: false },
+    });
+    rerender({ open: true }); // pushes the marker
+
+    suppressNextHistoryBack(); // simulate GlobalSearch.navigate() before onOpenChange(false)
+    rerender({ open: false }); // close paired with router.push
+
+    expect(backSpy).not.toHaveBeenCalled();
+    // One-shot: the flag was consumed, a later unrelated close still pops normally.
+    rerender({ open: true }); // re-open, pushes a fresh marker
+    rerender({ open: false }); // unrelated close
+    expect(backSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("consumeSuppressedBack is a read-and-reset one-shot", () => {
+    expect(consumeSuppressedBack()).toBe(false);
+    suppressNextHistoryBack();
+    expect(consumeSuppressedBack()).toBe(true);
+    expect(consumeSuppressedBack()).toBe(false);
   });
 });

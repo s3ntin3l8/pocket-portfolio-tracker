@@ -1193,6 +1193,7 @@
     "hint": "Ketik untuk mencari instrumen dan transaksi.",
     "searching": "Mencari…",
     "noResults": "Tidak ada hasil.",
+    "error": "Pencarian gagal. Silakan coba lagi.",
     "groupInstruments": "Instrumen",
     "groupTransactions": "Transaksi",
     "catalogBadge": "katalog",
