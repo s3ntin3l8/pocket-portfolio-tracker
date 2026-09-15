@@ -54,11 +54,19 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
  * independent retry, and a `pgboss.job` row an operator can actually see progress on —
  * instead of one global job whose 900s handler timeout is exceeded by the very first
  * force run at platform scale. See issue #745.
+ *
+ * `expireInSeconds` was raised from 900 to 1800 in #755 after a 26-instrument, ~5-year
+ * portfolio (~1881 days) was observed running ~25–30 minutes per pass, with pg-boss
+ * marking the job failed/retry *while the handler was still running* — the orphaned
+ * execution would finish and log success, then the retry would kick off a redundant
+ * concurrent run. This is a band-aid; the proper fix (a handler heartbeat so
+ * pg-boss's expiry supervisor doesn't reclaim in-flight jobs) is tracked as a
+ * follow-up issue.
  */
 export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
 export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
 export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
-  expireInSeconds: 900,
+  expireInSeconds: 1800,
   retryLimit: 2,
   retryDelay: 300,
   retryBackoff: true,
