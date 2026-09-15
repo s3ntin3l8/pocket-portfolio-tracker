@@ -40,15 +40,16 @@ export function registerJobsRoutes(app: FastifyInstance) {
         // active work. For user-triggerable queues (`backfill-stale-history`) and
         // fan-out children (`backfill-portfolio`) we keep the full count so a
         // freshly-triggered job that hasn't started yet is still visible.
-        // `IN ()` with an empty list is a Postgres syntax error, so guard against
-        // that — if every cron queue ever loses the flag, fall back to the
-        // pre-#748 behavior (count all three states) rather than crashing the query.
+        // Base on all three states so the no-flags fallback is naturally correct
+        // (count everything), then conditionally exclude cron-queue `created` rows.
         const cronOnlyActiveInFlightNames: string[] = JOB_DESCRIPTORS.filter(
           (j) => (j as { cronOnlyActiveInFlight?: boolean }).cronOnlyActiveInFlight === true,
         ).map((j) => j.name);
+        // `NOT IN ()` is always true in Postgres, so an empty list correctly
+        // results in no exclusion — all three states count for all queues.
         const excludeCreatedForCron =
           cronOnlyActiveInFlightNames.length > 0
-            ? sql`OR (state = 'created' AND NOT (name IN ${cronOnlyActiveInFlightNames}))`
+            ? sql`AND NOT (state = 'created' AND name IN ${cronOnlyActiveInFlightNames})`
             : sql``;
         type JobStatusRow = {
           name: string;
@@ -62,7 +63,7 @@ export function registerJobsRoutes(app: FastifyInstance) {
             MAX(completed_on) FILTER (WHERE state = 'completed') AS last_completed,
             MAX(completed_on) FILTER (WHERE state = 'failed')    AS last_failed,
             COUNT(*) FILTER (
-              WHERE state IN ('active', 'retry')
+              WHERE state IN ('active', 'retry', 'created')
               ${excludeCreatedForCron}
             ) AS in_progress
           FROM pgboss.job

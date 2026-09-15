@@ -150,7 +150,6 @@ export const JOB_DESCRIPTORS = [
       "Fetch sector/industry/country from market-data providers for held instruments missing a sector.",
     cron: INSTRUMENT_META_CRON,
     supportsForce: true,
-    cronOnlyActiveInFlight: true,
   },
   {
     name: GC_RECEIPTS_QUEUE,
