@@ -55,18 +55,27 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
  * instead of one global job whose 900s handler timeout is exceeded by the very first
  * force run at platform scale. See issue #745.
  *
- * `expireInSeconds` was raised from 900 to 1800 in #755 after a 26-instrument, ~5-year
- * portfolio (~1881 days) was observed running ~25–30 minutes per pass, with pg-boss
- * marking the job failed/retry *while the handler was still running* — the orphaned
- * execution would finish and log success, then the retry would kick off a redundant
- * concurrent run. This is a band-aid; the proper fix (a handler heartbeat so
- * pg-boss's expiry supervisor doesn't reclaim in-flight jobs) is tracked as a
- * follow-up issue.
+ * `expireInSeconds` was raised from 900 to 2400 in #755 after a 26-instrument, ~5-year
+ * portfolio (~1881 days) was observed logging three "backfill-portfolio complete" lines
+ * ~25–30 minutes apart on a single force trigger, with pg-boss marking the job
+ * failed/retry *while the handler was still running* — the orphaned execution would
+ * finish and log success while a concurrent retry kicked off a redundant second (and
+ * third) run of the same portfolio. 2400s (40 min) leaves comfortable headroom over
+ * the observed ~30 min upper bound; the previous raise to 1800s in the first iteration
+ * of this PR was tight enough that any run exceeding 30 min by a second would have hit
+ * the same orphaning bug.
+ *
+ * `retryLimit: 2` stays: the orphaning case is no longer the dominant cost (a real
+ * run that completes within 2400s gets zero retries); only a handler that *throws*
+ * still goes through the retry path, and that's the case retries are meant for. A
+ * portfolio that *always* exceeds 2400s is genuinely oversized for this code path and
+ * would benefit from per-instrument chunking (follow-up #761) or a handler heartbeat
+ * (#762), not from more retries with the same broken supervision.
  */
 export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
 export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
 export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
-  expireInSeconds: 1800,
+  expireInSeconds: 2400,
   retryLimit: 2,
   retryDelay: 300,
   retryBackoff: true,
