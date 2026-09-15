@@ -9,6 +9,7 @@ import type {
   SearchTransactionResult,
 } from "@portfolio/api-client";
 import { useApiClient } from "@/lib/api";
+import { suppressNextHistoryBack } from "@/lib/back-to-close-stack";
 import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,7 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [results, setResults] = useState<GlobalSearchResult | null>(null);
 
   // Debounce timer + stale-response guard.
@@ -70,6 +72,7 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
       setQuery("");
       setResults(null);
       setLoading(false);
+      setError(false);
       if (timerRef.current) clearTimeout(timerRef.current);
     }
   }
@@ -81,10 +84,12 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
       const trimmed = q.trim();
       if (!trimmed) {
         setLoading(false);
+        setError(false);
         setResults(null);
         return;
       }
       setLoading(true);
+      setError(false);
       latestQueryRef.current = trimmed;
       timerRef.current = setTimeout(async () => {
         try {
@@ -96,6 +101,13 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
           // Drop stale responses.
           if (latestQueryRef.current !== trimmed) return;
           setResults(data);
+        } catch {
+          // Surface the failure instead of silently leaving an empty list — otherwise
+          // a 500 / network blip is indistinguishable from "no matches".
+          if (latestQueryRef.current === trimmed) {
+            setError(true);
+            setResults(null);
+          }
         } finally {
           if (latestQueryRef.current === trimmed) setLoading(false);
         }
@@ -110,6 +122,12 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
   }
 
   function navigate(path: string) {
+    // Suppress `useBackToClose`'s `history.back()` cleanup for this close — the dialog
+    // is closing *to* a new route, not from a user back-press. Without this, the cleanup
+    // effect can fire before Next.js has called `history.pushState` for the new route,
+    // see the marker is still the top entry, and call `history.back()` — silently
+    // cancelling the navigation. See `back-to-close-stack.ts` for the full writeup.
+    suppressNextHistoryBack();
     handleOpenChange(false);
     router.push(path);
   }
@@ -128,8 +146,12 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
   const trimmedQuery = query.trim();
 
   // Determine which single empty-state message to show (mutually exclusive).
+  // Error wins over every other state: an outstanding failure is more actionable than
+  // a stale "Searching…" or a misleading "No results." that would otherwise be shown
+  // while the previous request's results have been cleared.
   let emptyContent: string | null = null;
   if (trimmedQuery === "") emptyContent = t("hint");
+  else if (error) emptyContent = t("error");
   else if (loading && !hasResults) emptyContent = t("searching");
   else if (!loading && !hasResults) emptyContent = t("noResults");
 

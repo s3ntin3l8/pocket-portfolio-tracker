@@ -34,6 +34,17 @@ let stack: MarkerEntry[] = [];
 let pendingProgrammaticBacks = 0;
 let listenerAttached = false;
 
+// One-shot guard for the programmatic-close + `router.push` race in `CommandDialog`:
+// closing the palette to navigate to a result can otherwise fire `history.back()` from
+// the `useBackToClose` cleanup effect before Next.js has called `history.pushState` for
+// the new route — the marker is still the top entry, the cleanup thinks it's a real
+// back-press, and the navigation is undone (clicking a search result "does nothing").
+// Set synchronously before the dialog's `onOpenChange(false)`; consumed (and reset)
+// inside the same effect that would otherwise call `history.back()`. Only the next
+// transition is affected — a stale leftover can't suppress an unrelated later close
+// because the effect always reads-and-resets the flag in one step.
+let skipNextBack = false;
+
 function handlePopState() {
   if (pendingProgrammaticBacks > 0) {
     // We caused this via our own history.back() (releasing a non-topmost instance's
@@ -94,6 +105,23 @@ export function notePendingProgrammaticBack() {
   pendingProgrammaticBacks += 1;
 }
 
+/** Mark the very next `useBackToClose` cleanup transition as one that shouldn't call
+ *  `history.back()` — used when a `CommandDialog`/search result close is followed
+ *  immediately by a `router.push`. See the `skipNextBack` declaration above for why
+ *  this exists. No-op on the server. */
+export function suppressNextHistoryBack() {
+  if (typeof window === "undefined") return;
+  skipNextBack = true;
+}
+
+/** Read-and-reset the one-shot skip flag. Returns `true` if the next close's
+ *  `history.back()` should be skipped. See `suppressNextHistoryBack`. */
+export function consumeSuppressedBack(): boolean {
+  if (!skipNextBack) return false;
+  skipNextBack = false;
+  return true;
+}
+
 /** Test-only: this repo's vitest config shares the module registry across every test
  *  within a file (`isolate` resets per-file, not per-test), so a test that leaves stack
  *  entries or a nonzero counter behind would leak into later tests in the same file.
@@ -103,6 +131,7 @@ export function notePendingProgrammaticBack() {
 export function resetBackToCloseStackForTests() {
   stack = [];
   pendingProgrammaticBacks = 0;
+  skipNextBack = false;
   if (typeof window !== "undefined" && listenerAttached) {
     window.removeEventListener("popstate", handlePopState);
   }
