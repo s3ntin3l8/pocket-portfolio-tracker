@@ -87,6 +87,15 @@ export const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60; // 6 hours
  * The full descriptor for each scheduled queue, used by the admin jobs panel.
  * `cron: null` means the queue is triggered on-demand (no fixed schedule).
  *
+ * `cronOnlyActiveInFlight` (see #748) tells the admin jobs route to exclude
+ * `created`-state rows from the in-flight count. For a queue that fires on a
+ * fixed schedule (every 5 min, hourly, daily…) there is almost always at least
+ * one `created` row sitting in the queue waiting for a worker — counting those
+ * as "in flight" misleads operators into thinking real work is happening when
+ * it isn't. Set this to true for queues where the `created` backlog is
+ * schedule-dominated noise; leave false for queues where a `created` row
+ * signals a user's triggered job hasn't started yet.
+ *
  * #105 note: `triggerJob()` only affects the replica that receives the request.
  *  In a multi-replica setup the pg-boss job is still enqueued in Postgres so any
  *  idle worker replica can pick it up, but `invalidateMarketData()` /
@@ -99,12 +108,14 @@ export const JOB_DESCRIPTORS = [
     label: "Price refresh",
     description: "Refresh last prices for all held instruments during market hours.",
     cron: SCHEDULE_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: SNAPSHOT_QUEUE,
     label: "Daily snapshot",
     description: "Record daily net-worth snapshots for the dashboard chart.",
     cron: SNAPSHOT_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: INTRADAY_SNAPSHOT_QUEUE,
@@ -112,36 +123,42 @@ export const JOB_DESCRIPTORS = [
     description:
       "Capture a net-worth point every 15 minutes (market-hours-gated) for the 1D/7D value chart.",
     cron: INTRADAY_SNAPSHOT_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: TR_SYNC_QUEUE,
     label: "Trade Republic sync",
     description: "Pull the latest Trade Republic timeline events and stage as draft imports.",
     cron: TR_SYNC_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: IBKR_SYNC_QUEUE,
     label: "Interactive Brokers sync",
     description: "Fetch IBKR Flex EOD statements and stage new transactions as draft imports.",
     cron: "0 2 * * *", // default; overridden by IBKR_SYNC_CRON env at runtime
+    cronOnlyActiveInFlight: true,
   },
   {
     name: ANTAM_QUEUE,
     label: "Gold buyback scrape",
     description: "Scrape Antam and Galeri24 buyback rates into the scraped-quotes cache.",
     cron: ANTAM_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: NAV_QUEUE,
     label: "Reksa dana NAV scrape",
     description: "Scrape the Bibit NAV catalogue for all tracked mutual funds.",
     cron: NAV_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: DIVIDEND_QUEUE,
     label: "Dividend refresh",
     description: "Pull announced and historical dividend events from market-data providers.",
     cron: DIVIDEND_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: INSTRUMENT_META_QUEUE,
@@ -157,6 +174,7 @@ export const JOB_DESCRIPTORS = [
     description:
       "Delete staged receipt documents from abandoned draft imports (older than 7 days).",
     cron: GC_RECEIPTS_CRON,
+    cronOnlyActiveInFlight: true,
   },
   {
     name: BACKFILL_STALE_QUEUE,

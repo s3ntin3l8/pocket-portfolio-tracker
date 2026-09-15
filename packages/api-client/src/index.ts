@@ -152,8 +152,16 @@ export interface AdminJob {
   /** Whether this job supports a force flag that bypasses caches/stale checks. */
   supportsForce?: boolean;
   /**
-   * In-flight work for this queue right now (active + queued job rows), so an operator
-   * can tell a long-running trigger apart from one that silently failed. 0 when idle.
+   * In-flight work for this queue right now, so an operator can tell a long-running
+   * trigger apart from one that silently failed. 0 when idle.
+   *
+   * The set of states counted varies by queue type (#748):
+   *   - cron-only queues (`refresh-prices`, `intraday-snapshot`, …): only `active`
+   *     and `retry` — `created` rows are just queue backlog waiting for the next
+   *     worker tick and would over-report depth as active work
+   *   - user-triggerable queues (`backfill-stale-history`) and fan-out children
+   *     (`backfill-portfolio`): `active` + `retry` + `created` — a freshly
+   *     triggered job that hasn't started yet IS a meaningful in-flight signal
    */
   inProgress?: number;
   /**

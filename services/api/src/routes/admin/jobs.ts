@@ -33,6 +33,24 @@ export function registerJobsRoutes(app: FastifyInstance) {
           ...JOB_DESCRIPTORS.map((j) => j.name),
           BACKFILL_PORTFOLIO_QUEUE,
         ];
+        // #748: for queues that only run on a cron schedule, exclude `created`-state
+        // rows from the in-flight count. A cron queue with a 5-minute cadence almost
+        // always has at least one `created` row sitting in the queue waiting for a
+        // worker — counting those as "in flight" would misreport queue depth as
+        // active work. For user-triggerable queues (`backfill-stale-history`) and
+        // fan-out children (`backfill-portfolio`) we keep the full count so a
+        // freshly-triggered job that hasn't started yet is still visible.
+        // Base on all three states so the no-flags fallback is naturally correct
+        // (count everything), then conditionally exclude cron-queue `created` rows.
+        const cronOnlyActiveInFlightNames: string[] = JOB_DESCRIPTORS.filter(
+          (j) => (j as { cronOnlyActiveInFlight?: boolean }).cronOnlyActiveInFlight === true,
+        ).map((j) => j.name);
+        // `NOT IN ()` is always true in Postgres, so an empty list correctly
+        // results in no exclusion — all three states count for all queues.
+        const excludeCreatedForCron =
+          cronOnlyActiveInFlightNames.length > 0
+            ? sql`AND NOT (state = 'created' AND name IN ${cronOnlyActiveInFlightNames})`
+            : sql``;
         type JobStatusRow = {
           name: string;
           last_completed: string | null;
@@ -44,7 +62,10 @@ export function registerJobsRoutes(app: FastifyInstance) {
             name,
             MAX(completed_on) FILTER (WHERE state = 'completed') AS last_completed,
             MAX(completed_on) FILTER (WHERE state = 'failed')    AS last_failed,
-            COUNT(*) FILTER (WHERE state IN ('active', 'created', 'retry')) AS in_progress
+            COUNT(*) FILTER (
+              WHERE state IN ('active', 'retry', 'created')
+              ${excludeCreatedForCron}
+            ) AS in_progress
           FROM pgboss.job
           WHERE name IN ${queueNames}
             AND (completed_on > NOW() - INTERVAL '30 days' OR completed_on IS NULL)
