@@ -96,6 +96,7 @@ export {
   PERIOD_LOSS_MAX_PCT,
   MAX_PRICE_CARRY_FORWARD_DAYS,
   DEAD_FEED_MISS_THRESHOLD,
+  XIRR_MAX_RATE,
 } from "./sanity-gates.js";
 export {
   computeTrades,
