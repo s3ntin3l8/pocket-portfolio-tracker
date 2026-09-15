@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.18](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.17...v0.1.18) (2026-09-15)
+
+
+### Bug Fixes
+
+* **admin:** exclude created-state rows from inProgress for cron-only queues ([#765](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/765)) ([cee33d8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/cee33d84d79c888d1403c77ee97e560c58361c7f))
+* **backfill:** widen backfill-portfolio expireInSeconds to 2400s ([#766](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/766)) ([978757e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/978757e1caf3466ffa3ed8a8a157d5fdcb9ea828))
+* **core:** cap XIRR at XIRR_MAX_RATE to suppress absurd annualized returns ([#767](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/767)) ([3b47257](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3b47257626d41d2cac63492d5360ac9704f55033))
+* **web:** make global search result clicks navigate, surface search failures ([#768](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/768)) ([a41ccdd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a41ccddb3c3e1c3c900758196c8e4510c50a08e0))
+
 ## [0.1.17](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.16...v0.1.17) (2026-09-14)
 
 
