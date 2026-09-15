@@ -350,8 +350,11 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
 
   // Per-portfolio backfill work, fanned out from backfill-stale-history below. Each
   // portfolio gets its own pg-boss job (own expiry budget, independent retry, visible
-  // pgboss.job row) instead of one global job whose 900s handler timeout a force run at
-  // platform scale blows through on the very first invocation. See issue #745.
+  // pgboss.job row) instead of one global job whose handler timeout a force run at
+  // platform scale blows through on the very first invocation. The per-portfolio
+  // budget was raised from 900s to 2400s in #755 after a 26-instrument, ~5-year
+  // portfolio was observed logging three orphan "complete" lines ~25–30 min apart
+  // on a single trigger (see #755). See issues #745 and #755.
   await boss.createQueue(BACKFILL_PORTFOLIO_QUEUE, BACKFILL_PORTFOLIO_QUEUE_OPTIONS);
   await boss.updateQueue(BACKFILL_PORTFOLIO_QUEUE, BACKFILL_PORTFOLIO_QUEUE_OPTIONS);
   // batchSize pinned to 1 (pg-boss's own default, made explicit here): the loop below
