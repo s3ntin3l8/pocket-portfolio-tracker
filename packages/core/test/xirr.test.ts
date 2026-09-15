@@ -4,28 +4,29 @@ import { xirr, type CashFlowPoint } from "../src/xirr.js";
 const d = (s: string) => new Date(s);
 
 describe("xirr — sanity bound (#756)", () => {
-  it("returns NaN for a near-zero early contribution with very large terminal value over short horizon", () => {
-    // Reproduces the class of bug from #756: a tiny early "acquisition" followed
-    // by a much larger terminal value can produce a technically-correct but
-    // absurd annualized rate. With a 1-day horizon and €0.01 → €10K, the annual
-    // rate exceeds 5000% (XIRR_MAX_RATE) and must be capped to NaN.
+  it("returns NaN for a 1-day flow that would converge to ~53x (just over the cap)", () => {
+    // -1000 → +1011 in 1 day yields (1011/1000)-1 = 0.011 daily → annualized
+    // rate ≈ 53.22, well above XIRR_MAX_RATE (50). The solver converges here
+    // (no overflow), but the cap fires and returns NaN.
     const flows: CashFlowPoint[] = [
-      { amount: -0.01, date: d("2024-01-01") },
-      { amount: 10_000, date: d("2024-01-02") },
+      { amount: -1000, date: d("2024-01-01") },
+      { amount: 1011, date: d("2024-01-02") },
     ];
     const rate = xirr(flows);
     expect(Number.isNaN(rate)).toBe(true);
   });
 
-  it("returns NaN for a one-day horizon with extreme value growth", () => {
-    // Same class of bug: $1 → $1M in one day. The annualized rate is astronomical
-    // regardless of the absolute dollar amounts.
+  it("returns a finite rate for a 1-day flow just below the cap", () => {
+    // Just-under-cap twin: -1000 → +1010.6 yields annualized rate ≈ 45.93,
+    // below XIRR_MAX_RATE (50). The solver converges to a finite rate — no cap.
     const flows: CashFlowPoint[] = [
-      { amount: -1, date: d("2026-01-01") },
-      { amount: 1_000_000, date: d("2026-01-02") },
+      { amount: -1000, date: d("2024-01-01") },
+      { amount: 1010.6, date: d("2024-01-02") },
     ];
     const rate = xirr(flows);
-    expect(Number.isNaN(rate)).toBe(true);
+    expect(Number.isFinite(rate)).toBe(true);
+    expect(rate).toBeGreaterThan(40);
+    expect(rate).toBeLessThan(50);
   });
 
   it("returns NaN when the cap is exceeded over a multi-year horizon", () => {
@@ -53,9 +54,10 @@ describe("xirr — sanity bound (#756)", () => {
     ];
     const rate = xirr(flows);
     expect(Number.isFinite(rate)).toBe(true);
-    // True root is r=0 (no growth, same net cash in and out over 1y),
-    // but with the derivative noise the converged value is close to 0.
-    expect(Math.abs(rate)).toBeLessThan(1);
+    // Flows net -200 in / +100 out: npv = -200 + 100/(1+r), root = -0.5.
+    // Newton's derivative noise causes the first iteration to overshoot below -1,
+    // falling through to bisection — which converges to the exact root.
+    expect(rate).toBeCloseTo(-0.5, 2);
   });
 
   it("still returns a finite rate for a genuine high-but-plausible return", () => {
