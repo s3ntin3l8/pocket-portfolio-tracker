@@ -66,6 +66,12 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
   for (let i = 0; i < 200; i++) {
     const mid = (lo + hi) / 2;
     const fm = npv(mid, flows);
+    // #756: same cap as the Newton path. This branch fires only when Newton's
+    // iteration diverged (derivative underflow, overshoot below -1, or
+    // non-finite arithmetic at i=0) AND bisection happened to find the root
+    // exactly at `fm ≈ 0` before exhausting its 200 iterations. Keep the cap
+    // symmetric with the Newton path so the rate ceiling can't be bypassed
+    // by falling through to bisection.
     if (Math.abs(fm) < 1e-9) return Math.abs(mid) > XIRR_MAX_RATE ? NaN : mid;
     if (flo * fm < 0) {
       hi = mid;
@@ -75,6 +81,9 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
     }
   }
   const converged = (lo + hi) / 2;
-  // #756: same cap on the bisection-converged rate.
+  // #756: cap on the exhausted-iteration bisection path. Same rationale:
+  // a bisection that converged within ±1e-9 on its bracket but couldn't
+  // reduce `fm` to under 1e-9 in 200 iterations (rare, but possible for
+  // very flat NPV curves near the root) should still respect the cap.
   return Math.abs(converged) > XIRR_MAX_RATE ? NaN : converged;
 }

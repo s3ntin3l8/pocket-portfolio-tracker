@@ -1,4 +1,5 @@
 import { xirr, type CashFlowPoint } from "./xirr.js";
+import { XIRR_MAX_RATE } from "./sanity-gates.js";
 
 /**
  * Compute period-scoped XIRR. Treats the portfolio value at `anchorDate` (the date of
@@ -38,7 +39,10 @@ export function periodXirr(
   ];
 
   const rate = xirr(flows);
-  // Clip obviously-broken results (e.g. near-zero startNav, single-day horizon).
-  if (!Number.isFinite(rate) || Math.abs(rate) > 50) return null;
+  // xirr() already caps at XIRR_MAX_RATE, but keep this guard here as a
+  // belt-and-suspenders check that documents the period-XIRR-specific intent:
+  // a period shorter than a year with extreme value movement produces an
+  // annualized rate that's numerically correct but never meaningful to a user.
+  if (!Number.isFinite(rate) || Math.abs(rate) > XIRR_MAX_RATE) return null;
   return rate;
 }
