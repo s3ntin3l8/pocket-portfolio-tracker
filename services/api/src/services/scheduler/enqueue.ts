@@ -1,5 +1,7 @@
 import type { PgBoss } from "pg-boss";
+import type { FanOutSubJob } from "../backfill/fan-out.js";
 import {
+  BACKFILL_INSTRUMENT_QUEUE,
   BACKFILL_PORTFOLIO_QUEUE,
   BACKFILL_PORTFOLIO_SINGLETON_SECONDS,
   IBKR_SYNC_QUEUE,
@@ -142,6 +144,53 @@ export async function enqueueBackfillPortfolio(
     // actual error is ever seen. console.error, not console.warn: a real backfill
     // silently never got enqueued for this portfolio.
     console.error(`[backfill] enqueue failed for portfolio ${portfolioId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Enqueue one per-instrument fan-out sub-job onto BACKFILL_INSTRUMENT_QUEUE (#761/#773).
+ * `singletonKey` is the coordination row's own id — not a throttle key, since
+ * `planFanOut`'s idempotent upsert (see fan-out.ts) can legitimately REUSE the same
+ * `backfillJobId` across a pg-boss retry of the portfolio job. Deliberately no
+ * `singletonSeconds`: under pg-boss's default `standard` queue policy `singletonKey`
+ * alone doesn't dedup (that needs a `short`/`singleton`/`stately`/`exclusive` policy) —
+ * `singletonSeconds` is a time *throttle*, and pairing it with a reused key would make a
+ * legitimate retry's re-send return `null` (job id) and silently never enqueue, turning
+ * a recoverable retry into a guaranteed poll timeout. The key is still passed so
+ * `pgboss.job` rows stay greppable by coordination row during an incident.
+ *
+ * Returns whether the send succeeded, mirroring `enqueueBackfillPortfolio` — this is
+ * the sole delivery mechanism for the sub-job, so `runFanOut` (fan-out.ts) treats a
+ * `false` as fatal rather than silently losing the sub-job.
+ */
+export async function enqueueBackfillInstrument(
+  sub: FanOutSubJob & { portfolioId: string },
+): Promise<boolean> {
+  if (!activeBoss) return false;
+  try {
+    const jobId = await activeBoss.send(
+      BACKFILL_INSTRUMENT_QUEUE,
+      {
+        backfillJobId: sub.backfillJobId,
+        portfolioId: sub.portfolioId,
+        instrumentId: sub.instrumentId,
+        chunkStart: sub.chunkStart,
+        chunkEnd: sub.chunkEnd,
+        tailOnly: sub.tailOnly,
+      },
+      { singletonKey: sub.backfillJobId },
+    );
+    // pg-boss's send() returns null on a singleton-key collision — see the doc comment
+    // above for why that shouldn't happen here under the standard policy, but treat it
+    // as a failure rather than silently reporting success for a sub-job that was never
+    // actually (re-)enqueued.
+    return jobId !== null;
+  } catch (err) {
+    console.error(
+      `[backfill] enqueue failed for instrument sub-job ${sub.backfillJobId} (instrument ${sub.instrumentId}):`,
+      err,
+    );
     return false;
   }
 }

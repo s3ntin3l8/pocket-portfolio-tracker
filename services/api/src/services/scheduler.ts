@@ -26,6 +26,8 @@ export {
   BACKFILL_STALE_CRON,
   BACKFILL_PORTFOLIO_QUEUE,
   BACKFILL_INSTRUMENT_QUEUE,
+  BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+  BACKFILL_FAN_OUT_MAX_WAIT_MS,
   INSTRUMENT_META_SINGLETON_SECONDS,
 } from "./scheduler/config.js";
 
@@ -40,6 +42,7 @@ export {
   enqueueTrSync,
   enqueueRecompute,
   enqueueBackfillPortfolio,
+  enqueueBackfillInstrument,
   enqueueInstrumentMetadata,
   usesPglite,
 } from "./scheduler/enqueue.js";
