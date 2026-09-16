@@ -7,3 +7,5 @@ CREATE TABLE "backfill_jobs" (
 	"status" text DEFAULT 'pending' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+--> statement-breakpoint
+CREATE UNIQUE INDEX "backfill_portfolio_instrument_chunk_idx" ON "backfill_jobs" USING btree ("portfolio_id","instrument_id","chunk_start");
