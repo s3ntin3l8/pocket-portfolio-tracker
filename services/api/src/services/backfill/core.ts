@@ -591,7 +591,7 @@ export async function backfillPortfolioHistory(
 export async function computeBackfillSnapshots(
   db: DB,
   portfolioId: string,
-  opts: { fromDate?: string; tailOnly?: boolean } = {},
+  opts: { fromDate?: string } = {},
 ): Promise<BackfillResult> {
   const txRows = await db
     .select()

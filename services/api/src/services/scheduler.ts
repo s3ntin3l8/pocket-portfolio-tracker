@@ -25,6 +25,7 @@ export {
   BACKFILL_STALE_QUEUE,
   BACKFILL_STALE_CRON,
   BACKFILL_PORTFOLIO_QUEUE,
+  BACKFILL_INSTRUMENT_QUEUE,
   INSTRUMENT_META_SINGLETON_SECONDS,
 } from "./scheduler/config.js";
 
@@ -44,9 +45,9 @@ export {
 } from "./scheduler/enqueue.js";
 
 import { PgBoss } from "pg-boss";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { ibkrConnections, trConnections } from "@portfolio/db";
+import { backfillJobs, ibkrConnections, trConnections } from "@portfolio/db";
 import { getDb } from "../db/client.js";
 import { getMarketData, flushUsage } from "./market-data.js";
 import { refreshHeldPrices } from "./refresh.js";
@@ -56,7 +57,12 @@ import { recordDailySnapshots, recordIntradaySnapshots } from "./snapshots.js";
 import { refreshAntamBuyback, refreshGaleri24Buyback, refreshNav } from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
 import { syncIbkrConnection } from "./ibkr/sync.js";
-import { backfillPortfolioHistory, backfillStalePortfolios } from "./backfill.js";
+import {
+  backfillPortfolioHistory,
+  computeBackfillSnapshots,
+  fetchInstrumentPrices,
+  backfillStalePortfolios,
+} from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 import { resetStaleSyncFlags } from "./scheduler/cleanup.js";
 import { setActiveBoss, usesPglite, enqueueBackfillPortfolio } from "./scheduler/enqueue.js";
@@ -86,6 +92,8 @@ import {
   BACKFILL_STALE_QUEUE_OPTIONS,
   BACKFILL_PORTFOLIO_QUEUE,
   BACKFILL_PORTFOLIO_QUEUE_OPTIONS,
+  BACKFILL_INSTRUMENT_QUEUE,
+  BACKFILL_INSTRUMENT_QUEUE_OPTIONS,
 } from "./scheduler/config.js";
 
 /**
@@ -371,14 +379,73 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         fromDate?: string;
         tailOnly?: boolean;
       };
+
       try {
-        const result = await backfillPortfolioHistory(
+        // Planner path (#761): fan out per-instrument work, poll for completion
+        const plannerResult = await backfillPortfolioHistory(
           getDb(),
           await getMarketData(),
           app.config.MARKET_DATA_TTL_MS,
           portfolioId,
-          { fromDate, tailOnly },
+          { fromDate, tailOnly, planner: true },
         );
+
+        if ("pending" in plannerResult && (plannerResult as { pending: number }).pending > 0) {
+          const pResult = plannerResult as {
+            pending: number;
+            subJobIds: string[];
+          };
+          app.log.info(
+            { portfolioId, subJobs: pResult.pending },
+            "backfill-portfolio: planner enqueued sub-jobs, polling for completion",
+          );
+
+          // Poll for sub-job completion
+          let pending = pResult.pending;
+          const subJobIds = new Set(pResult.subJobIds);
+          while (pending > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+            const statusRows = await getDb()
+              .select({ id: backfillJobs.id, status: backfillJobs.status })
+              .from(backfillJobs)
+              .where(inArray(backfillJobs.id, [...subJobIds] as string[]));
+            const byStatus = new Map(statusRows.map((r) => [r.id, r.status]));
+            const failedIds = [...subJobIds].filter((id) => byStatus.get(id) === "failed");
+            if (failedIds.length > 0) {
+              app.log.warn(
+                { portfolioId, failed: failedIds.length, failedIds },
+                "backfill-portfolio: sub-jobs failed, aborting planner",
+              );
+              throw new Error(`${failedIds.length}/${subJobIds.size} instrument sub-jobs failed`);
+            }
+            const doneCount = statusRows.filter((r) => r.status === "done").length;
+            pending = subJobIds.size - doneCount;
+
+            if (pending > 0) {
+              app.log.debug(
+                { portfolioId, pending, done: doneCount },
+                "backfill-portfolio: still waiting for sub-jobs",
+              );
+            }
+          }
+
+          app.log.info(
+            { portfolioId },
+            "backfill-portfolio: all sub-jobs complete, computing snapshots",
+          );
+
+          // Clean up coordination records — one row per instrument per run,
+          // no economic state. Cleanup is best-effort; orphan rows are harmless.
+          try {
+            await getDb().delete(backfillJobs).where(eq(backfillJobs.portfolioId, portfolioId));
+          } catch {
+            // best-effort
+          }
+        }
+
+        // Compute snapshots from the prices written by sub-jobs (or inline)
+        const result = await computeBackfillSnapshots(getDb(), portfolioId, { fromDate });
         await flushUsage();
         app.log.info({ portfolioId, fromDate, tailOnly, ...result }, "backfill-portfolio complete");
       } catch (err) {
@@ -438,6 +505,58 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     }
   });
   await boss.schedule(BACKFILL_STALE_QUEUE, BACKFILL_STALE_CRON);
+
+  // Per-instrument backfill sub-jobs (#761). Each job fetches prices for one
+  // instrument within a date range and writes them to the `prices` table.
+  // Enqueued by the backfill-portfolio planner; the planner polls for completion.
+  await boss.createQueue(BACKFILL_INSTRUMENT_QUEUE, BACKFILL_INSTRUMENT_QUEUE_OPTIONS);
+  await boss.updateQueue(BACKFILL_INSTRUMENT_QUEUE, BACKFILL_INSTRUMENT_QUEUE_OPTIONS);
+  await boss.work(BACKFILL_INSTRUMENT_QUEUE, { batchSize: 1 }, async (jobs) => {
+    for (const job of jobs) {
+      const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd } = job.data as {
+        backfillJobId: string;
+        portfolioId: string;
+        instrumentId: string;
+        chunkStart: string;
+        chunkEnd: string;
+      };
+      try {
+        const result = await fetchInstrumentPrices(getDb(), await getMarketData(), {
+          portfolioId,
+          instrumentId,
+          chunkStart,
+          chunkEnd,
+        });
+        await flushUsage();
+
+        // Mark coordination row as done
+        await getDb()
+          .update(backfillJobs)
+          .set({ status: "done" })
+          .where(eq(backfillJobs.id, backfillJobId));
+
+        app.log.info(
+          { backfillJobId, instrumentId, chunkStart, chunkEnd, days: result.days },
+          "backfill-instrument complete",
+        );
+      } catch (err) {
+        // Mark coordination row as failed so the planner doesn't poll forever
+        try {
+          await getDb()
+            .update(backfillJobs)
+            .set({ status: "failed" })
+            .where(eq(backfillJobs.id, backfillJobId));
+        } catch {
+          // best-effort
+        }
+        app.log.error(
+          { err, backfillJobId, instrumentId, chunkStart, chunkEnd },
+          "backfill-instrument failed",
+        );
+        throw err;
+      }
+    }
+  });
 
   // On-demand recompute after transaction mutations. Debounced per portfolio so bulk
   // imports collapse to one job; fromDate bounds the work to the affected window.
