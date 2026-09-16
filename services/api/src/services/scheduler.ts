@@ -81,6 +81,7 @@ import {
   GC_RECEIPTS_QUEUE,
   GC_RECEIPTS_CRON,
   RECOMPUTE_QUEUE,
+  RECOMPUTE_QUEUE_OPTIONS,
   BACKFILL_STALE_QUEUE,
   BACKFILL_STALE_CRON,
   BACKFILL_STALE_QUEUE_OPTIONS,
@@ -371,6 +372,11 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         fromDate?: string;
         tailOnly?: boolean;
       };
+      // Heartbeat supervision is pg-boss's own (#763): BACKFILL_PORTFOLIO_QUEUE_OPTIONS
+      // sets heartbeatSeconds, so `#processJobs` auto-touches this job every
+      // heartbeatSeconds/2 while the handler promise is pending — no manual
+      // setInterval/boss.touch() needed here. See BACKFILL_PORTFOLIO_QUEUE_OPTIONS'
+      // doc comment in scheduler/config.ts for what heartbeat does and doesn't cover.
       try {
         const result = await backfillPortfolioHistory(
           getDb(),
@@ -441,7 +447,10 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
 
   // On-demand recompute after transaction mutations. Debounced per portfolio so bulk
   // imports collapse to one job; fromDate bounds the work to the affected window.
-  await boss.createQueue(RECOMPUTE_QUEUE);
+  // RECOMPUTE_QUEUE_OPTIONS sets heartbeatSeconds so pg-boss's own heartbeat
+  // supervision (see BACKFILL_PORTFOLIO_QUEUE_OPTIONS' doc comment) applies here too.
+  await boss.createQueue(RECOMPUTE_QUEUE, RECOMPUTE_QUEUE_OPTIONS);
+  await boss.updateQueue(RECOMPUTE_QUEUE, RECOMPUTE_QUEUE_OPTIONS);
   await boss.work(RECOMPUTE_QUEUE, async (jobs) => {
     for (const job of jobs) {
       try {
