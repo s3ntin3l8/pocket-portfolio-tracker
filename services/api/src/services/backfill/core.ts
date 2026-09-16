@@ -39,9 +39,11 @@ export interface BackfillOptions {
   tailOnly?: boolean;
   /**
    * When true, don't fetch prices or compute snapshots. Instead, create coordination
-   * records in `backfill_jobs` and return sub-job metadata so the caller can fan out
-   * per-instrument work via BACKFILL_INSTRUMENT_QUEUE. The caller is responsible for
-   * calling `computeBackfillSnapshots` once all sub-jobs complete. See #761.
+   * records in `backfill_jobs` and return sub-job metadata describing the per-instrument
+   * work to do. This function does NOT enqueue anything itself — the caller is
+   * responsible for sending one BACKFILL_INSTRUMENT_QUEUE job per returned `subJobs`
+   * entry, polling `backfill_jobs` for completion, and calling
+   * `computeBackfillSnapshots` once every sub-job is done. See #761.
    */
   planner?: boolean;
 }
@@ -56,10 +58,10 @@ export interface BackfillResult {
 }
 
 /**
- * Extended result when `planner: true`. The planner didn't do any work itself —
- * it only enqueued per-instrument sub-jobs. `pending` tells the scheduler how
- * many sub-jobs are still running so it can poll for completion; `subJobs` is the
- * full list of coordination-row IDs for progress tracking.
+ * Extended result when `planner: true`. The planner didn't do any work itself — it
+ * only created `backfill_jobs` coordination rows; it did NOT enqueue any pg-boss jobs.
+ * `pending` tells the caller how many sub-jobs it still needs to send (then poll for
+ * completion); `subJobs` is the full per-instrument payload for those sends.
  */
 export interface BackfillPlannerResult extends BackfillResult {
   pending: number;

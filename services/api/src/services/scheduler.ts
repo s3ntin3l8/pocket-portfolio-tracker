@@ -394,53 +394,84 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
           const pResult = plannerResult as {
             pending: number;
             subJobIds: string[];
+            subJobs: Array<{
+              backfillJobId: string;
+              instrumentId: string;
+              chunkStart: string;
+              chunkEnd: string;
+            }>;
           };
-          app.log.info(
-            { portfolioId, subJobs: pResult.pending },
-            "backfill-portfolio: planner enqueued sub-jobs, polling for completion",
-          );
-
-          // Poll for sub-job completion
-          let pending = pResult.pending;
           const subJobIds = new Set(pResult.subJobIds);
-          while (pending > 0) {
-            await new Promise((resolve) => setTimeout(resolve, 5_000));
 
-            const statusRows = await getDb()
-              .select({ id: backfillJobs.id, status: backfillJobs.status })
-              .from(backfillJobs)
-              .where(inArray(backfillJobs.id, [...subJobIds] as string[]));
-            const byStatus = new Map(statusRows.map((r) => [r.id, r.status]));
-            const failedIds = [...subJobIds].filter((id) => byStatus.get(id) === "failed");
-            if (failedIds.length > 0) {
-              app.log.warn(
-                { portfolioId, failed: failedIds.length, failedIds },
-                "backfill-portfolio: sub-jobs failed, aborting planner",
-              );
-              throw new Error(`${failedIds.length}/${subJobIds.size} instrument sub-jobs failed`);
-            }
-            const doneCount = statusRows.filter((r) => r.status === "done").length;
-            pending = subJobIds.size - doneCount;
-
-            if (pending > 0) {
-              app.log.debug(
-                { portfolioId, pending, done: doneCount },
-                "backfill-portfolio: still waiting for sub-jobs",
-              );
-            }
-          }
-
-          app.log.info(
-            { portfolioId },
-            "backfill-portfolio: all sub-jobs complete, computing snapshots",
-          );
-
-          // Clean up coordination records — one row per instrument per run,
-          // no economic state. Cleanup is best-effort; orphan rows are harmless.
           try {
-            await getDb().delete(backfillJobs).where(eq(backfillJobs.portfolioId, portfolioId));
-          } catch {
-            // best-effort
+            // The planner only inserted coordination rows (backfillPortfolioHistory);
+            // it's this loop's job to actually enqueue the pg-boss jobs those rows
+            // track. Without this, nothing ever consumes BACKFILL_INSTRUMENT_QUEUE and
+            // the poll loop below waits forever on rows that will never turn "done".
+            for (const sub of pResult.subJobs) {
+              await boss.send(BACKFILL_INSTRUMENT_QUEUE, {
+                backfillJobId: sub.backfillJobId,
+                portfolioId,
+                instrumentId: sub.instrumentId,
+                chunkStart: sub.chunkStart,
+                chunkEnd: sub.chunkEnd,
+              });
+            }
+
+            app.log.info(
+              { portfolioId, subJobs: pResult.pending },
+              "backfill-portfolio: planner enqueued sub-jobs, polling for completion",
+            );
+
+            // Poll for sub-job completion
+            let pending = pResult.pending;
+            while (pending > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+              const statusRows = await getDb()
+                .select({ id: backfillJobs.id, status: backfillJobs.status })
+                .from(backfillJobs)
+                .where(inArray(backfillJobs.id, [...subJobIds] as string[]));
+              const byStatus = new Map(statusRows.map((r) => [r.id, r.status]));
+              const failedIds = [...subJobIds].filter((id) => byStatus.get(id) === "failed");
+              if (failedIds.length > 0) {
+                app.log.warn(
+                  { portfolioId, failed: failedIds.length, failedIds },
+                  "backfill-portfolio: sub-jobs failed, aborting planner",
+                );
+                throw new Error(`${failedIds.length}/${subJobIds.size} instrument sub-jobs failed`);
+              }
+              const doneCount = statusRows.filter((r) => r.status === "done").length;
+              pending = subJobIds.size - doneCount;
+
+              if (pending > 0) {
+                app.log.debug(
+                  { portfolioId, pending, done: doneCount },
+                  "backfill-portfolio: still waiting for sub-jobs",
+                );
+              }
+            }
+
+            app.log.info(
+              { portfolioId },
+              "backfill-portfolio: all sub-jobs complete, computing snapshots",
+            );
+          } finally {
+            // Clean up this run's coordination records — one row per instrument per
+            // run, no economic state — whether the poll above succeeded or threw. Must
+            // run on failure too: the unique (portfolioId, instrumentId, chunkStart)
+            // index means a left-behind row from a failed attempt poisons every later
+            // run of the same portfolio+instrument+chunk with a duplicate-key error on
+            // insert. Scoped to this run's own row ids (not `eq(portfolioId, ...)`) so
+            // a concurrently-running newer backfill of the same portfolio doesn't have
+            // its own coordination rows deleted out from under its poll loop. Best-effort.
+            try {
+              await getDb()
+                .delete(backfillJobs)
+                .where(inArray(backfillJobs.id, [...subJobIds] as string[]));
+            } catch {
+              // best-effort
+            }
           }
         }
 
@@ -511,52 +542,72 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   // Enqueued by the backfill-portfolio planner; the planner polls for completion.
   await boss.createQueue(BACKFILL_INSTRUMENT_QUEUE, BACKFILL_INSTRUMENT_QUEUE_OPTIONS);
   await boss.updateQueue(BACKFILL_INSTRUMENT_QUEUE, BACKFILL_INSTRUMENT_QUEUE_OPTIONS);
-  await boss.work(BACKFILL_INSTRUMENT_QUEUE, { batchSize: 1 }, async (jobs) => {
-    for (const job of jobs) {
-      const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd } = job.data as {
-        backfillJobId: string;
-        portfolioId: string;
-        instrumentId: string;
-        chunkStart: string;
-        chunkEnd: string;
-      };
-      try {
-        const result = await fetchInstrumentPrices(getDb(), await getMarketData(), {
-          portfolioId,
-          instrumentId,
-          chunkStart,
-          chunkEnd,
-        });
-        await flushUsage();
-
-        // Mark coordination row as done
-        await getDb()
-          .update(backfillJobs)
-          .set({ status: "done" })
-          .where(eq(backfillJobs.id, backfillJobId));
-
-        app.log.info(
-          { backfillJobId, instrumentId, chunkStart, chunkEnd, days: result.days },
-          "backfill-instrument complete",
-        );
-      } catch (err) {
-        // Mark coordination row as failed so the planner doesn't poll forever
+  // includeMetadata: true surfaces retryCount/retryLimit on each job so the catch
+  // block below can tell a transient failure (pg-boss will retry this same job) from
+  // a terminal one — see the comment there.
+  await boss.work(
+    BACKFILL_INSTRUMENT_QUEUE,
+    { batchSize: 1, includeMetadata: true },
+    async (jobs) => {
+      for (const job of jobs) {
+        const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd } = job.data as {
+          backfillJobId: string;
+          portfolioId: string;
+          instrumentId: string;
+          chunkStart: string;
+          chunkEnd: string;
+        };
         try {
+          const result = await fetchInstrumentPrices(getDb(), await getMarketData(), {
+            portfolioId,
+            instrumentId,
+            chunkStart,
+            chunkEnd,
+          });
+          await flushUsage();
+
+          // Mark coordination row as done
           await getDb()
             .update(backfillJobs)
-            .set({ status: "failed" })
+            .set({ status: "done" })
             .where(eq(backfillJobs.id, backfillJobId));
-        } catch {
-          // best-effort
+
+          app.log.info(
+            { backfillJobId, instrumentId, chunkStart, chunkEnd, days: result.days },
+            "backfill-instrument complete",
+          );
+        } catch (err) {
+          // pg-boss's own fetch query increments retryCount BEFORE this attempt runs
+          // (0 on the first attempt), and retries this same job iff retryCount was
+          // below retryLimit at the time it failed. So retryCount >= retryLimit here
+          // means this WAS the last attempt pg-boss will make — only then is the
+          // failure terminal. Marking the coordination row "failed" on every throw
+          // (including ones pg-boss is about to retry) would make BACKFILL_INSTRUMENT_
+          // QUEUE_OPTIONS.retryLimit dead config: the planner's poll loop aborts and
+          // re-runs the WHOLE portfolio the moment it next polls (within 5s), well
+          // before pg-boss's own retry of just this one instrument would have had a
+          // chance to succeed.
+          const { retryCount, retryLimit } = job;
+          const isFinalAttempt = retryCount >= retryLimit;
+          if (isFinalAttempt) {
+            try {
+              await getDb()
+                .update(backfillJobs)
+                .set({ status: "failed" })
+                .where(eq(backfillJobs.id, backfillJobId));
+            } catch {
+              // best-effort
+            }
+          }
+          app.log.error(
+            { err, backfillJobId, instrumentId, chunkStart, chunkEnd, retryCount, retryLimit },
+            "backfill-instrument failed",
+          );
+          throw err;
         }
-        app.log.error(
-          { err, backfillJobId, instrumentId, chunkStart, chunkEnd },
-          "backfill-instrument failed",
-        );
-        throw err;
       }
-    }
-  });
+    },
+  );
 
   // On-demand recompute after transaction mutations. Debounced per portfolio so bulk
   // imports collapse to one job; fromDate bounds the work to the affected window.
