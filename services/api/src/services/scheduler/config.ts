@@ -75,9 +75,24 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
 export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
 export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
 export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
-  expireInSeconds: 2400,
+  expireInSeconds: 1200,
   retryLimit: 2,
   retryDelay: 300,
+  retryBackoff: true,
+  heartbeatSeconds: 300,
+} as const;
+
+/**
+ * Per-instrument backfill sub-job queue (#761). Each job fetches prices for one
+ * instrument within a date range and writes them to the `prices` table. The
+ * planner (BACKFILL_PORTFOLIO_QUEUE with `planner: true`) enqueues these and
+ * polls for completion before computing snapshots.
+ */
+export const BACKFILL_INSTRUMENT_QUEUE = "backfill-instrument";
+export const BACKFILL_INSTRUMENT_QUEUE_OPTIONS = {
+  expireInSeconds: 600,
+  retryLimit: 2,
+  retryDelay: 60,
   retryBackoff: true,
 } as const;
 
@@ -183,5 +198,19 @@ export const JOB_DESCRIPTORS = [
       "Find portfolios whose value-over-time history doesn't reach back to inception and backfill them. Idempotent — near-no-op once all portfolios are healed.",
     cron: BACKFILL_STALE_CRON,
     supportsForce: true,
+  },
+  {
+    name: BACKFILL_PORTFOLIO_QUEUE,
+    label: "Backfill portfolio",
+    description:
+      "Per-portfolio backfill work, fanned out from backfill-stale-history. Each portfolio gets its own job.",
+    cron: null,
+  },
+  {
+    name: BACKFILL_INSTRUMENT_QUEUE,
+    label: "Backfill instrument",
+    description:
+      "Per-instrument price fetch sub-job (#761). Writes prices for one instrument within a date range.",
+    cron: null,
   },
 ] as const;

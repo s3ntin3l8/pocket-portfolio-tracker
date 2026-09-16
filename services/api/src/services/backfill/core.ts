@@ -1,6 +1,7 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import {
+  backfillJobs,
   corporateActions,
   dividendEvents,
   instruments,
@@ -36,6 +37,13 @@ export interface BackfillOptions {
    * re-fetch on every sweep run. See issue #737.
    */
   tailOnly?: boolean;
+  /**
+   * When true, don't fetch prices or compute snapshots. Instead, create coordination
+   * records in `backfill_jobs` and return sub-job metadata so the caller can fan out
+   * per-instrument work via BACKFILL_INSTRUMENT_QUEUE. The caller is responsible for
+   * calling `computeBackfillSnapshots` once all sub-jobs complete. See #761.
+   */
+  planner?: boolean;
 }
 
 export interface BackfillResult {
@@ -47,13 +55,30 @@ export interface BackfillResult {
   unpriced: string[];
 }
 
+/**
+ * Extended result when `planner: true`. The planner didn't do any work itself —
+ * it only enqueued per-instrument sub-jobs. `pending` tells the scheduler how
+ * many sub-jobs are still running so it can poll for completion; `subJobs` is the
+ * full list of coordination-row IDs for progress tracking.
+ */
+export interface BackfillPlannerResult extends BackfillResult {
+  pending: number;
+  subJobIds: string[];
+  subJobs: Array<{
+    backfillJobId: string;
+    instrumentId: string;
+    chunkStart: string;
+    chunkEnd: string;
+  }>;
+}
+
 export async function backfillPortfolioHistory(
   db: DB,
   marketData: MarketDataService,
   _ttlMs: number,
   portfolioId: string,
   opts: BackfillOptions = {},
-): Promise<BackfillResult> {
+): Promise<BackfillResult | BackfillPlannerResult> {
   const txRows = await db
     .select()
     .from(transactions)
@@ -82,6 +107,50 @@ export async function backfillPortfolioHistory(
     ? await db.select().from(instruments).where(inArray(instruments.id, instrIds))
     : [];
   const instrById = new Map(instrRows.map((i) => [i.id, i]));
+
+  // --- Planner path (#761): create coordination records and return early ---
+  if (opts.planner) {
+    const subJobs: BackfillPlannerResult["subJobs"] = [];
+
+    // Determine per-instrument chunk boundaries
+    for (const instr of instrRows) {
+      const firstHeld = txRows
+        .filter((r) => r.instrumentId === instr.id)
+        .reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt);
+      const firstHeldDate = toDateKey(firstHeld);
+      const fetchFrom = firstHeldDate < startDate ? startDate : firstHeldDate;
+
+      const [row] = await db
+        .insert(backfillJobs)
+        .values({
+          portfolioId,
+          instrumentId: instr.id,
+          chunkStart: fetchFrom,
+          chunkEnd: today,
+          status: "pending",
+        })
+        .returning({ id: backfillJobs.id });
+
+      if (row) {
+        subJobs.push({
+          backfillJobId: row.id,
+          instrumentId: instr.id,
+          chunkStart: fetchFrom,
+          chunkEnd: today,
+        });
+      }
+    }
+
+    return {
+      instruments: instrRows.length,
+      days: 0,
+      truncated: [],
+      unpriced: [],
+      pending: subJobs.length,
+      subJobIds: subJobs.map((j) => j.backfillJobId),
+      subJobs,
+    };
+  }
 
   const caRows = instrIds.length
     ? await db
@@ -413,6 +482,278 @@ export async function backfillPortfolioHistory(
   // fallback) from "priced before, but this particular gap exceeds the carry-forward
   // bound" (excluded from MV, unchanged from pre-#744 behavior — see buildDailyValueFlows'
   // hasEverPriced doc comment for why the two are NOT treated the same).
+  const filledPrices = new Map<string, Map<string, { close: string; currency: string }>>();
+  const earliestPricedDate = new Map<string, string>();
+  for (const [instrId, dateMap] of rawPrices) {
+    const sortedRawDates = [...dateMap.keys()].sort();
+    if (sortedRawDates.length > 0) earliestPricedDate.set(instrId, sortedRawDates[0]!);
+
+    const filled = new Map<string, { close: string; currency: string }>();
+    let last: { close: string; currency: string } | null = null;
+    let lastMs = 0;
+    for (const date of dateGrid) {
+      const candle = dateMap.get(date);
+      if (candle) {
+        last = candle;
+        lastMs = new Date(`${date}T00:00:00.000Z`).getTime();
+      }
+      if (!last) continue;
+      const daysSince = (new Date(`${date}T00:00:00.000Z`).getTime() - lastMs) / 86_400_000;
+      if (daysSince <= MAX_PRICE_CARRY_FORWARD_DAYS) filled.set(date, last);
+    }
+    filledPrices.set(instrId, filled);
+  }
+
+  function hasEverPriced(instrId: string, date: string): boolean {
+    const earliest = earliestPricedDate.get(instrId);
+    return earliest !== undefined && earliest <= date;
+  }
+
+  function priceAt(instrId: string, date: string): { close: string; currency: string } | null {
+    const filled = filledPrices.get(instrId);
+    if (!filled) return null;
+    const raw = filled.get(date);
+    if (!raw) return null;
+    const factor = splitAdjustmentFactor(coreCas, instrId, date);
+    if (factor.isZero() || factor.isNaN()) return raw;
+    return { close: new Decimal(raw.close).div(factor).toString(), currency: raw.currency };
+  }
+
+  function fxAt(date: string) {
+    return makeFxRateFn(fxByDate.get(date) ?? {}, baseCurrency);
+  }
+
+  const coreTxns = toCoreTxns(txRows);
+
+  const dailyFlows = buildDailyValueFlows({
+    transactions: coreTxns,
+    corporateActions: coreCas,
+    dates: dateGrid,
+    priceAt,
+    hasEverPriced,
+    fxAt,
+    baseCurrency,
+    kindOf,
+    flowDateOf: (tx) => flowDateOf(tx),
+  });
+
+  let count = 0;
+  for (const flow of dailyFlows) {
+    const asOf = new Date(`${flow.date}T23:59:59.999Z`);
+    const holdingsAtDate = computeHoldings(coreTxns, coreCas, asOf);
+    const pricesForDate: Record<string, { price: string; currency: string }> = {};
+    for (const h of holdingsAtDate) {
+      const p = priceAt(h.instrumentId, flow.date);
+      if (p) pricesForDate[h.instrumentId] = { price: p.close, currency: p.currency };
+    }
+    const cash = cashCounted ? cashBalances(coreTxns.filter((t) => t.executedAt <= asOf)) : {};
+    const fx = fxAt(flow.date);
+    const nw = netWorth({
+      holdings: holdingsAtDate,
+      prices: pricesForDate,
+      cash,
+      displayCurrency: baseCurrency,
+      fx,
+      hasEverPriced: (instrId) => hasEverPriced(instrId, flow.date),
+    });
+
+    await db
+      .insert(portfolioSnapshots)
+      .values({
+        portfolioId,
+        date: flow.date,
+        netWorth: nw,
+        marketValue: flow.marketValue,
+        effectiveFlow: flow.effectiveFlow,
+        currency: baseCurrency,
+      })
+      .onConflictDoUpdate({
+        target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
+        set: {
+          netWorth: nw,
+          marketValue: flow.marketValue,
+          effectiveFlow: flow.effectiveFlow,
+          currency: baseCurrency,
+        },
+      });
+    count++;
+  }
+
+  return { instruments: instrRows.length, days: count, truncated, unpriced };
+}
+
+/**
+ * Compute portfolio snapshots from prices already in the DB. Used by the
+ * planner/sub-job pattern (#761): after all per-instrument sub-jobs have
+ * written their prices, this function reads them back and computes the
+ * full snapshot series. Also usable standalone for non-planner backfills.
+ */
+export async function computeBackfillSnapshots(
+  db: DB,
+  portfolioId: string,
+  opts: { fromDate?: string; tailOnly?: boolean } = {},
+): Promise<BackfillResult> {
+  const txRows = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.portfolioId, portfolioId));
+
+  if (txRows.length === 0) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
+
+  const [pf] = await db
+    .select({ cashCounted: portfolios.cashCounted })
+    .from(portfolios)
+    .where(eq(portfolios.id, portfolioId))
+    .limit(1);
+  const cashCounted = pf?.cashCounted ?? true;
+
+  const inceptionMs = Math.min(...txRows.map((r) => r.executedAt.getTime()));
+  const inceptionDate = toDateKey(new Date(inceptionMs));
+  const startDate = opts.fromDate && opts.fromDate > inceptionDate ? opts.fromDate : inceptionDate;
+  const today = toDateKey(new Date());
+
+  if (startDate > today) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
+
+  const instrIds = [
+    ...new Set(txRows.map((r) => r.instrumentId).filter((x): x is string => x !== null)),
+  ];
+  const instrRows = instrIds.length
+    ? await db.select().from(instruments).where(inArray(instruments.id, instrIds))
+    : [];
+  const instrById = new Map(instrRows.map((i) => [i.id, i]));
+
+  const caRows = instrIds.length
+    ? await db
+        .select()
+        .from(corporateActions)
+        .where(inArray(corporateActions.instrumentId, instrIds))
+    : [];
+  const coreCas = caRows.map((r) => ({
+    instrumentId: r.instrumentId,
+    type: r.type as "split" | "bonus" | "rights",
+    ratio: r.ratio,
+    exDate: new Date(r.exDate),
+  }));
+
+  const truncated: string[] = [];
+  const unpriced: string[] = [];
+  const rawPrices = new Map<string, Map<string, { close: string; currency: string }>>();
+
+  // Read prices from DB (already written by sub-jobs or inline backfill)
+  for (const instr of instrRows) {
+    const priceRows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+
+    const instrPrices = new Map<string, { close: string; currency: string }>();
+    rawPrices.set(instr.id, instrPrices);
+
+    let firstPricedDate: string | null = null;
+    for (const row of priceRows) {
+      if (row.date >= startDate) {
+        instrPrices.set(row.date, { close: row.close, currency: row.currency });
+      }
+      if (!firstPricedDate || row.date < firstPricedDate) {
+        firstPricedDate = row.date;
+      }
+    }
+
+    // Check truncation: first-priced after first-held
+    const firstHeld = txRows
+      .filter((r) => r.instrumentId === instr.id)
+      .reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt);
+    const firstHeldDate = toDateKey(firstHeld);
+    if (firstPricedDate && firstPricedDate > firstHeldDate) {
+      truncated.push(instr.id);
+    }
+    if (instrPrices.size === 0) {
+      unpriced.push(instr.id);
+    }
+  }
+
+  // Refresh dividends (non-fatal)
+  if (instrIds.length > 0) {
+    try {
+      const { refreshDividends } = await import("../dividends.js");
+      const { getMarketData } = await import("../market-data.js");
+      await refreshDividends(db, await getMarketData(), new Date());
+    } catch {
+      // non-fatal
+    }
+  }
+
+  const divEventRows = instrIds.length
+    ? await db.select().from(dividendEvents).where(inArray(dividendEvents.instrumentId, instrIds))
+    : [];
+  const divEventsByInstr = new Map<
+    string,
+    { exDate: string; payDate: string | null; amountPerShare: string }[]
+  >();
+  for (const row of divEventRows) {
+    const list = divEventsByInstr.get(row.instrumentId) ?? [];
+    list.push({
+      exDate: row.exDate,
+      payDate: row.payDate ?? null,
+      amountPerShare: row.amountPerShare,
+    });
+    divEventsByInstr.set(row.instrumentId, list);
+  }
+
+  function flowDateOf(tx: {
+    instrumentId: string | null;
+    type: string;
+    price: string;
+    executedAt: Date;
+  }): string {
+    const payDate = toDateKey(tx.executedAt);
+    if ((tx.type === "dividend" || tx.type === "coupon") && tx.instrumentId) {
+      const events = divEventsByInstr.get(tx.instrumentId) ?? [];
+      const payMs = tx.executedAt.getTime();
+      let bestMatch: { exDate: string } | null = null;
+      let bestDelta = Infinity;
+      for (const ev of events) {
+        if (ev.payDate) {
+          const delta = Math.abs(new Date(ev.payDate).getTime() - payMs);
+          if (delta < bestDelta && delta < 7 * 86_400_000) {
+            bestDelta = delta;
+            bestMatch = ev;
+          }
+        }
+        if (!bestMatch && ev.amountPerShare === tx.price) {
+          bestMatch = ev;
+        }
+      }
+      if (bestMatch) return bestMatch.exDate;
+    }
+    return payDate;
+  }
+
+  const dateGrid: string[] = [];
+  const d = new Date(startDate);
+  const endDate = new Date(today);
+  while (d <= endDate) {
+    dateGrid.push(toDateKey(d));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+
+  const allCurrencies = [...new Set(instrRows.map((i) => i.currency))];
+  const txCurrencies = [...new Set(txRows.map((r) => r.currency))];
+  const allCcys = [...new Set([...allCurrencies, ...txCurrencies])];
+
+  const [pfRow] = await db
+    .select({ baseCurrency: (await import("@portfolio/db")).portfolios.baseCurrency })
+    .from((await import("@portfolio/db")).portfolios)
+    .where(eq((await import("@portfolio/db")).portfolios.id, portfolioId))
+    .limit(1);
+  const baseCurrency = pfRow?.baseCurrency ?? "IDR";
+
+  const fxByDate = await getFxRatesForDates(db, allCcys, baseCurrency, dateGrid);
+
+  function kindOf(instrId: string): PriceSeriesKind {
+    const instr = instrById.get(instrId);
+    if (!instr) return "none";
+    if (instr.assetClass === "bond" || instr.assetClass === "mutual_fund") return "flatProxy";
+    return "realSeries";
+  }
+
   const filledPrices = new Map<string, Map<string, { close: string; currency: string }>>();
   const earliestPricedDate = new Map<string, string>();
   for (const [instrId, dateMap] of rawPrices) {
