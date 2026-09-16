@@ -610,6 +610,13 @@
       "when": 1789381966130,
       "tag": "0086_light_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1789567666721,
+      "tag": "0087_lumpy_sentry",
+      "breakpoints": true
     }
   ]
 }

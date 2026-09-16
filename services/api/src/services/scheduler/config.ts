@@ -97,6 +97,37 @@ export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
   heartbeatSeconds: 300,
 } as const;
 
+/**
+ * Per-instrument backfill sub-job queue (#761). Each job fetches prices for one
+ * instrument within a date range and writes them to the `prices` table. The planner
+ * (`planFanOut` in `backfill/fan-out.ts`, #773) enqueues these via
+ * `enqueueBackfillInstrument` and polls `backfill_jobs` for completion before computing
+ * snapshots.
+ */
+export const BACKFILL_INSTRUMENT_QUEUE = "backfill-instrument";
+export const BACKFILL_INSTRUMENT_QUEUE_OPTIONS = {
+  expireInSeconds: 600,
+  retryLimit: 2,
+  retryDelay: 60,
+  retryBackoff: true,
+} as const;
+
+/** Poll cadence for the fan-out's `backfill_jobs` coordination-table poll (#773). */
+export const BACKFILL_FAN_OUT_POLL_INTERVAL_MS = 5_000;
+
+/**
+ * Independent deadline for the fan-out poll loop, at 90% of the portfolio job's own
+ * `expireInSeconds` — derived from it (not a separate hardcoded number) so the two can
+ * never drift apart. This is a backstop, not the primary stop: `job.signal` (checked by
+ * `pollFanOutCompletion`) is what actually notices pg-boss has force-resolved the job,
+ * and fires well before this deadline in the common case. This deadline exists for the
+ * case where signal semantics don't behave as expected — it fails with a diagnosable
+ * `FanOutTimeoutError` before pg-boss's own `resolveWithinSeconds` force-resolves the
+ * job out from under it.
+ */
+export const BACKFILL_FAN_OUT_MAX_WAIT_MS =
+  Math.floor(BACKFILL_PORTFOLIO_QUEUE_OPTIONS.expireInSeconds * 0.9) * 1000;
+
 export const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60; // 6 hours
 
 /**

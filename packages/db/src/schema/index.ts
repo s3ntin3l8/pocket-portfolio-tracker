@@ -15,4 +15,5 @@ export * from "./dividends-prices.js";
 export * from "./snapshots.js";
 export * from "./targets-tax.js";
 export * from "./user-preferences.js";
+export * from "./backfill.js";
 export * from "./relations.js";

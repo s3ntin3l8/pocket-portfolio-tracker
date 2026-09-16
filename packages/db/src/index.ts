@@ -41,6 +41,7 @@ export * from "./schema/dividends-prices.js";
 export * from "./schema/snapshots.js";
 export * from "./schema/targets-tax.js";
 export * from "./schema/user-preferences.js";
+export * from "./schema/backfill.js";
 export * from "./schema/relations.js";
 
 export const migrationsDir = path.resolve(import.meta.dirname, "../drizzle");

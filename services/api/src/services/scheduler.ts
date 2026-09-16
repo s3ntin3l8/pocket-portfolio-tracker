@@ -25,6 +25,9 @@ export {
   BACKFILL_STALE_QUEUE,
   BACKFILL_STALE_CRON,
   BACKFILL_PORTFOLIO_QUEUE,
+  BACKFILL_INSTRUMENT_QUEUE,
+  BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+  BACKFILL_FAN_OUT_MAX_WAIT_MS,
   INSTRUMENT_META_SINGLETON_SECONDS,
 } from "./scheduler/config.js";
 
@@ -39,6 +42,7 @@ export {
   enqueueTrSync,
   enqueueRecompute,
   enqueueBackfillPortfolio,
+  enqueueBackfillInstrument,
   enqueueInstrumentMetadata,
   usesPglite,
 } from "./scheduler/enqueue.js";
@@ -46,7 +50,7 @@ export {
 import { PgBoss } from "pg-boss";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { ibkrConnections, trConnections } from "@portfolio/db";
+import { backfillJobs, ibkrConnections, trConnections } from "@portfolio/db";
 import { getDb } from "../db/client.js";
 import { getMarketData, flushUsage } from "./market-data.js";
 import { refreshHeldPrices } from "./refresh.js";
@@ -56,10 +60,22 @@ import { recordDailySnapshots, recordIntradaySnapshots } from "./snapshots.js";
 import { refreshAntamBuyback, refreshGaleri24Buyback, refreshNav } from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
 import { syncIbkrConnection } from "./ibkr/sync.js";
-import { backfillPortfolioHistory, backfillStalePortfolios } from "./backfill.js";
+import {
+  backfillPortfolioHistory,
+  computeBackfillSnapshots,
+  fetchInstrumentPrices,
+  backfillStalePortfolios,
+  planFanOut,
+  runFanOut,
+} from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 import { resetStaleSyncFlags } from "./scheduler/cleanup.js";
-import { setActiveBoss, usesPglite, enqueueBackfillPortfolio } from "./scheduler/enqueue.js";
+import {
+  setActiveBoss,
+  usesPglite,
+  enqueueBackfillPortfolio,
+  enqueueBackfillInstrument,
+} from "./scheduler/enqueue.js";
 import {
   QUEUE,
   SCHEDULE_CRON,
@@ -87,6 +103,10 @@ import {
   BACKFILL_STALE_QUEUE_OPTIONS,
   BACKFILL_PORTFOLIO_QUEUE,
   BACKFILL_PORTFOLIO_QUEUE_OPTIONS,
+  BACKFILL_INSTRUMENT_QUEUE,
+  BACKFILL_INSTRUMENT_QUEUE_OPTIONS,
+  BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+  BACKFILL_FAN_OUT_MAX_WAIT_MS,
 } from "./scheduler/config.js";
 
 /**
@@ -378,13 +398,40 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
       // setInterval/boss.touch() needed here. See BACKFILL_PORTFOLIO_QUEUE_OPTIONS'
       // doc comment in scheduler/config.ts for what heartbeat does and doesn't cover.
       try {
-        const result = await backfillPortfolioHistory(
-          getDb(),
-          await getMarketData(),
-          app.config.MARKET_DATA_TTL_MS,
-          portfolioId,
-          { fromDate, tailOnly },
-        );
+        // Planner path (#761/#773): compute per-instrument chunk boundaries and claim
+        // backfill_jobs coordination rows. planFanOut/runFanOut own the fan-out/poll/
+        // cleanup lifecycle end to end — see backfill/fan-out.ts for the testable core
+        // this used to be inlined here.
+        const plan = await planFanOut(getDb(), portfolioId, { fromDate, tailOnly });
+
+        if (plan.pending > 0) {
+          app.log.info(
+            { portfolioId, subJobs: plan.pending },
+            "backfill-portfolio: fanning out to per-instrument sub-jobs",
+          );
+
+          // job.signal is pg-boss's own AbortSignal for this job — it's aborted once
+          // pg-boss's resolveWithinSeconds race against expireInSeconds settles.
+          // Threading it into runFanOut lets pollFanOutCompletion notice a
+          // force-resolve immediately instead of continuing to poll as a zombie after
+          // pg-boss has already failed/retried this job (see fan-out.ts's doc
+          // comments for the pg-boss-source-verified mechanism).
+          const outcome = await runFanOut(getDb(), plan, {
+            enqueue: (sub) => enqueueBackfillInstrument({ ...sub, portfolioId }),
+            pollIntervalMs: BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+            maxWaitMs: BACKFILL_FAN_OUT_MAX_WAIT_MS,
+            signal: job.signal,
+          });
+
+          app.log.info(
+            { portfolioId, ...outcome },
+            "backfill-portfolio: sub-jobs complete, computing snapshots",
+          );
+        }
+
+        // Compute snapshots from the prices written by sub-jobs (or from an earlier
+        // inline/tailOnly run with no instruments needing a fan-out).
+        const result = await computeBackfillSnapshots(getDb(), portfolioId, { fromDate });
         await flushUsage();
         app.log.info({ portfolioId, fromDate, tailOnly, ...result }, "backfill-portfolio complete");
       } catch (err) {
@@ -444,6 +491,81 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     }
   });
   await boss.schedule(BACKFILL_STALE_QUEUE, BACKFILL_STALE_CRON);
+
+  // Per-instrument backfill sub-jobs (#761). Each job fetches prices for one
+  // instrument within a date range and writes them to the `prices` table.
+  // Enqueued by the backfill-portfolio planner; the planner polls for completion.
+  await boss.createQueue(BACKFILL_INSTRUMENT_QUEUE, BACKFILL_INSTRUMENT_QUEUE_OPTIONS);
+  await boss.updateQueue(BACKFILL_INSTRUMENT_QUEUE, BACKFILL_INSTRUMENT_QUEUE_OPTIONS);
+  // includeMetadata: true surfaces retryCount/retryLimit on each job so the catch
+  // block below can tell a transient failure (pg-boss will retry this same job) from
+  // a terminal one — see the comment there.
+  await boss.work(
+    BACKFILL_INSTRUMENT_QUEUE,
+    { batchSize: 1, includeMetadata: true },
+    async (jobs) => {
+      for (const job of jobs) {
+        const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd, tailOnly } =
+          job.data as {
+            backfillJobId: string;
+            portfolioId: string;
+            instrumentId: string;
+            chunkStart: string;
+            chunkEnd: string;
+            tailOnly?: boolean;
+          };
+        try {
+          const result = await fetchInstrumentPrices(getDb(), await getMarketData(), {
+            portfolioId,
+            instrumentId,
+            chunkStart,
+            chunkEnd,
+            tailOnly,
+          });
+          await flushUsage();
+
+          // Mark coordination row as done
+          await getDb()
+            .update(backfillJobs)
+            .set({ status: "done" })
+            .where(eq(backfillJobs.id, backfillJobId));
+
+          app.log.info(
+            { backfillJobId, instrumentId, chunkStart, chunkEnd, days: result.days },
+            "backfill-instrument complete",
+          );
+        } catch (err) {
+          // pg-boss's own fetch query increments retryCount BEFORE this attempt runs
+          // (0 on the first attempt), and retries this same job iff retryCount was
+          // below retryLimit at the time it failed. So retryCount >= retryLimit here
+          // means this WAS the last attempt pg-boss will make — only then is the
+          // failure terminal. Marking the coordination row "failed" on every throw
+          // (including ones pg-boss is about to retry) would make BACKFILL_INSTRUMENT_
+          // QUEUE_OPTIONS.retryLimit dead config: the planner's poll loop aborts and
+          // re-runs the WHOLE portfolio the moment it next polls (within 5s), well
+          // before pg-boss's own retry of just this one instrument would have had a
+          // chance to succeed.
+          const { retryCount, retryLimit } = job;
+          const isFinalAttempt = retryCount >= retryLimit;
+          if (isFinalAttempt) {
+            try {
+              await getDb()
+                .update(backfillJobs)
+                .set({ status: "failed" })
+                .where(eq(backfillJobs.id, backfillJobId));
+            } catch {
+              // best-effort
+            }
+          }
+          app.log.error(
+            { err, backfillJobId, instrumentId, chunkStart, chunkEnd, retryCount, retryLimit },
+            "backfill-instrument failed",
+          );
+          throw err;
+        }
+      }
+    },
+  );
 
   // On-demand recompute after transaction mutations. Debounced per portfolio so bulk
   // imports collapse to one job; fromDate bounds the work to the affected window.
