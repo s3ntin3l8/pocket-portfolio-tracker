@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.19](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.18...v0.1.19) (2026-09-16)
+
+
+### Features
+
+* **backfill:** split large portfolios into per-instrument sub-jobs ([#772](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/772)) ([ef6d91f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ef6d91f7acaca5ecc1a6fc491368cc5a0cc2a06e))
+
+
+### Bug Fixes
+
+* **backfill:** use pg-boss's built-in heartbeat for faster crash detection ([#770](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/770)) ([96cda31](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/96cda31b2fc2391aea2a18fa2c4517d7e02e0b81))
+* **web:** show xirrYoungHint on insights hero XIRR card for young portfolios ([#762](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/762)) ([#771](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/771)) ([26befcf](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/26befcfa3cb87cd1bd5dc6b7ac2a5ee0954b8c1d))
+
 ## [0.1.18](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.17...v0.1.18) (2026-09-15)
 
 
