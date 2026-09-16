@@ -1,6 +1,6 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
-import { backfillJobs, instruments, prices, scrapedQuotes } from "@portfolio/db";
+import { instruments, prices, scrapedQuotes } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
@@ -23,19 +23,6 @@ export interface BackfillOptions {
    * re-fetch on every sweep run. See issue #737.
    */
   tailOnly?: boolean;
-  /**
-   * When true, don't fetch prices or compute snapshots. Instead, create coordination
-   * records in `backfill_jobs` and return sub-job metadata describing the per-instrument
-   * work to do. This function does NOT enqueue anything itself — the caller is
-   * responsible for sending one BACKFILL_INSTRUMENT_QUEUE job per returned `subJobs`
-   * entry, polling `backfill_jobs` for completion, and calling
-   * `computeBackfillSnapshots` once every sub-job is done. See #761.
-   *
-   * TODO(#773): this planner branch is being replaced by `backfill/fan-out.ts`'s
-   * `planFanOut`/`runFanOut` (idempotent insert, tailOnly threading, abort-aware poll) —
-   * scheduled for removal here once the scheduler is rewired onto it.
-   */
-  planner?: boolean;
 }
 
 export interface BackfillResult {
@@ -47,74 +34,16 @@ export interface BackfillResult {
   unpriced: string[];
 }
 
-/**
- * Extended result when `planner: true`. The planner didn't do any work itself — it
- * only created `backfill_jobs` coordination rows; it did NOT enqueue any pg-boss jobs.
- * `pending` tells the caller how many sub-jobs it still needs to send (then poll for
- * completion); `subJobs` is the full per-instrument payload for those sends.
- */
-export interface BackfillPlannerResult extends BackfillResult {
-  pending: number;
-  subJobIds: string[];
-  subJobs: Array<{
-    backfillJobId: string;
-    instrumentId: string;
-    chunkStart: string;
-    chunkEnd: string;
-  }>;
-}
-
 export async function backfillPortfolioHistory(
   db: DB,
   marketData: MarketDataService,
   _ttlMs: number,
   portfolioId: string,
   opts: BackfillOptions = {},
-): Promise<BackfillResult | BackfillPlannerResult> {
+): Promise<BackfillResult> {
   const ctx = await loadBackfillContext(db, portfolioId, opts);
   if (!ctx) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
   const { txRows, startDate, today, instrIds, instrRows } = ctx;
-
-  // --- Planner path (#761): create coordination records and return early ---
-  if (opts.planner) {
-    const subJobs: BackfillPlannerResult["subJobs"] = [];
-
-    // Determine per-instrument chunk boundaries
-    for (const instr of instrRows) {
-      const firstHeldDate = firstHeldDateFrom(txRows, instr.id) ?? startDate;
-      const fetchFrom = laterDateKey(firstHeldDate, startDate);
-
-      const [row] = await db
-        .insert(backfillJobs)
-        .values({
-          portfolioId,
-          instrumentId: instr.id,
-          chunkStart: fetchFrom,
-          chunkEnd: today,
-          status: "pending",
-        })
-        .returning({ id: backfillJobs.id });
-
-      if (row) {
-        subJobs.push({
-          backfillJobId: row.id,
-          instrumentId: instr.id,
-          chunkStart: fetchFrom,
-          chunkEnd: today,
-        });
-      }
-    }
-
-    return {
-      instruments: instrRows.length,
-      days: 0,
-      truncated: [],
-      unpriced: [],
-      pending: subJobs.length,
-      subJobIds: subJobs.map((j) => j.backfillJobId),
-      subJobs,
-    };
-  }
 
   const truncated: string[] = [];
   const unpriced: string[] = [];
@@ -354,10 +283,13 @@ export async function backfillPortfolioHistory(
 }
 
 /**
- * Compute portfolio snapshots from prices already in the DB. Used by the
- * planner/sub-job pattern (#761): after all per-instrument sub-jobs have
- * written their prices, this function reads them back and computes the
- * full snapshot series. Also usable standalone for non-planner backfills.
+ * Compute portfolio snapshots from prices already in the DB. Used by the per-instrument
+ * fan-out (#761/#773, see `backfill/fan-out.ts`'s `planFanOut`/`runFanOut`): after all
+ * per-instrument sub-jobs have written their prices independently, the scheduler calls
+ * this to read them back and compute the full snapshot series. (Contrast
+ * `backfillPortfolioHistory` above, which fetches prices itself and passes its own
+ * in-memory `rawPrices` map straight to `writeSnapshotSeries` — no DB read-back needed
+ * since it already has them in hand.)
  */
 export async function computeBackfillSnapshots(
   db: DB,

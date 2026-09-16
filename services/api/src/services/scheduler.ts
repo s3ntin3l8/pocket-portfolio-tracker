@@ -48,7 +48,7 @@ export {
 } from "./scheduler/enqueue.js";
 
 import { PgBoss } from "pg-boss";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { backfillJobs, ibkrConnections, trConnections } from "@portfolio/db";
 import { getDb } from "../db/client.js";
@@ -65,10 +65,17 @@ import {
   computeBackfillSnapshots,
   fetchInstrumentPrices,
   backfillStalePortfolios,
+  planFanOut,
+  runFanOut,
 } from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 import { resetStaleSyncFlags } from "./scheduler/cleanup.js";
-import { setActiveBoss, usesPglite, enqueueBackfillPortfolio } from "./scheduler/enqueue.js";
+import {
+  setActiveBoss,
+  usesPglite,
+  enqueueBackfillPortfolio,
+  enqueueBackfillInstrument,
+} from "./scheduler/enqueue.js";
 import {
   QUEUE,
   SCHEDULE_CRON,
@@ -98,6 +105,8 @@ import {
   BACKFILL_PORTFOLIO_QUEUE_OPTIONS,
   BACKFILL_INSTRUMENT_QUEUE,
   BACKFILL_INSTRUMENT_QUEUE_OPTIONS,
+  BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+  BACKFILL_FAN_OUT_MAX_WAIT_MS,
 } from "./scheduler/config.js";
 
 /**
@@ -389,101 +398,39 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
       // setInterval/boss.touch() needed here. See BACKFILL_PORTFOLIO_QUEUE_OPTIONS'
       // doc comment in scheduler/config.ts for what heartbeat does and doesn't cover.
       try {
-        // Planner path (#761): fan out per-instrument work, poll for completion
-        const plannerResult = await backfillPortfolioHistory(
-          getDb(),
-          await getMarketData(),
-          app.config.MARKET_DATA_TTL_MS,
-          portfolioId,
-          { fromDate, tailOnly, planner: true },
-        );
+        // Planner path (#761/#773): compute per-instrument chunk boundaries and claim
+        // backfill_jobs coordination rows. planFanOut/runFanOut own the fan-out/poll/
+        // cleanup lifecycle end to end — see backfill/fan-out.ts for the testable core
+        // this used to be inlined here.
+        const plan = await planFanOut(getDb(), portfolioId, { fromDate, tailOnly });
 
-        if ("pending" in plannerResult && (plannerResult as { pending: number }).pending > 0) {
-          const pResult = plannerResult as {
-            pending: number;
-            subJobIds: string[];
-            subJobs: Array<{
-              backfillJobId: string;
-              instrumentId: string;
-              chunkStart: string;
-              chunkEnd: string;
-            }>;
-          };
-          const subJobIds = new Set(pResult.subJobIds);
+        if (plan.pending > 0) {
+          app.log.info(
+            { portfolioId, subJobs: plan.pending },
+            "backfill-portfolio: fanning out to per-instrument sub-jobs",
+          );
 
-          try {
-            // The planner only inserted coordination rows (backfillPortfolioHistory);
-            // it's this loop's job to actually enqueue the pg-boss jobs those rows
-            // track. Without this, nothing ever consumes BACKFILL_INSTRUMENT_QUEUE and
-            // the poll loop below waits forever on rows that will never turn "done".
-            for (const sub of pResult.subJobs) {
-              await boss.send(BACKFILL_INSTRUMENT_QUEUE, {
-                backfillJobId: sub.backfillJobId,
-                portfolioId,
-                instrumentId: sub.instrumentId,
-                chunkStart: sub.chunkStart,
-                chunkEnd: sub.chunkEnd,
-              });
-            }
+          // job.signal is pg-boss's own AbortSignal for this job — it's aborted once
+          // pg-boss's resolveWithinSeconds race against expireInSeconds settles.
+          // Threading it into runFanOut lets pollFanOutCompletion notice a
+          // force-resolve immediately instead of continuing to poll as a zombie after
+          // pg-boss has already failed/retried this job (see fan-out.ts's doc
+          // comments for the pg-boss-source-verified mechanism).
+          const outcome = await runFanOut(getDb(), plan, {
+            enqueue: (sub) => enqueueBackfillInstrument({ ...sub, portfolioId }),
+            pollIntervalMs: BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+            maxWaitMs: BACKFILL_FAN_OUT_MAX_WAIT_MS,
+            signal: job.signal,
+          });
 
-            app.log.info(
-              { portfolioId, subJobs: pResult.pending },
-              "backfill-portfolio: planner enqueued sub-jobs, polling for completion",
-            );
-
-            // Poll for sub-job completion
-            let pending = pResult.pending;
-            while (pending > 0) {
-              await new Promise((resolve) => setTimeout(resolve, 5_000));
-
-              const statusRows = await getDb()
-                .select({ id: backfillJobs.id, status: backfillJobs.status })
-                .from(backfillJobs)
-                .where(inArray(backfillJobs.id, [...subJobIds] as string[]));
-              const byStatus = new Map(statusRows.map((r) => [r.id, r.status]));
-              const failedIds = [...subJobIds].filter((id) => byStatus.get(id) === "failed");
-              if (failedIds.length > 0) {
-                app.log.warn(
-                  { portfolioId, failed: failedIds.length, failedIds },
-                  "backfill-portfolio: sub-jobs failed, aborting planner",
-                );
-                throw new Error(`${failedIds.length}/${subJobIds.size} instrument sub-jobs failed`);
-              }
-              const doneCount = statusRows.filter((r) => r.status === "done").length;
-              pending = subJobIds.size - doneCount;
-
-              if (pending > 0) {
-                app.log.debug(
-                  { portfolioId, pending, done: doneCount },
-                  "backfill-portfolio: still waiting for sub-jobs",
-                );
-              }
-            }
-
-            app.log.info(
-              { portfolioId },
-              "backfill-portfolio: all sub-jobs complete, computing snapshots",
-            );
-          } finally {
-            // Clean up this run's coordination records — one row per instrument per
-            // run, no economic state — whether the poll above succeeded or threw. Must
-            // run on failure too: the unique (portfolioId, instrumentId, chunkStart)
-            // index means a left-behind row from a failed attempt poisons every later
-            // run of the same portfolio+instrument+chunk with a duplicate-key error on
-            // insert. Scoped to this run's own row ids (not `eq(portfolioId, ...)`) so
-            // a concurrently-running newer backfill of the same portfolio doesn't have
-            // its own coordination rows deleted out from under its poll loop. Best-effort.
-            try {
-              await getDb()
-                .delete(backfillJobs)
-                .where(inArray(backfillJobs.id, [...subJobIds] as string[]));
-            } catch {
-              // best-effort
-            }
-          }
+          app.log.info(
+            { portfolioId, ...outcome },
+            "backfill-portfolio: sub-jobs complete, computing snapshots",
+          );
         }
 
-        // Compute snapshots from the prices written by sub-jobs (or inline)
+        // Compute snapshots from the prices written by sub-jobs (or from an earlier
+        // inline/tailOnly run with no instruments needing a fan-out).
         const result = await computeBackfillSnapshots(getDb(), portfolioId, { fromDate });
         await flushUsage();
         app.log.info({ portfolioId, fromDate, tailOnly, ...result }, "backfill-portfolio complete");
@@ -558,19 +505,22 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     { batchSize: 1, includeMetadata: true },
     async (jobs) => {
       for (const job of jobs) {
-        const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd } = job.data as {
-          backfillJobId: string;
-          portfolioId: string;
-          instrumentId: string;
-          chunkStart: string;
-          chunkEnd: string;
-        };
+        const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd, tailOnly } =
+          job.data as {
+            backfillJobId: string;
+            portfolioId: string;
+            instrumentId: string;
+            chunkStart: string;
+            chunkEnd: string;
+            tailOnly?: boolean;
+          };
         try {
           const result = await fetchInstrumentPrices(getDb(), await getMarketData(), {
             portfolioId,
             instrumentId,
             chunkStart,
             chunkEnd,
+            tailOnly,
           });
           await flushUsage();
 

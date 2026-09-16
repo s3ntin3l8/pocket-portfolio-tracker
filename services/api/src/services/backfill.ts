@@ -3,7 +3,6 @@ export {
   computeBackfillSnapshots,
   type BackfillOptions,
   type BackfillResult,
-  type BackfillPlannerResult,
 } from "./backfill/core.js";
 export {
   fetchInstrumentPrices,
@@ -11,3 +10,16 @@ export {
   type InstrumentChunkResult,
 } from "./backfill/instrument.js";
 export { backfillStalePortfolios, type SweepResult, type SweepOptions } from "./backfill/sweep.js";
+export {
+  planFanOut,
+  runFanOut,
+  pollFanOutCompletion,
+  cleanupFanOutRows,
+  FanOutEnqueueError,
+  FanOutSubJobFailedError,
+  FanOutTimeoutError,
+  FanOutAbortedError,
+  FanOutOwnershipLostError,
+  type FanOutPlan,
+  type FanOutSubJob,
+} from "./backfill/fan-out.js";
