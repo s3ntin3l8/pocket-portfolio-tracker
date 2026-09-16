@@ -187,7 +187,8 @@
     },
     "xirr": {
       "label": "Annualised return · XIRR",
-      "caption": "Money-weighted, net of fees · since Jan {year}"
+      "caption": "Money-weighted, net of fees · since Jan {year}",
+      "youngHint": "* annualised from under a year — may overstate"
     },
     "rebalancingCard": {
       "title": "Rebalancing",

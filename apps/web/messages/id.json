@@ -187,7 +187,8 @@
     },
     "xirr": {
       "label": "Imbal hasil tahunan · XIRR",
-      "caption": "Berbobot uang, bersih dari biaya · sejak Jan {year}"
+      "caption": "Berbobot uang, bersih dari biaya · sejak Jan {year}",
+      "youngHint": "* disetahunkan dari data di bawah setahun — bisa berlebih"
     },
     "rebalancingCard": {
       "title": "Penyeimbangan",

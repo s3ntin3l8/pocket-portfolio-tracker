@@ -16,6 +16,7 @@ import {
   loadHoldings,
   loadPreferences,
   loadInsights,
+  loadContributions,
   getSelectedPortfolioId,
 } from "@/lib/server-api";
 import { bestAndWorst, periodToMover } from "@/lib/movers";
@@ -40,16 +41,18 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
   const holdingsPromise = loadHoldings();
   const selectedIdPromise = getSelectedPortfolioId();
   const insightsPromise = loadInsights("all");
+  const contributionsPromise = loadContributions();
 
   const prefs = await prefsPromise;
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
-  const [result, history, holdingsView, selectedId, insights] = await Promise.all([
+  const [result, history, holdingsView, selectedId, insights, contributions] = await Promise.all([
     loadNetWorth(costBasis),
     historyPromise,
     holdingsPromise,
     selectedIdPromise,
     insightsPromise,
+    contributionsPromise,
   ]);
 
   if (TIMING) {
@@ -125,6 +128,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">
           {t("xirr.caption", { year: sinceYear })}
         </p>
+        {summary.xirr !== null &&
+          contributions.status === "ok" &&
+          contributions.data.monthsElapsed < 12 && (
+            <p className="mt-1 text-xs text-white/50">{t("xirr.youngHint")}</p>
+          )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
