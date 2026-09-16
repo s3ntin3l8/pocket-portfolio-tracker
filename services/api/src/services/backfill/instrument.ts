@@ -1,14 +1,24 @@
 import { eq, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
-import { instruments, prices, scrapedQuotes, transactions } from "@portfolio/db";
+import { instruments, prices, scrapedQuotes } from "@portfolio/db";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
+import { firstHeldDateFor, isManualPriceBond } from "./shared.js";
 
 export interface InstrumentChunkData {
   portfolioId: string;
   instrumentId: string;
   chunkStart: string;
   chunkEnd: string;
+  /**
+   * This is a trailing-edge-only heal — see BackfillOptions.tailOnly in core.ts for the
+   * full rationale (issue #737). Must be threaded through from the planner: an empty
+   * fetch result on a short tail window means "no new candles since then," not "this
+   * instrument has no history," and falling back to a full-range fetch on every such
+   * miss is what let a permanently dead feed re-trigger an unbounded provider call on
+   * every sweep run.
+   */
+  tailOnly?: boolean;
 }
 
 export interface InstrumentChunkResult {
@@ -36,7 +46,7 @@ export async function fetchInstrumentPrices(
   marketData: MarketDataService,
   data: InstrumentChunkData,
 ): Promise<InstrumentChunkResult> {
-  const { instrumentId, chunkStart, chunkEnd } = data;
+  const { portfolioId, instrumentId, chunkStart, chunkEnd, tailOnly } = data;
 
   const [instr] = await db
     .select()
@@ -51,7 +61,7 @@ export async function fetchInstrumentPrices(
   const instrPrices = new Map<string, { close: string; currency: string }>();
 
   if (instr.assetClass === "bond") {
-    if (instr.manualPrice && Number(instr.manualPrice) > 0) {
+    if (isManualPriceBond(instr)) {
       return { instrumentId, days: 0, truncated: false, unpriced: false };
     }
     if (instr.faceValue) {
@@ -174,22 +184,18 @@ export async function fetchInstrumentPrices(
     isin: instr.isin ?? undefined,
   };
 
-  // Get the first-held date for this instrument to detect truncation
-  const txRows = await db
-    .select({ executedAt: transactions.executedAt })
-    .from(transactions)
-    .where(eq(transactions.instrumentId, instrumentId));
-  const firstHeldDate =
-    txRows.length > 0
-      ? txRows.reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt)
-      : new Date(chunkStart);
-  const firstHeldKey = firstHeldDate.toISOString().slice(0, 10);
+  // Get the first-held date for this instrument, scoped to THIS portfolio, to detect
+  // truncation — an instrument held by multiple portfolios must not have one
+  // portfolio's truncation flag answer "when was this held by ANY portfolio."
+  const firstHeldKey = (await firstHeldDateFor(db, portfolioId, instrumentId)) ?? chunkStart;
 
   let candles: Candle[];
   let fetchError: Error | null = null;
   try {
+    // See InstrumentChunkData.tailOnly's doc comment — mirrors core.ts's inline path
+    // (`allowMaxFallback: !opts.tailOnly`).
     candles = await marketData.getHistoryFrom(ref, chunkStart, {
-      allowMaxFallback: true,
+      allowMaxFallback: !tailOnly,
     });
   } catch (err) {
     fetchError = err instanceof Error ? err : new Error(String(err));
