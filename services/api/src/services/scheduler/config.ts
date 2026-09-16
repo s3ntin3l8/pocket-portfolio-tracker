@@ -199,18 +199,4 @@ export const JOB_DESCRIPTORS = [
     cron: BACKFILL_STALE_CRON,
     supportsForce: true,
   },
-  {
-    name: BACKFILL_PORTFOLIO_QUEUE,
-    label: "Backfill portfolio",
-    description:
-      "Per-portfolio backfill work, fanned out from backfill-stale-history. Each portfolio gets its own job.",
-    cron: null,
-  },
-  {
-    name: BACKFILL_INSTRUMENT_QUEUE,
-    label: "Backfill instrument",
-    description:
-      "Per-instrument price fetch sub-job (#761). Writes prices for one instrument within a date range.",
-    cron: null,
-  },
 ] as const;
