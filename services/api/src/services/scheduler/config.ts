@@ -31,6 +31,17 @@ export const GC_RECEIPTS_CRON = "0 3 * * *";
 
 export const RECOMPUTE_QUEUE = "recompute-history";
 export const RECOMPUTE_SINGLETON_SECONDS = 30;
+/**
+ * `heartbeatSeconds` lets pg-boss's own built-in heartbeat supervision (see
+ * BACKFILL_PORTFOLIO_QUEUE_OPTIONS below) detect a genuinely crashed handler early,
+ * rather than only via `expireInSeconds`'s 900s default. Without a `heartbeatSeconds`
+ * on the queue, `heartbeat_seconds` stays NULL in `pgboss.job` and `failJobsByHeartbeat`
+ * is a no-op for this queue's rows (it requires `heartbeat_seconds IS NOT NULL`) — a
+ * manual `boss.touch()` call would write `heartbeat_on` but nothing would ever read it.
+ */
+export const RECOMPUTE_QUEUE_OPTIONS = {
+  heartbeatSeconds: 300,
+} as const;
 
 export const BACKFILL_STALE_QUEUE = "backfill-stale-history";
 export const BACKFILL_STALE_CRON = "0 5 * * *";
@@ -55,13 +66,15 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
  * instead of one global job whose 900s handler timeout is exceeded by the very first
  * force run at platform scale. See issue #745.
  *
- * `heartbeatSeconds: 300` enables pg-boss's built-in heartbeat supervision (#763).
- * The handler periodically calls `boss.touch()` to reset the heartbeat clock; pg-boss
- * only marks a job failed/retry when the heartbeat goes stale — i.e. the handler has
- * genuinely died. `expireInSeconds` (now 1200s / 20 min) becomes a crash safety net
- * rather than a correctness boundary: a handler that's still alive keeps its lease
- * via heartbeats regardless of how long it runs. This eliminates the orphaned-execution
- * class of bugs that plagued the pre-heartbeat architecture (see #755).
+ * `heartbeatSeconds: 300` enables pg-boss's own built-in heartbeat supervision (#763):
+ * `#processJobs` auto-touches the job every heartbeatSeconds/2 for as long as the
+ * handler promise is still pending, so `failJobsByHeartbeat` (a separate, faster reaper
+ * than `expireInSeconds`) only fires when the handler — or the whole process — has
+ * genuinely died, not merely run long. This does NOT extend `expireInSeconds`: pg-boss
+ * races every handler against `expireInSeconds` via `resolveWithinSeconds` independent
+ * of heartbeat state, and the distributed `failJobsByTimeout` reaper has no heartbeat
+ * exemption either — `expireInSeconds` (2400s / 40 min) remains a hard deadline for a
+ * live handler, not just a crash safety net. See issue #755.
  *
  * `retryLimit: 2` stays: only a handler that *throws* goes through the retry path,
  * and that's the case retries are meant for. A portfolio that's genuinely oversized
