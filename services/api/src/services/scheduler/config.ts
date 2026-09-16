@@ -31,6 +31,24 @@ export const GC_RECEIPTS_CRON = "0 3 * * *";
 
 export const RECOMPUTE_QUEUE = "recompute-history";
 export const RECOMPUTE_SINGLETON_SECONDS = 30;
+/**
+ * `heartbeatSeconds` lets pg-boss's own built-in heartbeat supervision (see
+ * BACKFILL_PORTFOLIO_QUEUE_OPTIONS below) detect a genuinely crashed handler early.
+ * Without a `heartbeatSeconds` on the queue, `heartbeat_seconds` stays NULL in
+ * `pgboss.job` and `failJobsByHeartbeat` is a no-op for this queue's rows (it requires
+ * `heartbeat_seconds IS NOT NULL`) — a manual `boss.touch()` call would write
+ * `heartbeat_on` but nothing would ever read it.
+ *
+ * `expireInSeconds` is raised to match BACKFILL_PORTFOLIO_QUEUE_OPTIONS: this queue
+ * runs the same `backfillPortfolioHistory` work (just bounded by `fromDate` instead of
+ * always from inception), so an edit to an old transaction can trigger a recompute with
+ * a worst case as large as a full backfill. Heartbeat does NOT extend this — see that
+ * queue's doc comment for why `expireInSeconds` stays a hard deadline regardless.
+ */
+export const RECOMPUTE_QUEUE_OPTIONS = {
+  expireInSeconds: 2400,
+  heartbeatSeconds: 300,
+} as const;
 
 export const BACKFILL_STALE_QUEUE = "backfill-stale-history";
 export const BACKFILL_STALE_CRON = "0 5 * * *";
@@ -55,22 +73,19 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
  * instead of one global job whose 900s handler timeout is exceeded by the very first
  * force run at platform scale. See issue #745.
  *
- * `expireInSeconds` was raised from 900 to 2400 in #755 after a 26-instrument, ~5-year
- * portfolio (~1881 days) was observed logging three "backfill-portfolio complete" lines
- * ~25–30 minutes apart on a single force trigger, with pg-boss marking the job
- * failed/retry *while the handler was still running* — the orphaned execution would
- * finish and log success while a concurrent retry kicked off a redundant second (and
- * third) run of the same portfolio. 2400s (40 min) leaves comfortable headroom over
- * the observed ~30 min upper bound; the previous raise to 1800s in the first iteration
- * of this PR was tight enough that any run exceeding 30 min by a second would have hit
- * the same orphaning bug.
+ * `heartbeatSeconds: 300` enables pg-boss's own built-in heartbeat supervision (#763):
+ * `#processJobs` auto-touches the job every heartbeatSeconds/2 for as long as the
+ * handler promise is still pending, so `failJobsByHeartbeat` (a separate, faster reaper
+ * than `expireInSeconds`) only fires when the handler — or the whole process — has
+ * genuinely died, not merely run long. This does NOT extend `expireInSeconds`: pg-boss
+ * races every handler against `expireInSeconds` via `resolveWithinSeconds` independent
+ * of heartbeat state, and the distributed `failJobsByTimeout` reaper has no heartbeat
+ * exemption either — `expireInSeconds` (2400s / 40 min) remains a hard deadline for a
+ * live handler, not just a crash safety net. See issue #755.
  *
- * `retryLimit: 2` stays: the orphaning case is no longer the dominant cost (a real
- * run that completes within 2400s gets zero retries); only a handler that *throws*
- * still goes through the retry path, and that's the case retries are meant for. A
- * portfolio that *always* exceeds 2400s is genuinely oversized for this code path and
- * would benefit from per-instrument chunking (follow-up #761) or a handler heartbeat
- * (#762), not from more retries with the same broken supervision.
+ * `retryLimit: 2` stays: only a handler that *throws* goes through the retry path,
+ * and that's the case retries are meant for. A portfolio that's genuinely oversized
+ * would benefit from per-instrument chunking (#761), not from more retries.
  */
 export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
 export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
