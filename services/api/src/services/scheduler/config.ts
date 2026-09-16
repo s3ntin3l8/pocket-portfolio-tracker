@@ -33,13 +33,20 @@ export const RECOMPUTE_QUEUE = "recompute-history";
 export const RECOMPUTE_SINGLETON_SECONDS = 30;
 /**
  * `heartbeatSeconds` lets pg-boss's own built-in heartbeat supervision (see
- * BACKFILL_PORTFOLIO_QUEUE_OPTIONS below) detect a genuinely crashed handler early,
- * rather than only via `expireInSeconds`'s 900s default. Without a `heartbeatSeconds`
- * on the queue, `heartbeat_seconds` stays NULL in `pgboss.job` and `failJobsByHeartbeat`
- * is a no-op for this queue's rows (it requires `heartbeat_seconds IS NOT NULL`) — a
- * manual `boss.touch()` call would write `heartbeat_on` but nothing would ever read it.
+ * BACKFILL_PORTFOLIO_QUEUE_OPTIONS below) detect a genuinely crashed handler early.
+ * Without a `heartbeatSeconds` on the queue, `heartbeat_seconds` stays NULL in
+ * `pgboss.job` and `failJobsByHeartbeat` is a no-op for this queue's rows (it requires
+ * `heartbeat_seconds IS NOT NULL`) — a manual `boss.touch()` call would write
+ * `heartbeat_on` but nothing would ever read it.
+ *
+ * `expireInSeconds` is raised to match BACKFILL_PORTFOLIO_QUEUE_OPTIONS: this queue
+ * runs the same `backfillPortfolioHistory` work (just bounded by `fromDate` instead of
+ * always from inception), so an edit to an old transaction can trigger a recompute with
+ * a worst case as large as a full backfill. Heartbeat does NOT extend this — see that
+ * queue's doc comment for why `expireInSeconds` stays a hard deadline regardless.
  */
 export const RECOMPUTE_QUEUE_OPTIONS = {
+  expireInSeconds: 2400,
   heartbeatSeconds: 300,
 } as const;
 
