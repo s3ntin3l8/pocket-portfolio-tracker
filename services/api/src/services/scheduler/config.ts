@@ -55,30 +55,26 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
  * instead of one global job whose 900s handler timeout is exceeded by the very first
  * force run at platform scale. See issue #745.
  *
- * `expireInSeconds` was raised from 900 to 2400 in #755 after a 26-instrument, ~5-year
- * portfolio (~1881 days) was observed logging three "backfill-portfolio complete" lines
- * ~25–30 minutes apart on a single force trigger, with pg-boss marking the job
- * failed/retry *while the handler was still running* — the orphaned execution would
- * finish and log success while a concurrent retry kicked off a redundant second (and
- * third) run of the same portfolio. 2400s (40 min) leaves comfortable headroom over
- * the observed ~30 min upper bound; the previous raise to 1800s in the first iteration
- * of this PR was tight enough that any run exceeding 30 min by a second would have hit
- * the same orphaning bug.
+ * `heartbeatSeconds: 300` enables pg-boss's built-in heartbeat supervision (#763).
+ * The handler periodically calls `boss.touch()` to reset the heartbeat clock; pg-boss
+ * only marks a job failed/retry when the heartbeat goes stale — i.e. the handler has
+ * genuinely died. `expireInSeconds` (now 1200s / 20 min) becomes a crash safety net
+ * rather than a correctness boundary: a handler that's still alive keeps its lease
+ * via heartbeats regardless of how long it runs. This eliminates the orphaned-execution
+ * class of bugs that plagued the pre-heartbeat architecture (see #755).
  *
- * `retryLimit: 2` stays: the orphaning case is no longer the dominant cost (a real
- * run that completes within 2400s gets zero retries); only a handler that *throws*
- * still goes through the retry path, and that's the case retries are meant for. A
- * portfolio that *always* exceeds 2400s is genuinely oversized for this code path and
- * would benefit from per-instrument chunking (follow-up #761) or a handler heartbeat
- * (#762), not from more retries with the same broken supervision.
+ * `retryLimit: 2` stays: only a handler that *throws* goes through the retry path,
+ * and that's the case retries are meant for. A portfolio that's genuinely oversized
+ * would benefit from per-instrument chunking (#761), not from more retries.
  */
 export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
 export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
 export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
-  expireInSeconds: 2400,
+  expireInSeconds: 1200,
   retryLimit: 2,
   retryDelay: 300,
   retryBackoff: true,
+  heartbeatSeconds: 300,
 } as const;
 
 export const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60; // 6 hours

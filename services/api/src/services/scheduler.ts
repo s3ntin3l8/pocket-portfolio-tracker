@@ -371,6 +371,16 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         fromDate?: string;
         tailOnly?: boolean;
       };
+      // Heartbeat: extend the pg-boss lease every 120s so the expiry supervisor
+      // doesn't reclaim a still-running handler. Cleared in `finally` so it never
+      // leaks. See #763.
+      let heartbeatTicks = 0;
+      const heartbeatTimer = setInterval(() => {
+        boss.touch(BACKFILL_PORTFOLIO_QUEUE, job.id).catch((err) => {
+          app.log.warn({ err, portfolioId }, "backfill-portfolio heartbeat touch failed");
+        });
+        heartbeatTicks++;
+      }, 120_000);
       try {
         const result = await backfillPortfolioHistory(
           getDb(),
@@ -380,10 +390,15 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
           { fromDate, tailOnly },
         );
         await flushUsage();
-        app.log.info({ portfolioId, fromDate, tailOnly, ...result }, "backfill-portfolio complete");
+        app.log.info(
+          { portfolioId, fromDate, tailOnly, heartbeatTicks, ...result },
+          "backfill-portfolio complete",
+        );
       } catch (err) {
         app.log.error({ err, portfolioId, fromDate, tailOnly }, "backfill-portfolio failed");
         throw err; // let pg-boss record a genuine failure instead of a false "completed"
+      } finally {
+        clearInterval(heartbeatTimer);
       }
     }
   });
@@ -444,6 +459,13 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   await boss.createQueue(RECOMPUTE_QUEUE);
   await boss.work(RECOMPUTE_QUEUE, async (jobs) => {
     for (const job of jobs) {
+      let heartbeatTicks = 0;
+      const heartbeatTimer = setInterval(() => {
+        boss.touch(RECOMPUTE_QUEUE, job.id).catch((err) => {
+          app.log.warn({ err }, "recompute-history heartbeat touch failed");
+        });
+        heartbeatTicks++;
+      }, 120_000);
       try {
         const { portfolioId, fromDate } = job.data as { portfolioId: string; fromDate: string };
         const result = await backfillPortfolioHistory(
@@ -453,9 +475,14 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
           portfolioId,
           { fromDate },
         );
-        app.log.info({ portfolioId, fromDate, ...result }, "history recompute complete");
+        app.log.info(
+          { portfolioId, fromDate, heartbeatTicks, ...result },
+          "history recompute complete",
+        );
       } catch (err) {
         app.log.error({ err }, "history recompute failed");
+      } finally {
+        clearInterval(heartbeatTimer);
       }
     }
   });
