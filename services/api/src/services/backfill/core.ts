@@ -116,9 +116,18 @@ export async function backfillPortfolioHistory(
 
     // Determine per-instrument chunk boundaries
     for (const instr of instrRows) {
-      const firstHeld = txRows
-        .filter((r) => r.instrumentId === instr.id)
-        .reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt);
+      // Seed the reduce with one of THIS instrument's own transactions, not
+      // txRows[0] (an arbitrary transaction from anywhere in the portfolio, possibly
+      // for a different instrument entirely). Seeding with an unrelated, potentially
+      // earlier date meant the reduce could never find anything "smaller" and got
+      // stuck at that wrong seed — inflating the fetch window to the whole
+      // portfolio's earliest date for every instrument, not just the one actually
+      // held that early.
+      const instrTxns = txRows.filter((r) => r.instrumentId === instr.id);
+      const firstHeld = instrTxns.reduce(
+        (min, r) => (r.executedAt < min ? r.executedAt : min),
+        instrTxns[0]!.executedAt,
+      );
       const firstHeldDate = toDateKey(firstHeld);
       const fetchFrom = firstHeldDate < startDate ? startDate : firstHeldDate;
 
@@ -214,9 +223,13 @@ export async function backfillPortfolioHistory(
   }
 
   for (const instr of instrRows) {
-    const firstHeld = txRows
-      .filter((r) => r.instrumentId === instr.id)
-      .reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt);
+    // Seed with this instrument's own first transaction, not an arbitrary one — see
+    // the identical fix in the planner path above for why.
+    const instrTxns = txRows.filter((r) => r.instrumentId === instr.id);
+    const firstHeld = instrTxns.reduce(
+      (min, r) => (r.executedAt < min ? r.executedAt : min),
+      instrTxns[0]!.executedAt,
+    );
     const firstHeldDate = toDateKey(firstHeld);
     const fetchFrom = firstHeldDate < startDate ? startDate : firstHeldDate;
 
@@ -643,25 +656,37 @@ export async function computeBackfillSnapshots(
 
   // Read prices from DB (already written by sub-jobs or inline backfill)
   for (const instr of instrRows) {
-    const priceRows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
-
     const instrPrices = new Map<string, { close: string; currency: string }>();
     rawPrices.set(instr.id, instrPrices);
 
+    // Mirror fetchInstrumentPrices/the inline path: a manually-priced bond writes
+    // nothing new to `prices` for this run, so reading whatever is already in that
+    // table here would pick up stale par-value rows left over from before the manual
+    // price was set — silently overriding the user's manual price with generated par
+    // history. Leave `instrPrices` empty; downstream valuation falls back to cost
+    // basis for dates with no price, same as any other never-priced holding.
+    const isManualPriceBond =
+      instr.assetClass === "bond" && instr.manualPrice && Number(instr.manualPrice) > 0;
+
     let firstPricedDate: string | null = null;
-    for (const row of priceRows) {
-      if (row.date >= startDate) {
-        instrPrices.set(row.date, { close: row.close, currency: row.currency });
-      }
-      if (!firstPricedDate || row.date < firstPricedDate) {
-        firstPricedDate = row.date;
+    if (!isManualPriceBond) {
+      const priceRows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+      for (const row of priceRows) {
+        if (row.date >= startDate) {
+          instrPrices.set(row.date, { close: row.close, currency: row.currency });
+        }
+        if (!firstPricedDate || row.date < firstPricedDate) {
+          firstPricedDate = row.date;
+        }
       }
     }
 
     // Check truncation: first-priced after first-held
-    const firstHeld = txRows
-      .filter((r) => r.instrumentId === instr.id)
-      .reduce((min, r) => (r.executedAt < min ? r.executedAt : min), txRows[0]!.executedAt);
+    const instrTxns = txRows.filter((r) => r.instrumentId === instr.id);
+    const firstHeld = instrTxns.reduce(
+      (min, r) => (r.executedAt < min ? r.executedAt : min),
+      instrTxns[0]!.executedAt,
+    );
     const firstHeldDate = toDateKey(firstHeld);
     if (firstPricedDate && firstPricedDate > firstHeldDate) {
       truncated.push(instr.id);
