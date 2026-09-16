@@ -70,7 +70,7 @@ export const BACKFILL_STALE_QUEUE_OPTIONS = {
 export const BACKFILL_PORTFOLIO_QUEUE = "backfill-portfolio";
 export const BACKFILL_PORTFOLIO_SINGLETON_SECONDS = 30;
 export const BACKFILL_PORTFOLIO_QUEUE_OPTIONS = {
-  expireInSeconds: 1200,
+  expireInSeconds: 2400,
   retryLimit: 2,
   retryDelay: 300,
   retryBackoff: true,
