@@ -217,13 +217,50 @@ export async function cleanupFanOutRows(
 }
 
 /**
+ * Best-effort delete of this run's already-`done` coordination rows, scoped to
+ * `claimedAt` like `cleanupFanOutRows`. Used on timeout (see `pollFanOutCompletion`
+ * below): a retried portfolio job's `planFanOut` upserts EVERY still-present row for
+ * this portfolio back to `"pending"` (its `onConflictDoUpdate` can't tell "genuinely
+ * unfinished" from "finished but not yet cleaned up"), so leaving done rows in place
+ * across a timeout makes a retry re-fetch instruments that already completed. Never
+ * throws.
+ */
+export async function cleanupDoneFanOutRows(
+  db: DB,
+  subJobIds: string[],
+  claimedAt: Date,
+): Promise<number> {
+  if (subJobIds.length === 0) return 0;
+  try {
+    const deleted = await db
+      .delete(backfillJobs)
+      .where(
+        and(
+          inArray(backfillJobs.id, subJobIds),
+          eq(backfillJobs.createdAt, claimedAt),
+          eq(backfillJobs.status, "done"),
+        ),
+      )
+      .returning({ id: backfillJobs.id });
+    return deleted.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Poll `backfill_jobs` until every row in `plan.subJobIds` is `"done"`, one is
  * `"failed"`, the deadline is exceeded, or `signal` aborts. Owns cleanup: deletes this
  * run's rows only on a DEFINITE VERDICT about them — success, or a genuine sub-job
- * failure. On abort/timeout/ownership-lost, the rows are left alone: at that point we no
- * longer know whether they're safely ours to delete or whether sub-jobs are still in
- * flight, and leaving them is safe precisely because `planFanOut` is idempotent over
- * them (a later replan reclaims and resets them rather than colliding).
+ * failure. On abort/ownership-lost, the rows are left alone: at that point we no longer
+ * know whether they're safely ours to delete or whether sub-jobs are still in flight.
+ * On timeout specifically, the already-`done` rows ARE deleted (see
+ * `cleanupDoneFanOutRows`) even though the run overall didn't finish — otherwise a
+ * pg-boss retry's `planFanOut` would reset those completed rows back to `"pending"` and
+ * re-fetch instruments that already finished, amplifying a single timeout into a full
+ * portfolio re-fetch on every retry. The still-unfinished rows are left alone, same as
+ * abort/ownership-lost — `planFanOut` is idempotent over them, so a later replan
+ * reclaims and resets them rather than colliding.
  */
 export async function pollFanOutCompletion(
   db: DB,
@@ -241,13 +278,14 @@ export async function pollFanOutCompletion(
     throw new FanOutAbortedError("fan-out aborted before polling began");
   }
 
-  let verdict: "success" | "failed" | null = null;
+  let verdict: "success" | "failed" | "timeout" | null = null;
   try {
     for (;;) {
       await abortableSleep(pollIntervalMs, opts.signal);
 
       const waitedMs = Date.now() - startedAt;
       if (waitedMs > maxWaitMs) {
+        verdict = "timeout";
         throw new FanOutTimeoutError(
           `fan-out poll exceeded maxWaitMs (${maxWaitMs}ms) for ${subJobIds.length} sub-jobs`,
           waitedMs,
@@ -293,6 +331,8 @@ export async function pollFanOutCompletion(
   } finally {
     if (verdict === "success" || verdict === "failed") {
       await cleanupFanOutRows(db, subJobIds, claimedAt);
+    } else if (verdict === "timeout") {
+      await cleanupDoneFanOutRows(db, subJobIds, claimedAt);
     }
   }
 }
