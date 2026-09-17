@@ -276,6 +276,30 @@ export async function backfillPortfolioHistory(
     }
   }
 
+  // Merge in previously-persisted prices for dates this run's fetch didn't refresh
+  // (issue #775). A candle fetch above only covers THIS run — on a dead feed
+  // (candles.length === 0) `rawPrices` for that instrument stays entirely empty, even
+  // when an earlier successful run already wrote real price rows for it. Without this
+  // merge, writeSnapshotSeries' `hasEverPriced` would see "never priced at all" and
+  // fall back to cost basis immediately, instead of carrying the stale-but-real price
+  // forward (bounded by MAX_PRICE_CARRY_FORWARD_DAYS) the way `computeBackfillSnapshots`
+  // (the fan-out path, which reads the full `prices` table) already does — see the
+  // hasEverPriced doc comment in CLAUDE.md/writeSnapshotSeries for why collapsing that
+  // distinction corrupts the TWR index. Only fills gaps: a date this run DID fetch keeps
+  // its freshly-fetched value.
+  for (const instr of instrRows) {
+    if (instr.assetClass === "bond" && isManualPriceBond(instr)) continue;
+    const instrPrices = rawPrices.get(instr.id);
+    if (!instrPrices) continue;
+    const priceRows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+    for (const row of priceRows) {
+      if (row.date < startDate) continue;
+      if (!instrPrices.has(row.date)) {
+        instrPrices.set(row.date, { close: row.close, currency: row.currency });
+      }
+    }
+  }
+
   const flowDateOf = await buildFlowDateFn(db, instrIds);
   const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf);
 
@@ -287,9 +311,10 @@ export async function backfillPortfolioHistory(
  * fan-out (#761/#773, see `backfill/fan-out.ts`'s `planFanOut`/`runFanOut`): after all
  * per-instrument sub-jobs have written their prices independently, the scheduler calls
  * this to read them back and compute the full snapshot series. (Contrast
- * `backfillPortfolioHistory` above, which fetches prices itself and passes its own
- * in-memory `rawPrices` map straight to `writeSnapshotSeries` — no DB read-back needed
- * since it already has them in hand.)
+ * `backfillPortfolioHistory` above, which fetches prices itself and merges them with its
+ * own DB read-back before passing the combined `rawPrices` map to `writeSnapshotSeries` —
+ * see the merge step there, issue #775, for why both paths must read the full `prices`
+ * history rather than just this run's fetch.)
  */
 export async function computeBackfillSnapshots(
   db: DB,

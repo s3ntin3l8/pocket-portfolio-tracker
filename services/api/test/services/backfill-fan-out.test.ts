@@ -392,6 +392,41 @@ describe("pollFanOutCompletion (#773)", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("rejects with FanOutTimeoutError but deletes already-done rows, leaving only unfinished ones", async () => {
+    const db = await ensureDb();
+    const claimedAt = new Date();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "fanout-poll-4b", email: "fanout-poll-4b@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Poll 4b", baseCurrency: "USD" })
+      .returning();
+    const doneIds = await seedSubJobs(db, pf.id, 2, "done", claimedAt);
+    const pendingIds = await seedSubJobs(db, pf.id, 1, "pending", claimedAt);
+    const ids = [...doneIds, ...pendingIds];
+
+    await expect(
+      pollFanOutCompletion(
+        db,
+        { subJobIds: ids, claimedAt },
+        { pollIntervalMs: 10, maxWaitMs: 30 },
+      ),
+    ).rejects.toThrow(FanOutTimeoutError);
+
+    // A retry's planFanOut would otherwise reset these done rows back to "pending" and
+    // re-fetch instruments that already finished (the retry-amplification bug).
+    const doneRows = await db.select().from(backfillJobs).where(inArray(backfillJobs.id, doneIds));
+    expect(doneRows).toHaveLength(0);
+
+    const pendingRows = await db
+      .select()
+      .from(backfillJobs)
+      .where(inArray(backfillJobs.id, pendingIds));
+    expect(pendingRows).toHaveLength(1);
+  });
+
   it("rejects promptly on an abort signal — well under the poll interval — leaving rows intact", async () => {
     const db = await ensureDb();
     const claimedAt = new Date();

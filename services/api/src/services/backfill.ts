@@ -15,6 +15,7 @@ export {
   runFanOut,
   pollFanOutCompletion,
   cleanupFanOutRows,
+  cleanupDoneFanOutRows,
   FanOutEnqueueError,
   FanOutSubJobFailedError,
   FanOutTimeoutError,
