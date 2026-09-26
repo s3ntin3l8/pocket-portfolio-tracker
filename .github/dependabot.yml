@@ -24,6 +24,14 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # jsdom 30.1.x breaks the web tests: dropdown menu items never render
+      # after the trigger click (18 failures across 5 test files under
+      # jsdom 30.1.0 with everything else unchanged), which takes the whole
+      # npm-deps group PR down with it. Drop this once a fixed release is
+      # verified against `npm test --workspace @portfolio/web`.
+      - dependency-name: "jsdom"
+        versions: ["30.1.x"]
 
   - package-ecosystem: "docker"
     directory: "/"
