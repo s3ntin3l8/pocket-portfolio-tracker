@@ -24,8 +24,8 @@
     "repair:instruments": "tsx --env-file=../../.env src/db/repair-eu-instruments.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1138.0",
-    "@aws-sdk/s3-request-presigner": "^3.1138.0",
+    "@aws-sdk/client-s3": "^3.1139.0",
+    "@aws-sdk/s3-request-presigner": "^3.1139.0",
     "@fastify/compress": "^9.2.0",
     "@fastify/cors": "^11.3.0",
     "@fastify/env": "^7.0.0",
