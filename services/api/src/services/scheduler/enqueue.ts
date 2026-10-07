@@ -8,6 +8,7 @@ import {
   INSTRUMENT_META_QUEUE,
   INSTRUMENT_META_SINGLETON_SECONDS,
   RECOMPUTE_QUEUE,
+  RECOMPUTE_SINGLETON_SECONDS,
   TR_SYNC_QUEUE,
 } from "./config.js";
 
@@ -91,14 +92,19 @@ export async function enqueueTrSync(connectionId: string): Promise<{ queued: boo
 }
 
 /**
- * Enqueue a durable history recompute job. Do not debounce with a singleton time window:
- * a later edit can affect an earlier date, and pg-boss would silently discard that job.
- * Each request remains durable and fromDate bounds its affected history window.
+ * Enqueue a history recompute for a portfolio. The singleton window collapses bursts
+ * (imports and syncs) while pg-boss refreshes the pending job with the latest payload.
+ * Callers must pass the earliest affected date so the coalesced request keeps the widest
+ * recompute window.
  */
 export async function enqueueRecompute(portfolioId: string, fromDate: string): Promise<void> {
   if (!activeBoss) return;
   try {
-    await activeBoss.send(RECOMPUTE_QUEUE, { portfolioId, fromDate });
+    await activeBoss.send(
+      RECOMPUTE_QUEUE,
+      { portfolioId, fromDate },
+      { singletonKey: portfolioId, singletonSeconds: RECOMPUTE_SINGLETON_SECONDS },
+    );
   } catch {
     // non-fatal
   }

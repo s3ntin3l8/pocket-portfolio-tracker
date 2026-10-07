@@ -80,6 +80,8 @@ export async function portfoliosRoute(app: FastifyInstance) {
       const { portfolioId } = request.params;
       const input = portfolioPatchSchema.parse(request.body);
       if (Object.keys(input).length === 0) {
+        // Empty patches assign no holder, so ownership is checked directly by both
+        // portfolio id and user id instead of running holderOwnedOrNull below.
         const [existing] = await app.db
           .select()
           .from(portfolios)

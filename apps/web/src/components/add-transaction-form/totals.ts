@@ -22,7 +22,8 @@ export function stripGrouping(v: string | null | undefined): number {
 /**
  * Live transaction total — mirrors the Add Transaction v2 design's `_tickTotal`/summary-line
  * logic exactly (buy: subtotal+fees+tax; sell: subtotal−fees−tax; transfer: qty×cost basis;
- * income: amount−tax). Returns `null` when the type has no total concept (cash/share-receipt)
+ * income: the entered net amount (tax is shown separately for breakdown only). Returns
+ * `null` when the type has no total concept (cash/share-receipt)
  * or the required fields aren't filled in yet.
  */
 export function computeTxTotal(
