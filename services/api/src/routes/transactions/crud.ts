@@ -83,13 +83,19 @@ export function registerCrudRoutes(app: FastifyInstance) {
       const deleted = await app.db
         .delete(transactions)
         .where(and(eq(transactions.portfolioId, portfolioId), inArray(transactions.id, ids)))
-        .returning({ id: transactions.id, importId: transactions.importId });
+        .returning({
+          id: transactions.id,
+          importId: transactions.importId,
+          executedAt: transactions.executedAt,
+        });
       if (deleted.length > 0) {
         await deleteReceiptsForTransactions(
           app,
           deleted.map((d) => d.id),
           deleted.map((d) => d.importId).filter((x): x is string => x !== null),
         );
+        const fromDate = deleted.map((d) => toDateKey(d.executedAt)).sort()[0]!;
+        await enqueueRecompute(portfolioId, fromDate);
       }
       return { deleted: deleted.length };
     },
@@ -104,6 +110,11 @@ export function registerCrudRoutes(app: FastifyInstance) {
         ...(request.body as Record<string, unknown>),
         portfolioId,
       });
+      const [previous] = await app.db
+        .select({ executedAt: transactions.executedAt })
+        .from(transactions)
+        .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
+        .limit(1);
       const [updated] = await app.db
         .update(transactions)
         .set({
@@ -131,7 +142,11 @@ export function registerCrudRoutes(app: FastifyInstance) {
       if (!updated) {
         return reply.code(404).send({ error: "transaction_not_found" });
       }
-      await enqueueRecompute(portfolioId, toDateKey(updated.executedAt));
+      const fromDate = [previous?.executedAt, updated.executedAt]
+        .filter((date): date is Date => date instanceof Date)
+        .map(toDateKey)
+        .sort()[0]!;
+      await enqueueRecompute(portfolioId, fromDate);
       return updated;
     },
   );

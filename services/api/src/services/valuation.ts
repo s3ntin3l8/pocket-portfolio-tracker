@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { corporateActions, instruments, prices as pricesTable, transactions } from "@portfolio/db";
 import {
   summarizePortfolio,
@@ -219,7 +219,7 @@ export async function valuePortfolio(
   const tFx = performance.now();
 
   const tCorpStart = performance.now();
-  const cas = await corporateActionsForInstruments(db, instrumentIds);
+  const cas = await corporateActionsForInstruments(db, instrumentIds, portfolioId);
   const summary = summarizePortfolio({
     transactions: coreTxns,
     corporateActions: cas,
@@ -406,16 +406,26 @@ export function clearValuationCache(_log?: FastifyBaseLogger): void {
 async function corporateActionsForInstruments(
   db: DB,
   instrumentIds: string[],
+  portfolioId: string,
 ): Promise<CorporateAction[]> {
   if (instrumentIds.length === 0) return [];
   const rows = await db
     .select()
     .from(corporateActions)
-    .where(inArray(corporateActions.instrumentId, instrumentIds));
+    .where(
+      and(
+        inArray(corporateActions.instrumentId, instrumentIds),
+        or(isNull(corporateActions.portfolioId), eq(corporateActions.portfolioId, portfolioId)),
+      ),
+    );
   return rows.map((r) => ({
     instrumentId: r.instrumentId,
     type: r.type,
     ratio: r.ratio,
     exDate: new Date(r.exDate),
+    portfolioId: r.portfolioId,
+    targetInstrumentId: r.targetInstrumentId ?? undefined,
+    ratioTo: r.ratioTo ?? undefined,
+    taxableMarketValue: r.taxableMarketValue ?? undefined,
   }));
 }

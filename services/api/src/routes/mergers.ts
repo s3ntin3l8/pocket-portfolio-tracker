@@ -136,6 +136,7 @@ export async function mergersRoute(app: FastifyInstance) {
             .values({
               instrumentId: input.fromInstrumentId,
               type: "merger",
+              portfolioId,
               ratio: outQty.div(inQty).toString(),
               exDate: dateStr,
               targetInstrumentId: input.toInstrumentId,

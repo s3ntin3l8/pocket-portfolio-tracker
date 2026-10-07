@@ -216,7 +216,9 @@ export function useTransactionForm({
       ? "pricePerGram"
       : showQuantity
         ? "price"
-        : "amount";
+        : (INCOME_TYPES as readonly string[]).includes(type)
+          ? "netAmount"
+          : "amount";
   const priceHint = isTransfer
     ? "transferBasisHint"
     : type === "adjustment"

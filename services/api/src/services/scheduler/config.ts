@@ -30,7 +30,6 @@ export const GC_RECEIPTS_QUEUE = "gc-staged-receipts";
 export const GC_RECEIPTS_CRON = "0 3 * * *";
 
 export const RECOMPUTE_QUEUE = "recompute-history";
-export const RECOMPUTE_SINGLETON_SECONDS = 30;
 /**
  * `heartbeatSeconds` lets pg-boss's own built-in heartbeat supervision (see
  * BACKFILL_PORTFOLIO_QUEUE_OPTIONS below) detect a genuinely crashed handler early.

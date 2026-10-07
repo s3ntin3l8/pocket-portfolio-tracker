@@ -53,7 +53,7 @@ export function computeTxTotal(
     return { kind: "transfer", subtotal, fees: 0, tax: 0, total: subtotal };
   }
   if ((INCOME_TYPES as readonly string[]).includes(type) && isFinite(pn)) {
-    return { kind: "income", subtotal: pn, fees: 0, tax: tn, total: pn - tn };
+    return { kind: "income", subtotal: pn, fees: 0, tax: tn, total: pn };
   }
   return null;
 }

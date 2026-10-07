@@ -93,6 +93,7 @@ export interface CorporateAction {
   type: "split" | "bonus" | "rights" | "merger";
   ratio: string; // split 2:1 => "2"; 1:10 bonus => "0.1"; merger = source ratio
   exDate: Date;
+  portfolioId?: string | null;
   // Merger-specific (undefined for non-merger CAs)
   targetInstrumentId?: string;
   ratioTo?: string; // target instrument's ratio

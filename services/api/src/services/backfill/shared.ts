@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull, or } from "drizzle-orm";
 import { corporateActions, instruments, portfolios, transactions } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { DB } from "../../db/client.js";
@@ -48,13 +48,22 @@ export async function loadBackfillContext(
     ? await db
         .select()
         .from(corporateActions)
-        .where(inArray(corporateActions.instrumentId, instrIds))
+        .where(
+          and(
+            inArray(corporateActions.instrumentId, instrIds),
+            or(isNull(corporateActions.portfolioId), eq(corporateActions.portfolioId, portfolioId)),
+          ),
+        )
     : [];
   const coreCas = caRows.map((r) => ({
     instrumentId: r.instrumentId,
     type: r.type as "split" | "bonus" | "rights",
     ratio: r.ratio,
     exDate: new Date(r.exDate),
+    portfolioId: r.portfolioId,
+    targetInstrumentId: r.targetInstrumentId ?? undefined,
+    ratioTo: r.ratioTo ?? undefined,
+    taxableMarketValue: r.taxableMarketValue ?? undefined,
   }));
 
   return {

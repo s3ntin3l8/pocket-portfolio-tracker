@@ -617,6 +617,13 @@
       "when": 1789567666721,
       "tag": "0087_lumpy_sentry",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1791369276193,
+      "tag": "0088_shallow_landau",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,5 @@
-import { defaultCache } from "@serwist/next/worker";
 import type { HandlerDidErrorCallbackParam, PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { NetworkOnly, Serwist } from "serwist";
+import { CacheFirst, NetworkOnly, Serwist } from "serwist";
 import { resolveLocalePrefix } from "./sw-locale";
 import { routing } from "../i18n/routing";
 
@@ -20,6 +19,23 @@ declare const self: ServiceWorkerGlobalScope;
 // page (`?shared=1`) reads it back out, then deletes it. See `share_target` in the manifest.
 export const SHARE_CACHE = "share-target";
 export const SHARE_KEY = "/shared-image";
+export const PUBLIC_STATIC_CACHE = "public-static-v1";
+
+// Drop runtime caches created by older workers (which cached personalized pages) as
+// soon as this worker activates. The precache contains only build-time public assets.
+self.addEventListener("activate", (event: ExtendableEvent) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((names) =>
+        Promise.all(
+          names
+            .filter((name) => name !== PUBLIC_STATIC_CACHE && !name.startsWith("serwist-precache"))
+            .map((name) => caches.delete(name)),
+        ),
+      ),
+  );
+});
 
 // Web Share Target: Android delivers a shared image as a multipart POST to
 // `/share-target` (no server route can receive it in a static/SSR app, so the SW does).
@@ -68,20 +84,19 @@ const serwist = new Serwist({
   skipWaiting: false,
   clientsClaim: true,
   navigationPreload: true,
-  // Auth + API routes must never be cached, preloaded, or replayed by the SW: the OAuth
-  // callback carries a single-use `code`, and `defaultCache`'s catch-all treats it as a
-  // same-origin document navigation — a replayed/cached hit consumes the code twice and
-  // the exchange fails with `invalid_grant`. Force everything under /api straight to the
-  // network. Ordered before defaultCache so this rule wins.
+  // Only immutable Next build assets are cached at runtime. Pages, RSC payloads, auth,
+  // and API responses can contain account data, so they always go to the network.
   runtimeCaching: [
     {
-      matcher: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/api"),
+      matcher: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/_next/static/"),
+      handler: new CacheFirst({ cacheName: PUBLIC_STATIC_CACHE }),
+    },
+    {
+      matcher: ({ sameOrigin }) => sameOrigin,
       handler: new NetworkOnly(),
     },
-    ...defaultCache,
   ],
-  // Serve the precached offline page when a navigation can't be fulfilled (the user is
-  // offline and the route wasn't already cached). Visited routes still work from cache.
+  // Serve the precached offline page when a navigation can't be fulfilled while offline.
   // Routes are localized under /[locale]; match each non-default locale's own offline
   // page by its path prefix first, falling back to the default locale's for everything
   // else (including unprefixed/unrecognized paths).
