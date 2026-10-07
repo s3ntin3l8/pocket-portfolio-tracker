@@ -172,10 +172,10 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
                     {s.byInstrument.slice(0, 8).map((c) => (
                       <div key={c.instrumentId ?? c.symbol ?? "—"} className="space-y-1">
                         <div className="flex items-baseline justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1 truncate">
                             <span className={TABLE_LABEL}>{c.symbol ?? "—"}</span>
                             {(c.displayName ?? c.name) && (
-                              <span className={cn("ml-2 truncate", TABLE_SUBLABEL)}>
+                              <span className={cn("ml-2", TABLE_SUBLABEL)}>
                                 {c.displayName ?? c.name}
                               </span>
                             )}

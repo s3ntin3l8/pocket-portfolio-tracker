@@ -129,11 +129,11 @@ export default async function TradesPage({
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Main column: trades table + tax lens ── */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <TradesTable trades={log.trades} currency={currency} />
 
           {/* ── Tax lens ── */}
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 @lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle>{t("realizedByYearChartTitle")}</CardTitle>

@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 
 /**
  * Report-screen header (reference: Realized P&L / Income / Savings / Tax). A back chevron —
@@ -18,10 +19,18 @@ export function ReportHeader({
   title: string;
   subtitle?: string;
   backHref?: string;
+  /** On narrow screens, the action occupies a second row below the title and subtitle. */
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-center gap-3">
+    <div
+      className={cn(
+        "mb-6",
+        action
+          ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:items-center"
+          : "flex items-center gap-3",
+      )}
+    >
       <Link
         href={backHref}
         aria-label="Back"
@@ -35,7 +44,9 @@ export function ReportHeader({
         <h1 className="truncate text-2xl font-bold md:hidden">{title}</h1>
         {subtitle && <p className="truncate text-sm text-text-2">{subtitle}</p>}
       </div>
-      {action}
+      {action && (
+        <div className="col-start-2 row-start-2 justify-self-end md:ml-auto">{action}</div>
+      )}
     </div>
   );
 }

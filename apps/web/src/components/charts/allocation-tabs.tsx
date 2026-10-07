@@ -267,7 +267,7 @@ export function AllocationTabs({
 
   return (
     <Tabs defaultValue="class" onValueChange={handleTabChange}>
-      <TabsList className="mb-3 flex w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <TabsList className="mb-3 flex w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <TabsTrigger value="class">{t("allocationTabClass")}</TabsTrigger>
         <TabsTrigger value="currency">{t("allocationTabCurrency")}</TabsTrigger>
         <TabsTrigger value="region">{t("allocationTabRegion")}</TabsTrigger>

@@ -11,14 +11,7 @@ import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { DriftRow, TargetWeight } from "@portfolio/api-client";
-
-const COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-];
+import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
 
 export interface RebalancingSlice {
   key: string;
@@ -175,7 +168,12 @@ export function RebalancingCard({
               <div key={row.key} className="flex items-center gap-2 text-sm">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: COLORS[i % COLORS.length] }}
+                  style={{
+                    background: assetClassColor(
+                      row.key,
+                      ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length],
+                    ),
+                  }}
                 />
                 <span className="flex-1">{row.label}</span>
                 <div className="flex w-24 items-center gap-1">
@@ -243,7 +241,12 @@ export function RebalancingCard({
               <div key={s.key} className="flex items-center gap-2 text-sm">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: COLORS[i % COLORS.length] }}
+                  style={{
+                    background: assetClassColor(
+                      s.key,
+                      ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length],
+                    ),
+                  }}
                 />
                 <span className="flex-1 truncate">{s.label}</span>
                 <span className="tabular text-muted-foreground">{s.actualPct.toFixed(1)}%</span>
