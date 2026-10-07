@@ -5,7 +5,7 @@ const ASSET_CLASS_COLORS: Record<string, string> = {
   bond: "var(--color-chart-3)",
   etf: "var(--color-chart-4)",
   mutual_fund: "var(--color-chart-4)",
-  crypto: "var(--color-chart-4)",
+  crypto: "var(--color-chart-6)",
   cash: "var(--color-chart-5)",
 };
 

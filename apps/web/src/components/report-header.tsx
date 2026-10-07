@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 
 /**
  * Report-screen header (reference: Realized P&L / Income / Savings / Tax). A back chevron —
@@ -22,11 +23,12 @@ export function ReportHeader({
 }) {
   return (
     <div
-      className={
+      className={cn(
+        "mb-6",
         action
-          ? "mb-6 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:items-center"
-          : "mb-6 flex items-center gap-3"
-      }
+          ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:items-center"
+          : "flex items-center gap-3",
+      )}
     >
       <Link
         href={backHref}

@@ -40,6 +40,7 @@
   --chart-3: #0d9488; /* teal   — bonds */
   --chart-4: #7c5cfc; /* violet — funds / ETF */
   --chart-5: #94a3b8; /* slate  — cash */
+  --chart-6: #d45d8c; /* rose   — crypto */
 
   /* Pocket surface & text ramp (feature components read these directly) */
   --card-2: #f7faf8;
@@ -94,6 +95,7 @@
   --chart-3: #14b8a6;
   --chart-4: #9575ff;
   --chart-5: #94a3b8;
+  --chart-6: #f078a8;
 
   --card-2: #141b17;
   --text-2: #8a988f;
@@ -136,6 +138,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
   --color-card-2: var(--card-2);
   --color-pill: var(--pill);
   --color-text-2: var(--text-2);
