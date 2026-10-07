@@ -115,7 +115,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
           </Card>
 
           {/* Plans + forecast side by side on desktop (reference: 2-col grid). */}
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 @lg:grid-cols-2">
             {sparplanResult.status === "ok" && sparplanResult.data.plans.length > 0 && (
               <SparplanSection
                 data={sparplanResult.data}

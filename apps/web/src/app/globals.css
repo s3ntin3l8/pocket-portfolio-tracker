@@ -21,7 +21,7 @@
   --secondary: #edf1ef;
   --secondary-foreground: #11211a;
   --muted: #f0f3f1;
-  --muted-foreground: #7c8a82;
+  --muted-foreground: #64736a;
   --accent: #edf1ef;
   --accent-foreground: #11211a;
 
@@ -43,8 +43,8 @@
 
   /* Pocket surface & text ramp (feature components read these directly) */
   --card-2: #f7faf8;
-  --text-2: #7c8a82;
-  --text-3: #9aa8a0;
+  --text-2: #64736a;
+  --text-3: #66736a;
   --text-mute: #5b6b62;
   --line: #f0f3f1;
   --row-hover: #fbfcfb;
@@ -97,7 +97,7 @@
 
   --card-2: #141b17;
   --text-2: #8a988f;
-  --text-3: #66746b;
+  --text-3: #89968d;
   --text-mute: #aebbb2;
   --line: #222a26;
   --row-hover: #1e2622;

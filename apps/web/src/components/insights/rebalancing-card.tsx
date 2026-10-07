@@ -11,6 +11,7 @@ import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { DriftRow, TargetWeight } from "@portfolio/api-client";
+import { assetClassColor } from "@/lib/asset-class-colors";
 
 const COLORS = [
   "var(--color-chart-1)",
@@ -175,7 +176,7 @@ export function RebalancingCard({
               <div key={row.key} className="flex items-center gap-2 text-sm">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: COLORS[i % COLORS.length] }}
+                  style={{ background: assetClassColor(row.key, COLORS[i % COLORS.length]) }}
                 />
                 <span className="flex-1">{row.label}</span>
                 <div className="flex w-24 items-center gap-1">

@@ -21,7 +21,13 @@ export function ReportHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-center gap-3">
+    <div
+      className={
+        action
+          ? "mb-6 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:items-center"
+          : "mb-6 flex items-center gap-3"
+      }
+    >
       <Link
         href={backHref}
         aria-label="Back"
@@ -35,7 +41,9 @@ export function ReportHeader({
         <h1 className="truncate text-2xl font-bold md:hidden">{title}</h1>
         {subtitle && <p className="truncate text-sm text-text-2">{subtitle}</p>}
       </div>
-      {action}
+      {action && (
+        <div className="col-start-2 row-start-2 justify-self-end md:ml-auto">{action}</div>
+      )}
     </div>
   );
 }

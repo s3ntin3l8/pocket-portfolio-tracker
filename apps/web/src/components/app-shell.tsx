@@ -170,63 +170,63 @@ export function AppShell({
             ref={scrollContainerRef}
             className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain"
           >
-            {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps.
-            Padding lives on the INNER wrapper (not the outer bar) so its cap/center
-            matches <main>'s content edges exactly — see the widescreen note on <main>.
-            The outer bar stays edge-to-edge (bg-card, sticky, safe-area-top only) so it
-            still reads as one continuous surface across the full width. */}
-            {/* w-full + will-change-transform: workaround for an iOS Safari compositor
-              bug where `sticky` element backgrounds paint only ~60% across the scroll
-              container's content width instead of the element's full width (#472).
-              shrink-0: this header and <main> are both flex items in this column-flex
-              scroll container — Safari has a long-standing bug where it doesn't treat
-              a flex item's own `min-height` as a hard floor in a scrollable flex column,
-              shrinking the item below it once a sibling's content is tall enough to need
-              scrolling. Live-verified: on a page with enough content to scroll (Holdings),
-              the header rendered at ~63px (its `min-h-[62px]` alone, safe-area padding
-              discarded) instead of its natural ~124px, with its own child content
-              overflowing past it — on a page that fits one screen (Profile/Settings),
-              no shrinking occurred and it rendered correctly. Same bug class `shrink-0`
-              already fixes for the Sheet's drag handle/footer (`ui/sheet.tsx`, #472). */}
-            <header className="sticky top-0 z-30 flex w-full min-h-[62px] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)] will-change-transform">
-              <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-6 md:pr-6">
-                {/* Mobile brand (desktop shows it in the sidebar). */}
-                <Link href="/holdings" className="md:hidden" aria-label="Pocket">
-                  <Brand />
-                </Link>
-                <DesktopTopbarTitle />
-                <div className="min-w-0">{switcher}</div>
-                <div className="ml-auto flex items-center gap-1">
-                  <ThemeToggle className="hidden md:inline-flex" />
-                  <GlobalSearch holderId={selectedHolderId} />
-                  {/* Global add-entry affordance: reachable from every screen, owns the
-                  share-target / shortcut auto-open. Suspense is required because
-                  AddTransactionMenu reads useSearchParams and this shell renders on
-                  every route (avoids a CSR-bailout de-opt). */}
-                  <Suspense fallback={null}>
-                    <AddTransactionMenu autoOpenFromParams isAdmin={isAdmin} />
-                  </Suspense>
+            <PageHeaderProvider>
+              {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps.
+              Padding lives on the INNER wrapper (not the outer bar) so its cap/center
+              matches <main>'s content edges exactly — see the widescreen note on <main>.
+              The outer bar stays edge-to-edge (bg-card, sticky, safe-area-top only) so it
+              still reads as one continuous surface across the full width. */}
+              {/* w-full + will-change-transform: workaround for an iOS Safari compositor
+                bug where `sticky` element backgrounds paint only ~60% across the scroll
+                container's content width instead of the element's full width (#472).
+                shrink-0: this header and <main> are both flex items in this column-flex
+                scroll container — Safari has a long-standing bug where it doesn't treat
+                a flex item's own `min-height` as a hard floor in a scrollable flex column,
+                shrinking the item below it once a sibling's content is tall enough to need
+                scrolling. Live-verified: on a page with enough content to scroll (Holdings),
+                the header rendered at ~63px (its `min-h-[62px]` alone, safe-area padding
+                discarded) instead of its natural ~124px, with its own child content
+                overflowing past it — on a page that fits one screen (Profile/Settings),
+                no shrinking occurred and it rendered correctly. Same bug class `shrink-0`
+                already fixes for the Sheet's drag handle/footer (`ui/sheet.tsx`, #472). */}
+              <header className="sticky top-0 z-30 flex w-full min-h-[62px] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)] will-change-transform">
+                <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-6 md:pr-6">
+                  {/* Mobile brand (desktop shows it in the sidebar). */}
+                  <Link href="/holdings" className="md:hidden" aria-label="Pocket">
+                    <Brand />
+                  </Link>
+                  <DesktopTopbarTitle />
+                  <div className="min-w-0">{switcher}</div>
+                  <div className="ml-auto flex items-center gap-1">
+                    <ThemeToggle className="hidden md:inline-flex" />
+                    <GlobalSearch holderId={selectedHolderId} />
+                    {/* Global add-entry affordance: reachable from every screen, owns the
+                    share-target / shortcut auto-open. Suspense is required because
+                    AddTransactionMenu reads useSearchParams and this shell renders on
+                    every route (avoids a CSR-bailout de-opt). */}
+                    <Suspense fallback={null}>
+                      <AddTransactionMenu autoOpenFromParams isAdmin={isAdmin} />
+                    </Suspense>
+                  </div>
                 </div>
-              </div>
-            </header>
-            {/* Widescreen desktop (issue #462): the Pocket Prototype reference is a
-            padding:24px scroll area with LEFT-ALIGNED max-width:1100px content — not a
-            centered column. We intentionally deviate from that reference above typical
-            laptop widths: content grows to a generous 1600px cap and centers within the
-            space right of the sidebar (sidebar treated as chrome, not the viewport), so
-            wide/ultrawide monitors don't leave a large blank right margin. `@container`
-            lets page grids key density tiers off this real content width rather than
-            viewport width, which is otherwise skewed by the 236px sidebar offset. */}
-            <PullToRefresh scrollContainerRef={scrollContainerRef}>
-              <main className="@container mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(11rem,calc(env(safe-area-inset-bottom)+11rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-                <InstallPrompt />
-                <PageHeaderProvider>
+              </header>
+              {/* Widescreen desktop (issue #462): the Pocket Prototype reference is a
+              padding:24px scroll area with LEFT-ALIGNED max-width:1100px content — not a
+              centered column. We intentionally deviate from that reference above typical
+              laptop widths: content grows to a generous 1600px cap and centers within the
+              space right of the sidebar (sidebar treated as chrome, not the viewport), so
+              wide/ultrawide monitors don't leave a large blank right margin. `@container`
+              lets page grids key density tiers off this real content width rather than
+              viewport width, which is otherwise skewed by the 236px sidebar offset. */}
+              <PullToRefresh scrollContainerRef={scrollContainerRef}>
+                <main className="@container mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(11rem,calc(env(safe-area-inset-bottom)+11rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                  <InstallPrompt />
                   <RouteTransition scrollContainerRef={scrollContainerRef}>
                     {children}
                   </RouteTransition>
-                </PageHeaderProvider>
-              </main>
-            </PullToRefresh>
+                </main>
+              </PullToRefresh>
+            </PageHeaderProvider>
           </div>
 
           <BottomNav anomalyCount={anomalyCount} anomalyError={anomalyError} />
