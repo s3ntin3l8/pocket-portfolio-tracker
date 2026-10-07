@@ -42,6 +42,7 @@ export async function deriveIncomeShares(
     const cas = await corporateActionsFor(
       app,
       coreTxns.map((t) => t.instrumentId),
+      portfolioId,
     );
     const timelines = buildShareTimelines(coreTxns, cas);
 

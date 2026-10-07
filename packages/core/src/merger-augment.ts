@@ -45,8 +45,6 @@ export function augmentTransactionsWithSyntheticMergerLegs(
   if (mergerCas.length === 0) return txns;
 
   const augmented: CoreTransaction[] = [...txns];
-  const timelines = buildShareTimelines(augmented, cas);
-
   for (const ca of mergerCas) {
     const taxableMarketValue = D(ca.taxableMarketValue!);
     const targetId = ca.targetInstrumentId!;
@@ -106,7 +104,12 @@ export function augmentTransactionsWithSyntheticMergerLegs(
 
     if (sellPair && buyPair) continue;
 
-    const heldQty = sharesHeldAt(timelines, ca.instrumentId, ca.exDate);
+    // Rebuild after each merger so a later merger can consume shares created by an
+    // earlier one. Existing importer legs are authoritative for their own quantity.
+    const timelines = buildShareTimelines(augmented, cas);
+    const heldQty = sellPair
+      ? D(sellPair.quantity)
+      : sharesHeldAt(timelines, ca.instrumentId, ca.exDate);
     if (!heldQty || heldQty.lte(0)) continue;
 
     // Currency reference — use whatever currency existing transactions for this
@@ -119,7 +122,7 @@ export function augmentTransactionsWithSyntheticMergerLegs(
     if (!fromCcy || !toCcy) continue;
 
     const outQty = heldQty;
-    const inQty = heldQty.mul(ratioTo);
+    const inQty = buyPair ? D(buyPair.quantity) : heldQty.mul(ratioTo);
 
     if (!sellPair) {
       augmented.push({

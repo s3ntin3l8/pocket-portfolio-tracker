@@ -498,7 +498,7 @@ describe("AddTransactionForm", () => {
     fireEvent.change(screen.getByLabelText(m.symbol), {
       target: { value: "sr021" },
     });
-    fireEvent.change(screen.getByLabelText(m.amount), {
+    fireEvent.change(screen.getByLabelText(m.netAmount), {
       target: { value: "37500" },
     });
     fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {

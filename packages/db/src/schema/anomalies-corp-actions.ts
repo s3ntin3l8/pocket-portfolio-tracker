@@ -44,6 +44,8 @@ export const corporateActions = pgTable("corporate_actions", {
   type: corpActionTypeEnum("type").notNull(),
   ratio: numeric("ratio").notNull(),
   exDate: date("ex_date").notNull(),
+  // Merger valuation is portfolio-specific; null keeps legacy/global actions.
+  portfolioId: uuid("portfolio_id").references(() => portfolios.id, { onDelete: "cascade" }),
   terms: text("terms"),
   // Merger-specific (nullable — only set when type = "merger")
   targetInstrumentId: uuid("target_instrument_id").references(() => instruments.id, {

@@ -1,4 +1,4 @@
-import { and, eq, max, min, isNotNull, inArray } from "drizzle-orm";
+import { and, eq, max, min, isNotNull, inArray, isNull, or } from "drizzle-orm";
 import {
   corporateActions,
   instruments,
@@ -120,7 +120,15 @@ export async function backfillStalePortfolios(
     ? await db
         .select()
         .from(corporateActions)
-        .where(inArray(corporateActions.instrumentId, allInstrIds))
+        .where(
+          and(
+            inArray(corporateActions.instrumentId, allInstrIds),
+            or(
+              isNull(corporateActions.portfolioId),
+              inArray(corporateActions.portfolioId, [...txByPortfolio.keys()]),
+            ),
+          ),
+        )
     : [];
   const corpActionsByInstr = new Map<string, CorporateAction[]>();
   for (const ca of caRows) {
@@ -129,6 +137,10 @@ export async function backfillStalePortfolios(
       type: ca.type,
       ratio: ca.ratio,
       exDate: new Date(ca.exDate),
+      portfolioId: ca.portfolioId,
+      targetInstrumentId: ca.targetInstrumentId ?? undefined,
+      ratioTo: ca.ratioTo ?? undefined,
+      taxableMarketValue: ca.taxableMarketValue ?? undefined,
     };
     const list = corpActionsByInstr.get(ca.instrumentId) ?? [];
     list.push(coreCa);
@@ -140,7 +152,11 @@ export async function backfillStalePortfolios(
   const heldInstrIdsByPortfolio = new Map<string, Set<string>>();
   for (const [portfolioId, txRows] of txByPortfolio) {
     const coreTxns = toCoreTxns(txRows);
-    const holdings = computeHoldings(coreTxns, allCorpActions, now);
+    const holdings = computeHoldings(
+      coreTxns,
+      allCorpActions.filter((ca) => ca.portfolioId == null || ca.portfolioId === portfolioId),
+      now,
+    );
     const heldIds = new Set(
       holdings.filter((h) => Number(h.quantity) > 0 && h.instrumentId).map((h) => h.instrumentId!),
     );

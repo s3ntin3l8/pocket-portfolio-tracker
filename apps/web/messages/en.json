@@ -1595,6 +1595,7 @@
       "quantity": "Quantity",
       "price": "Price per unit",
       "amount": "Amount",
+      "netAmount": "Net payment",
       "fees": "Fees",
       "currency": "Currency",
       "date": "Date",

@@ -52,6 +52,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
       const cas = await corporateActionsFor(
         app,
         rows.map((r) => r.instrumentId),
+        portfolioId,
       );
       const holdings = computeHoldings(coreTxns, cas);
       const rawReconciliation = trConn?.lastReconciliation as ReconciliationGap | null | undefined;

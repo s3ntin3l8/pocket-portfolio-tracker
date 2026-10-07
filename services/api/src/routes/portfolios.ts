@@ -79,6 +79,17 @@ export async function portfoliosRoute(app: FastifyInstance) {
       const id = request.userId;
       const { portfolioId } = request.params;
       const input = portfolioPatchSchema.parse(request.body);
+      if (Object.keys(input).length === 0) {
+        // Empty patches assign no holder, so ownership is checked directly by both
+        // portfolio id and user id instead of running holderOwnedOrNull below.
+        const [existing] = await app.db
+          .select()
+          .from(portfolios)
+          .where(and(eq(portfolios.id, portfolioId), eq(portfolios.userId, id)))
+          .limit(1);
+        if (!existing) return reply.code(404).send({ error: "portfolio_not_found" });
+        return flattenPortfolio(existing, await holderFor(existing.accountHolderId));
+      }
       if (!(await holderOwnedOrNull(id, input.accountHolderId))) {
         return reply.code(404).send({ error: "account_holder_not_found" });
       }

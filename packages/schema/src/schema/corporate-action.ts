@@ -12,6 +12,7 @@ export const corporateActionBaseSchema = z.object({
   type: corporateActionTypeSchema,
   ratio: decimalString,
   exDate: z.coerce.date(),
+  portfolioId: z.guid().optional(),
   terms: z.string().optional(),
   // Merger-specific (required when type = "merger")
   targetInstrumentId: z.guid().optional(),

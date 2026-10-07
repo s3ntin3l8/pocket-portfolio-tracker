@@ -86,7 +86,8 @@ export const authRoute = fp(async (app) => {
 
       // timingSafeVerifyPassword pays the scrypt cost even when no user/passwordHash
       // exists, so both "no such user" and "wrong password" paths take ~same time.
-      if (!user || !timingSafeVerifyPassword(password, user.passwordHash)) {
+      const validPassword = timingSafeVerifyPassword(password, user?.passwordHash ?? null);
+      if (!user || !validPassword) {
         return reply.code(401).send({ error: "Invalid email or password" });
       }
 

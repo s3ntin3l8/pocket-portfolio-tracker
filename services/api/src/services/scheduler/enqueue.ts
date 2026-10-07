@@ -92,10 +92,10 @@ export async function enqueueTrSync(connectionId: string): Promise<{ queued: boo
 }
 
 /**
- * Enqueue a history recompute for a portfolio, collapsed (debounced) via singletonKey so
- * rapid bulk-edits (multi-file import, TR sync) collapse to one job. fromDate bounds the
- * recompute to transactions on or after that date (pass min(changed executedAt)).
- * No-op when pg-boss is unavailable (PGlite / tests).
+ * Enqueue a history recompute for a portfolio. The singleton window collapses bursts
+ * (imports and syncs) while pg-boss refreshes the pending job with the latest payload.
+ * Callers must pass the earliest affected date so the coalesced request keeps the widest
+ * recompute window.
  */
 export async function enqueueRecompute(portfolioId: string, fromDate: string): Promise<void> {
   if (!activeBoss) return;

@@ -10,10 +10,21 @@ import { useTranslations } from "next-intl";
  */
 export function SignOutButton() {
   const t = useTranslations("Settings");
+  const handleSignOut = async () => {
+    if ("caches" in window) {
+      const names = await window.caches.keys();
+      await Promise.all(
+        names
+          .filter((name) => name !== "public-static-v1" && !name.startsWith("serwist-precache"))
+          .map((name) => window.caches.delete(name)),
+      );
+    }
+    await signOut({ callbackUrl: "/" });
+  };
   return (
     <button
       type="button"
-      onClick={() => signOut({ callbackUrl: "/" })}
+      onClick={() => void handleSignOut()}
       className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-card py-3.5 text-sm font-bold text-destructive shadow-card transition-colors hover:bg-destructive/5"
     >
       <LogOut className="size-4" />

@@ -37,9 +37,9 @@ describe("computeTxTotal", () => {
     expect(total).toEqual({ kind: "transfer", subtotal: 500, fees: 0, tax: 0, total: 500 });
   });
 
-  it("income: amount − tax", () => {
+  it("income: entered amount is already net of withheld tax", () => {
     const total = computeTxTotal("dividend", "", "250", "0", "37.5");
-    expect(total).toEqual({ kind: "income", subtotal: 250, fees: 0, tax: 37.5, total: 212.5 });
+    expect(total).toEqual({ kind: "income", subtotal: 250, fees: 0, tax: 37.5, total: 250 });
   });
 
   it("treats missing fees/tax as zero", () => {

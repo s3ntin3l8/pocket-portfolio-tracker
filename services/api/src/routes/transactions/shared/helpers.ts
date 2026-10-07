@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import {
   corporateActions,
@@ -148,18 +148,35 @@ export const bulkDeleteSchema = z.object({
 export async function corporateActionsFor(
   app: FastifyInstance,
   instrumentIds: (string | null)[],
+  portfolioId?: string,
 ): Promise<CorporateAction[]> {
   const ids = [...new Set(instrumentIds.filter((x): x is string => x !== null))];
   if (ids.length === 0) return [];
   const rows = await app.db
     .select()
     .from(corporateActions)
-    .where(inArray(corporateActions.instrumentId, ids));
+    .where(
+      and(
+        inArray(corporateActions.instrumentId, ids),
+        ...(portfolioId
+          ? [
+              or(
+                isNull(corporateActions.portfolioId),
+                eq(corporateActions.portfolioId, portfolioId),
+              ),
+            ]
+          : []),
+      ),
+    );
   return rows.map((r) => ({
     instrumentId: r.instrumentId,
     type: r.type,
     ratio: r.ratio,
     exDate: new Date(r.exDate),
+    portfolioId: r.portfolioId,
+    targetInstrumentId: r.targetInstrumentId ?? undefined,
+    ratioTo: r.ratioTo ?? undefined,
+    taxableMarketValue: r.taxableMarketValue ?? undefined,
   }));
 }
 
@@ -188,6 +205,7 @@ export async function computePortfolioAnomalies(
     const cas = await corporateActionsFor(
       app,
       rows.map((r) => r.instrumentId),
+      portfolio.id,
     );
     const rawReconciliation = trConn?.lastReconciliation as ReconciliationGap | null | undefined;
     const reconciliation = rawReconciliation
