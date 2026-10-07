@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.20](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.19...v0.1.20) (2026-10-07)
+
+
+### Bug Fixes
+
+* address app audit findings ([#786](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/786)) ([3ad6664](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3ad666430e4936c9e2230f6591d0993a6548c2bd))
+* **web:** address UI review findings ([#795](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/795)) ([2783ba4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2783ba4a9b1d65836ede5c417d80f7c253a74e7f))
+
 ## [0.1.19](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.18...v0.1.19) (2026-09-16)
 
 
