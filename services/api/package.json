@@ -24,8 +24,8 @@
     "repair:instruments": "tsx --env-file=../../.env src/db/repair-eu-instruments.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1144.0",
-    "@aws-sdk/s3-request-presigner": "^3.1144.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@fastify/compress": "^9.2.0",
     "@fastify/cors": "^11.3.0",
     "@fastify/env": "^7.0.0",
@@ -45,8 +45,8 @@
     "fastify-plugin": "^6.0.0",
     "fflate": "^0.8.3",
     "jose": "^6.2.12",
-    "pg-boss": "^12.35.1",
-    "pino": "^10.3.1",
+    "pg-boss": "^12.36.0",
+    "pino": "^10.4.0",
     "pino-roll": "^4.0.0",
     "postgres": "^3.4.5",
     "unpdf": "^1.8.1",
@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@vitest/coverage-v8": "^5.0.3",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-vitest": "^8.0.0",
