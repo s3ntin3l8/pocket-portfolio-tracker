@@ -3,7 +3,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "next-intl";
 import { formatMoney } from "@/lib/utils";
-import { assetClassColor } from "@/lib/asset-class-colors";
+import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
 
 /** A single donut slice — any keyed category (asset class, currency, …). */
 export interface DonutSlice {
@@ -11,14 +11,6 @@ export interface DonutSlice {
   label: string;
   value: number;
 }
-
-const COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-];
 
 export function AllocationDonut({
   data,
@@ -82,7 +74,10 @@ export function AllocationDonut({
               {data.map((slice, i) => (
                 <Cell
                   key={slice.key}
-                  fill={assetClassColor(slice.key, COLORS[i % COLORS.length])}
+                  fill={assetClassColor(
+                    slice.key,
+                    ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length],
+                  )}
                 />
               ))}
             </Pie>
@@ -118,7 +113,12 @@ export function AllocationDonut({
             >
               <span
                 className="size-2.5 shrink-0 rounded-[3px]"
-                style={{ background: assetClassColor(d.key, COLORS[i % COLORS.length]) }}
+                style={{
+                  background: assetClassColor(
+                    d.key,
+                    ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length],
+                  ),
+                }}
               />
               <span className="truncate text-xs font-semibold">{d.label}</span>
             </button>

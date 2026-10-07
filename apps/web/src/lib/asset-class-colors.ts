@@ -9,6 +9,9 @@ const ASSET_CLASS_COLORS: Record<string, string> = {
   cash: "var(--color-chart-5)",
 };
 
+/** Fallback sequence for allocation categories without a dedicated asset-class color. */
+export const ASSET_CLASS_COLOR_PALETTE = [...new Set(Object.values(ASSET_CLASS_COLORS))];
+
 export function assetClassColor(key: string, fallback: string): string {
   return ASSET_CLASS_COLORS[key] ?? fallback;
 }

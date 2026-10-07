@@ -37,5 +37,6 @@ describe("AppShell page header wiring", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Income report" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/reports");
   });
 });

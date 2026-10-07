@@ -19,6 +19,7 @@ export function ReportHeader({
   title: string;
   subtitle?: string;
   backHref?: string;
+  /** On narrow screens, the action occupies a second row below the title and subtitle. */
   action?: React.ReactNode;
 }) {
   return (
