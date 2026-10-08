@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.21](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.20...v0.1.21) (2026-10-08)
+
+
+### Bug Fixes
+
+* **db:** enable RLS on backfill_jobs and guard against future gaps ([#796](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/796)) ([94805cd](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/94805cd100d7eb339b063c6df26a3ffee8d3f39b))
+
 ## [0.1.20](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.19...v0.1.20) (2026-10-07)
 
 
