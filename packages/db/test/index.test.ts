@@ -122,7 +122,7 @@ describe("@portfolio/db schema", () => {
     const res = await client.query<{ relname: string }>(
       `select c.relname from pg_class c
          join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+        where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity
         order by c.relname`,
     );
     expect(res.rows.map((r) => r.relname)).toEqual([]);
