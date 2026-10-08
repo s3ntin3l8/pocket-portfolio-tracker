@@ -24,4 +24,4 @@ export const backfillJobs = pgTable(
       t.chunkStart,
     ),
   }),
-);
+).enableRLS();

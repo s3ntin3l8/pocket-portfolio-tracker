@@ -1,0 +1,1 @@
+ALTER TABLE "backfill_jobs" ENABLE ROW LEVEL SECURITY;
