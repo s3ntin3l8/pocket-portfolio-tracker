@@ -115,4 +115,16 @@ describe("@portfolio/db schema", () => {
     await db.insert(transactions).values(row);
     await expect(db.insert(transactions).values(row)).rejects.toThrow();
   });
+
+  // Supabase's Data API exposes any public table without RLS to the anon role; see
+  // drizzle/0001_enable_rls.sql for why every table enables RLS with no policies.
+  it("enables row level security on every public table", async () => {
+    const res = await client.query<{ relname: string }>(
+      `select c.relname from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity
+        order by c.relname`,
+    );
+    expect(res.rows.map((r) => r.relname)).toEqual([]);
+  });
 });
