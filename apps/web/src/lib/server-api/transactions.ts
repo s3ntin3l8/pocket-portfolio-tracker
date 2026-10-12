@@ -6,14 +6,16 @@ import {
   type TransactionWithPortfolio,
 } from "./_shared";
 import { loadMe } from "./user";
+import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
 export async function loadTransactionsAcrossPortfolios(): Promise<{
-  status: "ok" | "empty" | "unavailable";
+  status: "ok" | "empty" | DataFailureStatus;
+  retryAfter?: number | null;
   transactions: TransactionWithPortfolio[];
   scopeCurrency: string;
 }> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable", transactions: [], scopeCurrency: "IDR" };
+  if (!api) return { status: "unauthorized", transactions: [], scopeCurrency: "IDR" };
   try {
     const allPortfolios = await listPortfoliosCached();
     if (allPortfolios.length === 0)
@@ -34,8 +36,14 @@ export async function loadTransactionsAcrossPortfolios(): Promise<{
       portfolioName: nameById.get(t.portfolioId) ?? "",
     }));
     return { status: "ok", transactions, scopeCurrency };
-  } catch {
-    return { status: "unavailable", transactions: [], scopeCurrency: "IDR" };
+  } catch (err) {
+    const failure = classifyFailure(err);
+    return {
+      status: failure.status,
+      ...(failure.status === "rate_limited" ? { retryAfter: failure.retryAfter } : {}),
+      transactions: [],
+      scopeCurrency: "IDR",
+    };
   }
 }
 
@@ -54,10 +62,10 @@ export async function loadNetworthTransactionsPaginated(
       summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
       years?: string[];
     }
-  | { status: "unavailable"; rows: []; total: 0 }
+  | (DataFailure & { rows: []; total: 0 })
 > {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable", rows: [], total: 0 };
+  if (!api) return { status: "unauthorized", rows: [], total: 0 };
   try {
     const data = await api.listNetworthTransactionsPaginated(
       page,
@@ -74,8 +82,8 @@ export async function loadNetworthTransactionsPaginated(
       summary: data.summary,
       years: data.years,
     };
-  } catch {
-    return { status: "unavailable", rows: [], total: 0 };
+  } catch (err) {
+    return { ...classifyFailure(err), rows: [], total: 0 };
   }
 }
 
@@ -96,10 +104,10 @@ export async function loadTransactionsPaginated(
       summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
       years?: string[];
     }
-  | { status: "unavailable"; rows: []; total: 0 }
+  | (DataFailure & { rows: []; total: 0 })
 > {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable", rows: [], total: 0 };
+  if (!api) return { status: "unauthorized", rows: [], total: 0 };
   try {
     const data = await api.listTransactionsPaginated(
       portfolioId,
@@ -118,7 +126,7 @@ export async function loadTransactionsPaginated(
       summary: data.summary,
       years: data.years,
     };
-  } catch {
-    return { status: "unavailable", rows: [], total: 0 };
+  } catch (err) {
+    return { ...classifyFailure(err), rows: [], total: 0 };
   }
 }

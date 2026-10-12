@@ -7,22 +7,33 @@ import {
   type InstrumentDetail,
   type InstrumentScope,
 } from "./_shared";
+import { classifyFailure, type DataFailure } from "@/lib/data-status";
 
-export async function loadInstrument(
+export type InstrumentResult =
+  { status: "ok"; data: InstrumentDetail } | { status: "not_found" } | DataFailure;
+
+/**
+ * Loads an instrument and tells "doesn't exist" (404/400/422) apart from a transient
+ * failure (rate limit, expired session, API down) — the page must only say "not found"
+ * for the former.
+ */
+export async function loadInstrumentResult(
   id: string,
   range: InstrumentPriceRange = "1y",
-): Promise<InstrumentDetail | null> {
+): Promise<InstrumentResult> {
   const api = await getServerApi();
-  if (!api) return null;
+  if (!api) return { status: "unauthorized" };
   try {
     const [instrument, history, corporateActions] = await Promise.all([
       api.getInstrument(id),
       api.getInstrumentHistory(id, toApiRange(range)),
       api.listCorporateActions(id),
     ]);
-    return { instrument, history, corporateActions };
-  } catch {
-    return null;
+    return { status: "ok", data: { instrument, history, corporateActions } };
+  } catch (err) {
+    const status = (err as { status?: unknown } | null)?.status;
+    if (status === 404 || status === 400 || status === 422) return { status: "not_found" };
+    return classifyFailure(err);
   }
 }
 

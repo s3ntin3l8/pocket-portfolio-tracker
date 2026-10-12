@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import type React from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins, ScrollText, PiggyBank, Receipt, FileText } from "lucide-react";
@@ -8,7 +10,7 @@ import {
   loadIncomeStats,
   loadTrades,
   loadContributions,
-  loadNetworthTax,
+  loadNetworthTaxResult,
   loadTaxYearDetail,
   loadPreferences,
   loadDocuments,
@@ -37,7 +39,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
 
   // loadPreferences() used to be awaited before anything else — a full serial round trip
   // blocking the whole page. The loaders that don't need costBasis/taxRegime are kicked
-  // off immediately in parallel with prefs; only loadTrades and loadNetworthTax wait on
+  // off immediately in parallel with prefs; only loadTrades and loadNetworthTaxResult wait on
   // prefs to resolve (they need the user's selected costBasis and taxRegime).
   const prefsPromise = loadPreferences();
   const incomePromise = loadIncomeStats();
@@ -48,13 +50,20 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
   const taxRegime = prefs?.taxRegime ?? "DE";
 
-  const [income, trades, contributions, taxHolders, taxReports] = await Promise.all([
+  const [income, trades, contributions, taxResult, taxReports] = await Promise.all([
     incomePromise,
     loadTrades(undefined, costBasis),
     contributionsPromise,
-    loadNetworthTax(undefined, taxRegime),
+    loadNetworthTaxResult(undefined, taxRegime),
     documentsPromise,
   ]);
+  const taxHolders = taxResult.status === "ok" ? taxResult.holders : [];
+  // A failed loader must not masquerade as "no data" — and must not leave a silently
+  // partial page. Surface the first failure (rate limit, expired session, API down) as a
+  // banner above whatever cards did load.
+  const failure = [income, trades, contributions, taxResult].find(
+    (r) => r.status === "unauthorized" || r.status === "rate_limited" || r.status === "unavailable",
+  );
   // Indonesian final tax needs the same disposals/dividendRows the Tax page itself
   // recomputes over (see tax/page.tsx) — only fetched when relevant, and only when
   // there's something to compute over.
@@ -427,6 +436,14 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>
       </header>
+
+      {failure && (
+        <DataState
+          status={failure.status as "unauthorized" | "rate_limited" | "unavailable"}
+          retryAfter={retryAfterOf(failure)}
+          icon={Receipt}
+        />
+      )}
 
       {cards.length > 0 ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 @min-[1500px]:grid-cols-3">

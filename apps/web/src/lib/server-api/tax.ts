@@ -18,10 +18,40 @@ import {
   type TaxSummaryHolderWithCarryForward,
 } from "./_shared";
 import { loadPreferences } from "./user";
+import { classifyFailure, type DataFailure } from "@/lib/data-status";
+
+export type NetworthTaxResult =
+  { status: "ok"; holders: TaxSummaryHolderWithCarryForward[] } | DataFailure;
+
+/**
+ * Like `loadNetworthTax`, but distinguishes "no tax data" (`ok` with no holders) from a
+ * failed load (`unauthorized` / `rate_limited` / `unavailable`) so the Tax and Reports
+ * pages don't show the empty copy — or a silently partial page — when the API is down.
+ */
+export async function loadNetworthTaxResult(
+  year?: number,
+  taxRegime: "DE" | "ID" = "DE",
+): Promise<NetworthTaxResult> {
+  if (!(await getServerApi())) return { status: "unauthorized" };
+  try {
+    return { status: "ok", holders: await fetchNetworthTax(year, taxRegime, true) };
+  } catch (err) {
+    return classifyFailure(err);
+  }
+}
 
 export async function loadNetworthTax(
   year?: number,
   taxRegime: "DE" | "ID" = "DE",
+): Promise<TaxSummaryHolderWithCarryForward[]> {
+  return fetchNetworthTax(year, taxRegime, false);
+}
+
+/** `rethrow` false swallows failures into `[]` (legacy contract); true propagates them. */
+async function fetchNetworthTax(
+  year: number | undefined,
+  taxRegime: "DE" | "ID",
+  rethrow: boolean,
 ): Promise<TaxSummaryHolderWithCarryForward[]> {
   const api = await getServerApi();
   if (!api) return [];
@@ -154,7 +184,8 @@ export async function loadNetworthTax(
     // /networth/tax always aggregates by a genuine account holder — holder.id here is
     // never a portfolio-id fallback.
     return holders.map((h) => ({ ...h, accountHolderId: h.holder.id }));
-  } catch {
+  } catch (err) {
+    if (rethrow) throw err;
     return [];
   }
 }

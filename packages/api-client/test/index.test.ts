@@ -130,6 +130,44 @@ describe("createApiClient", () => {
 });
 
 describe("apiErrorCode", () => {
+  it("exposes retryAfter on a 429 from the Retry-After header or the message body", () => {
+    expect(new ApiError(429, "{}", "12").retryAfter).toBe(12);
+    expect(
+      new ApiError(429, JSON.stringify({ error: "Rate limit exceeded, retry in 16 seconds" }))
+        .retryAfter,
+    ).toBe(16);
+    expect(new ApiError(429, "{}").retryAfter).toBeNull();
+    // Only meaningful for 429.
+    expect(new ApiError(503, "{}", "30").retryAfter).toBeNull();
+    expect(new ApiError(429, "{}", "30").status).toBe(429);
+  });
+
+  it("sends configured extra headers and surfaces Retry-After on 429", async () => {
+    const fetchImpl = vi.fn(
+      async (_url: string, init: RequestInit) =>
+        ({
+          ok: false,
+          status: 429,
+          headers: new Headers({ "retry-after": "7" }),
+          text: async () => "{}",
+          json: async () => ({}),
+          _init: init,
+        }) as unknown as Response,
+    );
+    const client = createApiClient({
+      baseUrl: "http://api",
+      getToken: () => "tok",
+      headers: { "x-forwarded-for": "203.0.113.9" },
+      fetch: fetchImpl as unknown as typeof fetch,
+    });
+    const err = await client.getHoldings("p1").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).retryAfter).toBe(7);
+    const sent = fetchImpl.mock.calls[0]![1].headers as Record<string, string>;
+    expect(sent["x-forwarded-for"]).toBe("203.0.113.9");
+    expect(sent.authorization).toBe("Bearer tok");
+  });
+
   it("extracts the error code from an ApiError body", () => {
     expect(apiErrorCode(new ApiError(503, JSON.stringify({ error: "pytr_not_available" })))).toBe(
       "pytr_not_available",

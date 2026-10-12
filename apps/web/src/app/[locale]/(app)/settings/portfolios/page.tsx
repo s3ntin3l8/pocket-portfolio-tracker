@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Briefcase, Plus } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
@@ -55,12 +57,8 @@ export default async function SettingsPortfoliosPage({
       <SectionHeader title={ts("portfoliosLink")} backHref="/settings" />
 
       <div className="space-y-6">
-        {result.status === "unavailable" ? (
-          <EmptyState
-            icon={Briefcase}
-            title={te("unavailableTitle")}
-            description={te("unavailableBody")}
-          />
+        {result.status !== "ok" ? (
+          <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={Briefcase} />
         ) : result.portfolios.length > 0 ? (
           <div className="grid gap-3.5 sm:grid-cols-2">
             {result.portfolios.map(({ portfolio, netWorth }) => {
@@ -191,7 +189,7 @@ export default async function SettingsPortfoliosPage({
           />
         )}
 
-        {result.status !== "unavailable" && <AccountHoldersManager holders={holders} />}
+        {result.status === "ok" && <AccountHoldersManager holders={holders} />}
       </div>
     </>
   );

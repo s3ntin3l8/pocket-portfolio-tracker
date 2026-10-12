@@ -1,6 +1,7 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Scale } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
 import { RebalancingCard } from "@/components/insights/rebalancing-card";
 import { BestWorstCard } from "@/components/insights/best-worst-card";
 import { DrawdownCard } from "@/components/insights/drawdown-card";
@@ -74,10 +75,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
           <PageHeaderSetter title={t("title")} />
           <PageTitle>{t("title")}</PageTitle>
         </header>
-        <EmptyState
+        <DataState
+          status={result.status}
+          retryAfter={retryAfterOf(result)}
           icon={Scale}
-          title={result.status === "empty" ? te("noPortfolioTitle") : te("unavailableTitle")}
-          description={result.status === "empty" ? te("noPortfolioBody") : te("unavailableBody")}
+          empty={{ title: te("noPortfolioTitle"), description: te("noPortfolioBody") }}
         />
       </div>
     );

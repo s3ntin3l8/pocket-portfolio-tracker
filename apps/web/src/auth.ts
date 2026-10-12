@@ -1,3 +1,4 @@
+import { firstForwardedHop } from "@/lib/client-ip";
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Authentik from "next-auth/providers/authentik";
 import Credentials from "next-auth/providers/credentials";
@@ -177,13 +178,19 @@ export const authConfig: NextAuthConfig = {
               email: { label: "Email", type: "email" },
               password: { label: "Password", type: "password" },
             },
-            async authorize(credentials) {
+            async authorize(credentials, request) {
               const apiUrl = process.env.API_URL;
               if (!apiUrl || !credentials?.email || !credentials?.password) return null;
               try {
+                // Forward the end user's IP so the API's per-IP login limit isn't shared by
+                // every user behind this container.
+                const clientIp = request ? firstForwardedHop(request.headers) : null;
                 const res = await fetch(`${apiUrl}/auth/local/login`, {
                   method: "POST",
-                  headers: { "content-type": "application/json" },
+                  headers: {
+                    "content-type": "application/json",
+                    ...(clientIp ? { "x-forwarded-for": clientIp } : {}),
+                  },
                   body: JSON.stringify({
                     email: credentials.email,
                     password: credentials.password,

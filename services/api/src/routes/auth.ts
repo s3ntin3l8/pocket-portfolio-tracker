@@ -37,6 +37,50 @@ const setPasswordSchema = z.object({
 });
 
 /**
+ * Per-account login throttle (in memory, per process): at most LOGIN_FAIL_MAX failed
+ * attempts per normalized email per LOGIN_FAIL_WINDOW_MS, cleared on a successful login.
+ * Complements the per-IP route limit — a distributed guesser that rotates IPs still hits
+ * this, while one noisy IP can no longer lock out other users' accounts.
+ */
+const LOGIN_FAIL_MAX = 5;
+const LOGIN_FAIL_WINDOW_MS = 60_000;
+const LOGIN_FAIL_MAX_KEYS = 10_000;
+
+export function createLoginThrottle(now: () => number = Date.now) {
+  const failures = new Map<string, number[]>();
+
+  function recent(email: string): number[] {
+    const cutoff = now() - LOGIN_FAIL_WINDOW_MS;
+    const live = (failures.get(email) ?? []).filter((t) => t > cutoff);
+    if (live.length === 0) failures.delete(email);
+    else failures.set(email, live);
+    return live;
+  }
+
+  return {
+    /** Seconds until the next attempt is allowed, or 0 when not throttled. */
+    retryAfter(email: string): number {
+      const live = recent(email);
+      if (live.length < LOGIN_FAIL_MAX) return 0;
+      return Math.max(1, Math.ceil((live[0]! + LOGIN_FAIL_WINDOW_MS - now()) / 1000));
+    },
+    recordFailure(email: string): void {
+      const live = recent(email);
+      live.push(now());
+      failures.set(email, live);
+      if (failures.size > LOGIN_FAIL_MAX_KEYS) {
+        // Bound memory against an attacker spraying random emails: drop the oldest key.
+        const oldest = failures.keys().next().value;
+        if (oldest !== undefined) failures.delete(oldest);
+      }
+    },
+    clear(email: string): void {
+      failures.delete(email);
+    },
+  };
+}
+
+/**
  * Local password auth routes. Only functional when AUTH_LOCAL_SECRET is configured in
  * the environment — these routes return 503 "auth_not_configured" otherwise.
  */
@@ -57,6 +101,7 @@ export const authRoute = fp(async (app) => {
   }
 
   const signingKey = new TextEncoder().encode(localSecret);
+  const loginThrottle = createLoginThrottle();
 
   async function signLocalJwt(sub: string, email: string): Promise<string> {
     return new SignJWT({ sub, email })
@@ -74,7 +119,15 @@ export const authRoute = fp(async (app) => {
    */
   app.post(
     "/auth/local/login",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute",
+          keyGenerator: (request: FastifyRequest) => request.ip,
+        },
+      },
+    },
     async (request, reply) => {
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -82,14 +135,25 @@ export const authRoute = fp(async (app) => {
       }
 
       const { email, password } = parsed.data;
+
+      const wait = loginThrottle.retryAfter(email);
+      if (wait > 0) {
+        return reply
+          .code(429)
+          .header("retry-after", String(wait))
+          .send({ error: `Too many login attempts, retry in ${wait} seconds` });
+      }
+
       const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
 
       // timingSafeVerifyPassword pays the scrypt cost even when no user/passwordHash
       // exists, so both "no such user" and "wrong password" paths take ~same time.
       const validPassword = timingSafeVerifyPassword(password, user?.passwordHash ?? null);
       if (!user || !validPassword) {
+        loginThrottle.recordFailure(email);
         return reply.code(401).send({ error: "Invalid email or password" });
       }
+      loginThrottle.clear(email);
 
       // Sign the token with the row's OWN authSub, not a synthetic `local|${email}` —
       // `authenticate` resolves users by authSub (plugins/auth.ts), and a user that didn't
@@ -198,7 +262,15 @@ export const authRoute = fp(async (app) => {
    */
   app.get(
     "/auth/local/setup-status",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+          keyGenerator: (request: FastifyRequest) => request.ip,
+        },
+      },
+    },
     async () => {
       const [{ count }] = await app.db.select({ count: sql<number>`count(*)` }).from(users);
       return { needsSetup: Number(count) === 0 };
@@ -224,7 +296,15 @@ export const authRoute = fp(async (app) => {
    */
   app.post(
     "/auth/local/setup",
-    { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "1 minute",
+          keyGenerator: (request: FastifyRequest) => request.ip,
+        },
+      },
+    },
     async (request, reply) => {
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {

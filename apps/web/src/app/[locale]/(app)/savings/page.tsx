@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PiggyBank } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +10,6 @@ import { SparplanSection } from "@/components/savings/sparplan-section";
 import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
 import { CashOnHandCard } from "@/components/savings/cash-on-hand-card";
-import { EmptyState } from "@/components/empty-state";
 import { loadContributions, loadSparplan, loadHoldings } from "@/lib/server-api";
 import { formatMoney, formatPercent } from "@/lib/utils";
 
@@ -20,7 +21,6 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Savings");
-  const te = await getTranslations("Empty");
 
   // Holder scope is now global (cookie-based via the portfolio switcher).
   // All three loaders are independent — fire them in parallel.
@@ -50,14 +50,14 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
   );
 
   if (result.status !== "ok" || Number(result.data.totalContributed) === 0) {
-    const unavailable = result.status === "unavailable";
     return (
       <div className="space-y-5">
         {heading}
-        <EmptyState
+        <DataState
+          status={result.status === "ok" ? "empty" : result.status}
+          retryAfter={retryAfterOf(result)}
           icon={PiggyBank}
-          title={unavailable ? te("unavailableTitle") : t("emptyTitle")}
-          description={unavailable ? te("unavailableBody") : t("emptyBody")}
+          empty={{ title: t("emptyTitle"), description: t("emptyBody") }}
         />
       </div>
     );

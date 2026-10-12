@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -17,7 +19,7 @@ import {
 } from "@/components/tax/tax-cards";
 import { RegimeIndicator } from "@/components/tax/regime-indicator";
 import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
-import { loadNetworthTax, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
+import { loadNetworthTaxResult, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 import type { TaxSummaryHolderWithCarryForward } from "@/lib/server-api/_shared";
 import { harvestSummary } from "@portfolio/core";
@@ -43,7 +45,8 @@ export default async function TaxPage({
   const prefs = await loadPreferences();
   const regime = prefs?.taxRegime ?? "DE";
 
-  const holders = await loadNetworthTax(year, regime);
+  const taxResult = await loadNetworthTaxResult(year, regime);
+  const holders = taxResult.status === "ok" ? taxResult.holders : [];
   const detailByHolder = await loadTaxYearDetail(holders, year);
 
   if (TIMING) {
@@ -75,6 +78,15 @@ export default async function TaxPage({
       />
     </>
   );
+
+  if (taxResult.status !== "ok") {
+    return (
+      <div className="space-y-5">
+        {Heading}
+        <DataState status={taxResult.status} retryAfter={retryAfterOf(taxResult)} icon={Receipt} />
+      </div>
+    );
+  }
 
   if (holders.length === 0) {
     const te = await getTranslations("Empty");

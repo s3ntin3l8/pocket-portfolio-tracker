@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { firstForwardedHop } from "@/lib/client-ip";
 
 /**
  * Same-origin proxy for the ONE unauthenticated local-auth write: POST /auth/local/setup
@@ -23,9 +24,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "validation_error" }, { status: 400 });
   }
 
+  const clientIp = firstForwardedHop(request.headers);
   const upstream = await fetch(`${apiUrl.replace(/\/$/, "")}/auth/local/setup`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(clientIp ? { "x-forwarded-for": clientIp } : {}),
+    },
     body: JSON.stringify(body),
   });
 

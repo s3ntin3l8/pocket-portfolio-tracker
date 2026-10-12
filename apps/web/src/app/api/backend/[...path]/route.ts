@@ -1,3 +1,4 @@
+import { firstForwardedHop } from "@/lib/client-ip";
 import { NextResponse, type NextRequest } from "next/server";
 import { accessTokenFromCookieHeader } from "@/lib/session-token";
 
@@ -43,13 +44,7 @@ function apiBaseUrl(): string {
 /** The real client IP, resolved once at the edge (Traefik) — see plugins/env.ts's
  *  TRUSTED_PROXY_CIDRS on the API side, which trusts this proxy's own forwarded value. */
 function resolvedClientIp(request: NextRequest): string | null {
-  const xff = request.headers.get("x-forwarded-for");
-  if (!xff) return null;
-  // Take the first hop only: Traefik is the sole ingress and overwrites/sets this header
-  // fresh (see the deployment's Traefik config), so forwarding it verbatim would be fine
-  // in practice, but pinning to the first value keeps this proxy's own outgoing header
-  // unambiguous regardless of upstream configuration drift.
-  return xff.split(",")[0]?.trim() || null;
+  return firstForwardedHop(request.headers);
 }
 
 async function proxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {

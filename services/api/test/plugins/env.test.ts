@@ -24,7 +24,7 @@ describe("env plugin", () => {
     expect(app.config.DATABASE_URL).toBe("postgres://postgres:postgres@localhost:5432/portfolio");
     expect(app.config.DB_ENCRYPTION_KEY).toBe("");
     expect(app.config.CORS_ORIGIN).toBe("");
-    expect(app.config.RATE_LIMIT_MAX).toBe(100);
+    expect(app.config.RATE_LIMIT_MAX).toBe(600);
     expect(app.config.RATE_LIMIT_WINDOW).toBe("1 minute");
     expect(app.config.TRUSTED_PROXY_CIDRS).toBe("");
     expect(app.config.MARKET_DATA_TTL_MS).toBe(900000);

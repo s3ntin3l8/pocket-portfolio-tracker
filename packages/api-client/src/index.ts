@@ -1896,13 +1896,27 @@ export interface TrSyncResult {
 // --- Client --------------------------------------------------------------
 
 export class ApiError extends Error {
+  /** Seconds to wait before retrying (429 only): the `Retry-After` header, else the API's
+   *  `retry in N seconds` message. Null when the API gave no hint. */
+  public readonly retryAfter: number | null;
+
   constructor(
     public readonly status: number,
     public readonly body: string,
+    retryAfterHeader?: string | null,
   ) {
     super(`API request failed (${status})`);
     this.name = "ApiError";
+    this.retryAfter = status === 429 ? parseRetryAfter(retryAfterHeader, body) : null;
   }
+}
+
+function parseRetryAfter(header: string | null | undefined, body: string): number | null {
+  const fromHeader = header ? Number(header) : NaN;
+  if (Number.isFinite(fromHeader) && fromHeader > 0) return Math.ceil(fromHeader);
+  const m = /retry in (\d+)\s*seconds?/i.exec(body);
+  if (m) return Number(m[1]);
+  return null;
 }
 
 /**
@@ -2042,6 +2056,9 @@ export interface ApiClientConfig {
   getToken?: () => string | undefined | Promise<string | undefined>;
   /** Override fetch (tests / non-browser runtimes). Defaults to global fetch. */
   fetch?: typeof fetch;
+  /** Extra headers sent on every request (e.g. `x-forwarded-for` from server-side loaders,
+   *  so the API can attribute the call to the end user rather than the web container). */
+  headers?: Record<string, string>;
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
@@ -2078,13 +2095,14 @@ export function createApiClient(config: ApiClientConfig) {
     const res = await doFetch(`${config.baseUrl}${path}`, {
       method,
       headers: {
+        ...config.headers,
         ...(hasBody && !isForm ? { "content-type": "application/json" } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       body: isForm ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
-      throw new ApiError(res.status, await res.text());
+      throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
     }
     if (res.status === 204) return undefined as T;
     const result = (await res.json()) as T;
@@ -2108,10 +2126,10 @@ export function createApiClient(config: ApiClientConfig) {
     const token = await config.getToken?.();
     const res = await doFetch(`${config.baseUrl}${path}`, {
       method,
-      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      headers: { ...config.headers, ...(token ? { authorization: `Bearer ${token}` } : {}) },
     });
     if (!res.ok) {
-      throw new ApiError(res.status, await res.text());
+      throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
     }
     return res.blob();
   }

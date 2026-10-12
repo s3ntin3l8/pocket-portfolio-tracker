@@ -10,13 +10,14 @@ import {
   resolveHolderScope,
   type NetWorthResult,
 } from "./_shared";
+import { classifyFailure } from "@/lib/data-status";
 
 export async function loadNetWorth(
   costBasis?: "purchase_price" | "total_paid",
   period = "max",
 ): Promise<NetWorthResult> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable" };
+  if (!api) return { status: "unauthorized" };
   const resolvedCostBasis = normalizeCostBasis(costBasis);
   try {
     const portfolios = await listPortfoliosCached();
@@ -37,8 +38,8 @@ export async function loadNetWorth(
     const data = await getNetWorthCached(resolvedCostBasis, holderId, period);
     if (data.portfolioCount === 0) return { status: "empty" };
     return { status: "ok", data };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return classifyFailure(err);
   }
 }
 

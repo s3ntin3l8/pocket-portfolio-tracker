@@ -1,3 +1,5 @@
+import { retryAfterOf, type DataFailureStatus } from "@/lib/data-status";
+import { DataState } from "@/components/data-state";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -49,7 +51,8 @@ export default async function TransactionsPage({
   const importsPromise = loadImports();
   const portfolioListPromise = loadPortfolioList();
 
-  let status: "ok" | "empty" | "unavailable";
+  let status: "ok" | DataFailureStatus;
+  let retryAfter: number | null = null;
   let rows: TxRow[] = [];
   let total = 0;
   let txSummary: { totalInvested: string; totalProceeds: string; totalIncome: string } | null =
@@ -68,6 +71,7 @@ export default async function TransactionsPage({
       loadNetworthAnomalies(),
     ]);
     status = result.status;
+    retryAfter = retryAfterOf(result);
     rows = result.rows;
     total = result.total;
     if (result.status === "ok") {
@@ -90,6 +94,7 @@ export default async function TransactionsPage({
       loadAnomalies(),
     ]);
     status = txResult.status;
+    retryAfter = retryAfterOf(txResult);
     if (txResult.status === "ok") {
       rows = txResult.rows;
       total = txResult.total;
@@ -208,15 +213,11 @@ export default async function TransactionsPage({
   // No page-number navigation — replaced with a "Load more" button inside the table
   // component that fetches the next server page and appends progressively.
 
-  if (status === "unavailable") {
+  if (status !== "ok") {
     return (
       <div className="space-y-5">
         {heading}
-        <EmptyState
-          icon={Receipt}
-          title={te("unavailableTitle")}
-          description={te("unavailableBody")}
-        />
+        <DataState status={status} retryAfter={retryAfter} icon={Receipt} />
       </div>
     );
   }
