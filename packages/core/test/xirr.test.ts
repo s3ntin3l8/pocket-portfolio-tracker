@@ -110,3 +110,29 @@ describe("xirr — sanity bound (#756)", () => {
     expect(Number.isNaN(xirr(flows))).toBe(true);
   });
 });
+
+describe("xirr — same-day flows (audit B11)", () => {
+  it("returns NaN when every flow shares the same date (zero-net)", () => {
+    const flows: CashFlowPoint[] = [
+      { amount: -100, date: d("2024-03-01") },
+      { amount: 100, date: d("2024-03-01") },
+    ];
+    expect(Number.isNaN(xirr(flows))).toBe(true);
+  });
+
+  it("returns NaN when every flow shares the same date (non-zero net)", () => {
+    const flows: CashFlowPoint[] = [
+      { amount: -100, date: d("2024-03-01") },
+      { amount: 110, date: d("2024-03-01") },
+    ];
+    expect(Number.isNaN(xirr(flows))).toBe(true);
+  });
+
+  it("still solves a normal two-date flow", () => {
+    const flows: CashFlowPoint[] = [
+      { amount: -100, date: d("2024-01-01") },
+      { amount: 110, date: d("2025-01-01") },
+    ];
+    expect(xirr(flows)).toBeCloseTo(0.1, 2);
+  });
+});

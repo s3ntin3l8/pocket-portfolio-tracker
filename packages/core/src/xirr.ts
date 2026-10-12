@@ -39,6 +39,12 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
     return NaN;
   }
 
+  // Every flow on the same day: NPV is identically zero for every rate (no
+  // time elapses to discount over), so there is no defined annualized return.
+  // Without this guard Newton bails on `df === 0` and bisection "finds" a
+  // root at its first midpoint (≈49.5 → +4,950%).
+  if (Math.max(...flows.map((f) => f.years)) === 0) return NaN;
+
   let rate = guess;
   for (let i = 0; i < 100; i++) {
     const f = npv(rate, flows);
@@ -62,7 +68,7 @@ export function xirr(points: CashFlowPoint[], guess = 0.1): number {
   let hi = 100;
   let flo = npv(lo, flows);
   const fhi = npv(hi, flows);
-  if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return NaN;
+  if (!isFinite(flo) || !isFinite(fhi) || flo * fhi >= 0) return NaN;
   for (let i = 0; i < 200; i++) {
     const mid = (lo + hi) / 2;
     const fm = npv(mid, flows);
