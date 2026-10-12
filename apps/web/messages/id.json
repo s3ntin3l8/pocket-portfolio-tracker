@@ -2041,7 +2041,8 @@
     },
     "footnote": "Jerman mengenakan pajak penghasilan investasi sebesar {rate}% flat (Abgeltungsteuer + Solidaritätszuschlag). Sparer-Pauschbetrag {allowance} Anda diterapkan lebih dulu, lalu kerugian mengimbangi keuntungan dalam tahun yang sama. Hanya perkiraan, bukan nasihat pajak.",
     "regime": {
-      "label": "Rezim pajak · berlaku di mana saja, juga di Pengaturan",
+      "indicator": "Rezim: {regime}",
+      "change": "Ubah",
       "de": "Jerman",
       "id": "Indonesia"
     },

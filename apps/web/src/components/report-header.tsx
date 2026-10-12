@@ -17,7 +17,7 @@ export function ReportHeader({
   action,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   backHref?: string;
   /** On narrow screens, the action occupies a second row below the title and subtitle. */
   action?: React.ReactNode;
@@ -42,7 +42,11 @@ export function ReportHeader({
       </Link>
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-2xl font-bold md:hidden">{title}</h1>
-        {subtitle && <p className="truncate text-sm text-text-2">{subtitle}</p>}
+        {subtitle && (
+          <p className={cn("text-sm text-text-2", typeof subtitle === "string" && "truncate")}>
+            {subtitle}
+          </p>
+        )}
       </div>
       {action && (
         <div className="col-start-2 row-start-2 justify-self-end md:ml-auto">{action}</div>

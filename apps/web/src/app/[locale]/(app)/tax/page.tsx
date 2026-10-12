@@ -5,7 +5,6 @@ import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PreferenceChips } from "@/components/preference-chips";
 import {
   EstimatedTaxHero,
   AllowanceSummaryBoxes,
@@ -16,6 +15,7 @@ import {
   CoverageCard,
   type TaxTranslator,
 } from "@/components/tax/tax-cards";
+import { RegimeIndicator } from "@/components/tax/regime-indicator";
 import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
 import { loadNetworthTax, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
@@ -64,22 +64,13 @@ export default async function TaxPage({
       <ReportHeader
         title={t("title")}
         subtitle={
-          regime === "ID"
-            ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() })
-            : t("subtitle")
-        }
-        action={
-          <div className="flex flex-col items-end gap-1">
-            <PreferenceChips
-              prefKey="taxRegime"
-              current={regime}
-              options={[
-                { value: "DE", label: t("regime.de") },
-                { value: "ID", label: t("regime.id") },
-              ]}
-            />
-            <span className="px-0.5 text-[11px] text-muted-foreground">{t("regime.label")}</span>
-          </div>
+          <>
+            {regime === "ID"
+              ? t("id.subtitle", { year: year ?? new Date().getUTCFullYear() })
+              : t("subtitle")}
+            <br />
+            <RegimeIndicator regime={regime} t={t} />
+          </>
         }
       />
     </>
