@@ -582,20 +582,6 @@ describe("aggregate + misc loaders", () => {
     h.cookies = {};
   });
 
-  it("loadInstrument returns the detail bundle or null on error", async () => {
-    h.client.getInstrument = async () => ({ id: "i1" });
-    h.client.getInstrumentHistory = async () => [{ t: 1 }];
-    h.client.listCorporateActions = async () => [];
-    expect(await api.loadInstrument("i1")).toMatchObject({
-      instrument: { id: "i1" },
-    });
-
-    h.client.getInstrument = async () => {
-      throw new Error("x");
-    };
-    expect(await api.loadInstrument("i1")).toBeNull();
-  });
-
   it("loadInstrumentResult only reports not_found for a real 404, never a transient error", async () => {
     h.client.getInstrumentHistory = async () => [];
     h.client.listCorporateActions = async () => [];

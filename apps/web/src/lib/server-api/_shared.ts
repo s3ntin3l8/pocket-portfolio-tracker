@@ -75,6 +75,8 @@ const getServerApi = cache(async (): Promise<ApiClient | null> => {
   // Forward the end user's IP (first x-forwarded-for hop, as the browser proxy does).
   // Without it every server-rendered page of every user reaches the API from this
   // container's single IP. The API only trusts it from proxies in TRUSTED_PROXY_CIDRS.
+  // Read once: getServerApi is request-cached, so every loader in this request shares this
+  // client (and this snapshot of the header) rather than calling headers() per loader.
   let clientIp: string | null = null;
   try {
     clientIp = firstForwardedHop(await headers());

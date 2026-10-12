@@ -39,7 +39,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
 
   // loadPreferences() used to be awaited before anything else — a full serial round trip
   // blocking the whole page. The loaders that don't need costBasis/taxRegime are kicked
-  // off immediately in parallel with prefs; only loadTrades and loadNetworthTax wait on
+  // off immediately in parallel with prefs; only loadTrades and loadNetworthTaxResult wait on
   // prefs to resolve (they need the user's selected costBasis and taxRegime).
   const prefsPromise = loadPreferences();
   const incomePromise = loadIncomeStats();

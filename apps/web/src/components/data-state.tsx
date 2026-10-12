@@ -33,7 +33,6 @@ export function DataState({
   empty?: { title: string; description: string; action?: React.ReactNode };
 }) {
   const t = useTranslations("DataState");
-  const te = useTranslations("Empty");
 
   if (status === "empty") {
     return (
@@ -80,8 +79,8 @@ export function DataState({
   return (
     <EmptyState
       icon={ServerCrash}
-      title={te("unavailableTitle")}
-      description={te("unavailableBody")}
+      title={t("unavailableTitle")}
+      description={t("unavailableBody")}
       action={<DataStateRetry />}
     />
   );

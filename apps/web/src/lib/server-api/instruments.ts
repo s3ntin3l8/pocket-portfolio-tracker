@@ -37,14 +37,6 @@ export async function loadInstrumentResult(
   }
 }
 
-export async function loadInstrument(
-  id: string,
-  range: InstrumentPriceRange = "1y",
-): Promise<InstrumentDetail | null> {
-  const result = await loadInstrumentResult(id, range);
-  return result.status === "ok" ? result.data : null;
-}
-
 export async function loadInstrumentScope(
   instrumentId: string,
   costBasis?: "purchase_price" | "total_paid",

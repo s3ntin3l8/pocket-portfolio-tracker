@@ -17,11 +17,19 @@ export function DataStateRetry({ retryAfter }: { retryAfter?: number | null }) {
   const [elapsed, setElapsed] = useState(0);
   const remaining = Math.max(0, (retryAfter && retryAfter > 0 ? retryAfter : 0) - elapsed);
 
+  // One interval for the component's lifetime (not a timeout re-armed every second); it
+  // stops itself once the wait has elapsed.
+  const total = retryAfter && retryAfter > 0 ? retryAfter : 0;
   useEffect(() => {
-    if (remaining <= 0) return;
-    const id = setTimeout(() => setElapsed((e) => e + 1), 1000);
-    return () => clearTimeout(id);
-  }, [remaining]);
+    if (total <= 0) return;
+    let ticks = 0;
+    const id = setInterval(() => {
+      ticks += 1;
+      setElapsed(ticks);
+      if (ticks >= total) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [total]);
 
   return (
     <Button variant="outline" disabled={remaining > 0} onClick={() => router.refresh()}>

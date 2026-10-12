@@ -2392,6 +2392,8 @@
     "ogImageAlt": "Pocket holdings dashboard showing total portfolio value"
   },
   "DataState": {
+    "unavailableTitle": "Can't reach the API",
+    "unavailableBody": "Sign in and make sure the API server is running, then refresh.",
     "retry": "Retry",
     "retryIn": "Retry in {seconds}s",
     "unauthorizedTitle": "Your session expired",

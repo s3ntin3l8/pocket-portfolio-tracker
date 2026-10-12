@@ -2398,6 +2398,8 @@
     "ogImageAlt": "Dasbor kepemilikan Pocket yang menampilkan total nilai portofolio"
   },
   "DataState": {
+    "unavailableTitle": "Tidak dapat menjangkau API",
+    "unavailableBody": "Masuk dan pastikan server API berjalan, lalu segarkan.",
     "retry": "Coba lagi",
     "retryIn": "Coba lagi dalam {seconds}d",
     "unauthorizedTitle": "Sesi Anda berakhir",
