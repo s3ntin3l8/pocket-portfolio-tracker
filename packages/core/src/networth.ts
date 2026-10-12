@@ -1,17 +1,53 @@
 import { Decimal } from "decimal.js";
 import type { Holding } from "./types.js";
 
-/** Returns the rate to multiply an amount in `from` to express it in `to`. */
-export type FxRateFn = (from: string, to: string) => string;
+/**
+ * Returns the rate to multiply an amount in `from` to express it in `to`, or `null`
+ * when no rate is known for the pair (audit B2). A missing rate must never be
+ * silently treated as 1:1 — `convert()` throws {@link FxRateMissingError} on it, and
+ * valuation paths that can degrade gracefully probe with {@link tryConvert} /
+ * {@link fxAvailable} first and flag the affected amounts (`fxMissing`) instead.
+ */
+export type FxRateFn = (from: string, to: string) => string | null;
+
+/** Thrown by {@link convert} when the FX function has no rate for the pair. */
+export class FxRateMissingError extends Error {
+  constructor(
+    readonly from: string,
+    readonly to: string,
+  ) {
+    super(`No FX rate available for ${from} -> ${to}`);
+    this.name = "FxRateMissingError";
+  }
+}
 
 export interface PriceQuote {
   price: string;
   currency: string;
 }
 
+/**
+ * Convert `amount` from `from` into `to`. Throws {@link FxRateMissingError} when the
+ * rate is unknown — callers that must keep going (valuation, snapshots) check
+ * {@link fxAvailable} or use {@link tryConvert} instead.
+ */
 export function convert(amount: string, from: string, to: string, fx: FxRateFn): string {
+  const out = tryConvert(amount, from, to, fx);
+  if (out === null) throw new FxRateMissingError(from, to);
+  return out;
+}
+
+/** Like {@link convert}, but returns `null` instead of throwing on an unknown rate. */
+export function tryConvert(amount: string, from: string, to: string, fx: FxRateFn): string | null {
   if (from === to) return amount;
-  return new Decimal(amount).mul(new Decimal(fx(from, to))).toString();
+  const rate = fx(from, to);
+  if (rate === null) return null;
+  return new Decimal(amount).mul(new Decimal(rate)).toString();
+}
+
+/** Whether `fx` can convert `from` into `to` (always true for the same currency). */
+export function fxAvailable(from: string, to: string, fx: FxRateFn): boolean {
+  return from === to || fx(from, to) !== null;
 }
 
 export interface NetWorthInput {

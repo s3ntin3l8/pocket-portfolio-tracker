@@ -7,6 +7,7 @@ import compress from "@fastify/compress";
 import sensible from "@fastify/sensible";
 import multipart from "@fastify/multipart";
 import { ZodError } from "zod";
+import { FxRateMissingError } from "@portfolio/core";
 import { envPlugin } from "./plugins/env.js";
 import { loggingPlugin } from "./plugins/logging.js";
 import { securityPlugin } from "./plugins/security.js";
@@ -163,6 +164,13 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
       return reply.code(400).send({ error: "validation_error", issues: error.issues });
+    }
+    // A currency with no known FX rate (none cached, provider unreachable) is never
+    // converted 1:1 (audit B2). Read paths that can't degrade gracefully surface it as a
+    // retryable 503 with a stable code instead of a number off by the exchange rate.
+    if (error instanceof FxRateMissingError) {
+      app.log.warn({ from: error.from, to: error.to }, "FX rate missing");
+      return reply.code(503).send({ error: "fx_rate_missing", from: error.from, to: error.to });
     }
     app.log.error(error);
     const err = error as { statusCode?: number; message?: string };

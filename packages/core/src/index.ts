@@ -16,6 +16,9 @@ export { periodXirr } from "./period-xirr.js";
 export {
   netWorth,
   convert,
+  tryConvert,
+  fxAvailable,
+  FxRateMissingError,
   type FxRateFn,
   type PriceQuote,
   type NetWorthInput,

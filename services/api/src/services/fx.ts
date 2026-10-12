@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { fxRates } from "@portfolio/db";
 import { toDateKey, type FxRateFn } from "@portfolio/core";
@@ -137,8 +137,12 @@ async function cacheFxRate(
 
 /**
  * Read-through FX cache: returns each foreign currency's rate to `base`, served
- * from today's fx_rates rows and back-filled live via the provider. Currencies
- * without a rate are simply omitted (callers fall back to 1:1).
+ * from today's fx_rates rows and back-filled live via the provider. A currency the
+ * provider can't serve right now (outage, holiday morning before the ECB fix) falls
+ * back to its most recent cached rate on or before today — the same carry-forward
+ * {@link getFxRatesForDates} applies to historical dates (audit B2). Currencies with
+ * no rate at all are omitted; {@link makeFxRateFn} then reports them as missing
+ * (null), never as 1:1.
  */
 export async function getFxRates(
   db: DB,
@@ -168,6 +172,21 @@ export async function getFxRates(
       await cacheFxRate(db, from, base, str, today);
     }
   }
+
+  // Carry forward: the latest cached rate on or before today for anything still missing.
+  const stillMissing = foreign.filter((c) => !(c in out));
+  if (stillMissing.length > 0) {
+    const prior = await db
+      .select()
+      .from(fxRates)
+      .where(
+        and(eq(fxRates.quote, base), lte(fxRates.date, today), inArray(fxRates.base, stillMissing)),
+      )
+      .orderBy(desc(fxRates.date));
+    for (const r of prior) {
+      if (!(r.base in out)) out[r.base] = r.rate;
+    }
+  }
   return out;
 }
 
@@ -176,8 +195,8 @@ export async function getFxRates(
  * converts each day at that day's rate (not today's). Served from `fx_rates`, with any
  * still-missing dates back-filled from the provider's historical series across the
  * range, then carried forward (and back, for leading gaps) to cover non-trading days.
- * Returns a `date → { foreign: rate }` map; currencies with no rate are omitted so the
- * caller falls back to 1:1 via {@link makeFxRateFn}.
+ * Returns a `date → { foreign: rate }` map; currencies with no rate at all are omitted,
+ * and {@link makeFxRateFn} reports them as missing (null) rather than 1:1.
  */
 export async function getFxRatesForDates(
   db: DB,
@@ -250,11 +269,16 @@ export async function getFxRatesForDates(
   return result;
 }
 
-/** Build a synchronous FxRateFn from a foreign→base rate map (for valuation). */
+/**
+ * Build a synchronous FxRateFn from a foreign→base rate map (for valuation). An
+ * unknown pair returns `null` (audit B2) — never "1", which used to silently count
+ * e.g. an IDR amount as EUR. `convert()` throws on it; valuation paths check
+ * `fxAvailable`/`tryConvert` first and flag the affected amounts (`fxMissing`).
+ */
 export function makeFxRateFn(rates: Record<string, string>, base: string): FxRateFn {
   return (from, to) => {
     if (from === to) return "1";
     if (to === base && rates[from]) return rates[from];
-    return "1"; // unknown pair: leave unconverted rather than zero out value
+    return null;
   };
 }

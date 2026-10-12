@@ -67,6 +67,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   // into the totals below like any priced holding. Surfaced via a footer note + a
   // per-row badge so the total doesn't silently read as a real market value.
   const valuedAtCostCount = rows.filter((h) => h.valuedAtCost).length;
+  // Holdings whose currency has no FX rate into the display currency (audit B2): their
+  // display value is null and they're left out of the totals rather than converted 1:1.
+  const fxMissingCount = rows.filter((h) => h.fxMissing).length;
 
   // Column totals across the (already class-filtered) visible rows. Market value and
   // P&L sum every holding that has a value at all — priced or valued at cost; a holding
@@ -205,6 +208,14 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                         {t("valuedAtCostBadge")}
                       </span>
                     )}
+                    {h.fxMissing && (
+                      <span
+                        title={t("fxMissingTooltip")}
+                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase text-text-mute"
+                      >
+                        {t("fxMissingBadge")}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className={cn(TABLE_VALUE_STRONG, pnlColor)}>
                     {pnl === null ? "—" : formatSignedMoney(pnl, currency, locale)}
@@ -256,6 +267,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
           </p>
         )}
+        {fxMissingCount > 0 && (
+          <p className="mt-2 text-[11px] font-medium text-text-mute">
+            {t("fxMissingFooterNote", { count: fxMissingCount })}
+          </p>
+        )}
       </div>
 
       {/* ── Mobile list (< md) ── reference row: badge, symbol over "name · quantity",
@@ -305,6 +321,14 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                       {t("valuedAtCostBadge")}
                     </span>
                   )}
+                  {h.fxMissing && (
+                    <span
+                      title={t("fxMissingTooltip")}
+                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[8px] font-bold uppercase text-text-mute"
+                    >
+                      {t("fxMissingBadge")}
+                    </span>
+                  )}
                 </div>
                 <div className={cn("text-xs font-bold", pnlColor)}>
                   {pct !== null ? formatPercent(pct / 100, locale) : "—"}
@@ -346,6 +370,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
         {valuedAtCostCount > 0 && (
           <p className="px-4 py-2 text-[11px] font-medium text-text-mute">
             {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
+          </p>
+        )}
+        {fxMissingCount > 0 && (
+          <p className="px-4 py-2 text-[11px] font-medium text-text-mute">
+            {t("fxMissingFooterNote", { count: fxMissingCount })}
           </p>
         )}
       </div>

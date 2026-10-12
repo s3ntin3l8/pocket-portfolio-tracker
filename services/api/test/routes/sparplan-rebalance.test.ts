@@ -571,7 +571,9 @@ describe("sparplan rebalancing (Phase B)", () => {
     expect(prefsRes.statusCode).toBe(200);
     expect(prefsRes.json().taxRegime).toBe("ID");
 
-    const pf = await createPortfolio(t, "PhaseD ID Regime");
+    // IDR-quoted instruments in an IDR book: no FX rate is needed (a missing rate is no
+    // longer silently treated as 1:1 — audit B2).
+    const pf = await createPortfolio(t, "PhaseD ID Regime", "IDR");
 
     const [vwce] = await app.db
       .insert(instruments)

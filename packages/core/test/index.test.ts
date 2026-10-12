@@ -1070,3 +1070,90 @@ describe("cross-currency holdings and valuation", () => {
     expect(h.unrealizedPnLDisplay).toBe("200");
   });
 });
+
+describe("summarizePortfolio — missing FX rate (audit B2)", () => {
+  const EURSTK = "inst-eur-stock";
+  // Knows nothing but the identity — every foreign pair is missing.
+  const noRates = (from: string, to: string): string | null => (from === to ? "1" : null);
+
+  it("flags a holding whose quote currency has no rate and excludes it from totals (never 1:1)", () => {
+    const s = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: AAPL, type: "buy", quantity: "10", price: "1000", currency: "IDR" }),
+        tx({ instrumentId: EURSTK, type: "buy", quantity: "10", price: "100", currency: "EUR" }),
+      ],
+      prices: {
+        [AAPL]: { price: "1100", currency: "IDR" },
+        [EURSTK]: { price: "110", currency: "EUR" },
+      },
+      displayCurrency: "IDR",
+      fx: noRates,
+    });
+    const eur = s.holdings.find((h) => h.instrumentId === EURSTK)!;
+    const idr = s.holdings.find((h) => h.instrumentId === AAPL)!;
+    expect(eur.fxMissing).toBe(true);
+    expect(eur.marketValueDisplay).toBeNull();
+    expect(eur.unrealizedPnLDisplay).toBeNull();
+    expect(idr.fxMissing).toBeUndefined();
+    expect(s.fxMissingCurrencies).toEqual(["EUR"]);
+    // Only the IDR holding counts — not 11,000 + 1,100 (EUR at 1:1).
+    expect(s.totalMarketValue).toBe("11000");
+    expect(s.netWorth).toBe("11000");
+    expect(s.exposureByCurrency).toEqual({ IDR: "11000" });
+  });
+
+  it("flags an unpriced (at-cost) holding whose cost currency has no rate", () => {
+    const s = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: EURSTK, type: "buy", quantity: "10", price: "100", currency: "EUR" }),
+      ],
+      prices: {},
+      displayCurrency: "IDR",
+      fx: noRates,
+    });
+    expect(s.holdings[0].fxMissing).toBe(true);
+    expect(s.holdings[0].valuedAtCost).toBeUndefined();
+    expect(s.totalMarketValue).toBe("0");
+  });
+
+  it("excludes cash and income in a currency with no rate, and reports it", () => {
+    const s = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: null, type: "deposit", quantity: "1", price: "500", currency: "USD" }),
+        tx({ instrumentId: null, type: "deposit", quantity: "1", price: "1000", currency: "IDR" }),
+        tx({ instrumentId: null, type: "interest", quantity: "1", price: "5", currency: "USD" }),
+      ],
+      prices: {},
+      displayCurrency: "IDR",
+      fx: noRates,
+      cashCounted: true,
+    });
+    expect(s.fxMissingCurrencies).toEqual(["USD"]);
+    expect(s.netWorth).toBe("1000");
+    expect(s.totalIncome).toBe("0");
+    // Native cash balances are still reported as-is.
+    expect(s.cash.USD).toBe("505");
+  });
+
+  it("aggregatePortfolios unions fxMissingCurrencies and OR-merges the holding flag", () => {
+    const a = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: EURSTK, type: "buy", quantity: "1", price: "100", currency: "EUR" }),
+      ],
+      prices: { [EURSTK]: { price: "110", currency: "EUR" } },
+      displayCurrency: "IDR",
+      fx: noRates,
+    });
+    const b = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: EURSTK, type: "buy", quantity: "1", price: "100", currency: "EUR" }),
+      ],
+      prices: { [EURSTK]: { price: "110", currency: "EUR" } },
+      displayCurrency: "IDR",
+      fx: (from, to) => (from === to ? "1" : "17000"),
+    });
+    const agg = aggregatePortfolios([a, b], "IDR");
+    expect(agg.fxMissingCurrencies).toEqual(["EUR"]);
+    expect(agg.holdings[0].fxMissing).toBe(true);
+  });
+});

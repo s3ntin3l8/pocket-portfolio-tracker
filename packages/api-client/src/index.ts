@@ -956,6 +956,12 @@ export interface HoldingValuation extends Holding {
    * (e.g. a "shown at cost" badge) rather than let it read as a real, flat market value.
    */
   valuedAtCost?: boolean;
+  /**
+   * True when this holding's currency has no known FX rate into the display currency
+   * (audit B2): display-currency fields are null and it's excluded from totals rather
+   * than converted 1:1. Undefined when FX resolved normally.
+   */
+  fxMissing?: boolean;
   previousClose: string | null;
   dayChange: string | null;
   dayChangePct: string | null;
@@ -989,6 +995,11 @@ export interface PortfolioSummary {
   totalDayChange: string;
   /** Wealth denominated in each currency (display-currency magnitudes). */
   exposureByCurrency: Record<string, string>;
+  /**
+   * Currencies with no known FX rate into the display currency (audit B2); amounts in
+   * them are excluded from the totals above. Empty/absent when every rate resolved.
+   */
+  fxMissingCurrencies?: string[];
   /** Allocation breakdown across asset class, currency, region, sector + concentration. */
   allocation?: AllocationBreakdown;
   /**
@@ -1026,6 +1037,11 @@ export interface NetWorth {
   totalDayChange: string;
   /** Wealth denominated in each currency (display-currency magnitudes). */
   exposureByCurrency: Record<string, string>;
+  /**
+   * Currencies with no known FX rate into the display currency (audit B2); amounts in
+   * them are excluded from the totals above. Empty/absent when every rate resolved.
+   */
+  fxMissingCurrencies?: string[];
   /** Allocation breakdown across asset class, currency, region, sector + concentration. */
   allocation?: AllocationBreakdown;
   /**

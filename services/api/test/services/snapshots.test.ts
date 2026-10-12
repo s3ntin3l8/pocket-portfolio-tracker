@@ -679,3 +679,58 @@ describe("aggregateByDate", () => {
     ]);
   });
 });
+
+describe("recordDailySnapshots — missing FX rate (audit B2)", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("skips a portfolio whose holding has no FX rate into the base currency (no 1:1 row)", async () => {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "fx-missing-user", email: "fx-missing@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "FxMissing", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "FXMISS",
+        market: "XETRA",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "EUR-quoted, no EUR/IDR rate",
+      })
+      .returning();
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: new Date("2026-01-10"),
+    });
+
+    // No fx_rates row for EUR→IDR and no provider under test.
+    const svc = new MarketDataService([new FixtureProvider({ FXMISS: "110" })]);
+    const warnings: unknown[] = [];
+    const log = { warn: (obj: unknown) => warnings.push(obj) } as never;
+    await recordDailySnapshots(db, svc, 10_000, new Date("2026-02-10T16:00:00.000Z"), log);
+
+    const rows = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, p.id));
+    expect(rows).toHaveLength(0);
+    expect(warnings).toContainEqual(
+      expect.objectContaining({ portfolioId: p.id, missing: ["EUR"] }),
+    );
+  });
+});

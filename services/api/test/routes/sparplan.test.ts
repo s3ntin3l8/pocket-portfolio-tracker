@@ -178,6 +178,12 @@ describe("sparplan detection", () => {
   it("GET /networth/sparplan sums plans across two portfolios (no collapse)", async () => {
     const t = await token("aggplanner");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    await app.inject({
+      method: "PATCH",
+      url: "/me",
+      headers: auth(t),
+      payload: { displayCurrency: "EUR" },
+    }); // EUR books shown in EUR: no FX rate needed (missing rates are no longer 1:1, audit B2)
 
     const pfA = await createPortfolio(t, "Depot A");
     const pfB = await createPortfolio(t, "Depot B");

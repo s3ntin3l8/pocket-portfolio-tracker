@@ -95,15 +95,11 @@ describe("transactions summary FX conversion (#593)", () => {
 
     const eurBook = await createPortfolio(t, "EUR book", "EUR");
     const idrBook = await createPortfolio(t, "IDR book", "IDR");
-    // A third, mixed-in currency with no seeded rate — proves the known 1:1 fallback
-    // doesn't corrupt the totals for the currencies that DO have a rate.
-    const sgdBook = await createPortfolio(t, "SGD book", "SGD");
 
     await postTx(t, eurBook, { type: "buy", quantity: "10", price: "100", currency: "EUR" }); // 1000 EUR invested
     await postTx(t, eurBook, { type: "sell", quantity: "5", price: "50", currency: "EUR" }); // 250 EUR proceeds
     await postTx(t, eurBook, { type: "dividend", quantity: "1", price: "20", currency: "EUR" }); // 20 EUR income
     await postTx(t, idrBook, { type: "buy", quantity: "1", price: "5000000", currency: "IDR" }); // 5,000,000 IDR invested
-    await postTx(t, sgdBook, { type: "buy", quantity: "1", price: "100", currency: "SGD" }); // 100 SGD invested, no rate seeded
 
     await app.db
       .insert(fxRates)
@@ -120,10 +116,22 @@ describe("transactions summary FX conversion (#593)", () => {
       totalProceeds: string;
       totalIncome: string;
     };
-    // 1000 EUR * 16000 + 5,000,000 IDR + 100 SGD (unrated, falls back to 1:1) unconverted.
-    expect(summary.totalInvested).toBe("21000100");
+    // 1000 EUR * 16000 + 5,000,000 IDR.
+    expect(summary.totalInvested).toBe("21000000");
     expect(summary.totalProceeds).toBe("4000000");
     expect(summary.totalIncome).toBe("320000");
+
+    // A third currency with no rate at all (none cached, no provider under test) is no
+    // longer counted 1:1 (audit B2) — the summary fails loudly with a stable code.
+    const sgdBook = await createPortfolio(t, "SGD book", "SGD");
+    await postTx(t, sgdBook, { type: "buy", quantity: "1", price: "100", currency: "SGD" });
+    const missing = await app.inject({
+      method: "GET",
+      url: "/networth/transactions?page=1&pageSize=25",
+      headers: auth(t),
+    });
+    expect(missing.statusCode).toBe(503);
+    expect(missing.json()).toMatchObject({ error: "fx_rate_missing", from: "SGD", to: "IDR" });
   });
 
   it("single-portfolio summary converts a foreign-currency row to the portfolio's base currency", async () => {

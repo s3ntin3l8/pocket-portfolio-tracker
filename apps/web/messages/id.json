@@ -1339,6 +1339,9 @@
     "valuedAtCostBadge": "Nilai biaya",
     "valuedAtCostTooltip": "Harga pasar tidak tersedia — ditampilkan berdasarkan biaya perolehan, bukan nilai pasar.",
     "valuedAtCostFooterNote": "Termasuk {count, plural, other {# kepemilikan}} yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
+    "fxMissingBadge": "Tanpa kurs",
+    "fxMissingTooltip": "Kurs untuk mata uang ini tidak tersedia — tidak dihitung dalam total, bukan dikonversi 1:1.",
+    "fxMissingFooterNote": "Tidak termasuk {count, plural, other {# kepemilikan}} tanpa kurs yang tersedia.",
     "heroValuedAtCostNote": "Termasuk satu atau lebih kepemilikan yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
     "hero": {
       "label": "Total nilai portofolio",

@@ -61,6 +61,12 @@ describe("trade log", () => {
 
     const t = await token("trader");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) }); // upsert user
+    await app.inject({
+      method: "PATCH",
+      url: "/me",
+      headers: auth(t),
+      payload: { displayCurrency: "EUR" },
+    }); // EUR books shown in EUR: no FX rate needed (missing rates are no longer 1:1, audit B2)
     pf = await createPortfolio(t, "Trades");
 
     [tlkm] = (

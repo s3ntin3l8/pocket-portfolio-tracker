@@ -237,18 +237,18 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
         symbol: "IDX-NW1",
         market: "IDX",
         assetClass: "equity",
-        currency: "EUR",
+        currency: "IDR",
         name: "IDX NW1",
       })
       .returning();
     // ID users typically have NO FSA allocation — holder has no taxAllowanceAnnual.
-    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR" });
+    const portfolioId = await createPortfolio(t, { baseCurrency: "IDR" });
     await seedTransaction(app, portfolioId, auth(t), {
       type: "buy",
       instrumentId: eq.id,
       quantity: "5",
       price: "100",
-      currency: "EUR",
+      currency: "IDR",
       executedAt: "2025-01-15T00:00:00.000Z",
     });
     await seedTransaction(app, portfolioId, auth(t), {
@@ -256,7 +256,7 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
       instrumentId: eq.id,
       quantity: "5",
       price: "150",
-      currency: "EUR",
+      currency: "IDR",
       executedAt: "2025-06-15T00:00:00.000Z",
     });
 
@@ -284,8 +284,8 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
     expect(body.length).toBeGreaterThanOrEqual(1);
     const [entry] = body;
     expect(entry.year).toBe(2025);
-    // /networth/tax echoes the user's displayCurrency; portfolio.baseCurrency
-    // ("EUR" above) is irrelevant here — see /portfolios/:id/tax for per-portfolio FX.
+    // /networth/tax echoes the user's displayCurrency (IDR-denominated book here, so no
+    // FX rate is needed — a missing rate is no longer silently 1:1, audit B2) — see /portfolios/:id/tax for per-portfolio FX.
     expect(entry.currency).toBe("IDR");
     expect(entry.indonesianFinalTax).toBeDefined();
     expect(entry.indonesianFinalTax!.totalProceeds).toBe("750.00");
@@ -297,6 +297,12 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
   it("rolls proceeds across multiple portfolios of the same holder into one ID payload", async () => {
     const t = await token("tax-id-nw-2");
     await setTaxRegime(t, "ID");
+    await app.inject({
+      method: "PATCH",
+      url: "/me",
+      headers: auth(t),
+      payload: { displayCurrency: "EUR" },
+    }); // EUR books shown in EUR: no FX rate needed (missing rates are no longer 1:1, audit B2)
     const [eq] = await app.db
       .insert(instruments)
       .values({

@@ -1333,6 +1333,9 @@
     "valuedAtCostBadge": "At cost",
     "valuedAtCostTooltip": "No market price available — shown at cost basis, not market value.",
     "valuedAtCostFooterNote": "Includes {count, plural, one {1 holding} other {# holdings}} shown at cost (no market price available).",
+    "fxMissingBadge": "No FX rate",
+    "fxMissingTooltip": "No exchange rate available for this currency — excluded from totals rather than converted 1:1.",
+    "fxMissingFooterNote": "Excludes {count, plural, one {1 holding} other {# holdings}} with no exchange rate available.",
     "heroValuedAtCostNote": "Includes one or more holdings shown at cost (no market price available).",
     "hero": {
       "label": "Total portfolio value",

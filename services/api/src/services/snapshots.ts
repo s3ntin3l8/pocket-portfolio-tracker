@@ -15,6 +15,7 @@ import {
   transactions,
 } from "@portfolio/db";
 import type { MarketDataService } from "@portfolio/market-data";
+import type { FastifyBaseLogger } from "fastify";
 import type { DB } from "../db/client.js";
 import { valuePortfolio } from "./valuation.js";
 import { isMarketOpen } from "./market-hours.js";
@@ -32,12 +33,18 @@ export interface NetWorthPoint {
  * Record today's net-worth snapshot for every portfolio, in its base currency.
  * Idempotent per (portfolio, date) — re-running the job overwrites the day's value,
  * so a manual trigger or a retried cron never double-counts. Returns the row count.
+ *
+ * A portfolio whose valuation is missing an FX rate (`summary.fxMissingCurrencies`,
+ * audit B2) is skipped for the day — logged at warn — rather than persisting a value
+ * that silently omits (or, before B2, 1:1-converted) part of it. The history chart
+ * carries the previous snapshot forward over the gap.
  */
 export async function recordDailySnapshots(
   db: DB,
   marketData: MarketDataService,
   ttlMs: number,
   now: Date = new Date(),
+  log?: FastifyBaseLogger,
 ): Promise<number> {
   const date = toDateKey(now);
   const pfs = await db.select().from(portfolios);
@@ -106,6 +113,13 @@ export async function recordDailySnapshots(
       undefined,
       now,
     );
+    if (summary.fxMissingCurrencies.length > 0) {
+      log?.warn(
+        { portfolioId: p.id, date, missing: summary.fxMissingCurrencies },
+        "daily snapshot skipped: FX rate missing",
+      );
+      continue;
+    }
 
     // Compute today's effectiveFlow: -Σ cashFlow(tx) for qualifying txns executed today.
     // This measures flows into/out of the SECURITIES sleeve only (holdings market value),
@@ -180,6 +194,7 @@ export async function recordIntradaySnapshots(
   marketData: MarketDataService,
   ttlMs: number,
   now: Date = new Date(),
+  log?: FastifyBaseLogger,
 ): Promise<number> {
   // Which instruments are held by which portfolio (mirrors refreshHeldPrices's
   // held-instruments query, but portfolio-scoped since the gate is per-portfolio).
@@ -237,6 +252,14 @@ export async function recordIntradaySnapshots(
       undefined,
       now,
     );
+    // Same FX-missing skip as the daily snapshot (audit B2).
+    if (summary.fxMissingCurrencies.length > 0) {
+      log?.warn(
+        { portfolioId: p.id, missing: summary.fxMissingCurrencies },
+        "intraday snapshot skipped: FX rate missing",
+      );
+      continue;
+    }
     await db.insert(portfolioIntradaySnapshots).values({
       portfolioId: p.id,
       capturedAt: now,
