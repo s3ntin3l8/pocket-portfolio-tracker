@@ -69,7 +69,7 @@ export async function generateMetadata({
     ...baseMetadata,
     ...buildSiteMetadata({
       locale,
-      baseUrl: process.env.AUTH_URL ?? "http://localhost:3005",
+      baseUrl: process.env.AUTH_URL || "http://localhost:3005",
       t,
     }),
   };

@@ -27,6 +27,7 @@ export function buildSiteMetadata({
       type: "website",
       siteName: "Pocket",
       url: "/",
+      // Fallback only for callers that bypass the layout's `hasLocale` guard.
       locale: OG_LOCALES[locale] ?? OG_LOCALES.en,
       title,
       description,

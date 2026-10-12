@@ -5,7 +5,7 @@
 // Text is rasterised by librsvg using the host's fontconfig, so the result depends on the
 // fonts installed when you run it (generic sans if Plus Jakarta Sans is missing).
 import sharp from "sharp";
-import { stat } from "node:fs/promises";
+import { access, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -65,7 +65,11 @@ const mask = Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" width="${SHOT.w}" height="${SHOT.h}">` +
     `<rect width="${SHOT.w}" height="${SHOT.h}" rx="${SHOT.r}" fill="#fff"/></svg>`,
 );
-const shot = await sharp(join(publicDir, "screenshots", "holdings-dark-wide.png"))
+const shotPath = join(publicDir, "screenshots", "holdings-dark-wide.png");
+await access(shotPath).catch(() => {
+  throw new Error(`Missing ${shotPath} — generate it first (scripts/screenshots.mjs).`);
+});
+const shot = await sharp(shotPath)
   .resize(SHOT.w, SHOT.h, { fit: "cover", position: "left top" })
   .composite([{ input: mask, blend: "dest-in" }])
   .png()
