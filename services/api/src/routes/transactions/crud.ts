@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { transactions, trResolvedEvents, dismissedAnomalies } from "@portfolio/db";
 import { transactionInputSchema } from "@portfolio/schema";
 import { toDateKey } from "@portfolio/core";
@@ -225,9 +225,33 @@ export function registerCrudRoutes(app: FastifyInstance) {
   app.post<{ Params: PortfolioParams }>(
     "/portfolios/:portfolioId/transactions/resolve-drafts",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request) => {
+    async (request, reply) => {
       const { portfolioId } = request.params;
       const { ids, action } = resolveDraftsSchema.parse(request.body);
+      // Same gate as POST /imports/:id/confirm (audit B4): a synced inbound depot transfer
+      // with no carried cost basis (price 0) can't be confirmed until the user edits the
+      // draft's price — it would otherwise land at zero cost basis. All-or-nothing, so a
+      // batch confirm never half-applies.
+      if (action === "confirm") {
+        const blocked = await app.db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.portfolioId, portfolioId),
+              eq(transactions.status, "draft"),
+              eq(transactions.type, "transfer_in"),
+              lte(transactions.price, "0"),
+              inArray(transactions.id, ids),
+            ),
+          );
+        if (blocked.length > 0) {
+          return reply.code(400).send({
+            error: "transfer_cost_basis_required",
+            transactionIds: blocked.map((r) => r.id),
+          });
+        }
+      }
       const nextStatus = action === "confirm" ? "normal" : "archived";
       const resolution = action === "confirm" ? "confirmed" : "discarded";
 

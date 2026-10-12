@@ -6,7 +6,9 @@ import { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/api-client";
 import { TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { ReviewDraft } from "./types";
+import { Input } from "@/components/ui/input";
+import { draftNeedsCostBasis } from "@/components/import-flow/types";
+import type { ImportDraft, ReviewDraft } from "./types";
 import { fmtQty, fmtAmt } from "./types";
 
 export function DraftRow({
@@ -15,6 +17,7 @@ export function DraftRow({
   onToggle,
   onEdit,
   onRemove,
+  onUpdate,
   showRemove,
 }: {
   draft: ReviewDraft;
@@ -22,8 +25,14 @@ export function DraftRow({
   onToggle: (uid: string) => void;
   onEdit: (uid: string) => void;
   onRemove: (uid: string) => void;
+  /** Inline edits (the carried cost basis of an inbound transfer). Read-only when omitted. */
+  onUpdate?: (uid: string, patch: Partial<ImportDraft>) => void;
   showRemove: boolean;
 }) {
+  // An inbound transfer the parser couldn't price (or one the user hasn't priced yet) —
+  // its cost basis is required before confirm, so the price is editable right on the row.
+  const needsCostBasis =
+    draftNeedsCostBasis(draft) || (draft.attention ?? []).includes("needs_cost_basis");
   const t = useTranslations("Import");
   const pct = (c: number) => t("confidence", { pct: Math.round(c * 100) });
   const dateOf = (d: ReviewDraft) => d.executedAt.slice(0, 10);
@@ -63,6 +72,11 @@ export function DraftRow({
               {dupLabel(draft)}
             </Badge>
           )}
+          {draftNeedsCostBasis(draft) && (
+            <Badge variant="warning" title={t("review.needsCostBasisHint")}>
+              {t("review.needsCostBasis")}
+            </Badge>
+          )}
         </div>
       </TableCell>
       <TableCell>
@@ -84,7 +98,20 @@ export function DraftRow({
         {dateOf(draft)}
       </TableCell>
       <TableCell className="tabular text-right">{fmtQty(draft.quantity)}</TableCell>
-      <TableCell className="tabular text-right">{fmtAmt(draft.price)}</TableCell>
+      <TableCell className="tabular text-right">
+        {needsCostBasis && onUpdate ? (
+          <Input
+            inputMode="decimal"
+            className="ml-auto h-8 w-28 text-right"
+            aria-label={t("review.costBasisLabel")}
+            placeholder={t("review.costBasisPlaceholder")}
+            value={draft.price === "0" ? "" : draft.price}
+            onChange={(e) => onUpdate(draft.uid, { price: e.target.value.trim() || "0" })}
+          />
+        ) : (
+          fmtAmt(draft.price)
+        )}
+      </TableCell>
       <TableCell className="tabular text-right text-muted-foreground">
         {draft.total ? fmtAmt(draft.total) : "—"}
       </TableCell>

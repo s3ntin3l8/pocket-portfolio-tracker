@@ -28,6 +28,24 @@ export const parsedActionSchema = z.enum([
 ]);
 export type ParsedAction = z.infer<typeof parsedActionSchema>;
 
+/** Review-screen attention reasons a parsed draft can carry (see `attention` below). */
+export const draftAttentionSchema = z.enum(["needs_cost_basis"]);
+export type DraftAttention = z.infer<typeof draftAttentionSchema>;
+
+/**
+ * Whether a draft is an inbound depot transfer with no carried cost basis (price 0). Such
+ * a row would land the shares at zero cost — a later sale would then report 100% gain and
+ * fully taxable proceeds — so confirm refuses it until the user enters the basis (audit
+ * B4). A `transfer_out`'s row price is never read (it leaves at running average cost).
+ */
+export function transferNeedsCostBasis(d: { action: string; price: string }): boolean {
+  if (d.action !== "transfer_in") return false;
+  const price = d.price.trim();
+  // Positive iff it is a well-formed, unsigned decimal string with a non-zero digit
+  // (string check — no float round-trip of a money value).
+  return !(/^\d+(\.\d+)?$/.test(price) && /[1-9]/.test(price));
+}
+
 export const parsedTransactionSchema = z.object({
   assetClass: assetClassSchema.nullish(),
   action: parsedActionSchema,
@@ -66,6 +84,13 @@ export const parsedTransactionSchema = z.object({
     )
     .nullish(),
   confidence: z.number().min(0).max(1),
+  /**
+   * Reasons this draft needs the user's attention in the review screen before it can be
+   * confirmed. `needs_cost_basis`: an inbound depot transfer whose source carried no
+   * acquisition price — the carried cost basis must be entered (confirm rejects a
+   * `transfer_in` at price 0 with `transfer_cost_basis_required`; audit B4).
+   */
+  attention: z.array(draftAttentionSchema).nullish(),
   taxComponents: taxComponentsSchema.nullish(),
   orderRef: z.string().nullish(),
   extraSources: z

@@ -293,6 +293,7 @@ export function ImportReview({
         onToggleSort={toggleSort}
         onEdit={setEditingUid}
         onRemove={handleRemove}
+        onUpdate={onUpdate}
         onMapIssue={openMap}
         assetClassFilter={assetClassFilter}
         actionFilter={actionFilter}

@@ -24,6 +24,19 @@ export interface ImportDraft {
   orderRef?: string | null;
   taxComponents?: Record<string, string> | null;
   likelyDuplicate?: import("@portfolio/api-client").LikelyDuplicate | null;
+  /** Review-time attention reasons set by the parser (e.g. "needs_cost_basis"). */
+  attention?: string[] | null;
+}
+
+/**
+ * An inbound depot transfer with no carried cost basis yet (price empty/0) — confirm
+ * refuses it (`transfer_cost_basis_required`, audit B4) until the user enters the basis.
+ * Mirrors `transferNeedsCostBasis` in @portfolio/schema (string check, no float parse).
+ */
+export function draftNeedsCostBasis(d: Pick<ImportDraft, "action" | "price">): boolean {
+  if (d.action !== "transfer_in") return false;
+  const price = (d.price ?? "").trim();
+  return !(/^\d+(\.\d+)?$/.test(price) && /[1-9]/.test(price));
 }
 
 export interface ImportContractScheduleRow {

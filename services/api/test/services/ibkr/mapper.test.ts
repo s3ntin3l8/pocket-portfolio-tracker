@@ -152,6 +152,49 @@ describe("mapFlexToDrafts — transfers", () => {
     expect(xfer.currency).toBe("USD");
     expect(xfer.executedAt).toEqual(new Date("2024-04-01"));
     expect(xfer.confidence).toBe(0.85);
+    expect(xfer.attention).toBeUndefined();
+  });
+
+  function withTransfer(fields: Record<string, string | undefined>): FlexStatement {
+    const s = stmt();
+    s.transfers = [
+      {
+        assetCategory: "STK",
+        symbol: "NOCB",
+        isin: "US0000000001",
+        currency: "USD",
+        date: "20240501",
+        type: "IN",
+        quantity: "8",
+        transactionID: "xfer-b4",
+        ...fields,
+      } as FlexStatement["transfers"][number],
+    ];
+    return s;
+  }
+
+  it("derives the carried cost from costBasisMoney / quantity (decimal, no float)", () => {
+    const { drafts } = mapFlexToDrafts(withTransfer({ costBasisMoney: "-1000.10" }));
+    const xfer = drafts.find((d) => d.externalId === "ibkr:xfer:xfer-b4")!;
+    expect(xfer.price).toBe("125.0125");
+    expect(xfer.attention).toBeUndefined();
+  });
+
+  it("never books positionAmount (market value) as cost — flags needs_cost_basis instead (#818)", () => {
+    const { drafts } = mapFlexToDrafts(withTransfer({ positionAmount: "2400" }));
+    const xfer = drafts.find((d) => d.externalId === "ibkr:xfer:xfer-b4")!;
+    expect(xfer.action).toBe("transfer_in");
+    expect(xfer.price).toBe("0");
+    expect(xfer.confidence).toBe(0.5);
+    expect(xfer.attention).toEqual(["needs_cost_basis"]);
+  });
+
+  it("does not flag an outbound transfer without cost basis (it leaves at average cost)", () => {
+    const { drafts } = mapFlexToDrafts(withTransfer({ type: "OUT", positionAmount: "2400" }));
+    const xfer = drafts.find((d) => d.externalId === "ibkr:xfer:xfer-b4")!;
+    expect(xfer.action).toBe("transfer_out");
+    expect(xfer.price).toBe("0");
+    expect(xfer.attention).toBeUndefined();
   });
 });
 

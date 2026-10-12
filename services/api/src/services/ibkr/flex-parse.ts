@@ -74,7 +74,7 @@ export interface FlexTransfer {
   date: string; // YYYY-MM-DD or YYYYMMDD
   type: string; // "IN" | "OUT" | "ACATS IN" | "ACATS OUT" | "INTERNAL IN" | "INTERNAL OUT"
   direction?: string; // "IN" | "OUT" — fallback when type is verbose
-  positionAmount?: string; // quantity * market price — useful for carried cost
+  positionAmount?: string; // quantity * market price — market value, never used as carried cost (#818)
   positionAmountInBase?: string;
   costBasisMoney?: string; // carried cost basis in trade currency
   costBasisPrice?: string; // per-share cost basis

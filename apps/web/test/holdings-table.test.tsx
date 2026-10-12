@@ -224,6 +224,25 @@ describe("HoldingsTable", () => {
     expect(container.querySelector("polyline")).toBeNull();
   });
 
+  describe("fxMissing disclosure (audit B2)", () => {
+    it("badges and footnotes a holding with no FX rate, shown without a display value", () => {
+      const noFx: HoldingValuation = {
+        ...makeHolding("FXLESS", "10", "100"),
+        marketValueDisplay: null,
+        unrealizedPnLDisplay: null,
+        fxMissing: true,
+      };
+      renderTable({ rows: [noFx, makeHolding("AAPL", "10", "1500")] });
+      expect(screen.getAllByText("No FX rate").length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/1 holding with no exchange rate/).length).toBeGreaterThan(0);
+    });
+
+    it("does not badge a holding whose FX resolved", () => {
+      renderTable();
+      expect(screen.queryByText("No FX rate")).not.toBeInTheDocument();
+    });
+  });
+
   describe("valuedAtCost disclosure (#744)", () => {
     it("renders an at-cost badge next to a holding valued at cost, but not for a normally-priced one", () => {
       const atCost: HoldingValuation = { ...makeHolding("MWOF", "10", "100"), valuedAtCost: true };

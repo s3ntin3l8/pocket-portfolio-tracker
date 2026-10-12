@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PortfolioPicker } from "@/components/portfolio-picker";
 import { cn } from "@/lib/utils";
+import { draftNeedsCostBasis } from "@/components/import-flow/types";
 import type { ReviewDraft } from "./types";
 import type { ImportReviewGroup, ImportTargetPortfolio } from "./types";
 import { fmtQty, fmtAmt } from "./types";
@@ -78,6 +79,11 @@ function MobileDraftCard({
             {draft.likelyDuplicate && (
               <Badge variant={draft.likelyDuplicate.kind === "enrichment" ? "default" : "warning"}>
                 {dupLabel(draft)}
+              </Badge>
+            )}
+            {draftNeedsCostBasis(draft) && (
+              <Badge variant="warning" title={t("review.needsCostBasisHint")}>
+                {t("review.needsCostBasis")}
               </Badge>
             )}
           </div>

@@ -1,5 +1,10 @@
 import { isTradeType } from "@portfolio/core";
-import type { ParsedAction, ImportIssue, ParsedTransaction } from "@portfolio/schema";
+import type {
+  DraftAttention,
+  ParsedAction,
+  ImportIssue,
+  ParsedTransaction,
+} from "@portfolio/schema";
 import { formatDecimal } from "../parsers/numeric.js";
 import { collapsePerkFundedAcquisitions } from "../parsers/perk-pairing.js";
 import {
@@ -113,6 +118,7 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
   let price = formatDecimal(amount);
   let confidence = 1;
   let sellTaxOverride: number | null = null;
+  let attention: DraftAttention[] | null = null;
 
   if (isTradeType(action)) {
     const shares = Math.abs(ev.shares ?? 0);
@@ -147,7 +153,18 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
       return skip(`${ev.eventType} without a share count`, "attention", ev);
     }
     quantity = formatDecimal(shares);
+    // A transfer is cash-neutral: TR's event carries no acquisition price (the exporter
+    // has no carried-cost field, and `executedPrice` — if a detail row happens to carry
+    // one — is not the user's cost basis, so it is deliberately NOT used: a silently
+    // wrong "known" basis is worse than an unknown one). An inbound transfer therefore
+    // lands as a flagged draft the user completes in the review screen; confirm refuses
+    // it at price 0 (audit B4). An outbound transfer's row price is never read — the
+    // shares leave at their running average cost — so it needs no flag.
     price = "0";
+    if (action === "transfer_in") {
+      confidence = 0.5;
+      attention = ["needs_cost_basis"];
+    }
   }
 
   if (action === "bonus") {
@@ -210,6 +227,7 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     description: ev.description ?? null,
     documentRefs: ev.documentRefs ?? null,
     vorabBase: ev.vorabBase != null ? formatDecimal(ev.vorabBase) : null,
+    ...(attention ? { attention } : {}),
   };
   return { draft };
 }

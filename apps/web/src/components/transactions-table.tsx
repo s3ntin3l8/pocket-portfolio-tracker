@@ -18,7 +18,7 @@ import {
   TradeFilterBanner,
   ReconciliationBanner,
 } from "@/components/transactions/activity-banners";
-import type { Anomaly } from "@portfolio/api-client";
+import { apiErrorCode, type Anomaly } from "@portfolio/api-client";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
 
 import type { TxRow } from "./transactions-table/types";
@@ -89,6 +89,7 @@ export function TransactionsTable({
   actions?: React.ReactNode;
 }) {
   const ta = useTranslations("Anomalies");
+  const tTx = useTranslations("Transactions");
   const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
@@ -293,9 +294,21 @@ export function TransactionsTable({
       );
       clearSelection();
       router.refresh();
+    } catch (err) {
+      if (!handleResolveError(err)) throw err;
+      router.refresh(); // other portfolios' batches may have gone through
     } finally {
       setBusy(false);
     }
+  }
+
+  // Confirm refuses an inbound depot transfer that still has no cost basis (price 0) —
+  // audit B4. Surface it as a translated toast instead of an unhandled rejection; the
+  // user fixes it by editing the draft's price. Returns false for any other error.
+  function handleResolveError(err: unknown): boolean {
+    if (apiErrorCode(err) !== "transfer_cost_basis_required") return false;
+    toast.error(tTx("draftTransferCostBasisRequired"));
+    return true;
   }
 
   async function onResolveOne(tx: TxRow, action: "confirm" | "discard") {
@@ -303,6 +316,8 @@ export function TransactionsTable({
     try {
       await api.resolveDraftTransactions(tx.portfolioId, [tx.id], action);
       router.refresh();
+    } catch (err) {
+      if (!handleResolveError(err)) throw err;
     } finally {
       setResolvingId(null);
     }

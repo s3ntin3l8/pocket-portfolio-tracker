@@ -580,7 +580,11 @@ describe("mapTrEventToDraft", () => {
     expect(tin).toMatchObject({
       action: "transfer_in",
       quantity: "1",
-      price: "0", // carried cost unknown at import → surfaces missing_transfer_basis anomaly
+      // TR carries no acquisition price → flagged for the review screen; confirm refuses
+      // it at price 0 until the carried cost basis is entered (audit B4).
+      price: "0",
+      confidence: 0.5,
+      attention: ["needs_cost_basis"],
       isin: "GB0002875804",
     });
     const tout = draftOf({
@@ -591,6 +595,9 @@ describe("mapTrEventToDraft", () => {
       shares: 14,
     });
     expect(tout).toMatchObject({ action: "transfer_out", quantity: "14", price: "0" });
+    // transfer_out leaves at running average cost — its row price is never read, no flag.
+    expect(tout.attention).toBeUndefined();
+    expect(tout.confidence).toBe(1);
     // #359's incoming-transfer event type normalises to transfer_in.
     expect(
       draftOf({
@@ -620,7 +627,20 @@ describe("mapTrEventToDraft", () => {
       quantity: "0.026242",
       price: "0",
       assetClass: "crypto",
+      attention: ["needs_cost_basis"],
     });
+  });
+
+  it("never uses a transfer event's executedPrice as its cost basis (audit B4)", () => {
+    const tin = draftOf({
+      ...base,
+      eventType: "TRANSFER_IN",
+      amount: 0,
+      isin: "GB0002875804",
+      shares: 3,
+      executedPrice: 41.5,
+    });
+    expect(tin).toMatchObject({ price: "0", attention: ["needs_cost_basis"] });
   });
 
   it("rejects a transfer missing its share count or ISIN", () => {

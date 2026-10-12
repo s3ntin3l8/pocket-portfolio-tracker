@@ -119,6 +119,60 @@ describe("pytr import → confirm", () => {
     expect(deposit.instrumentId).toBeNull();
   });
 
+  it("refuses a transfer_in draft at price 0 with transfer_cost_basis_required (audit B4)", async () => {
+    const t = await token("pytr-xfer-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR xfer", baseCurrency: "EUR" },
+      })
+    ).json().id;
+    const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));
+    const importId = await stagePytrImport(portfolioId, pf.userId);
+    const transferIn: ParsedTransaction = {
+      assetClass: "equity",
+      action: "transfer_in",
+      isin: "DE0007236101",
+      name: "Siemens",
+      quantity: "4",
+      unit: "shares",
+      price: "0",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2026-03-03T10:00:00.000Z"),
+      confidence: 0.5,
+      externalId: "tr-xfer-1",
+      attention: ["needs_cost_basis"],
+    };
+
+    const refused = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { transactions: [...DRAFTS, transferIn] },
+    });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json()).toEqual({
+      error: "transfer_cost_basis_required",
+      draftIndices: [DRAFTS.length],
+    });
+
+    // With the carried cost basis filled in, the same draft confirms.
+    const ok = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { transactions: [...DRAFTS, { ...transferIn, price: "95.20" }] },
+    });
+    expect(ok.statusCode).toBe(201);
+    const row = ok
+      .json()
+      .transactions.find((x: { externalId: string }) => x.externalId === "tr-xfer-1");
+    expect(row).toMatchObject({ type: "transfer_in", price: "95.20" });
+  });
+
   // A TR PDF import mixing a security buy with two cash-movement true-ups (deposit refund +
   // withdrawal charge) — the only cash rows a TR settlement PDF emits (tax-optimization).
   const TR_PDF_DRAFTS: ParsedTransaction[] = [
