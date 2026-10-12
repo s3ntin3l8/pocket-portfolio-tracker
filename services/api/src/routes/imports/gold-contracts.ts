@@ -26,15 +26,19 @@ export async function writeGoldContracts(
   for (let ci = 0; ci < contracts.length; ci++) {
     const c = contracts[ci];
     const gold = goldInstrumentForContract(c);
-    const instrument = await findOrCreateInstrument(tx, {
-      symbol: gold.symbol,
-      market: gold.market,
-      assetClass: "gold",
-      unit: "grams",
-      currency: c.currency,
-      name: gold.name,
-      isin: null,
-    });
+    const instrument = await findOrCreateInstrument(
+      tx,
+      {
+        symbol: gold.symbol,
+        market: gold.market,
+        assetClass: "gold",
+        unit: "grams",
+        currency: c.currency,
+        name: gold.name,
+        isin: null,
+      },
+      { actor: { isAdmin: false } },
+    );
     const [loan] = await tx
       .insert(loans)
       .values({

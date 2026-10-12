@@ -13,9 +13,12 @@
  * re-lists the same report is a no-op. Uploads have no sourceEventId and dedup at the route
  * layer via content hash (mirroring the screenshot/CSV import upload path).
  *
- * Key convention: inbox/{userId}/{category}/{taxYear|misc}/{sanitizedFilename}
+ * Key convention: inbox/{userId}/{category}/{taxYear|misc}/{name}-{uniqueId}{.ext}, where
+ * uniqueId is a per-document UUID, so two uploads sharing a filename never share an object.
+ * The key is persisted in `documents.storageKey`; read/delete paths use the stored value.
  */
 
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { documents } from "@portfolio/db";
@@ -43,7 +46,11 @@ export function buildInboxKey(
     ? sanitiseFilename(originalFilename)
     : `document${mimeType ? extFromMime(mimeType) : ""}`;
   const yearSegment = taxYear ? String(taxYear) : "misc";
-  return `inbox/${userId}/${category}/${yearSegment}/${filename}`;
+  // Unique suffix before the extension: same-named uploads must not share (and overwrite
+  // or co-delete) one storage object.
+  const dot = filename.lastIndexOf(".");
+  const [stem, ext] = dot > 0 ? [filename.slice(0, dot), filename.slice(dot)] : [filename, ""];
+  return `inbox/${userId}/${category}/${yearSegment}/${stem}-${randomUUID()}${ext}`;
 }
 
 export interface StoreInboxDocumentOptions {

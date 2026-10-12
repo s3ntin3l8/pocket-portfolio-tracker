@@ -8,7 +8,7 @@ const schema = {
   properties: {
     NODE_ENV: {
       type: "string",
-      default: "development",
+      default: "production", // fail-closed: dev-only privileges need an explicit "development"
       enum: ["development", "production", "test"],
     },
     PORT: {

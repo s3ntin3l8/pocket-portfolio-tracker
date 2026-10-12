@@ -166,6 +166,18 @@ and promote/demote admin via `POST`/`PATCH /admin/users/*` (API-only for now —
 for those three; there's also no self-service password reset, since this project has no
 mailer). `docker-compose.prod.yml` forwards `AUTH_LOCAL_SECRET` to both `api` and `web`.
 
+**Moving from local accounts to Authentik.** If both are configured, a first OIDC login
+whose e-mail matches an existing local account re-binds that account to the OIDC identity
+(keeping its data). This only happens when the token carries `email_verified: true`;
+otherwise the API answers `401 {"error":"email_unverified"}` and changes nothing. The
+assumption is that Authentik accounts are admin-created and users cannot self-register or
+edit their e-mail to an unverified value — if your Authentik policy differs, keep that
+check in mind (and make sure your e-mail scope maps `email_verified` truthfully).
+
+`NODE_ENV` defaults to `production` when unset. Personal access tokens are admin only when
+it is explicitly `development` (the `.env.example` default for local dev); never set that
+on a deployment.
+
 ## Conventions
 
 - **ESM throughout** (`"type": "module"`); `.ts` sources import with `.js` specifiers

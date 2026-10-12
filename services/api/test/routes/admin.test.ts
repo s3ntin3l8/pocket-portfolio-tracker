@@ -1104,4 +1104,28 @@ describe("admin provider config", () => {
       await app.db.delete(users).where(eq(users.id, id));
     }
   });
+
+  it("GET /admin/audit returns the newest 100 entries, newest first", async () => {
+    await app.db.delete(adminAuditLog);
+    const base = Date.UTC(2030, 0, 1);
+    await app.db.insert(adminAuditLog).values(
+      Array.from({ length: 120 }, (_, i) => ({
+        actorSub: "seed",
+        action: "seed_entry",
+        target: `row-${i}`,
+        at: new Date(base + i * 60_000),
+      })),
+    );
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/audit",
+      headers: auth(await token("admin-audit-order", [ADMIN_GROUP])),
+    });
+    const rows = res.json() as { target: string }[];
+    expect(rows).toHaveLength(100);
+    expect(rows[0].target).toBe("row-119");
+    expect(rows[99].target).toBe("row-20");
+    // Don't leave future-dated rows that would shadow later tests' fresh entries.
+    await app.db.delete(adminAuditLog);
+  });
 });

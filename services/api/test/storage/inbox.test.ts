@@ -115,21 +115,29 @@ async function ensurePortfolio(userId: string): Promise<string> {
 const appLike = () => app as unknown as Parameters<typeof storeInboxDocument>[0];
 
 describe("buildInboxKey", () => {
-  it("produces inbox/{userId}/{category}/{year}/{filename}", () => {
-    expect(buildInboxKey("u1", "tax_report", 2025, "report.pdf")).toBe(
-      "inbox/u1/tax_report/2025/report.pdf",
+  const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+  it("produces inbox/{userId}/{category}/{year}/{name}-{uuid}{ext}", () => {
+    expect(buildInboxKey("u1", "tax_report", 2025, "report.pdf")).toMatch(
+      new RegExp(`^inbox/u1/tax_report/2025/report-${UUID}\\.pdf$`),
     );
   });
 
   it("falls back to 'misc' when taxYear is absent", () => {
-    expect(buildInboxKey("u1", "tax_report", null, "report.pdf")).toBe(
-      "inbox/u1/tax_report/misc/report.pdf",
+    expect(buildInboxKey("u1", "tax_report", null, "report.pdf")).toMatch(
+      new RegExp(`^inbox/u1/tax_report/misc/report-${UUID}\\.pdf$`),
     );
   });
 
   it("sanitises the filename", () => {
-    expect(buildInboxKey("u1", "tax_report", 2025, "../../etc/passwd")).toBe(
-      "inbox/u1/tax_report/2025/passwd",
+    expect(buildInboxKey("u1", "tax_report", 2025, "../../etc/passwd")).toMatch(
+      new RegExp(`^inbox/u1/tax_report/2025/passwd-${UUID}$`),
+    );
+  });
+
+  it("never yields the same key twice for the same filename", () => {
+    expect(buildInboxKey("u1", "tax_report", 2025, "report.pdf")).not.toBe(
+      buildInboxKey("u1", "tax_report", 2025, "report.pdf"),
     );
   });
 });
@@ -262,5 +270,41 @@ describe("gcStagedReceipts does not sweep inbox documents", () => {
     const doc = await getInboxDocument(app, result.documentId);
     expect(doc).not.toBeNull();
     expect(store.data.has(doc!.storageKey)).toBe(true);
+  });
+});
+
+describe("same-filename uploads", () => {
+  it("store distinct objects; deleting one leaves the other", async () => {
+    const userId = await ensureUser("inbox-samename-1");
+    const portfolioId = await ensurePortfolio(userId);
+    const mk = (content: string) =>
+      storeInboxDocument(appLike(), {
+        userId,
+        portfolioId,
+        category: "tax_report",
+        taxYear: 2025,
+        buf: Buffer.from(content),
+        mimeType: "application/pdf",
+        originalFilename: "report.pdf",
+        source: "upload",
+      });
+    const a = await mk("first pdf");
+    const b = await mk("second pdf");
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+
+    const docA = await getInboxDocument(appLike(), a.documentId);
+    const docB = await getInboxDocument(appLike(), b.documentId);
+    expect(docA!.storageKey).not.toBe(docB!.storageKey);
+    expect((await store.get(docA!.storageKey))!.toString()).toBe("first pdf");
+    expect((await store.get(docB!.storageKey))!.toString()).toBe("second pdf");
+
+    await deleteInboxDocument(appLike(), {
+      documentId: a.documentId,
+      storageKey: docA!.storageKey,
+    });
+    expect(await store.exists(docA!.storageKey)).toBe(false);
+    expect(await store.exists(docB!.storageKey)).toBe(true);
+    expect((await store.get(docB!.storageKey))!.toString()).toBe("second pdf");
   });
 });

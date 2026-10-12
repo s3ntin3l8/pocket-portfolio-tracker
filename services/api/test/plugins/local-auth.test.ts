@@ -123,7 +123,7 @@ async function oidcJwtFor(
   key: CryptoKey,
   email: string = `${sub}@example.com`,
 ): Promise<string> {
-  return new SignJWT({ email })
+  return new SignJWT({ email, email_verified: true })
     .setProtectedHeader({ alg: "ES256" })
     .setSubject(sub)
     .setIssuer(ISSUER)
@@ -475,6 +475,28 @@ describe("OIDC migration from local authSub", () => {
     const [survivor] = await migApp.db.select().from(users).where(eq(users.email, email)).limit(1);
     expect(survivor.authSub).toBe("oidc-victim-sub");
 
+    await migApp.db.delete(users).where(eq(users.email, email));
+  });
+
+  it("refuses to migrate a local row when the OIDC e-mail is unverified (401, rows untouched)", async () => {
+    const email = "unverified@example.com";
+    await migApp.db.insert(users).values({ authSub: `local|${email}`, email, name: "Local U" });
+    const jwt = await new SignJWT({ email, email_verified: false })
+      .setProtectedHeader({ alg: "ES256" })
+      .setSubject("oidc-sub-unverified")
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime("1h")
+      .sign(migKey);
+
+    const res = await migApp.inject({ method: "GET", url: "/me", headers: auth(jwt) });
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: "email_unverified" });
+
+    const rows = await migApp.db.select().from(users).where(eq(users.email, email));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].authSub).toBe(`local|${email}`);
     await migApp.db.delete(users).where(eq(users.email, email));
   });
 });

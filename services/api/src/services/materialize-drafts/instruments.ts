@@ -105,6 +105,7 @@ export async function resolveDraftInstruments(
           wkn: d.wkn ?? null,
         },
         {
+          actor: { isAdmin: false },
           resolveMarket: async (isin) => {
             const r = await resolveEuIsin(isin);
             return r ? { market: r.market, currency: r.currency } : null;

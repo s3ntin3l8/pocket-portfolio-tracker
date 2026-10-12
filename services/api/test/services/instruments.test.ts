@@ -107,7 +107,39 @@ describe("findOrCreateInstrument", () => {
     expect(healed.currency).toBe("USD");
   });
 
-  it("re-pins a TR crypto holding stuck on Xetra/EUR to CRYPTO (currency kept)", async () => {
+  it("does not re-pin a row that is NOT on the default/unknown market, and does not change assetClass for a non-admin", async () => {
+    const isin = "US0378331005";
+    await getDb()
+      .insert(instruments)
+      .values({
+        ...base,
+        market: "US",
+        currency: "USD",
+        symbol: "TIER2",
+        assetClass: "equity",
+        name: "Tier2",
+        isin,
+      });
+
+    const unchanged = await findOrCreateInstrument(
+      getDb(),
+      {
+        symbol: "TIER2",
+        market: "CRYPTO",
+        assetClass: "bond",
+        unit: "units",
+        currency: "EUR",
+        name: "Tier2",
+        isin,
+      },
+      { actor: { isAdmin: false } },
+    );
+    expect(unchanged.market).toBe("US");
+    expect(unchanged.currency).toBe("USD");
+    expect(unchanged.assetClass).toBe("equity");
+  });
+
+  it("re-pins a TR crypto holding stuck on Xetra/EUR to CRYPTO (currency kept); assetClass stays equity for non-admins", async () => {
     const isin = "XF000BTC0017";
     await getDb()
       .insert(instruments)
@@ -124,8 +156,31 @@ describe("findOrCreateInstrument", () => {
     });
     expect(healed.symbol).toBe("BTC");
     expect(healed.market).toBe("CRYPTO");
-    expect(healed.assetClass).toBe("crypto");
+    // assetClass is a cross-family change: admin-only (equity stays for a normal user).
+    expect(healed.assetClass).toBe("equity");
     expect(healed.currency).toBe("EUR");
+  });
+
+  it("lets an admin actor change assetClass cross-family", async () => {
+    const isin = "XF000ADM0019";
+    await getDb()
+      .insert(instruments)
+      .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
+    const healed = await findOrCreateInstrument(
+      getDb(),
+      {
+        symbol: "ADMC",
+        market: "CRYPTO",
+        assetClass: "crypto",
+        unit: "shares",
+        currency: "EUR",
+        name: "Admin coin",
+        isin,
+      },
+      { actor: { isAdmin: true } },
+    );
+    expect(healed.assetClass).toBe("crypto");
+    expect(healed.market).toBe("CRYPTO");
   });
 
   it("does not re-pin a real EUR fund off Xetra", async () => {
