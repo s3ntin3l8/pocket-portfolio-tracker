@@ -160,6 +160,28 @@ export function registerCrudRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { portfolioId, txId } = request.params;
       const { status } = statusBodySchema.parse(request.body);
+      // Promoting a draft to a counting status is a confirm too — same cost-basis gate as
+      // resolve-drafts (audit B4), so a price-0 transfer_in can't slip around it here.
+      if (status !== "archived") {
+        const [blocked] = await app.db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.id, txId),
+              eq(transactions.portfolioId, portfolioId),
+              eq(transactions.status, "draft"),
+              eq(transactions.type, "transfer_in"),
+              lte(transactions.price, "0"),
+            ),
+          )
+          .limit(1);
+        if (blocked) {
+          return reply
+            .code(400)
+            .send({ error: "transfer_cost_basis_required", transactionIds: [blocked.id] });
+        }
+      }
       const [updated] = await app.db
         .update(transactions)
         .set({ status })

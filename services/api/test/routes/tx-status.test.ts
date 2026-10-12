@@ -373,6 +373,42 @@ describe("transaction status (archived / cash_neutral)", () => {
     expect(ok.json().updated).toBe(2);
   });
 
+  it("PATCH …/status can't promote a price-0 transfer_in draft around the gate", async () => {
+    const { t, portfolioId } = await setup();
+    const [xfer] = await app.db
+      .insert(transactions)
+      .values({
+        portfolioId,
+        instrumentId: acmeId,
+        type: "transfer_in",
+        quantity: "5",
+        price: "0",
+        currency: "EUR",
+        executedAt: new Date("2026-02-02T00:00:00.000Z"),
+        source: "pytr",
+        externalId: "ev-xfer-status",
+        status: "draft",
+      })
+      .returning({ id: transactions.id });
+    for (const status of ["normal", "cash_neutral"]) {
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/portfolios/${portfolioId}/transactions/${xfer.id}/status`,
+        headers: auth(t),
+        payload: { status },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("transfer_cost_basis_required");
+    }
+    const archived = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}/transactions/${xfer.id}/status`,
+      headers: auth(t),
+      payload: { status: "archived" },
+    });
+    expect(archived.statusCode).toBe(200);
+  });
+
   it("still lets the user discard a transfer_in draft with no cost basis", async () => {
     const { t, portfolioId } = await setup();
     const [xfer] = await app.db
