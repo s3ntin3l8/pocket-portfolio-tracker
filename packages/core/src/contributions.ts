@@ -147,6 +147,117 @@ interface DayWalkResult {
   points: FlowPoint[];
 }
 
+// ---------------------------------------------------------------------------
+// Average-cost pool — shared by both boundary walks
+// ---------------------------------------------------------------------------
+
+/** A running average-cost position for one instrument, in its cost (trade) currency. */
+interface PoolPosition {
+  qty: Decimal;
+  cost: Decimal;
+  costCurrency: string;
+}
+
+/** Transaction types that add to the average-cost pool (at `qty × price + fees`). */
+function isPoolAcquisition(tx: CoreTransaction): boolean {
+  return (
+    tx.type === "buy" ||
+    tx.type === "savings_plan" ||
+    tx.type === "bonus" ||
+    tx.type === "transfer_in"
+  );
+}
+
+/**
+ * Instruments whose pool-building acquisitions span more than one currency. Their cost
+ * basis is meaningless (currency-blind), so both walks drop them rather than crash the
+ * whole summary. `warn` emits the structured warning once per instrument.
+ */
+function mixedCurrencyInstruments(sorted: CoreTransaction[], warn: boolean): Set<string> {
+  const skipped = new Set<string>();
+  const acquisitionCurrencies = new Map<string, Set<string>>();
+  for (const tx of sorted) {
+    if (!tx.instrumentId || !isPoolAcquisition(tx)) continue;
+    const set = acquisitionCurrencies.get(tx.instrumentId) ?? new Set<string>();
+    set.add(tx.currency);
+    acquisitionCurrencies.set(tx.instrumentId, set);
+  }
+  for (const [instrumentId, ccys] of acquisitionCurrencies) {
+    if (ccys.size > 1) {
+      skipped.add(instrumentId);
+      if (warn) {
+        process.stderr.write(
+          JSON.stringify({
+            level: "warn",
+            event: "contributions_mixed_currency_instrument",
+            instrumentId,
+            currencies: [...ccys].sort(),
+          }) + "\n",
+        );
+      }
+    }
+  }
+  return skipped;
+}
+
+/** Add an acquisition to the pool; returns its gross cost (`qty × price + fees`, costCurrency). */
+function poolAcquire(pool: Map<string, PoolPosition>, tx: CoreTransaction): Decimal {
+  const id = tx.instrumentId!;
+  let p = pool.get(id);
+  if (!p) {
+    p = { qty: D(0), cost: D(0), costCurrency: tx.currency };
+    pool.set(id, p);
+  }
+  const gross = D(tx.quantity).abs().mul(D(tx.price)).add(D(tx.fees));
+  p.qty = p.qty.add(D(tx.quantity).abs());
+  p.cost = p.cost.add(gross);
+  return gross;
+}
+
+/**
+ * Remove `tx.quantity` (clamped to the held quantity) from the pool at the running average
+ * cost; returns that cost in the pool's costCurrency, or null when nothing is held.
+ */
+function poolRemove(
+  pool: Map<string, PoolPosition>,
+  tx: CoreTransaction,
+): { cost: Decimal; costCurrency: string } | null {
+  const p = pool.get(tx.instrumentId!);
+  if (!p || p.qty.lte(0)) return null;
+  const qty = Decimal.min(D(tx.quantity).abs(), p.qty);
+  const cost = p.cost.div(p.qty).mul(qty);
+  p.qty = p.qty.sub(qty);
+  p.cost = p.cost.sub(cost);
+  return { cost, costCurrency: p.costCurrency };
+}
+
+/**
+ * Carried cost of every `transfer_out` row: the running average cost of the shares leaving,
+ * replayed chronologically through the same pool the outside walk uses (audit B4). Rows
+ * with nothing held (or on a mixed-currency instrument) are absent — no value leaves.
+ */
+function transferOutCarriedCosts(
+  txns: CoreTransaction[],
+): Map<CoreTransaction, { cost: Decimal; costCurrency: string }> {
+  const out = new Map<CoreTransaction, { cost: Decimal; costCurrency: string }>();
+  if (!txns.some((tx) => tx.type === "transfer_out")) return out;
+  const sorted = [...txns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
+  const skipped = mixedCurrencyInstruments(sorted, false);
+  const pool = new Map<string, PoolPosition>();
+  for (const tx of sorted) {
+    if (!tx.instrumentId || skipped.has(tx.instrumentId)) continue;
+    if (isPoolAcquisition(tx)) {
+      poolAcquire(pool, tx);
+    } else if (tx.type === "sell") {
+      poolRemove(pool, tx);
+    } else if (tx.type === "transfer_out") {
+      const removed = poolRemove(pool, tx);
+      if (removed) out.set(tx, removed);
+    }
+  }
+  return out;
+}
+
 /**
  * Walks the INSIDE-boundary rules (net external cash) once, producing both the
  * day-bucketed view {@link insideDays} needs and the per-transaction point view
@@ -155,6 +266,7 @@ interface DayWalkResult {
 function walkInsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): DayWalkResult {
   const months = new Map<string, FlowAgg>();
   const points: FlowPoint[] = [];
+  const transferOutCosts = transferOutCarriedCosts(txns);
   for (const tx of txns) {
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
@@ -173,8 +285,13 @@ function walkInsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string):
       m.inflow = m.inflow.add(amount);
       points.push({ date: tx.executedAt, amount: amount.neg(), isTransfer: true });
     } else if (tx.type === "transfer_out") {
-      // Outbound transfer: capital leaves the boundary at carried cost basis.
-      const amount = transferInflow(tx, fx, display);
+      // Outbound transfer: capital leaves the boundary at carried cost basis — the running
+      // average cost of the shares leaving, never the row's own price (audit B4: broker
+      // feeds carry transfer_out at price 0, which made the outflow 0 while the value
+      // dropped). Nothing held → nothing leaves.
+      const carried = transferOutCosts.get(tx);
+      if (!carried) continue;
+      const amount = D(convert(carried.cost.toString(), carried.costCurrency, display, fx));
       m.outflow = m.outflow.add(amount);
       points.push({ date: tx.executedAt, amount, isTransfer: true });
     } else {
@@ -206,35 +323,8 @@ function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string)
   // summary (the original behavior) or skip-and-refund mid-loop, we pre-scan
   // for instruments whose acquisitions span more than one currency and drop
   // them entirely — every tx for that instrument is skipped in the main loop.
-  const skippedInstruments = new Set<string>();
-  const acquisitionCurrencies = new Map<string, Set<string>>();
-  for (const tx of sorted) {
-    if (!tx.instrumentId) continue;
-    if (
-      tx.type !== "buy" &&
-      tx.type !== "savings_plan" &&
-      tx.type !== "bonus" &&
-      tx.type !== "transfer_in"
-    )
-      continue;
-    const set = acquisitionCurrencies.get(tx.instrumentId) ?? new Set<string>();
-    set.add(tx.currency);
-    acquisitionCurrencies.set(tx.instrumentId, set);
-  }
-  for (const [instrumentId, ccys] of acquisitionCurrencies) {
-    if (ccys.size > 1) {
-      skippedInstruments.add(instrumentId);
-      process.stderr.write(
-        JSON.stringify({
-          level: "warn",
-          event: "contributions_mixed_currency_instrument",
-          instrumentId,
-          currencies: [...ccys].sort(),
-        }) + "\n",
-      );
-    }
-  }
-  const pool = new Map<string, { qty: Decimal; cost: Decimal; costCurrency: string }>();
+  const skippedInstruments = mixedCurrencyInstruments(sorted, true);
+  const pool = new Map<string, PoolPosition>();
   const months = new Map<string, FlowAgg>();
   const points: FlowPoint[] = [];
 
@@ -244,28 +334,12 @@ function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string)
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
 
-    if (
-      tx.type === "buy" ||
-      tx.type === "savings_plan" ||
-      tx.type === "bonus" ||
-      tx.type === "transfer_in"
-    ) {
+    if (isPoolAcquisition(tx)) {
       // Acquisitions add to the pool in costCurrency (NOT pre-converted to display).
       // The previous code accumulated in display, which forced a redundant conversion
       // at outflow time using tx.currency (the depot's base) — wrong for cross-currency
       // holdings where buys were priced in a non-base currency.
-      const existing = pool.get(tx.instrumentId);
-      if (!existing) {
-        pool.set(tx.instrumentId, {
-          qty: D(0),
-          cost: D(0),
-          costCurrency: tx.currency,
-        });
-      }
-      const p = pool.get(tx.instrumentId)!;
-      const gross = D(tx.quantity).abs().mul(D(tx.price)).add(D(tx.fees));
-      p.qty = p.qty.add(D(tx.quantity).abs());
-      p.cost = p.cost.add(gross);
+      const gross = poolAcquire(pool, tx);
       if (isExternalAcquisition(tx)) {
         // Convert from costCurrency to display only at the inflow boundary.
         const amount = D(convert(gross.toString(), tx.currency, display, fx));
@@ -280,17 +354,12 @@ function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string)
     } else if (tx.type === "transfer_out") {
       // Outbound transfer removes from the avg-cost pool and counts as outflow
       // (capital leaving the boundary), analogous to a sell but with no P&L.
-      const p = pool.get(tx.instrumentId);
-      if (!p || p.qty.lte(0)) continue;
-      const transferQty = Decimal.min(D(tx.quantity).abs(), p.qty);
-      const avg = p.cost.div(p.qty);
-      const costOfTransferred = avg.mul(transferQty); // in costCurrency
-      p.qty = p.qty.sub(transferQty);
-      p.cost = p.cost.sub(costOfTransferred);
+      const removed = poolRemove(pool, tx);
+      if (!removed) continue;
       // Convert from costCurrency → display (B4 fix). Previously this used
       // `tx.currency` (= depot base), which double-converted when the pool was in
       // display, or silently zero-converted when the depot base equalled display.
-      const amount = D(convert(costOfTransferred.toString(), p.costCurrency, display, fx));
+      const amount = D(convert(removed.cost.toString(), removed.costCurrency, display, fx));
       m.outflow = m.outflow.add(amount);
       points.push({ date: tx.executedAt, amount, isTransfer: true });
     } else if (tx.type === "sell") {
