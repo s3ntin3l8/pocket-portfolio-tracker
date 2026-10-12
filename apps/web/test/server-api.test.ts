@@ -14,10 +14,13 @@ const h = vi.hoisted(() => {
     cookies: {} as Record<string, string>,
     // `never[]` params so any concretely-typed stub (e.g. `(id: string) => …`) assigns.
     client: {} as Record<string, (...args: never[]) => unknown>,
+    requestHeaders: {} as Record<string, string>,
+    clientConfig: undefined as { headers?: Record<string, string> } | undefined,
   };
 });
 
 vi.mock("next/headers", () => ({
+  headers: async () => new Headers(h.requestHeaders),
   cookies: async () => ({
     get: (name: string) => (h.cookies[name] !== undefined ? { value: h.cookies[name] } : undefined),
     getAll: () => Object.entries(h.cookies).map(([name, value]) => ({ name, value })),
@@ -26,7 +29,12 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/session-token", () => ({
   accessTokenFromCookieHeader: async () => h.accessToken,
 }));
-vi.mock("@portfolio/api-client", () => ({ createApiClient: () => h.client }));
+vi.mock("@portfolio/api-client", () => ({
+  createApiClient: (config: { headers?: Record<string, string> }) => {
+    h.clientConfig = config;
+    return h.client;
+  },
+}));
 
 import * as api from "../src/lib/server-api";
 import type { TaxSummaryHolder } from "@portfolio/api-client";
@@ -39,6 +47,8 @@ const PF = [
 beforeEach(() => {
   h.accessToken = "tok"; // signed in by default
   h.cookies = {};
+  h.requestHeaders = {};
+  h.clientConfig = undefined;
   h.client = {
     // resolveSelection() now always calls listAccountHolders — default to empty list.
     listAccountHolders: async () => [],
@@ -172,6 +182,19 @@ describe("loadHoldings", () => {
     expect(h.client.getNetWorth).not.toHaveBeenCalled();
   });
 
+  it("forwards the first x-forwarded-for hop of the incoming request to the API client", async () => {
+    h.requestHeaders = { "x-forwarded-for": "203.0.113.7, 10.0.0.1" };
+    h.client.listPortfolios = async () => [];
+    await api.loadHoldings();
+    expect(h.clientConfig?.headers).toEqual({ "x-forwarded-for": "203.0.113.7" });
+  });
+
+  it("sends no forwarding header when the request has none", async () => {
+    h.client.listPortfolios = async () => [];
+    await api.loadHoldings();
+    expect(h.clientConfig?.headers).toBeUndefined();
+  });
+
   it("is empty with no portfolios and unavailable on error / signed out", async () => {
     h.client.listPortfolios = async () => [];
     expect(await api.loadHoldings()).toMatchObject({ status: "empty" });
@@ -182,6 +205,28 @@ describe("loadHoldings", () => {
     expect(await api.loadHoldings()).toMatchObject({ status: "unavailable" });
 
     h.accessToken = null;
+    expect(await api.loadHoldings()).toMatchObject({ status: "unauthorized" });
+  });
+
+  it("classifies 429 (with retryAfter) and 401 apart from a generic outage", async () => {
+    h.client.listPortfolios = async () => {
+      throw Object.assign(new Error("rl"), { status: 429, retryAfter: 16 });
+    };
+    expect(await api.loadHoldings()).toMatchObject({ status: "rate_limited", retryAfter: 16 });
+
+    h.client.listPortfolios = async () => {
+      throw Object.assign(new Error("rl"), { status: 429, retryAfter: null });
+    };
+    expect(await api.loadHoldings()).toMatchObject({ status: "rate_limited", retryAfter: null });
+
+    h.client.listPortfolios = async () => {
+      throw Object.assign(new Error("expired"), { status: 401 });
+    };
+    expect(await api.loadHoldings()).toMatchObject({ status: "unauthorized" });
+
+    h.client.listPortfolios = async () => {
+      throw Object.assign(new Error("down"), { status: 503 });
+    };
     expect(await api.loadHoldings()).toMatchObject({ status: "unavailable" });
   });
 
@@ -321,14 +366,14 @@ describe("loadPortfolio", () => {
     expect(fallback).toMatchObject({ status: "ok", data: "p1" });
   });
 
-  it("is empty with no portfolios and unavailable when signed out", async () => {
+  it("is empty with no portfolios and unauthorized when signed out", async () => {
     h.client.listPortfolios = async () => [];
     expect(await api.loadPortfolio(async () => 1)).toMatchObject({
       status: "empty",
     });
     h.accessToken = null;
     expect(await api.loadPortfolio(async () => 1)).toMatchObject({
-      status: "unavailable",
+      status: "unauthorized",
     });
   });
 });
@@ -549,6 +594,28 @@ describe("aggregate + misc loaders", () => {
       throw new Error("x");
     };
     expect(await api.loadInstrument("i1")).toBeNull();
+  });
+
+  it("loadInstrumentResult only reports not_found for a real 404, never a transient error", async () => {
+    h.client.getInstrumentHistory = async () => [];
+    h.client.listCorporateActions = async () => [];
+    h.client.getInstrument = async () => ({ id: "i1" });
+    expect(await api.loadInstrumentResult("i1")).toMatchObject({ status: "ok" });
+
+    h.client.getInstrument = async () => {
+      throw Object.assign(new Error("nf"), { status: 404 });
+    };
+    expect(await api.loadInstrumentResult("i1")).toEqual({ status: "not_found" });
+
+    h.client.getInstrument = async () => {
+      throw Object.assign(new Error("rl"), { status: 429, retryAfter: 5 });
+    };
+    expect(await api.loadInstrumentResult("i1")).toEqual({ status: "rate_limited", retryAfter: 5 });
+
+    h.client.getInstrument = async () => {
+      throw new Error("network");
+    };
+    expect(await api.loadInstrumentResult("i1")).toEqual({ status: "unavailable" });
   });
 
   it("loadMe returns the user or null", async () => {

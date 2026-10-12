@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Layers, Plus, AlertCircle, AlertTriangle } from "lucide-react";
 import { Link } from "@/i18n/navigation";
@@ -208,15 +210,11 @@ export default async function HoldingsPage({
     </>
   );
 
-  if (result.status === "unavailable") {
+  if (result.status !== "ok" && result.status !== "empty") {
     return (
       <div className="space-y-5">
         {Heading}
-        <EmptyState
-          icon={Layers}
-          title={te("unavailableTitle")}
-          description={te("unavailableBody")}
-        />
+        <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={Layers} />
       </div>
     );
   }

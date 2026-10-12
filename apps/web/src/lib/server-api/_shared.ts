@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createApiClient } from "@portfolio/api-client";
 import type {
   ApiClient,
@@ -26,6 +26,8 @@ import {
 } from "@/lib/portfolio-selection";
 import { toApiRange, type InstrumentPriceRange } from "@/lib/instrument-price-range";
 import { accessTokenFromCookieHeader } from "@/lib/session-token";
+import { firstForwardedHop } from "@/lib/client-ip";
+import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
 export type Scope =
   | { kind: "all" }
@@ -70,7 +72,20 @@ const getServerApi = cache(async (): Promise<ApiClient | null> => {
     token = await accessTokenFromCookieHeader(cookieHeader);
   }
   if (!token) return null;
-  return createApiClient({ baseUrl: apiBaseUrl, getToken: () => token });
+  // Forward the end user's IP (first x-forwarded-for hop, as the browser proxy does).
+  // Without it every server-rendered page of every user reaches the API from this
+  // container's single IP. The API only trusts it from proxies in TRUSTED_PROXY_CIDRS.
+  let clientIp: string | null = null;
+  try {
+    clientIp = firstForwardedHop(await headers());
+  } catch {
+    // No request scope (e.g. a build-time render) — nothing to forward.
+  }
+  return createApiClient({
+    baseUrl: apiBaseUrl,
+    getToken: () => token,
+    ...(clientIp ? { headers: { "x-forwarded-for": clientIp } } : {}),
+  });
 });
 
 function normalizeCostBasis(
@@ -126,8 +141,7 @@ const getNetWorthCached = cache(
   },
 );
 
-export type NetWorthResult =
-  { status: "ok"; data: NetWorth } | { status: "empty" } | { status: "unavailable" };
+export type NetWorthResult = { status: "ok"; data: NetWorth } | { status: "empty" } | DataFailure;
 
 export interface PortfolioWithValue {
   portfolio: Portfolio;
@@ -188,7 +202,9 @@ export interface TransactionWithPortfolio extends Transaction {
 }
 
 export interface HoldingsView {
-  status: "ok" | "empty" | "unavailable";
+  status: "ok" | "empty" | DataFailureStatus;
+  /** Seconds to wait when `status` is `rate_limited` and the API said how long. */
+  retryAfter?: number | null;
   holdings: HoldingValuation[];
   displayCurrency: string;
   cash: Record<string, string>;
@@ -196,7 +212,7 @@ export interface HoldingsView {
 }
 
 export type PortfolioResult<T> =
-  { status: "ok"; portfolio: Portfolio; data: T } | { status: "empty" } | { status: "unavailable" };
+  { status: "ok"; portfolio: Portfolio; data: T } | { status: "empty" } | DataFailure;
 
 const ID_ALL_PORTFOLIOS_ID = "__id_all_portfolios__";
 
@@ -334,7 +350,7 @@ export async function loadHoldings(
   const api = await getServerApi();
   if (!api)
     return {
-      status: "unavailable",
+      status: "unauthorized",
       holdings: [],
       displayCurrency: "IDR",
       cash: {},
@@ -369,9 +385,11 @@ export async function loadHoldings(
       cash: data.cash,
       cashTracked: data.cashTracked,
     };
-  } catch {
+  } catch (err) {
+    const failure = classifyFailure(err);
     return {
-      status: "unavailable",
+      status: failure.status,
+      ...(failure.status === "rate_limited" ? { retryAfter: failure.retryAfter } : {}),
       holdings: [],
       displayCurrency: "IDR",
       cash: {},

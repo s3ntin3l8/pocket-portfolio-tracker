@@ -1,9 +1,9 @@
+import { DataState } from "@/components/data-state";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Wallet } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/empty-state";
 import { EditTransaction } from "@/components/edit-transaction";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import { loadTransactionsAcrossPortfolios } from "@/lib/server-api";
@@ -48,10 +48,11 @@ export default async function EditTransactionPage({
     return (
       <div className="space-y-6">
         {header(t("tx.editTitle"), t("tx.subtitle"))}
-        <EmptyState
+        <DataState
+          status={result.status}
+          retryAfter={result.retryAfter ?? null}
           icon={Wallet}
-          title={te("unavailableTitle")}
-          description={te("unavailableBody")}
+          empty={{ title: te("noTransactionsTitle"), description: te("noTransactionsBody") }}
         />
       </div>
     );

@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ScrollText } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -79,15 +81,11 @@ export default async function TradesPage({
     </>
   );
 
-  if (result.status === "unavailable") {
+  if (result.status !== "ok" && result.status !== "empty") {
     return (
       <div className="space-y-5">
         {Heading}
-        <EmptyState
-          icon={ScrollText}
-          title={te("unavailableTitle")}
-          description={te("unavailableBody")}
-        />
+        <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={ScrollText} />
       </div>
     );
   }

@@ -1,3 +1,5 @@
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,12 +58,11 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     return (
       <div className="space-y-5">
         {heading}
-        <EmptyState
+        <DataState
+          status={result.status}
+          retryAfter={retryAfterOf(result)}
           icon={Coins}
-          title={result.status === "unavailable" ? te("unavailableTitle") : te("noPortfolioTitle")}
-          description={
-            result.status === "unavailable" ? te("unavailableBody") : te("noPortfolioBody")
-          }
+          empty={{ title: te("noPortfolioTitle"), description: te("noPortfolioBody") }}
         />
       </div>
     );

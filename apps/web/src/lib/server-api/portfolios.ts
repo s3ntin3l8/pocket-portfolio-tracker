@@ -6,27 +6,26 @@ import {
   type PortfolioWithValue,
   type PortfolioResult,
 } from "./_shared";
+import { classifyFailure, type DataFailure } from "@/lib/data-status";
 
-export async function loadPortfoliosList(): Promise<{
-  status: "ok" | "unavailable";
-  portfolios: Portfolio[];
-}> {
+export async function loadPortfoliosList(): Promise<
+  { status: "ok"; portfolios: Portfolio[] } | (DataFailure & { portfolios: Portfolio[] })
+> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable", portfolios: [] };
+  if (!api) return { status: "unauthorized", portfolios: [] };
   try {
     const list = await listPortfoliosCached();
     return { status: "ok", portfolios: list };
-  } catch {
-    return { status: "unavailable", portfolios: [] };
+  } catch (err) {
+    return { ...classifyFailure(err), portfolios: [] };
   }
 }
 
-export async function loadPortfolios(): Promise<{
-  status: "ok" | "unavailable";
-  portfolios: PortfolioWithValue[];
-}> {
+export async function loadPortfolios(): Promise<
+  { status: "ok"; portfolios: PortfolioWithValue[] } | (DataFailure & { portfolios: [] })
+> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable", portfolios: [] };
+  if (!api) return { status: "unauthorized", portfolios: [] };
   try {
     const [list, values] = await Promise.all([listPortfoliosCached(), api.listPortfolioValues()]);
     const valueMap = new Map(values.map((v) => [v.id, v.netWorth]));
@@ -35,8 +34,8 @@ export async function loadPortfolios(): Promise<{
       netWorth: valueMap.get(portfolio.id) ?? "0",
     }));
     return { status: "ok", portfolios };
-  } catch {
-    return { status: "unavailable", portfolios: [] };
+  } catch (err) {
+    return { ...classifyFailure(err), portfolios: [] };
   }
 }
 
@@ -54,7 +53,7 @@ export async function loadPortfolio<T>(
   fn: (api: ApiClient, portfolio: Portfolio) => Promise<T>,
 ): Promise<PortfolioResult<T>> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable" };
+  if (!api) return { status: "unauthorized" };
   try {
     const portfolios = await listPortfoliosCached();
     if (portfolios.length === 0) return { status: "empty" };
@@ -62,7 +61,7 @@ export async function loadPortfolio<T>(
     const portfolio = portfolios.find((p) => p.id === wanted) ?? portfolios[0];
     const data = await fn(api, portfolio);
     return { status: "ok", portfolio, data };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return classifyFailure(err);
   }
 }

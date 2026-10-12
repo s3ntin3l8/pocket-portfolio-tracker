@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { DataState } from "@/components/data-state";
+import { retryAfterOf } from "@/lib/data-status";
 import { StatCard } from "@/components/stat-card";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { InstrumentPriceCard } from "@/components/instrument-price-card";
@@ -25,7 +27,7 @@ import { TransactionsTable, type TxRow } from "@/components/transactions-table";
 import { InstrumentLotsTable } from "@/components/instrument-lots-table";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
-  loadInstrument,
+  loadInstrumentResult,
   loadInstrumentScope,
   loadAnomalies,
   loadIncomeStats,
@@ -70,7 +72,7 @@ export default async function InstrumentPage({
   // blocking the whole page. The loaders that don't need costBasis are kicked off
   // immediately instead; only loadInstrumentScope waits on it.
   const prefsPromise = loadPreferences();
-  const instrumentPromise = loadInstrument(id);
+  const instrumentPromise = loadInstrumentResult(id);
   const anomaliesPromise = loadAnomalies();
   const incomeStatsPromise = loadIncomeStats();
   const mePromise = loadMe();
@@ -97,7 +99,7 @@ export default async function InstrumentPage({
         id,
       );
 
-  const [data, scope, allAnomalies, incomeStatsResult, txResult] = await Promise.all([
+  const [instrumentResult, scope, allAnomalies, incomeStatsResult, txResult] = await Promise.all([
     instrumentPromise,
     loadInstrumentScope(id, costBasis),
     anomaliesPromise,
@@ -158,7 +160,7 @@ export default async function InstrumentPage({
     </Button>
   );
 
-  if (!data) {
+  if (instrumentResult.status === "not_found") {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">{back}</div>
@@ -167,7 +169,21 @@ export default async function InstrumentPage({
     );
   }
 
-  const { instrument, history, corporateActions } = data;
+  // Transient failures (rate limit, expired session, API down) are never "not found".
+  if (instrumentResult.status !== "ok") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">{back}</div>
+        <DataState
+          status={instrumentResult.status}
+          retryAfter={retryAfterOf(instrumentResult)}
+          icon={LineChart}
+        />
+      </div>
+    );
+  }
+
+  const { instrument, history, corporateActions } = instrumentResult.data;
 
   // Prefer the provider-enriched presentation name (`Apple Inc.`) over the raw
   // broker/import `name` (which can be a description or just the ticker). Some providers

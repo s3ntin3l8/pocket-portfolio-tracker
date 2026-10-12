@@ -10,6 +10,7 @@ export * from "./server-api/portfolios";
 export * from "./server-api/tax";
 export * from "./server-api/transactions";
 export * from "./server-api/user";
+export { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
 // Re-export shared types/helpers used directly by consumers
 export {
@@ -36,6 +37,7 @@ export {
 } from "./server-api/_shared";
 
 // Remaining functions not extracted into domain modules
+import { classifyFailure, type DataFailure } from "@/lib/data-status";
 import type {
   Anomaly,
   PerformancePoint,
@@ -81,11 +83,11 @@ export async function loadNetworthAnomalies(): Promise<Anomaly[] | null> {
 export type ContributionsView =
   | { status: "ok"; data: ContributionStats; valueHistory: PerformancePoint[] }
   | { status: "empty" }
-  | { status: "unavailable" };
+  | DataFailure;
 
 export async function loadContributions(): Promise<ContributionsView> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable" };
+  if (!api) return { status: "unauthorized" };
   try {
     const portfolios = await listPortfoliosCached();
     if (portfolios.length === 0) return { status: "empty" };
@@ -106,19 +108,19 @@ export async function loadContributions(): Promise<ContributionsView> {
       // History unavailable — chart degrades gracefully.
     }
     return { status: "ok", data, valueHistory };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return classifyFailure(err);
   }
 }
 
 export type SparplanView =
   | { status: "ok"; data: SparplanStats; portfolioId: string | null }
   | { status: "empty" }
-  | { status: "unavailable" };
+  | DataFailure;
 
 export async function loadSparplan(): Promise<SparplanView> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable" };
+  if (!api) return { status: "unauthorized" };
   try {
     const portfolios = await listPortfoliosCached();
     if (portfolios.length === 0) return { status: "empty" };
@@ -129,20 +131,19 @@ export async function loadSparplan(): Promise<SparplanView> {
       ? await api.getPortfolioSparplan(selected.id)
       : await api.getSparplan(holderId);
     return { status: "ok", data, portfolioId: selected?.id ?? null };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return classifyFailure(err);
   }
 }
 
-export type TradeLogView =
-  { status: "ok"; data: TradeLog } | { status: "empty" } | { status: "unavailable" };
+export type TradeLogView = { status: "ok"; data: TradeLog } | { status: "empty" } | DataFailure;
 
 export async function loadTrades(
   method: TradeMethod = "average",
   costBasis?: "purchase_price" | "total_paid",
 ): Promise<TradeLogView> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable" };
+  if (!api) return { status: "unauthorized" };
   try {
     const portfolios = await listPortfoliosCached();
     if (portfolios.length === 0) return { status: "empty" };
@@ -153,17 +154,17 @@ export async function loadTrades(
       ? await api.getTrades(selected.id, method, costBasis)
       : await api.getNetWorthTrades(method, costBasis, holderId);
     return { status: "ok", data };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return classifyFailure(err);
   }
 }
 
 export type IncomeStatsView =
-  { status: "ok"; data: IncomeStats } | { status: "empty" } | { status: "unavailable" };
+  { status: "ok"; data: IncomeStats } | { status: "empty" } | DataFailure;
 
 export async function loadIncomeStats(): Promise<IncomeStatsView> {
   const api = await getServerApi();
-  if (!api) return { status: "unavailable" };
+  if (!api) return { status: "unauthorized" };
   try {
     const portfolios = await listPortfoliosCached();
     if (portfolios.length === 0) return { status: "empty" };
@@ -174,7 +175,7 @@ export async function loadIncomeStats(): Promise<IncomeStatsView> {
       ? await api.getPortfolioIncome(selected.id)
       : await api.getIncome(holderId);
     return { status: "ok", data };
-  } catch {
-    return { status: "unavailable" };
+  } catch (err) {
+    return classifyFailure(err);
   }
 }

@@ -1048,7 +1048,7 @@
     "ratio": "Ratio",
     "exDate": "Ex-date",
     "notFound": "Instrument not found",
-    "notFoundBody": "It may have been removed, or the API is unavailable.",
+    "notFoundBody": "It may have been removed or never existed.",
     "position": "Your position",
     "quantityLabel": "Quantity",
     "avgCostLabel": "Avg cost",
@@ -2390,5 +2390,15 @@
     "ogTitle": "Pocket — every asset, one clear number",
     "ogDescription": "Stocks, funds, gold, bonds and cash across every broker — one clear net-worth number.",
     "ogImageAlt": "Pocket holdings dashboard showing total portfolio value"
+  },
+  "DataState": {
+    "retry": "Retry",
+    "retryIn": "Retry in {seconds}s",
+    "unauthorizedTitle": "Your session expired",
+    "unauthorizedBody": "Sign in again to keep going. Your data is safe.",
+    "signIn": "Sign in",
+    "rateLimitedTitle": "Too many requests",
+    "rateLimitedBody": "The server asked us to slow down. You can retry in {seconds} seconds.",
+    "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry."
   }
 }

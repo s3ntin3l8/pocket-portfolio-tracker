@@ -1054,7 +1054,7 @@
     "ratio": "Rasio",
     "exDate": "Tanggal ex",
     "notFound": "Instrumen tidak ditemukan",
-    "notFoundBody": "Mungkin telah dihapus, atau API tidak tersedia.",
+    "notFoundBody": "Mungkin telah dihapus atau tidak pernah ada.",
     "position": "Posisi Anda",
     "quantityLabel": "Jumlah",
     "avgCostLabel": "Harga rata-rata",
@@ -2396,5 +2396,15 @@
     "ogTitle": "Pocket — semua aset, satu angka jelas",
     "ogDescription": "Saham, reksa dana, emas, obligasi, dan kas di semua broker — satu angka kekayaan bersih yang jelas.",
     "ogImageAlt": "Dasbor kepemilikan Pocket yang menampilkan total nilai portofolio"
+  },
+  "DataState": {
+    "retry": "Coba lagi",
+    "retryIn": "Coba lagi dalam {seconds}d",
+    "unauthorizedTitle": "Sesi Anda berakhir",
+    "unauthorizedBody": "Masuk lagi untuk melanjutkan. Data Anda aman.",
+    "signIn": "Masuk",
+    "rateLimitedTitle": "Terlalu banyak permintaan",
+    "rateLimitedBody": "Server meminta kami melambat. Anda dapat mencoba lagi dalam {seconds} detik.",
+    "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi."
   }
 }

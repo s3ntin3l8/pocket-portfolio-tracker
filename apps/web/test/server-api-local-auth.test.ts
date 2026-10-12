@@ -17,6 +17,7 @@ const h = vi.hoisted(() => {
 
 vi.mock("@portfolio/api-client", () => ({ createApiClient: () => h.client }));
 vi.mock("next/headers", () => ({
+  headers: async () => new Headers(),
   cookies: async () => ({
     getAll: () => [{ name: "__Secure-authjs.session-token", value: "encrypted-jwt" }],
   }),
