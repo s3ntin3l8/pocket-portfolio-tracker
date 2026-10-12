@@ -212,6 +212,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     let sub: string | undefined;
     let email: string | undefined;
     let isAdmin = false;
+    let emailVerified = false;
     let authMethod: AuthedUser["authMethod"] | undefined;
     let tokenIssuedAt: number | undefined;
 
@@ -232,6 +233,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
           const groups = Array.isArray(payload.groups) ? payload.groups : [];
           const adminGroup = app.config.AUTHENTIK_ADMIN_GROUP;
           isAdmin = adminGroup !== "" && groups.includes(adminGroup);
+          emailVerified = payload.email_verified === true;
           authMethod = "jwt";
         }
       } catch {
@@ -302,6 +304,11 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         // untouched; admin can reconcile out-of-band.
         if (!existing || !existing.authSub.startsWith("local|")) {
           return reply.code(401).send({ error: "invalid_token" });
+        }
+        // Rebinding a local account by e-mail alone is only safe when the IdP vouches
+        // for the address; an unverified claim could be set to match any local user.
+        if (!emailVerified) {
+          return reply.code(401).send({ error: "email_unverified" });
         }
         const [migratedRow] = await app.db
           .update(users)

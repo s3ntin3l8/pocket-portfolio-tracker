@@ -93,18 +93,47 @@ describe("findOrCreateInstrument", () => {
       .insert(instruments)
       .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
 
-    const healed = await findOrCreateInstrument(getDb(), {
-      symbol: "O",
-      market: "US",
-      assetClass: "equity",
-      unit: "shares",
-      currency: "USD",
-      name: "Realty Income",
-      isin,
-    });
+    const healed = await findOrCreateInstrument(
+      getDb(),
+      {
+        symbol: "O",
+        market: "US",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "USD",
+        name: "Realty Income",
+        isin,
+      },
+      { actor: { isAdmin: true } },
+    );
     expect(healed.symbol).toBe("O");
     expect(healed.market).toBe("US");
     expect(healed.currency).toBe("USD");
+  });
+
+  it("does not re-pin or change assetClass for a non-admin actor (tier 2 is admin-only)", async () => {
+    const isin = "XF000ETH0013";
+    await getDb()
+      .insert(instruments)
+      .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
+
+    const unchanged = await findOrCreateInstrument(
+      getDb(),
+      {
+        symbol: "ETH",
+        market: "CRYPTO",
+        assetClass: "crypto",
+        unit: "shares",
+        currency: "EUR",
+        name: "Ether",
+        isin,
+      },
+      { actor: { isAdmin: false } },
+    );
+    // Tier 1 still applies (ISIN-as-symbol -> ticker); tier 2 does not.
+    expect(unchanged.symbol).toBe("ETH");
+    expect(unchanged.market).toBe("XETRA");
+    expect(unchanged.assetClass).toBe("equity");
   });
 
   it("re-pins a TR crypto holding stuck on Xetra/EUR to CRYPTO (currency kept)", async () => {
@@ -113,15 +142,19 @@ describe("findOrCreateInstrument", () => {
       .insert(instruments)
       .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
 
-    const healed = await findOrCreateInstrument(getDb(), {
-      symbol: "BTC",
-      market: "CRYPTO",
-      assetClass: "crypto",
-      unit: "shares",
-      currency: "EUR",
-      name: "Bitcoin",
-      isin,
-    });
+    const healed = await findOrCreateInstrument(
+      getDb(),
+      {
+        symbol: "BTC",
+        market: "CRYPTO",
+        assetClass: "crypto",
+        unit: "shares",
+        currency: "EUR",
+        name: "Bitcoin",
+        isin,
+      },
+      { actor: { isAdmin: true } },
+    );
     expect(healed.symbol).toBe("BTC");
     expect(healed.market).toBe("CRYPTO");
     expect(healed.assetClass).toBe("crypto");
@@ -214,15 +247,19 @@ describe("findOrCreateInstrument", () => {
         isin,
       });
 
-    const healed = await findOrCreateInstrument(getDb(), {
-      symbol: "AMZN",
-      market: "US",
-      assetClass: "equity",
-      unit: "shares",
-      currency: "USD",
-      name: "Amazon.com Inc",
-      isin,
-    });
+    const healed = await findOrCreateInstrument(
+      getDb(),
+      {
+        symbol: "AMZN",
+        market: "US",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "USD",
+        name: "Amazon.com Inc",
+        isin,
+      },
+      { actor: { isAdmin: true } },
+    );
     expect(healed.market).toBe("US");
     expect(healed.currency).toBe("USD");
   });

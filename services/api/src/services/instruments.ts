@@ -12,25 +12,36 @@ type Instrument = typeof instruments.$inferSelect;
  * strictly better — so a row created before ISIN/asset-class resolution worked (e.g. an
  * ISIN stored as the symbol, or a UCITS ETF mislabelled `mutual_fund`) self-heals on the
  * next import instead of staying stuck. Only upgrades; never downgrades.
+ *
+ * Two tiers, because `instruments` is shared reference data feeding every user's
+ * valuations. Tier 1 (anyone): same-family refinements (`mutual_fund` -> `etf`,
+ * ISIN-as-symbol -> ticker, ISIN/WKN and bond-term null back-fill). Tier 2 (admin
+ * only): cross-family `assetClass` changes and `market`/`currency` re-pins. Tier-2
+ * fields are reported in `tier2` so the caller can audit-log them.
  */
 function instrumentUpgrade(
   existing: Instrument,
   input: Omit<InstrumentInput, "isin" | "wkn"> & { isin?: string | null; wkn?: string | null },
-): Partial<
-  Pick<
-    Instrument,
-    | "symbol"
-    | "assetClass"
-    | "market"
-    | "currency"
-    | "isin"
-    | "wkn"
-    | "faceValue"
-    | "couponRate"
-    | "couponSchedule"
-    | "maturityDate"
-  >
-> {
+  isAdmin: boolean,
+): {
+  set: Partial<
+    Pick<
+      Instrument,
+      | "symbol"
+      | "assetClass"
+      | "market"
+      | "currency"
+      | "isin"
+      | "wkn"
+      | "faceValue"
+      | "couponRate"
+      | "couponSchedule"
+      | "maturityDate"
+    >
+  >;
+  tier2: string[];
+} {
+  const tier2: string[] = [];
   const set: Partial<
     Pick<
       Instrument,
@@ -54,8 +65,15 @@ function instrumentUpgrade(
     input.assetClass !== existing.assetClass &&
     input.assetClass !== "equity" &&
     (existing.assetClass === "equity" || existing.assetClass === "mutual_fund")
-  )
-    set.assetClass = input.assetClass;
+  ) {
+    const sameFamily = existing.assetClass === "mutual_fund" && input.assetClass === "etf";
+    if (sameFamily) {
+      set.assetClass = input.assetClass;
+    } else if (isAdmin) {
+      set.assetClass = input.assetClass;
+      tier2.push("assetClass");
+    }
+  }
   // Re-pin a row stuck on the EU-broker default (Xetra/EUR) OR on an unrecognised market
   // (e.g. a legacy row with market "PE" from a raw provider exchange code) to its real
   // tradeable venue when a fresh import resolves one our providers price directly (US stocks,
@@ -67,9 +85,10 @@ function instrumentUpgrade(
     (existing.market === "XETRA" && existing.currency === "EUR") ||
     !isKnownMarket(existing.market)
   ) {
-    if (PRICEABLE_FOREIGN_MARKETS.has(input.market)) {
+    if (isAdmin && PRICEABLE_FOREIGN_MARKETS.has(input.market)) {
       set.market = input.market;
       set.currency = input.currency;
+      tier2.push("market", "currency");
     }
   }
   // Back-fill missing ISIN/WKN when the input carries one.
@@ -96,7 +115,7 @@ function instrumentUpgrade(
     if (existing.maturityDate == null && input.maturityDate !== undefined)
       set.maturityDate = input.maturityDate;
   }
-  return set;
+  return { set, tier2 };
 }
 
 /** Apply an upgrade if non-empty, returning the (possibly updated) row. */
@@ -104,9 +123,16 @@ async function healInstrument(
   db: DB,
   existing: Instrument,
   input: Omit<InstrumentInput, "isin" | "wkn"> & { isin?: string | null; wkn?: string | null },
+  opts?: FindOrCreateOpts,
 ): Promise<Instrument> {
-  const set = instrumentUpgrade(existing, input);
+  const { set, tier2 } = instrumentUpgrade(existing, input, opts?.actor?.isAdmin === true);
   if (Object.keys(set).length === 0) return existing;
+  if (tier2.length > 0) {
+    opts?.log?.info(
+      { instrumentId: existing.id, userId: opts.actor?.userId, fields: tier2, set },
+      "instrument tier-2 upgrade applied by admin",
+    );
+  }
   const [updated] = await db
     .update(instruments)
     .set(set)
@@ -143,6 +169,14 @@ export function marketForEuInstrument(_assetClass?: string | null): string {
  *   an import.
  */
 export interface FindOrCreateOpts {
+  /**
+   * Who is asking. Cross-family `assetClass` changes and `market`/`currency` re-pins on an
+   * existing shared row require `isAdmin: true`; omitted means non-admin (fail-closed).
+   * Background/import paths pass `{ isAdmin: false }`.
+   */
+  actor?: { isAdmin: boolean; userId?: string };
+  /** Logger used to record tier-2 (admin-only) upgrades. */
+  log?: { info: (obj: object, msg: string) => void };
   resolveMarket?: (isin: string) => Promise<{ market: string; currency: string } | null>;
 }
 
@@ -167,7 +201,7 @@ export async function findOrCreateInstrument(
       .from(instruments)
       .where(eq(instruments.isin, input.isin))
       .limit(1);
-    if (byIsin) return healInstrument(db, byIsin, input);
+    if (byIsin) return healInstrument(db, byIsin, input, opts);
   }
 
   if (input.wkn) {
@@ -176,7 +210,7 @@ export async function findOrCreateInstrument(
       .from(instruments)
       .where(eq(instruments.wkn, input.wkn))
       .limit(1);
-    if (byWkn) return healInstrument(db, byWkn, input);
+    if (byWkn) return healInstrument(db, byWkn, input, opts);
   }
 
   // Correct an unrecognised market before the (symbol, market) identity lookup and
@@ -202,7 +236,7 @@ export async function findOrCreateInstrument(
     .from(instruments)
     .where(and(eq(instruments.symbol, input.symbol), eq(instruments.market, market)))
     .limit(1);
-  if (existing) return healInstrument(db, existing, input);
+  if (existing) return healInstrument(db, existing, input, opts);
 
   const [created] = await db
     .insert(instruments)

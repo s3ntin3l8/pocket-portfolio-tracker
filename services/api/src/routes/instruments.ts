@@ -323,6 +323,8 @@ export async function instrumentsRoute(app: FastifyInstance) {
     const input = instrumentInputSchema.parse(request.body);
     const md = await getMarketData();
     const instrument = await findOrCreateInstrument(app.db, input, {
+      actor: { isAdmin: request.user?.isAdmin === true, userId: request.userId },
+      log: request.log,
       resolveMarket: async (isin) => {
         const [hit] = await md.search(isin);
         return hit ? { market: hit.market, currency: hit.currency } : null;

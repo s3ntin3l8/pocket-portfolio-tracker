@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { sql } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { adminAuditLog, importSettings } from "@portfolio/db";
 import { importSettingsUpdateSchema } from "@portfolio/schema";
 import { getImportStrategy, IMPORT_SETTINGS_ID } from "../services/import-settings.js";
@@ -34,8 +34,7 @@ export async function adminRoute(app: FastifyInstance) {
 
   // Recent admin actions (newest first, capped to 100 entries for the UI).
   app.get("/admin/audit", { preHandler: app.requireAdmin }, async () => {
-    const rows = await app.db.select().from(adminAuditLog).orderBy(adminAuditLog.at).limit(100);
-    return rows.reverse();
+    return app.db.select().from(adminAuditLog).orderBy(desc(adminAuditLog.at)).limit(100);
   });
 
   // ─── Scraper trigger ─────────────────────────────────────────────────────
