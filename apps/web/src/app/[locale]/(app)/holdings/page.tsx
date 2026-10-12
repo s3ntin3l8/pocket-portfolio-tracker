@@ -13,6 +13,7 @@ import { AllocationCard } from "@/components/holdings/allocation-card";
 import { PortfolioValueCard, type Tone } from "@/components/holdings/portfolio-value-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { PositionsPanel } from "@/components/holdings/positions-panel";
+import { FxMissingBanner, collectFxMissing } from "@/components/fx-missing-banner";
 import {
   loadHoldings,
   loadAnomalies,
@@ -291,9 +292,16 @@ export default async function HoldingsPage({
   const summary = netWorthResult.status === "ok" ? netWorthResult.data : null;
   const allocation = summary?.allocation;
 
+  // Currencies with no FX rate (audit B2): their holdings are left out of the totals.
+  const fxMissing = collectFxMissing(
+    summary,
+    result.status === "ok" ? (result as { fxMissingCurrencies?: string[] }) : null,
+  );
+
   return (
     <div className="space-y-5">
       {Heading}
+      <FxMissingBanner currencies={fxMissing} />
 
       {/* ── Hero chart: full-width above the table ── */}
       {summary && (

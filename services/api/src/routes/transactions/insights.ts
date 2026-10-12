@@ -11,6 +11,7 @@ import {
   sortinoRatio,
   streakAnalysis,
   maxDrawdown,
+  fxAvailable,
 } from "@portfolio/core";
 import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { getMarketData } from "../../services/market-data.js";
@@ -91,6 +92,12 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         const currencies = [...new Set([...snapshots.map((r) => r.currency), bmConfig.currency])];
         const dates = [...new Set(snapshots.map((r) => r.date))];
         const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates);
+        // Snapshot rows whose currency has no rate are left out (never 1:1, audit B2) and
+        // reported as fxMissingCurrencies; rates carry over the whole date grid, so this
+        // drops a portfolio leg consistently rather than single days.
+        const convertibleSnapshots = snapshots.filter((r) =>
+          fxAvailable(r.currency, display, makeFxRateFn(ratesByDate.get(r.date) ?? {}, display)),
+        );
 
         const perPortfolio = new Map<
           string,
@@ -102,7 +109,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
             currency: string;
           }[]
         >();
-        for (const r of snapshots) {
+        for (const r of convertibleSnapshots) {
           const list = perPortfolio.get(r.portfolioId) ?? [];
           list.push(r);
           perPortfolio.set(r.portfolioId, list);
@@ -218,17 +225,22 @@ export function registerInsightsRoutes(app: FastifyInstance) {
           const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
           if (refreshedBm.size > 1) {
             let bmFxMissingDates = 0;
+            // Benchmark days with no FX rate are dropped (never 1:1, audit B2) and the
+            // currency reported as fxMissingCurrencies.
             const bmPrices = bmDates
               .filter((d) => refreshedBm.has(d))
-              .map((d) => {
-                const dayRates = ratesByDate.get(d) ?? {};
-                if (bmConfig.currency !== display && !dayRates[bmConfig.currency])
+              .flatMap((d) => {
+                const fx = makeFxRateFn(ratesByDate.get(d) ?? {}, display);
+                if (!fxAvailable(bmConfig.currency, display, fx)) {
                   bmFxMissingDates++;
-                const fx = makeFxRateFn(dayRates, display);
-                return {
-                  date: d,
-                  close: convert(refreshedBm.get(d)!, bmConfig.currency, display, fx),
-                };
+                  return [];
+                }
+                return [
+                  {
+                    date: d,
+                    close: convert(refreshedBm.get(d)!, bmConfig.currency, display, fx),
+                  },
+                ];
               });
             if (bmFxMissingDates > 0) {
               app.log.warn(
@@ -239,7 +251,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
                   display,
                   missingDates: bmFxMissingDates,
                 },
-                "insights: benchmark FX rate missing for some dates — those days left unconverted",
+                "insights: benchmark FX rate missing for some dates — those days dropped",
               );
             }
             const bmIndex = computeBenchmarkIndex(bmPrices);

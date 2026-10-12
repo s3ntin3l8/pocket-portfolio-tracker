@@ -1,8 +1,11 @@
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { fxRates } from "@portfolio/db";
-import { toDateKey, type FxRateFn } from "@portfolio/core";
+import { FX_MAX_CARRY_FORWARD_DAYS, toDateKey, type FxRateFn } from "@portfolio/core";
 import type { DB } from "../db/client.js";
+import { recordFxMissing } from "../lib/fx-missing.js";
+
+export { recordFxMissing } from "../lib/fx-missing.js";
 
 /** Live FX source: returns the rate to convert 1 `from` into `to`, or null. */
 export interface FxProvider {
@@ -139,10 +142,9 @@ async function cacheFxRate(
  * Read-through FX cache: returns each foreign currency's rate to `base`, served
  * from today's fx_rates rows and back-filled live via the provider. A currency the
  * provider can't serve right now (outage, holiday morning before the ECB fix) falls
- * back to its most recent cached rate on or before today — the same carry-forward
- * {@link getFxRatesForDates} applies to historical dates (audit B2). Currencies with
- * no rate at all are omitted; {@link makeFxRateFn} then reports them as missing
- * (null), never as 1:1.
+ * back to its most recent cached rate on or before today, within
+ * `FX_MAX_CARRY_FORWARD_DAYS` (audit B2). Currencies with no rate in that window are
+ * omitted; {@link makeFxRateFn} then reports them as missing (null), never as 1:1.
  */
 export async function getFxRates(
   db: DB,
@@ -173,14 +175,23 @@ export async function getFxRates(
     }
   }
 
-  // Carry forward: the latest cached rate on or before today for anything still missing.
+  // Carry forward: the latest cached rate on or before today for anything still missing —
+  // bounded to FX_MAX_CARRY_FORWARD_DAYS, so an old rate is reported missing (excluded,
+  // `fxMissingCurrencies`) rather than presented as today's.
   const stillMissing = foreign.filter((c) => !(c in out));
   if (stillMissing.length > 0) {
+    const oldest = new Date(`${today}T00:00:00.000Z`);
+    oldest.setUTCDate(oldest.getUTCDate() - FX_MAX_CARRY_FORWARD_DAYS);
     const prior = await db
       .select()
       .from(fxRates)
       .where(
-        and(eq(fxRates.quote, base), lte(fxRates.date, today), inArray(fxRates.base, stillMissing)),
+        and(
+          eq(fxRates.quote, base),
+          lte(fxRates.date, today),
+          gte(fxRates.date, toDateKey(oldest)),
+          inArray(fxRates.base, stillMissing),
+        ),
       )
       .orderBy(desc(fxRates.date));
     for (const r of prior) {
@@ -272,13 +283,16 @@ export async function getFxRatesForDates(
 /**
  * Build a synchronous FxRateFn from a foreign→base rate map (for valuation). An
  * unknown pair returns `null` (audit B2) — never "1", which used to silently count
- * e.g. an IDR amount as EUR. `convert()` throws on it; valuation paths check
- * `fxAvailable`/`tryConvert` first and flag the affected amounts (`fxMissing`).
+ * e.g. an IDR amount as EUR — and records the `from` currency into the request's
+ * missing-FX scope. Callers exclude what they can't convert (`fxAvailable`/
+ * `tryConvert`/`partitionConvertible`) and the response reports `fxMissingCurrencies`;
+ * a bare `convert()` throws `FxRateMissingError` as a last resort.
  */
 export function makeFxRateFn(rates: Record<string, string>, base: string): FxRateFn {
   return (from, to) => {
     if (from === to) return "1";
     if (to === base && rates[from]) return rates[from];
+    recordFxMissing([from]);
     return null;
   };
 }

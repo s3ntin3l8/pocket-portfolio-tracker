@@ -2413,5 +2413,9 @@
     "rateLimitedTitle": "Too many requests",
     "rateLimitedBody": "The server asked us to slow down. You can retry in {seconds} seconds.",
     "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry."
+  },
+  "FxMissing": {
+    "title": "Exchange rate missing.",
+    "body": "No exchange rate is available for {currencies}, so {count, plural, one {amounts in that currency are} other {amounts in those currencies are}} left out of the totals here instead of being converted 1:1. They'll be included once a rate is available."
   }
 }

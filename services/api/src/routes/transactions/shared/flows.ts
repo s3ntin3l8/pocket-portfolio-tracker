@@ -8,6 +8,7 @@ import {
   cashFlow,
   boundaryFlowPoints,
   transferFlowPoints,
+  partitionConvertible,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
 
@@ -37,12 +38,15 @@ import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
  */
 export async function boundaryFlows(
   app: FastifyInstance,
-  txns: CoreTransaction[],
+  allTxns: CoreTransaction[],
   boundary: "inside" | "outside",
   target: string,
 ): Promise<CashFlowPoint[]> {
-  const rates = await getFxRates(app.db, [...new Set(txns.map((t) => t.currency))], target);
+  const rates = await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], target);
   const fx = makeFxRateFn(rates, target);
+  // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies; the
+  // matching value (summary net worth) excludes the same currencies.
+  const txns = partitionConvertible(allTxns, target, fx).convertible;
 
   if (boundary === "inside") {
     return boundaryFlowPoints(txns, "inside", target, fx);

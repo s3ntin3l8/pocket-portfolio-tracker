@@ -121,8 +121,11 @@ describe("transactions summary FX conversion (#593)", () => {
     expect(summary.totalProceeds).toBe("4000000");
     expect(summary.totalIncome).toBe("320000");
 
-    // A third currency with no rate at all (none cached, no provider under test) is no
-    // longer counted 1:1 (audit B2) — the summary fails loudly with a stable code.
+    // A third currency with no rate at all (none cached, no provider under test) is
+    // excluded from the converted totals and reported — never counted 1:1 (which would
+    // read as 21,000,100) and never a failed request (audit B2).
+    // These POSTs are non-GET writes, so the app's onResponse hook clears the derivation
+    // cache — the GET below recomputes instead of replaying the first GET's cached body.
     const sgdBook = await createPortfolio(t, "SGD book", "SGD");
     await postTx(t, sgdBook, { type: "buy", quantity: "1", price: "100", currency: "SGD" });
     const missing = await app.inject({
@@ -130,8 +133,12 @@ describe("transactions summary FX conversion (#593)", () => {
       url: "/networth/transactions?page=1&pageSize=25",
       headers: auth(t),
     });
-    expect(missing.statusCode).toBe(503);
-    expect(missing.json()).toMatchObject({ error: "fx_rate_missing", from: "SGD", to: "IDR" });
+    expect(missing.statusCode).toBe(200);
+    const body = missing.json();
+    expect(body.fxMissingCurrencies).toEqual(["SGD"]);
+    expect(missing.headers["x-fx-missing-currencies"]).toBe("SGD");
+    expect(body.summary.totalInvested).toBe("21000000");
+    expect(body.summary.fxMissingCurrencies).toEqual(["SGD"]);
   });
 
   it("single-portfolio summary converts a foreign-currency row to the portfolio's base currency", async () => {

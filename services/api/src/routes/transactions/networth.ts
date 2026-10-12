@@ -9,6 +9,7 @@ import {
   type CashFlowPoint,
   convert,
   toDateKey,
+  fxAvailable,
 } from "@portfolio/core";
 import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { loadSparklines } from "../../services/sparklines.js";
@@ -159,6 +160,9 @@ export function registerNetworthRoutes(app: FastifyInstance) {
             snap.date,
           ]);
           const fx = makeFxRateFn(ratesByDate.get(snap.date) ?? {}, display);
+          // No rate: treat like a missing snapshot — the period figures are withheld
+          // rather than built on a 1:1 start NAV (audit B2); reported as fxMissingCurrencies.
+          if (!fxAvailable(snap.currency, display, fx)) return null;
           return {
             nav: Number(convert(snap.netWorth, snap.currency, display, fx)),
             date: snap.date,

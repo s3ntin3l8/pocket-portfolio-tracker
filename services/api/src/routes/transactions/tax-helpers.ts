@@ -19,8 +19,9 @@ import {
   convert,
   toDateKey,
   indonesianFinalTax,
+  excludeMissingFx,
 } from "@portfolio/core";
-import { getFxRates, makeFxRateFn } from "../../services/fx.js";
+import { getFxRates, makeFxRateFn, recordFxMissing } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 
 export async function lossCarryForwardFor(
@@ -167,7 +168,9 @@ export async function restOfYearForecastGross(
   if (allCcys.size === 0) return "0";
 
   const rates = await getFxRates(app.db, [...allCcys], display);
-  const fx = makeFxRateFn(rates, display);
+  // A projection is a pure sum: unconvertible amounts are excluded (audit B2) and
+  // reported via the request's fxMissingCurrencies.
+  const fx = excludeMissingFx(makeFxRateFn(rates, display));
 
   let totalGross = 0;
 
@@ -238,13 +241,16 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   const { tradeLog, coreTxns, year, metaById, displayCurrency, fxRates } = input;
   const ZERO = "0";
 
-  // Native-currency → display-currency. Returns the same amount when source currency
-  // is already the display currency (or no rate is registered — accepts the imprecision
-  // on that one bucket rather than throwing on the entire report).
+  // Native-currency → display-currency. A source currency with no registered rate is
+  // excluded (0) and reported via the request's fxMissingCurrencies (audit B2) — never
+  // counted 1:1, and never a failed report.
   const fxTo = (amount: Decimal, fromCurrency: string): Decimal => {
     if (fromCurrency === displayCurrency) return amount;
     const rate = fxRates.get(fromCurrency);
-    if (rate === undefined) return amount;
+    if (rate === undefined) {
+      recordFxMissing([fromCurrency]);
+      return new Decimal(0);
+    }
     return amount.mul(rate);
   };
 

@@ -9,6 +9,8 @@ import {
   netWorth,
   summarizePortfolio,
   aggregatePortfolios,
+  partitionConvertible,
+  excludeMissingFx,
   projectCoupons,
   projectDividends,
   trailingIncomeByInstrument,
@@ -1155,5 +1157,46 @@ describe("summarizePortfolio — missing FX rate (audit B2)", () => {
     const agg = aggregatePortfolios([a, b], "IDR");
     expect(agg.fxMissingCurrencies).toEqual(["EUR"]);
     expect(agg.holdings[0].fxMissing).toBe(true);
+  });
+});
+
+describe("partitionConvertible / excludeMissingFx (audit B2)", () => {
+  const noUsd = (from: string, to: string): string | null =>
+    from === to ? "1" : from === "EUR" ? "17000" : null;
+
+  it("drops whole instruments with any unconvertible currency, and unconvertible cash rows", () => {
+    const usdBuy = tx({
+      instrumentId: "u",
+      type: "buy",
+      currency: "USD",
+      quantity: "1",
+      price: "1",
+    });
+    const usdDiv = tx({ instrumentId: "u", type: "dividend", currency: "USD", price: "1" });
+    const eurBuy = tx({
+      instrumentId: "e",
+      type: "buy",
+      currency: "EUR",
+      quantity: "1",
+      price: "1",
+    });
+    // Bought in EUR but quoted in USD → dropped too (its value can't be expressed).
+    const eurBuyUsdQuote = tx({ instrumentId: "q", type: "buy", currency: "EUR", price: "1" });
+    const usdCash = tx({ instrumentId: null, type: "deposit", currency: "USD", price: "5" });
+    const idrCash = tx({ instrumentId: null, type: "deposit", currency: "IDR", price: "5" });
+    const { convertible, missing } = partitionConvertible(
+      [usdBuy, usdDiv, eurBuy, eurBuyUsdQuote, usdCash, idrCash],
+      "IDR",
+      noUsd,
+      (id) => (id === "q" ? "USD" : undefined),
+    );
+    expect(convertible).toEqual([eurBuy, idrCash]);
+    expect(missing).toEqual(["USD"]);
+  });
+
+  it("excludeMissingFx turns a missing rate into 0 for pure sums", () => {
+    const fx = excludeMissingFx(noUsd);
+    expect(fx("USD", "IDR")).toBe("0");
+    expect(fx("EUR", "IDR")).toBe("17000");
   });
 });

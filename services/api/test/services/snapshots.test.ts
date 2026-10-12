@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import {
+  fxRates as fxRatesTable,
   instruments,
   portfolioIntradaySnapshots,
   portfolios,
@@ -806,5 +807,56 @@ describe("recordDailySnapshots — depot transfers (audit B1)", () => {
       })),
     );
     for (const pt of index) expect(Number(pt.pct)).toBeCloseTo(0, 9);
+  });
+});
+
+describe("recordDailySnapshots — flows converted to the base currency", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("FX-converts a foreign-currency trade's flow (it used to be added in the trade currency)", async () => {
+    const db = getDb();
+    const date = "2026-05-04";
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "flow-fx-user", email: "flow-fx@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "FlowFx", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "FLOWFX",
+        market: "XETRA",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "EUR stock",
+      })
+      .returning();
+    await db.insert(fxRatesTable).values({ base: "EUR", quote: "IDR", rate: "17000", date });
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: new Date(`${date}T09:00:00.000Z`),
+    });
+    const svc = new MarketDataService([new FixtureProvider({ FLOWFX: "100" })]);
+    await recordDailySnapshots(db, svc, 0, new Date(`${date}T16:00:00.000Z`));
+    const [row] = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, p.id));
+    // 10 × 100 EUR × 17,000 in both market value and the inception flow — not 1,000.
+    expect(row.marketValue).toBe("17000000");
+    expect(row.effectiveFlow).toBe("17000000");
   });
 });

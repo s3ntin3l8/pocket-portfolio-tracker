@@ -140,13 +140,21 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   at price 0 with `attention: ["needs_cost_basis"]`; both confirm paths
   (`/imports/:id/confirm`, `…/transactions/resolve-drafts`) refuse a price-0 `transfer_in` with 400
   `transfer_cost_basis_required` until the user enters it (#818).
-- **A missing FX rate is never 1:1.** `getFxRates`/`getFxRatesForDates` carry the latest cached
-  rate forward; if a currency still has none, `makeFxRateFn` returns `null` and `convert()` throws
-  `FxRateMissingError` (mapped to a 503 `fx_rate_missing`). `summarizePortfolio` instead flags the
-  affected holdings `fxMissing` (display values null, excluded from totals — no sane number exists,
-  unlike `valuedAtCost`) and lists `fxMissingCurrencies`; the daily/intraday snapshot jobs skip
-  such a portfolio for the day rather than persist a partial value (#816). New FX consumers: use
-  `tryConvert`/`fxAvailable` where degrading is better than failing, never a `?? "1"` fallback.
+- **A missing FX rate is never 1:1 and never a failed request — it is a flagged exclusion.**
+  `getFxRates`/`getFxRatesForDates` carry the latest cached rate forward (`getFxRates` only within
+  `FX_MAX_CARRY_FORWARD_DAYS` = 14, `packages/core/src/sanity-gates.ts` — an older rate counts as
+  missing, never shown as today's); if a currency still has none, `makeFxRateFn` returns `null` and records the currency in a request-scoped set
+  (`services/api/src/lib/fx-missing.ts`, opened per request in `app.ts`). Every consumer excludes
+  what it can't convert — `summarizePortfolio` flags holdings `fxMissing` (display values null,
+  out of every total; unlike `valuedAtCost` there is no sane number) and lists
+  `fxMissingCurrencies`; per-transaction consumers use `partitionConvertible` (drops whole
+  instruments, so no cost basis is split), pure sums `excludeMissingFx`, row/series consumers
+  `fxAvailable`/`tryConvert` — and the response is a 200 carrying `fxMissingCurrencies` (top-level
+  on object responses, plus the `x-fx-missing-currencies` header on every shape; cached
+  derivations replay it). The web shows `FxMissingBanner` when it's non-empty. The daily/intraday
+  snapshot jobs and the backfill skip a portfolio rather than persist a partial value (#816).
+  `convert()` still throws `FxRateMissingError` as a last resort — reaching it is a bug (logged).
+  Never add a `?? "1"` fallback.
 - **A holding with no usable market price is valued at cost basis, not skipped/zero.**
   Nothing economic happened on the day a price feed goes silent, so treating it as worth 0
   understates net worth by the whole cost basis, not by the (unknown) gain/loss since purchase.

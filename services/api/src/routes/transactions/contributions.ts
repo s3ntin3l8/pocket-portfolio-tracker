@@ -9,6 +9,7 @@ import {
   aggregatePortfolios,
   contributionStats,
   type CashFlowPoint,
+  partitionConvertible,
 } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
@@ -144,8 +145,14 @@ export function registerContributionsRoutes(app: FastifyInstance) {
             await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], display),
             display,
           );
+          // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies.
           const perPortfolio = loaded.map(({ txns, boundary }) =>
-            contributionStats({ txns, displayCurrency: display, fx, boundary }),
+            contributionStats({
+              txns: partitionConvertible(txns, display, fx).convertible,
+              displayCurrency: display,
+              fx,
+              boundary,
+            }),
           );
           const flowsByPortfolio = await mapPool(
             loaded,

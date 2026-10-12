@@ -2419,5 +2419,9 @@
     "rateLimitedTitle": "Terlalu banyak permintaan",
     "rateLimitedBody": "Server meminta kami melambat. Anda dapat mencoba lagi dalam {seconds} detik.",
     "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi."
+  },
+  "FxMissing": {
+    "title": "Kurs tidak tersedia.",
+    "body": "Tidak ada kurs untuk {currencies}, sehingga jumlah dalam mata uang tersebut tidak dihitung dalam total di sini, alih-alih dikonversi 1:1. Jumlah tersebut akan disertakan setelah kurs tersedia."
   }
 }

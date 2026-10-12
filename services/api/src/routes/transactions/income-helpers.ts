@@ -15,6 +15,7 @@ import {
   type CoreTransaction,
   type PortfolioSummary,
   convert,
+  excludeMissingFx,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import { corporateActionsFor, instrumentMeta } from "./shared.js";
@@ -32,7 +33,9 @@ export async function buildIncomeStats(
 
   const ccys = [...new Set([...incomeTxns, ...interestTxns].map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
-  const fx = makeFxRateFn(rates, display);
+  // Income figures are pure sums: an amount with no FX rate is excluded (contributes 0)
+  // and its currency reported as fxMissingCurrencies — never 1:1, never a failed request.
+  const fx = excludeMissingFx(makeFxRateFn(rates, display));
 
   const meta = await instrumentMeta(app, [
     ...incomeTxns.map((t) => t.instrumentId),

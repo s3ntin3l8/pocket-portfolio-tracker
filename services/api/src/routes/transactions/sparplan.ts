@@ -19,6 +19,7 @@ import {
   harvestSuggestions,
   type DriftRow,
   type TradeAction,
+  partitionConvertible,
 } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
@@ -320,7 +321,9 @@ export function registerSparplanRoutes(app: FastifyInstance) {
               const ccys = [...new Set(coreTxns.map((t) => t.currency))];
               const rates = await getFxRates(app.db, ccys, display);
               const fx = makeFxRateFn(rates, display);
-              return detectSparplans({ txns: coreTxns, displayCurrency: display, fx });
+              // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies.
+              const { convertible } = partitionConvertible(coreTxns, display, fx);
+              return detectSparplans({ txns: convertible, displayCurrency: display, fx });
             },
           );
           const perPortfolio: SparplanStats[] = portfolioResults;

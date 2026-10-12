@@ -4,6 +4,7 @@ import {
   summarizePortfolio,
   openLots,
   computeTrades,
+  partitionConvertible,
   type CoreTransaction,
   type CorporateAction,
   type CostBasisMode,
@@ -15,7 +16,7 @@ import {
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { getCachedQuotes } from "./price-cache.js";
-import { getFxRates, makeFxRateFn } from "./fx.js";
+import { getFxRates, makeFxRateFn, recordFxMissing } from "./fx.js";
 import { materializeManualPriceRow } from "./instruments.js";
 import { toCoreTxns } from "./tx-core.js";
 import { logTiming } from "../lib/timing.js";
@@ -214,7 +215,7 @@ export async function valuePortfolio(
   for (const p of Object.values(prices)) currencies.add(p.currency);
   for (const r of rows) currencies.add(r.currency);
   const tFxStart = performance.now();
-  const rates = await getFxRates(db, [...currencies], displayCurrency);
+  const rates = await getFxRates(db, [...currencies], displayCurrency, now);
   const fx = makeFxRateFn(rates, displayCurrency);
   const tFx = performance.now();
 
@@ -317,7 +318,7 @@ export async function valuePortfolioCached(
   const hit = derivationCache.get(key);
   if (hit && hit.expiresAt > now) {
     logTiming(undefined, "valuePortfolioCached HIT", 0, { key, ttlRemaining: hit.expiresAt - now });
-    return hit.promise;
+    return withFxMissingRecorded(hit.promise);
   }
   logTiming(undefined, "valuePortfolioCached MISS", 0, { key });
   const promise = valuePortfolio(
@@ -339,7 +340,19 @@ export async function valuePortfolioCached(
       derivationCache.delete(key);
     }
   });
-  return promise;
+  return withFxMissingRecorded(promise);
+}
+
+/**
+ * A cached valuation may have been computed under ANOTHER request's missing-FX scope, so
+ * re-record its `fxMissingCurrencies` into the current request's scope (audit B2) — the
+ * response then reports them even on a cache hit.
+ */
+function withFxMissingRecorded(promise: Promise<Valuation>): Promise<Valuation> {
+  return promise.then((v) => {
+    recordFxMissing(v.summary.fxMissingCurrencies);
+    return v;
+  });
 }
 
 /**
@@ -372,8 +385,10 @@ export async function getCachedFifoTradeLog(
   }
   logTiming(undefined, "fifoTradeLogCache MISS", 0, { key });
   const fx = makeFxRateFn(fxRates, target);
+  // Same missing-FX exclusion as buildTradeLog (audit B2).
+  const { convertible } = partitionConvertible(coreTxns, target, fx, (id) => prices[id]?.currency);
   const tradeLog = computeTrades({
-    transactions: coreTxns,
+    transactions: convertible,
     corporateActions,
     prices,
     displayCurrency: target,

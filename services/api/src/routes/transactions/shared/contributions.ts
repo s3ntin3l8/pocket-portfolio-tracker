@@ -8,6 +8,7 @@ import {
   type CoreTransaction,
   type PortfolioSummary,
   type SparplanStats,
+  partitionConvertible,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
 import { boundaryFlows } from "./flows.js";
@@ -81,8 +82,11 @@ export async function buildContributions(
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
   const fx = makeFxRateFn(rates, display);
+  // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies. The value
+  // side (`summary.netWorth`) excludes the same currencies, so both stay on one footing.
+  const { convertible } = partitionConvertible(coreTxns, display, fx);
   const stats = contributionStats({
-    txns: coreTxns,
+    txns: convertible,
     displayCurrency: display,
     fx,
     boundary,
@@ -109,7 +113,8 @@ export async function buildSparplanStats(
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
   const fx = makeFxRateFn(rates, display);
-  const stats = detectSparplans({ txns: coreTxns, displayCurrency: display, fx });
+  const { convertible } = partitionConvertible(coreTxns, display, fx);
+  const stats = detectSparplans({ txns: convertible, displayCurrency: display, fx });
   const meta = await instrumentMeta(
     app,
     stats.plans.map((p) => p.instrumentId),

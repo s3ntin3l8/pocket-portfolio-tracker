@@ -133,6 +133,20 @@ describe("getFxRates", () => {
     expect(out.NOK).toBe("12000");
   });
 
+  it("treats a cached rate older than FX_MAX_CARRY_FORWARD_DAYS as missing, not as today's", async () => {
+    const db = getDb();
+    const now = new Date("2026-05-20T08:00:00.000Z");
+    // 2026-05-06 is exactly 14 days back (still usable); 2026-05-05 is 15 days back.
+    await db.insert(fxRates).values([
+      { base: "SEK", quote: "IDR", rate: "1500", date: "2026-05-05" },
+      { base: "DKK", quote: "IDR", rate: "2300", date: "2026-05-05" },
+      { base: "DKK", quote: "IDR", rate: "2310", date: "2026-05-06" },
+    ]);
+    const out = await getFxRates(db, ["SEK", "DKK"], "IDR", now, { getRate: async () => null });
+    expect(out.SEK).toBeUndefined();
+    expect(out.DKK).toBe("2310");
+  });
+
   it("omits a currency with no cached rate at all and no provider", async () => {
     const out = await getFxRates(getDb(), ["CHF"], "IDR", new Date(), null);
     expect(out.CHF).toBeUndefined();

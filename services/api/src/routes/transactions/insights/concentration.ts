@@ -11,6 +11,7 @@ import {
   PERIOD_GAIN_MAX_PCT,
   PERIOD_LOSS_MAX_PCT,
   MAX_PRICE_CARRY_FORWARD_DAYS,
+  fxAvailable,
 } from "@portfolio/core";
 import { toCoreTxns } from "../../../services/tx-core.js";
 import { getFxRatesForDates, makeFxRateFn } from "../../../services/fx.js";
@@ -198,6 +199,9 @@ export async function computeConcentrationSection(
           price = latestPriceBefore(h.instrumentId, asOfDate);
         }
         if (!price) continue;
+        // No FX rate for the quote currency: left out of the weights (never 1:1, audit B2)
+        // and reported as fxMissingCurrencies.
+        if (!fxAvailable(price.currency, display, fx)) continue;
         // Only the CURRENT month's weight is an "as of now" claim — a stale feed here
         // would silently hold a dead instrument's last-known weight steady forever.
         // Earlier months are historical and unaffected: whatever was the last known
