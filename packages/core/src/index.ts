@@ -88,6 +88,8 @@ export {
   chainAggregateIndex,
   aggregateValueFlows,
   splitAdjustmentFactor,
+  isDepotTransfer,
+  transferValueFlow,
   type PriceSeriesKind,
   type DailyValueFlow,
   type IndexPoint,

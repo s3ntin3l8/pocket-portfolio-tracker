@@ -734,3 +734,77 @@ describe("recordDailySnapshots — missing FX rate (audit B2)", () => {
     );
   });
 });
+
+describe("recordDailySnapshots — depot transfers (audit B1)", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("books a transfer_in at market value so the TWR index is flat across it", async () => {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "xfer-snap-user", email: "xfer-snap@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "XferSnap", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "XFERSNAP",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Transfer snapshot test",
+      })
+      .returning();
+    // Flat price on both days. The live job values the transactions as they stand when
+    // it runs, so each day's rows are inserted before that day's run.
+    const svc = new MarketDataService([new FixtureProvider({ XFERSNAP: "100" })]);
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      currency: "IDR",
+      executedAt: new Date("2026-04-01T09:00:00.000Z"),
+    });
+    await recordDailySnapshots(db, svc, 0, new Date("2026-04-01T16:00:00.000Z"));
+    // Depot transfer on day 2, carried cost 60 ≠ market 100.
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "transfer_in",
+      quantity: "10",
+      price: "60",
+      currency: "IDR",
+      executedAt: new Date("2026-04-02T09:00:00.000Z"),
+    });
+    await recordDailySnapshots(db, svc, 0, new Date("2026-04-02T16:00:00.000Z"));
+
+    const rows = (
+      await db.select().from(portfolioSnapshots).where(eq(portfolioSnapshots.portfolioId, p.id))
+    ).sort((a, b) => (a.date < b.date ? -1 : 1));
+    expect(rows.map((r) => r.date)).toEqual(["2026-04-01", "2026-04-02"]);
+    // Day 1 — the buy is the inception flow on the day it lands.
+    expect(rows[0].marketValue).toBe("1000");
+    // Day 2 — the transfer adds 10 × 100 of market value and the same as a flow.
+    expect(rows[1].marketValue).toBe("2000");
+    expect(rows[1].effectiveFlow).toBe("1000");
+
+    const index = chainIndex(
+      rows.map((r) => ({
+        date: r.date,
+        marketValue: r.marketValue ?? "0",
+        effectiveFlow: r.effectiveFlow ?? "0",
+      })),
+    );
+    for (const pt of index) expect(Number(pt.pct)).toBeCloseTo(0, 9);
+  });
+});

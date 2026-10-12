@@ -894,3 +894,177 @@ describe("buildDailyValueFlows: never-priced holding valued at cost (issue #744)
     expect(flows.map((f) => f.marketValue)).toEqual(["11000", "10000", "11000"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Depot transfers are return-neutral in the securities-sleeve TWR (audit B1)
+// ---------------------------------------------------------------------------
+
+describe("TWR: depot transfers are flows, not returns (audit B1)", () => {
+  const INST = "inst-xfer";
+  const dates = ["2026-01-01", "2026-01-02", "2026-01-03"];
+  const flat = { [INST]: { "2026-01-01": "100", "2026-01-02": "100", "2026-01-03": "100" } };
+  const buy = tx({
+    instrumentId: INST,
+    type: "buy",
+    quantity: "10",
+    price: "100",
+    executedAt: new Date("2026-01-01"),
+  });
+
+  it("transfer_in on day 2 at flat prices leaves the index unchanged", () => {
+    const { flows, index } = pipeline({
+      transactions: [
+        buy,
+        // Carried cost (60) deliberately differs from the market price (100): the flow
+        // must be the market value added, not the cost basis.
+        tx({
+          instrumentId: INST,
+          type: "transfer_in",
+          quantity: "10",
+          price: "60",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      priceMap: flat,
+      dates,
+    });
+    expect(flows[1].marketValue).toBe("2000");
+    expect(flows[1].effectiveFlow).toBe("1000");
+    for (const p of index) expect(Number(p.pct)).toBeCloseTo(0, 9);
+  });
+
+  it("transfer_out on day 2 at flat prices leaves the index unchanged (row price 0)", () => {
+    const { flows, index } = pipeline({
+      transactions: [
+        buy,
+        tx({
+          instrumentId: INST,
+          type: "transfer_out",
+          quantity: "4",
+          price: "0",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      priceMap: flat,
+      dates,
+    });
+    expect(flows[1].marketValue).toBe("600");
+    expect(flows[1].effectiveFlow).toBe("-400");
+    for (const p of index) expect(Number(p.pct)).toBeCloseTo(0, 9);
+  });
+
+  it("a legacy bonus+kind:'transfer_in' row is treated as a transfer; a plain bonus stays return", () => {
+    const legacy = pipeline({
+      transactions: [
+        buy,
+        tx({
+          instrumentId: INST,
+          type: "bonus",
+          kind: "transfer_in",
+          quantity: "10",
+          price: "60",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      priceMap: flat,
+      dates,
+    });
+    expect(legacy.flows[1].effectiveFlow).toBe("1000");
+    expect(Number(legacy.index[2].pct)).toBeCloseTo(0, 9);
+
+    // A free-share bonus of 1 share (10% more value at flat prices) is genuine return.
+    const plain = pipeline({
+      transactions: [
+        buy,
+        tx({
+          instrumentId: INST,
+          type: "bonus",
+          quantity: "1",
+          price: "0",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      priceMap: flat,
+      dates,
+    });
+    expect(plain.flows[1].effectiveFlow).toBe("0");
+    expect(Number(plain.index[1].pct)).toBeCloseTo(10, 6);
+  });
+
+  it("an unpriced, never-priced instrument transferred in falls back to carried cost", () => {
+    const OTHER = "inst-unpriced";
+    const flows = buildDailyValueFlows({
+      transactions: [
+        buy,
+        tx({
+          instrumentId: OTHER,
+          type: "transfer_in",
+          quantity: "5",
+          price: "40",
+          fees: "2",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      corporateActions: [],
+      dates,
+      priceAt: (id, date) => (id === INST ? { close: flat[INST][date], currency: "IDR" } : null),
+      hasEverPriced: () => false,
+      fxAt: noFx,
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+    });
+    // MV gains the at-cost value 5×40+2 = 202; the flow offsets exactly that.
+    expect(flows[1].marketValue).toBe("1202");
+    expect(flows[1].effectiveFlow).toBe("202");
+    const index = chainIndex(flows);
+    for (const p of index) expect(Number(p.pct)).toBeCloseTo(0, 9);
+  });
+
+  it("stays return-neutral when a split happens after the transfer", () => {
+    const cas: CorporateAction[] = [
+      { instrumentId: INST, type: "split", ratio: "2", exDate: new Date("2026-01-03") },
+    ];
+    // Prices back-adjusted for the later split (caller convention): 100 raw → 50.
+    const adjusted = { [INST]: { "2026-01-01": "50", "2026-01-02": "50", "2026-01-03": "50" } };
+    const { index } = pipeline({
+      transactions: [
+        buy,
+        tx({
+          instrumentId: INST,
+          type: "transfer_in",
+          // Small enough (+20%) that the >50% artifact guard can't mask a wrong flow.
+          quantity: "2",
+          price: "100",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      priceMap: adjusted,
+      dates,
+      cas,
+    });
+    for (const p of index) expect(Number(p.pct)).toBeCloseTo(0, 9);
+  });
+
+  it("transfers in another currency are FX-converted at the day's rate", () => {
+    const flows = buildDailyValueFlows({
+      transactions: [
+        tx({
+          instrumentId: INST,
+          type: "transfer_in",
+          quantity: "10",
+          price: "5",
+          currency: "EUR",
+          executedAt: new Date("2026-01-02"),
+        }),
+      ],
+      corporateActions: [],
+      dates: ["2026-01-02"],
+      priceAt: () => ({ close: "6", currency: "EUR" }),
+      fxAt: () => (from, to) => (from === to ? "1" : "17000"),
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+    });
+    expect(flows[0].marketValue).toBe("1020000");
+    expect(flows[0].effectiveFlow).toBe("1020000");
+  });
+});
