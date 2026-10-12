@@ -2035,7 +2035,8 @@
     },
     "footnote": "Germany taxes investment income at a flat {rate}% (Abgeltungsteuer + Solidaritätszuschlag). Your {allowance} Sparer-Pauschbetrag is applied first, then losses offset gains within the same year. Estimate only, not tax advice.",
     "regime": {
-      "label": "Tax regime · applies everywhere, also in Settings",
+      "indicator": "Regime: {regime}",
+      "change": "Change",
       "de": "Germany",
       "id": "Indonesia"
     },

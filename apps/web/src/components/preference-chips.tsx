@@ -13,10 +13,10 @@ interface ChipOption {
 interface Props {
   /**
    * Which global user-preference field this chip group writes. Kept generic so the
-   * same component backs both the Settings → Investing "Tax code"/"Cost basis" chips
-   * AND the Tax page's DE/ID regime toggle — all three write the SAME underlying
-   * `taxRegime`/`costBasisMode` preference via `putPreferences`, so whichever surface
-   * the user touches, the other stays in sync on next render (`router.refresh()`).
+   * same component backs the Settings → Investing "Tax code"/"Cost basis" chips. These
+   * are GLOBAL preferences (written via `putPreferences`), so they live only in
+   * Settings — never as a page-level filter; `router.refresh()` makes every
+   * server-rendered consumer (e.g. the Tax page) pick up the new value.
    */
   prefKey: "taxRegime" | "costBasisMode";
   current: string;
