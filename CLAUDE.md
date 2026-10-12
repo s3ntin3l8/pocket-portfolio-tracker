@@ -116,7 +116,9 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   migration 0044). Depot-to-depot share transfers (Depotübertrag): cash-neutral, shares move
   at carried cost basis — no P&L on `transfer_out` (not a disposal). This replaces the legacy
   `bonus`+`kind:"transfer_in"` sub-type pattern (those rows should be migrated). Inside-boundary:
-  `transfer_in` is an inflow at carried cost, `transfer_out` an outflow at carried cost —
+  `transfer_in` is an inflow at carried cost, `transfer_out` an outflow at carried cost — the
+  running average cost of the shares leaving (same pool as the outside walk), never the row's own
+  price, which broker feeds set to 0 —
   `boundaryFlowPoints(txns, "inside", …)` is the complete, correct flow list for XIRR here, since
   cost-basis and cash-received valuation coincide for deposit/withdrawal/transfer_in/transfer_out.
   Outside-boundary: `transfer_in` at gross cost, `transfer_out` at running average cost — but
@@ -127,6 +129,24 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   `services/api/src/routes/transactions/shared/flows.ts`. Getting this distinction wrong is
   exactly how #736 (transfers valued at ≈0) happened, and re-collapsing the two is how a second,
   different bug (dropping realized gains/dividends from `totalReturnPct`) would happen next.
+  **The TWR securities sleeve is a third, separate definition:** `buildDailyValueFlows`
+  (`packages/core/src/twr.ts`) and the daily snapshot job (`services/api/src/services/snapshots.ts`)
+  book a transfer as an `effectiveFlow` equal to the market value it adds/removes that day
+  (`transferValueFlow` — carried cost only when that path values the holding at cost), so the
+  transfer day is return-neutral (#815). Don't reuse `transferFlowPoints` there, and don't move
+  market-value transfer valuation into the contribution/XIRR walk. **Cost basis on import:** a
+  broker feed without the carried basis (TR always; IBKR without `costBasisPrice`/`costBasisMoney`
+  — `positionAmount` is market value and is never booked as cost) emits the `transfer_in` draft
+  at price 0 with `attention: ["needs_cost_basis"]`; both confirm paths
+  (`/imports/:id/confirm`, `…/transactions/resolve-drafts`) refuse a price-0 `transfer_in` with 400
+  `transfer_cost_basis_required` until the user enters it (#818).
+- **A missing FX rate is never 1:1.** `getFxRates`/`getFxRatesForDates` carry the latest cached
+  rate forward; if a currency still has none, `makeFxRateFn` returns `null` and `convert()` throws
+  `FxRateMissingError` (mapped to a 503 `fx_rate_missing`). `summarizePortfolio` instead flags the
+  affected holdings `fxMissing` (display values null, excluded from totals — no sane number exists,
+  unlike `valuedAtCost`) and lists `fxMissingCurrencies`; the daily/intraday snapshot jobs skip
+  such a portfolio for the day rather than persist a partial value (#816). New FX consumers: use
+  `tryConvert`/`fxAvailable` where degrading is better than failing, never a `?? "1"` fallback.
 - **A holding with no usable market price is valued at cost basis, not skipped/zero.**
   Nothing economic happened on the day a price feed goes silent, so treating it as worth 0
   understates net worth by the whole cost basis, not by the (unknown) gain/loss since purchase.
