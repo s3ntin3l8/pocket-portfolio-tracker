@@ -71,6 +71,28 @@ describe("security plugin", () => {
     await app.close();
   });
 
+  it("gives each Bearer credential its own bucket from the same IP", async () => {
+    process.env.RATE_LIMIT_MAX = "2";
+    const app = await buildApp();
+    const get = (token?: string) =>
+      app.inject({
+        method: "GET",
+        url: "/health",
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+
+    expect((await get("token-a")).statusCode).toBe(200);
+    expect((await get("token-a")).statusCode).toBe(200);
+    expect((await get("token-a")).statusCode).toBe(429);
+    // Same IP, different credential: unaffected by token-a's exhaustion.
+    expect((await get("token-b")).statusCode).toBe(200);
+    expect((await get("token-b")).statusCode).toBe(200);
+    expect((await get("token-b")).statusCode).toBe(429);
+    // Anonymous traffic keeps the per-IP bucket.
+    expect((await get()).statusCode).toBe(200);
+    await app.close();
+  });
+
   it("reflects an allowlisted CORS origin", async () => {
     process.env.CORS_ORIGIN = "https://app.example.com";
     const app = await buildApp();

@@ -60,7 +60,9 @@ const schema = {
     },
     RATE_LIMIT_MAX: {
       type: "number",
-      default: 100,
+      // Per credential (see plugins/security.ts). One server-rendered page fans out to
+      // 10-15 API calls, so the budget is page-shaped rather than request-shaped.
+      default: 600,
     },
     RATE_LIMIT_WINDOW: {
       type: "string",

@@ -479,6 +479,47 @@ describe("OIDC migration from local authSub", () => {
   });
 });
 
+describe("per-email login throttle (route)", () => {
+  let tApp: App;
+
+  beforeAll(async () => {
+    process.env.AUTH_LOCAL_SECRET = LOCAL_SECRET;
+    process.env.RATE_LIMIT_MAX = "10000";
+    tApp = await buildApp();
+    await tApp.db.insert(users).values({
+      authSub: "local|throttle@example.com",
+      email: "throttle@example.com",
+      passwordHash: hashPassword("right-password"),
+    });
+    await tApp.db.insert(users).values({
+      authSub: "local|other@example.com",
+      email: "other@example.com",
+      passwordHash: hashPassword("other-password"),
+    });
+  });
+
+  afterAll(async () => {
+    await tApp.close();
+    delete process.env.AUTH_LOCAL_SECRET;
+    delete process.env.RATE_LIMIT_MAX;
+  });
+
+  const login = (email: string, password: string) =>
+    tApp.inject({ method: "POST", url: "/auth/local/login", payload: { email, password } });
+
+  it("locks one account after 5 failures regardless of IP, without affecting others", async () => {
+    for (let i = 0; i < 5; i++) {
+      expect((await login("Throttle@Example.com", "nope")).statusCode).toBe(401);
+    }
+    // Normalized email: the correct password is refused while throttled.
+    const blocked = await login("throttle@example.com", "right-password");
+    expect(blocked.statusCode).toBe(429);
+    expect(Number(blocked.headers["retry-after"])).toBeGreaterThan(0);
+    // A different account is unaffected.
+    expect((await login("other@example.com", "other-password")).statusCode).toBe(200);
+  });
+});
+
 // A separate app instance (its own in-memory PGlite + its own per-route rate-limit
 // bucket) so these tests' extra /auth/local/login calls don't collide with the login
 // rate limit (10/min) already exercised by the "local auth routes" describe above.
