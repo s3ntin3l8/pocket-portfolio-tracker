@@ -6,8 +6,9 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
+import { buildSiteMetadata } from "@/lib/site-metadata";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeColorSync, STORAGE_KEY } from "@/components/theme-color-sync";
 import { IosSplashLinks } from "@/components/ios-splash-links";
@@ -27,7 +28,7 @@ const dmMono = DM_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "Pocket",
   description:
     "Every asset, one clear number — stocks, funds, gold and cash across every brokerage in a single figure.",
@@ -54,6 +55,25 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.png",
   },
 };
+
+// `AUTH_URL` is the canonical public origin; read per request (not at build) since the
+// published image is built without it. Static siblings (offline, not-found) get the fallback.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "meta" });
+  return {
+    ...baseMetadata,
+    ...buildSiteMetadata({
+      locale,
+      baseUrl: process.env.AUTH_URL ?? "http://localhost:3005",
+      t,
+    }),
+  };
+}
 
 export const viewport: Viewport = {
   // SSR/pre-hydration default, following the OS scheme so the browser/status-bar chrome

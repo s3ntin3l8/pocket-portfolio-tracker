@@ -2391,5 +2391,10 @@
         ]
       }
     }
+  },
+  "meta": {
+    "ogTitle": "Pocket — semua aset, satu angka jelas",
+    "ogDescription": "Saham, reksa dana, emas, obligasi, dan kas di semua broker — satu angka kekayaan bersih yang jelas.",
+    "ogImageAlt": "Dasbor kepemilikan Pocket yang menampilkan total nilai portofolio"
   }
 }

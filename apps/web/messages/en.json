@@ -2385,5 +2385,10 @@
         ]
       }
     }
+  },
+  "meta": {
+    "ogTitle": "Pocket — every asset, one clear number",
+    "ogDescription": "Stocks, funds, gold, bonds and cash across every broker — one clear net-worth number.",
+    "ogImageAlt": "Pocket holdings dashboard showing total portfolio value"
   }
 }
