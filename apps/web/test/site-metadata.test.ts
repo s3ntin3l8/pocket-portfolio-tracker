@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import sharp from "sharp";
 import { buildSiteMetadata } from "@/lib/site-metadata";
 
@@ -31,7 +31,7 @@ describe("buildSiteMetadata", () => {
   });
 
   it("ships the committed og-image.jpg at 1200x630", async () => {
-    const file = fileURLToPath(new URL("../public/og-image.jpg", import.meta.url));
+    const file = join(__dirname, "..", "public", "og-image.jpg");
     expect(existsSync(file)).toBe(true);
     const meta = await sharp(file).metadata();
     expect([meta.width, meta.height]).toEqual([1200, 630]);
