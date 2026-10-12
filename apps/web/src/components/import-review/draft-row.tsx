@@ -2,12 +2,11 @@
 
 import { useTranslations } from "next-intl";
 import { Pencil, Trash2 } from "lucide-react";
-import { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/api-client";
+import { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/api-client";
 import { TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { draftNeedsCostBasis } from "@/components/import-flow/types";
 import type { ImportDraft, ReviewDraft } from "./types";
 import { fmtQty, fmtAmt } from "./types";
 
@@ -32,7 +31,7 @@ export function DraftRow({
   // An inbound transfer the parser couldn't price (or one the user hasn't priced yet) —
   // its cost basis is required before confirm, so the price is editable right on the row.
   const needsCostBasis =
-    draftNeedsCostBasis(draft) || (draft.attention ?? []).includes("needs_cost_basis");
+    transferNeedsCostBasis(draft) || (draft.attention ?? []).includes("needs_cost_basis");
   const t = useTranslations("Import");
   const pct = (c: number) => t("confidence", { pct: Math.round(c * 100) });
   const dateOf = (d: ReviewDraft) => d.executedAt.slice(0, 10);
@@ -72,7 +71,7 @@ export function DraftRow({
               {dupLabel(draft)}
             </Badge>
           )}
-          {draftNeedsCostBasis(draft) && (
+          {transferNeedsCostBasis(draft) && (
             <Badge variant="warning" title={t("review.needsCostBasisHint")}>
               {t("review.needsCostBasis")}
             </Badge>

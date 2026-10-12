@@ -3,12 +3,11 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown, Trash2 } from "lucide-react";
-import { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/api-client";
+import { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PortfolioPicker } from "@/components/portfolio-picker";
 import { cn } from "@/lib/utils";
-import { draftNeedsCostBasis } from "@/components/import-flow/types";
 import type { ReviewDraft } from "./types";
 import type { ImportReviewGroup, ImportTargetPortfolio } from "./types";
 import { fmtQty, fmtAmt } from "./types";
@@ -81,7 +80,7 @@ function MobileDraftCard({
                 {dupLabel(draft)}
               </Badge>
             )}
-            {draftNeedsCostBasis(draft) && (
+            {transferNeedsCostBasis(draft) && (
               <Badge variant="warning" title={t("review.needsCostBasisHint")}>
                 {t("review.needsCostBasis")}
               </Badge>
