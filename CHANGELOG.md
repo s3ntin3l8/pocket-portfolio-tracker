@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.21...v0.1.22) (2026-10-12)
+
+
+### Features
+
+* **web:** add Open Graph / Twitter social preview card ([#799](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/799)) ([5950fe4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5950fe4d79747418841cc44d4c03a6b40d8fb7fd))
+
 ## [0.1.21](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.20...v0.1.21) (2026-10-08)
 
 
