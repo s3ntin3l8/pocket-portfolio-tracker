@@ -101,7 +101,7 @@ describe("POST /instruments upgrade tiers", () => {
     expect((await reload(row.id)).assetClass).toBe("etf");
   });
 
-  it("non-admin cannot re-pin market/currency via an ISIN match", async () => {
+  it("non-admin still heals a row stuck on the Xetra/EUR default (guarded re-pin)", async () => {
     const isin = "US0378331005";
     const row = await seed("UPG-PIN", "equity");
     await app.db.update(instruments).set({ isin }).where(eq(instruments.id, row.id));
@@ -116,26 +116,25 @@ describe("POST /instruments upgrade tiers", () => {
     });
     expect(res.statusCode).toBe(201);
     const after = await reload(row.id);
-    expect(after.market).toBe("XETRA");
-    expect(after.currency).toBe("EUR");
+    expect(after.market).toBe("US");
+    expect(after.currency).toBe("USD");
   });
 
-  it("admin can re-pin market/currency", async () => {
-    const isin = "US5949181045";
-    const row = await seed("UPG-ADM", "equity");
-    await app.db.update(instruments).set({ isin }).where(eq(instruments.id, row.id));
-    const res = await post(await token("upg-admin", [ADMIN_GROUP]), {
-      symbol: "UPG-ADM",
+  it("non-admin cannot re-pin a row already on a known, non-default market", async () => {
+    const row = await seed("UPG-KEEP", "equity", "US", "USD");
+    const res = await post(await token("upg-user-4"), {
+      symbol: "UPG-KEEP",
       market: "US",
       assetClass: "equity",
       unit: "shares",
       currency: "USD",
-      name: "UPG-ADM",
-      isin,
+      name: "UPG-KEEP",
+      isin: "US5949181045",
     });
     expect(res.statusCode).toBe(201);
     const after = await reload(row.id);
     expect(after.market).toBe("US");
-    expect(after.currency).toBe("USD");
+    // Only the null ISIN back-fill (tier 1) applies.
+    expect(after.assetClass).toBe("equity");
   });
 });

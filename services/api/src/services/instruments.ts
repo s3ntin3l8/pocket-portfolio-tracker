@@ -15,8 +15,9 @@ type Instrument = typeof instruments.$inferSelect;
  *
  * Two tiers, because `instruments` is shared reference data feeding every user's
  * valuations. Tier 1 (anyone): same-family refinements (`mutual_fund` -> `etf`,
- * ISIN-as-symbol -> ticker, ISIN/WKN and bond-term null back-fill). Tier 2 (admin
- * only): cross-family `assetClass` changes and `market`/`currency` re-pins. Tier-2
+ * ISIN-as-symbol -> ticker, ISIN/WKN and bond-term null back-fill) and the guarded
+ * market/currency re-pin off a known-bad default (Xetra/EUR or an unrecognised market, only
+ * to a priceable venue). Tier 2 (admin only): cross-family `assetClass` changes. Tier-2
  * fields are reported in `tier2` so the caller can audit-log them.
  */
 function instrumentUpgrade(
@@ -85,10 +86,9 @@ function instrumentUpgrade(
     (existing.market === "XETRA" && existing.currency === "EUR") ||
     !isKnownMarket(existing.market)
   ) {
-    if (isAdmin && PRICEABLE_FOREIGN_MARKETS.has(input.market)) {
+    if (PRICEABLE_FOREIGN_MARKETS.has(input.market)) {
       set.market = input.market;
       set.currency = input.currency;
-      tier2.push("market", "currency");
     }
   }
   // Back-fill missing ISIN/WKN when the input carries one.

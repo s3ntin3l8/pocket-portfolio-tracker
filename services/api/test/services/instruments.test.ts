@@ -93,72 +93,94 @@ describe("findOrCreateInstrument", () => {
       .insert(instruments)
       .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
 
-    const healed = await findOrCreateInstrument(
-      getDb(),
-      {
-        symbol: "O",
-        market: "US",
-        assetClass: "equity",
-        unit: "shares",
-        currency: "USD",
-        name: "Realty Income",
-        isin,
-      },
-      { actor: { isAdmin: true } },
-    );
+    const healed = await findOrCreateInstrument(getDb(), {
+      symbol: "O",
+      market: "US",
+      assetClass: "equity",
+      unit: "shares",
+      currency: "USD",
+      name: "Realty Income",
+      isin,
+    });
     expect(healed.symbol).toBe("O");
     expect(healed.market).toBe("US");
     expect(healed.currency).toBe("USD");
   });
 
-  it("does not re-pin or change assetClass for a non-admin actor (tier 2 is admin-only)", async () => {
-    const isin = "XF000ETH0013";
+  it("does not re-pin a row that is NOT on the default/unknown market, and does not change assetClass for a non-admin", async () => {
+    const isin = "US0378331005";
     await getDb()
       .insert(instruments)
-      .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
+      .values({
+        ...base,
+        market: "US",
+        currency: "USD",
+        symbol: "TIER2",
+        assetClass: "equity",
+        name: "Tier2",
+        isin,
+      });
 
     const unchanged = await findOrCreateInstrument(
       getDb(),
       {
-        symbol: "ETH",
+        symbol: "TIER2",
         market: "CRYPTO",
-        assetClass: "crypto",
-        unit: "shares",
+        assetClass: "bond",
+        unit: "units",
         currency: "EUR",
-        name: "Ether",
+        name: "Tier2",
         isin,
       },
       { actor: { isAdmin: false } },
     );
-    // Tier 1 still applies (ISIN-as-symbol -> ticker); tier 2 does not.
-    expect(unchanged.symbol).toBe("ETH");
-    expect(unchanged.market).toBe("XETRA");
+    expect(unchanged.market).toBe("US");
+    expect(unchanged.currency).toBe("USD");
     expect(unchanged.assetClass).toBe("equity");
   });
 
-  it("re-pins a TR crypto holding stuck on Xetra/EUR to CRYPTO (currency kept)", async () => {
+  it("re-pins a TR crypto holding stuck on Xetra/EUR to CRYPTO (currency kept); assetClass stays equity for non-admins", async () => {
     const isin = "XF000BTC0017";
     await getDb()
       .insert(instruments)
       .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
 
+    const healed = await findOrCreateInstrument(getDb(), {
+      symbol: "BTC",
+      market: "CRYPTO",
+      assetClass: "crypto",
+      unit: "shares",
+      currency: "EUR",
+      name: "Bitcoin",
+      isin,
+    });
+    expect(healed.symbol).toBe("BTC");
+    expect(healed.market).toBe("CRYPTO");
+    // assetClass is a cross-family change: admin-only (equity stays for a normal user).
+    expect(healed.assetClass).toBe("equity");
+    expect(healed.currency).toBe("EUR");
+  });
+
+  it("lets an admin actor change assetClass cross-family", async () => {
+    const isin = "XF000ADM0019";
+    await getDb()
+      .insert(instruments)
+      .values({ ...base, symbol: isin, assetClass: "equity", name: isin, isin });
     const healed = await findOrCreateInstrument(
       getDb(),
       {
-        symbol: "BTC",
+        symbol: "ADMC",
         market: "CRYPTO",
         assetClass: "crypto",
         unit: "shares",
         currency: "EUR",
-        name: "Bitcoin",
+        name: "Admin coin",
         isin,
       },
       { actor: { isAdmin: true } },
     );
-    expect(healed.symbol).toBe("BTC");
-    expect(healed.market).toBe("CRYPTO");
     expect(healed.assetClass).toBe("crypto");
-    expect(healed.currency).toBe("EUR");
+    expect(healed.market).toBe("CRYPTO");
   });
 
   it("does not re-pin a real EUR fund off Xetra", async () => {
@@ -247,19 +269,15 @@ describe("findOrCreateInstrument", () => {
         isin,
       });
 
-    const healed = await findOrCreateInstrument(
-      getDb(),
-      {
-        symbol: "AMZN",
-        market: "US",
-        assetClass: "equity",
-        unit: "shares",
-        currency: "USD",
-        name: "Amazon.com Inc",
-        isin,
-      },
-      { actor: { isAdmin: true } },
-    );
+    const healed = await findOrCreateInstrument(getDb(), {
+      symbol: "AMZN",
+      market: "US",
+      assetClass: "equity",
+      unit: "shares",
+      currency: "USD",
+      name: "Amazon.com Inc",
+      isin,
+    });
     expect(healed.market).toBe("US");
     expect(healed.currency).toBe("USD");
   });
