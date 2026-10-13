@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { useLocale, useTranslations } from "next-intl";
 import { formatMoneyCompact } from "@/lib/utils";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export interface RevenueEarningsYear {
   year: number;
@@ -72,6 +73,7 @@ export function RevenueEarningsChart({
   data: RevenueEarningsYear[];
   currency: string;
 }) {
+  const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const t = useTranslations("Instrument");
   const money = (v: number) => formatMoneyCompact(v, currency, locale);
@@ -92,8 +94,18 @@ export function RevenueEarningsChart({
             cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
             content={<ChartTooltip money={money} t={t} />}
           />
-          <Bar dataKey="revenue" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="earnings" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+          <Bar
+            isAnimationActive={!reducedMotion}
+            dataKey="revenue"
+            fill="var(--color-chart-1)"
+            radius={[4, 4, 0, 0]}
+          />
+          <Bar
+            isAnimationActive={!reducedMotion}
+            dataKey="earnings"
+            fill="var(--color-chart-2)"
+            radius={[4, 4, 0, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

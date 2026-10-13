@@ -317,10 +317,10 @@ describe("ImportHistory", () => {
 
   it("renders sortable column headers", () => {
     renderHistory();
-    expect(screen.getByRole("button", { name: /parser/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /status/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /items/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /timestamp/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^parser$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^status$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^items$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^timestamp$/i })).toBeInTheDocument();
   });
 
   it("sorts by item count numerically ascending", () => {
@@ -332,7 +332,7 @@ describe("ImportHistory", () => {
     // All three are confirmed (hidden by default) — reveal them first.
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
     // Default: screenshot(10), csv(1), dkb(5)
-    fireEvent.click(screen.getByRole("button", { name: /items/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^items$/i }));
     const rows = screen.getAllByRole("row").slice(1);
     // asc: 1 (csv), 5 (dkb), 10 (screenshot)
     expect(rows[0]).toHaveTextContent("csv");
@@ -347,7 +347,7 @@ describe("ImportHistory", () => {
       </NextIntlClientProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Show completed/ }));
-    fireEvent.click(screen.getByRole("button", { name: /parser/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^parser$/i }));
     const rows = screen.getAllByRole("row").slice(1);
     // asc: csv, dkb, screenshot
     expect(rows[0]).toHaveTextContent("csv");
@@ -357,7 +357,7 @@ describe("ImportHistory", () => {
 
   it("sets aria-sort ascending then descending on repeated clicks", () => {
     renderHistory();
-    const parserBtn = screen.getByRole("button", { name: /parser/i });
+    const parserBtn = screen.getByRole("button", { name: /^parser$/i });
     fireEvent.click(parserBtn);
     expect(parserBtn.closest("th")).toHaveAttribute("aria-sort", "ascending");
     fireEvent.click(parserBtn);
@@ -737,6 +737,15 @@ describe("ImportHistory", () => {
     const mobileRow = screen.getByTestId("import-mobile-draft1");
     fireEvent.click(mobileRow);
     // A plain tap on a draft mirrors the explicit Review action.
+    expect(pushMock).toHaveBeenCalledWith("/transactions/import/draft1");
+  });
+
+  it("a draft's mobile card is keyboard-reachable and Enter opens its review page", () => {
+    renderHistory();
+    const mobileRow = screen.getByTestId("import-mobile-draft1");
+    expect(mobileRow).toHaveAttribute("role", "button");
+    expect(mobileRow).toHaveAttribute("tabindex", "0");
+    fireEvent.keyDown(mobileRow, { key: "Enter" });
     expect(pushMock).toHaveBeenCalledWith("/transactions/import/draft1");
   });
 });

@@ -255,7 +255,7 @@ describe("OnboardingFlow", () => {
 
     it("dots advance the carousel slide", () => {
       renderFlow();
-      const dots = screen.getAllByRole("button", { name: "Go to slide" });
+      const dots = screen.getAllByRole("button", { name: /Go to slide/ });
       expect(dots).toHaveLength(4);
       fireEvent.click(dots[2]);
       expect(screen.getByText(messages.Onboarding.mobileIntro.slide3.headline)).toBeInTheDocument();

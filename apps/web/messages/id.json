@@ -430,8 +430,8 @@
     "usersTokens": "Token",
     "usersActions": "Aksi",
     "confirmActionCancel": "Batal",
-    "confirmActionTypeToConfirm": "Ketik \"Delete\" untuk konfirmasi",
-    "confirmActionInputPlaceholder": "Delete"
+    "confirmActionTypeToConfirm": "Ketik \"{word}\" untuk konfirmasi",
+    "confirmActionInputPlaceholder": "Hapus"
   },
   "Income": {
     "title": "Pendapatan",
@@ -517,18 +517,10 @@
     "groupByLabel": "Kelompokkan berdasarkan",
     "calendarTitle": "Kalender pembayaran",
     "calendarSubtitle": "Dividen & kupon yang akan datang",
-    "calendarPrev": "Bulan sebelumnya",
-    "calendarNext": "Bulan berikutnya",
-    "calendarToday": "Hari ini",
     "calendarEmptyTitle": "Belum ada pembayaran yang akan datang",
     "calendarEmptyBody": "Kalender akan menampilkan proyeksi dan pengumuman dividen begitu data tersedia.",
     "calendarDayEvents": "{count, plural, other {# pembayaran}}",
     "calendarMoreAfter": "+{count} lagi setelah jendela ini",
-    "calendarDayMixedCurrencies": "Beberapa mata uang",
-    "calendarMore": "+{count} lagi",
-    "calendarMoreAria": "dan {count} pembayaran lainnya",
-    "calendarJumpToday": "Loncat ke hari ini",
-    "calendarEventTitle": "{name} — {amount}",
     "calendarLegendScheduled": "Terjadwal",
     "calendarLegendProjected": "Proyeksi",
     "calendarLegendGrown": "Proyeksi +",
@@ -872,7 +864,9 @@
       },
       "empty": "Tidak ada draf yang cocok dengan filter Anda.",
       "duplicate": "Sudah diimpor · {source} · {date}",
-      "duplicateNotice": "{count, plural, other {# draf}} sepertinya sudah pernah diimpor dan tidak akan ditambahkan oleh Konfirmasi. Untuk tetap menambahkannya, pilih draf tersebut lalu gunakan \"Konfirmasi terpilih\"."
+      "duplicateNotice": "{count, plural, other {# draf}} sepertinya sudah pernah diimpor dan tidak akan ditambahkan oleh Konfirmasi. Untuk tetap menambahkannya, pilih draf tersebut lalu gunakan \"Konfirmasi terpilih\".",
+      "enrichment": "Memperkaya yang ada · {source} · {date}",
+      "enrichmentNotice": "{count, plural, other {# draf akan memperkaya}} transaksi yang sudah ada dengan detail tambahan (dokumen, info pajak) — diterapkan otomatis saat Konfirmasi."
     },
     "accountMismatch": {
       "otherPortfolio": "Berkas ini (rekening {account}) sepertinya milik \"{portfolio}\". Tetap impor ke portofolio yang dipilih?",
@@ -2423,5 +2417,23 @@
   "FxMissing": {
     "title": "Kurs tidak tersedia.",
     "body": "Tidak ada kurs untuk {currencies}, sehingga jumlah dalam mata uang tersebut tidak dihitung dalam total di sini, alih-alih dikonversi 1:1. Jumlah tersebut akan disertakan setelah kurs tersedia."
+  },
+  "A11y": {
+    "back": "Kembali",
+    "close": "Tutup",
+    "clearSelection": "Hapus pilihan",
+    "backToHoldings": "Kembali ke kepemilikan",
+    "skipToContent": "Lewati ke konten utama",
+    "primaryNav": "Navigasi utama",
+    "needsReview": "{count, plural, other {# item perlu ditinjau}}",
+    "search": "Cari",
+    "toggleTheme": "Ganti tema",
+    "moreOptions": "Opsi lainnya",
+    "previous": "Sebelumnya",
+    "next": "Berikutnya",
+    "goToSlide": "Buka slide {n}"
+  },
+  "UiText": {
+    "streakMonths": "{count} bln"
   }
 }

@@ -5,6 +5,7 @@ import type { InsightsStreaks } from "@portfolio/api-client";
 
 export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; locale: string }) {
   const t = useTranslations("Insights.streaks");
+  const tU = useTranslations("UiText");
   const winRate = streaks.totalMonths > 0 ? streaks.positiveMonths / streaks.totalMonths : 0;
 
   const bestLen = streaks.bestStreak?.length ?? null;
@@ -22,7 +23,9 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[11px] text-text-2">{t("bestRun")}</span>
             {bestLen !== null ? (
-              <span className="tabular text-sm font-bold text-success">{bestLen}mo</span>
+              <span className="tabular text-sm font-bold text-success">
+                {tU("streakMonths", { count: bestLen })}
+              </span>
             ) : (
               <span className="text-sm text-text-3">—</span>
             )}
@@ -55,7 +58,9 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[11px] text-text-2">{t("worstRun")}</span>
             {worstLen !== null ? (
-              <span className="tabular text-sm font-bold text-destructive">{worstLen}mo</span>
+              <span className="tabular text-sm font-bold text-destructive">
+                {tU("streakMonths", { count: worstLen })}
+              </span>
             ) : (
               <span className="text-sm text-text-3">—</span>
             )}

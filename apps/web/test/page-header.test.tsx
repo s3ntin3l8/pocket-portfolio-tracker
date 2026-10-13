@@ -90,13 +90,13 @@ describe("PageTitle", () => {
   it("renders an h1 with the mobile-only visibility class", () => {
     render(<PageTitle>Holdings</PageTitle>);
     const h1 = screen.getByRole("heading", { level: 1, name: "Holdings" });
-    expect(h1.className).toContain("md:hidden");
+    expect(h1.className).toContain("md:sr-only");
   });
 
   it("merges an optional className without leaving a trailing space", () => {
     render(<PageTitle className="custom-class">Holdings</PageTitle>);
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.className).toBe("text-2xl font-bold md:hidden custom-class");
+    expect(h1.className).toBe("text-2xl font-bold md:sr-only custom-class");
   });
 });
 

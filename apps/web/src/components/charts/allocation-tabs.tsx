@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { formatFixed } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AllocationDonut } from "./allocation-donut";
@@ -22,6 +23,7 @@ function toNumber(v: string): number {
  */
 function DriftHint({ drift, dimensionLabel }: { drift: DriftRow[]; dimensionLabel: string }) {
   const t = useTranslations("DriftBadge");
+  const locale = useLocale();
   const overs = drift.filter((d) => d.status === "over");
   const unders = drift.filter((d) => d.status === "under");
 
@@ -36,8 +38,9 @@ function DriftHint({ drift, dimensionLabel }: { drift: DriftRow[]; dimensionLabe
   const parts: string[] = [];
   const topOver = [...overs].sort((a, b) => b.driftPct - a.driftPct)[0];
   const topUnder = [...unders].sort((a, b) => a.driftPct - b.driftPct)[0];
-  if (topOver) parts.push(t("over", { pct: Math.abs(topOver.driftPct).toFixed(1) }));
-  if (topUnder) parts.push(t("under", { pct: Math.abs(topUnder.driftPct).toFixed(1) }));
+  if (topOver) parts.push(t("over", { pct: formatFixed(Math.abs(topOver.driftPct), locale, 1) }));
+  if (topUnder)
+    parts.push(t("under", { pct: formatFixed(Math.abs(topUnder.driftPct), locale, 1) }));
 
   return <p className="text-xs text-center text-muted-foreground mt-2">{parts.join(" · ")}</p>;
 }

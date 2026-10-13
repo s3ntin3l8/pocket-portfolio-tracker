@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AlertCircle, RefreshCw, Plug, Unplug } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ export function IbkrConnectFlow({
   onChanged?: () => void;
 }) {
   const t = useTranslations("InteractiveBrokers");
+  const locale = useLocale();
   const [phase, setPhase] = useState<Phase>(phaseFor(initial.status));
   const [token, setToken] = useState("");
   const [queryId, setQueryId] = useState("");
@@ -158,7 +159,7 @@ export function IbkrConnectFlow({
 
           {initial.lastSyncAt && (
             <p className="text-xs text-muted-foreground">
-              {t("lastSync")}: {new Date(initial.lastSyncAt).toLocaleString()}
+              {t("lastSync")}: {new Date(initial.lastSyncAt).toLocaleString(locale)}
             </p>
           )}
 

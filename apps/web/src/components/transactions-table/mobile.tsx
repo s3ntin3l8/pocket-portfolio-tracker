@@ -3,6 +3,7 @@
 import { useTranslations, useLocale } from "next-intl";
 import { AlertCircle, AlertTriangle } from "lucide-react";
 import { cn, formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
+import { onActivateKey } from "@/lib/a11y";
 import { TxRow, KIND_ICON } from "./types";
 import { TypeIconChip, SourceChips, txNetAmount, rowPerShareDisplay } from "./utils";
 import type { Anomaly } from "@portfolio/api-client";
@@ -62,7 +63,10 @@ export function MobileView({
                 <div
                   key={tx.id}
                   data-state={isSelected ? "selected" : undefined}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onRowActivate(tx)}
+                  onKeyDown={onActivateKey(() => onRowActivate(tx))}
                   {...longPressHandlers(tx.id)}
                   className={cn(
                     "flex cursor-pointer select-none items-center gap-3 px-[15px] py-[14px]",

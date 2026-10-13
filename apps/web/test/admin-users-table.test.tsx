@@ -5,6 +5,7 @@ import type { AdminUser } from "@portfolio/api-client";
 
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn(async () => (key: string) => key),
+  getLocale: vi.fn(async () => "en"),
 }));
 
 // AdminUserActions (the kebab menu) has its own dedicated test — stub it here so this

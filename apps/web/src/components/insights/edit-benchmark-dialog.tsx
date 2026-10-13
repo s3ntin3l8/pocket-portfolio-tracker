@@ -137,7 +137,7 @@ export function EditBenchmarkDialog({
                 <button
                   type="button"
                   onClick={() => removeAt(i)}
-                  className="rounded-full p-0.5 text-text-3 transition-colors hover:text-foreground"
+                  className="touch-target relative rounded-full p-0.5 text-text-3 transition-colors hover:text-foreground"
                   aria-label={t("remove")}
                 >
                   <X className="size-3" />
@@ -157,6 +157,7 @@ export function EditBenchmarkDialog({
                     setQuery(e.target.value);
                     runSearch(e.target.value);
                   }}
+                  aria-label={t("searchBenchmark")}
                   placeholder={t("searchBenchmark")}
                   className="h-10 pl-9 pr-9 text-sm"
                 />

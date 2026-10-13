@@ -93,6 +93,7 @@ export function PortfolioStep({
             th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
             portfolioNameError && styles.inputError,
           )}
+          aria-label={copy.nameLabel}
           placeholder={copy.namePlaceholder}
           value={portfolioName}
           onChange={(e) => onPortfolioNameChange(e.target.value)}
@@ -116,15 +117,22 @@ export function PortfolioStep({
           <Input
             className={cn(th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14")}
             style={{ paddingRight: 40 }}
+            aria-label={copy.brokerageLabel}
             placeholder={copy.brokeragePlaceholder}
             value={brokerageValue}
             onChange={(e) => onBrokerageChange(e.target.value)}
             onFocus={onBrokerageFocus}
             onBlur={onBrokerageBlur}
           />
-          <span
+          <button
+            type="button"
+            aria-label={copy.brokerageLabel}
+            aria-expanded={brokerageOpen}
             onClick={onBrokerageToggle}
             style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
               position: "absolute",
               top: 0,
               right: 0,
@@ -154,7 +162,7 @@ export function PortfolioStep({
             >
               <path d={ICONS.chevronDown} />
             </svg>
-          </span>
+          </button>
         </div>
         {brokerageOpen && (
           <div

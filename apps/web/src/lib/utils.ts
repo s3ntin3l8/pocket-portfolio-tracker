@@ -135,6 +135,12 @@ export function formatSignedMoney(
   return `${amount >= 0 ? "+" : ""}${formatMoney(amount, currency, locale, opts)}`;
 }
 
+/** Semantic text tone for a signed P&L figure: gain green, loss red, zero/unknown neutral. */
+export function signTone(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n === 0) return "";
+  return n > 0 ? "text-success" : "text-destructive";
+}
+
 /**
  * Locale-formatted quantity. Reference (`Pocket Prototype.dc.html`) renders bare numbers
  * for "shares"/"units" with no suffix, and only "grams" gets a short unit ("8 g") — not
@@ -152,6 +158,43 @@ export function formatPercent(value: number, locale = "en") {
     maximumFractionDigits: 2,
     signDisplay: "exceptZero",
   }).format(value);
+}
+
+/**
+ * Locale-formatted percentage from a value already expressed in percent points
+ * (`12.5` -> "12.5%" / "12,5 %"). Use instead of `x.toFixed(1) + "%"`, which hard-codes
+ * the decimal separator and the sign/space convention.
+ */
+export function formatPercentPoints(pct: number, locale = "en", digits = 1) {
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(pct / 100);
+}
+
+/** Locale-formatted plain number with a fixed number of decimals (percentage-point gaps, …). */
+export function formatFixed(value: number, locale = "en", digits = 1) {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+/**
+ * Human-readable byte size with a locale-formatted number ("1.5 KB" / "1,5 KB"). The
+ * unit symbols (B/KB/MB/GB) are language-neutral, so only the number needs the locale.
+ */
+export function formatBytes(bytes: number, locale = "en"): string {
+  const fmt = (n: number, digits: number) =>
+    new Intl.NumberFormat(locale, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(n);
+  if (bytes < 1024) return `${fmt(bytes, 0)} B`;
+  if (bytes < 1024 * 1024) return `${fmt(bytes / 1024, 1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${fmt(bytes / (1024 * 1024), 1)} MB`;
+  return `${fmt(bytes / (1024 * 1024 * 1024), 2)} GB`;
 }
 
 /** Locale-formatted plain ratio (PE, beta, …) — unsigned, 1-2 decimals. */

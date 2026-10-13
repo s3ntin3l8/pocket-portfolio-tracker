@@ -92,3 +92,18 @@
 .floaty {
   animation: floaty 5.5s ease-in-out infinite;
 }
+
+/* Reduced motion: drop the ambient loops and entrance fades; layout/state is unchanged. */
+@media (prefers-reduced-motion: reduce) {
+  .stepAnim,
+  .driftGlow,
+  .driftGlowReverse,
+  .driftGlowIntro,
+  .driftGlowIntroReverse,
+  .swayWaveBrand,
+  .swayWaveIntro,
+  .fadeStep,
+  .floaty {
+    animation: none;
+  }
+}

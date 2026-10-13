@@ -24,6 +24,7 @@ export default async function SettingsLayout({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Settings");
+  const tNav = await getTranslations("Nav");
 
   const [me, portfoliosResult, holders] = await Promise.all([
     loadMe(),
@@ -137,14 +138,18 @@ export default async function SettingsLayout({
         </div>
       }
       landingTop={
-        identityCard && (
-          <Link
-            href="/settings/account"
-            className="mb-4 flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
-          >
-            {identityCard}
-          </Link>
-        )
+        <>
+          {/* The mobile landing has no visible page title; keep one h1 for the outline. */}
+          <h1 className="sr-only">{tNav("settings")}</h1>
+          {identityCard && (
+            <Link
+              href="/settings/account"
+              className="mb-4 flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
+            >
+              {identityCard}
+            </Link>
+          )}
+        </>
       }
     >
       {children}

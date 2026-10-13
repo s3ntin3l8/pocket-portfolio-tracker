@@ -95,6 +95,11 @@ export default async function AppLayout({
             netWorthResult.data.displayCurrency,
             locale,
           ),
+          allTimePct:
+            Number(netWorthResult.data.totalCost) > 0
+              ? Number(netWorthResult.data.totalUnrealizedPnL) /
+                Number(netWorthResult.data.totalCost)
+              : null,
           allTimePctFormatted:
             Number(netWorthResult.data.totalCost) > 0
               ? formatPercent(

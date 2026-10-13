@@ -4,6 +4,7 @@ import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
 
@@ -28,6 +29,7 @@ function CommandDialog({
   onOpenChange,
   ...props
 }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root>) {
+  const tA = useTranslations("A11y");
   // Android hardware/gesture back closes the palette instead of navigating the route.
   useBackToClose(open, onOpenChange);
   return (
@@ -38,7 +40,7 @@ function CommandDialog({
           aria-describedby={undefined}
           className="fixed left-1/2 top-[20%] z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
         >
-          <DialogPrimitive.Title className="sr-only">Search</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{tA("search")}</DialogPrimitive.Title>
           {children}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

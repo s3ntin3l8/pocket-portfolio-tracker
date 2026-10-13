@@ -430,7 +430,7 @@
     "usersTokens": "Tokens",
     "usersActions": "Actions",
     "confirmActionCancel": "Cancel",
-    "confirmActionTypeToConfirm": "Type \"Delete\" to confirm",
+    "confirmActionTypeToConfirm": "Type \"{word}\" to confirm",
     "confirmActionInputPlaceholder": "Delete"
   },
   "Income": {
@@ -2417,5 +2417,23 @@
   "FxMissing": {
     "title": "Exchange rate missing.",
     "body": "No exchange rate is available for {currencies}, so {count, plural, one {amounts in that currency are} other {amounts in those currencies are}} left out of the totals here instead of being converted 1:1. They'll be included once a rate is available."
+  },
+  "A11y": {
+    "back": "Back",
+    "close": "Close",
+    "clearSelection": "Clear selection",
+    "backToHoldings": "Back to holdings",
+    "skipToContent": "Skip to main content",
+    "primaryNav": "Main navigation",
+    "needsReview": "{count, plural, one {# item needs review} other {# items need review}}",
+    "search": "Search",
+    "toggleTheme": "Toggle theme",
+    "moreOptions": "More options",
+    "previous": "Previous",
+    "next": "Next",
+    "goToSlide": "Go to slide {n}"
+  },
+  "UiText": {
+    "streakMonths": "{count}mo"
   }
 }

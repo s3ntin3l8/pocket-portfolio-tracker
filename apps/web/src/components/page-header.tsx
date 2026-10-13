@@ -60,7 +60,10 @@ export function PageHeaderSetter({
 }
 
 /**
- * Renders the page's <h1> on mobile (hidden on desktop where the topbar owns it).
+ * The page's single <h1>. Visible on mobile; from `md` up the desktop topbar shows the
+ * title visually (as a plain paragraph, via `PageHeaderSetter`), so the <h1> stays in the
+ * accessibility tree but is screen-reader-only there. NOT `md:hidden`: that would leave
+ * the document without any heading on desktop.
  */
 export function PageTitle({
   children,
@@ -69,7 +72,7 @@ export function PageTitle({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <h1 className={cn("text-2xl font-bold md:hidden", className)}>{children}</h1>;
+  return <h1 className={cn("text-2xl font-bold md:sr-only", className)}>{children}</h1>;
 }
 
 /** Read the current page header state (used by AppShell). */

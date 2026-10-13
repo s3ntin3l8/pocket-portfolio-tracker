@@ -8,6 +8,7 @@ import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-t
 import { cn, formatPercent } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import type { BenchmarkSymbolEntry, YearlyReturnRow } from "@portfolio/api-client";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const CHART_PALETTE = [
   "var(--color-chart-1)",
@@ -24,6 +25,7 @@ interface YearlyReturnsCardProps {
 }
 
 export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyReturnsCardProps) {
+  const reducedMotion = useReducedMotion();
   const t = useTranslations("Insights.yearlyReturns");
 
   // Chart data: one row per year, one numeric series per benchmark (decimal fraction × 100).
@@ -119,9 +121,15 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                 return <ChartTooltipPanel title={String(label)} rows={tooltipRows} />;
               }}
             />
-            <Bar dataKey="portfolio" fill={CHART_PALETTE[0]} radius={[3, 3, 0, 0]} />
+            <Bar
+              isAnimationActive={!reducedMotion}
+              dataKey="portfolio"
+              fill={CHART_PALETTE[0]}
+              radius={[3, 3, 0, 0]}
+            />
             {benchmarkColumnKeys.map((sym, i) => (
               <Bar
+                isAnimationActive={!reducedMotion}
                 key={sym}
                 dataKey={sym}
                 fill={CHART_PALETTE[(i + 1) % CHART_PALETTE.length]}

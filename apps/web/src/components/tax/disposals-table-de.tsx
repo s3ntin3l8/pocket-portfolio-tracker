@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import type { TaxDisposalRow } from "@/lib/server-api";
-import { formatMoney } from "@/lib/utils";
+import { cn, formatMoney, signTone } from "@/lib/utils";
 import { useTableSort, type ColDef } from "@/lib/table-sort";
+import { onActivateKey } from "@/lib/a11y";
 import { useExpandedRows } from "./use-expanded-rows";
 import { DisposalCell, LotRow } from "./disposal-cells";
 import type { TaxTranslator } from "./tax-cards";
@@ -107,14 +108,17 @@ export function DisposalTable({
                   <Fragment key={key}>
                     <TableRow
                       className={hasLots ? "cursor-pointer" : undefined}
+                      tabIndex={hasLots ? 0 : undefined}
+                      aria-expanded={hasLots ? isOpen : undefined}
                       onClick={hasLots ? () => toggle(key) : undefined}
+                      onKeyDown={hasLots ? onActivateKey(() => toggle(key)) : undefined}
                     >
                       <DisposalCell row={r} money={money} t={t} isOpen={isOpen} />
                       <TableCell className="tabular text-right text-muted-foreground">
                         {money(r.proceeds)}
                       </TableCell>
                       <TableCell className="tabular text-right">
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        <span className={cn("font-semibold", signTone(Number(r.gain)))}>
                           {money(r.gain)}
                         </span>
                         {Number(r.tfRate) > 0 && (
@@ -134,7 +138,7 @@ export function DisposalTable({
                           lot={lot}
                           money={money}
                           secondaryValue={money(lot.gain)}
-                          secondaryClassName="font-medium text-emerald-600 dark:text-emerald-400"
+                          secondaryClassName={cn("font-medium", signTone(Number(lot.gain)))}
                         />
                       ))}
                   </Fragment>
@@ -147,7 +151,9 @@ export function DisposalTable({
                 <TableCell className="tabular text-right font-semibold">
                   {money(totalProceeds)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                <TableCell
+                  className={cn("tabular text-right font-semibold", signTone(Number(totalGain)))}
+                >
                   {money(totalGain)}
                 </TableCell>
               </TableRow>

@@ -4,6 +4,7 @@ import { AreaChart, Area, Line, Tooltip, ResponsiveContainer } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
 import type { ForecastPoint } from "@portfolio/core";
 import { formatMoney } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
  * Forecast sparkline for the green-gradient forecast hero: a solid white **value**
@@ -21,6 +22,7 @@ export function ForecastChart({
   presentValue: string;
   currency: string;
 }) {
+  const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const t = useTranslations("Savings");
   const pv = Number(presentValue);
@@ -59,6 +61,7 @@ export function ForecastChart({
             }}
           />
           <Area
+            isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="value"
             stroke="#ffffff"
@@ -67,6 +70,7 @@ export function ForecastChart({
             activeDot={{ r: 5, fill: "#fff", stroke: "#0B7D58", strokeWidth: 2.5 }}
           />
           <Line
+            isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="contributed"
             stroke="rgba(255,255,255,.65)"

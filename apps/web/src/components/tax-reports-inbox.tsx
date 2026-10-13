@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PortfolioPicker, type PickablePortfolio } from "@/components/portfolio-picker";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
+import { formatBytes as formatBytesLocale } from "@/lib/utils";
 
 const INBOX_COLS: ColDef<InboxDocument>[] = [
   { key: "document", get: (d) => d.originalFilename ?? "", type: "text" },
@@ -32,13 +33,6 @@ const INBOX_COLS: ColDef<InboxDocument>[] = [
   { key: "size", get: (d) => d.sizeBytes ?? 0, type: "numeric" },
   { key: "date", get: (d) => d.storedAt, type: "date" },
 ];
-
-function formatBytes(n: number | null): string {
-  if (n == null) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** Source badge: "pytr" (fetched from Trade Republic) vs "upload" (user-provided). */
 function SourceBadge({ source }: { source: string | null }) {
@@ -76,6 +70,7 @@ export function TaxReportsInbox({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [portfolioId, setPortfolioId] = useState(initialPortfolioId);
   const df = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+  const formatBytes = (n: number | null) => (n == null ? "—" : formatBytesLocale(n, locale));
   const canUpload = Boolean(portfolioId) && !uploading;
   const { sortKey, sortDir, toggle, sort } = useTableSort<InboxDocument>(INBOX_COLS);
   const sortedDocs = useMemo(() => sort(documents), [documents, sort]);

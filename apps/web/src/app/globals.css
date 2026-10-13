@@ -194,6 +194,23 @@
   }
 }
 
+/* Touch-target floor (WCAG 2.5.5 / audit F7): grows the tappable area of a small control
+   to at least 44x44 via an invisible, centred ::before, without changing its visual size
+   or its footprint in layout. The element must already be positioned (`relative`, or
+   `absolute`/`fixed`) and must not clip overflow. Neighbouring controls closer than 44px
+   overlap harmlessly (the later sibling wins the overlap). */
+@utility touch-target {
+  &::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* Hide scrollbar but keep scroll functional — used by the income calendar's
    horizontal month strip on screens where all 12 months don't fit. */
 @utility scrollbar-none {

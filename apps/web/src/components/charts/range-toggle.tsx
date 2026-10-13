@@ -44,7 +44,7 @@ export function RangeToggle({
           onClick={() => onChange(r)}
           aria-pressed={value === r}
           className={cn(
-            "transition-colors disabled:opacity-50",
+            "touch-target relative transition-colors disabled:opacity-50",
             theme === "inverse"
               ? cn(
                   "flex-1 rounded-full py-1.5 text-center text-xs",

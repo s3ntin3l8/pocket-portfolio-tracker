@@ -71,6 +71,7 @@ export function ToolbarSearch({
       <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
       <Input
         type="text"
+        aria-label={placeholder}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -81,7 +82,7 @@ export function ToolbarSearch({
           type="button"
           onClick={() => onChange("")}
           aria-label={clearLabel}
-          className="absolute right-2 text-muted-foreground hover:text-foreground"
+          className="absolute right-2 text-muted-foreground before:absolute before:-inset-3 hover:text-foreground"
         >
           <X className="size-3.5" />
         </button>

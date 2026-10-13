@@ -66,6 +66,7 @@ export function AddTransactionMenu({
   isAdmin?: boolean;
 } = {}) {
   const tm = useTranslations("Manage");
+  const tA = useTranslations("A11y");
   const ti = useTranslations("Import");
   const api = useApiClient();
   const searchParams = useSearchParams();
@@ -465,7 +466,7 @@ export function AddTransactionMenu({
                   type="button"
                   onClick={() => setStep("choose")}
                   aria-label={tm("back")}
-                  className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                  className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
                 >
                   <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
                 </button>
@@ -479,8 +480,8 @@ export function AddTransactionMenu({
                   mid-import — the pre-merge mobile Sheet's built-in close button worked
                   the same way. */}
               <DialogClose
-                className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
-                aria-label="Close"
+                className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                aria-label={tA("close")}
               >
                 <X className="size-[18px]" strokeWidth={2.2} />
               </DialogClose>

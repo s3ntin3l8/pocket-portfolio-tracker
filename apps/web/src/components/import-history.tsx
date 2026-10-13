@@ -188,7 +188,7 @@ export function ImportHistory({
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="size-6"
+                      className="touch-target relative size-6"
                       title={t("selectRows")}
                       aria-label={t("selectRows")}
                       onClick={() => setSelectionMode(true)}

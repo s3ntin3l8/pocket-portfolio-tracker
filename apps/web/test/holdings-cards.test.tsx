@@ -83,15 +83,17 @@ describe("AllocationCard", () => {
 describe("RegionCurrencyCard", () => {
   it("renders both sections with their rows", () => {
     render(
-      <RegionCurrencyCard
-        regionTitle="By region"
-        currencyTitle="By currency"
-        regionRows={[
-          { key: "Asia", label: "Asia", pct: 62.4 },
-          { key: "Europe", label: "Europe", pct: 37.6 },
-        ]}
-        currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
-      />,
+      withIntl(
+        <RegionCurrencyCard
+          regionTitle="By region"
+          currencyTitle="By currency"
+          regionRows={[
+            { key: "Asia", label: "Asia", pct: 62.4 },
+            { key: "Europe", label: "Europe", pct: 37.6 },
+          ]}
+          currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
+        />,
+      ),
     );
     expect(screen.getByText("By region")).toBeInTheDocument();
     expect(screen.getByText("By currency")).toBeInTheDocument();
@@ -103,12 +105,14 @@ describe("RegionCurrencyCard", () => {
 
   it("shows a dash placeholder for an empty column", () => {
     render(
-      <RegionCurrencyCard
-        regionTitle="By region"
-        currencyTitle="By currency"
-        regionRows={[]}
-        currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
-      />,
+      withIntl(
+        <RegionCurrencyCard
+          regionTitle="By region"
+          currencyTitle="By currency"
+          regionRows={[]}
+          currencyRows={[{ key: "IDR", label: "IDR", pct: 100 }]}
+        />,
+      ),
     );
     expect(screen.getAllByText("—")).toHaveLength(1);
   });

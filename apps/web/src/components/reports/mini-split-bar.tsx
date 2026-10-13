@@ -1,7 +1,8 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { formatPercentPoints } from "@/lib/utils";
 import { useChartTooltip } from "@/components/ui/use-chart-tooltip";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
 
@@ -47,11 +48,13 @@ export function MiniSplitBar({ segments }: { segments: MiniSplitBarSegment[] }) 
 
 function Segment({ segment }: { segment: MiniSplitBarSegment }) {
   const t = useTranslations("Chart");
+  const locale = useLocale();
   const tip = useChartTooltip<{ rows: ChartTooltipRow[]; label: string }>();
   const { pct, color, striped, label, amount, amountLabel } = segment;
   const flex = Math.max(0.5, Math.min(100, pct));
   const hasContent = label !== undefined || amount !== undefined;
-  const a11yLabel = label ? `${label}: ${pct.toFixed(1)}%` : `${pct.toFixed(1)}%`;
+  const pctLabel = formatPercentPoints(pct, locale, 1);
+  const a11yLabel = label ? `${label}: ${pctLabel}` : pctLabel;
   // Translated defaults so the fallback rows aren't English-only. The caller
   // can still override via `label` / `amountLabel`. This closes the #478
   // review's #3 gap: the bar was previously always-English for callers that
@@ -59,7 +62,7 @@ function Segment({ segment }: { segment: MiniSplitBarSegment }) {
   const rows: ChartTooltipRow[] = [];
   rows.push({
     label: label ?? t("share"),
-    value: `${pct.toFixed(1)}%`,
+    value: pctLabel,
     dot: color,
   });
   if (amount) {

@@ -414,7 +414,9 @@ export function OnboardingFlow() {
                     <button
                       type="button"
                       onClick={handleBack}
+                      className="touch-target"
                       style={{
+                        position: "relative",
                         display: "flex",
                         alignItems: "center",
                         gap: 5,
@@ -436,7 +438,9 @@ export function OnboardingFlow() {
                     type="button"
                     onClick={() => void handleSkipSetup()}
                     disabled={exiting}
+                    className="touch-target"
                     style={{
+                      position: "relative",
                       background: "none",
                       border: "none",
                       padding: 0,

@@ -48,6 +48,7 @@ export function HolderStep({
             th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
             holderNameError && styles.inputError,
           )}
+          aria-label={copy.nameLabel}
           placeholder={copy.namePlaceholder}
           value={holderName}
           onChange={(e) => onHolderNameChange(e.target.value)}
@@ -70,6 +71,7 @@ export function HolderStep({
             th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
             birthYearError && styles.inputError,
           )}
+          aria-label={copy.birthYearLabel}
           placeholder={copy.birthYearPlaceholder}
           inputMode="numeric"
           value={birthYear}

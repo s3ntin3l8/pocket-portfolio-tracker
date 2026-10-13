@@ -143,6 +143,7 @@ export function RecordCorporateActionForm({
 }) {
   const t = useTranslations("CorpAction");
   const tt = useTranslations("TxType");
+  const tA11y = useTranslations("A11y");
   const [type, setType] = useState<CaType>(isAdmin ? "split" : "merger");
 
   const [query, setQuery] = useState("");
@@ -378,7 +379,7 @@ export function RecordCorporateActionForm({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label={t("search")}
+                    aria-label={tA11y("clearSelection")}
                     onClick={() => setSelected(null)}
                   >
                     <X className="size-4" />

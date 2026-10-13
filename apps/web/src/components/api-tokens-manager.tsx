@@ -195,7 +195,7 @@ export function ApiTokensManager({
       <button
         type="button"
         onClick={openCreateModal}
-        className="flex items-center gap-1.5 text-sm font-bold text-success"
+        className="touch-target relative flex items-center gap-1.5 text-sm font-bold text-success"
       >
         <Plus className="size-4" strokeWidth={2.4} />
         {t("tokensCreate")}

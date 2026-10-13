@@ -88,7 +88,11 @@ describe("AdminUserActions", () => {
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: m.deleteUser }));
 
-    await waitFor(() => expect(screen.getByText(m.confirmActionTypeToConfirm)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText(m.confirmActionTypeToConfirm.replace("{word}", "Delete")),
+      ).toBeInTheDocument(),
+    );
     const confirmButton = screen.getByRole("button", { name: m.deleteUser });
     expect(confirmButton).toBeDisabled();
 

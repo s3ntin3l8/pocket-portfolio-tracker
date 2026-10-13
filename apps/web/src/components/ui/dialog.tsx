@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useTranslations } from "next-intl";
 import { X, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
@@ -114,6 +115,7 @@ function DialogContent({
    *  nothing alongside the portaled content. */
   footer?: React.ReactNode | true;
 }) {
+  const tA = useTranslations("A11y");
   // `!= null` also catches `null` (not just `undefined`) — a caller passing
   // `condition && <content/>` (a common React idiom) gets `null`, not `false`, when
   // `condition` is falsy, and that must not render an empty footer bar.
@@ -165,7 +167,7 @@ function DialogContent({
         {fullScreenOnMobile && mobileHeader && (
           <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 md:hidden">
             <DialogPrimitive.Close
-              aria-label="Back"
+              aria-label={tA("back")}
               className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground"
             >
               <ChevronLeft className="size-[18px]" />
@@ -207,13 +209,13 @@ function DialogContent({
         {!hideClose && (
           <DialogPrimitive.Close
             className={cn(
-              "absolute right-4 top-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none",
+              "touch-target absolute right-4 top-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none",
               // The mobile header's own back-chevron already closes — don't show both.
               fullScreenOnMobile && mobileHeader && "max-md:hidden",
             )}
           >
             <X className="size-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{tA("close")}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
