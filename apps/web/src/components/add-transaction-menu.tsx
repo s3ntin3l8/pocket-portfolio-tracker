@@ -167,7 +167,7 @@ export function AddTransactionMenu({
 
     let cancelled = false;
     void (async () => {
-      const loaded = await loadPortfolios();
+      await loadPortfolios();
       if (cancelled) return;
       const targetPortfolioId = currentDefaultPortfolioId();
 

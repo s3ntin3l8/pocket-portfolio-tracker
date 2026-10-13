@@ -1,4 +1,3 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
 import { StatCard } from "@/components/stat-card";
 import { EstimatedTaxHero, type TaxTranslator } from "@/components/tax/tax-cards";
 import {
@@ -8,8 +7,8 @@ import {
   IdByYearTable,
 } from "@/components/tax/tax-tables";
 import { DisposalTable, IdSalesTable } from "@/components/tax/disposal-table";
-import { loadPreferences, type TaxYearDetail } from "@/lib/server-api";
-import { formatMoney, formatMoneyCompact } from "@/lib/utils";
+import type { TaxYearDetail } from "@/lib/server-api";
+import { formatMoneyCompact } from "@/lib/utils";
 import type { IndonesianFinalTax } from "@portfolio/core";
 
 /** Per-holder DE detail tables (DisposalTable + DividendsTable + ByYearTable). */

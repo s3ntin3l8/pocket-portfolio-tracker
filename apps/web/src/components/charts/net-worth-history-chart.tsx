@@ -224,7 +224,7 @@ export function NetWorthHistoryChart({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy={loading}>
       <div className="flex items-center justify-between gap-2">
         {/* Mode toggle */}
         <div

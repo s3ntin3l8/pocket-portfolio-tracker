@@ -41,7 +41,7 @@ const KNOWN_RECOMMENDATIONS = new Set(["strong_buy", "buy", "hold", "sell", "str
  * range, volume — labeled "as of" the cache's refresh time), analyst recommendations,
  * a revenue-vs-earnings mini chart, next earnings + ex-dividend dates, and an external
  * link. Client-fetched on mount (not server-preloaded) so a slow/unreachable provider
- * doesn't block the rest of the page — mirrors `GoldTicker`'s fetch-on-mount pattern.
+ * doesn't block the rest of the page.
  *
  * Coverage-driven: Yahoo's fundamentals coverage varies by asset class (equities get the
  * full set; ETFs get a reduced set — no PE/EPS/analyst data) and can be entirely absent

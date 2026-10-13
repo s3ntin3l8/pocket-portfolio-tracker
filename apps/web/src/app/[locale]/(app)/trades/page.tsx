@@ -7,7 +7,7 @@ import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { TABLE_LABEL, TABLE_VALUE, TABLE_VALUE_STRONG } from "@/components/ui/table";
+import { TABLE_LABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
 import { TradesTable } from "@/components/trades-table";
 import { TradeMethodToggle } from "@/components/trade-method-toggle";
 import { loadTrades, loadPreferences } from "@/lib/server-api";
