@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import type {
   AssetClass,
   InstrumentRef,
@@ -27,7 +28,7 @@ export class GoldApiProvider implements MarketDataProvider {
     opts: ProviderOptions = {},
   ) {
     this.baseUrl = opts.baseUrl ?? "https://www.goldapi.io/api";
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(assetClass: AssetClass, market: string): boolean {

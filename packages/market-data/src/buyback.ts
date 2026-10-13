@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import type { AssetClass, InstrumentRef, MarketDataProvider, Quote } from "./types.js";
 import type { ProviderOptions } from "./twelve-data.js";
 
@@ -19,7 +20,7 @@ export class BuybackProvider implements MarketDataProvider {
     this.name = opts.name;
     this.market = opts.market;
     this.baseUrl = opts.baseUrl;
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(assetClass: AssetClass, market: string): boolean {

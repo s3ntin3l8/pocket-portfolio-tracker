@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import type { AssetClass, InstrumentRef, MarketDataProvider, Quote } from "./types.js";
 import type { ProviderOptions } from "./twelve-data.js";
 
@@ -15,7 +16,7 @@ export class NavProvider implements MarketDataProvider {
 
   constructor(opts: ProviderOptions & { baseUrl: string }) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(assetClass: AssetClass): boolean {

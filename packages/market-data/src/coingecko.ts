@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import { toDateKey } from "@portfolio/core";
 import {
   MarketDataError,
@@ -74,7 +75,7 @@ export class CoinGeckoProvider implements MarketDataProvider {
   constructor(opts: CoinGeckoOptions = {}) {
     this.baseUrl = opts.baseUrl ?? "https://api.coingecko.com/api/v3";
     this.apiKey = opts.apiKey;
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(assetClass: AssetClass, market: string): boolean {

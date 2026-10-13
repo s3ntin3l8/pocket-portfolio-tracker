@@ -13,6 +13,10 @@ import { assetClassFromType, mapExchange } from "./instrument-mapping.js";
 import { isIsin, isWkn } from "./types.js";
 
 const MAX_SEARCH_RESULTS = 10;
+/** Max in-flight quote lookups during `getQuotes`. */
+const QUOTE_CONCURRENCY = 4;
+/** Provider failures tolerated per `getQuotes` run before it is skipped for the rest. */
+const PROVIDER_ERROR_BUDGET = 5;
 
 /** Optional instrumentation, e.g. to count API calls per provider for usage tracking. */
 export interface MarketDataServiceOptions {
@@ -51,12 +55,28 @@ export class MarketDataService {
   }
 
   async getQuote(ref: InstrumentRef): Promise<Quote | null> {
+    return this.getQuoteBudgeted(ref);
+  }
+
+  /**
+   * `budget` (optional, shared across one `getQuotes` run) counts provider failures; a
+   * provider that has already failed `PROVIDER_ERROR_BUDGET` times in the run is skipped
+   * for the remaining instruments so one dead upstream can't stall a 5-minute refresh.
+   */
+  private async getQuoteBudgeted(
+    ref: InstrumentRef,
+    budget?: Map<string, number>,
+  ): Promise<Quote | null> {
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
+      if ((budget?.get(provider.name) ?? 0) >= PROVIDER_ERROR_BUDGET) continue;
       try {
         this.opts.onCall?.(provider.name);
         const quote = await provider.getQuote(ref);
         if (quote) return quote;
-      } catch {
+      } catch (err) {
+        budget?.set(provider.name, (budget.get(provider.name) ?? 0) + 1);
+        // Surfaced even when a later provider succeeds (#749, audit D10).
+        this.opts.onProviderError?.(provider.name, "getQuote", err);
         // A failing/timing-out provider shouldn't block the fallback chain — try the next.
       }
     }
@@ -122,9 +142,14 @@ export class MarketDataService {
   async getDividends(ref: InstrumentRef, fromDate?: string): Promise<DividendEvent[]> {
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getDividends) continue;
-      this.opts.onCall?.(provider.name);
-      const events = (await provider.getDividends(ref, fromDate)) ?? [];
-      if (events.length > 0) return events;
+      try {
+        this.opts.onCall?.(provider.name);
+        const events = (await provider.getDividends(ref, fromDate)) ?? [];
+        if (events.length > 0) return events;
+      } catch (err) {
+        // One provider throwing must not abort the chain (audit D10).
+        this.opts.onProviderError?.(provider.name, "getDividends", err);
+      }
     }
     return [];
   }
@@ -294,14 +319,24 @@ export class MarketDataService {
     return null;
   }
 
-  /** Quote several instruments, keyed by an id you supply (e.g. instrument id). */
+  /**
+   * Quote several instruments, keyed by an id you supply (e.g. instrument id). Runs with
+   * bounded concurrency (not an unbounded `Promise.all`) and a per-run error budget per
+   * provider (audit D2).
+   */
   async getQuotes(refs: Array<{ id: string; ref: InstrumentRef }>): Promise<Record<string, Quote>> {
     const out: Record<string, Quote> = {};
-    await Promise.all(
-      refs.map(async ({ id, ref }) => {
-        const quote = await this.getQuote(ref);
+    const budget = new Map<string, number>();
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < refs.length) {
+        const { id, ref } = refs[next++]!;
+        const quote = await this.getQuoteBudgeted(ref, budget);
         if (quote) out[id] = quote;
-      }),
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(QUOTE_CONCURRENCY, refs.length) }, () => worker()),
     );
     return out;
   }
