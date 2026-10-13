@@ -12,6 +12,9 @@ import {
   convert,
   toDateKey,
   fxAvailable,
+  gainSummary,
+  aggregateBoundary,
+  mergeContributionStats,
 } from "@portfolio/core";
 import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { loadSparklines } from "../../services/sparklines.js";
@@ -27,6 +30,7 @@ import {
   boundaryFlows,
   excludeFxMissingInstruments,
   computePortfolioAnomalies,
+  portfolioContributionStats,
   PORTFOLIO_VALUATION_CONCURRENCY,
 } from "./shared.js";
 
@@ -93,7 +97,16 @@ export function registerNetworthRoutes(app: FastifyInstance) {
           display,
           corporateActions,
         );
-        return { summary, flows };
+        // Net contributed on the same instruments + boundary as the value (audit G2).
+        const contribution = await portfolioContributionStats(
+          app,
+          coreTxns,
+          summary,
+          display,
+          p.cashCounted ? "inside" : "outside",
+          corporateActions,
+        );
+        return { summary, flows, contribution };
       });
       const summaries = perPortfolio.map((r) => r.summary);
       const instrumentIds = new Set<string>();
@@ -103,6 +116,14 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       }
 
       const aggregated = aggregatePortfolios(summaries, display);
+      const gain = gainSummary({
+        summary: aggregated,
+        contribution: mergeContributionStats(
+          perPortfolio.map((r) => r.contribution),
+          display,
+        ),
+        boundary: aggregateBoundary(pfs.map((p) => (p.cashCounted ? "inside" : "outside"))),
+      });
       const meta = await instrumentMeta(app, [...instrumentIds]);
       const spark = await loadSparklines(app.db, [...instrumentIds]);
       const holdings = aggregated.holdings.map((h) => ({
@@ -187,6 +208,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
         ...aggregated,
         holdings,
         allocation,
+        gain,
         ...(Object.keys(drift).length > 0 ? { drift } : {}),
         xirr: Number.isFinite(rate) ? rate : null,
         periodXirr: pXirr,

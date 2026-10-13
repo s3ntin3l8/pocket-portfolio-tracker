@@ -4,6 +4,8 @@ import {
   detectSparplans,
   xirr,
   type CashFlowPoint,
+  gainSummary,
+  type GainSummary,
   type ContributionStats,
   type CoreTransaction,
   type CorporateAction,
@@ -111,6 +113,57 @@ export async function buildContributions(
     totalReturn: boundary === "outside",
     retirementAge,
   });
+}
+
+/**
+ * One portfolio's contribution stats on the same instrument set the value side used
+ * (fxMissing instruments excluded, unconvertible rows partitioned out — audit B2), so
+ * `netContributed` pairs with `summary.netWorth` on a single boundary. Shared by
+ * `buildContributions` consumers and the {@link GainSummary} on the summary/networth
+ * responses (audit G2).
+ */
+export async function portfolioContributionStats(
+  app: FastifyInstance,
+  coreTxns: CoreTransaction[],
+  summary: PortfolioSummary,
+  display: string,
+  boundary: "inside" | "outside",
+  corporateActions: CorporateAction[] = [],
+): Promise<ContributionStats> {
+  const ccys = [...new Set(coreTxns.map((t) => t.currency))];
+  const fx = makeFxRateFn(await getFxRates(app.db, ccys, display), display);
+  const { convertible } = partitionConvertible(
+    excludeFxMissingInstruments(coreTxns, summary),
+    display,
+    fx,
+  );
+  return contributionStats({
+    txns: convertible,
+    displayCurrency: display,
+    fx,
+    boundary,
+    corporateActions,
+  });
+}
+
+/** The single-portfolio {@link GainSummary} (audit G2). */
+export async function buildGainSummary(
+  app: FastifyInstance,
+  coreTxns: CoreTransaction[],
+  summary: PortfolioSummary,
+  display: string,
+  boundary: "inside" | "outside",
+  corporateActions: CorporateAction[] = [],
+): Promise<GainSummary> {
+  const contribution = await portfolioContributionStats(
+    app,
+    coreTxns,
+    summary,
+    display,
+    boundary,
+    corporateActions,
+  );
+  return gainSummary({ summary, contribution, boundary });
 }
 
 export async function buildSparplanStats(
