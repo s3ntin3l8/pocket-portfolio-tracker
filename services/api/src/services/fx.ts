@@ -78,7 +78,7 @@ export class FrankfurterFxProvider implements FxProvider {
     end: string,
   ): Promise<Record<string, number>> {
     try {
-      const url = `${this.baseUrl}/rates?from=${start}&to=${end}&base=${encodeURIComponent(from)}&quotes=${encodeURIComponent(to)}`;
+      const url = `${this.baseUrl}/rates?from=${encodeURIComponent(start)}&to=${encodeURIComponent(end)}&base=${encodeURIComponent(from)}&quotes=${encodeURIComponent(to)}`;
       const res = await this.doFetch(url);
       if (!res.ok) return {};
       const data = (await res.json()) as { date?: string; rate?: number }[];

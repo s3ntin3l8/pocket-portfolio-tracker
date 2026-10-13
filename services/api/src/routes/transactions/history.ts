@@ -12,6 +12,7 @@ import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
 import { aggregateValueFlows, xirr, chainIndex, convert, fxAvailable } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
+import { isReadOnlyPat } from "../../plugins/auth.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
@@ -69,7 +70,9 @@ export function registerHistoryRoutes(app: FastifyInstance) {
 
       const result = await withDerivationCache(
         historyCache,
-        `${portfolioId}:${range}`,
+        // A read-scoped PAT gets a benchmark-less variant (no provider fetch/persist);
+        // keep it out of the shared entry so it can't serve a degraded series to others.
+        `${portfolioId}:${range}${isReadOnlyPat(request) ? ":ro" : ""}`,
         async () => {
           const start = rangeStart(range);
           const conds = [eq(portfolioSnapshots.portfolioId, portfolioId)];
@@ -109,7 +112,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             const bmDates = result.map((p) => p.date);
             const existingBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
             const missingDates = bmDates.filter((d) => !existingBm.has(d));
-            if (missingDates.length > 0) {
+            if (missingDates.length > 0 && !isReadOnlyPat(request)) {
               const earliest = missingDates[0];
               try {
                 const md = await getMarketData();
@@ -243,7 +246,9 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       .limit(1);
     const display = u?.displayCurrency ?? "IDR";
 
-    const ck = cacheKey(id, range, holderId ?? "", includeParam, excludeParam);
+    const readOnlyPat = isReadOnlyPat(request);
+    const ck =
+      cacheKey(id, range, holderId ?? "", includeParam, excludeParam) + (readOnlyPat ? ":ro" : "");
     const cached = await withDerivationCache(historyCache, ck, async () => {
       // 1D/7D: aggregate the intraday (timestamped) table instead of the day-grained one.
       if (range === "1d" || range === "7d") {
@@ -356,7 +361,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         const bmDates = result.map((p) => p.date);
         const existingBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
         const missingDates = bmDates.filter((d) => !existingBm.has(d));
-        if (missingDates.length > 0) {
+        if (missingDates.length > 0 && !readOnlyPat) {
           const earliest = missingDates[0];
           try {
             const md = await getMarketData();

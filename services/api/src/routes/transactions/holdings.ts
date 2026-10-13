@@ -6,6 +6,7 @@ import { netManualAdjustments } from "../../services/pytr/reconcile.js";
 import { loadSparklines } from "../../services/sparklines.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 import { needsSectorEnrichment, needsNameEnrichment } from "../../services/instrument-metadata.js";
+import { isReadOnlyPat } from "../../plugins/auth.js";
 import { enqueueInstrumentMetadata } from "../../services/scheduler.js";
 import {
   computeHoldings,
@@ -107,8 +108,9 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
         request.log,
       )) as unknown as { summary: PortfolioSummary; metaById: Map<string, InstrumentMeta> };
       if (
-        needsSectorEnrichment([...metaById.values()]) ||
-        needsNameEnrichment([...metaById.values()])
+        !isReadOnlyPat(request) &&
+        (needsSectorEnrichment([...metaById.values()]) ||
+          needsNameEnrichment([...metaById.values()]))
       ) {
         void enqueueInstrumentMetadata();
       }

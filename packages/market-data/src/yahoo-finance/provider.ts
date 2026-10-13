@@ -110,7 +110,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
 
   private async chartBySymbol(symbol: string, range: string): Promise<ChartResult | null> {
     const res = await this.doFetch(
-      `${this.baseUrl}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`,
+      `${this.baseUrl}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=1d`,
       { headers: this.defaultHeaders },
     );
     if (res.status === 404) return null;
