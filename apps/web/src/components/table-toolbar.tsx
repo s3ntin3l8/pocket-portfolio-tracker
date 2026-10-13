@@ -35,12 +35,14 @@ export function TableToolbar({
 
 /**
  * Filters-wrapper class for toolbars whose chips stay visible (and horizontally scroll)
- * on mobile — Trades, Income, Holdings. `min-w-0` lets this shrink instead of squeezing
- * the search input when there are many pills inside a narrow main column.
+ * on mobile — Trades, Income, Holdings (with the edge scroll shadow, audit G5). From `md:`
+ * it takes the row's remaining width (`flex-1 min-w-0`) and wraps onto further lines, so the
+ * chips can never run underneath the fixed-size search box beside them.
  */
 export const TOOLBAR_FILTERS =
-  "flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] " +
-  "md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden";
+  "scroll-shadow-x flex min-w-0 items-center gap-2 pb-0.5 [--scroll-shadow-bg:var(--background)] " +
+  "[scrollbar-width:none] md:flex-1 md:flex-wrap md:overflow-visible md:bg-none md:pb-0 " +
+  "[&::-webkit-scrollbar]:hidden";
 
 /**
  * Filters-wrapper class for toolbars whose mobile chips live in a filter `Sheet` instead

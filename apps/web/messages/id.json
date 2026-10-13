@@ -1209,6 +1209,7 @@
     "email": "Email",
     "authVia": "Masuk melalui Authentik (OIDC) · {email}",
     "authViaLocal": "Masuk dengan email dan kata sandi · {email}",
+    "authViaDev": "Bypass pengembangan · {email}",
     "version": "Versi {version} — catatan rilis",
     "manage": "Kelola",
     "portfoliosLink": "Portofolio & pemilik",

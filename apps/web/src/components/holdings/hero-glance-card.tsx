@@ -32,6 +32,7 @@ export function HeroGlanceCard({
   atCostCount = 0,
   fxMissingCount = 0,
   atCostHref = "/holdings?filter=at-cost",
+  hasIntraday = true,
 }: {
   netWorth: string;
   currency: string;
@@ -56,6 +57,8 @@ export function HeroGlanceCard({
   fxMissingCount?: number;
   /** Where the count links to — the Holdings list filtered to at-cost / no-FX rows. */
   atCostHref?: string;
+  /** `false` on a fresh install hides the 1D/7D chips until intraday snapshots exist (G8); `"unavailable"` (check failed) keeps them. */
+  hasIntraday?: boolean | "unavailable";
 }) {
   const t = useTranslations("Holdings.hero");
   const tHoldings = useTranslations("Holdings");
@@ -145,6 +148,7 @@ export function HeroGlanceCard({
           selectedId={selectedId}
           holderId={holderId}
           variant="hero"
+          hasIntraday={hasIntraday}
           initialRange={initialRange}
           onSeriesChange={onSeriesChange}
         />

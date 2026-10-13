@@ -138,6 +138,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
             : undefined
         }
         value={m(Number(s.thisYear))}
+        valueCompact={mc(Number(s.thisYear))}
         caption={t("income.caption")}
         splitBar={splitBar}
         metrics={[
@@ -214,6 +215,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
             : undefined
         }
         value={m(ytdRealized)}
+        valueCompact={mc(ytdRealized)}
         caption={t("trades.caption")}
         splitBar={splitBar}
         metrics={[
@@ -275,6 +277,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
             : undefined
         }
         value={m(currentValue)}
+        valueCompact={mc(currentValue)}
         caption={t("savings.caption")}
         splitBar={splitBar}
         gain={
@@ -330,6 +333,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         title={t("tax.title")}
         trend={{ label: t("tax.idTrend"), tone: "neutral" }}
         value={m(totalTax)}
+        valueCompact={mc(totalTax)}
         caption={t("tax.idCaption")}
         metrics={[
           { label: t("tax.idMetricSales"), value: mc(totalProceeds) },
@@ -369,6 +373,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
             : undefined
         }
         value={m(usedYtd)}
+        valueCompact={mc(usedYtd)}
         caption={t("tax.caption")}
         splitBar={
           allowanceAnnual > 0

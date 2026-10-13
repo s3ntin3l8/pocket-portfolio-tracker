@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { setRequestLocale } from "next-intl/server";
 import { Landing } from "@/components/landing";
+import { isDevAuthBypass } from "@/lib/dev-auth";
 
 // Locale-based default when no returning-user cookie is set yet — id visitors see the
 // domestic figure, everyone else a Euro one (the primary user's home currency).
@@ -13,7 +14,7 @@ const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);
 // devToken bypass (see apps/web/src/app/[locale]/(app)/layout.tsx and
 // apps/web/src/app/api/backend/[...path]/route.ts) — when DEV_AUTH_TOKEN is active, the
 // sign-in forms below are dead ends (Authentik/local auth may not be configured at all).
-const devBypass = process.env.NODE_ENV !== "production" && Boolean(process.env.DEV_AUTH_TOKEN);
+const devBypass = isDevAuthBypass();
 
 /**
  * Whether the self-host first-run flow (POST /auth/local/setup) should still be

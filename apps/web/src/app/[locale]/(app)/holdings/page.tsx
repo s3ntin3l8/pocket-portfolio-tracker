@@ -23,6 +23,7 @@ import {
   loadNetworthAnomalies,
   loadNetWorth,
   loadNetWorthHistory,
+  loadHasIntraday,
   loadNetWorthHolderScope,
   loadPreferences,
   loadMe,
@@ -91,6 +92,7 @@ export default async function HoldingsPage({
   // all-portfolios view. Per-portfolio anomalies only work with a specific ID.
   const anomaliesPromise = portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies();
   const historyPromise = loadNetWorthHistory(HERO_INITIAL_RANGE);
+  const hasIntradayPromise = loadHasIntraday();
   const holderScopePromise = loadNetWorthHolderScope();
   const selectedIdPromise = getSelectedPortfolioId();
   const mePromise = loadMe();
@@ -98,14 +100,16 @@ export default async function HoldingsPage({
   const prefs = await prefsPromise;
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
-  const [result, netWorthResult, anomalies, history, selectedId, holderId] = await Promise.all([
-    loadHoldings(costBasis, portfolioParam),
-    loadNetWorth(costBasis),
-    anomaliesPromise,
-    historyPromise,
-    selectedIdPromise,
-    holderScopePromise,
-  ]);
+  const [result, netWorthResult, anomalies, history, selectedId, holderId, hasIntraday] =
+    await Promise.all([
+      loadHoldings(costBasis, portfolioParam),
+      loadNetWorth(costBasis),
+      anomaliesPromise,
+      historyPromise,
+      selectedIdPromise,
+      holderScopePromise,
+      hasIntradayPromise,
+    ]);
 
   if (TIMING) {
     // eslint-disable-next-line react-hooks/purity
@@ -315,6 +319,7 @@ export default async function HoldingsPage({
           currency={summary.displayCurrency}
           initialHistory={history}
           initialRange={HERO_INITIAL_RANGE}
+          hasIntraday={hasIntraday}
           selectedId={selectedId}
           holderId={holderId}
           benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}

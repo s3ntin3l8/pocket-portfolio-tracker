@@ -24,6 +24,7 @@ export const performanceCache = createStore<{
   asOf: string;
 }>();
 export const historyCache = createStore<unknown[]>();
+export const intradayStatusCache = createStore<{ hasIntraday: boolean }>();
 export const insightsCache = createStore<unknown>();
 
 export const sparplanCache = createStore<SparplanStats>();

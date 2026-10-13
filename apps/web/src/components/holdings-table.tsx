@@ -106,9 +106,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
 
   return (
     <>
-      {/* ── Desktop table (md+) ── */}
-      <div className="hidden md:block">
-        <Table>
+      {/* ── Desktop table (lg+; six columns need the room — tablet gets the list) ── */}
+      <div className="hidden lg:block">
+        {/* min-w-[720px] is the natural six-column minimum; it is load-bearing for
+            scroll-shadow-x, which only shows when the table actually overflows its wrapper. */}
+        <Table edgeAffordance className="min-w-[720px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead
@@ -294,9 +296,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
         )}
       </div>
 
-      {/* ── Mobile list (< md) ── reference row: badge, symbol over "name · quantity",
+      {/* ── List (< lg) ── reference row: badge, symbol over "name · quantity",
           a price-course sparkline, then value + percent. No avg-cost/price columns. ── */}
-      <div className="md:hidden flex flex-col">
+      <div className="flex flex-col lg:hidden">
         {sorted.map((h, i) => {
           const { pnl, pct, display } = computeRowValues(h, currency, locale);
           const pnlColor =

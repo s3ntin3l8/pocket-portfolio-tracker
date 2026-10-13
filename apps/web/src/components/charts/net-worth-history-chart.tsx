@@ -59,6 +59,7 @@ export function NetWorthHistoryChart({
   variant = "card",
   initialRange,
   onSeriesChange,
+  hasIntraday = true,
 }: {
   initial: HistoryPoint[];
   currency: string;
@@ -77,6 +78,10 @@ export function NetWorthHistoryChart({
   /** Fired whenever the rendered series (or range) changes — lets a "hero" caller derive
    *  its own period delta/pct pill from the same data the chart is already showing. */
   onSeriesChange?: (snapshot: HeroSeriesSnapshot, range: ChartRange) => void;
+  /** Hero variant only (ignored for "card"): a definite `false` hides the 1D/7D chips (no
+   *  intraday snapshots exist yet, so they would only show the "collecting" placeholder).
+   *  `true` and `"unavailable"` (the check failed) keep them. Defaults to true. */
+  hasIntraday?: boolean | "unavailable";
 }) {
   const te = useTranslations("Empty");
   const t = useTranslations("Chart");
@@ -206,6 +211,10 @@ export function NetWorthHistoryChart({
     />
   );
 
+  // Only a definite "no intraday data" hides the chips; a failed check keeps them.
+  const heroRanges =
+    hasIntraday === false ? HERO_RANGES.filter((r) => !isIntradayRange(r)) : HERO_RANGES;
+
   if (isHero) {
     return (
       <div className="space-y-3">
@@ -220,7 +229,7 @@ export function NetWorthHistoryChart({
         ) : (
           <p className="py-8 text-center text-sm text-white/80">{te("historyTitle")}</p>
         )}
-        <RangeToggle value={range} onChange={pick} ranges={HERO_RANGES} theme="inverse" />
+        <RangeToggle value={range} onChange={pick} ranges={heroRanges} theme="inverse" />
       </div>
     );
   }

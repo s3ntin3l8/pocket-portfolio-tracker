@@ -1,3 +1,5 @@
+import { authViaKey } from "@/lib/auth-label";
+import { isDevAuthBypass } from "@/lib/dev-auth";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { UserRound, TrendingUp, Briefcase, KeyRound, ShieldCheck } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
@@ -128,7 +130,7 @@ export default async function SettingsLayout({
         // line directly above it (matches the desktop account section's footer note).
         <div className="space-y-2 pt-1">
           <p className="px-1 text-center text-xs text-muted-foreground">
-            {t("authVia", { email: me?.email ?? "" })}
+            {t(authViaKey(me?.authSub, isDevAuthBypass()), { email: me?.email ?? "" })}
           </p>
           <SignOutButton />
           <AppVersion

@@ -3,6 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/card";
 import { TrendChip, type TrendTone } from "@/components/reports/trend-chip";
 import { MiniSplitBar, type MiniSplitBarSegment } from "@/components/reports/mini-split-bar";
+import { ResponsiveMoney } from "@/components/ui/responsive-money";
 import { TwoStatFooter } from "@/components/reports/two-stat-footer";
 
 /**
@@ -19,6 +20,7 @@ export function ReportCard({
   title,
   trend,
   value,
+  valueCompact,
   caption,
   splitBar,
   metrics,
@@ -32,6 +34,8 @@ export function ReportCard({
   title: string;
   trend?: { label: string; tone: TrendTone; arrow?: boolean };
   value: string;
+  /** Compact form of `value` shown below the `sm` breakpoint so a large figure never needs an ellipsis. */
+  valueCompact?: string;
   caption: string;
   splitBar?: MiniSplitBarSegment[];
   metrics: Array<{ label: string; value: string; color?: string }>;
@@ -59,7 +63,9 @@ export function ReportCard({
           {trend && <TrendChip label={trend.label} tone={trend.tone} arrow={trend.arrow} />}
         </div>
 
-        <p className="tabular mt-4 truncate text-[30px] font-extrabold">{value}</p>
+        <p className="tabular mt-4 text-[30px] font-extrabold">
+          <ResponsiveMoney full={value} compact={valueCompact} />
+        </p>
         <p className="mt-[3px] truncate text-[13px] font-medium text-text-2">{caption}</p>
 
         {gain && <div className="mt-2">{gain}</div>}

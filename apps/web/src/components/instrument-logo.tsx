@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import { MonogramBadge } from "@/components/monogram-badge";
 
@@ -20,6 +20,20 @@ export const MARKET_LOGO_SUFFIX: Record<string, string> = {
   IDX: ".JK",
   XETRA: ".DE",
 };
+
+/**
+ * logo.dev URLs that already failed to load this session (module-level, so it survives
+ * remounts and is shared by every row/page in the SPA). A known-missing logo renders the
+ * monogram immediately instead of re-requesting the 404 on every row, filter change and
+ * route transition. Resets on a full page reload — deliberately not persisted, so a logo that
+ * logo.dev adds later is picked up on the next session.
+ */
+const failedLogoUrls = new Set<string>();
+
+/** Test helper: forget remembered 404s. */
+export function resetFailedLogoCache() {
+  failedLogoUrls.clear();
+}
 
 /** Asset classes for which a logo.dev lookup is attempted; everything else is a monogram. */
 const LOGO_ASSET_CLASSES = new Set(["equity", "etf", "crypto"]);
@@ -67,15 +81,29 @@ export function InstrumentLogo({
   }
   const token = process.env.NEXT_PUBLIC_LOGODEV_TOKEN;
 
-  const eligible =
-    !errored && !!token && !!symbol && !!assetClass && LOGO_ASSET_CLASSES.has(assetClass);
+  const lookupEligible = !!token && !!symbol && !!assetClass && LOGO_ASSET_CLASSES.has(assetClass);
+  const src = lookupEligible
+    ? `https://img.logo.dev/${logoDevPath(symbol, market, assetClass)}?token=${token}&size=128&format=png&fallback=404`
+    : null;
 
-  if (!eligible) {
+  const markFailed = useCallback(() => {
+    if (src) failedLogoUrls.add(src);
+    setErrored(true);
+  }, [src]);
+
+  // SSR'd <img> elements can finish failing before React hydrates and attaches `onError`,
+  // which would leave the browser's broken-image glyph on screen forever. A ref callback
+  // runs at attach time, so catch the already-failed case there.
+  const imgRef = useCallback(
+    (img: HTMLImageElement | null) => {
+      if (img && img.complete && img.naturalWidth === 0 && img.currentSrc) markFailed();
+    },
+    [markFailed],
+  );
+
+  if (!src || errored || failedLogoUrls.has(src)) {
     return <MonogramBadge label={label} assetClass={assetClass} className={className} />;
   }
-
-  const path = logoDevPath(symbol, market, assetClass);
-  const src = `https://img.logo.dev/${path}?token=${token}&size=128&format=png&fallback=404`;
 
   return (
     <span
@@ -87,10 +115,11 @@ export function InstrumentLogo({
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- external CDN image, next/image is unused in this app */}
       <img
+        ref={imgRef}
         src={src}
         alt=""
         className="block size-full object-contain p-1"
-        onError={() => setErrored(true)}
+        onError={markFailed}
       />
     </span>
   );

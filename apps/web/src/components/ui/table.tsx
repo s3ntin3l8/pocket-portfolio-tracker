@@ -1,10 +1,26 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/**
+ * `edgeAffordance` (audit G5) opts a wide table into the scroll-shadow wrapper
+ * (`scroll-shadow-x`, shadows appear only on an edge with more content past it) and a
+ * pinned first column (`sticky-first-col`), so horizontal overflow is never silent.
+ */
+function Table({
+  className,
+  edgeAffordance = false,
+  ...props
+}: React.ComponentProps<"table"> & { edgeAffordance?: boolean }) {
   return (
-    <div className="relative w-full overflow-x-auto">
-      <table className={cn("w-full caption-bottom text-sm", className)} {...props} />
+    <div className={cn("relative w-full overflow-x-auto", edgeAffordance && "scroll-shadow-x")}>
+      <table
+        className={cn(
+          "w-full caption-bottom text-sm",
+          edgeAffordance && "sticky-first-col",
+          className,
+        )}
+        {...props}
+      />
     </div>
   );
 }
@@ -67,8 +83,8 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 // `cn()` (e.g. `cn(TABLE_VALUE, "text-text-mute")` for a de-emphasized secondary number).
 export const TABLE_LABEL = "text-sm font-bold";
 export const TABLE_SUBLABEL = "text-xs font-medium text-text-2";
-export const TABLE_VALUE = "tabular text-right text-[13px] font-medium";
-export const TABLE_VALUE_STRONG = "tabular text-right text-[13px] font-bold";
+export const TABLE_VALUE = "tabular whitespace-nowrap text-right text-[13px] font-medium";
+export const TABLE_VALUE_STRONG = "tabular whitespace-nowrap text-right text-[13px] font-bold";
 export const TABLE_SUBVALUE = "text-[11px] font-semibold";
 
 // Shared filter-chip pill spec, used by the toolbar filter rows above a table (Activity,

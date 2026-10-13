@@ -2461,6 +2461,8 @@ export function createApiClient(config: ApiClientConfig) {
       if (opts?.holderId) params.set("holderId", opts.holderId);
       return request<HistoryPoint[]>("GET", `/networth/history?${params.toString()}`);
     },
+    /** Whether 1D/7D intraday history exists yet (≥2 captures in the last 7 days). */
+    getIntradayStatus: () => request<{ hasIntraday: boolean }>("GET", "/networth/intraday-status"),
     getPortfolioHistory: (portfolioId: string, range = "1y") =>
       request<HistoryPoint[]>(
         "GET",

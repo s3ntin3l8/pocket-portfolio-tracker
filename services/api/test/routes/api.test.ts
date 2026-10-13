@@ -3469,6 +3469,57 @@ describe("auth + portfolios + transactions", () => {
     expect(cross.statusCode).toBe(404);
   });
 
+  // Audit G8: the hero hides its 1D/7D chips until intraday history exists.
+  it("reports intraday availability per user (needs >= 2 distinct captures)", async () => {
+    const { portfolioIntradaySnapshots } = await import("@portfolio/db");
+    const t = await token("intraday-status-user");
+    const status = async (tok: string) => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/networth/intraday-status",
+        headers: auth(tok),
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json();
+    };
+    expect(await status(t)).toEqual({ hasIntraday: false });
+    // Direct DB writes (the intraday job) don't flush the derivation cache; the answer is
+    // cached until a write request or the 60 s TTL, so flush by hand to simulate expiry.
+    const { clearDerivationCache } = await import("../../src/lib/derivation-cache.js");
+
+    const p = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "IS1", baseCurrency: "IDR" },
+      })
+    ).json().id;
+    const at = (hoursAgo: number) => new Date(Date.now() - hoursAgo * 3_600_000);
+    await app.db.insert(portfolioIntradaySnapshots).values({
+      portfolioId: p,
+      capturedAt: at(1),
+      netWorth: "1",
+      marketValue: "1",
+      currency: "IDR",
+    });
+    clearDerivationCache();
+    expect(await status(t)).toEqual({ hasIntraday: false });
+
+    await app.db.insert(portfolioIntradaySnapshots).values({
+      portfolioId: p,
+      capturedAt: at(2),
+      netWorth: "2",
+      marketValue: "2",
+      currency: "IDR",
+    });
+    expect(await status(t)).toEqual({ hasIntraday: false }); // still cached
+    clearDerivationCache();
+    expect(await status(t)).toEqual({ hasIntraday: true });
+    // Another user's snapshots never count.
+    expect(await status(await token("intraday-status-other"))).toEqual({ hasIntraday: false });
+  });
+
   // Audit B12: the aggregate history sums were JS float additions serialised as strings.
   it("sums aggregate intraday and daily net worth with Decimal (0.1 + 0.2 = 0.3)", async () => {
     const { portfolioIntradaySnapshots } = await import("@portfolio/db");
