@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
@@ -93,6 +93,17 @@ function renderPanel(
 const t = messages.Holdings;
 
 describe("PositionsPanel", () => {
+  // React reports a missing/duplicate list `key` through console.error — fail on any (E8).
+  let consoleError: MockInstance;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    const calls = consoleError.mock.calls.map((c) => c.map(String).join(" "));
+    consoleError.mockRestore();
+    expect(calls).toEqual([]);
+  });
+
   it("renders all rows with no query", () => {
     renderPanel();
     expect(screen.getAllByText("BBCA")[0]).toBeInTheDocument();
