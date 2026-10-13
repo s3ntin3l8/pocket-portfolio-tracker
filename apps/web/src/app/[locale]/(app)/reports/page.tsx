@@ -17,7 +17,8 @@ import {
   loadPreferences,
   loadDocuments,
 } from "@/lib/server-api";
-import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact, formatPercent, formatSignedMoney } from "@/lib/utils";
+import { GainFigure, toneOf } from "@/components/gain-figure";
 import type { TrendTone } from "@/components/reports/trend-chip";
 
 const ICONS = {
@@ -276,6 +277,18 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         value={m(currentValue)}
         caption={t("savings.caption")}
         splitBar={splitBar}
+        gain={
+          s.simpleGainPct !== null ? (
+            <GainFigure
+              amount={formatSignedMoney(currentValue - netContributed, currency, locale)}
+              pct={formatPercent(s.simpleGainPct, locale)}
+              tone={toneOf(currentValue - netContributed)}
+              basis="contributed"
+              amountClassName="text-[14px]"
+              pctClassName="text-[12px]"
+            />
+          ) : undefined
+        }
         metrics={[
           { label: t("savings.metricMonthly"), value: mc(Number(s.monthlyAverage)) },
           {

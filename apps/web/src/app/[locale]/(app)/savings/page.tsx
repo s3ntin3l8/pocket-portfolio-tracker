@@ -1,3 +1,4 @@
+import { Decimal } from "decimal.js";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -10,8 +11,10 @@ import { SparplanSection } from "@/components/savings/sparplan-section";
 import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
 import { CashOnHandCard } from "@/components/savings/cash-on-hand-card";
-import { loadContributions, loadSparplan, loadHoldings } from "@/lib/server-api";
-import { formatMoney, formatPercent } from "@/lib/utils";
+import { loadContributions, loadSparplan, loadHoldings, loadNetWorth } from "@/lib/server-api";
+import { GainFigure, toneOf } from "@/components/gain-figure";
+import { GainExplainer } from "@/components/gain-explainer";
+import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -24,10 +27,11 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
 
   // Holder scope is now global (cookie-based via the portfolio switcher).
   // All three loaders are independent — fire them in parallel.
-  const [result, sparplanResult, holdingsResult] = await Promise.all([
+  const [result, sparplanResult, holdingsResult, netWorthResult] = await Promise.all([
     loadContributions(),
     loadSparplan(),
     loadHoldings(),
+    loadNetWorth(),
   ]);
 
   if (TIMING) {
@@ -66,7 +70,14 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
   const c = result.data;
   const currency = c.displayCurrency;
   const m = (n: number) => formatMoney(n, currency, locale);
-  const gainTone = c.simpleGainPct === null ? "neutral" : c.simpleGainPct >= 0 ? "up" : "down";
+  // Gain vs NET CONTRIBUTED (the savings basis) — labelled as such, and explained by the same
+  // sheet the Holdings rail opens (audit G2). `gain` is the scope's single GainSummary.
+  const gain = netWorthResult.status === "ok" ? netWorthResult.data.gain : undefined;
+  // From the shared payload when available, so this figure and the explainer cannot disagree;
+  // the contributions response (same value/net pair) is only the fallback for an older API.
+  const gainAmount = gain
+    ? new Decimal(gain.value).minus(gain.netContributed).toNumber()
+    : new Decimal(c.currentValue).minus(c.netContributed).toNumber();
 
   return (
     <div className="space-y-5">
@@ -154,16 +165,24 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
               delta={t("monthsElapsed", { count: c.monthsElapsed })}
               deltaTone="neutral"
             />
-            <StatCard
-              label={t("currentValue")}
-              value={m(Number(c.currentValue))}
-              delta={
-                c.simpleGainPct !== null
-                  ? `${formatPercent(c.simpleGainPct, locale)} ${t("simpleGain")}`
-                  : undefined
-              }
-              deltaTone={gainTone}
-            />
+            <StatCard label={t("currentValue")} value={m(Number(c.currentValue))} />
+            <Card>
+              <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
+                <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{t("gainLabel")}</p>
+                <GainFigure
+                  amount={formatSignedMoney(gainAmount, currency, locale)}
+                  pct={c.simpleGainPct !== null ? formatPercent(c.simpleGainPct, locale) : null}
+                  tone={toneOf(gainAmount)}
+                  basis="contributed"
+                  className="mt-1"
+                />
+                {gain && (
+                  <div className="mt-1.5">
+                    <GainExplainer gain={gain} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             {c.totalReturnPct !== null && (
               <StatCard
                 label={t("totalReturn")}

@@ -45,6 +45,12 @@ export {
   type CostBasisMode,
 } from "./valuation.js";
 export {
+  gainSummary,
+  aggregateBoundary,
+  type GainSummary,
+  type GainBoundary,
+} from "./gain-summary.js";
+export {
   loanBalances,
   liabilityBalances,
   totalLiabilities,

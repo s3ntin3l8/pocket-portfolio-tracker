@@ -4,7 +4,6 @@ import { transactions, dismissedAnomalies, trConnections } from "@portfolio/db";
 import { toCoreTxns } from "../../services/tx-core.js";
 import { netManualAdjustments } from "../../services/pytr/reconcile.js";
 import { loadSparklines } from "../../services/sparklines.js";
-import type { InstrumentMeta } from "../../services/valuation.js";
 import { needsSectorEnrichment, needsNameEnrichment } from "../../services/instrument-metadata.js";
 import { isReadOnlyPat } from "../../plugins/auth.js";
 import { enqueueInstrumentMetadata } from "../../services/scheduler.js";
@@ -13,7 +12,6 @@ import {
   detectAnomalies,
   allocationBreakdown,
   type CoreTransaction,
-  type PortfolioSummary,
   type ReconciliationGap,
 } from "@portfolio/core";
 
@@ -23,6 +21,7 @@ import {
   loadValuation,
   loadDrift,
   computePortfolioAnomalies,
+  buildGainSummary,
   resolveCostBasisMode,
 } from "./shared.js";
 
@@ -99,14 +98,14 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
       const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
-      const { summary, metaById } = (await loadValuation(
+      const { summary, metaById, coreTxns, corporateActions } = await loadValuation(
         app,
         portfolioId,
         portfolio.baseCurrency,
         await resolveCostBasisMode(app, id, request.query),
         portfolio.cashCounted,
         request.log,
-      )) as unknown as { summary: PortfolioSummary; metaById: Map<string, InstrumentMeta> };
+      );
       if (
         !isReadOnlyPat(request) &&
         (needsSectorEnrichment([...metaById.values()]) ||
@@ -131,6 +130,14 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
         })),
         allocation,
         ...(Object.keys(drift).length > 0 ? { drift } : {}),
+        gain: await buildGainSummary(
+          app,
+          coreTxns,
+          summary,
+          portfolio.baseCurrency,
+          portfolio.cashCounted ? "inside" : "outside",
+          corporateActions,
+        ),
       };
     },
   );

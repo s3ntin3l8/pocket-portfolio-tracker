@@ -14,7 +14,7 @@ import {
   loadAnomalyBadge,
 } from "@/lib/server-api";
 import { qualifyingHolders } from "@/lib/portfolio-selection";
-import { formatMoney, formatPercent } from "@/lib/utils";
+import { formatNetWorth, formatPercent } from "@/lib/utils";
 import { getSessionState } from "@/lib/session-token";
 
 // Auth is enforced only once it's configured, so the design-system screens stay
@@ -90,8 +90,8 @@ export default async function AppLayout({
   const netWorthSummary =
     netWorthResult.status === "ok"
       ? {
-          valueFormatted: formatMoney(
-            Number(netWorthResult.data.netWorth),
+          valueFormatted: formatNetWorth(
+            netWorthResult.data.netWorth,
             netWorthResult.data.displayCurrency,
             locale,
           ),

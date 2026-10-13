@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Pencil, Info } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
-import { cn } from "@/lib/utils";
+import { cn, formatPercentPoints } from "@/lib/utils";
 import type { DriftRow, TargetWeight } from "@portfolio/api-client";
 import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
 
@@ -44,6 +44,7 @@ export function RebalancingCard({
 }) {
   const t = useTranslations("Insights.rebalancingCard");
   const td = useTranslations("TargetDialog");
+  const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
 
@@ -249,7 +250,11 @@ export function RebalancingCard({
                   }}
                 />
                 <span className="flex-1 truncate">{s.label}</span>
-                <span className="tabular text-muted-foreground">{s.actualPct.toFixed(1)}%</span>
+                {/* Same server `pct` + formatter the Composition donut legend prints, so the two
+                    Insights cards can't disagree on a class's weight (audit G2). */}
+                <span className="tabular text-muted-foreground">
+                  {formatPercentPoints(s.actualPct, locale, 1)}
+                </span>
                 {d && (
                   <>
                     <span className="text-muted-foreground">→</span>

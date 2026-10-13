@@ -24,6 +24,7 @@ export function ReportCard({
   metrics,
   href,
   openLabel,
+  gain,
 }: {
   icon: LucideIcon;
   iconBg: string;
@@ -36,6 +37,10 @@ export function ReportCard({
   metrics: Array<{ label: string; value: string; color?: string }>;
   href: string;
   openLabel: string;
+  /** A labelled gain figure (`GainFigure`) shown under the caption — present on cards whose
+   *  headline value has a gain against a stated basis (audit G2). Plain text, so it is safe
+   *  inside the card's link. */
+  gain?: React.ReactNode;
 }) {
   // Layout transcribed from the reference's desktop `reports` cards: 44px icon chip +
   // 700 16px title + delta pill in ONE header row, 800 30px value, 500 13px caption,
@@ -56,6 +61,8 @@ export function ReportCard({
 
         <p className="tabular mt-4 truncate text-[30px] font-extrabold">{value}</p>
         <p className="mt-[3px] truncate text-[13px] font-medium text-text-2">{caption}</p>
+
+        {gain && <div className="mt-2">{gain}</div>}
 
         {splitBar && splitBar.length > 0 && (
           <div className="mt-4">

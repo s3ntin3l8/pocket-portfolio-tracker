@@ -980,6 +980,29 @@ export interface HoldingValuation extends Holding {
   sparkline?: number[];
 }
 
+/**
+ * The one gain story (audit G2): the fields every gain figure is built from, each with
+ * its own basis. Decimal strings in `displayCurrency`. Mirrors `GainSummary` in
+ * `@portfolio/core`; computed once server-side from the valuation + contribution stats.
+ */
+export interface GainSummary {
+  displayCurrency: string;
+  /** Boundary the value / net-contributed pair sits on; "mixed" for an aggregate whose portfolios differ. */
+  boundary: "inside" | "outside" | "mixed";
+  /** What the scope is worth now (net worth; cash included only for cash-inside portfolios). */
+  value: string;
+  /** Cost basis of the holdings still open — the "vs cost of holdings" basis. */
+  costOfOpen: string;
+  /** Net external capital that crossed the boundary — the "vs net contributed" basis. */
+  netContributed: string;
+  /** Market value of open holdings minus `costOfOpen` (holdings valued at cost add 0). */
+  unrealized: string;
+  /** Gains locked in by sells. */
+  realized: string;
+  /** Dividends, coupons and interest received. */
+  income: string;
+}
+
 export interface PortfolioSummary {
   displayCurrency: string;
   holdings: HoldingValuation[];
@@ -1012,6 +1035,8 @@ export interface PortfolioSummary {
    * Absent when the user has no targets for this scope.
    */
   drift?: Record<string, DriftRow[]>;
+  /** The single {@link GainSummary} for this scope (audit G2). */
+  gain?: GainSummary;
 }
 
 export interface PortfolioPerformance {
@@ -1052,6 +1077,8 @@ export interface NetWorth {
    * Keys are dimension names; only dimensions with saved targets are present.
    */
   drift?: Record<string, DriftRow[]>;
+  /** The single {@link GainSummary} for this scope (audit G2). */
+  gain?: GainSummary;
   xirr: number | null;
   /** Period-scoped XIRR (ytd / 1y / 5y). Null when period is "max" or no snapshot data. */
   periodXirr?: number | null;

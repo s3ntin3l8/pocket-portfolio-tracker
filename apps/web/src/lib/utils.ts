@@ -22,6 +22,15 @@ export function formatMoney(
 }
 
 /**
+ * The ONE formatter for a scope's headline net-worth figure (hero, Holdings rail, sidebar).
+ * Takes the API's Decimal string and always renders full precision for the currency, so no
+ * surface can round differently from another ("€39,045.00" vs "€39,044.83", audit G2).
+ */
+export function formatNetWorth(netWorth: string | number, currency = "IDR", locale = "en") {
+  return formatMoney(Number(netWorth), currency, locale);
+}
+
+/**
  * Money formatter that abbreviates large values with locale-aware compact notation
  * ("€1.25M", "Rp 1,25 jt") so they fit tight spots like the forecast scenario chips,
  * while values below `threshold` stay fully precise. Default threshold: 1,000,000.

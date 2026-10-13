@@ -612,7 +612,8 @@
     "targetCancel": "Cancel",
     "targetSave": "Save targets",
     "targetLoadError": "Couldn't load targets.",
-    "targetSaveError": "Couldn't save targets."
+    "targetSaveError": "Couldn't save targets.",
+    "gainLabel": "Gain"
   },
   "Portfolios": {
     "title": "Portfolios",
@@ -1337,12 +1338,11 @@
     "searchClear": "Clear search",
     "noResults": "No holdings match your search.",
     "valuedAtCostBadge": "At cost",
-    "valuedAtCostTooltip": "No market price available — shown at cost basis, not market value.",
+    "valuedAtCostTooltip": "No market price; valued at cost",
     "valuedAtCostFooterNote": "Includes {count, plural, one {1 holding} other {# holdings}} shown at cost (no market price available).",
     "fxMissingBadge": "No FX rate",
-    "fxMissingTooltip": "No exchange rate available for this currency — excluded from totals rather than converted 1:1.",
+    "fxMissingTooltip": "No FX rate; excluded from totals",
     "fxMissingFooterNote": "Excludes {count, plural, one {1 holding} other {# holdings}} with no exchange rate available.",
-    "heroValuedAtCostNote": "Includes one or more holdings shown at cost (no market price available).",
     "hero": {
       "label": "Total portfolio value",
       "periodPast": "past {range}",
@@ -1362,7 +1362,13 @@
     "byRegion": "By region",
     "byCurrency": "By currency",
     "sparklineRange": "Range",
-    "sparklineRangeAria": "Price range {range}"
+    "sparklineRangeAria": "Price range {range}",
+    "heroAtCostBanner": "{count, plural, one {# holding at cost} other {# holdings at cost}}",
+    "heroNoFxBanner": "{count, plural, one {# holding without FX rate} other {# holdings without FX rate}}",
+    "heroAtCostBannerAria": "Show holdings valued at cost or without an FX rate",
+    "atCostFilterChip": "Needs price or FX rate ({count})",
+    "atCostFilterClear": "Show all holdings",
+    "donutAtCostLegend": "Hatched: valued at cost"
   },
   "Chart": {
     "modeLabel": "Chart mode",
@@ -2435,5 +2441,29 @@
   },
   "UiText": {
     "streakMonths": "{count}mo"
+  },
+  "Gain": {
+    "basisCost": "vs cost of holdings",
+    "basisContributed": "vs net contributed",
+    "explainerTrigger": "How is this gain calculated?",
+    "explainerTitle": "How the gain figures are calculated",
+    "explainerIntro": "A gain is always measured against a stated basis. The same scope can show different numbers because each answers a different question.",
+    "fieldValue": "Value now",
+    "fieldValueDef": "What this scope is worth today, in your display currency. Includes cash only when cash is inside the scope.",
+    "fieldCostOfOpen": "Cost of holdings",
+    "fieldCostOfOpenDef": "What the positions you still hold cost you. The basis for the holdings gain.",
+    "fieldNetContributed": "Net contributed",
+    "fieldNetContributedDef": "Money that crossed the scope boundary on net. The basis for the savings gain.",
+    "fieldUnrealized": "Unrealized gain",
+    "fieldUnrealizedDef": "Market value of open positions minus their cost. A position valued at cost adds nothing.",
+    "fieldRealized": "Realized gain",
+    "fieldRealizedDef": "Gains already locked in by selling.",
+    "fieldIncome": "Income",
+    "fieldIncomeDef": "Dividends, coupons and interest received. Counted as return, never as contribution.",
+    "boundaryInside": "Cash counts in this scope. Contributions are deposits minus withdrawals, and the value includes cash.",
+    "boundaryOutside": "Cash is outside this scope. Contributions are net invested capital, and the value covers securities only.",
+    "boundaryMixed": "This scope combines portfolios with different cash boundaries. Each portfolio pairs its value and contributions on its own boundary before they are added up.",
+    "holdingsGainLine": "Holdings gain: value of open positions against what they cost.",
+    "savingsGainLine": "Savings gain: value now against net contributed."
   }
 }

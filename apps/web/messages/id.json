@@ -612,7 +612,8 @@
     "targetCancel": "Batal",
     "targetSave": "Simpan target",
     "targetLoadError": "Gagal memuat target.",
-    "targetSaveError": "Gagal menyimpan target."
+    "targetSaveError": "Gagal menyimpan target.",
+    "gainLabel": "Keuntungan"
   },
   "Portfolios": {
     "title": "Portofolio",
@@ -1337,12 +1338,11 @@
     "searchClear": "Hapus pencarian",
     "noResults": "Tidak ada kepemilikan yang cocok dengan pencarian Anda.",
     "valuedAtCostBadge": "Nilai biaya",
-    "valuedAtCostTooltip": "Harga pasar tidak tersedia — ditampilkan berdasarkan biaya perolehan, bukan nilai pasar.",
+    "valuedAtCostTooltip": "Tidak ada harga pasar; dinilai berdasarkan biaya perolehan",
     "valuedAtCostFooterNote": "Termasuk {count, plural, other {# kepemilikan}} yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
     "fxMissingBadge": "Tanpa kurs",
-    "fxMissingTooltip": "Kurs untuk mata uang ini tidak tersedia — tidak dihitung dalam total, bukan dikonversi 1:1.",
+    "fxMissingTooltip": "Tidak ada kurs; tidak dihitung dalam total",
     "fxMissingFooterNote": "Tidak termasuk {count, plural, other {# kepemilikan}} tanpa kurs yang tersedia.",
-    "heroValuedAtCostNote": "Termasuk satu atau lebih kepemilikan yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
     "hero": {
       "label": "Total nilai portofolio",
       "periodPast": "{range} terakhir",
@@ -1362,7 +1362,13 @@
     "byRegion": "Berdasarkan wilayah",
     "byCurrency": "Berdasarkan mata uang",
     "sparklineRange": "Rentang",
-    "sparklineRangeAria": "Rentang harga {range}"
+    "sparklineRangeAria": "Rentang harga {range}",
+    "heroAtCostBanner": "{count, plural, other {# kepemilikan berdasarkan biaya perolehan}}",
+    "heroNoFxBanner": "{count, plural, other {# kepemilikan tanpa kurs}}",
+    "heroAtCostBannerAria": "Tampilkan kepemilikan yang dinilai berdasarkan biaya perolehan atau tanpa kurs",
+    "atCostFilterChip": "Perlu harga atau kurs ({count})",
+    "atCostFilterClear": "Tampilkan semua kepemilikan",
+    "donutAtCostLegend": "Berarsir: dinilai berdasarkan biaya perolehan"
   },
   "Chart": {
     "modeLabel": "Mode grafik",
@@ -2435,5 +2441,29 @@
   },
   "UiText": {
     "streakMonths": "{count} bln"
+  },
+  "Gain": {
+    "basisCost": "terhadap biaya kepemilikan",
+    "basisContributed": "terhadap kontribusi bersih",
+    "explainerTrigger": "Bagaimana keuntungan ini dihitung?",
+    "explainerTitle": "Cara angka keuntungan dihitung",
+    "explainerIntro": "Keuntungan selalu diukur terhadap dasar tertentu. Cakupan yang sama bisa menampilkan angka berbeda karena masing-masing menjawab pertanyaan yang berbeda.",
+    "fieldValue": "Nilai saat ini",
+    "fieldValueDef": "Nilai cakupan ini hari ini dalam mata uang tampilan Anda. Kas hanya dihitung bila kas berada di dalam cakupan.",
+    "fieldCostOfOpen": "Biaya kepemilikan",
+    "fieldCostOfOpenDef": "Biaya posisi yang masih Anda pegang. Dasar untuk keuntungan kepemilikan.",
+    "fieldNetContributed": "Kontribusi bersih",
+    "fieldNetContributedDef": "Dana bersih yang melewati batas cakupan. Dasar untuk keuntungan tabungan.",
+    "fieldUnrealized": "Keuntungan belum direalisasi",
+    "fieldUnrealizedDef": "Nilai pasar posisi terbuka dikurangi biayanya. Posisi yang dinilai berdasarkan biaya perolehan tidak menambah apa pun.",
+    "fieldRealized": "Keuntungan terealisasi",
+    "fieldRealizedDef": "Keuntungan yang sudah terkunci melalui penjualan.",
+    "fieldIncome": "Pendapatan",
+    "fieldIncomeDef": "Dividen, kupon, dan bunga yang diterima. Dihitung sebagai imbal hasil, bukan kontribusi.",
+    "boundaryInside": "Kas dihitung dalam cakupan ini. Kontribusi adalah setoran dikurangi penarikan, dan nilai mencakup kas.",
+    "boundaryOutside": "Kas berada di luar cakupan ini. Kontribusi adalah modal investasi bersih, dan nilai hanya mencakup sekuritas.",
+    "boundaryMixed": "Cakupan ini menggabungkan portofolio dengan batas kas yang berbeda. Setiap portofolio memasangkan nilai dan kontribusinya pada batasnya sendiri sebelum dijumlahkan.",
+    "holdingsGainLine": "Keuntungan kepemilikan: nilai posisi terbuka terhadap biayanya.",
+    "savingsGainLine": "Keuntungan tabungan: nilai saat ini terhadap kontribusi bersih."
   }
 }

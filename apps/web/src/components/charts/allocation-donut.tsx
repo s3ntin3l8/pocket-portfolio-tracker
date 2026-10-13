@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "next-intl";
 import { formatMoney, formatPercentPoints } from "@/lib/utils";
@@ -11,6 +12,13 @@ export interface DonutSlice {
   key: string;
   label: string;
   value: number;
+  /** Part of `value` that is valued at cost basis (no market price). Drawn hatched so the
+   *  at-cost share reads as "not a market value" (audit G3). Clamped to `[0, value]`. */
+  atCostValue?: number;
+  /** The server's share of the whole for this slice (percent points). When given the legend
+   *  shows this instead of re-deriving `value / sum`, so every surface that renders the same
+   *  allocation (Holdings donut, Insights Composition + Rebalancing) prints the same number. */
+  actualPct?: number;
 }
 
 export function AllocationDonut({
@@ -20,6 +28,8 @@ export function AllocationDonut({
   label = "Total",
   onSliceClick,
   showPercent = true,
+  atCostLegend,
+  atCostLabel,
 }: {
   data: DonutSlice[];
   currency?: string;
@@ -29,7 +39,12 @@ export function AllocationDonut({
   /** Whether the legend shows a trailing "%" column — the Holdings allocation card
    *  does, Income's "By source" card doesn't (value only). Default true. */
   showPercent?: boolean;
+  /** Legend note shown when any slice has an `atCostValue` (e.g. "Hatched: valued at cost"). */
+  atCostLegend?: string;
+  /** Tooltip suffix for the hatched part of a slice (e.g. "At cost"). */
+  atCostLabel?: string;
 }) {
+  const hatchId = useId().replace(/:/g, "");
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const sum = data.reduce((s, d) => s + d.value, 0);
@@ -42,7 +57,51 @@ export function AllocationDonut({
       compactDisplay: "short",
       maximumFractionDigits: currency === "IDR" ? 0 : 1,
     }).format(n);
+  // Server pct when given, else value / sum; a non-finite result (empty or zero-sum data)
+  // renders as a dash rather than "NaN%".
+  const pctOf = (d: DonutSlice): number | null => {
+    const v = d.actualPct ?? (sum > 0 ? (d.value / sum) * 100 : Number.NaN);
+    return Number.isFinite(v) ? v : null;
+  };
   const formattedTotal = displayTotal > 0 ? compact(displayTotal) : null;
+
+  // Split each slice into its market-priced part and its at-cost part; the latter gets a
+  // hatched fill. Sums are unchanged, so the ring still totals exactly the slice values.
+  const colorOf = (key: string, i: number) =>
+    assetClassColor(key, ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length]);
+  const pieData = data.flatMap((d, i) => {
+    const atCost = Math.min(Math.max(d.atCostValue ?? 0, 0), d.value);
+    const out: {
+      key: string;
+      baseKey: string;
+      label: string;
+      value: number;
+      hatchIdx: number | null;
+      fill: string;
+    }[] = [];
+    if (d.value - atCost > 0 || atCost === 0) {
+      out.push({
+        key: d.key,
+        baseKey: d.key,
+        label: d.label,
+        value: d.value - atCost,
+        hatchIdx: null,
+        fill: colorOf(d.key, i),
+      });
+    }
+    if (atCost > 0) {
+      out.push({
+        key: `${d.key}:at-cost`,
+        baseKey: d.key,
+        label: atCostLabel ? `${d.label} · ${atCostLabel}` : d.label,
+        value: atCost,
+        hatchIdx: i,
+        fill: `url(#${hatchId}-${i})`,
+      });
+    }
+    return out;
+  });
+  const hasAtCost = pieData.some((p) => p.hatchIdx !== null);
 
   // Transcribed from `Pocket Prototype.dc.html` (desktop Holdings allocation card):
   // 128px donut (r54/13 stroke on a 120 viewBox → inner ≈50/outer ≈64 at 128px),
@@ -62,26 +121,44 @@ export function AllocationDonut({
           initialDimension={{ width: 128, height: 128 }}
         >
           <PieChart>
+            {hasAtCost && (
+              <defs>
+                {data.map((d, i) =>
+                  pieData.some((p) => p.hatchIdx === i) ? (
+                    <pattern
+                      key={d.key}
+                      id={`${hatchId}-${i}`}
+                      width="6"
+                      height="6"
+                      patternUnits="userSpaceOnUse"
+                      patternTransform="rotate(45)"
+                    >
+                      <rect width="6" height="6" fill={colorOf(d.key, i)} />
+                      <rect
+                        width="2.5"
+                        height="6"
+                        style={{ fill: "var(--color-card)" }}
+                        fillOpacity="0.55"
+                      />
+                    </pattern>
+                  ) : null,
+                )}
+              </defs>
+            )}
             <Pie
               isAnimationActive={!reducedMotion}
-              data={data}
+              data={pieData}
               dataKey="value"
               nameKey="label"
               innerRadius={50}
               outerRadius={64}
               paddingAngle={0}
               strokeWidth={0}
-              onClick={(entry) => onSliceClick?.(entry.payload.key)}
+              onClick={(entry) => onSliceClick?.(entry.payload.baseKey)}
               style={{ cursor: onSliceClick ? "pointer" : undefined }}
             >
-              {data.map((slice, i) => (
-                <Cell
-                  key={slice.key}
-                  fill={assetClassColor(
-                    slice.key,
-                    ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length],
-                  )}
-                />
+              {pieData.map((slice) => (
+                <Cell key={slice.key} fill={slice.fill} />
               ))}
             </Pie>
             <Tooltip
@@ -116,12 +193,7 @@ export function AllocationDonut({
             >
               <span
                 className="size-2.5 shrink-0 rounded-[3px]"
-                style={{
-                  background: assetClassColor(
-                    d.key,
-                    ASSET_CLASS_COLOR_PALETTE[i % ASSET_CLASS_COLOR_PALETTE.length],
-                  ),
-                }}
+                style={{ background: colorOf(d.key, i) }}
               />
               <span className="truncate text-xs font-semibold">{d.label}</span>
             </button>
@@ -130,11 +202,24 @@ export function AllocationDonut({
             </span>
             {showPercent && (
               <span className="tabular w-[50px] shrink-0 text-right text-xs font-bold">
-                {formatPercentPoints((d.value / sum) * 100, locale, 1)}
+                {pctOf(d) === null ? "—" : formatPercentPoints(pctOf(d)!, locale, 1)}
               </span>
             )}
           </li>
         ))}
+        {hasAtCost && atCostLegend && (
+          <li className="flex items-center gap-2 text-[11px] font-medium text-text-2">
+            <span
+              aria-hidden
+              className="size-2.5 shrink-0 rounded-[3px] border border-text-3"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, var(--color-text-3) 0 2px, transparent 2px 4px)",
+              }}
+            />
+            {atCostLegend}
+          </li>
+        )}
       </ul>
     </div>
   );
