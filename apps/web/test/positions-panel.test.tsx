@@ -244,4 +244,22 @@ describe("PositionsPanel", () => {
       expect(screen.queryByRole("button", { name: /Needs price or FX rate/ })).toBeNull();
     });
   });
+
+  describe("toolbar layout (tablet widths)", () => {
+    it("lets the chip list shrink and wrap from md, so it cannot run under the search box", () => {
+      renderPanel({ classTabs: ["all", "equity", "crypto"] });
+      const tablist = screen.getByRole("tablist");
+      // Below md it keeps its full width (the wrapper scrolls); from md it may shrink and
+      // wraps its own chips instead of overflowing the wrapper.
+      for (const cls of ["max-md:shrink-0", "md:min-w-0", "md:flex-wrap"]) {
+        expect(tablist.className).toContain(cls);
+      }
+      // The wrapper takes the row's remaining width; the search block beside it is fixed.
+      const wrapper = tablist.parentElement!;
+      expect(wrapper.className).toContain("md:flex-1");
+      expect(wrapper.className).toContain("min-w-0");
+      const search = screen.getByRole("textbox").closest("div")!.parentElement!;
+      expect(search.className).toContain("shrink-0");
+    });
+  });
 });

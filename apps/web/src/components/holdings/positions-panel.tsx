@@ -95,7 +95,11 @@ export function PositionsPanel({
             // Activity's TOOLBAR_FILTERS_DESKTOP_ONLY — chips stay visible (and
             // horizontally scrollable) at every width.
             <div className={TOOLBAR_FILTERS}>
-              <TabsList className="h-auto gap-2 rounded-full border-0 bg-transparent p-0">
+              {/* TabsList is a nowrap inline-flex whose min-width is its content, so from `md`
+                  (where the row shows chips and search side by side) it used to overflow the
+                  chip wrapper and paint under the search box. Below md it keeps its full width
+                  and the wrapper scrolls; from md it may shrink and wraps its own chips. */}
+              <TabsList className="h-auto gap-2 rounded-full border-0 bg-transparent p-0 max-md:shrink-0 md:min-w-0 md:flex-wrap md:justify-start">
                 {classTabs.map((key) => (
                   <TabsTrigger
                     key={key}
