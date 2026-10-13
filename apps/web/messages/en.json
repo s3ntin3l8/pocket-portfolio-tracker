@@ -2103,7 +2103,8 @@
       "accrued": "Vorabpauschale accrued · YTD",
       "accruedDesc": "Accumulating ETFs — phantom income, no cash received",
       "credited": "Vorabpauschale credited · YTD",
-      "creditedDesc": "Pre-paid tax reclaimed on disposal"
+      "creditedDesc": "Pre-paid tax reclaimed on disposal",
+      "estimatedBasis": "Estimated from year-start and year-end prices; your broker's figure replaces it once imported"
     },
     "coverage": {
       "title": "How your tax is covered · {year}",

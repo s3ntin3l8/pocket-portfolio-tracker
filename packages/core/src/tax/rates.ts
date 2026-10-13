@@ -65,10 +65,38 @@ export function basiszinsFor(year: number, warn?: (msg: string) => void): string
 }
 
 /**
- * Estimated Vorabpauschale base per share-holding when the broker supplies none:
- * Basisertrag = value at 1 Jan x Basiszins x 70%, prorated by full months held (1/12 per
- * month not held), capped at the actual fund increase in the year (value change plus
- * distributions) and floored at 0. Returns null when the year's Basiszins is unknown.
+ * Vorabpauschale per unit for a FULL calendar year (§18 Abs. 1 InvStG), before any
+ * acquisition-year reduction: the Basisertrag (price at the start of the year x 70% of the
+ * Basiszins), capped at the actual increase over the year (end - start price plus
+ * distributions), minus the distributions already paid, floored at 0. Unrounded; null
+ * when the year's Basiszins is unknown.
+ */
+export function vorabpauschalePerUnit(input: {
+  year: number;
+  priceStartOfYear: string;
+  priceEndOfYear: string;
+  distributionsPerUnit: string;
+  warn?: (msg: string) => void;
+}): Decimal | null {
+  const zins = basiszinsFor(input.year, input.warn);
+  if (zins === null) return null;
+  const start = D(input.priceStartOfYear);
+  const dist = D(input.distributionsPerUnit);
+  const basisertrag = start.times(zins).times("0.7");
+  const mehrbetrag = D(input.priceEndOfYear).minus(start).plus(dist);
+  const capped = Decimal.min(basisertrag, Decimal.max(ZERO, mehrbetrag));
+  // `mehrbetrag` (hence `capped`) already includes `dist`; subtracting it back out reverses
+  // that, because distributions are taxed separately as income, not as Vorabpauschale.
+  return Decimal.max(ZERO, capped.minus(dist));
+}
+
+/**
+ * Estimated Vorabpauschale base for a position when the broker supplies none (§18
+ * InvStG): the full-year amount (see {@link vorabpauschalePerUnit}) scaled by the value
+ * held, then, for units bought during the year, reduced by 1/12 per full month before the
+ * purchase month (§18 Abs. 2 — the reduction applies to the Vorabpauschale itself, after
+ * the cap and the distributions). `monthsHeld` is the number of months from the purchase
+ * month on (12 = held the whole year). Returns null when the year's Basiszins is unknown.
  */
 export function estimateVorabpauschale(input: {
   year: number;
@@ -78,14 +106,25 @@ export function estimateVorabpauschale(input: {
   monthsHeld?: number;
   warn?: (msg: string) => void;
 }): string | null {
-  const zins = basiszinsFor(input.year, input.warn);
-  if (zins === null) return null;
+  const full = vorabpauschalePerUnit({
+    year: input.year,
+    priceStartOfYear: input.valueStartOfYear,
+    priceEndOfYear: input.valueEndOfYear,
+    distributionsPerUnit: input.distributions,
+    warn: input.warn,
+  });
+  if (full === null) return null;
   const months = Math.min(12, Math.max(0, input.monthsHeld ?? 12));
-  const basisertrag = D(input.valueStartOfYear).times(zins).times("0.7").times(months).div(12);
-  const increase = D(input.valueEndOfYear)
-    .minus(D(input.valueStartOfYear))
-    .plus(D(input.distributions));
-  const capped = Decimal.min(basisertrag, Decimal.max(ZERO, increase));
-  // Distributions already paid in the year reduce the pauschale.
-  return Decimal.max(ZERO, capped.minus(D(input.distributions))).toFixed(2);
+  return full.times(months).div(12).toFixed(2);
+}
+
+/**
+ * The day the Vorabpauschale for `year` is deemed received (§18 Abs. 3 InvStG): the first
+ * working day of the following year. 1 Jan is always a holiday; following the BMF's
+ * published dates (e.g. 4 Jan 2027 for 2026), weekends are skipped. Returns 00:00 UTC.
+ */
+export function vorabZuflussDate(year: number): Date {
+  const d = new Date(Date.UTC(year + 1, 0, 2));
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
+  return d;
 }

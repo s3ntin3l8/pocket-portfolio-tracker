@@ -174,6 +174,7 @@ export function VorabpauschaleRow({
         label={t("vorabpauschale.accrued")}
         value={money(u.vorabpauschaleAccrued)}
         delta={t("vorabpauschale.accruedDesc")}
+        basis={u.vorabpauschaleEstimated ? t("vorabpauschale.estimatedBasis") : undefined}
       />
       <StatCard
         label={t("vorabpauschale.credited")}

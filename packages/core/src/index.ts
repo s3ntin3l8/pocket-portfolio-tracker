@@ -172,6 +172,10 @@ export {
   BASISZINS_BY_YEAR,
   basiszinsFor,
   estimateVorabpauschale,
+  vorabpauschalePerUnit,
+  vorabZuflussDate,
+  estimateVorabRows,
+  type VorabEstimateInput,
 } from "./tax.js";
 export {
   indonesianFinalTax,

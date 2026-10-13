@@ -333,6 +333,9 @@ export interface AllowanceUsage {
   vorabpauschaleAccrued: string;
   /** Tf-adjusted Vorabpauschale disposal credit realized this year, decimal string, never negative. */
   vorabpauschaleCredited: string;
+  /** True when part of `vorabpauschaleAccrued` is an estimate from year-start/end prices
+   *  (no broker-booked figure for that fund and year). Absent otherwise. */
+  vorabpauschaleEstimated?: boolean;
   /** Aktienverlusttopf — realized stock (assetClass="equity") gains/losses only. */
   stockPot: PotUsage;
   /** Allgemeiner Verlusttopf — fund/bond/derivative gains/losses, dividend/interest/coupon

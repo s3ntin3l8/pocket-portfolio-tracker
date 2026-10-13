@@ -155,13 +155,11 @@ folds the net (accrual − credit) into the general pot.
 ### Basiszins and the Vorabpauschale
 
 The Vorabpauschale base normally comes from the broker (`vorabBase` on the `tax`/
-`vorabpauschale` row); without it the accrual is 0. `BASISZINS_BY_YEAR`
-(`packages/core/src/tax/rates.ts`) holds the official Basiszins (§18 Abs. 4 InvStG,
-derived by the Bundesbank at the first trading day of the year and published by the
-Bundesfinanzministerium) and `estimateVorabpauschale` applies
-`value on 1 Jan × Basiszins × 70%`, prorated by months held, capped at the actual
-increase, minus distributions. Sources (BMF-Schreiben "Basiszins zur Berechnung der
-Vorabpauschale gem. § 18 Absatz 4 InvStG"):
+`vorabpauschale` row). `BASISZINS_BY_YEAR` (`packages/core/src/tax/rates.ts`) holds the
+official Basiszins (§18 Abs. 4 InvStG, derived by the Bundesbank at the first trading day
+of the year and published by the Bundesfinanzministerium). Sources (BMF-Schreiben
+"Basiszins zur Berechnung der Vorabpauschale gem. § 18 Absatz 4 InvStG"; all four values
+re-checked against the letters, Oct 2026):
 
 | Year | Basiszins | BMF-Schreiben                                                 |
 | ---- | --------- | ------------------------------------------------------------- |
@@ -170,9 +168,43 @@ Vorabpauschale gem. § 18 Absatz 4 InvStG"):
 | 2025 | 2.53%     | 10 Jan 2025, IV C 1 - S 1980/00230/009/002                    |
 | 2026 | 3.20%     | Jan 2026, IV C 1 - S 1980/00230/012/001 (BStBl 2026 I S. 155) |
 
-A year with no entry returns `null` and logs a warning — values are never guessed. The
-estimate is not yet wired into the trade log automatically (it needs 1 Jan / 31 Dec
-fund prices); it is available for callers that have them.
+A year with no entry returns `null` and logs a warning — values are never guessed.
+
+### Estimated Vorabpauschale (when the broker books none)
+
+For German-regime fund holdings (`etf`, `mutual_fund`) the tax route derives the missing
+accrual itself — `estimateVorabRows` (`packages/core/src/tax/vorab-estimate.ts`), loaded
+from `prices` by `services/vorab-estimate.ts` and fed into the same trade log as the
+broker rows. The rows are **derived, never stored**, carry `estimated: true`, and surface as
+`vorabByYear[].estimated` / `AllowanceUsage.vorabpauschaleEstimated` (the Tax page labels
+the accrued figure "Estimated from year-start and year-end prices"). Rules (§18 InvStG,
+verified against the statute text):
+
+- **Per unit, full year** (Abs. 1): `Basisertrag = price at start of year × Basiszins ×
+70%`, capped at the actual increase (`price at year end − price at start + distributions`),
+  minus the distributions already paid, floored at 0. The start/end price is the latest
+  stored close on or before 1 Jan / 31 Dec (at most 5 days back — an older close is a miss).
+- **Purchase year** (Abs. 2): the _Vorabpauschale itself_ (after the cap and distributions)
+  is reduced by 1/12 for every full month before the purchase month. The cap uses the
+  year's first/last price for every unit, whenever it was bought.
+- **Only units held at 31 Dec** count (lots are consumed FIFO by sales/`transfer_out`);
+  units sold during the year get none. The statute text does not spell this out; it follows
+  the Vorabpauschale arising at year end (a sale before then settles via the disposal gain).
+- **Deemed received** (Abs. 3) on the first working day of the next year
+  (`vorabZuflussDate`: weekends skipped, e.g. 4 Jan 2027 for 2026), so the accrual lands in
+  year Y+1's allowance figures — the same year a broker row would be dated.
+- **A broker row always wins:** if a `vorabpauschale` row is dated December Y or in January–November of Y+1
+  for the instrument, no estimate is made for Y. The next broker import therefore replaces the
+  estimate without any cleanup.
+- **No row rather than a wrong one:** a missing boundary price, a price quoted in another
+  currency than the transactions, or a year without a Basiszins produces no estimate (and a
+  logged warning) — never a zero or guessed base. Years before 2023 (no table) are not
+  estimated. A split/bonus in the year is handled by bringing both quantities and prices to
+  current share terms.
+
+Staleness: the estimate sits inside the FIFO trade-log cache, so it is as fresh as the
+valuation that feeds it (60 s TTL, cleared on any write); a background price backfill shows
+up at the next TTL expiry.
 
 ### Harvest suggestions
 

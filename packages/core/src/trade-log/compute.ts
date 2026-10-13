@@ -205,7 +205,11 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         legs: ep.legs,
         vorabByYear: [...ep.vorabByYear.entries()]
           .sort(([a], [b]) => a - b)
-          .map(([year, amount]) => ({ year, amount: amount.toString() })),
+          .map(([year, amount]) => ({
+            year,
+            amount: amount.toString(),
+            ...(ep.vorabEstimated.has(year) ? { estimated: true } : {}),
+          })),
       });
     };
 
@@ -394,6 +398,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         vorabPool = vorabPool.add(baseDisplay);
         const year = tx.executedAt.getUTCFullYear();
         episode.vorabByYear.set(year, (episode.vorabByYear.get(year) ?? ZERO).add(baseDisplay));
+        if (tx.estimated) episode.vorabEstimated.add(year);
       }
       // dividend/coupon/interest/fee/deposit/withdrawal/loan_*/bonus|split|rights TYPE:
       // no effect on the lot ledger (income is folded by window; CAs handled above).
