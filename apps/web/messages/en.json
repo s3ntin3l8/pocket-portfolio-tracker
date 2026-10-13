@@ -1523,7 +1523,7 @@
       "chipIncome": "Income",
       "chipIssues": "Needs review · {count}",
       "allTime": "All time",
-      "incomeBasis": "All income types, net of fees and tax"
+      "incomeBasis": "All income types, net of fees and tax rows"
     },
     "transactionCol": "Transaction",
     "price": "Price",

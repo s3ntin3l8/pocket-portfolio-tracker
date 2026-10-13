@@ -36,13 +36,13 @@ describe("AllFilterBanner basis label", () => {
           value: "€2",
           sub: "All time",
           tone: "neutral",
-          basis: "All income types, net of fees and tax",
+          basis: "All income types, net of fees and tax rows",
         },
       ],
       mix: [],
     };
     render(<AllFilterBanner data={data} cashFlowMixLabel="Mix" />);
-    expect(screen.getAllByText("All income types, net of fees and tax")).toHaveLength(1);
+    expect(screen.getAllByText("All income types, net of fees and tax rows")).toHaveLength(1);
   });
 });
 

@@ -1523,7 +1523,7 @@
       "chipIncome": "Pendapatan",
       "chipIssues": "Perlu ditinjau · {count}",
       "allTime": "Sepanjang waktu",
-      "incomeBasis": "Semua jenis pendapatan, setelah biaya dan pajak"
+      "incomeBasis": "Semua jenis pendapatan, setelah biaya dan baris pajak"
     },
     "transactionCol": "Transaksi",
     "price": "Harga",
