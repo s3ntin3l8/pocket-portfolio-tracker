@@ -110,7 +110,7 @@ describe("GET /portfolios/:portfolioId/transactions ?convertTo=", () => {
 
     const res = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions?convertTo=EUR`,
+      url: `/portfolios/${portfolioId}/transactions?convertTo=EUR&all=1`,
       headers: auth(t),
     });
     expect(res.statusCode).toBe(200);
@@ -148,7 +148,7 @@ describe("GET /portfolios/:portfolioId/transactions ?convertTo=", () => {
 
     const res = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     const rows = res.json() as Record<string, unknown>[];

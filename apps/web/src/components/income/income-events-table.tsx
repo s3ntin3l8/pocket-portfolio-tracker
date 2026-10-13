@@ -376,7 +376,8 @@ export function IncomeEventsTable({
     if (!e.transactionId || !e.portfolioId) return;
     setLoadingId(e.transactionId);
     try {
-      const list = await api.listTransactions(e.portfolioId);
+      // Fetch just this row (audit D5: the full-list read is a bounded export now).
+      const list = await api.listTransactionsByIds(e.portfolioId, [e.transactionId]);
       setDetailTx(list.find((r) => r.id === e.transactionId) ?? null);
     } finally {
       setLoadingId(null);
