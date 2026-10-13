@@ -15,7 +15,18 @@ import { BrokerageIcon } from "@/components/brokerage-icon";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { SELECTED_PORTFOLIO_COOKIE, HOLDER_SCOPE_PREFIX } from "@/lib/portfolio-selection";
+import {
+  SELECTED_PORTFOLIO_COOKIE,
+  SCOPE_PARAM,
+  formatScopeParam,
+  parseScopeParam,
+  scopeToCookieValue,
+  type ScopeSelection,
+} from "@/lib/portfolio-selection";
+
+/** Params that belong to the previous scope's view and must not survive a scope change:
+ *  the Holdings drill-in override and list pagination. */
+const SCOPE_RESET_PARAMS = ["portfolio", "page"];
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -27,11 +38,12 @@ const ONE_YEAR = 60 * 60 * 24 * 365;
  *    equivalent to the portfolio view already covered by section 3).
  * 3. Individual portfolios.
  *
- * Selecting any item writes the `pf` cookie and triggers an RSC refresh so
- * every server-rendered screen re-reads the new scope.
- * - Portfolio: `pf=<portfolioId>`
- * - Holder aggregate: `pf=holder:<holderId>`
- * - All: `pf=all`
+ * The URL is the source of truth: selecting an item pushes `?scope=` (a history entry,
+ * so back/forward restores the previous scope) and also writes the `pf` cookie, which
+ * remains the default for scope-less URLs. Other search params are preserved.
+ * - Portfolio: `?scope=p:<portfolioId>` / `pf=<portfolioId>`
+ * - Holder aggregate: `?scope=h:<holderId>` / `pf=holder:<holderId>`
+ * - All: `?scope=all` / `pf=all`
  */
 export function PortfolioSwitcher({
   portfolios,
@@ -50,21 +62,41 @@ export function PortfolioSwitcher({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // A scope in the URL wins over the server-provided selection (the layout isn't
+  // re-rendered by a search-param navigation, so its props can lag the URL).
+  const urlScope = parseScopeParam(searchParams.get(SCOPE_PARAM));
+  let scopedId = selectedId;
+  let scopedHolderId = selectedHolderId;
+  if (urlScope) {
+    scopedId =
+      urlScope.kind === "portfolio" && portfolios.some((p) => p.id === urlScope.portfolioId)
+        ? urlScope.portfolioId
+        : null;
+    scopedHolderId =
+      urlScope.kind === "holder" && holders.some((h) => h.id === urlScope.holderId)
+        ? urlScope.holderId
+        : null;
+  }
+
   // When the user drills into a portfolio from /portfolios (card click), we land on
-  // /holdings?portfolio=<id> without touching the global cookie. Reflect that transient
-  // override in the switcher so the label is accurate, but leave the cookie alone.
+  // /holdings?portfolio=<id> without touching the scope. Reflect that transient
+  // override in the switcher so the label is accurate.
   const overrideParam = pathname === "/holdings" ? searchParams.get("portfolio") : null;
   const overrideActive = !!overrideParam && portfolios.some((p) => p.id === overrideParam);
-  const effectiveSelectedId = overrideActive ? overrideParam : selectedId;
-  const effectiveHolderId = overrideActive ? null : selectedHolderId;
+  const effectiveSelectedId = overrideActive ? overrideParam : scopedId;
+  const effectiveHolderId = overrideActive ? null : scopedHolderId;
 
   if (portfolios.length === 0) return null;
 
-  function onSelect(value: string) {
-    document.cookie = `${SELECTED_PORTFOLIO_COOKIE}=${value}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
-    // Selecting anything from the switcher while on a drill-in URL should drop
-    // the ?portfolio= param so the cookie governs from here on.
-    if (overrideActive) router.replace(pathname);
+  function onSelect(scope: ScopeSelection) {
+    document.cookie = `${SELECTED_PORTFOLIO_COOKIE}=${scopeToCookieValue(scope)}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
+    const params = new URLSearchParams(searchParams.toString());
+    for (const key of SCOPE_RESET_PARAMS) params.delete(key);
+    params.set(SCOPE_PARAM, formatScopeParam(scope));
+    // push (not replace): a scope change is a navigation the back button should undo.
+    router.push(`${pathname}?${params.toString()}`);
+    // The layout (sidebar net worth, switcher props) isn't re-rendered by a search-param
+    // navigation; refresh re-reads it for the new scope.
     router.refresh();
   }
 
@@ -122,7 +154,7 @@ export function PortfolioSwitcher({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-w-[16rem]">
         {/* Section 1: All portfolios */}
-        <DropdownMenuItem onSelect={() => onSelect("all")}>
+        <DropdownMenuItem onSelect={() => onSelect({ kind: "all" })}>
           <Layers className="size-5 shrink-0 text-muted-foreground" />
           <span className="truncate">{t("all")}</span>
           <Check
@@ -141,7 +173,7 @@ export function PortfolioSwitcher({
             {holders.map((h) => (
               <DropdownMenuItem
                 key={h.id}
-                onSelect={() => onSelect(`${HOLDER_SCOPE_PREFIX}${h.id}`)}
+                onSelect={() => onSelect({ kind: "holder", holderId: h.id })}
               >
                 <Users className="size-5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{h.name}</span>
@@ -160,7 +192,10 @@ export function PortfolioSwitcher({
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{t("portfolios")}</DropdownMenuLabel>
         {portfolios.map((p) => (
-          <DropdownMenuItem key={p.id} onSelect={() => onSelect(p.id)}>
+          <DropdownMenuItem
+            key={p.id}
+            onSelect={() => onSelect({ kind: "portfolio", portfolioId: p.id })}
+          >
             <BrokerageIcon brokerage={p.brokerage} className="size-5" />
             <span className="truncate">{portfolioLabel(p)}</span>
             <Check

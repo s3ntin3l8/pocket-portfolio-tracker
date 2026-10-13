@@ -1,6 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 
 /**
  * Section title used by every Settings/Admin sub-route's content. On mobile it's a
@@ -17,13 +17,13 @@ export function SectionHeader({ title, backHref }: { title: string; backHref: st
   return (
     <div className="mb-4 md:mb-0">
       <div className="flex items-center gap-3">
-        <Link
+        <ScopeLink
           href={backHref}
           aria-label={t("back")}
           className="relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm before:absolute before:-inset-1 md:hidden"
         >
           <ChevronLeft className="size-[18px]" />
-        </Link>
+        </ScopeLink>
         <h1 className="text-xl font-extrabold tracking-tight md:sr-only">{title}</h1>
       </div>
     </div>

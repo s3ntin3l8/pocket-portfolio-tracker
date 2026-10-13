@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useBackToClose } from "../src/lib/use-back-to-close";
+import { replaceUrlParam } from "../src/lib/url-state";
 import {
   consumeSuppressedBack,
   resetBackToCloseStackForTests,
@@ -384,5 +385,51 @@ describe("useBackToClose", () => {
     suppressNextHistoryBack();
     expect(consumeSuppressedBack()).toBe(true);
     expect(consumeSuppressedBack()).toBe(false);
+  });
+});
+
+// URL-state interplay (audit G4): the hero range writes `?range=` via a shallow
+// `history.replaceState` (no history entry), while a scope change is a real push.
+describe("useBackToClose with URL-state history writes", () => {
+  it("a shallow range replace while an overlay is open keeps the marker usable", () => {
+    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const onOpenChange = vi.fn();
+    const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
+      initialProps: { open: false },
+    });
+    rerender({ open: true }); // pushes the marker
+    const depth = window.history.length;
+
+    replaceUrlParam("range", "1m"); // replace keeps history.state (the marker id)
+
+    expect(window.history.length).toBe(depth); // no extra entry
+    expect(window.location.search).toContain("range=1m");
+    rerender({ open: false }); // normal close still pops its own marker
+    expect(backSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a replace does not fire popstate, so it never closes an open overlay", () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
+      initialProps: { open: false },
+    });
+    rerender({ open: true });
+    replaceUrlParam("range", "7d");
+    replaceUrlParam("range", null);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("a scope push while an overlay is open is treated as real navigation (no history.back())", () => {
+    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const onOpenChange = vi.fn();
+    const { rerender } = renderHook(({ open }) => useBackToClose(open, onOpenChange), {
+      initialProps: { open: false },
+    });
+    rerender({ open: true });
+
+    window.history.pushState({}, "", "?scope=p%3Ap1"); // switcher's router.push
+
+    rerender({ open: false });
+    expect(backSpy).not.toHaveBeenCalled();
   });
 });

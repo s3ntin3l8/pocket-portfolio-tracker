@@ -69,6 +69,35 @@ describe("getSelectedPortfolioId", () => {
   });
 });
 
+describe("scope precedence (?scope= header > pf cookie > all)", () => {
+  it("prefers the proxy-provided ?scope= header over the cookie", async () => {
+    h.cookies = { pf: "p1" };
+    h.requestHeaders = { "x-pocket-scope": "p:p2" };
+    expect(await api.getSelectedPortfolioId()).toBe("p2");
+    h.requestHeaders = { "x-pocket-scope": "all" };
+    expect(await api.getSelectedPortfolioId()).toBeNull();
+  });
+
+  it("ignores a malformed header and falls back to the cookie", async () => {
+    h.cookies = { pf: "p1" };
+    h.requestHeaders = { "x-pocket-scope": "nonsense" };
+    expect(await api.getSelectedPortfolioId()).toBe("p1");
+  });
+
+  it("resolves a holder scope from the header for the layout selection", async () => {
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "IDR", accountHolderId: "h1" },
+      { id: "p2", name: "B", baseCurrency: "EUR", accountHolderId: "h1" },
+    ];
+    h.client.listAccountHolders = async () => [{ id: "h1", name: "Self" }];
+    h.requestHeaders = { "x-pocket-scope": "h:h1" };
+    expect(await api.resolveSelection()).toMatchObject({
+      selectedId: null,
+      selectedHolderId: "h1",
+    });
+  });
+});
+
 describe("resolveSelection", () => {
   it("validates the cookie against the live list", async () => {
     h.client.listPortfolios = async () => PF;

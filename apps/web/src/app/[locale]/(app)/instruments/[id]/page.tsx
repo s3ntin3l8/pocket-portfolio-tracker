@@ -8,7 +8,7 @@ import {
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -155,9 +155,9 @@ export default async function InstrumentPage({
       aria-label={tA11y("backToHoldings")}
       className="rounded-xl bg-card shadow-card"
     >
-      <Link href="/holdings">
+      <ScopeLink href="/holdings">
         <ArrowLeft className="size-4" />
-      </Link>
+      </ScopeLink>
     </Button>
   );
 

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatSignedMoney, formatPercent, cn } from "@/lib/utils";
 import { toneClass } from "./constants";
 
@@ -50,12 +50,12 @@ export function DesktopRow({
           />
           <div className="min-w-0 max-w-[180px]">
             <div className="flex min-w-0 items-center gap-1.5">
-              <Link
+              <ScopeLink
                 href={`/instruments/${tr.instrumentId}`}
                 className={cn(TABLE_LABEL, "min-w-0 truncate hover:underline")}
               >
                 {tr.instrument?.symbol ?? "—"}
-              </Link>
+              </ScopeLink>
               <Badge variant={tr.status === "open" ? "default" : "outline"} className="shrink-0">
                 {t(`status_${tr.status}`)}
               </Badge>

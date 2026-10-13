@@ -14,7 +14,7 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 import { TxRow, KIND_ICON } from "./types";
 import {
@@ -237,13 +237,13 @@ export function DesktopTable({
                             {tx.kind && KIND_ICON[tx.kind] ? tt(tx.kind) : tt(tx.type)}
                             {tx.instrument?.symbol ? " · " : ""}
                             {tx.instrumentId && tx.instrument?.symbol ? (
-                              <Link
+                              <ScopeLink
                                 href={`/instruments/${tx.instrumentId}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="hover:underline"
                               >
                                 {tx.instrument.symbol}
-                              </Link>
+                              </ScopeLink>
                             ) : (
                               (tx.instrument?.symbol ?? "")
                             )}

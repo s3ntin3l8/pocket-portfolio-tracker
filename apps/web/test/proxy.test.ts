@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const intl = vi.hoisted(() => ({ seen: [] as Request[] }));
 vi.mock("next-intl/middleware", () => ({
-  default: () => () => new Response(null, { status: 200 }),
+  default: () => (req: Request) => {
+    intl.seen.push(req);
+    return new Response(null, { status: 200 });
+  },
 }));
 
-import { bypassI18n, config, isAllowedHost } from "../src/proxy";
+import { NextRequest } from "next/server";
+import proxy, { bypassI18n, config, isAllowedHost, withScopeHeader } from "../src/proxy";
 
 function headersWith(opts: { host?: string; xForwardedHost?: string }): Headers {
   const h = new Headers();
@@ -80,5 +85,38 @@ describe("proxy host guard", () => {
     expect(bypassI18n("/api/auth/signin")).toBe(true);
     expect(bypassI18n("/api/backend/portfolios")).toBe(true);
     expect(bypassI18n("/dashboard")).toBe(false);
+  });
+});
+
+describe("proxy scope header", () => {
+  function req(url: string, headers: Record<string, string> = {}) {
+    return new NextRequest(url, { headers: { host: "localhost:3005", ...headers } });
+  }
+
+  it("surfaces a valid ?scope= as x-pocket-scope", () => {
+    const out = withScopeHeader(req("http://localhost:3005/en/holdings?scope=p:abc"));
+    expect(out.headers.get("x-pocket-scope")).toBe("p:abc");
+  });
+
+  it("omits it for a malformed scope and strips a client-supplied header", () => {
+    const out = withScopeHeader(
+      req("http://localhost:3005/en/holdings?scope=<x>", { "x-pocket-scope": "p:evil" }),
+    );
+    expect(out.headers.has("x-pocket-scope")).toBe(false);
+    const none = withScopeHeader(req("http://localhost:3005/en/holdings"));
+    expect(none.headers.has("x-pocket-scope")).toBe(false);
+  });
+
+  it("replaces a spoofed header with the URL's scope", () => {
+    const out = withScopeHeader(
+      req("http://localhost:3005/en/holdings?scope=all", { "x-pocket-scope": "p:evil" }),
+    );
+    expect(out.headers.get("x-pocket-scope")).toBe("all");
+  });
+
+  it("hands the intl middleware the request carrying the header", () => {
+    intl.seen.length = 0;
+    proxy(req("http://localhost:3005/en/holdings?scope=h:h1"));
+    expect(intl.seen[0]?.headers.get("x-pocket-scope")).toBe("h:h1");
   });
 });

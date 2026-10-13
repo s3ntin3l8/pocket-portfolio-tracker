@@ -4,12 +4,12 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
-const replace = vi.fn();
+const push = vi.fn();
 let mockPathname = "/";
 let mockSearchParams = new URLSearchParams();
 
 vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ refresh, replace }),
+  useRouter: () => ({ refresh, push }),
   usePathname: () => mockPathname,
 }));
 vi.mock("next/navigation", () => ({
@@ -47,7 +47,7 @@ function openMenu() {
 describe("PortfolioSwitcher", () => {
   beforeEach(() => {
     refresh.mockClear();
-    replace.mockClear();
+    push.mockClear();
     mockPathname = "/";
     mockSearchParams = new URLSearchParams();
     document.cookie = "pf=; max-age=0; path=/";
@@ -123,6 +123,7 @@ describe("PortfolioSwitcher", () => {
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /DKB/ }));
     expect(document.cookie).toContain("pf=p2");
+    expect(push).toHaveBeenCalledWith("/?scope=p%3Ap2");
     expect(refresh).toHaveBeenCalled();
   });
 
@@ -158,6 +159,7 @@ describe("PortfolioSwitcher", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /Self/ }));
     // document.cookie doesn't encode `:` — the raw value is `holder:h1`.
     expect(document.cookie).toContain("pf=holder:h1");
+    expect(push).toHaveBeenCalledWith("/?scope=h%3Ah1");
     expect(refresh).toHaveBeenCalled();
   });
 
@@ -224,7 +226,46 @@ describe("PortfolioSwitcher", () => {
     });
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: messages.PortfolioSwitcher.all }));
-    expect(replace).toHaveBeenCalledWith("/holdings");
+    expect(push).toHaveBeenCalledWith("/holdings?scope=all");
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("preserves other params, resets pagination, and pushes (not replaces) a scope change", () => {
+    mockPathname = "/transactions";
+    mockSearchParams = new URLSearchParams("type=buy&page=3");
+    renderSwitcher({
+      portfolios: [
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
+      ],
+      selectedId: null,
+    });
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /DKB/ }));
+    expect(push).toHaveBeenCalledWith("/transactions?type=buy&scope=p%3Ap2");
+  });
+
+  it("reflects a ?scope= in the URL on the trigger even when the server props lag", () => {
+    mockSearchParams = new URLSearchParams("scope=p:p2");
+    renderSwitcher({
+      portfolios: [
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
+      ],
+      selectedId: null,
+    });
+    expect(trigger()).toHaveTextContent("DKB");
+  });
+
+  it("ignores a ?scope= naming an unknown portfolio (falls to All)", () => {
+    mockSearchParams = new URLSearchParams("scope=p:gone");
+    renderSwitcher({
+      portfolios: [
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "DKB", brokerage: null, accountHolder: null },
+      ],
+      selectedId: "p1",
+    });
+    expect(trigger()).toHaveTextContent(messages.PortfolioSwitcher.all);
   });
 });

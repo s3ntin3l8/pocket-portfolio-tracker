@@ -4,7 +4,9 @@ import { Suspense, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
-import { Link, usePathname } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
+import { LastVisitedTracker } from "@/components/last-visited-tracker";
 import { cn } from "@/lib/utils";
 import { GainFigure, toneOf } from "@/components/gain-figure";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -31,13 +33,13 @@ function DesktopTopbarTitle() {
   return (
     <div className="hidden min-w-0 max-w-[40%] items-center gap-2 md:flex">
       {backHref && (
-        <Link
+        <ScopeLink
           href={backHref}
           aria-label={t("back")}
           className="relative flex size-8 shrink-0 items-center justify-center rounded-lg text-text-mute before:absolute before:-inset-1.5 transition-colors hover:bg-secondary hover:text-foreground"
         >
           <ChevronLeft className="size-5" />
-        </Link>
+        </ScopeLink>
       )}
       {/* Not a heading: the page itself renders the one <h1> (screen-reader-only at md+),
           so a second <h1> here would double the document outline on every route. */}
@@ -103,6 +105,7 @@ export function AppShell({
   return (
     <FullScreenOverlayProvider>
       <NavProgressProvider>
+        <LastVisitedTracker />
         {/* Skip link: first focusable element; jumps past the sidebar/topbar to <main>. */}
         <a
           href="#main"
@@ -131,7 +134,7 @@ export function AppShell({
                 const active = key === activeKey;
                 const badge = key === "activity" && anomalyCount > 0 ? anomalyCount : null;
                 return (
-                  <Link
+                  <ScopeLink
                     key={key}
                     href={href}
                     aria-current={active ? "page" : undefined}
@@ -156,7 +159,7 @@ export function AppShell({
                         <span className="sr-only">{tA("needsReview", { count: badge })}</span>
                       </span>
                     )}
-                  </Link>
+                  </ScopeLink>
                 );
               })}
             </nav>
@@ -216,9 +219,9 @@ export function AppShell({
               <header className="sticky top-0 z-30 flex w-full min-h-[62px] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)] will-change-transform">
                 <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-6 md:pr-6">
                   {/* Mobile brand (desktop shows it in the sidebar). */}
-                  <Link href="/holdings" className="md:hidden" aria-label="Pocket">
+                  <ScopeLink href="/holdings" className="md:hidden" aria-label="Pocket">
                     <Brand />
-                  </Link>
+                  </ScopeLink>
                   <DesktopTopbarTitle />
                   <div className="min-w-0">{switcher}</div>
                   <div className="ml-auto flex items-center gap-1">

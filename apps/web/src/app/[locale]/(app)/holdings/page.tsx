@@ -2,7 +2,7 @@ import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Layers, Plus, AlertCircle, AlertTriangle } from "lucide-react";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ExportCsvButton } from "@/components/export-csv-button";
@@ -39,6 +39,7 @@ import {
   type AnomalyTranslator,
 } from "@/lib/utils";
 import { PageTitle } from "@/components/page-header";
+import { isIntradayHeroRange, resolveHeroRange } from "@/lib/chart-range";
 import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
 
 const CLASS_TABS = [
@@ -52,14 +53,6 @@ const CLASS_TABS = [
   "cash",
 ] as const;
 
-/**
- * The range the Holdings hero chart initially loads. Deliberately a day-grained range
- * (not 1D/7D): intraday snapshots are brand new (PR #386) and only backfill over time,
- * so defaulting to an intraday range would show "Collecting intraday data…" as the
- * landing state on every fresh install/portfolio. 1D/7D stay one tap away as chips.
- */
-const HERO_INITIAL_RANGE = "1y";
-
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
 export default async function HoldingsPage({
@@ -67,12 +60,12 @@ export default async function HoldingsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ portfolio?: string; filter?: string }>;
+  searchParams: Promise<{ portfolio?: string; filter?: string; range?: string }>;
 }) {
   // eslint-disable-next-line react-hooks/purity
   const t0 = TIMING ? performance.now() : 0;
   const { locale } = await params;
-  const { portfolio: portfolioParam, filter: filterParam } = await searchParams;
+  const { portfolio: portfolioParam, filter: filterParam, range: rangeParam } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("Holdings");
   const ta = await getTranslations("Anomalies");
@@ -91,8 +84,14 @@ export default async function HoldingsPage({
   // selected — matches how Activity/Transactions loads anomalies for the
   // all-portfolios view. Per-portfolio anomalies only work with a specific ID.
   const anomaliesPromise = portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies();
-  const historyPromise = loadNetWorthHistory(HERO_INITIAL_RANGE);
   const hasIntradayPromise = loadHasIntraday();
+  // `?range=` deep link: the hero opens on it, except that an intraday range with no
+  // intraday data (its chips are hidden) falls back to the default.
+  const heroRange =
+    rangeParam && isIntradayHeroRange(rangeParam)
+      ? resolveHeroRange(rangeParam, await hasIntradayPromise)
+      : resolveHeroRange(rangeParam);
+  const historyPromise = loadNetWorthHistory(heroRange);
   const holderScopePromise = loadNetWorthHolderScope();
   const selectedIdPromise = getSelectedPortfolioId();
   const mePromise = loadMe();
@@ -280,9 +279,12 @@ export default async function HoldingsPage({
               ? ta("bannerError", { count: errorCount })
               : ta("bannerWarning", { count: warningCount })}
         </span>
-        <Link href="/transactions" className="shrink-0 font-medium underline underline-offset-2">
+        <ScopeLink
+          href="/transactions"
+          className="shrink-0 font-medium underline underline-offset-2"
+        >
           {ta("viewTransactions")}
-        </Link>
+        </ScopeLink>
       </div>
     ) : null;
 
@@ -315,10 +317,12 @@ export default async function HoldingsPage({
       {/* ── Hero chart: full-width above the table ── */}
       {summary && (
         <HeroGlanceCard
+          // Remount on a scope change: the chart seeds its state from `initialHistory`.
+          key={`${portfolioParam ?? ""}:${selectedId ?? ""}:${holderId ?? ""}`}
           netWorth={summary.netWorth}
           currency={summary.displayCurrency}
           initialHistory={history}
-          initialRange={HERO_INITIAL_RANGE}
+          initialRange={heroRange}
           hasIntraday={hasIntraday}
           selectedId={selectedId}
           holderId={holderId}

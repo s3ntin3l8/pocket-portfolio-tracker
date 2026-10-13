@@ -1,6 +1,8 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { replaceUrlParam } from "@/lib/url-state";
 import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronRight, Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -60,7 +62,16 @@ export function IncomeTimeline({
   olderYears?: string[];
 }) {
   const t = useTranslations("Income");
-  const [yearFilter, setYearFilter] = useState("all");
+  // The year filter is URL state (`?year=`), shallow: a deep link opens on that year.
+  const searchParams = useSearchParams();
+  const [yearFilter, setYearFilterState] = useState(() => {
+    const fromUrl = searchParams?.get("year");
+    return fromUrl && /^\d{4}$/.test(fromUrl) ? fromUrl : "all";
+  });
+  const setYearFilter = (y: string) => {
+    setYearFilterState(y);
+    replaceUrlParam("year", y === "all" ? null : y);
+  };
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
   const [groupByInstrument, setGroupByInstrument] = useState(false);

@@ -2466,5 +2466,8 @@
     "boundaryMixed": "Cakupan ini menggabungkan portofolio dengan batas kas yang berbeda. Setiap portofolio memasangkan nilai dan kontribusinya pada batasnya sendiri sebelum dijumlahkan.",
     "holdingsGainLine": "Keuntungan kepemilikan: nilai posisi terbuka terhadap biayanya.",
     "savingsGainLine": "Keuntungan tabungan: nilai saat ini terhadap kontribusi bersih."
+  },
+  "Period": {
+    "taxYear": "Tahun pajak"
   }
 }

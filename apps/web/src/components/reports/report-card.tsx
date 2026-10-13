@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { Card } from "@/components/ui/card";
 import { TrendChip, type TrendTone } from "@/components/reports/trend-chip";
 import { MiniSplitBar, type MiniSplitBarSegment } from "@/components/reports/mini-split-bar";
@@ -50,7 +50,7 @@ export function ReportCard({
   // 700 16px title + delta pill in ONE header row, 800 30px value, 500 13px caption,
   // 7px split bar, and a bordered footer pinned to the card bottom.
   return (
-    <Link href={href} className="group block h-full">
+    <ScopeLink href={href} className="group block h-full">
       <Card className="flex h-full min-w-0 flex-col rounded-[18px] px-[22px] py-5 transition-colors group-hover:border-primary/40">
         <div className="flex w-full items-center gap-3">
           <span
@@ -78,6 +78,6 @@ export function ReportCard({
 
         <TwoStatFooter metrics={metrics} openLabel={openLabel} accentColor={iconFg} />
       </Card>
-    </Link>
+    </ScopeLink>
   );
 }

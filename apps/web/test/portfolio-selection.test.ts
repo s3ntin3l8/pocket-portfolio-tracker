@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
+  effectiveScopeValue,
+  formatScopeParam,
+  parseCookieScope,
+  parseScopeParam,
+  resolveScope,
+  scopeToCookieValue,
+  withScope,
   pickDefaultPortfolioId,
   qualifyingHolders,
   readSelectedScope,
@@ -90,5 +97,93 @@ describe("pickDefaultPortfolioId", () => {
   });
   it("is empty with no portfolios", () => {
     expect(pickDefaultPortfolioId([], "p1")).toBe("");
+  });
+});
+
+describe("scope URL param", () => {
+  it("parses all | p:<id> | h:<id> and rejects anything else", () => {
+    expect(parseScopeParam("all")).toEqual({ kind: "all" });
+    expect(parseScopeParam("p:abc-123")).toEqual({ kind: "portfolio", portfolioId: "abc-123" });
+    expect(parseScopeParam("h:h_1")).toEqual({ kind: "holder", holderId: "h_1" });
+    for (const bad of [
+      null,
+      undefined,
+      "",
+      "p:",
+      "h:",
+      "x:1",
+      "p:a b",
+      "p:../x",
+      "p:<script>",
+      "holder:h1",
+      "abc",
+    ]) {
+      expect(parseScopeParam(bad)).toBeNull();
+    }
+  });
+
+  it("round-trips through formatScopeParam and maps to the cookie encoding", () => {
+    for (const v of ["all", "p:p1", "h:h1"]) {
+      expect(formatScopeParam(parseScopeParam(v)!)).toBe(v);
+    }
+    expect(scopeToCookieValue({ kind: "portfolio", portfolioId: "p1" })).toBe("p1");
+    expect(scopeToCookieValue({ kind: "holder", holderId: "h1" })).toBe("holder:h1");
+    expect(scopeToCookieValue({ kind: "all" })).toBe("all");
+    expect(parseCookieScope("holder:h1")).toEqual({ kind: "holder", holderId: "h1" });
+    expect(parseCookieScope(undefined)).toEqual({ kind: "all" });
+  });
+});
+
+describe("resolveScope precedence", () => {
+  it("prefers a valid param over the cookie", () => {
+    expect(resolveScope({ param: "p:p2", cookie: "p1" })).toEqual({
+      kind: "portfolio",
+      portfolioId: "p2",
+    });
+    // An explicit ?scope=all overrides a portfolio cookie.
+    expect(resolveScope({ param: "all", cookie: "p1" })).toEqual({ kind: "all" });
+  });
+
+  it("falls back to the cookie when the param is absent or malformed", () => {
+    expect(resolveScope({ param: null, cookie: "holder:h1" })).toEqual({
+      kind: "holder",
+      holderId: "h1",
+    });
+    expect(resolveScope({ param: "garbage", cookie: "p1" })).toEqual({
+      kind: "portfolio",
+      portfolioId: "p1",
+    });
+  });
+
+  it("defaults to all with neither", () => {
+    expect(resolveScope({})).toEqual({ kind: "all" });
+  });
+
+  it("effectiveScopeValue gives client code the cookie-encoded winner", () => {
+    expect(effectiveScopeValue("h:h1", "pf=p1")).toBe("holder:h1");
+    expect(effectiveScopeValue(null, "pf=p1")).toBe("p1");
+    expect(effectiveScopeValue(null, "")).toBeNull();
+  });
+});
+
+describe("withScope", () => {
+  it("carries the current scope onto an internal href", () => {
+    expect(withScope("/reports", new URLSearchParams("scope=p:p1"))).toBe("/reports?scope=p%3Ap1");
+    expect(withScope("/tax?year=2025", "scope=h:h1&range=1m")).toBe("/tax?year=2025&scope=h%3Ah1");
+    expect(withScope("/holdings?filter=at-cost#top", new URLSearchParams("scope=all"))).toBe(
+      "/holdings?filter=at-cost&scope=all#top",
+    );
+  });
+
+  it("leaves hrefs alone when there is nothing valid to carry", () => {
+    expect(withScope("/reports", new URLSearchParams())).toBe("/reports");
+    expect(withScope("/reports", null)).toBe("/reports");
+    expect(withScope("/reports", new URLSearchParams("scope=bogus"))).toBe("/reports");
+  });
+
+  it("never overrides an explicit scope in the href and skips external hrefs", () => {
+    expect(withScope("/holdings?scope=all", "scope=p:p1")).toBe("/holdings?scope=all");
+    expect(withScope("https://example.com/x", "scope=p:p1")).toBe("https://example.com/x");
+    expect(withScope("//evil.example/x", "scope=p:p1")).toBe("//evil.example/x");
   });
 });
