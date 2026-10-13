@@ -61,6 +61,31 @@ A portfolio with no FSA configured (`taxAllowanceAnnual` is `null`) can't comput
 tax at all — the route returns `422 tax_allowance_not_configured`, and the `/sparplan`
 route returns `taxUnavailable: true` instead of erroring.
 
+### Tax rate (`capitalGainsTaxRate` / `churchTax`)
+
+`effectiveCapitalGainsTaxRate` (`packages/core/src/tax/rates.ts`) resolves the flat rate
+used for "tax saving" figures, in this order:
+
+1. The holder's explicit `accountHolders.capitalGainsTaxRate`, if set (always wins).
+2. Otherwise, with `churchTax` unset: Abgeltungsteuer 25% + Solidaritätszuschlag 5.5% of
+   it = **26.375%** (previously a bare 25%).
+3. Otherwise, with `churchTax` set (§32d Abs. 1 EStG): the Kapitalertragsteuer is reduced
+   because the church tax is deductible, `e = 25% / (1 + 0.25·k)`, and the total is
+   `e · (1 + 0.055 + k)` with `k` = church-tax rate on the KapESt (default **9%**; 8% in
+   Baden-Württemberg and Bayern, passed as `churchTaxRate`). k = 9% gives 27.9951%,
+   k = 8% gives 27.8186%. `churchTax` is a boolean, so 9% is assumed unless an explicit
+   rate is configured.
+
+### Holding period (§23 EStG)
+
+Gold/crypto gains are tax-free only if held **more than one year**. The test is calendar
+arithmetic (`heldMoreThanOneYear`, `packages/core/src/trade-log/helpers.ts`): a sale on
+the one-year anniversary is still inside the period, the next day is not, and a 29 Feb
+acquisition ends on 28 Feb (§188 Abs. 2 BGB) — no 365-day count, so leap years are right.
+Long-term flags are decided **per lot**: a FIFO leg by its own lot; an average-method leg
+only if every lot consumed by that sale is older than a year, so a recent top-up does not
+inherit the first lot's status. An open trade is long-term when every lot still held is.
+
 ### Teilfreistellung (partial exemption)
 
 Fund gains/losses, fund **distributions** and Vorabpauschale are multiplied by
@@ -69,7 +94,12 @@ per instrument in `TradeLog.incomeByInstrumentYear` (the instrument-attributed p
 `dividendsByYear`); instrument-less income such as account interest stays unadjusted.
 An equity-ETF distribution of €100 therefore counts as €70 in the general pot. The rate comes from `instruments.partialExemptionRate` when set,
 else a hardcoded default by asset class (`services/api/src/routes/transactions/tax.ts`):
-ETF → **30%**, mutual fund → **15%**, everything else → **0%** (no exemption). Worked
+ETF → **30%**, mutual fund → **15%**, everything else → **0%** (no exemption). The
+class default is only a fallback: bond/real-estate/mixed funds have different statutory
+rates (e.g. 60% real estate, 15% mixed), so the **per-instrument
+`instruments.partialExemptionRate` is the documented override**. There is currently no
+write path for it in the API or the instrument edit dialog — it is set in the database
+only (tracked as a follow-up). Worked
 example (from `packages/core/test/tax.test.ts`): a closed equity-ETF trade with a
 €1,000 realized gain and a 30% Teilfreistellung rate tf-adjusts to **€700** — against a
 €1,000 allowance, that leaves €300 remaining.
@@ -120,6 +150,28 @@ side (per-instrument accrual pool on `Trade.vorabByYear`, and a disposal credit 
 sold); `tax.ts` owns the _tax-netting_ side — it Teilfreistellung-adjusts both the
 accrual and the credit, in the same per-trade loop that handles realized gains, and
 folds the net (accrual − credit) into the general pot.
+
+### Basiszins and the Vorabpauschale
+
+The Vorabpauschale base normally comes from the broker (`vorabBase` on the `tax`/
+`vorabpauschale` row); without it the accrual is 0. `BASISZINS_BY_YEAR`
+(`packages/core/src/tax/rates.ts`) holds the official Basiszins (§18 Abs. 4 InvStG,
+derived by the Bundesbank at the first trading day of the year and published by the
+Bundesfinanzministerium) and `estimateVorabpauschale` applies
+`value on 1 Jan × Basiszins × 70%`, prorated by months held, capped at the actual
+increase, minus distributions. Sources (BMF-Schreiben "Basiszins zur Berechnung der
+Vorabpauschale gem. § 18 Absatz 4 InvStG"):
+
+| Year | Basiszins | BMF-Schreiben                                                 |
+| ---- | --------- | ------------------------------------------------------------- |
+| 2023 | 2.55%     | 4 Jan 2023                                                    |
+| 2024 | 2.29%     | 5 Jan 2024, IV C 1 - S 1980-1/19/10038 :008                   |
+| 2025 | 2.53%     | 10 Jan 2025, IV C 1 - S 1980/00230/009/002                    |
+| 2026 | 3.20%     | Jan 2026, IV C 1 - S 1980/00230/012/001 (BStBl 2026 I S. 155) |
+
+A year with no entry returns `null` and logs a warning — values are never guessed. The
+estimate is not yet wired into the trade log automatically (it needs 1 Jan / 31 Dec
+fund prices); it is available for callers that have them.
 
 ### Harvest suggestions
 
@@ -181,7 +233,11 @@ allowance/carry-forward state to fetch.
 ## `costBasisMode` — not a tax setting
 
 `userPreferences.costBasisMode` (`"purchase_price"` default, or `"total_paid"`) is a
-**separate** global preference from `taxRegime` — it changes how cost basis is computed
+**separate** global preference. Server-side it is resolved by `resolveCostBasisMode`
+(`services/api/src/routes/transactions/shared/helpers.ts`): an explicit valid
+`?costBasis=` query wins, otherwise the saved preference — used by the tax, contributions,
+history, sparplan, trades, holdings and net-worth routes.
+It is a **separate** global preference from `taxRegime` — it changes how cost basis is computed
 for FIFO/average-cost trade logs and P&L generally (`packages/core/src/valuation.ts`,
 `CostBasisMode`), not anything tax-specific. It's unrelated to either tax module above;
 don't assume a `taxRegime` change implies a `costBasisMode` change or vice versa. (A

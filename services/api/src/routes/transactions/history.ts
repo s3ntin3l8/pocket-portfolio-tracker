@@ -15,6 +15,7 @@ import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
+  resolveCostBasisMode,
   historyCache,
   performanceCache,
   boundaryFlows,
@@ -151,6 +152,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const boundary = portfolio.cashCounted ? "inside" : "outside";
+      const costBasisMode = await resolveCostBasisMode(app, request.userId);
       const cached = await withDerivationCache(
         performanceCache,
         `${portfolioId}:${boundary}`,
@@ -159,7 +161,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             app,
             portfolioId,
             portfolio.baseCurrency,
-            undefined,
+            costBasisMode,
             portfolio.cashCounted,
           );
 

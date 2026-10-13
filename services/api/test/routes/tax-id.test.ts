@@ -371,7 +371,7 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
   });
   it("applies no 0.1% sales tax to gold or EU-ETF disposals (IDX equity only)", async () => {
     const t = await token("tax-id-c4");
-    const mk = async (symbol: string, market: string, assetClass: string) => {
+    const mk = async (symbol: string, market: string, assetClass: "gold" | "etf" | "equity") => {
       const [row] = await app.db
         .insert(instruments)
         .values({ symbol, market, assetClass, currency: "EUR", name: symbol })

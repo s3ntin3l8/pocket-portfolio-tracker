@@ -18,7 +18,7 @@ import type {
   Episode,
   Event,
 } from "./types.js";
-import { LONG_TERM_DAYS, DEFAULT_DUST, makeEpisode, calcAvgHoldingDays } from "./helpers.js";
+import { heldMoreThanOneYear, DEFAULT_DUST, makeEpisode, calcAvgHoldingDays } from "./helpers.js";
 import { finalizeLog } from "./finalize.js";
 import { augmentTransactionsWithSyntheticMergerLegs } from "../merger-augment.js";
 
@@ -102,6 +102,22 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
     // ~0, since a full-close sell's ratio is 1); reset defensively at the dust-close snap.
     let vorabPool = ZERO;
 
+    // Long-term (§23): a closed trade is long-term when every disposal leg was; an open
+    // one when every lot still held is older than a year. Per-lot dates matter for the
+    // average method too — a recent top-up must not inherit the first lot's status.
+    const tradeLongTerm = (
+      status: "open" | "closed",
+      entry: Date,
+      end: Date,
+      legs: { longTerm: boolean }[],
+    ): boolean => {
+      if (status === "closed") return legs.length > 0 && legs.every((l) => l.longTerm);
+      const held = lots.filter((l) => l.qty.gt(0));
+      return held.length > 0
+        ? held.every((l) => heldMoreThanOneYear(l.acqDate, end))
+        : heldMoreThanOneYear(entry, end);
+    };
+
     const finalizeTrade = (ep: Episode, status: "open" | "closed", exitAt: Date | null) => {
       const currentQty = avgQty; // remaining units (0 when closed)
       const entryDate = ep.entryDate;
@@ -174,7 +190,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         exitDate: exitDate ? toDateKey(exitDate) : null,
         holdingDays,
         avgHoldingDays,
-        longTerm: holdingDays >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+        longTerm:
+          tradeLongTerm(status, entryDate, periodEnd, ep.legs) && isTaxFreeEligible(instrumentId),
         quantity: qtyShown.toString(),
         avgEntryPrice,
         avgExitPrice,
@@ -301,7 +318,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
               proceeds: conv(sliceProceeds, costCcy).toString(),
               gain: conv(sliceProceeds.sub(s.cost), costCcy).toString(),
               holdingDays: days,
-              longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+              longTerm: heldMoreThanOneYear(s.acqDate, sellDate) && isTaxFreeEligible(instrumentId),
               taxYear,
               vorabCredit: sliceVorabCredit.toString(),
             });
@@ -316,7 +333,9 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
             proceeds: conv(proceeds, costCcy).toString(),
             gain: conv(realizedSlice, costCcy).toString(),
             holdingDays: days,
-            longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+            longTerm:
+              fifoSlices.every((s) => heldMoreThanOneYear(s.acqDate, sellDate)) &&
+              isTaxFreeEligible(instrumentId),
             taxYear,
             vorabCredit: vorabCreditThis.toString(),
           });

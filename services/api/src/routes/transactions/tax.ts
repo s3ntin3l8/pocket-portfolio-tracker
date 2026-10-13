@@ -2,7 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { and, eq, isNull } from "drizzle-orm";
 import { accountHolders, portfolios, users, userPreferences } from "@portfolio/db";
 import type { TradeLog } from "@portfolio/core";
-import { allowanceUsageYTD, harvestSuggestions, mergeTradeLogs } from "@portfolio/core";
+import {
+  allowanceUsageYTD,
+  effectiveCapitalGainsTaxRate,
+  harvestSuggestions,
+  mergeTradeLogs,
+} from "@portfolio/core";
 import { Decimal } from "decimal.js";
 import {
   derivationCacheKey,
@@ -28,6 +33,7 @@ import {
   loadValuation,
   buildTradeLog,
   PORTFOLIO_VALUATION_CONCURRENCY,
+  resolveCostBasisMode,
   type PortfolioParams,
 } from "./shared.js";
 import {
@@ -75,6 +81,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
       let holderProfile: {
         taxAllowanceAnnual: string | null;
         capitalGainsTaxRate: string | null;
+        churchTax: boolean | null;
       } | null = null;
       let totalAllocatedForHolder = toDecimalSafe(portfolio.taxAllowanceAnnual);
       let lossCarryForwardInput: { stock?: string; general?: string } | undefined;
@@ -86,6 +93,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
             .select({
               taxAllowanceAnnual: accountHolders.taxAllowanceAnnual,
               capitalGainsTaxRate: accountHolders.capitalGainsTaxRate,
+              churchTax: accountHolders.churchTax,
             })
             .from(accountHolders)
             .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
@@ -117,18 +125,19 @@ export function registerTaxRoutes(app: FastifyInstance) {
       );
       const overAllocated = totalAllocatedForHolder.gt(holderAllowanceCap);
 
+      const costBasisMode = await resolveCostBasisMode(app, id);
       const valuation = await loadValuation(
         app,
         portfolioId,
         portfolio.baseCurrency,
-        undefined,
+        costBasisMode,
         portfolio.cashCounted,
       );
       const { coreTxns, prices, metaById, corporateActions: cas, fxRates } = valuation;
       const cacheKey = derivationCacheKey(
         portfolioId,
         portfolio.baseCurrency,
-        undefined,
+        costBasisMode,
         portfolio.cashCounted,
       );
       const tradeLog = await getCachedFifoTradeLog(
@@ -193,7 +202,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
       // DE path — all the FSA/Harvest/Tf computations need `portfolio.taxAllowanceAnnual`
       // to be set (guarded by the regime==="DE" 422 above).
       const allowanceAnnual = portfolio.taxAllowanceAnnual as string;
-      const taxRate = holderProfile?.capitalGainsTaxRate ?? "0.25";
+      const taxRate = effectiveCapitalGainsTaxRate(holderProfile ?? {});
 
       const usage = allowanceUsageYTD({
         tradeLog,
@@ -211,6 +220,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         allowanceAnnual,
         taxRate,
         year,
+        assetClasses,
         usage,
       });
 
@@ -349,6 +359,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         if (regime === "DE" && totalAllocated.isZero()) return null;
 
         const now = new Date();
+        const costBasisMode = await resolveCostBasisMode(app, id);
         const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
           const {
             coreTxns,
@@ -356,14 +367,14 @@ export function registerTaxRoutes(app: FastifyInstance) {
             metaById,
             summary,
             fxRates: pFxRates,
-          } = await loadValuation(app, p.id, display, undefined, p.cashCounted);
+          } = await loadValuation(app, p.id, display, costBasisMode, p.cashCounted);
           const log = await buildTradeLog(
             app,
             coreTxns,
             prices,
             display,
             "fifo",
-            undefined,
+            costBasisMode,
             metaById,
           );
           // Skip restOfYearForecastGross under ID — the forecast is gross-income-only
@@ -442,7 +453,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         const assetClasses = Object.fromEntries(
           [...meta.entries()].map(([iid, m]) => [iid, m.assetClass]),
         );
-        const taxRate = holder.capitalGainsTaxRate ?? "0.25";
+        const taxRate = effectiveCapitalGainsTaxRate(holder);
         const forecastIncomeRestOfYear =
           totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
         const lossCarryForward = await lossCarryForwardFor(app, holder.id, year);
@@ -472,6 +483,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
           allowanceAnnual,
           taxRate,
           year,
+          assetClasses,
           usage,
         });
 

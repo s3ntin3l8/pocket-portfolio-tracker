@@ -2,12 +2,13 @@ import { Decimal } from "decimal.js";
 import { D, ZERO } from "../decimal.js";
 import { effectiveMultiplier, computePotsUsage, isSection23Class } from "../tax-helpers.js";
 import type { YearTax } from "../trade-log.js";
+import { DEFAULT_CAPITAL_GAINS_TAX_RATE } from "./rates.js";
 import type { AllowanceUsageInput, AllowanceUsage } from "./types.js";
 
 export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   const year = input.year ?? new Date().getUTCFullYear();
   const allowance = D(input.allowanceAnnual);
-  const taxRate = D(input.taxRate ?? "0.25");
+  const taxRate = D(input.taxRate ?? DEFAULT_CAPITAL_GAINS_TAX_RATE);
   const currency = input.tradeLog.displayCurrency;
   const assetClasses = input.assetClasses ?? {};
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { instruments } from "@portfolio/db";
+import { eq } from "drizzle-orm";
+import { instruments, users } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 
@@ -145,6 +146,63 @@ describe("tax routes", () => {
       expect(body.allowanceUsage.allowanceAnnual).toBe("1000.00");
       expect(body.allowanceUsage.remaining).toBe("1000.00"); // no transactions
       expect(body.harvestSuggestions).toEqual([]);
+    });
+
+    it("defaults the tax rate to 26.375% and folds church tax in when set (audit C5)", async () => {
+      const t = await token("tax-c5-rate");
+      const plain = await createHolder(t, { name: "Plain", taxAllowanceAnnual: "1000" });
+      const church = await createHolder(t, {
+        name: "Church",
+        taxAllowanceAnnual: "1000",
+        churchTax: true,
+      });
+      const explicit = await createHolder(t, {
+        name: "Explicit",
+        taxAllowanceAnnual: "1000",
+        churchTax: true,
+        capitalGainsTaxRate: "0.30",
+      });
+      const rateFor = async (holderId: string) => {
+        const pid = await createPortfolio(t, {
+          accountHolderId: holderId,
+          taxAllowanceAnnual: "1000",
+        });
+        const res = await app.inject({
+          method: "GET",
+          url: `/portfolios/${pid}/tax?year=2025`,
+          headers: auth(t),
+        });
+        expect(res.statusCode).toBe(200);
+        return res.json().allowanceUsage.taxRate as string;
+      };
+      expect(await rateFor(plain)).toBe("0.26375");
+      expect(await rateFor(church)).toBe("0.279951");
+      expect(await rateFor(explicit)).toBe("0.3");
+    });
+
+    it("resolves costBasisMode from preferences when the query is absent (audit C5)", async () => {
+      const t = await token("tax-c5-costbasis");
+      const { resolveCostBasisMode } = await import("../../src/routes/transactions/shared.js");
+      // Touch an authed route so the user row exists, then set the preference.
+      await app.inject({ method: "GET", url: "/me/preferences", headers: auth(t) });
+      const [row] = await app.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, "tax-c5-costbasis@example.com"))
+        .limit(1);
+      expect(await resolveCostBasisMode(app, row.id)).toBeUndefined();
+      await app.inject({
+        method: "PUT",
+        url: "/me/preferences",
+        headers: auth(t),
+        payload: { costBasisMode: "total_paid" },
+      });
+      expect(await resolveCostBasisMode(app, row.id)).toBe("total_paid");
+      // An explicit, valid query value still wins.
+      expect(await resolveCostBasisMode(app, row.id, { costBasis: "purchase_price" })).toBe(
+        "purchase_price",
+      );
+      expect(await resolveCostBasisMode(app, row.id, { costBasis: "bogus" })).toBe("total_paid");
     });
 
     it("applies loss carry-forward when the holder has exactly one depot", async () => {
