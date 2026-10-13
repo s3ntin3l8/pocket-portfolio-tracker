@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { generateKeyPair, SignJWT } from "jose";
-import { users, apiTokens } from "@portfolio/db";
+import { users, apiTokens, adminAuditLog } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import { hashPassword, hashToken } from "../../src/plugins/auth.js";
@@ -126,5 +126,21 @@ describe("POST /admin/users/:id/set-password (A12)", () => {
     expect(keep.statusCode).toBe(200);
     expect(await tokenCount(revokedId)).toBe(0);
     expect(await tokenCount(keptId)).toBe(1);
+  });
+
+  it("combines allowLocalFallback with default PAT revocation and audits both", async () => {
+    const id = await seed("oidc|combo-user", false);
+    const res = await app.inject({
+      method: "POST",
+      url: `/admin/users/${id}/set-password`,
+      headers: auth(adminT),
+      payload: { allowLocalFallback: true, keepTokens: false },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(await tokenCount(id)).toBe(0);
+    const [row] = await app.db.select().from(users).where(eq(users.id, id));
+    expect(row.passwordHash).not.toBeNull();
+    const [audit] = await app.db.select().from(adminAuditLog).where(eq(adminAuditLog.target, id));
+    expect(audit.meta).toEqual({ keepTokens: false, allowLocalFallback: true, oidcOnly: true });
   });
 });

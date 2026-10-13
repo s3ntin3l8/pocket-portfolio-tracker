@@ -123,6 +123,16 @@ describe("read-scoped PAT vs side-effecting GETs (A7)", () => {
     }
   });
 
+  it("reaches the enrich handler with a write PAT (503 while the provider is disabled)", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/instruments/enrich?q=abc",
+      headers: auth(writePat),
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error).toBe("enrichment_unavailable");
+  });
+
   it("GET /networth enqueues metadata for an interactive session but not a read PAT", async () => {
     const ro = await app.inject({ method: "GET", url: "/networth", headers: auth(readPat) });
     expect(ro.statusCode).toBe(200);

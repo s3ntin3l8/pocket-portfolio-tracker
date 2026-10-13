@@ -30,6 +30,7 @@ const ALLOWED_EXACT = new Set([
   "XDG_RUNTIME_DIR",
 ]);
 
+/** Allow-listed parent variables, then `extraEnv` (which overrides allow-listed keys). */
 export function buildSubprocessEnv(
   extraEnv: Record<string, string> = {},
   base: NodeJS.ProcessEnv = process.env,

@@ -193,7 +193,13 @@ export function registerUsersRoutes(app: FastifyInstance) {
         actorSub: request.user!.authSub,
         action: "admin_set_password",
         target: id,
-        meta: { keepTokens: keepTokens === true, allowLocalFallback: oidcOnly },
+        // Record both the caller's input and the effective decision (oidcOnly + flag => the
+        // reset created a local login for an OIDC-only user).
+        meta: {
+          keepTokens: keepTokens === true,
+          allowLocalFallback: allowLocalFallback === true,
+          oidcOnly,
+        },
       });
 
       return { ...updated, tempPassword };

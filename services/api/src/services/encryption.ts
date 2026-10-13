@@ -31,7 +31,7 @@ export class EncryptionService {
       const decoded = Buffer.from(opts.key, "base64url");
       if (decoded.length !== KEY_BYTES) {
         throw new Error(
-          `DB_ENCRYPTION_KEY must decode to exactly ${KEY_BYTES} bytes (base64url); got ${decoded.length}. ` +
+          `DB_ENCRYPTION_KEY must decode to exactly ${KEY_BYTES} bytes (base64 or base64url); got ${decoded.length}. ` +
             `Generate one with: openssl rand -base64 32`,
         );
       }

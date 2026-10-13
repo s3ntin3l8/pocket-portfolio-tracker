@@ -29,6 +29,9 @@ describe("sanitizeConnectionError (A8)", () => {
     expect(out).not.toContain("https://");
     expect(out.length).toBeLessThanOrEqual(140);
     expect(oneLine("a".repeat(30))).toBe("[redacted]");
+    // Short numeric ids stay readable; long digit runs (phone-like) are hidden.
+    expect(oneLine("pool 123456 closed")).toBe("pool 123456 closed");
+    expect(oneLine("rejected 4915123456789")).toBe("rejected [redacted]");
     expect(sanitizeConnectionError("not an error", "fallback")).toBe("fallback");
   });
 });

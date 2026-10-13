@@ -18,7 +18,7 @@ export function oneLine(raw: string): string {
     .replace(/https?:\/\/\S+/gi, "[url]")
     .replace(/(?:\/[\w.@-]+){2,}/g, "[path]")
     .replace(/[A-Za-z0-9_\-+=]{24,}/g, "[redacted]")
-    .replace(/\d{6,}/g, "[redacted]");
+    .replace(/\d{10,}/g, "[redacted]");
   return cleaned.length > MAX_LEN ? `${cleaned.slice(0, MAX_LEN - 1)}…` : cleaned;
 }
 
@@ -32,7 +32,8 @@ export function sanitizeConnectionError(err: unknown, fallback = "sync failed"):
   if (err instanceof PytrApprovalError) return "Trade Republic login was not approved";
   if (err instanceof PytrUnavailableError) return "pytr is not available";
   if (err instanceof PytrError) {
-    // PytrError carries raw subprocess stderr; only our own fixed messages are safe to keep.
+    // PytrError carries raw subprocess stderr. Both branches return a FIXED literal, never
+    // `err.message`; do not swap them or stderr leaks into the stored/echoed lastError.
     return /timed out/i.test(err.message)
       ? "pytr process timed out"
       : "pytr failed (see server logs)";
