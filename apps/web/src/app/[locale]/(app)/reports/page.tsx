@@ -5,7 +5,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins, ScrollText, PiggyBank, Receipt, FileText } from "lucide-react";
 import { ReportCard } from "@/components/reports/report-card";
 import { EmptyState } from "@/components/empty-state";
-import { FxMissingBanner, collectFxMissing } from "@/components/fx-missing-banner";
+import { FxMissingBanner } from "@/components/fx-missing-banner";
+import { collectFxMissing } from "@/lib/fx-missing";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
   loadIncomeStats,

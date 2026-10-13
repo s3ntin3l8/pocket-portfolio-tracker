@@ -3,21 +3,9 @@
 import { useTranslations } from "next-intl";
 import { AlertTriangle } from "lucide-react";
 
-/**
- * Collect the `fxMissingCurrencies` of several API payloads (any may be null/undefined),
- * deduplicated and sorted — for a page that renders several responses.
- */
-export function collectFxMissing(
-  ...sources: ({ fxMissingCurrencies?: string[] | null } | null | undefined | string[])[]
-): string[] {
-  const out = new Set<string>();
-  for (const s of sources) {
-    if (!s) continue;
-    const list = Array.isArray(s) ? s : (s.fxMissingCurrencies ?? []);
-    for (const c of list) out.add(c);
-  }
-  return [...out].sort();
-}
+// `collectFxMissing` (the server-side aggregator) lives in `@/lib/fx-missing` — this file
+// is a client module, and a function exported from here cannot be called by a server
+// component (React: "Attempted to call collectFxMissing() from the server").
 
 /**
  * Non-blocking notice that some amounts on the page had no exchange rate and are left

@@ -13,7 +13,8 @@ import { AllocationCard } from "@/components/holdings/allocation-card";
 import { PortfolioValueCard, type Tone } from "@/components/holdings/portfolio-value-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { PositionsPanel } from "@/components/holdings/positions-panel";
-import { FxMissingBanner, collectFxMissing } from "@/components/fx-missing-banner";
+import { FxMissingBanner } from "@/components/fx-missing-banner";
+import { collectFxMissing } from "@/lib/fx-missing";
 import {
   loadHoldings,
   loadAnomalies,
