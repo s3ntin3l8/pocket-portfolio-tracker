@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Search } from "lucide-react";
 import type {
   GlobalSearchResult,
@@ -27,6 +27,7 @@ const DEBOUNCE_MS = 300;
 
 export function GlobalSearch({ holderId }: { holderId?: string | null }) {
   const t = useTranslations("Search");
+  const locale = useLocale();
   const client = useApiClient();
   const router = useRouter();
 
@@ -231,7 +232,7 @@ export function GlobalSearch({ holderId }: { holderId?: string | null }) {
                       )}
                     </div>
                     <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                      {new Date(tx.executedAt).toLocaleDateString()}
+                      {new Date(tx.executedAt).toLocaleDateString(locale)}
                     </span>
                   </CommandItem>
                 ))}

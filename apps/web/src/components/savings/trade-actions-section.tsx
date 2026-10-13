@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import type { TradeAction } from "@portfolio/api-client";
 import { formatMoney } from "@/lib/utils";
@@ -21,6 +21,7 @@ export function TradeActionsSection({
   labelByKey,
 }: TradeActionsProps) {
   const t = useTranslations("RebalanceDialog");
+  const locale = useLocale();
   const sells = tradeActions.filter((a) => a.side === "sell");
   const buys = tradeActions.filter((a) => a.side === "buy");
 
@@ -39,7 +40,7 @@ export function TradeActionsSection({
                 {labelByKey.get(a.key) ?? a.key}
               </span>
               <span className="tabular font-medium shrink-0">
-                {formatMoney(Number(a.deltaValue), currency, "en")}
+                {formatMoney(Number(a.deltaValue), currency, locale)}
               </span>
             </div>
           ))}
@@ -57,7 +58,7 @@ export function TradeActionsSection({
                 {labelByKey.get(a.key) ?? a.key}
               </span>
               <span className="tabular font-medium shrink-0">
-                {formatMoney(Number(a.deltaValue), currency, "en")}
+                {formatMoney(Number(a.deltaValue), currency, locale)}
               </span>
             </div>
           ))}
@@ -66,8 +67,8 @@ export function TradeActionsSection({
       {sells.length > 0 && allowanceUsed !== null && remainingAllowance !== null && (
         <p className="text-xs text-muted-foreground border-t pt-2">
           {t("allowanceUsed", {
-            used: formatMoney(Number(allowanceUsed), currency, "en"),
-            remaining: formatMoney(Number(remainingAllowance), currency, "en"),
+            used: formatMoney(Number(allowanceUsed), currency, locale),
+            remaining: formatMoney(Number(remainingAllowance), currency, locale),
           })}
         </p>
       )}

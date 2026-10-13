@@ -21,7 +21,7 @@ import {
  * A reusable confirmation dialog modelled after {@link DeleteHolderDialog}.
  * Supports an optional "type to confirm" flow for destructive actions.
  *
- * When `requiresTyping` is true the user must type the word "Delete" before the
+ * When `requiresTyping` is true the user must type the localised confirmation word (en: "Delete") before the
  * confirm button is enabled. The `entityLabel` is shown prominently in the
  * description so the user knows exactly what they're acting on.
  *
@@ -57,6 +57,8 @@ export function ConfirmActionDialog({
   onConfirm: () => Promise<void>;
 }) {
   const t = useTranslations("Admin");
+  // The word to type is localised (placeholder key doubles as the expected word).
+  const confirmWord = t("confirmActionInputPlaceholder");
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const [busy, setBusy] = useState(false);
@@ -84,7 +86,7 @@ export function ConfirmActionDialog({
     }
   }
 
-  const canConfirm = requiresTyping ? typed === "Delete" : true;
+  const canConfirm = requiresTyping ? typed.trim() === confirmWord : true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,7 +106,7 @@ export function ConfirmActionDialog({
         {requiresTyping && (
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground">
-              {t("confirmActionTypeToConfirm")}
+              {t("confirmActionTypeToConfirm", { word: confirmWord })}
             </label>
             <Input
               placeholder={t("confirmActionInputPlaceholder")}

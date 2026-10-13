@@ -3,7 +3,10 @@ import { render, screen } from "@testing-library/react";
 import { AppShell } from "../src/components/app-shell";
 import { PageHeaderSetter } from "../src/components/page-header";
 
-vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
+    values ? `${key}:${JSON.stringify(values)}` : key,
+}));
 
 vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => null }));
 vi.mock("@/components/portfolio-switcher", () => ({ PortfolioSwitcher: () => null }));
@@ -36,8 +39,61 @@ describe("AppShell page header wiring", () => {
       </AppShell>,
     );
 
-    expect(await screen.findByRole("heading", { name: "Income report" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/reports");
+    // The topbar title is a plain paragraph, not a heading (the page owns the one <h1>).
+    expect(await screen.findByText("Income report")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Income report" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "back" })).toHaveAttribute("href", "/reports");
+  });
+
+  it("renders exactly one h1 when the page supplies its own", async () => {
+    const { container } = render(
+      <AppShell>
+        <PageHeaderSetter title="Income report" backHref="/reports" />
+        <h1>Income report</h1>
+      </AppShell>,
+    );
+    await screen.findByText("Income report", { selector: "p" });
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+  });
+
+  it("renders a skip link targeting the main landmark and labels the sidebar nav", () => {
+    const { container } = render(
+      <AppShell>
+        <div />
+      </AppShell>,
+    );
+    const skip = screen.getByRole("link", { name: "skipToContent" });
+    expect(skip).toHaveAttribute("href", "#main");
+    expect(container.querySelector("main#main")).not.toBeNull();
+    expect(screen.getByRole("navigation", { name: "primaryNav" })).toBeInTheDocument();
+  });
+
+  it("gives the Activity badge accessible text", () => {
+    render(
+      <AppShell anomalyCount={4}>
+        <div />
+      </AppShell>,
+    );
+    expect(screen.getByText(/needsReview/)).toBeInTheDocument();
+  });
+
+  it("tones the sidebar all-time % by sign", () => {
+    const { rerender } = render(
+      <AppShell
+        netWorthSummary={{ valueFormatted: "€1", allTimePctFormatted: "-5.00%", allTimePct: -0.05 }}
+      >
+        <div />
+      </AppShell>,
+    );
+    expect(screen.getByText(/-5\.00%/).className).toContain("text-destructive");
+    rerender(
+      <AppShell
+        netWorthSummary={{ valueFormatted: "€1", allTimePctFormatted: "+5.00%", allTimePct: 0.05 }}
+      >
+        <div />
+      </AppShell>,
+    );
+    expect(screen.getByText(/\+5\.00%/).className).toContain("text-success");
   });
 
   it("renders the Activity anomaly badge in the sidebar when given a non-zero count", () => {

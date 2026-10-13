@@ -1,3 +1,6 @@
+import { useLocale } from "next-intl";
+import { formatPercentPoints } from "@/lib/utils";
+
 const COLORS = [
   "var(--color-chart-1)",
   "var(--color-chart-2)",
@@ -13,6 +16,7 @@ interface Row {
 }
 
 function Section({ title, rows }: { title: string; rows: Row[] }) {
+  const locale = useLocale();
   return (
     <div className="min-w-0">
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
@@ -28,7 +32,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
               />
               <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{r.label}</span>
               <span className="tabular shrink-0 text-[13px] font-bold text-text-2">
-                {r.pct.toFixed(1)}%
+                {formatPercentPoints(r.pct, locale, 1)}
               </span>
             </div>
           ))}

@@ -55,7 +55,7 @@ export function BenchmarkCard({
       <button
         type="button"
         onClick={() => setDialogOpen(true)}
-        className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
+        className="touch-target absolute right-3 top-3 flex size-7 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
         aria-label={t("editBenchmark")}
       >
         <Pencil className="size-3.5 text-text-3" />

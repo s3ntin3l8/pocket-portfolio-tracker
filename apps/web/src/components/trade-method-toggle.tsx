@@ -29,7 +29,7 @@ export function TradeMethodToggle({ current, labelAverage, labelFifo }: Props) {
       <Link
         href={href("average")}
         className={cn(
-          "rounded-md px-3 py-1 transition-colors",
+          "touch-target relative rounded-md px-3 py-1 transition-colors",
           current === "average" ? active : inactive,
         )}
       >
@@ -38,7 +38,7 @@ export function TradeMethodToggle({ current, labelAverage, labelFifo }: Props) {
       <Link
         href={href("fifo")}
         className={cn(
-          "rounded-md px-3 py-1 transition-colors",
+          "touch-target relative rounded-md px-3 py-1 transition-colors",
           current === "fifo" ? active : inactive,
         )}
       >

@@ -1,4 +1,5 @@
 import { ChevronLeft } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function ReportHeader({
   /** On narrow screens, the action occupies a second row below the title and subtitle. */
   action?: React.ReactNode;
 }) {
+  const tA = useTranslations("A11y");
   return (
     <div
       className={cn(
@@ -33,7 +35,7 @@ export function ReportHeader({
     >
       <Link
         href={backHref}
-        aria-label="Back"
+        aria-label={tA("back")}
         // Visual size stays the reference's 36px card button; `before:` pads the tap
         // target out to ~44px (the touch-target minimum) without affecting layout.
         className="relative flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-transform before:absolute before:-inset-1 active:scale-95 md:hidden"
@@ -41,7 +43,7 @@ export function ReportHeader({
         <ChevronLeft className="size-[19px]" strokeWidth={2.2} />
       </Link>
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-2xl font-bold md:hidden">{title}</h1>
+        <h1 className="truncate text-2xl font-bold md:sr-only">{title}</h1>
         {subtitle && (
           <p className={cn("text-sm text-text-2", typeof subtitle === "string" && "truncate")}>
             {subtitle}

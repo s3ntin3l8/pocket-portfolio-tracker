@@ -32,6 +32,7 @@ export default async function AdminLayout({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Admin");
+  const tA = await getTranslations("A11y");
 
   const me = await loadMe();
   if (!me?.isAdmin) notFound();
@@ -110,7 +111,7 @@ export default async function AdminLayout({
         <div className="mb-4 flex items-center gap-3">
           <Link
             href="/settings"
-            aria-label="Back"
+            aria-label={tA("back")}
             className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm"
           >
             <ChevronLeft className="size-[18px]" />

@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { render as rtlRender, cleanup, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "../messages/en.json";
 import { Dialog, DialogContent, DialogTitle } from "../src/components/ui/dialog";
 import { useSheetFooter, useSheetFooterChrome } from "../src/components/ui/sheet";
 import {
@@ -8,6 +11,17 @@ import {
 } from "../src/components/full-screen-overlay";
 
 afterEach(cleanup);
+
+// DialogContent / SheetContent read their close/back labels from the A11y namespace.
+const withIntl = (ui: ReactElement) => (
+  <NextIntlClientProvider locale="en" messages={messages}>
+    {ui}
+  </NextIntlClientProvider>
+);
+const render = (ui: ReactElement) => {
+  const result = rtlRender(withIntl(ui));
+  return { ...result, rerender: (next: ReactElement) => result.rerender(withIntl(next)) };
+};
 
 // JSDOM doesn't evaluate media queries, so "full-screen on mobile, centered on desktop"
 // is asserted via the responsive Tailwind classes themselves (max-md:/md:), matching how

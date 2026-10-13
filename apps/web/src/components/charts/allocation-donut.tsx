@@ -2,8 +2,9 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "next-intl";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /** A single donut slice — any keyed category (asset class, currency, …). */
 export interface DonutSlice {
@@ -29,6 +30,7 @@ export function AllocationDonut({
    *  does, Income's "By source" card doesn't (value only). Default true. */
   showPercent?: boolean;
 }) {
+  const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const sum = data.reduce((s, d) => s + d.value, 0);
   const displayTotal = total ?? sum;
@@ -61,6 +63,7 @@ export function AllocationDonut({
         >
           <PieChart>
             <Pie
+              isAnimationActive={!reducedMotion}
               data={data}
               dataKey="value"
               nameKey="label"
@@ -127,7 +130,7 @@ export function AllocationDonut({
             </span>
             {showPercent && (
               <span className="tabular w-[50px] shrink-0 text-right text-xs font-bold">
-                {((d.value / sum) * 100).toFixed(1)}%
+                {formatPercentPoints((d.value / sum) * 100, locale, 1)}
               </span>
             )}
           </li>

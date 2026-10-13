@@ -12,8 +12,10 @@ import {
 import { useLocale } from "next-intl";
 import { formatMoney } from "@/lib/utils";
 import type { ValuePoint } from "@/lib/mock-data";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export function ValueAreaChart({ data }: { data: ValuePoint[] }) {
+  const reducedMotion = useReducedMotion();
   const locale = useLocale();
 
   return (
@@ -45,6 +47,7 @@ export function ValueAreaChart({ data }: { data: ValuePoint[] }) {
             }}
           />
           <Area
+            isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="value"
             stroke="var(--color-primary)"

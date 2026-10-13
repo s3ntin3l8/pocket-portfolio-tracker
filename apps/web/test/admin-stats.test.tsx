@@ -7,6 +7,7 @@ import type { AdminStats as AdminStatsData } from "@portfolio/api-client";
 // output) are asserted directly rather than through i18n, so this just needs to echo keys.
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn(async () => (key: string) => key),
+  getLocale: vi.fn(async () => "en"),
 }));
 
 const { AdminStats } = await import("../src/components/admin-stats");

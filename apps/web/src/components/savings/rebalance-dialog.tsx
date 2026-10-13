@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Target } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatPercentPoints } from "@/lib/utils";
 
 import { useRebalance } from "./use-rebalance";
 import { TradeActionsSection } from "./trade-actions-section";
@@ -36,6 +36,7 @@ export function RebalanceDialog({
   trigger?: React.ReactNode;
 }) {
   const t = useTranslations("RebalanceDialog");
+  const locale = useLocale();
   const r = useRebalance({ portfolioId, plans, drift, contributionSplit });
 
   return (
@@ -62,9 +63,15 @@ export function RebalanceDialog({
           <div className="space-y-3 py-2">
             {r.rows.map((row) => (
               <div key={row.key} className="flex items-center gap-3">
-                <Label className="flex-1 text-sm font-normal">{row.label}</Label>
+                <Label
+                  htmlFor={`rebalance-target-${row.key}`}
+                  className="flex-1 text-sm font-normal"
+                >
+                  {row.label}
+                </Label>
                 <div className="flex items-center gap-1 w-24">
                   <Input
+                    id={`rebalance-target-${row.key}`}
                     type="number"
                     min={0}
                     max={100}
@@ -88,7 +95,7 @@ export function RebalanceDialog({
               r.sumOk ? "text-muted-foreground" : "text-destructive font-medium"
             }`}
           >
-            {t("total")}: {r.total.toFixed(1)}% {!r.sumOk && t("mustEqual100")}
+            {t("total")}: {formatPercentPoints(r.total, locale, 1)} {!r.sumOk && t("mustEqual100")}
           </div>
         )}
 
@@ -131,7 +138,7 @@ export function RebalanceDialog({
               <p className="text-xs font-medium text-muted-foreground mb-2">
                 {t("recommendedSplit")}{" "}
                 <span className="tabular">
-                  ({formatMoney(Number(activeMonthlyTotalDisplay), currency, "en")})
+                  ({formatMoney(Number(activeMonthlyTotalDisplay), currency, locale)})
                 </span>
               </p>
               <div className="space-y-1">
@@ -143,10 +150,10 @@ export function RebalanceDialog({
                     <div key={d.key} className="flex items-center justify-between gap-2 text-sm">
                       <span className="text-muted-foreground truncate flex-1">{label}</span>
                       <span className="tabular font-medium shrink-0">
-                        {formatMoney(Number(s.amount), currency, "en")}
+                        {formatMoney(Number(s.amount), currency, locale)}
                       </span>
                       <span className="text-xs text-muted-foreground shrink-0 w-12 text-right">
-                        {s.sharePct.toFixed(1)}%
+                        {formatPercentPoints(s.sharePct, locale, 1)}
                       </span>
                     </div>
                   );

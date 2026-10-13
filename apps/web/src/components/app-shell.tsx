@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { Link, usePathname } from "@/i18n/navigation";
-import { cn } from "@/lib/utils";
+import { cn, signTone } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PortfolioSwitcher } from "@/components/portfolio-switcher";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
@@ -24,6 +24,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PageHeaderProvider, usePageHeader } from "@/components/page-header";
 
 function DesktopTopbarTitle() {
+  const t = useTranslations("A11y");
   const { title, backHref } = usePageHeader();
   if (!title) return null;
   return (
@@ -31,13 +32,15 @@ function DesktopTopbarTitle() {
       {backHref && (
         <Link
           href={backHref}
-          aria-label="Back"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-text-mute transition-colors hover:bg-secondary hover:text-foreground"
+          aria-label={t("back")}
+          className="relative flex size-8 shrink-0 items-center justify-center rounded-lg text-text-mute before:absolute before:-inset-1.5 transition-colors hover:bg-secondary hover:text-foreground"
         >
           <ChevronLeft className="size-5" />
         </Link>
       )}
-      <h1 className="min-w-0 truncate text-lg font-bold">{title}</h1>
+      {/* Not a heading: the page itself renders the one <h1> (screen-reader-only at md+),
+          so a second <h1> here would double the document outline on every route. */}
+      <p className="min-w-0 truncate text-lg font-bold">{title}</p>
     </div>
   );
 }
@@ -62,9 +65,15 @@ export function AppShell({
   anomalyCount?: number;
   anomalyError?: boolean;
   /** Sidebar footer summary (reference: always-visible, pinned bottom, above sign-out). */
-  netWorthSummary?: { valueFormatted: string; allTimePctFormatted: string | null } | null;
+  netWorthSummary?: {
+    valueFormatted: string;
+    allTimePctFormatted: string | null;
+    /** Raw all-time return (fraction); drives the gain/loss tone of the formatted %. */
+    allTimePct?: number | null;
+  } | null;
 }) {
   const t = useTranslations("Nav");
+  const tA = useTranslations("A11y");
   const pathname = usePathname();
   const activeKey = navActiveKey(pathname);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +102,13 @@ export function AppShell({
   return (
     <FullScreenOverlayProvider>
       <NavProgressProvider>
+        {/* Skip link: first focusable element; jumps past the sidebar/topbar to <main>. */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-foreground focus:shadow-card focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {tA("skipToContent")}
+        </a>
         {/* `h-app-viewport` (globals.css), not `h-dvh`: that was its own independent
           `100dvh` utility that completely bypassed `<html>`'s standalone-mode
           viewport-height fix (iOS PWA — `100dvh` can underreport there) rather than
@@ -109,7 +125,7 @@ export function AppShell({
             <div className="px-2 pb-6">
               <Brand />
             </div>
-            <nav className="flex flex-col gap-[3px]">
+            <nav aria-label={tA("primaryNav")} className="flex flex-col gap-[3px]">
               {navItems.map(({ href, icon: Icon, key }) => {
                 const active = key === activeKey;
                 const badge = key === "activity" && anomalyCount > 0 ? anomalyCount : null;
@@ -135,7 +151,8 @@ export function AppShell({
                           anomalyError ? "bg-destructive" : "bg-[var(--gold-fg)]",
                         )}
                       >
-                        {badge > 99 ? "99+" : badge}
+                        <span aria-hidden>{badge > 99 ? "99+" : badge}</span>
+                        <span className="sr-only">{tA("needsReview", { count: badge })}</span>
                       </span>
                     )}
                   </Link>
@@ -150,7 +167,12 @@ export function AppShell({
                     {netWorthSummary.valueFormatted}
                   </p>
                   {netWorthSummary.allTimePctFormatted && (
-                    <p className="tabular mt-0.5 text-xs font-bold text-success">
+                    <p
+                      className={cn(
+                        "tabular mt-0.5 text-xs font-bold",
+                        signTone(netWorthSummary.allTimePct),
+                      )}
+                    >
                       {netWorthSummary.allTimePctFormatted} {t("allTime")}
                     </p>
                   )}
@@ -219,7 +241,11 @@ export function AppShell({
               lets page grids key density tiers off this real content width rather than
               viewport width, which is otherwise skewed by the 236px sidebar offset. */}
               <PullToRefresh scrollContainerRef={scrollContainerRef}>
-                <main className="@container mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(11rem,calc(env(safe-area-inset-bottom)+11rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                <main
+                  id="main"
+                  tabIndex={-1}
+                  className="@container focus:outline-none mx-auto w-full max-w-[1600px] flex-1 px-4 pb-[max(11rem,calc(env(safe-area-inset-bottom)+11rem))] pt-4 sm:px-6 sm:pt-6 md:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+                >
                   <InstallPrompt />
                   <RouteTransition scrollContainerRef={scrollContainerRef}>
                     {children}

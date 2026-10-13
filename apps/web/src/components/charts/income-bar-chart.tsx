@@ -14,6 +14,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /** One bar — a calendar year of income, or the dashed next-year forecast. */
 export interface IncomeBar {
@@ -153,6 +154,7 @@ function BarTotalLabels({ data, format }: { data: IncomeBar[]; format: (v: numbe
  * {@link ForecastChart}/{@link PriceChart}.
  */
 export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency: string }) {
+  const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const t = useTranslations("Income");
   const money = (v: number) => formatMoney(v, currency, locale);
@@ -195,7 +197,12 @@ export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency
             cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
             content={<ChartTooltip money={money} t={t} />}
           />
-          <Bar dataKey="value" stackId="stack" radius={[4, 4, 0, 0]}>
+          <Bar
+            isAnimationActive={!reducedMotion}
+            dataKey="value"
+            stackId="stack"
+            radius={[4, 4, 0, 0]}
+          >
             {data.map((d, i) => (
               <Cell
                 key={i}
@@ -207,7 +214,12 @@ export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency
               />
             ))}
           </Bar>
-          <Bar dataKey="projected" stackId="stack" radius={[4, 4, 0, 0]}>
+          <Bar
+            isAnimationActive={!reducedMotion}
+            dataKey="projected"
+            stackId="stack"
+            radius={[4, 4, 0, 0]}
+          >
             {data.map((d, i) => (
               <Cell key={i} fill="url(#income-projected-stripe)" />
             ))}

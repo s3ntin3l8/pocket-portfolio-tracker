@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { BookOpen } from "lucide-react";
@@ -25,6 +25,7 @@ export function LossCarryforwardEditor({
   // `taxYear` is the year the carry-forward is *applied in* (see
   // lossCarryForwardFor on the API side), not the year it originated from — so this
   // must default to, and include, the year currently on screen.
+  const uid = useId();
   const [year, setYear] = useState(currentYear);
   const [stock, setStock] = useState("0");
   const [general, setGeneral] = useState("0");
@@ -91,8 +92,12 @@ export function LossCarryforwardEditor({
         <p className="text-xs text-muted-foreground">{t("lossCarryforward.description")}</p>
 
         <div>
-          <Label>{t("lossCarryforward.yearLabel")}</Label>
-          <Select value={String(year)} onChange={(e) => setYear(Number(e.target.value))}>
+          <Label htmlFor={`lcf-${uid}-year`}>{t("lossCarryforward.yearLabel")}</Label>
+          <Select
+            id={`lcf-${uid}-year`}
+            value={String(year)}
+            onChange={(e) => setYear(Number(e.target.value))}
+          >
             {years.map((y) => (
               <option key={y} value={y}>
                 {y}
@@ -103,8 +108,9 @@ export function LossCarryforwardEditor({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <Label>{t("lossCarryforward.stockLabel")}</Label>
+            <Label htmlFor={`lcf-${uid}-stock`}>{t("lossCarryforward.stockLabel")}</Label>
             <Input
+              id={`lcf-${uid}-stock`}
               type="text"
               inputMode="decimal"
               value={stock}
@@ -115,8 +121,9 @@ export function LossCarryforwardEditor({
             </p>
           </div>
           <div>
-            <Label>{t("lossCarryforward.generalLabel")}</Label>
+            <Label htmlFor={`lcf-${uid}-general`}>{t("lossCarryforward.generalLabel")}</Label>
             <Input
+              id={`lcf-${uid}-general`}
               type="text"
               inputMode="decimal"
               value={general}

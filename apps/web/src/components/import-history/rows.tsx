@@ -8,6 +8,7 @@ import { Download, Eye, FolderInput, Trash2, Undo2 } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { ImportRecord } from "@portfolio/api-client";
 import { cn } from "@/lib/utils";
+import { onActivateKey } from "@/lib/a11y";
 import { sourceMeta, statusLabelKey } from "./utils";
 import { STATUS_VARIANT } from "./types";
 
@@ -280,7 +281,10 @@ export function MobileRow({
     <div
       data-testid={`import-mobile-${imp.id}`}
       data-state={isSelected ? "selected" : undefined}
+      role="button"
+      tabIndex={0}
       onClick={handleTap}
+      onKeyDown={onActivateKey(handleTap)}
       {...longPressHandlers(imp.id)}
       className={cn(
         "flex cursor-pointer select-none items-center gap-3 px-[15px] py-[13px]",

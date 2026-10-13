@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 interface PullToRefreshProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface PullToRefreshProps {
 }
 
 export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshProps) {
+  const reducedMotion = useReducedMotion();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pullDistance, setPullDistance] = useState(0);
@@ -110,7 +112,8 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
           style={{
             height: `${pullDistance}px`,
             top: 0,
-            transition: isDragging ? "none" : "height 0.22s cubic-bezier(0.25, 1, 0.5, 1)",
+            transition:
+              isDragging || reducedMotion ? "none" : "height 0.22s cubic-bezier(0.25, 1, 0.5, 1)",
           }}
         >
           {/* Shimmer sweep effect */}
@@ -128,11 +131,15 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
             style={{
               opacity,
               transform: `scale(${scale})`,
-              transition: isDragging ? "none" : "transform 0.22s ease, opacity 0.22s ease",
+              transition:
+                isDragging || reducedMotion ? "none" : "transform 0.22s ease, opacity 0.22s ease",
             }}
           >
             <RefreshCw
-              className={cn("size-5 text-primary", isRefreshing && "animate-spin")}
+              className={cn(
+                "size-5 text-primary",
+                isRefreshing && "animate-spin motion-reduce:animate-none",
+              )}
               style={{
                 transform: isRefreshing ? undefined : `rotate(${rotation}deg)`,
               }}

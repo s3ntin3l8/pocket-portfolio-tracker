@@ -80,6 +80,7 @@ export function TransactionDetailSheet({
   const t = useTranslations("Transactions");
   const tt = useTranslations("TxType");
   const tm = useTranslations("Manage");
+  const tA = useTranslations("A11y");
   const td = useTranslations("Manage.delete");
   const ta = useTranslations("Anomalies");
   const locale = useLocale();
@@ -160,7 +161,7 @@ export function TransactionDetailSheet({
     <button
       type="button"
       className={iconBtn}
-      aria-label="Close"
+      aria-label={tA("close")}
       onClick={() => onOpenChange(false)}
     >
       <X className="size-[18px]" strokeWidth={2.2} />

@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { Icon, ICONS } from "./icon";
 import styles from "./onboarding.module.css";
+import { useTranslations } from "next-intl";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export type MobileSlideKind = "card" | "glyph";
 
@@ -56,12 +58,17 @@ export function MobileIntro({
     onGoToSlideRef.current = onGoToSlide;
   });
 
+  const tA = useTranslations("A11y");
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
+    // Auto-advancing slides are motion the user can't pause: with reduced motion they
+    // advance only via the dots / tap zones / Get started.
+    if (reducedMotion) return;
     const timer = setInterval(() => {
       onGoToSlideRef.current(slide + 1);
     }, AUTO_ADVANCE_MS);
     return () => clearInterval(timer);
-  }, [slide]);
+  }, [slide, reducedMotion]);
 
   const slides = copy.slides;
   const cur = slides[slide];
@@ -144,7 +151,7 @@ export function MobileIntro({
       <button
         type="button"
         onClick={() => onGoToSlide(slide - 1)}
-        aria-label="Previous"
+        aria-label={tA("previous")}
         style={{
           position: "absolute",
           left: 0,
@@ -160,7 +167,7 @@ export function MobileIntro({
       <button
         type="button"
         onClick={() => onGoToSlide(slide + 1)}
-        aria-label="Next"
+        aria-label={tA("next")}
         style={{
           position: "absolute",
           right: 0,
@@ -358,7 +365,7 @@ export function MobileIntro({
               key={k}
               type="button"
               onClick={() => onGoToSlide(k)}
-              aria-label="Go to slide"
+              aria-label={tA("goToSlide", { n: k + 1 })}
               style={{
                 width: k === slide ? 22 : 7,
                 height: 7,

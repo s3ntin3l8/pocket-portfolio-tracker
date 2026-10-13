@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Drawer } from "vaul";
+import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
@@ -186,6 +187,7 @@ function SheetContent({
    *  close inside a custom header (e.g. the transaction detail sheet's icon cluster). */
   hideClose?: boolean;
 }) {
+  const tA = useTranslations("A11y");
   const dismissible = React.useContext(SheetDismissibleContext);
   // DOM node for the persistent footer region (side="bottom" only) — see
   // `useSheetFooter`. `useState`, not `useRef`: a ref's `.current` mutation doesn't
@@ -302,7 +304,7 @@ function SheetContent({
             )}
           >
             <X className="size-[18px]" strokeWidth={2.2} />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{tA("close")}</span>
           </Drawer.Close>
         )}
       </Drawer.Content>

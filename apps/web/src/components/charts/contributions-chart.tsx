@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/empty-state";
 import { mergeContributionValue } from "@/lib/chart-series";
 import { formatMoney } from "@/lib/utils";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
  * Contributions vs. portfolio value overlay chart.
@@ -40,6 +41,7 @@ export function ContributionsChart({
   valueHistory: PerformancePoint[];
   currency: string;
 }) {
+  const reducedMotion = useReducedMotion();
   const t = useTranslations("Savings");
   const te = useTranslations("Empty");
   const locale = useLocale();
@@ -124,6 +126,7 @@ export function ContributionsChart({
 
               {/* Transparent base Area — establishes the lower boundary of the band */}
               <Area
+                isAnimationActive={!reducedMotion}
                 type="monotone"
                 dataKey="floor"
                 stackId="band"
@@ -134,6 +137,7 @@ export function ContributionsChart({
               />
               {/* Green gain band */}
               <Area
+                isAnimationActive={!reducedMotion}
                 type="monotone"
                 dataKey="gain"
                 stackId="band"
@@ -144,6 +148,7 @@ export function ContributionsChart({
               />
               {/* Red loss band */}
               <Area
+                isAnimationActive={!reducedMotion}
                 type="monotone"
                 dataKey="loss"
                 stackId="band"
@@ -155,6 +160,7 @@ export function ContributionsChart({
 
               {/* Crisp boundary: contributions step line */}
               <Line
+                isAnimationActive={!reducedMotion}
                 type="stepAfter"
                 dataKey="contributed"
                 stroke="var(--color-muted-foreground)"
@@ -164,6 +170,7 @@ export function ContributionsChart({
               />
               {/* Crisp boundary: daily value line */}
               <Line
+                isAnimationActive={!reducedMotion}
                 type="monotone"
                 dataKey="value"
                 stroke="var(--color-success)"

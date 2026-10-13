@@ -24,6 +24,7 @@ export function BottomNav({
   anomalyError?: boolean;
 }) {
   const t = useTranslations("Nav");
+  const tA = useTranslations("A11y");
   const pathname = usePathname();
   const activeKey = navActiveKey(pathname);
   const overlayOpen = useAnyFullScreenOverlayOpen();
@@ -34,7 +35,7 @@ export function BottomNav({
   return (
     <nav
       ref={navRef}
-      aria-label="Primary"
+      aria-label={tA("primaryNav")}
       className={cn(
         "fixed inset-x-0 bottom-0 z-30 flex items-start justify-around border-t border-border bg-card/80 px-3 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg md:hidden",
         overlayOpen && "hidden",
@@ -63,7 +64,8 @@ export function BottomNav({
                     anomalyError ? "bg-destructive" : "bg-[var(--gold-fg)]",
                   )}
                 >
-                  {badge > 99 ? "99+" : badge}
+                  <span aria-hidden>{badge > 99 ? "99+" : badge}</span>
+                  <span className="sr-only">{tA("needsReview", { count: badge })}</span>
                 </span>
               )}
             </span>

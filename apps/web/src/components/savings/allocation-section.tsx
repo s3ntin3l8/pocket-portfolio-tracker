@@ -2,7 +2,7 @@
 
 import type { DriftRow, SparplanContributionSplit } from "@portfolio/api-client";
 import type { useTranslations } from "next-intl";
-import { formatMoney } from "@/lib/utils";
+import { formatFixed, formatMoney, formatPercentPoints } from "@/lib/utils";
 
 export const SEG_COLORS = ["#7C5CFC", "#0D9488", "var(--gold-fg)", "#0E9F6E", "#3B82F6", "#F97316"];
 
@@ -39,8 +39,8 @@ export function AllocationSection({
     rest = t("driftOnTargetRest");
   } else {
     const name = nameOf(worst.key);
-    const pct = Math.abs(worst.driftPct).toFixed(1);
-    const target = `${worst.targetPct.toFixed(0)}%`;
+    const pct = formatFixed(Math.abs(worst.driftPct), locale, 1);
+    const target = formatPercentPoints(worst.targetPct, locale, 0);
     if (worst.status === "under") {
       const s = splitByKey.get(worst.key);
       strong = t("driftUnderStrong", { name, pct });
@@ -79,10 +79,10 @@ export function AllocationSection({
             />
             <span className="min-w-0 flex-1 truncate text-text-2">{nameOf(d.key)}</span>
             <span className="tabular text-text-3">
-              {t("allocTarget", { pct: `${d.targetPct.toFixed(0)}%` })}
+              {t("allocTarget", { pct: formatPercentPoints(d.targetPct, locale, 0) })}
             </span>
             <span className="tabular w-[62px] text-right">
-              {t("allocNow", { pct: `${d.actualPct.toFixed(0)}%` })}
+              {t("allocNow", { pct: formatPercentPoints(d.actualPct, locale, 0) })}
             </span>
           </div>
         ))}
@@ -123,7 +123,7 @@ export function AllocationSection({
                 <span className="min-w-0 flex-1 truncate text-text-2">{nameOf(s.key)}</span>
                 <span className="tabular">{formatMoney(Number(s.amount), currency, locale)}</span>
                 <span className="tabular w-[42px] text-right text-text-3">
-                  {s.sharePct.toFixed(0)}%
+                  {formatPercentPoints(s.sharePct, locale, 0)}
                 </span>
               </div>
             ))}

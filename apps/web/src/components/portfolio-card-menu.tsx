@@ -46,6 +46,7 @@ export function PortfolioCardMenu({
   ibkrSync?: PortfolioSyncConfig;
 }) {
   const tf = useTranslations("PortfolioForm");
+  const tA = useTranslations("A11y");
   const ttr = useTranslations("TradeRepublic");
   const tibkr = useTranslations("InteractiveBrokers");
   const api = useApiClient();
@@ -171,7 +172,7 @@ export function PortfolioCardMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" aria-label="More options">
+        <Button size="icon" variant="ghost" aria-label={tA("moreOptions")}>
           {anySyncing ? (
             <RefreshCw className="size-4 animate-spin" />
           ) : (

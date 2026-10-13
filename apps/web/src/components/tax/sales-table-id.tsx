@@ -17,6 +17,7 @@ import type { IdDisposalTax } from "@portfolio/core";
 import type { TaxDisposalLot } from "@/lib/server-api";
 import { formatMoney } from "@/lib/utils";
 import { useTableSort, type ColDef } from "@/lib/table-sort";
+import { onActivateKey } from "@/lib/a11y";
 import { useExpandedRows } from "./use-expanded-rows";
 import { DisposalCell, LotRow } from "./disposal-cells";
 import type { TaxTranslator } from "./tax-cards";
@@ -105,7 +106,10 @@ export function IdSalesTable({
                   <Fragment key={key}>
                     <TableRow
                       className={hasLots ? "cursor-pointer" : undefined}
+                      tabIndex={hasLots ? 0 : undefined}
+                      aria-expanded={hasLots ? isOpen : undefined}
                       onClick={hasLots ? () => toggle(key) : undefined}
+                      onKeyDown={hasLots ? onActivateKey(() => toggle(key)) : undefined}
                     >
                       <DisposalCell
                         row={{

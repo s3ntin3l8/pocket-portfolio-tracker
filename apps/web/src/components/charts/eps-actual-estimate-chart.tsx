@@ -3,6 +3,7 @@
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTranslations } from "next-intl";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export interface EpsQuarter {
   /** Yahoo's calendar-quarter label, e.g. "1Q2025". */
@@ -112,6 +113,7 @@ export function EpsActualEstimateChart({
   data: EpsQuarter[];
   currentQuarterEstimate: number | null;
 }) {
+  const reducedMotion = useReducedMotion();
   const t = useTranslations("Instrument");
   const rows: EpsChartRow[] = [...data];
   if (currentQuarterEstimate != null) {
@@ -139,7 +141,12 @@ export function EpsActualEstimateChart({
             cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
             content={<ChartTooltip t={t} />}
           />
-          <Bar dataKey="estimate" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]}>
+          <Bar
+            isAnimationActive={!reducedMotion}
+            dataKey="estimate"
+            fill="var(--color-chart-1)"
+            radius={[4, 4, 0, 0]}
+          >
             {rows.map((r, i) =>
               r.forecast ? (
                 <Cell
@@ -153,7 +160,12 @@ export function EpsActualEstimateChart({
               ) : undefined,
             )}
           </Bar>
-          <Bar dataKey="actual" fill="var(--color-chart-2)" radius={[4, 4, 0, 0]} />
+          <Bar
+            isAnimationActive={!reducedMotion}
+            dataKey="actual"
+            fill="var(--color-chart-2)"
+            radius={[4, 4, 0, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

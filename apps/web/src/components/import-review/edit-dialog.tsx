@@ -1,5 +1,6 @@
 "use client";
 
+import { cloneElement, isValidElement, useId } from "react";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -17,11 +18,19 @@ import {
 import { MAP_ACTIONS } from "./types";
 import type { ImportDraft, ReviewDraft } from "./types";
 
+/**
+ * Label + control pair. The label is tied to the control via `htmlFor`/`id` (an `id` the
+ * child already carries wins), so the control is announced by name and clicking the label
+ * focuses it.
+ */
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const generatedId = useId();
+  const child = isValidElement<{ id?: string }>(children) ? children : null;
+  const id = child?.props.id ?? generatedId;
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {child ? cloneElement(child, { id }) : children}
     </div>
   );
 }

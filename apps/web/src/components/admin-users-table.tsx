@@ -1,13 +1,7 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import type { AdminUser } from "@portfolio/api-client";
 import { AdminUserActions } from "@/components/admin-user-actions";
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+import { formatBytes } from "@/lib/utils";
 
 function Pill({ children }: { children: React.ReactNode }) {
   return (
@@ -24,6 +18,7 @@ function Pill({ children }: { children: React.ReactNode }) {
  */
 export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
   const t = await getTranslations("Admin");
+  const locale = await getLocale();
 
   if (users.length === 0) {
     return <p className="text-sm italic text-muted-foreground">{t("usersNoUsers")}</p>;
@@ -36,7 +31,7 @@ export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
           <div className="flex items-baseline gap-2.5">
             <span className="min-w-0 flex-1 truncate text-sm font-bold">{u.email}</span>
             <span className="shrink-0 text-[11px] font-medium tabular-nums text-text-3">
-              {new Date(u.createdAt).toLocaleDateString()}
+              {new Date(u.createdAt).toLocaleDateString(locale)}
             </span>
             <AdminUserActions
               userId={u.id}
@@ -55,7 +50,7 @@ export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
             <Pill>
               {u.documentCount} {t("usersDocuments")}
             </Pill>
-            <Pill>{formatBytes(u.storageBytes)}</Pill>
+            <Pill>{formatBytes(u.storageBytes, locale)}</Pill>
             <Pill>
               {u.tokenCount} {t("usersTokens")}
             </Pill>

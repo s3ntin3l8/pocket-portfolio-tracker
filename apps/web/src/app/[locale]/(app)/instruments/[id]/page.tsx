@@ -55,6 +55,7 @@ export default async function InstrumentPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Instrument");
+  const tA11y = await getTranslations("A11y");
   const ta = await getTranslations("Anomalies");
   const tc = await getTranslations("AssetClass");
 
@@ -151,7 +152,7 @@ export default async function InstrumentPage({
       variant="outline"
       size="icon"
       asChild
-      aria-label={t("priceHistory")}
+      aria-label={tA11y("backToHoldings")}
       className="rounded-xl bg-card shadow-card"
     >
       <Link href="/holdings">

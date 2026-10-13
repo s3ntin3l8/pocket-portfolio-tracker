@@ -12,6 +12,7 @@ import {
 import { useLocale } from "next-intl";
 import type { Candle } from "@portfolio/api-client";
 import { formatMoney } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export function PriceChart({
   data,
@@ -33,6 +34,7 @@ export function PriceChart({
   showYAxis?: boolean;
   height?: number;
 }) {
+  const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const points = data.map((d) => ({ date: d.date, close: Number(d.close) }));
   const gradientId = theme === "inverse" ? "price-fill-inverse" : "price-fill";
@@ -127,6 +129,7 @@ export function PriceChart({
             }
           />
           <Area
+            isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="close"
             stroke={lineColor}

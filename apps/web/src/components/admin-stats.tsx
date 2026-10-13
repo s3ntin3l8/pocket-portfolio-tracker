@@ -1,19 +1,7 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { formatBytes as formatBytesLocale } from "@/lib/utils";
 import { Info } from "lucide-react";
 import type { AdminStats as AdminStatsData } from "@portfolio/api-client";
-
-function formatBytes(bytes: number | null | undefined): string {
-  if (bytes == null) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function formatRows(rows: number | null | undefined): string {
-  if (rows == null) return "—";
-  return rows.toLocaleString();
-}
 
 /**
  * `/admin/database`. Design (`Admin Settings.dc.html`, "DATABASE / STATS" section): two
@@ -26,6 +14,11 @@ function formatRows(rows: number | null | undefined): string {
  */
 export async function AdminStats({ stats }: { stats: AdminStatsData }) {
   const t = await getTranslations("Admin");
+  const locale = await getLocale();
+  const formatBytes = (bytes: number | null | undefined): string =>
+    bytes == null ? "—" : formatBytesLocale(bytes, locale);
+  const formatRows = (rows: number | null | undefined): string =>
+    rows == null ? "—" : rows.toLocaleString(locale);
   const { db, objectStorage } = stats;
   // The real API has no top-level row-count total (only a per-table breakdown) — sum it
   // here for the design's "Rows (est.)" tile, but only when every table actually reported
