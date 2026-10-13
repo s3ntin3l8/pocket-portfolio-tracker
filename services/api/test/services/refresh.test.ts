@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { users, portfolios, instruments, transactions, lastPrices } from "@portfolio/db";
+import {
+  users,
+  portfolios,
+  instruments,
+  transactions,
+  lastPrices,
+  corporateActions,
+} from "@portfolio/db";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
-import { refreshHeldPrices } from "../../src/services/refresh.js";
+import { currentlyHeldInstrumentIds, refreshHeldPrices } from "../../src/services/refresh.js";
 
 function service(counter: { n: number }): MarketDataService {
   return {
@@ -143,5 +150,72 @@ describe("refreshHeldPrices", () => {
     const xetraRef = capturedRefs.find((r) => r.market === "XETRA");
     expect(xetraRef).toBeDefined();
     expect(xetraRef?.isin).toBe("IE00B5BMR087");
+  });
+
+  it("refresh set EQUALS the currently-held set: held + fully-sold + never-held (audit D2)", async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "refresh|held", email: "held@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Held", baseCurrency: "IDR" })
+      .returning();
+    const mk = (symbol: string) => ({
+      symbol,
+      market: "IDX",
+      assetClass: "equity" as const,
+      currency: "IDR",
+      name: symbol,
+    });
+    const [heldI, soldI, neverI, splitI] = await db
+      .insert(instruments)
+      .values([mk("HELDX"), mk("SOLDX"), mk("NEVERX"), mk("SPLITX")])
+      .returning();
+    const tx = (instrumentId: string, type: "buy" | "sell", quantity: string, day: number) => ({
+      portfolioId: pf.id,
+      instrumentId,
+      type,
+      quantity,
+      price: "1",
+      currency: "IDR",
+      executedAt: new Date(Date.UTC(2026, 0, day)),
+    });
+    await db.insert(transactions).values([
+      tx(heldI.id, "buy", "10", 1),
+      tx(soldI.id, "buy", "10", 1),
+      tx(soldI.id, "sell", "10", 2),
+      tx(splitI.id, "buy", "5", 1),
+      tx(splitI.id, "sell", "10", 3), // 5 shares x2 split = 10, fully sold after the split
+    ]);
+    await db.insert(corporateActions).values({
+      instrumentId: splitI.id,
+      type: "split",
+      ratio: "2",
+      exDate: "2026-01-02",
+    });
+    void neverI; // no transactions at all
+
+    const ids = await currentlyHeldInstrumentIds(db);
+    expect(ids).toContain(heldI.id);
+    expect(ids).not.toContain(soldI.id);
+    expect(ids).not.toContain(neverI.id);
+    expect(ids).not.toContain(splitI.id);
+
+    const asked: string[] = [];
+    const capturing = {
+      getQuotes: async (refs: Array<{ id: string; ref: InstrumentRef }>) => {
+        for (const { ref } of refs) asked.push(ref.symbol);
+        return {};
+      },
+    } as unknown as MarketDataService;
+    await refreshHeldPrices(db, capturing, new Date(Date.UTC(2026, 1, 9, 3)));
+    // Exactly the held, market-open instruments from this and the earlier fixtures — none of the sold/never-held.
+    expect(asked).not.toContain("SOLDX");
+    expect(asked).not.toContain("NEVERX");
+    expect(asked).not.toContain("SPLITX");
+    expect(asked).toContain("HELDX");
+    expect(new Set(asked)).toEqual(new Set(["BBCA", "GOLD", "SXR8", "HELDX"]));
   });
 });
