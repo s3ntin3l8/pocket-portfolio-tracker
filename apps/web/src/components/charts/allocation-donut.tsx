@@ -71,6 +71,7 @@ export function AllocationDonut({
       label: string;
       value: number;
       hatchIdx: number | null;
+      fill: string;
     }[] = [];
     if (d.value - atCost > 0 || atCost === 0) {
       out.push({
@@ -79,6 +80,7 @@ export function AllocationDonut({
         label: d.label,
         value: d.value - atCost,
         hatchIdx: null,
+        fill: colorOf(d.key, i),
       });
     }
     if (atCost > 0) {
@@ -88,6 +90,7 @@ export function AllocationDonut({
         label: atCostLabel ? `${d.label} · ${atCostLabel}` : d.label,
         value: atCost,
         hatchIdx: i,
+        fill: `url(#${hatchId}-${i})`,
       });
     }
     return out;
@@ -125,7 +128,12 @@ export function AllocationDonut({
                       patternTransform="rotate(45)"
                     >
                       <rect width="6" height="6" fill={colorOf(d.key, i)} />
-                      <rect width="2.5" height="6" fill="var(--color-card)" fillOpacity="0.55" />
+                      <rect
+                        width="2.5"
+                        height="6"
+                        style={{ fill: "var(--color-card)" }}
+                        fillOpacity="0.55"
+                      />
                     </pattern>
                   ) : null,
                 )}
@@ -143,19 +151,9 @@ export function AllocationDonut({
               onClick={(entry) => onSliceClick?.(entry.payload.baseKey)}
               style={{ cursor: onSliceClick ? "pointer" : undefined }}
             >
-              {pieData.map((slice) => {
-                const i = data.findIndex((d) => d.key === slice.baseKey);
-                return (
-                  <Cell
-                    key={slice.key}
-                    fill={
-                      slice.hatchIdx !== null
-                        ? `url(#${hatchId}-${slice.hatchIdx})`
-                        : colorOf(slice.baseKey, i)
-                    }
-                  />
-                );
-              })}
+              {pieData.map((slice) => (
+                <Cell key={slice.key} fill={slice.fill} />
+              ))}
             </Pie>
             <Tooltip
               formatter={(value) => formatMoney(Number(value), currency, locale)}

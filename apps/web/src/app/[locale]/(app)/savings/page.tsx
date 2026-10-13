@@ -71,8 +71,12 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
   const m = (n: number) => formatMoney(n, currency, locale);
   // Gain vs NET CONTRIBUTED (the savings basis) — labelled as such, and explained by the same
   // sheet the Holdings rail opens (audit G2). `gain` is the scope's single GainSummary.
-  const gainAmount = Number(c.currentValue) - Number(c.netContributed);
   const gain = netWorthResult.status === "ok" ? netWorthResult.data.gain : undefined;
+  // From the shared payload when available, so this figure and the explainer cannot disagree;
+  // the contributions response (same value/net pair) is only the fallback for an older API.
+  const gainAmount = gain
+    ? Number(gain.value) - Number(gain.netContributed)
+    : Number(c.currentValue) - Number(c.netContributed);
 
   return (
     <div className="space-y-5">

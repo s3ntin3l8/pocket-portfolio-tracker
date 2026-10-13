@@ -89,6 +89,13 @@ export function HeroGlanceCard({
   const benchmarkPct = snapshot.benchmarkPct !== null ? Number(snapshot.benchmarkPct) : null;
   const periodWord = range === "all" ? t("periodAllTime") : t("periodPast", { range: tr(range) });
 
+  const atCostLabel = [
+    atCostCount > 0 ? tHoldings("heroAtCostBanner", { count: atCostCount }) : null,
+    fxMissingCount > 0 ? tHoldings("heroNoFxBanner", { count: fxMissingCount }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div
       className="rounded-[26px] px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-2xl"
@@ -102,15 +109,10 @@ export function HeroGlanceCard({
         <p className="mt-0.5 text-[11px] font-medium text-white/70">
           <Link
             href={atCostHref}
-            aria-label={tHoldings("heroAtCostBannerAria")}
+            aria-label={atCostLabel}
             className="underline underline-offset-2 hover:text-white"
           >
-            {[
-              atCostCount > 0 ? tHoldings("heroAtCostBanner", { count: atCostCount }) : null,
-              fxMissingCount > 0 ? tHoldings("heroNoFxBanner", { count: fxMissingCount }) : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+            {atCostLabel}
           </Link>
         </p>
       )}

@@ -57,7 +57,7 @@ describe("HeroGlanceCard", () => {
         />
       </NextIntlClientProvider>,
     );
-    const link = screen.getByRole("link", { name: /valued at cost/i });
+    const link = screen.getByRole("link", { name: /2 holdings at cost/i });
     expect(link).toHaveTextContent("2 holdings at cost");
     expect(link.getAttribute("href")).toContain("filter=at-cost");
     expect(screen.queryByText(/Includes one or more/)).not.toBeInTheDocument();
