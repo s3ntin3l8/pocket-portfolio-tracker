@@ -436,6 +436,86 @@ describe("tax routes", () => {
       // per-disposal figure without re-deriving this fallback logic itself.
       expect(body.tfRatesByInstrument[etf.id]).toBe("0.30");
     });
+
+    it("uses the per-instrument partialExemptionRate override instead of the asset-class default", async () => {
+      // Verify that an ETF instrument with null partial_exemption_rate still gets
+      // the 30% statutory exemption via the assetClass fallback in tfRatesFor.
+      const t = await token("tax-etf-override");
+
+      // Insert an ETF with NO explicit partialExemptionRate.
+      const [etf] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "OVERRIDE-ETF",
+          partialExemptionRate: "0.15",
+          market: "XETRA",
+          assetClass: "etf",
+          currency: "EUR",
+          name: "World ETF",
+        })
+        .returning();
+
+      const holderId = await createHolder(t, {
+        name: "Override Holder",
+        taxAllowanceAnnual: "1000",
+        capitalGainsTaxRate: "0.25",
+        taxResidence: "DE",
+      });
+      const portfolioId = await createPortfolio(t, {
+        accountHolderId: holderId,
+        baseCurrency: "EUR",
+        taxAllowanceAnnual: "1000",
+      });
+
+      // Upsert the user and create a buy + sell for a 1000 EUR gross gain.
+      await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+      const buy = await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "buy",
+          instrumentId: etf.id,
+          quantity: "10",
+          price: "100",
+          currency: "EUR",
+          executedAt: "2025-01-15T00:00:00.000Z",
+        },
+      });
+      expect(buy.statusCode).toBe(201);
+
+      const sell = await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "sell",
+          instrumentId: etf.id,
+          quantity: "10",
+          price: "200", // gain = (200-100)*10 = 1000 gross
+          currency: "EUR",
+          executedAt: "2025-06-15T00:00:00.000Z",
+        },
+      });
+      expect(sell.statusCode).toBe(201);
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/tax?year=2025`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+
+      // Gross gain = 1000. With the 15% override (not the 30% ETF default): adjusted = 1000 × 0.85 = 850.
+      // allowance = 1000, so usedYtd = 850, remaining = 150.
+      expect(body.allowanceUsage.realizedGainsAdjusted).toBe("850.00");
+      expect(body.allowanceUsage.usedYtd).toBe("850.00");
+      expect(body.allowanceUsage.remaining).toBe("150.00");
+      // The same 30% asset-class-fallback rate, exposed so the frontend can Tf-adjust a
+      // per-disposal figure without re-deriving this fallback logic itself.
+      expect(body.tfRatesByInstrument[etf.id]).toBe("0.15");
+    });
   });
 
   // ---------------------------------------------------------------------------

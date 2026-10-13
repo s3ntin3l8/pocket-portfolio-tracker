@@ -67,6 +67,12 @@ const patchInstrumentSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")
     .nullable()
     .optional(),
+  // Teilfreistellung override as a fraction (0.30 = 30%). null clears it, so the
+  // asset-class default applies again (see buildTfRates).
+  partialExemptionRate: decimalString
+    .refine((v) => Number(v) >= 0 && Number(v) <= 1, { message: "must be between 0 and 1" })
+    .nullable()
+    .optional(),
 });
 const enrichQuerySchema = z.object({ q: z.string().trim().min(1) });
 const manualPriceSchema = z.object({

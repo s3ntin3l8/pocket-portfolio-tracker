@@ -3,12 +3,22 @@ import {
   computeTrades,
   effectiveCapitalGainsTaxRate,
   basiszinsFor,
+  defaultPartialExemptionRate,
   estimateVorabpauschale,
   BASISZINS_BY_YEAR,
   allowanceUsageYTD,
   type CoreTransaction,
 } from "../src/index.js";
 import { heldMoreThanOneYear } from "../src/trade-log/helpers.js";
+
+describe("defaultPartialExemptionRate", () => {
+  it("is 30% for equity funds, 15% for mixed funds, none otherwise", () => {
+    expect(defaultPartialExemptionRate("etf")).toBe("0.30");
+    expect(defaultPartialExemptionRate("mutual_fund")).toBe("0.15");
+    expect(defaultPartialExemptionRate("equity")).toBeNull();
+    expect(defaultPartialExemptionRate("bond")).toBeNull();
+  });
+});
 
 describe("effectiveCapitalGainsTaxRate", () => {
   it("defaults to Abgeltungsteuer + Soli (26.375%)", () => {

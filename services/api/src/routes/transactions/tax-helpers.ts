@@ -20,6 +20,7 @@ import {
   toDateKey,
   indonesianFinalTax,
   excludeMissingFx,
+  defaultPartialExemptionRate,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn, recordFxMissing } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
@@ -205,13 +206,8 @@ export function buildTfRates(
   for (const t of trades) {
     const meta = metaById.get(t.instrumentId);
     if (!meta) continue;
-    if (meta.partialExemptionRate !== null) {
-      result[t.instrumentId] = meta.partialExemptionRate;
-    } else if (meta.assetClass === "etf") {
-      result[t.instrumentId] = "0.30";
-    } else if (meta.assetClass === "mutual_fund") {
-      result[t.instrumentId] = "0.15";
-    }
+    const rate = meta.partialExemptionRate ?? defaultPartialExemptionRate(meta.assetClass);
+    if (rate !== null) result[t.instrumentId] = rate;
   }
   return result;
 }

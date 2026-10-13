@@ -280,6 +280,7 @@ export async function updateInstrument(
     couponRate?: string | null;
     couponSchedule?: string | null;
     maturityDate?: string | null;
+    partialExemptionRate?: string | null;
   },
 ): Promise<Instrument | "conflict" | "not_found"> {
   const [existing] = await db.select().from(instruments).where(eq(instruments.id, id)).limit(1);
@@ -314,6 +315,8 @@ export async function updateInstrument(
   if (patch.couponRate !== undefined) set.couponRate = patch.couponRate;
   if (patch.couponSchedule !== undefined) set.couponSchedule = patch.couponSchedule;
   if (patch.maturityDate !== undefined) set.maturityDate = patch.maturityDate;
+  if (patch.partialExemptionRate !== undefined)
+    set.partialExemptionRate = patch.partialExemptionRate;
 
   if (Object.keys(set).length === 0) return existing;
 

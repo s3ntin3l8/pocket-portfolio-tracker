@@ -93,13 +93,14 @@ Fund gains/losses, fund **distributions** and Vorabpauschale are multiplied by
 per instrument in `TradeLog.incomeByInstrumentYear` (the instrument-attributed part of
 `dividendsByYear`); instrument-less income such as account interest stays unadjusted.
 An equity-ETF distribution of €100 therefore counts as €70 in the general pot. The rate comes from `instruments.partialExemptionRate` when set,
-else a hardcoded default by asset class (`services/api/src/routes/transactions/tax.ts`):
+else a default by asset class (`defaultPartialExemptionRate` in `packages/core/src/tax/rates.ts`,
+applied by `buildTfRates` in `services/api/src/routes/transactions/tax-helpers.ts`):
 ETF → **30%**, mutual fund → **15%**, everything else → **0%** (no exemption). The
 class default is only a fallback: bond/real-estate/mixed funds have different statutory
 rates (e.g. 60% real estate, 15% mixed), so the **per-instrument
-`instruments.partialExemptionRate` is the documented override**. There is currently no
-write path for it in the API or the instrument edit dialog — it is set in the database
-only (tracked as a follow-up). Worked
+`instruments.partialExemptionRate` is the documented override**. Admins set it in the
+instrument edit dialog (percent, fund classes only; blank clears it) via
+`PATCH /instruments/:id` (`partialExemptionRate`, a fraction 0–1 or `null`). Worked
 example (from `packages/core/test/tax.test.ts`): a closed equity-ETF trade with a
 €1,000 realized gain and a 30% Teilfreistellung rate tf-adjusts to **€700** — against a
 €1,000 allowance, that leaves €300 remaining.

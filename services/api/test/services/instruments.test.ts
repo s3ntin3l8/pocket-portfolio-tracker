@@ -587,6 +587,55 @@ describe("updateInstrument", () => {
   });
 });
 
+describe("updateInstrument — partialExemptionRate", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("sets, then clears, the Teilfreistellung override", async () => {
+    const [row] = await getDb()
+      .insert(instruments)
+      .values({
+        market: "XETRA",
+        assetClass: "etf",
+        unit: "shares",
+        currency: "EUR",
+        symbol: "TF-OVERRIDE",
+        name: "TF override ETF",
+      })
+      .returning();
+
+    const set = await updateInstrument(getDb(), row.id, { partialExemptionRate: "0.15" });
+    expect(typeof set).not.toBe("string");
+    if (typeof set !== "string") expect(set.partialExemptionRate).toBe("0.15");
+
+    const cleared = await updateInstrument(getDb(), row.id, { partialExemptionRate: null });
+    expect(typeof cleared).not.toBe("string");
+    if (typeof cleared !== "string") expect(cleared.partialExemptionRate).toBeNull();
+  });
+
+  it("leaves the override untouched when the patch omits it", async () => {
+    const [row] = await getDb()
+      .insert(instruments)
+      .values({
+        market: "XETRA",
+        assetClass: "etf",
+        unit: "shares",
+        currency: "EUR",
+        symbol: "TF-KEEP",
+        name: "TF keep ETF",
+        partialExemptionRate: "0.60",
+      })
+      .returning();
+    const updated = await updateInstrument(getDb(), row.id, { name: "Renamed" });
+    expect(typeof updated).not.toBe("string");
+    if (typeof updated !== "string") expect(updated.partialExemptionRate).toBe("0.60");
+  });
+});
+
 describe("setManualPrice", () => {
   beforeAll(async () => {
     await ensureDb();

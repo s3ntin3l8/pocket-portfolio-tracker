@@ -655,6 +655,8 @@ export interface Instrument {
    *  the bond par fallback when set; `manualPriceAt` is its as-of timestamp. */
   manualPrice?: string | null;
   manualPriceAt?: string | null;
+  /** Teilfreistellung override as a fraction (0.30 = 30%); null/absent = asset-class default. */
+  partialExemptionRate?: string | null;
 }
 
 /** An instrument result from the global search — extends the catalog record with
@@ -2802,6 +2804,8 @@ export function createApiClient(config: ApiClientConfig) {
         couponRate?: string | null;
         couponSchedule?: string | null;
         maturityDate?: string | null;
+        /** Fraction 0–1; null clears the override. */
+        partialExemptionRate?: string | null;
       },
     ) => request<Instrument>("PATCH", `/instruments/${id}`, patch),
     /** Set (or, with `price: null`, clear) an instrument's manual price — not

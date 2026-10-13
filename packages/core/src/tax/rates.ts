@@ -32,6 +32,17 @@ export function effectiveCapitalGainsTaxRate(input: {
 }
 
 /**
+ * Default Teilfreistellung (§20 InvStG) as a fraction string, by asset class: 30% for
+ * equity funds (`etf`), 15% for mixed funds (`mutual_fund`), none otherwise (null). An
+ * instrument's own `partialExemptionRate` always overrides this.
+ */
+export function defaultPartialExemptionRate(assetClass: string): string | null {
+  if (assetClass === "etf") return "0.30";
+  if (assetClass === "mutual_fund") return "0.15";
+  return null;
+}
+
+/**
  * Basiszins for the Vorabpauschale (§18 Abs. 4 InvStG), by calendar year, as published
  * by the Bundesfinanzministerium (derived by the Bundesbank at the first trading day of
  * the year). Years absent here are deliberately unknown — never guessed.

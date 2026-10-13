@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import type { Instrument } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
+import { defaultPartialExemptionRate } from "@portfolio/core";
+import { fractionToPercent, percentToFraction } from "@/lib/tax-rate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +25,8 @@ const ASSET_CLASSES = [
   "crypto",
   "derivative",
 ] as const;
+
+const FUND_CLASSES = new Set(["etf", "mutual_fund"]);
 
 export function InstrumentEditDialog({
   instrument,
@@ -46,6 +50,7 @@ export function InstrumentEditDialog({
   const [name, setName] = useState(instrument.name);
   const [assetClass, setAssetClass] = useState(instrument.assetClass);
   const [market, setMarket] = useState(instrument.market);
+  const [tfPercent, setTfPercent] = useState(fractionToPercent(instrument.partialExemptionRate));
 
   function reset() {
     setIsin(instrument.isin ?? "");
@@ -54,11 +59,19 @@ export function InstrumentEditDialog({
     setName(instrument.name);
     setAssetClass(instrument.assetClass);
     setMarket(instrument.market);
+    setTfPercent(fractionToPercent(instrument.partialExemptionRate));
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    const isFund = FUND_CLASSES.has(assetClass);
+    // Blank clears the override (the asset-class default applies again).
+    const tfFraction = tfPercent.trim() === "" ? null : percentToFraction(tfPercent);
+    if (isFund && tfPercent.trim() !== "" && tfFraction === null) {
+      toast.error(t("tfInvalid"));
+      return;
+    }
     setBusy(true);
     try {
       await api.updateInstrument(instrument.id, {
@@ -68,6 +81,15 @@ export function InstrumentEditDialog({
         name,
         assetClass,
         market,
+        // Only fund classes expose the override. Typed text survives an in-dialog class
+        // round-trip (fund → other → fund) on purpose; submit reads `tfPercent` as-is.
+        // Moving a fund *off* a fund class clears its stored override, because
+        // `buildTfRates` would otherwise keep applying it to the non-fund.
+        ...(isFund
+          ? { partialExemptionRate: tfFraction }
+          : instrument.partialExemptionRate != null
+            ? { partialExemptionRate: null }
+            : {}),
       });
       router.refresh();
       toast.success(t("editSaved"));
@@ -159,6 +181,19 @@ export function InstrumentEditDialog({
                 required
               />
             </div>
+            {FUND_CLASSES.has(assetClass) && (
+              <div className="space-y-1.5">
+                <Label htmlFor={`${uid}-tf`}>{t("tfRate")}</Label>
+                <Input
+                  id={`${uid}-tf`}
+                  inputMode="decimal"
+                  value={tfPercent}
+                  placeholder={fractionToPercent(defaultPartialExemptionRate(assetClass)) + "%"}
+                  onChange={(e) => setTfPercent(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">{t("tfRateHint")}</p>
+              </div>
+            )}
           </form>
         </div>
       </DialogContent>

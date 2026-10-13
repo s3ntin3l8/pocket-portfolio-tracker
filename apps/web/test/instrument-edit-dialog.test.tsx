@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 
 const refresh = vi.fn();
-const updateInstrument = vi.fn(async () => ({}) as never);
+const updateInstrument = vi.fn(async (..._args: unknown[]) => ({}) as never);
 
 vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("@/lib/api", () => ({ useApiClient: () => ({ updateInstrument }) }));
@@ -98,6 +98,70 @@ describe("InstrumentEditDialog", () => {
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText(t.symbol)).toHaveValue("AAPL");
+  });
+
+  describe("Teilfreistellung override", () => {
+    const ETF = { ...INSTRUMENT, assetClass: "etf", partialExemptionRate: "0.15" } as Instrument;
+
+    it("is hidden for non-fund classes and never sent", async () => {
+      renderDialog();
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      expect(screen.queryByLabelText(t.tfRate)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+      await waitFor(() => expect(updateInstrument).toHaveBeenCalled());
+      expect(updateInstrument.mock.calls[0]?.[1]).not.toHaveProperty("partialExemptionRate");
+    });
+
+    it("clears a stale stored override when saving a non-fund class", async () => {
+      renderDialog({ ...INSTRUMENT, partialExemptionRate: "0.15" } as Instrument);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+      await waitFor(() =>
+        expect(updateInstrument).toHaveBeenCalledWith(
+          "i1",
+          expect.objectContaining({ partialExemptionRate: null }),
+        ),
+      );
+    });
+
+    it("pre-fills the stored fraction as a percent, with the class default as placeholder", () => {
+      renderDialog({ ...ETF, partialExemptionRate: null } as Instrument);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      expect(screen.getByLabelText(t.tfRate)).toHaveValue("");
+      expect(screen.getByLabelText(t.tfRate)).toHaveAttribute("placeholder", "30%");
+    });
+
+    it("submits the percent as a fraction", async () => {
+      renderDialog(ETF);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      expect(screen.getByLabelText(t.tfRate)).toHaveValue("15");
+      fireEvent.change(screen.getByLabelText(t.tfRate), { target: { value: "60" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+      await waitFor(() =>
+        expect(updateInstrument).toHaveBeenCalledWith(
+          "i1",
+          expect.objectContaining({ partialExemptionRate: "0.6" }),
+        ),
+      );
+    });
+
+    it("blank clears the override (null) and an invalid value blocks the save", async () => {
+      renderDialog(ETF);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByLabelText(t.tfRate), { target: { value: "150" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(t.tfInvalid));
+      expect(updateInstrument).not.toHaveBeenCalled();
+
+      fireEvent.change(screen.getByLabelText(t.tfRate), { target: { value: "" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+      await waitFor(() =>
+        expect(updateInstrument).toHaveBeenCalledWith(
+          "i1",
+          expect.objectContaining({ partialExemptionRate: null }),
+        ),
+      );
+    });
   });
 
   describe("overlay chrome (#625 migration)", () => {
