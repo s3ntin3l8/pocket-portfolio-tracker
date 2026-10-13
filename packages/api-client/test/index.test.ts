@@ -700,3 +700,116 @@ describe("createApiClient request methods", () => {
     expect(JSON.parse(seen?.init.body as string)).toEqual({ force: true });
   });
 });
+
+/** A fetch that never answers on its own — it only settles when its signal aborts. */
+function hangingFetch() {
+  return vi.fn(
+    (_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        if (init.signal?.aborted) return reject(init.signal.reason);
+        init.signal?.addEventListener("abort", () => reject(init.signal!.reason), { once: true });
+      }),
+  );
+}
+
+describe("request timeout and cancellation (audit E13)", () => {
+  it("rejects with an ApiError (408) when the request exceeds the timeout", async () => {
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      timeoutMs: 20,
+      fetch: hangingFetch() as unknown as typeof fetch,
+    });
+    const err = await client.listPortfolios().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(408);
+    expect((err as ApiError).body).toBe("request_timeout");
+  });
+
+  it("passes a signal to fetch by default", async () => {
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      return { ok: true, status: 200, json: async () => [], text: async () => "[]" } as Response;
+    });
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      fetch: fetchImpl as unknown as typeof fetch,
+    });
+    await client.listPortfolios();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates a caller abort as the platform AbortError, not an ApiError", async () => {
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      fetch: hangingFetch() as unknown as typeof fetch,
+    });
+    const ctrl = new AbortController();
+    const pending = client.getSummary("p1", undefined, { signal: ctrl.signal }).catch((e) => e);
+    ctrl.abort();
+    const err = await pending;
+    expect(err).not.toBeInstanceOf(ApiError);
+    expect((err as Error).name).toBe("AbortError");
+  });
+
+  it("an already-aborted caller signal rejects immediately", async () => {
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      fetch: hangingFetch() as unknown as typeof fetch,
+    });
+    const err = await client
+      .getNetWorth(undefined, undefined, undefined, { signal: AbortSignal.abort() })
+      .catch((e) => e);
+    expect(err).not.toBeInstanceOf(ApiError);
+  });
+
+  it("gives broker sync / import / upload POSTs the long budget instead of the read timeout", async () => {
+    const slow = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 80));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ status: "connected" }),
+        text: async () => "{}",
+      } as Response;
+    });
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      timeoutMs: 20, // would time out the 80 ms response if the long budget didn't apply
+      fetch: slow as unknown as typeof fetch,
+    });
+    await expect(client.verifyTr()).resolves.toEqual({ status: "connected" });
+  });
+});
+
+describe("listTransactions truncation marker (audit E13)", () => {
+  function clientWithHeaders(headers: Record<string, string>) {
+    const fetchImpl = vi.fn(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          headers: new Headers(headers),
+          json: async () => [{ id: "t1" }],
+          text: async () => "[]",
+        }) as unknown as Response,
+    );
+    return createApiClient({
+      baseUrl: "http://api.test",
+      fetch: fetchImpl as unknown as typeof fetch,
+    });
+  }
+
+  it("exposes the x-result-truncated cap alongside the rows", async () => {
+    const res = await clientWithHeaders({ "x-result-truncated": "5000" }).listTransactions("p1");
+    expect(res.rows).toEqual([{ id: "t1" }]);
+    expect(res.truncatedAt).toBe(5000);
+  });
+
+  it("reports null when the list was not capped (or the header is absent)", async () => {
+    expect((await clientWithHeaders({}).listTransactions("p1")).truncatedAt).toBeNull();
+    expect(
+      (await clientWithHeaders({ "x-result-truncated": "junk" }).listTransactions("p1"))
+        .truncatedAt,
+    ).toBeNull();
+  });
+});
