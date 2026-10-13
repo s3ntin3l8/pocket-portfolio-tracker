@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
+import { paginatedTransactionsResponseSchema } from "@portfolio/schema";
 
 // Covers B6 — `computeConvertedSummary` SQL aggregates total income as
 // `price * quantity`, but for `interest` and `bonus_cash` rows the amount lives
@@ -99,6 +100,7 @@ describe("transactions summary — income-type SQL branches (B6)", () => {
       headers: auth(t),
     });
     expect(res.statusCode).toBe(200);
+    paginatedTransactionsResponseSchema.parse(res.json());
     const summary = res.json().summary as { totalIncome: string };
     expect(summary.totalIncome).toBe("62.34");
   });

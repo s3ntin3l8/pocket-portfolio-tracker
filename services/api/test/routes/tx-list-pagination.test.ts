@@ -3,6 +3,10 @@ import { generateKeyPair, SignJWT } from "jose";
 import { transactions } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
+import {
+  paginatedTransactionsResponseSchema,
+  paginatedNetworthTransactionsResponseSchema,
+} from "@portfolio/schema";
 
 // Audit D5: a list request without `page` used to return every row, unbounded and (per
 // portfolio) unordered. Now it is the first page; `?all=1` is the explicit, capped,
@@ -91,6 +95,7 @@ describe("transaction list pagination contract (audit D5) + ids cache key (audit
     });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { rows: { executedAt: string }[]; total: number };
+    paginatedTransactionsResponseSchema.parse(body);
     expect(Array.isArray(body)).toBe(false);
     expect(body.total).toBe(ROWS);
     expect(body.rows).toHaveLength(25);
@@ -116,6 +121,7 @@ describe("transaction list pagination contract (audit D5) + ids cache key (audit
       url: "/networth/transactions",
       headers: auth(t),
     });
+    paginatedNetworthTransactionsResponseSchema.parse(paged.json());
     expect(paged.json().rows).toHaveLength(25);
     const all = await app.inject({
       method: "GET",

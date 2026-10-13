@@ -34,6 +34,7 @@ export function useApiClient(): ApiClient {
   return useMemo(() => {
     return createApiClient({
       baseUrl: apiBaseUrl,
+      validateResponses: process.env.NODE_ENV !== "production",
       fetch: async (input, init) => {
         const res = await fetch(input, init);
         if (res.status === 401) {

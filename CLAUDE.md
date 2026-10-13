@@ -226,6 +226,14 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   only a successful non-admin answer is `notFound()`; a failed lookup (429/401/5xx) renders
   `<AdminGateFailure>` (DataState + retry), never "Page not found". Non-gating uses (nav item,
   settings row) may hide on failure via `loadMe()`.
+- **Response contracts live in `@portfolio/schema`** (`packages/schema/src/schema/responses.ts`):
+  `/networth`, `/portfolios/:id/summary` and both paginated transaction lists. They mirror what
+  the routes actually serialize (loose objects; money is a decimal string that may carry Decimal.js
+  exponent form). `createApiClient({ validateResponses })` checks those four responses and throws
+  `ApiError` (502, body `invalid_response: <path> — <issues>`) on drift; the web turns it on outside
+  production. API route tests `parse` real responses against the same schemas, and
+  `packages/api-client/src/response-contract.type-test.ts` fails `tsc` if a schema stops being
+  assignable to the client interface. Change a serializer → change the schema in the same PR.
 - **Imports never auto-commit.** Screenshot/CSV parses become _draft_ records that the
   user confirms before a transaction is written. Dedup runs at three levels: **file-level**
   (same file re-upload → `contentHash`), **within-source transaction-level** (the

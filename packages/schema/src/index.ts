@@ -14,3 +14,4 @@ export * from "./schema/search.js";
 export * from "./schema/preferences.js";
 export { BENCHMARK_LABELS, benchmarkLabel } from "./benchmark-labels.js";
 export * from "./schema/document.js";
+export * from "./schema/responses.js";

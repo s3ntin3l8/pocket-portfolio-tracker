@@ -6,6 +6,7 @@ import { toDateKey } from "@portfolio/core";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import { overrideMarketData, invalidateMarketData } from "../../src/services/market-data.js";
+import { netWorthResponseSchema } from "@portfolio/schema";
 
 // Audit B2 contract: a currency with no FX rate is never converted 1:1 and never fails the
 // request — the affected rows/holdings are excluded from converted totals and the response
@@ -132,6 +133,7 @@ describe("missing FX rate → 200 + fxMissingCurrencies, never 1:1 (audit B2)", 
     const res = await app.inject({ method: "GET", url: "/networth", headers: auth(t) });
     expect(res.statusCode).toBe(200);
     const body = res.json();
+    netWorthResponseSchema.parse(body);
     expect(body.fxMissingCurrencies).toEqual(["USD"]);
     expect(res.headers["x-fx-missing-currencies"]).toBe("USD");
     // Only the EUR holding: 10 × 110 × 17,000 — not + 8 × 50 (USD at 1:1).

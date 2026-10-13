@@ -19,6 +19,13 @@ import type {
   DocumentCategory,
 } from "@portfolio/schema";
 
+import {
+  netWorthResponseSchema,
+  portfolioSummaryResponseSchema,
+  paginatedTransactionsResponseSchema,
+  paginatedNetworthTransactionsResponseSchema,
+} from "@portfolio/schema";
+
 export { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/schema";
 export type { ImportIssue, ParsedGoldContract, ProviderCredentialInput } from "@portfolio/schema";
 export type { ImportStrategy, ImportSettingsUpdate } from "@portfolio/schema";
@@ -2128,6 +2135,13 @@ export interface ApiClientConfig {
    *  `"request_timeout"`). Uploads and long-running sync/import POSTs use
    *  {@link LONG_TIMEOUT_MS} instead unless a per-call `timeoutMs` says otherwise. */
   timeoutMs?: number;
+  /**
+   * Validate the `/networth`, `/portfolios/:id/summary` and paginated-transaction responses
+   * against the `@portfolio/schema` response schemas. A mismatch throws an {@link ApiError}
+   * (`body` `"invalid_response"`, with the failing paths appended) instead of handing the
+   * UI a silently mis-typed cast. Off by default — the web turns it on outside production.
+   */
+  validateResponses?: boolean;
 }
 
 /** Per-call options accepted by the read helpers that take them. */
@@ -2262,6 +2276,28 @@ export function createApiClient(config: ApiClientConfig) {
     opts?: RequestOptions,
   ): Promise<T> {
     return (await requestWithHeaders<T>(method, path, body, opts)).data;
+  }
+
+  /** Runs `data` through `schema` when `validateResponses` is on; returns it untouched
+   *  (never the parsed copy) so validation can't change what callers see. */
+  function validated<T>(
+    schema: {
+      safeParse(data: unknown): {
+        success: boolean;
+        error?: { issues: ReadonlyArray<{ path: PropertyKey[]; message: string }> };
+      };
+    },
+    path: string,
+    data: T,
+  ): T {
+    if (!config.validateResponses) return data;
+    const result = schema.safeParse(data);
+    if (result.success) return data;
+    const issues = (result.error?.issues ?? [])
+      .slice(0, 5)
+      .map((i) => `${i.path.map(String).join(".") || "(root)"}: ${i.message}`)
+      .join("; ");
+    throw new ApiError(502, `invalid_response: ${path} — ${issues}`);
   }
 
   /** Like `request` but returns a Blob — for binary downloads (zip exports etc.). */
@@ -2401,7 +2437,10 @@ export function createApiClient(config: ApiClientConfig) {
       if (holderId) params.set("holderId", holderId);
       if (period && period !== "max") params.set("period", period);
       const qs = params.toString();
-      return request<NetWorth>("GET", qs ? `/networth?${qs}` : "/networth", undefined, opts);
+      const path = qs ? `/networth?${qs}` : "/networth";
+      return request<NetWorth>("GET", path, undefined, opts).then((d) =>
+        validated(netWorthResponseSchema, "/networth", d),
+      );
     },
 
     getPreferences: () => request<UserPreferences>("GET", "/me/preferences"),
@@ -2563,7 +2602,9 @@ export function createApiClient(config: ApiClientConfig) {
           fxMissingCurrencies?: string[];
         };
         years?: string[];
-      }>("GET", `/portfolios/${portfolioId}/transactions?${params}`, undefined, opts);
+      }>("GET", `/portfolios/${portfolioId}/transactions?${params}`, undefined, opts).then((d) =>
+        validated(paginatedTransactionsResponseSchema, "/portfolios/:id/transactions", d),
+      );
     },
     /** Aggregate paginated transactions across all portfolios (networth scope).
      *  Same enrichment + filter pattern as the per-portfolio paginated variant. */
@@ -2591,7 +2632,9 @@ export function createApiClient(config: ApiClientConfig) {
           fxMissingCurrencies?: string[];
         };
         years?: string[];
-      }>("GET", `/networth/transactions?${params}`);
+      }>("GET", `/networth/transactions?${params}`).then((d) =>
+        validated(paginatedNetworthTransactionsResponseSchema, "/networth/transactions", d),
+      );
     },
     /** Fetch exactly the given transaction ids, enriched the same way as a normal page —
      *  regardless of pagination/type/year/search scope. Used by "Show flagged only" (#562)
@@ -2815,7 +2858,7 @@ export function createApiClient(config: ApiClientConfig) {
           : `/portfolios/${portfolioId}/summary`,
         undefined,
         opts,
-      ),
+      ).then((d) => validated(portfolioSummaryResponseSchema, "/portfolios/:id/summary", d)),
     getPerformance: (portfolioId: string) =>
       request<PortfolioPerformance>("GET", `/portfolios/${portfolioId}/performance`),
 

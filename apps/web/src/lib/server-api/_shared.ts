@@ -95,6 +95,8 @@ const getServerApi = cache(async (): Promise<ApiClient | null> => {
   return createApiClient({
     baseUrl: apiBaseUrl,
     getToken: () => token,
+    // Contract check against the @portfolio/schema response schemas — dev/test only.
+    validateResponses: process.env.NODE_ENV !== "production",
     ...(clientIp ? { headers: { "x-forwarded-for": clientIp } } : {}),
   });
 });
