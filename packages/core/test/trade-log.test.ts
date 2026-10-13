@@ -265,6 +265,23 @@ describe("computeTrades — Vorabpauschale accrual + disposal credit", () => {
     expect(trades[0].vorabByYear).toEqual([{ year: 2026, amount: "4.18" }]);
   });
 
+  it("flags a year's vorabByYear entry as estimated when the accrual row is derived", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "4.18",
+        estimated: true,
+        quantity: "0",
+        price: "0",
+        executedAt: new Date("2026-01-02"),
+      }),
+    ];
+    const { trades } = run(txns);
+    expect(trades[0].vorabByYear).toEqual([{ year: 2026, amount: "4.18", estimated: true }]);
+  });
+
   it("credits the full accrued amount to a full-close sell (ratio = 1)", () => {
     const txns = [
       tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2025-01-01") }),

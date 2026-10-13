@@ -2103,7 +2103,8 @@
       "accrued": "Vorabpauschale terakumulasi · YTD",
       "accruedDesc": "ETF akumulasi — penghasilan fantasi, tanpa penerimaan kas",
       "credited": "Vorabpauschale dikreditkan · YTD",
-      "creditedDesc": "Pajak dibayar di muka yang dikembalikan saat pelepasan"
+      "creditedDesc": "Pajak dibayar di muka yang dikembalikan saat pelepasan",
+      "estimatedBasis": "Perkiraan dari harga awal dan akhir tahun; angka dari broker Anda akan menggantikannya setelah diimpor"
     },
     "coverage": {
       "title": "Bagaimana pajak Anda ditutupi · {year}",

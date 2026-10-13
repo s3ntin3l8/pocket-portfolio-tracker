@@ -56,6 +56,7 @@ export function makeEpisode(at: Date): Episode {
     realized: ZERO,
     legs: [],
     vorabByYear: new Map(),
+    vorabEstimated: new Set(),
     flows: [],
   };
 }

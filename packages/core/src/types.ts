@@ -86,6 +86,10 @@ export interface CoreTransaction {
   // kind="vorabpauschale". Consumed by trade-log.ts's per-instrument accrual/disposal-credit
   // tracking. null/undefined for every other transaction.
   vorabBase?: string | null;
+  // True only for derived (never persisted) rows from `estimateVorabRows`: a Vorabpauschale
+  // estimated from year-start/end prices because the broker booked none. Carried to the
+  // trade log's `vorabByYear[].estimated` so the UI can flag the figure.
+  estimated?: boolean;
 }
 
 export interface CorporateAction {

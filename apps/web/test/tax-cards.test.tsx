@@ -204,6 +204,23 @@ describe("VorabpauschaleRow", () => {
   });
 });
 
+describe("VorabpauschaleRow estimate flag", () => {
+  it("labels the accrued figure as an estimate only when flagged", () => {
+    const { rerender } = render(
+      <VorabpauschaleRow allowanceUsage={makeAllowanceUsage()} money={money} t={t} />,
+    );
+    expect(screen.queryByText(/Estimated from year-start/)).toBeNull();
+    rerender(
+      <VorabpauschaleRow
+        allowanceUsage={makeAllowanceUsage({ vorabpauschaleEstimated: true })}
+        money={money}
+        t={t}
+      />,
+    );
+    expect(screen.getByText(/Estimated from year-start and year-end prices/)).toBeInTheDocument();
+  });
+});
+
 describe("CoverageCard", () => {
   it("shows the taxable-excess branch when gains exceed the FSA, even in a year with a net trading loss", () => {
     // Stock pot loss, but dividends push taxableExcess above zero — the two-pot

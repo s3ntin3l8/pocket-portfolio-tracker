@@ -5,6 +5,8 @@ import {
   basiszinsFor,
   defaultPartialExemptionRate,
   estimateVorabpauschale,
+  vorabpauschalePerUnit,
+  vorabZuflussDate,
   BASISZINS_BY_YEAR,
   allowanceUsageYTD,
   type CoreTransaction,
@@ -119,6 +121,73 @@ describe("Basiszins table / Vorabpauschale estimate", () => {
         distributions: "50",
       }),
     ).toBe("127.10");
+  });
+});
+
+describe("§18 Abs. 2 acquisition-year reduction", () => {
+  it("scales the Vorabpauschale itself by monthsHeld/12, after the cap", () => {
+    // Full-year amount 177.10 (cap not binding); bought in July => 6 months => half.
+    expect(
+      estimateVorabpauschale({
+        year: 2025,
+        valueStartOfYear: "10000",
+        valueEndOfYear: "11000",
+        distributions: "0",
+        monthsHeld: 6,
+      }),
+    ).toBe("88.55");
+    // The cap binds on the full-year increase (100), then the reduction applies: 100 x 6/12.
+    expect(
+      estimateVorabpauschale({
+        year: 2025,
+        valueStartOfYear: "10000",
+        valueEndOfYear: "10100",
+        distributions: "0",
+        monthsHeld: 6,
+      }),
+    ).toBe("50.00");
+  });
+
+  it("clamps monthsHeld to 0..12 and treats 0 as no Vorabpauschale", () => {
+    const base = {
+      year: 2025,
+      valueStartOfYear: "10000",
+      valueEndOfYear: "11000",
+      distributions: "0",
+    };
+    expect(estimateVorabpauschale({ ...base, monthsHeld: 99 })).toBe("177.10");
+    expect(estimateVorabpauschale({ ...base, monthsHeld: 0 })).toBe("0.00");
+  });
+
+  it("vorabpauschalePerUnit is unrounded and null for an unknown year", () => {
+    const warn = vi.fn();
+    expect(
+      vorabpauschalePerUnit({
+        year: 2025,
+        priceStartOfYear: "100",
+        priceEndOfYear: "110",
+        distributionsPerUnit: "0",
+      })?.toString(),
+    ).toBe("1.771");
+    expect(
+      vorabpauschalePerUnit({
+        year: 2031,
+        priceStartOfYear: "100",
+        priceEndOfYear: "110",
+        distributionsPerUnit: "0",
+        warn,
+      }),
+    ).toBeNull();
+    expect(warn).toHaveBeenCalledOnce();
+  });
+});
+
+describe("vorabZuflussDate (§18 Abs. 3 InvStG)", () => {
+  it("is the first working day of the following year, skipping weekends", () => {
+    expect(vorabZuflussDate(2023).toISOString()).toBe("2024-01-02T00:00:00.000Z"); // Tue
+    expect(vorabZuflussDate(2024).toISOString()).toBe("2025-01-02T00:00:00.000Z"); // Thu
+    expect(vorabZuflussDate(2025).toISOString()).toBe("2026-01-02T00:00:00.000Z"); // Fri
+    expect(vorabZuflussDate(2026).toISOString()).toBe("2027-01-04T00:00:00.000Z"); // Sat -> Mon
   });
 });
 

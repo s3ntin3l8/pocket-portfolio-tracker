@@ -62,6 +62,8 @@ export interface Trade {
 export interface YearAmount {
   year: number;
   amount: string; // display currency
+  /** Set on `vorabByYear` entries built from estimated (not broker-booked) rows. */
+  estimated?: boolean;
 }
 
 export interface YearTax {
@@ -138,6 +140,7 @@ export interface Episode {
   legs: TradeLeg[];
   flows: CashFlowPoint[]; // for XIRR, display currency
   vorabByYear: Map<number, Decimal>; // Vorabpauschale accrued this episode, display currency
+  vorabEstimated: Set<number>; // years in `vorabByYear` that come from estimated rows
 }
 
 export type Event =

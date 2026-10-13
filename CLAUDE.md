@@ -208,6 +208,13 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   search-param navigation or by back/forward across scopes, so `ScopeSync` (in `AppShell`) compares the URL's
   effective scope with the scope the layout rendered for (`serverScope`) and `router.refresh()`es on a
   mismatch. Ids only in params — never personal data.
+- **Estimated Vorabpauschale is derived, never stored.** For DE-regime funds with no
+  broker-booked `vorabpauschale` row for a completed year, `estimateVorabRows`
+  (`packages/core/src/tax/vorab-estimate.ts`, loaded by `services/vorab-estimate.ts`) adds
+  `estimated: true` accrual rows to the tax trade log only; a broker row for the same
+  (instrument, year) always wins, and a missing price/Basiszins means no row (never 0). The
+  §18 Abs. 2 monthly reduction applies to the Vorabpauschale itself, after cap and
+  distributions. See `docs/tax.md`.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

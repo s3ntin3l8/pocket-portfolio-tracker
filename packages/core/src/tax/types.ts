@@ -15,6 +15,8 @@ export interface AllowanceUsage {
   incomeYtd: string;
   vorabpauschaleAccrued: string;
   vorabpauschaleCredited: string;
+  /** True when part of `vorabpauschaleAccrued` is an estimate (no broker-booked figure). */
+  vorabpauschaleEstimated?: boolean;
   stockPot: PotUsage;
   generalPot: PotUsage;
   usedYtd: string;

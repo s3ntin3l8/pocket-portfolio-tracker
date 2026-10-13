@@ -381,6 +381,10 @@ export async function getCachedFifoTradeLog(
   corporateActions: CorporateAction[],
   fxRates: Record<string, string>,
   now: number = Date.now(),
+  /** Extra derived rows (e.g. estimated Vorabpauschale accruals) appended to the trade-log
+   *  input. Lazy: only evaluated on a cache miss, so a hit costs no DB work. They are
+   *  covered by the same TTL/clear-on-write as the valuation inputs they derive from. */
+  extraTransactions?: () => Promise<CoreTransaction[]>,
 ): Promise<TradeLog> {
   const hit = fifoTradeLogCache.get(key);
   if (hit && hit.expiresAt > now) {
@@ -390,7 +394,13 @@ export async function getCachedFifoTradeLog(
   logTiming(undefined, "fifoTradeLogCache MISS", 0, { key });
   const fx = makeFxRateFn(fxRates, target);
   // Same missing-FX exclusion as buildTradeLog (audit B2).
-  const { convertible } = partitionConvertible(coreTxns, target, fx, (id) => prices[id]?.currency);
+  const extra = extraTransactions ? await extraTransactions() : [];
+  const { convertible } = partitionConvertible(
+    extra.length > 0 ? [...coreTxns, ...extra] : coreTxns,
+    target,
+    fx,
+    (id) => prices[id]?.currency,
+  );
   const tradeLog = computeTrades({
     transactions: convertible,
     corporateActions,

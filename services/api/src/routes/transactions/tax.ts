@@ -14,6 +14,7 @@ import {
   getCachedFifoTradeLog,
   type InstrumentMeta,
 } from "../../services/valuation.js";
+import { loadEstimatedVorabRows } from "../../services/vorab-estimate.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { toDecimalSafe } from "../../lib/decimal-safe.js";
 
@@ -148,6 +149,12 @@ export function registerTaxRoutes(app: FastifyInstance) {
         metaById,
         cas,
         fxRates,
+        Date.now(),
+        // German Vorabpauschale for funds the broker booked none for (derived, flagged
+        // "estimated"). Lazy so a trade-log cache hit costs no price queries.
+        regime === "DE"
+          ? () => loadEstimatedVorabRows(app.db, coreTxns, cas, metaById, new Date(), app.log)
+          : undefined,
       );
       const tfRates = buildTfRates(tradeLog.trades, metaById);
       const assetClasses = Object.fromEntries(
@@ -367,10 +374,15 @@ export function registerTaxRoutes(app: FastifyInstance) {
             metaById,
             summary,
             fxRates: pFxRates,
+            corporateActions: pCas,
           } = await loadValuation(app, p.id, display, costBasisMode, p.cashCounted);
+          const estimatedVorab =
+            regime === "DE"
+              ? await loadEstimatedVorabRows(app.db, coreTxns, pCas, metaById, new Date(), app.log)
+              : [];
           const log = await buildTradeLog(
             app,
-            coreTxns,
+            estimatedVorab.length > 0 ? [...coreTxns, ...estimatedVorab] : coreTxns,
             prices,
             display,
             "fifo",

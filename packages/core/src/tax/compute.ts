@@ -16,6 +16,7 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   let generalTradeSubtotal = ZERO;
   let vorabAccrued = ZERO;
   let vorabCredited = ZERO;
+  let vorabEstimated = false;
   for (const trade of input.tradeLog.trades) {
     const assetClass = assetClasses[trade.instrumentId];
     if (isSection23Class(assetClass)) continue;
@@ -40,6 +41,7 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
       const amt = D(va.amount);
       if (amt.gt(ZERO)) {
         vorabAccrued = vorabAccrued.plus(amt.times(multiplier));
+        if (va.estimated) vorabEstimated = true;
       }
     }
   }
@@ -102,6 +104,7 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
     incomeYtd: positiveIncome.toFixed(2),
     vorabpauschaleAccrued: vorabAccrued.toFixed(2),
     vorabpauschaleCredited: vorabCredited.toFixed(2),
+    ...(vorabEstimated ? { vorabpauschaleEstimated: true } : {}),
     stockPot: {
       netGainLoss: stockSubtotal.toFixed(2),
       carryForwardApplied: stockCF.toFixed(2),
