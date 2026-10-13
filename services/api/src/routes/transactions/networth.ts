@@ -22,6 +22,7 @@ import {
   costBasisFromQuery,
   loadDrift,
   boundaryFlows,
+  excludeFxMissingInstruments,
   computePortfolioAnomalies,
   PORTFOLIO_VALUATION_CONCURRENCY,
 } from "./shared.js";
@@ -90,7 +91,8 @@ export function registerNetworthRoutes(app: FastifyInstance) {
         );
         const flows = await boundaryFlows(
           app,
-          coreTxns,
+          // Flows and net worth exclude the same fxMissing instruments (audit B2).
+          excludeFxMissingInstruments(coreTxns, summary),
           p.cashCounted ? "inside" : "outside",
           display,
         );

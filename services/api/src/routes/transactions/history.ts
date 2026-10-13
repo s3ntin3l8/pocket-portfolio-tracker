@@ -13,7 +13,13 @@ import { rangeStart } from "../../services/snapshots.js";
 import { aggregateValueFlows, xirr, chainIndex, convert, fxAvailable } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
-import { loadValuation, historyCache, performanceCache, boundaryFlows } from "./shared.js";
+import {
+  loadValuation,
+  historyCache,
+  performanceCache,
+  boundaryFlows,
+  excludeFxMissingInstruments,
+} from "./shared.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import {
   getUserBenchmarkConfig,
@@ -157,7 +163,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             portfolio.cashCounted,
           );
 
-          const flows = await boundaryFlows(app, coreTxns, boundary, portfolio.baseCurrency);
+          // Flows and net worth exclude the same fxMissing instruments (audit B2).
+          const flows = await boundaryFlows(
+            app,
+            excludeFxMissingInstruments(coreTxns, summary),
+            boundary,
+            portfolio.baseCurrency,
+          );
           const asOf = new Date();
           flows.push({ amount: Number(summary.netWorth), date: asOf });
 

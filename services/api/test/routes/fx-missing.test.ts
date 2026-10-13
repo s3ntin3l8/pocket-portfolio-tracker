@@ -128,12 +128,6 @@ describe("missing FX rate → 200 + fxMissingCurrencies, never 1:1 (audit B2)", 
     });
   });
 
-  afterAll(async () => {
-    invalidateMarketData();
-    await app.close();
-    await closeDb();
-  });
-
   it("aggregate net worth excludes the unrated holding instead of counting it 1:1", async () => {
     const res = await app.inject({ method: "GET", url: "/networth", headers: auth(t) });
     expect(res.statusCode).toBe(200);
@@ -178,4 +172,100 @@ describe("missing FX rate → 200 + fxMissingCurrencies, never 1:1 (audit B2)", 
     expect(res.json().fxMissingCurrencies ?? []).toEqual([]);
     expect(res.headers["x-fx-missing-currencies"]).toBeUndefined();
   });
+});
+
+describe("missing QUOTE currency keeps contributions and value on one boundary (audit B2)", () => {
+  let t: string;
+  let pf: string;
+
+  beforeAll(async () => {
+    t = await token("fx-quote-user");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    pf = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        // Outside boundary: contribution = net invested capital, value = securities only.
+        payload: { name: "Cross ccy", baseCurrency: "EUR", cashCounted: false },
+      })
+    ).json().id as string;
+    const [eurStock] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "XQEUR",
+        market: "XETRA",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "E",
+      })
+      .returning();
+    // Bought in EUR (trade currency converts), but QUOTED in USD — and USD has no rate.
+    const [usdQuoted] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "XQUSD",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "U",
+      })
+      .returning();
+    for (const [instrumentId, price] of [
+      [eurStock.id, "100"],
+      [usdQuoted.id, "100"],
+    ] as const) {
+      const res = await app.inject({
+        method: "POST",
+        url: `/portfolios/${pf}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "buy",
+          instrumentId,
+          quantity: "10",
+          price,
+          currency: "EUR",
+          executedAt: "2025-01-02T00:00:00.000Z",
+        },
+      });
+      expect(res.statusCode).toBe(201);
+    }
+    overrideMarketData(
+      new MarketDataService([new FixtureProvider({ XQEUR: "110", XQUSD: "120" })]),
+    );
+  });
+
+  it("drops the unvalued instrument's buy from the contribution, not just its value", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/contributions`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.fxMissingCurrencies).toEqual(["USD"]);
+    // Only the EUR stock's 1,000 — the USD-quoted buy is out on both sides. Before the
+    // fix it stayed in (2,000) against a value of 1,100: a phantom −45%.
+    expect(Number(body.netContributed)).toBe(1000);
+    expect(body.simpleGainPct).toBeCloseTo(0.1, 6);
+  });
+
+  it("leaves no dangling buy in the XIRR flows (return is positive, not a near-total loss)", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/performance`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(Number(body.netWorth)).toBe(1100);
+    expect(body.xirr).toBeGreaterThan(0);
+  });
+});
+
+// One app for both suites (the first suite builds it); closed once at the very end.
+afterAll(async () => {
+  invalidateMarketData();
+  await app.close();
+  await closeDb();
 });

@@ -16,6 +16,7 @@ import type { PortfolioParams } from "./shared.js";
 import {
   buildContributions,
   boundaryFlows,
+  excludeFxMissingInstruments,
   loadValuation,
   networthContributionsCache,
   enrichContributions,
@@ -132,7 +133,8 @@ export function registerContributionsRoutes(app: FastifyInstance) {
               );
               return {
                 summary,
-                txns: coreTxns,
+                // Same instruments out of the flows as out of the value (audit B2).
+                txns: excludeFxMissingInstruments(coreTxns, summary),
                 boundary: p.cashCounted ? ("inside" as const) : ("outside" as const),
               };
             },

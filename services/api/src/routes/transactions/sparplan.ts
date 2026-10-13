@@ -26,6 +26,7 @@ import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
   buildSparplanStats,
+  excludeFxMissingInstruments,
   buildTradeLog,
   instrumentMeta,
   sparplanCache,
@@ -57,7 +58,13 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       const stats = await withDerivationCache(
         sparplanCache,
         cacheKey(portfolioId, portfolio.cashCounted ? "inside" : "outside"),
-        () => buildSparplanStats(app, coreTxns, portfolio.baseCurrency),
+        // Same fxMissing instruments out as the summary the drift is computed against (B2).
+        () =>
+          buildSparplanStats(
+            app,
+            excludeFxMissingInstruments(coreTxns, summary),
+            portfolio.baseCurrency,
+          ),
       );
 
       // Phase B: load instrument targets and compute drift + contribution split.
