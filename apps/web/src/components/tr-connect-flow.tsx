@@ -10,6 +10,7 @@ import type { ApiClient, TrConnection } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useInterval } from "@/lib/use-interval";
 
 /** The slice of the API client this flow needs (injectable for tests). */
 export type TrConnectClient = Pick<
@@ -121,22 +122,22 @@ export function TrConnectFlow({
   const verifyFiredRef = useRef(false);
   const windowStartRef = useRef(0);
   useEffect(() => {
-    if (phase !== "awaiting") return;
-    let active = true;
-    let timer: ReturnType<typeof setTimeout>;
+    if (phase !== "awaiting" || verifyFiredRef.current) return;
+    verifyFiredRef.current = true;
+    windowStartRef.current = Date.now();
+    // Fire-and-forget: this kicks off server-side completion; the poll observes it.
+    void client.verifyTr().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
-    if (!verifyFiredRef.current) {
-      verifyFiredRef.current = true;
-      windowStartRef.current = Date.now();
-      // Fire-and-forget: this kicks off server-side completion; the poll observes it.
-      void client.verifyTr().catch(() => undefined);
-    }
-
-    const poll = async () => {
-      if (!active) return;
+  // The status poll runs only while `awaiting` and the tab is visible (`useInterval`
+  // pauses on `document.hidden`); the approval window is wall-clock, so a long
+  // backgrounding correctly times the pairing out when the tab returns.
+  useInterval(
+    async ({ isCancelled }) => {
       try {
         const conn = await client.getTrConnection();
-        if (!active) return;
+        if (isCancelled()) return;
         if (conn.status === "connected") {
           setError(null);
           setPhase("connected");
@@ -152,21 +153,15 @@ export function TrConnectFlow({
       } catch {
         // Transient status read (e.g. token mid-rotation) — keep waiting.
       }
+      if (isCancelled()) return;
       if (Date.now() - windowStartRef.current > APPROVAL_WINDOW_MS) {
         setError(t("approvalError"));
         setPhase("form");
-        return;
       }
-      timer = setTimeout(() => void poll(), STATUS_POLL_INTERVAL_MS);
-    };
-    timer = setTimeout(() => void poll(), STATUS_POLL_INITIAL_DELAY_MS);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+    },
+    phase === "awaiting" ? STATUS_POLL_INTERVAL_MS : null,
+    { initialDelayMs: STATUS_POLL_INITIAL_DELAY_MS },
+  );
 
   const doSync = () => {
     void client

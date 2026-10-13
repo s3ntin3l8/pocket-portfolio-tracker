@@ -45,6 +45,16 @@ export function PwaUpdater() {
     });
 
     void serwist.register();
+
+    // A long-lived PWA tab is otherwise only checked for a new service worker on
+    // navigation (browsers throttle that to ~24 h); re-check whenever the app comes back
+    // to the foreground so a fresh deploy surfaces the "update available" prompt.
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void Promise.resolve(serwist.update()).catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   return null;

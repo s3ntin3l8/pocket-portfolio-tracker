@@ -5,6 +5,8 @@ import type { TrConnection, IbkrConnection } from "@portfolio/api-client";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("sonner", () => ({ toast: { error: toastError } }));
 const getTrConnection = vi.fn<() => Promise<TrConnection>>(async () => ({
   status: "connected",
   portfolioId: "p1",
@@ -41,6 +43,7 @@ function renderWatcher(props: Partial<React.ComponentProps<typeof PortfolioSyncW
 describe("PortfolioSyncWatcher", () => {
   beforeEach(() => {
     refresh.mockClear();
+    toastError.mockClear();
     getTrConnection.mockClear();
     getIbkrConnection.mockClear();
   });
@@ -80,8 +83,11 @@ describe("PortfolioSyncWatcher", () => {
     });
     renderWatcher({ trSync: { initialSyncing: true } });
     await waitFor(() => expect(getTrConnection).toHaveBeenCalled(), { timeout: 8000 });
-    // The error path never calls refresh — it toasts instead.
-    await new Promise((r) => setTimeout(r, 200));
+    // The error path never calls refresh — it toasts a TRANSLATED message instead of the
+    // raw server-side `lastError` text.
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastError).toHaveBeenCalledWith(messages.TradeRepublic.errors.tr_sync_failed);
+    expect(toastError).not.toHaveBeenCalledWith("boom");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

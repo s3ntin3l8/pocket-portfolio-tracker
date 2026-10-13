@@ -16,6 +16,7 @@ const { instances, FakeSerwist } = vi.hoisted(() => {
     listeners: Record<string, Array<(event?: unknown) => void>> = {};
     register = vi.fn().mockResolvedValue(undefined);
     messageSkipWaiting = vi.fn();
+    update = vi.fn().mockResolvedValue(undefined);
     constructor(
       public scriptURL: string,
       public opts: unknown,
@@ -86,5 +87,23 @@ describe("PwaUpdater", () => {
     // Clicking "Reload" hands control to the waiting worker.
     opts.action.onClick();
     expect(sw.messageSkipWaiting).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-checks for a new service worker whenever the app returns to the foreground", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { unmount } = renderUpdater();
+    const sw = instances[0];
+
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(sw.update).not.toHaveBeenCalled();
+
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(sw.update).toHaveBeenCalledTimes(1);
+
+    unmount();
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(sw.update).toHaveBeenCalledTimes(1);
   });
 });

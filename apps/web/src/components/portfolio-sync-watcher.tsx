@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
+import { useInterval } from "@/lib/use-interval";
 import type { PortfolioSyncConfig } from "@/components/portfolio-card-menu";
 
 const POLL_INTERVAL_MS = 3000;
@@ -35,64 +36,58 @@ export function PortfolioSyncWatcher({
   const api = useApiClient();
   const router = useRouter();
 
-  const trPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const ibkrPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Each poller runs only while its sync is in flight and the tab is visible
+  // (`useInterval` pauses on `document.hidden`). Visible ticks, not wall-clock, count
+  // toward the 5 min ceiling — a backgrounded tab never burns the budget.
+  const [trPolling, setTrPolling] = useState(Boolean(trSync?.initialSyncing));
+  const [ibkrPolling, setIbkrPolling] = useState(Boolean(ibkrSync?.initialSyncing));
+  const trTicks = useRef(0);
+  const ibkrTicks = useRef(0);
 
-  useEffect(() => {
-    if (!trSync?.initialSyncing) return;
-    let tick = 0;
-    const poll = async () => {
-      tick += 1;
-      if (tick * POLL_INTERVAL_MS > POLL_TIMEOUT_MS) {
-        if (trPollRef.current !== null) clearInterval(trPollRef.current);
+  useInterval(
+    async () => {
+      trTicks.current += 1;
+      if (trTicks.current * POLL_INTERVAL_MS > POLL_TIMEOUT_MS) {
+        setTrPolling(false);
         toast.error(ttr("errors.tr_sync_failed"));
         return;
       }
       try {
         const conn = await api.getTrConnection();
         if (!conn.syncing) {
-          if (trPollRef.current !== null) clearInterval(trPollRef.current);
-          if (conn.lastError) toast.error(conn.lastError);
+          setTrPolling(false);
+          // `lastError` is server-side/English diagnostic text — show our translated copy.
+          if (conn.lastError) toast.error(ttr("errors.tr_sync_failed"));
           else router.refresh();
         }
       } catch {
         // transient — keep polling
       }
-    };
-    trPollRef.current = setInterval(() => void poll(), POLL_INTERVAL_MS);
-    return () => {
-      if (trPollRef.current !== null) clearInterval(trPollRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    },
+    trPolling ? POLL_INTERVAL_MS : null,
+  );
 
-  useEffect(() => {
-    if (!ibkrSync?.initialSyncing) return;
-    let tick = 0;
-    const poll = async () => {
-      tick += 1;
-      if (tick * POLL_INTERVAL_MS > POLL_TIMEOUT_MS) {
-        if (ibkrPollRef.current !== null) clearInterval(ibkrPollRef.current);
+  useInterval(
+    async () => {
+      ibkrTicks.current += 1;
+      if (ibkrTicks.current * POLL_INTERVAL_MS > POLL_TIMEOUT_MS) {
+        setIbkrPolling(false);
         toast.error(tibkr("errors.ibkr_sync_failed"));
         return;
       }
       try {
         const conn = await api.getIbkrConnection();
         if (!conn.syncing) {
-          if (ibkrPollRef.current !== null) clearInterval(ibkrPollRef.current);
-          if (conn.lastError) toast.error(conn.lastError);
+          setIbkrPolling(false);
+          if (conn.lastError) toast.error(tibkr("errors.ibkr_sync_failed"));
           else router.refresh();
         }
       } catch {
         // transient — keep polling
       }
-    };
-    ibkrPollRef.current = setInterval(() => void poll(), POLL_INTERVAL_MS);
-    return () => {
-      if (ibkrPollRef.current !== null) clearInterval(ibkrPollRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    },
+    ibkrPolling ? POLL_INTERVAL_MS : null,
+  );
 
   return null;
 }

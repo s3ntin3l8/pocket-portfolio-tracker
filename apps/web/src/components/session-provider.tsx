@@ -1,6 +1,7 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
+import { usePageVisible } from "@/lib/use-interval";
 
 /**
  * Client wrapper so `useSession()` works in client components below the tree.
@@ -13,10 +14,15 @@ import { SessionProvider } from "next-auth/react";
  * request — and the client `useSession()` token continuously fresh. Without it the
  * session silently dies ~5 min after login. `refetchOnWindowFocus` additionally
  * refreshes when returning to a backgrounded tab.
+ *
+ * The interval is switched off (`0`) while the tab is hidden — a backgrounded PWA has no
+ * need to hit the API every minute — and `refetchOnWindowFocus` (plus the interval
+ * re-arming on `visibilitychange`) rotates the token as soon as the user is back.
  */
 export function AuthSessionProvider({ children }: { children: React.ReactNode }) {
+  const visible = usePageVisible();
   return (
-    <SessionProvider refetchInterval={60} refetchOnWindowFocus>
+    <SessionProvider refetchInterval={visible ? 60 : 0} refetchOnWindowFocus>
       {children}
     </SessionProvider>
   );

@@ -1,5 +1,5 @@
 import type { HandlerDidErrorCallbackParam, PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { CacheFirst, NetworkOnly, Serwist } from "serwist";
+import { CacheFirst, ExpirationPlugin, NetworkOnly, Serwist } from "serwist";
 import { resolveLocalePrefix } from "./sw-locale";
 import { routing } from "../i18n/routing";
 
@@ -89,7 +89,11 @@ const serwist = new Serwist({
   runtimeCaching: [
     {
       matcher: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/_next/static/"),
-      handler: new CacheFirst({ cacheName: PUBLIC_STATIC_CACHE }),
+      handler: new CacheFirst({
+        cacheName: PUBLIC_STATIC_CACHE,
+        // Hashed chunks from every past deploy would otherwise pile up forever.
+        plugins: [new ExpirationPlugin({ maxEntries: 200 })],
+      }),
     },
     {
       matcher: ({ sameOrigin }) => sameOrigin,
