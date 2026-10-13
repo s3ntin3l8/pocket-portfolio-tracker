@@ -15,7 +15,7 @@ export interface DownloadDocumentsResult {
 export interface PytrRunnerOptions {
   pythonBin: string;
   scriptDir: string;
-  wafStrategy: "awswaf" | "playwright";
+  wafStrategy: "awswaf";
   enabled: boolean;
   spawn?: SpawnFn;
   pairingTimeoutMs?: number;

@@ -42,8 +42,8 @@ COPY --from=build /app/packages/market-data/package.json ./packages/market-data/
 
 # --- Trade Republic sync (pytr) runs as a Python subprocess ---
 # Install pytr into an isolated venv (sidesteps PEP-668 on slim). DELIBERATELY do NOT
-# run `playwright install`: with PYTR_WAF_STRATEGY=awswaf the headless-browser code path
-# is never taken, so no Chromium (~400MB) is pulled. Without the venv the feature simply
+# run `playwright install`: playwright is an optional pytr extra we don't install, and
+# PYTR_WAF_STRATEGY=awswaf never takes the headless-browser path, so no Chromium (~400MB). Without the venv the feature simply
 # returns 503 — it never crashes the API.
 # `git` is required because requirements.txt pins pytr to an exact upstream commit
 # (git+https), not a PyPI release — see services/api/python/requirements.txt.

@@ -89,12 +89,12 @@ const schema = {
       type: "string",
       default: "python3",
     },
-    // How pytr mints the AWS-WAF token at pairing time. The no-browser solver by
-    // default; 'playwright' needs a bundled Chromium (not installed by default).
+    // How pytr mints the AWS-WAF token at pairing time: the no-browser solver.
+    // (pytr's 'playwright' strategy is an optional extra we don't install.)
     PYTR_WAF_STRATEGY: {
       type: "string",
       default: "awswaf",
-      enum: ["awswaf", "playwright"],
+      enum: ["awswaf"],
     },
     // Master switch for the Trade Republic feature (subprocess + routes).
     PYTR_ENABLED: {
@@ -262,7 +262,7 @@ declare module "fastify" {
       TRUSTED_PROXY_CIDRS: string;
       MARKET_DATA_TTL_MS: number;
       PYTR_PYTHON_BIN: string;
-      PYTR_WAF_STRATEGY: "awswaf" | "playwright";
+      PYTR_WAF_STRATEGY: "awswaf";
       PYTR_ENABLED: boolean;
       IBKR_FLEX_ENABLED: boolean;
       IBKR_FLEX_BASE_URL: string;
