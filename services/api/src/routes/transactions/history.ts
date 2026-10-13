@@ -178,7 +178,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             corporateActions,
           );
           const asOf = new Date();
-          flows.push({ amount: Number(summary.netWorth), date: asOf });
+          flows.push({ amount: summary.netWorth, date: asOf });
 
           const rate = xirr(flows);
           return {
