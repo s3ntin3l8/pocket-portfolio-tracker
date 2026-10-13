@@ -186,7 +186,6 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   by `getCachedQuotes` and `refreshHeldPrices`): an older quote counts as a miss and is not
   cached, so a dead feed drops to the cost path instead of being marked to its last price
   forever (audit B13).
-  (7 vs. 10 days) before issue #744 unified them.
 - **Every gain figure names its basis.** `GainSummary` (`packages/core/src/gain-summary.ts`,
   on `/networth` and `/portfolios/:id/summary` as `gain`) is the one derivation of
   `{ value, costOfOpen, netContributed, unrealized, realized, income }` — built from
