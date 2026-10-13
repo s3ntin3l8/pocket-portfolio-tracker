@@ -221,6 +221,11 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   never read `?costBasis=` alone. Loss netting is one-way (`computePotsUsage`): general-pot
   losses offset stock gains, stock losses only offset stock gains; the default capital-gains
   rate is 26.375% (`effectiveCapitalGainsTaxRate`); see `docs/tax.md`.
+- **A gate decides only on a successful answer.** Anything that 404s/redirects on `me`
+  (the admin layout and pages) goes through `requireAdmin()` (`apps/web/src/lib/server-api/user.ts`):
+  only a successful non-admin answer is `notFound()`; a failed lookup (429/401/5xx) renders
+  `<AdminGateFailure>` (DataState + retry), never "Page not found". Non-gating uses (nav item,
+  settings row) may hide on failure via `loadMe()`.
 - **Imports never auto-commit.** Screenshot/CSV parses become _draft_ records that the
   user confirms before a transaction is written. Dedup runs at three levels: **file-level**
   (same file re-upload → `contentHash`), **within-source transaction-level** (the

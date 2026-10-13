@@ -1,17 +1,17 @@
-import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminUsersTable } from "@/components/admin-users-table";
 import { SectionHeader } from "@/components/section-header";
 import { PageHeaderSetter } from "@/components/page-header";
-import { loadMe, loadAdminUsers } from "@/lib/server-api";
+import { AdminGateFailure } from "@/components/admin-gate-failure";
+import { requireAdmin, loadAdminUsers } from "@/lib/server-api";
 
 export default async function AdminUsersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Admin");
 
-  const me = await loadMe();
-  if (!me?.isAdmin) notFound();
+  const gate = await requireAdmin();
+  if (gate.status !== "ok") return <AdminGateFailure gate={gate} />;
 
   const result = await loadAdminUsers();
 

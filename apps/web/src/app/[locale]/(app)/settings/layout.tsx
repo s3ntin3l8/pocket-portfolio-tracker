@@ -28,6 +28,8 @@ export default async function SettingsLayout({
   const t = await getTranslations("Settings");
   const tNav = await getTranslations("Nav");
 
+  // `me` only decides whether the Admin row shows: a failed lookup hides it (never a 404;
+  // the admin pages themselves render a retryable DataState via `requireAdmin`).
   const [me, portfoliosResult, holders] = await Promise.all([
     loadMe(),
     loadPortfoliosList(),
