@@ -26,6 +26,7 @@ export function HeroGlanceCard({
   initialHistory,
   initialRange,
   selectedId = null,
+  holderId,
   benchmarkSymbol = "^GSPC",
   hasValuedAtCostHoldings = false,
 }: {
@@ -34,6 +35,9 @@ export function HeroGlanceCard({
   initialHistory: HistoryPoint[];
   initialRange: ChartRange;
   selectedId?: string | null;
+  /** Holder scope the server rendered `initialHistory` with — passed to the chart so range
+   *  changes refetch the same scope. */
+  holderId?: string;
   /** The user's configured benchmark symbol (from `userPreferences.benchmarkSymbol`).
    *  Defaults to `^GSPC` if unset, matching the server-side default. The holdings
    *  page already calls `loadPreferences()` and threads the symbol down so the
@@ -120,6 +124,7 @@ export function HeroGlanceCard({
           initial={initialHistory}
           currency={currency}
           selectedId={selectedId}
+          holderId={holderId}
           variant="hero"
           initialRange={initialRange}
           onSeriesChange={onSeriesChange}

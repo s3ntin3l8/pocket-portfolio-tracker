@@ -19,6 +19,7 @@ import {
   loadNetworthAnomalies,
   loadNetWorth,
   loadNetWorthHistory,
+  loadNetWorthHolderScope,
   loadPreferences,
   loadMe,
   getSelectedPortfolioId,
@@ -89,18 +90,20 @@ export default async function HoldingsPage({
   // all-portfolios view. Per-portfolio anomalies only work with a specific ID.
   const anomaliesPromise = portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies();
   const historyPromise = loadNetWorthHistory(HERO_INITIAL_RANGE);
+  const holderScopePromise = loadNetWorthHolderScope();
   const selectedIdPromise = getSelectedPortfolioId();
   const mePromise = loadMe();
 
   const prefs = await prefsPromise;
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
-  const [result, netWorthResult, anomalies, history, selectedId] = await Promise.all([
+  const [result, netWorthResult, anomalies, history, selectedId, holderId] = await Promise.all([
     loadHoldings(costBasis, portfolioParam),
     loadNetWorth(costBasis),
     anomaliesPromise,
     historyPromise,
     selectedIdPromise,
+    holderScopePromise,
   ]);
 
   if (TIMING) {
@@ -303,6 +306,7 @@ export default async function HoldingsPage({
           initialHistory={history}
           initialRange={HERO_INITIAL_RANGE}
           selectedId={selectedId}
+          holderId={holderId}
           benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
           hasValuedAtCostHoldings={summary.holdings.some((h) => h.valuedAtCost)}
         />

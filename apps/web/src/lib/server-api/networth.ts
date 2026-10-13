@@ -43,6 +43,21 @@ export async function loadNetWorth(
   }
 }
 
+/** The holder scope the aggregate net-worth views are currently filtered to (undefined when a
+ *  single portfolio is selected or no multi-portfolio holder scope is active) — threaded to
+ *  client components that refetch `/networth/history` themselves (the range picker), so the
+ *  refetch keeps the same scope as the server-rendered `initial` series. */
+export async function loadNetWorthHolderScope(): Promise<string | undefined> {
+  try {
+    const portfolios = await listPortfoliosCached();
+    const wanted = await getSelectedPortfolioId();
+    if (portfolios.some((p) => p.id === wanted)) return undefined;
+    return await resolveHolderScope(portfolios);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function loadNetWorthHistory(range = "1y"): Promise<HistoryPoint[]> {
   const api = await getServerApi();
   if (!api) return [];

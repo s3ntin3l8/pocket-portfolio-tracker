@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { HistoryPoint, PerformancePoint, IntradayPoint } from "@portfolio/api-client";
 
 // Stub the recharts-backed single-series chart so the card-variant test stays
 // light and deterministic.
+const chartProps: Array<{ data: unknown[] }> = [];
 vi.mock("@/components/charts/price-chart", () => ({
-  PriceChart: () => <div data-testid="chart" />,
+  PriceChart: (props: { data: unknown[] }) => {
+    chartProps.push(props);
+    return <div data-testid="chart" />;
+  },
 }));
 // Stub the new two-line hero chart so the hero-variant tests can assert on its
 // presence without recharts' SVG plumbing (jsdom doesn't lay out the
@@ -67,6 +71,41 @@ describe("NetWorthHistoryChart", () => {
     renderChart();
     fireEvent.click(screen.getByRole("button", { name: "3M" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("3m"));
+  });
+
+  it("forwards the holder scope when refetching", async () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <NetWorthHistoryChart initial={initial} currency="IDR" holderId="h1" />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "3M" }));
+    await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("3m", { holderId: "h1" }));
+  });
+
+  it("ignores a stale slow response that resolves after a newer pick", async () => {
+    let resolveSlow!: (v: HistoryPoint[]) => void;
+    getNetWorthHistory.mockImplementationOnce(
+      () => new Promise<HistoryPoint[]>((res) => (resolveSlow = res)),
+    );
+    renderChart();
+    fireEvent.click(screen.getByRole("button", { name: "3M" })); // slow
+    getNetWorthHistory.mockImplementationOnce(async () => [
+      { date: "2026-01-01", netWorth: "1" },
+      { date: "2026-02-01", netWorth: "2" },
+      { date: "2026-03-01", netWorth: "3" },
+      { date: "2026-04-01", netWorth: "4" },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "1M" })); // fast, newer
+    await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId("chart")).toBeInTheDocument());
+    await act(async () => {
+      resolveSlow([
+        { date: "2026-01-01", netWorth: "998" },
+        { date: "2026-02-01", netWorth: "999" },
+      ]);
+    });
+    expect(chartProps.at(-1)?.data).toHaveLength(4);
   });
 
   it("uses getPortfolioHistory instead of getNetWorthHistory when selectedId is set", async () => {
