@@ -38,8 +38,8 @@ captured real detail payload (see _extract_vorab_base) — a missing/unparseable
 degrades to a zero-effect booking rather than guessing.
 
 NOTE: targets pytr pinned to an exact upstream commit (see requirements.txt) for TR's
-June-2026 `compactPortfolioByType` rename. TR's
-private protocol can change.
+June-2026 `compactPortfolioByType` rename.
+TR's private protocol can change.
 
 Account-level report events (the annual tax report, "Jährlicher Steuerbericht") are
 informational — SKIP_EVENTS on the Node mapper side — but are collected here from BOTH
