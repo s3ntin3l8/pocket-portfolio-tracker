@@ -112,7 +112,7 @@ describe("PortfolioSwitcher", () => {
     expect(screen.getByRole("menuitem", { name: /Euro · Trade Republic/ })).toBeInTheDocument();
   });
 
-  it("writes the cookie and refreshes when a portfolio is chosen", () => {
+  it("writes the cookie and pushes the scope (ScopeSync owns the refresh) when a portfolio is chosen", () => {
     renderSwitcher({
       portfolios: [
         { id: "p1", name: "Main", brokerage: null, accountHolder: null },
@@ -124,7 +124,7 @@ describe("PortfolioSwitcher", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /DKB/ }));
     expect(document.cookie).toContain("pf=p2");
     expect(push).toHaveBeenCalledWith("/?scope=p%3Ap2");
-    expect(refresh).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("shows the Account holders section when qualifying holders are passed", () => {
@@ -160,7 +160,7 @@ describe("PortfolioSwitcher", () => {
     // document.cookie doesn't encode `:` — the raw value is `holder:h1`.
     expect(document.cookie).toContain("pf=holder:h1");
     expect(push).toHaveBeenCalledWith("/?scope=h%3Ah1");
-    expect(refresh).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("shows holder name on the trigger when selectedHolderId is set", () => {
@@ -227,7 +227,7 @@ describe("PortfolioSwitcher", () => {
     openMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: messages.PortfolioSwitcher.all }));
     expect(push).toHaveBeenCalledWith("/holdings?scope=all");
-    expect(refresh).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("preserves other params, resets pagination, and pushes (not replaces) a scope change", () => {

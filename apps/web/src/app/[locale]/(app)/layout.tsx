@@ -12,8 +12,9 @@ import {
   loadAccountHolders,
   loadNetWorth,
   loadAnomalyBadge,
+  getRawScope,
 } from "@/lib/server-api";
-import { qualifyingHolders } from "@/lib/portfolio-selection";
+import { qualifyingHolders, scopeToCookieValue } from "@/lib/portfolio-selection";
 import { formatNetWorth, formatPercent } from "@/lib/utils";
 import { getSessionState } from "@/lib/session-token";
 
@@ -85,6 +86,8 @@ export default async function AppLayout({
     name: h.name,
   }));
 
+  const serverScope = scopeToCookieValue(await getRawScope());
+
   // Sidebar net-worth footer (reference: always-visible, pinned bottom). Same scope
   // (single-portfolio vs. aggregate) as everywhere else — resolved by `loadNetWorth`.
   const netWorthSummary =
@@ -138,6 +141,7 @@ export default async function AppLayout({
           holders={qualHolders}
           selectedId={selection.selectedId}
           selectedHolderId={selection.selectedHolderId}
+          serverScope={serverScope}
           isAdmin={Boolean(me?.isAdmin)}
           netWorthSummary={netWorthSummary}
           anomalyCount={anomalyBadge.count}
