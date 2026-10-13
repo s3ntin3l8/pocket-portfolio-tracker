@@ -1227,3 +1227,27 @@ describe("getServerApi when auth is not configured", () => {
     process.env.AUTH_SECRET = "test-secret";
   });
 });
+
+describe("loadAnomalyBadge", () => {
+  it("counts aggregate anomalies and flags error severity", async () => {
+    h.client.getNetworthAnomalies = async () => ({
+      anomalies: [{ severity: "warning" }, { severity: "error" }, { severity: "warning" }],
+    });
+    expect(await api.loadAnomalyBadge()).toEqual({ count: 3, hasError: true });
+  });
+
+  it("uses the selected portfolio's anomalies when one is selected", async () => {
+    h.cookies = { pf: "p2" };
+    const getAnomalies = vi.fn(async () => ({ anomalies: [{ severity: "warning" }] }));
+    h.client.getAnomalies = getAnomalies;
+    expect(await api.loadAnomalyBadge()).toEqual({ count: 1, hasError: false });
+    expect(getAnomalies).toHaveBeenCalledWith("p2");
+  });
+
+  it("shows no badge when the fetch fails", async () => {
+    h.client.getNetworthAnomalies = async () => {
+      throw new Error("x");
+    };
+    expect(await api.loadAnomalyBadge()).toEqual({ count: 0, hasError: false });
+  });
+});

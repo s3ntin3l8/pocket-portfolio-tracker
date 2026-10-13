@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 // Barrel re-exports
 export * from "./server-api/account-holders";
 export * from "./server-api/admin";
@@ -54,22 +56,24 @@ import {
   resolveHolderScope,
 } from "./server-api/_shared";
 
-export async function loadAnomalies(portfolioOverride?: string): Promise<Anomaly[] | null> {
-  const api = await getServerApi();
-  if (!api) return null;
-  const portfolioId = portfolioOverride ?? (await getSelectedPortfolioId());
-  if (!portfolioId) return null;
-  try {
-    const { anomalies } = await api.getAnomalies(portfolioId);
-    return anomalies;
-  } catch {
-    return null;
-  }
-}
+export const loadAnomalies = cache(
+  async (portfolioOverride?: string): Promise<Anomaly[] | null> => {
+    const api = await getServerApi();
+    if (!api) return null;
+    const portfolioId = portfolioOverride ?? (await getSelectedPortfolioId());
+    if (!portfolioId) return null;
+    try {
+      const { anomalies } = await api.getAnomalies(portfolioId);
+      return anomalies;
+    } catch {
+      return null;
+    }
+  },
+);
 
 /** Aggregate variant of {@link loadAnomalies} for the all-portfolios Activity view (#562) —
  *  backs the "Needs review" banner/chip when no single portfolio is selected. */
-export async function loadNetworthAnomalies(): Promise<Anomaly[] | null> {
+export const loadNetworthAnomalies = cache(async (): Promise<Anomaly[] | null> => {
   const api = await getServerApi();
   if (!api) return null;
   try {
@@ -78,6 +82,18 @@ export async function loadNetworthAnomalies(): Promise<Anomaly[] | null> {
   } catch {
     return null;
   }
+});
+
+/** Summary for the Activity nav badge in the app layout: how many anomalies need review and
+ *  whether any is error-severity (red vs. gold dot). Same scope as the Activity page (the
+ *  selected portfolio, else the aggregate). Backed by the `cache()`d loaders above, so it costs
+ *  one API call per request that the page itself then reuses — nothing is cached across
+ *  requests. A failed fetch yields no badge rather than a misleading zero-with-error. */
+export async function loadAnomalyBadge(): Promise<{ count: number; hasError: boolean }> {
+  const selected = await getSelectedPortfolioId();
+  const anomalies = selected ? await loadAnomalies(selected) : await loadNetworthAnomalies();
+  if (!anomalies) return { count: 0, hasError: false };
+  return { count: anomalies.length, hasError: anomalies.some((a) => a.severity === "error") };
 }
 
 export type ContributionsView =
