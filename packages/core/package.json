@@ -20,7 +20,8 @@
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "tsx bench/twr.bench.ts"
   },
   "dependencies": {
     "decimal.js": "^10.4.3"

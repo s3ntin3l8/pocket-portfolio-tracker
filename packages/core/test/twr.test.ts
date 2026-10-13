@@ -4,6 +4,7 @@ import {
   chainIndex,
   aggregateValueFlows,
   splitAdjustmentFactor,
+  computeHoldings,
   type DailyValueFlow,
   type PriceSeriesKind,
 } from "../src/index.js";
@@ -1102,5 +1103,55 @@ describe("buildDailyValueFlows onHoldings", () => {
       ["2026-01-02", "10"],
       ["2026-01-03", "6"],
     ]);
+  });
+
+  it("emits holdings deep-equal to computeHoldings(asOf) for every date, with splits and transfers", () => {
+    const txns = [
+      tx({
+        instrumentId: "A",
+        quantity: "10",
+        price: "5",
+        executedAt: new Date("2026-01-01T09:00:00Z"),
+      }),
+      tx({
+        instrumentId: "B",
+        quantity: "3",
+        price: "9",
+        executedAt: new Date("2026-01-02T09:00:00Z"),
+      }),
+      tx({
+        instrumentId: "A",
+        type: "transfer_in",
+        quantity: "5",
+        price: "6",
+        executedAt: new Date("2026-01-03T09:00:00Z"),
+      }),
+      tx({
+        instrumentId: "B",
+        type: "sell",
+        quantity: "1",
+        price: "10",
+        executedAt: new Date("2026-01-04T09:00:00Z"),
+      }),
+    ];
+    const cas: CorporateAction[] = [
+      { instrumentId: "A", type: "split", ratio: "2", exDate: new Date("2026-01-03T00:00:00Z") },
+      { instrumentId: "C", type: "split", ratio: "3", exDate: new Date("2026-01-02T00:00:00Z") },
+    ];
+    const dates = ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04", "2026-01-05"];
+    const seen = new Map<string, unknown>();
+    buildDailyValueFlows({
+      transactions: txns,
+      corporateActions: cas,
+      dates,
+      priceAt: () => ({ close: "5", currency: "IDR" }),
+      fxAt: noFx,
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+      onHoldings: (date, holdings) => seen.set(date, holdings),
+    });
+    for (const date of dates) {
+      expect(seen.get(date)).toEqual(computeHoldings(txns, cas, new Date(`${date}T23:59:59.999Z`)));
+    }
   });
 });

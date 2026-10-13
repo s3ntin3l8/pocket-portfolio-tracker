@@ -24,7 +24,7 @@
 import type { Decimal } from "decimal.js";
 import { D, ZERO } from "./decimal.js";
 import { isTradeType } from "./categorization.js";
-import { computeHoldings, marketValue } from "./holdings.js";
+import { computeHoldings, createHoldingsCursor, marketValue } from "./holdings.js";
 import { cashFlow } from "./cash.js";
 import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
 import { convert, type FxRateFn } from "./networth.js";
@@ -129,6 +129,13 @@ export function transferValueFlow(
   asOf: Date,
   valueHolding: (h: Holding) => Decimal,
   holdingsWithTx: Holding[] = computeHoldings(transactions, corporateActions, asOf),
+  /**
+   * Optional fast path for the "left out" side: given the row, the instrument's holding
+   * without it (`null` = absent, `undefined` = unknown → full replay). The incremental
+   * backfill passes `HoldingsCursor.holdingWithout`, which replays one instrument's events
+   * instead of the whole history.
+   */
+  holdingWithout?: (tx: CoreTransaction) => Holding | null | undefined,
 ): Decimal {
   const id = tx.instrumentId;
   if (!id) return ZERO;
@@ -136,11 +143,17 @@ export function transferValueFlow(
     const h = hs.find((x) => x.instrumentId === id);
     return h && !D(h.quantity).isZero() ? valueHolding(h) : ZERO;
   };
-  const without = computeHoldings(
-    transactions.filter((t) => t !== tx),
-    corporateActions,
-    asOf,
-  );
+  const fast = holdingWithout?.(tx);
+  const without =
+    fast !== undefined
+      ? fast === null
+        ? []
+        : [fast]
+      : computeHoldings(
+          transactions.filter((t) => t !== tx),
+          corporateActions,
+          asOf,
+        );
   return valueOf(holdingsWithTx).sub(valueOf(without));
 }
 
@@ -216,11 +229,16 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
 
   const result: DailyValueFlow[] = [];
 
+  // One forward-only pass over the history instead of a full computeHoldings replay per
+  // day (issue #896); snapshot() is equivalent to computeHoldings(…, asOf) (parity-tested).
+  const cursor = createHoldingsCursor(transactions, corporateActions);
+
   for (const date of dates) {
     const fx = fxAt(date);
     // Holdings at end of this date. CAs always applied; txns filtered to ≤ date.
     const asOf = new Date(`${date}T23:59:59.999Z`);
-    const holdings = computeHoldings(transactions, corporateActions, asOf);
+    cursor.advanceTo(asOf);
+    const holdings = cursor.snapshot();
     onHoldings?.(date, holdings);
 
     // Market value: Σ qty × adjustedClose × FX. An instrument with no usable price
@@ -253,7 +271,9 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
         // the transfer day is return-neutral (audit B1). Checked before the trade/bonus
         // branches so a legacy bonus+kind:"transfer_in" row lands here too.
         flow = flow.add(
-          transferValueFlow(tx, transactions, corporateActions, asOf, valueHolding, holdings),
+          transferValueFlow(tx, transactions, corporateActions, asOf, valueHolding, holdings, (t) =>
+            cursor.holdingWithout(t, asOf),
+          ),
         );
       } else if (isTradeType(type)) {
         // effectiveFlow -= cashFlow(tx)
