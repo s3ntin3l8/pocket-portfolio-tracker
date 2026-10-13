@@ -10,7 +10,9 @@ import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
 import { AllocationCard } from "@/components/holdings/allocation-card";
-import { PortfolioValueCard, type Tone } from "@/components/holdings/portfolio-value-card";
+import { PortfolioValueCard } from "@/components/holdings/portfolio-value-card";
+import { GainExplainer } from "@/components/gain-explainer";
+import { toneOf } from "@/components/gain-figure";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { PositionsPanel } from "@/components/holdings/positions-panel";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
@@ -27,7 +29,7 @@ import {
   getSelectedPortfolioId,
 } from "@/lib/server-api";
 import {
-  formatMoney,
+  formatNetWorth,
   formatPercent,
   formatSignedMoney,
   rowAnomalyCounts,
@@ -49,9 +51,6 @@ const CLASS_TABS = [
   "cash",
 ] as const;
 
-/** Colour direction for a signed gain figure on the allocation stats strip. */
-const toneOf = (n: number): Tone => (n > 0 ? "up" : n < 0 ? "down" : "flat");
-
 /**
  * The range the Holdings hero chart initially loads. Deliberately a day-grained range
  * (not 1D/7D): intraday snapshots are brand new (PR #386) and only backfill over time,
@@ -67,12 +66,12 @@ export default async function HoldingsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ portfolio?: string }>;
+  searchParams: Promise<{ portfolio?: string; filter?: string }>;
 }) {
   // eslint-disable-next-line react-hooks/purity
   const t0 = TIMING ? performance.now() : 0;
   const { locale } = await params;
-  const { portfolio: portfolioParam } = await searchParams;
+  const { portfolio: portfolioParam, filter: filterParam } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("Holdings");
   const ta = await getTranslations("Anomalies");
@@ -288,6 +287,15 @@ export default async function HoldingsPage({
   // override that only applies to the positions table below). ──
   const summary = netWorthResult.status === "ok" ? netWorthResult.data : null;
   const allocation = summary?.allocation;
+  // Value of at-cost holdings per asset class (B7 made the slices sum correctly; G3 marks
+  // which part of each slice is cost rather than a market price).
+  const atCostByClass: Record<string, number> = {};
+  for (const h of summary?.holdings ?? []) {
+    const cls = h.instrument?.assetClass;
+    if (h.valuedAtCost && cls && h.marketValueDisplay != null) {
+      atCostByClass[cls] = (atCostByClass[cls] ?? 0) + Number(h.marketValueDisplay);
+    }
+  }
 
   // Currencies with no FX rate (audit B2): their holdings are left out of the totals.
   const fxMissing = collectFxMissing(
@@ -310,7 +318,13 @@ export default async function HoldingsPage({
           selectedId={selectedId}
           holderId={holderId}
           benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
-          hasValuedAtCostHoldings={summary.holdings.some((h) => h.valuedAtCost)}
+          atCostCount={summary.holdings.filter((h) => h.valuedAtCost).length}
+          fxMissingCount={summary.holdings.filter((h) => h.fxMissing).length}
+          atCostHref={
+            portfolioParam
+              ? `/holdings?portfolio=${portfolioParam}&filter=at-cost`
+              : "/holdings?filter=at-cost"
+          }
         />
       )}
 
@@ -334,6 +348,7 @@ export default async function HoldingsPage({
             cash={hasCash ? cash : undefined}
             classTabs={visibleClassTabs}
             actions={exportButton}
+            initialAtCostOnly={filterParam === "at-cost"}
           />
         </div>
 
@@ -342,8 +357,8 @@ export default async function HoldingsPage({
           <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
             <PortfolioValueCard
               totalLabel={t("allocation.totalLabel")}
-              totalValueFormatted={formatMoney(
-                Number(summary.netWorth),
+              totalValueFormatted={formatNetWorth(
+                summary.netWorth,
                 summary.displayCurrency,
                 locale,
               )}
@@ -362,6 +377,7 @@ export default async function HoldingsPage({
                   : null
               }
               allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
+              allTimeExplainer={summary.gain ? <GainExplainer gain={summary.gain} /> : undefined}
               todayLabel={t("allocation.todayLabel")}
               todayAmount={formatSignedMoney(
                 Number(summary.totalDayChange),
@@ -390,7 +406,11 @@ export default async function HoldingsPage({
                     key: s.key,
                     label: s.key === "cash" ? tc("cash") : tc(s.key),
                     value: Number(s.value),
+                    // Share of this class valued at cost (no market price) — hatched in the donut.
+                    atCostValue: atCostByClass[s.key],
+                    actualPct: s.pct,
                   }))}
+                atCostLegend={t("donutAtCostLegend")}
                 currency={summary.displayCurrency}
                 total={Number(summary.netWorth)}
               />

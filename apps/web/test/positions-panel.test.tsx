@@ -203,4 +203,45 @@ describe("PositionsPanel", () => {
     renderPanel({ actions: <button aria-label="Export CSV">Export</button> });
     expect(screen.getByRole("button", { name: "Export CSV" })).toBeInTheDocument();
   });
+
+  describe("at-cost filter (audit G3)", () => {
+    const atCost = { ...makeHolding("MWOF", "Mutual Fund", "mutual_fund"), valuedAtCost: true };
+    const mixed = [...ROWS, atCost];
+    const renderPanel = (initialAtCostOnly = false) =>
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <PositionsPanel
+            rows={mixed}
+            currency="IDR"
+            classTabs={["all", "equity", "crypto", "mutual_fund"]}
+            initialAtCostOnly={initialAtCostOnly}
+          />
+        </NextIntlClientProvider>,
+      );
+
+    it("starts narrowed to at-cost rows when opened from the hero link", () => {
+      renderPanel(true);
+      expect(screen.getAllByText("MWOF").length).toBeGreaterThan(0);
+      expect(screen.queryByText("BBCA")).not.toBeInTheDocument();
+    });
+
+    it("toggles the filter with a chip showing the count, and shows everything by default", () => {
+      renderPanel(false);
+      expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole("button", { name: /Needs price or FX rate \(1\)/ }));
+      expect(screen.queryByText("BBCA")).not.toBeInTheDocument();
+      expect(screen.getAllByText("MWOF").length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole("button", { name: "Show all holdings" }));
+      expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+    });
+
+    it("has no chip when nothing is at cost", () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <PositionsPanel rows={ROWS} currency="IDR" classTabs={["all", "equity", "crypto"]} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.queryByRole("button", { name: /Needs price or FX rate/ })).toBeNull();
+    });
+  });
 });

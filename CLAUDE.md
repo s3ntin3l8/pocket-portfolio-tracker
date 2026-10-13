@@ -186,6 +186,17 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   by `getCachedQuotes` and `refreshHeldPrices`): an older quote counts as a miss and is not
   cached, so a dead feed drops to the cost path instead of being marked to its last price
   forever (audit B13).
+  (7 vs. 10 days) before issue #744 unified them.
+- **Every gain figure names its basis.** `GainSummary` (`packages/core/src/gain-summary.ts`,
+  on `/networth` and `/portfolios/:id/summary` as `gain`) is the one derivation of
+  `{ value, costOfOpen, netContributed, unrealized, realized, income }` — built from
+  `summarizePortfolio` + `contributionStats` on the same instruments and boundary, no new walk.
+  In the web every gain number renders through `GainFigure` with a basis label ("vs cost of
+  holdings" for unrealized-over-open-cost: Holdings rail, sidebar; "vs net contributed" for
+  value-over-contributions: Savings, Reports › Savings), and the two headline figures open the
+  same `GainExplainer` dialog. A row valued at cost or without an FX rate has no measured gain:
+  its P&L cells render "—" (neutral), never a green "+0.00". Headline net worth is formatted
+  by `formatNetWorth` everywhere (hero, rail, sidebar) so no surface rounds differently.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

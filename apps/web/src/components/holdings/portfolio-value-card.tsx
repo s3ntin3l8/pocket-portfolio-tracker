@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
+import { GainFigure, type Tone } from "@/components/gain-figure";
 
-/** Direction of a gain figure — drives the value colour (green up / red down / neutral). */
-export type Tone = "up" | "down" | "flat";
+export type { Tone };
 
 const toneClass = (tone: Tone) =>
   tone === "up" ? "text-success" : tone === "down" ? "text-destructive" : "";
@@ -19,6 +19,7 @@ export function PortfolioValueCard({
   allTimeAmount,
   allTimePct,
   allTimeTone = "flat",
+  allTimeExplainer,
   todayLabel,
   todayAmount,
   todayPct,
@@ -30,6 +31,8 @@ export function PortfolioValueCard({
   allTimeAmount: string;
   allTimePct: string | null;
   allTimeTone?: Tone;
+  /** The shared "how is this gain calculated?" trigger (`GainExplainer`), rendered under the figure. */
+  allTimeExplainer?: React.ReactNode;
   todayLabel: string;
   todayAmount: string;
   todayPct: string | null;
@@ -46,16 +49,14 @@ export function PortfolioValueCard({
         {/* All-time P&L */}
         <div className="border-t border-line pt-3">
           <p className="text-[11px] font-semibold text-text-3">{allTimeLabel}</p>
-          <div className="mt-0.5 flex items-baseline gap-2">
-            <p className={cn("tabular text-[18px] font-extrabold", toneClass(allTimeTone))}>
-              {allTimeAmount}
-            </p>
-            {allTimePct != null && (
-              <p className={cn("tabular text-[13px] font-bold", toneClass(allTimeTone))}>
-                {allTimePct}
-              </p>
-            )}
-          </div>
+          <GainFigure
+            amount={allTimeAmount}
+            pct={allTimePct}
+            tone={allTimeTone}
+            basis="cost"
+            className="mt-0.5"
+          />
+          {allTimeExplainer && <div className="mt-1.5">{allTimeExplainer}</div>}
         </div>
         {/* Today's change */}
         <div className="border-t border-line pt-3">

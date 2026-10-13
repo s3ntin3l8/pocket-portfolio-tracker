@@ -9,7 +9,8 @@ import {
 } from "@/components/charts/net-worth-history-chart";
 import type { ChartRange } from "@/components/charts/range-toggle";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
-import { formatMoney, formatPercent } from "@/lib/utils";
+import { formatMoney, formatNetWorth, formatPercent } from "@/lib/utils";
+import { Link } from "@/i18n/navigation";
 
 /**
  * The Holdings "glance" hero: green gradient card with the current total portfolio
@@ -28,7 +29,9 @@ export function HeroGlanceCard({
   selectedId = null,
   holderId,
   benchmarkSymbol = "^GSPC",
-  hasValuedAtCostHoldings = false,
+  atCostCount = 0,
+  fxMissingCount = 0,
+  atCostHref = "/holdings?filter=at-cost",
 }: {
   netWorth: string;
   currency: string;
@@ -44,12 +47,15 @@ export function HeroGlanceCard({
    *  pill + legend labels track the line the chart is actually drawing. */
   benchmarkSymbol?: string | null;
   /**
-   * True when at least one holding contributing to `netWorth` has no market price
-   * and is valued at cost basis instead (issue #744). Surfaced as a small note under
-   * the headline figure — the same at-cost holdings are individually badged in
-   * `HoldingsTable`; this discloses that the *total* is affected too.
+   * Holdings with no market price that are valued at cost basis instead (issue #744), and
+   * holdings left out of the totals for lack of an FX rate (audit B2). Surfaced as a count
+   * under the headline figure that links to the Holdings list filtered to exactly those
+   * rows (audit G3) — the same rows are individually chipped in `HoldingsTable`.
    */
-  hasValuedAtCostHoldings?: boolean;
+  atCostCount?: number;
+  fxMissingCount?: number;
+  /** Where the count links to — the Holdings list filtered to at-cost / no-FX rows. */
+  atCostHref?: string;
 }) {
   const t = useTranslations("Holdings.hero");
   const tHoldings = useTranslations("Holdings");
@@ -90,11 +96,22 @@ export function HeroGlanceCard({
     >
       <p className="text-[13px] font-semibold text-white/78">{t("label")}</p>
       <p className="tabular mt-1 text-[34px] font-extrabold leading-tight sm:text-[36px]">
-        {formatMoney(Number(netWorth), currency, locale)}
+        {formatNetWorth(netWorth, currency, locale)}
       </p>
-      {hasValuedAtCostHoldings && (
+      {(atCostCount > 0 || fxMissingCount > 0) && (
         <p className="mt-0.5 text-[11px] font-medium text-white/70">
-          {tHoldings("heroValuedAtCostNote")}
+          <Link
+            href={atCostHref}
+            aria-label={tHoldings("heroAtCostBannerAria")}
+            className="underline underline-offset-2 hover:text-white"
+          >
+            {[
+              atCostCount > 0 ? tHoldings("heroAtCostBanner", { count: atCostCount }) : null,
+              fxMissingCount > 0 ? tHoldings("heroNoFxBanner", { count: fxMissingCount }) : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Link>
         </p>
       )}
 

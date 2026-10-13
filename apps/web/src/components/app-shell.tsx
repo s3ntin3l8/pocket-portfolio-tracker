@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { Link, usePathname } from "@/i18n/navigation";
-import { cn, signTone } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { GainFigure, toneOf } from "@/components/gain-figure";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PortfolioSwitcher } from "@/components/portfolio-switcher";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
@@ -167,14 +168,15 @@ export function AppShell({
                     {netWorthSummary.valueFormatted}
                   </p>
                   {netWorthSummary.allTimePctFormatted && (
-                    <p
-                      className={cn(
-                        "tabular mt-0.5 text-xs font-bold",
-                        signTone(netWorthSummary.allTimePct),
-                      )}
-                    >
-                      {netWorthSummary.allTimePctFormatted} {t("allTime")}
-                    </p>
+                    // Same GainFigure (and basis label) as the Holdings rail — the sidebar's
+                    // all-time % is unrealized gain vs cost of open holdings (audit G2).
+                    <GainFigure
+                      pct={netWorthSummary.allTimePctFormatted}
+                      tone={toneOf(netWorthSummary.allTimePct)}
+                      basis="cost"
+                      layout="inline"
+                      className="mt-0.5 text-xs"
+                    />
                   )}
                 </div>
               )}

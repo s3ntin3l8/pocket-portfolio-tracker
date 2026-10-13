@@ -15,6 +15,7 @@ vi.mock("@/lib/api", () => ({
   useApiClient: () => ({ getNetWorthHistory }),
 }));
 
+import { formatNetWorth } from "../src/lib/utils";
 import { HeroGlanceCard } from "../src/components/holdings/hero-glance-card";
 
 const initialWithBenchmark: HistoryPoint[] = [
@@ -43,7 +44,7 @@ describe("HeroGlanceCard", () => {
     expect(screen.getByText(/IDR\s*1,050,000/)).toBeInTheDocument();
   });
 
-  it("discloses when the total includes a holding valued at cost (issue #744)", () => {
+  it("shows an at-cost count that links to the filtered Holdings list (audit G3)", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <HeroGlanceCard
@@ -51,14 +52,51 @@ describe("HeroGlanceCard", () => {
           currency="IDR"
           initialHistory={initialWithBenchmark}
           initialRange="1m"
-          hasValuedAtCostHoldings
+          atCostCount={2}
+          atCostHref="/holdings?filter=at-cost"
         />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByText(/shown at cost/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /valued at cost/i });
+    expect(link).toHaveTextContent("2 holdings at cost");
+    expect(link.getAttribute("href")).toContain("filter=at-cost");
+    expect(screen.queryByText(/Includes one or more/)).not.toBeInTheDocument();
   });
 
-  it("omits the disclosure when every holding is normally priced", () => {
+  it("combines at-cost and no-FX counts, singular and plural", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1m"
+          atCostCount={1}
+          fxMissingCount={3}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("link")).toHaveTextContent(
+      "1 holding at cost · 3 holdings without FX rate",
+    );
+  });
+
+  it("prints the net worth with the shared formatter (same string the sidebar uses)", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="39044.83"
+          currency="EUR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1m"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(formatNetWorth("39044.83", "EUR", "en"))).toBeInTheDocument();
+    expect(screen.getByText("€39,044.83")).toBeInTheDocument();
+  });
+
+  it("omits the count when every holding is normally priced", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <HeroGlanceCard
@@ -69,7 +107,7 @@ describe("HeroGlanceCard", () => {
         />
       </NextIntlClientProvider>,
     );
-    expect(screen.queryByText(/shown at cost/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/at cost/)).not.toBeInTheDocument();
   });
 
   it("derives pill 1 from TWR pct (not absolute currency delta) and adds pill 2 from benchmark", () => {

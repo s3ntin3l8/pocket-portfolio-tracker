@@ -26,6 +26,7 @@ export function PositionsPanel({
   cash,
   classTabs,
   actions,
+  initialAtCostOnly = false,
 }: {
   rows: HoldingValuation[];
   currency: string;
@@ -43,30 +44,38 @@ export function PositionsPanel({
   /** Export CSV button — rendered right of the search input. Exports the full `rows`
    *  regardless of the active search/tab (see the comment above `exportRows` below). */
   actions?: React.ReactNode;
+  /** Start with the list narrowed to holdings valued at cost / without an FX rate — set by the
+   *  hero's "N holdings at cost" link (`/holdings?filter=at-cost`, audit G3). */
+  initialAtCostOnly?: boolean;
 }) {
   const t = useTranslations("Holdings");
   const tc = useTranslations("AssetClass");
   const [query, setQuery] = useState("");
+  const [atCostOnly, setAtCostOnly] = useState(initialAtCostOnly);
 
   const q = query.trim().toLowerCase();
+
+  // Rows with no real P&L: valued at cost (no market price) or without an FX rate.
+  const atCostRows = useMemo(() => rows.filter((h) => h.valuedAtCost || h.fxMissing), [rows]);
+  const base = atCostOnly ? atCostRows : rows;
 
   // Matches what the table actually renders (holdings-table.tsx): symbol and
   // displayName ?? name. No ISIN — InstrumentMeta doesn't carry one.
   const searched = useMemo(() => {
-    if (!q) return rows;
-    return rows.filter((h) => {
+    if (!q) return base;
+    return base.filter((h) => {
       const symbol = h.instrument?.symbol?.toLowerCase() ?? "";
       const name = (h.instrument?.displayName ?? h.instrument?.name ?? "").toLowerCase();
       return symbol.includes(q) || name.includes(q);
     });
-  }, [rows, q]);
+  }, [base, q]);
 
   // The cash pseudo-row is filtered, not dropped, when a query is active — dropping it
   // would make typing "cash" hide the Cash row instead of isolating it. Matches against
   // the currency code and the translated "Cash" label.
   const cashLabel = t("cash").toLowerCase();
   const filteredCash = useMemo(() => {
-    if (!cash) return undefined;
+    if (!cash || atCostOnly) return undefined;
     if (!q) return cash;
     const kept = Object.fromEntries(
       Object.entries(cash).filter(
@@ -74,7 +83,7 @@ export function PositionsPanel({
       ),
     );
     return Object.keys(kept).length > 0 ? kept : undefined;
-  }, [cash, q, cashLabel]);
+  }, [cash, q, cashLabel, atCostOnly]);
 
   return (
     <div className="space-y-3">
@@ -108,6 +117,22 @@ export function PositionsPanel({
                   </TabsTrigger>
                 ))}
               </TabsList>
+              {(atCostRows.length > 0 || atCostOnly) && (
+                <button
+                  type="button"
+                  aria-pressed={atCostOnly}
+                  aria-label={atCostOnly ? t("atCostFilterClear") : undefined}
+                  onClick={() => setAtCostOnly((v) => !v)}
+                  className={cn(
+                    CHIP_BASE,
+                    atCostOnly
+                      ? "border-transparent bg-pill font-bold text-white shadow-none"
+                      : CHIP_INACTIVE,
+                  )}
+                >
+                  {t("atCostFilterChip", { count: atCostRows.length })}
+                </button>
+              )}
             </div>
           }
           search={

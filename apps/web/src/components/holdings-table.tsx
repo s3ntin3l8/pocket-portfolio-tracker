@@ -33,8 +33,17 @@ const HOLDINGS_COLS: ColDef<HoldingValuation>[] = [
   { key: "pnl", get: (h) => h.unrealizedPnLDisplay ?? "0", type: "numeric" },
 ];
 
+/**
+ * A row valued at cost (no market price) or without an FX rate has no real gain figure: its
+ * "+0.00 / 0.00%" is an artefact of valuing it at cost (or excluding it), not a measured
+ * result, so the P&L cells render a neutral "—" instead of a green zero (audit G3).
+ */
+const pnlUnavailable = (h: HoldingValuation) => Boolean(h.valuedAtCost || h.fxMissing);
+
 function computeRowValues(h: HoldingValuation, currency: string, locale: string) {
-  const pnl = h.unrealizedPnLDisplay !== null ? Number(h.unrealizedPnLDisplay) : null;
+  const unavailable = pnlUnavailable(h);
+  const pnl =
+    !unavailable && h.unrealizedPnLDisplay !== null ? Number(h.unrealizedPnLDisplay) : null;
   const costBasis = Number(h.costBasisDisplay);
   const pct = pnl !== null && costBasis !== 0 ? (pnl / costBasis) * 100 : null;
   const native = (n: number) => formatMoney(n, h.currency ?? currency, locale);
@@ -218,7 +227,18 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                     )}
                   </TableCell>
                   <TableCell className={cn(TABLE_VALUE_STRONG, pnlColor)}>
-                    {pnl === null ? "—" : formatSignedMoney(pnl, currency, locale)}
+                    {pnl === null ? (
+                      <>
+                        <span aria-hidden>—</span>
+                        {pnlUnavailable(h) && (
+                          <span className="sr-only">
+                            {h.fxMissing ? t("fxMissingTooltip") : t("valuedAtCostTooltip")}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      formatSignedMoney(pnl, currency, locale)
+                    )}
                     {pct !== null && (
                       <div className={TABLE_SUBVALUE}>{formatPercent(pct / 100, locale)}</div>
                     )}

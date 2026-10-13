@@ -243,6 +243,49 @@ describe("HoldingsTable", () => {
     });
   });
 
+  describe("at-cost P&L cells (audit G3)", () => {
+    it("renders a neutral dash, not '+0.00 / 0.00%', for a row valued at cost", () => {
+      const atCost: HoldingValuation = {
+        ...makeHolding("MWOF", "10", "100"),
+        price: null,
+        marketValue: null,
+        marketValueDisplay: "1000",
+        unrealizedPnLDisplay: "0",
+        valuedAtCost: true,
+      };
+      renderTable({ rows: [atCost] });
+      const row = screen.getAllByRole("row").find((r) => r.textContent?.includes("MWOF"))!;
+      const cells = row.querySelectorAll("td");
+      const pnlCell = cells[cells.length - 1]!;
+      expect(pnlCell.textContent).toContain("—");
+      expect(pnlCell.textContent).not.toMatch(/\+/);
+      expect(pnlCell.textContent).not.toMatch(/0\.00%/);
+      expect(pnlCell.className).not.toContain("text-success");
+      // The tooltip text is still reachable (chip title + screen-reader text in the cell).
+      expect(pnlCell.textContent).toContain("No market price; valued at cost");
+      expect(screen.getAllByTitle("No market price; valued at cost").length).toBeGreaterThan(0);
+    });
+
+    it("renders a dash for a row with no FX rate, with the 'No FX rate' tooltip on its chip", () => {
+      const noFx: HoldingValuation = {
+        ...makeHolding("FXLESS", "10", "100"),
+        marketValueDisplay: null,
+        unrealizedPnLDisplay: null,
+        fxMissing: true,
+      };
+      renderTable({ rows: [noFx] });
+      expect(screen.getAllByTitle(/No FX rate/).length).toBeGreaterThan(0);
+      const row = screen.getAllByRole("row").find((r) => r.textContent?.includes("FXLESS"))!;
+      const cells = row.querySelectorAll("td");
+      expect(cells[cells.length - 1]!.textContent).toContain("—");
+    });
+
+    it("still shows a real P&L for a normally-priced row", () => {
+      renderTable({ rows: [makeHolding("AAPL", "10", "50")] });
+      expect(screen.getAllByText(/\+/).length).toBeGreaterThan(0);
+    });
+  });
+
   describe("valuedAtCost disclosure (#744)", () => {
     it("renders an at-cost badge next to a holding valued at cost, but not for a normally-priced one", () => {
       const atCost: HoldingValuation = { ...makeHolding("MWOF", "10", "100"), valuedAtCost: true };

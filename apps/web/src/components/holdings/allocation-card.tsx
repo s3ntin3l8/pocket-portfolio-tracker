@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type { DonutSlice } from "@/components/charts/allocation-donut";
 import { AllocationDonutSsr as AllocationDonut } from "@/components/charts/lazy";
 
@@ -17,19 +18,29 @@ export function AllocationCard({
   slices,
   currency,
   total,
+  atCostLegend,
 }: {
   title: string;
   slices: DonutSlice[];
   currency: string;
   /** Sum of `slices` — passed straight through to `AllocationDonut` for its center label. */
   total: number;
+  /** Legend note for the hatched at-cost share (see `DonutSlice.atCostValue`). */
+  atCostLegend?: string;
 }) {
+  const tHoldings = useTranslations("Holdings");
   return (
     <div className="@container rounded-[18px] bg-card px-6 py-5 shadow-card">
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
         {title}
       </p>
-      <AllocationDonut data={slices} currency={currency} total={total} />
+      <AllocationDonut
+        data={slices}
+        currency={currency}
+        total={total}
+        atCostLegend={atCostLegend}
+        atCostLabel={tHoldings("valuedAtCostBadge")}
+      />
     </div>
   );
 }
