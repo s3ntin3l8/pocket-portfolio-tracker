@@ -61,7 +61,7 @@ describe("PortfolioValueCard", () => {
 });
 
 describe("AllocationCard", () => {
-  it("renders the donut legend items", () => {
+  it("renders the donut legend items", async () => {
     render(
       withIntl(
         <AllocationCard
@@ -75,8 +75,9 @@ describe("AllocationCard", () => {
         />,
       ),
     );
-    expect(screen.getByText("Stocks")).toBeInTheDocument();
-    expect(screen.getByText("Gold")).toBeInTheDocument();
+    // The donut is a next/dynamic chunk (SSR'd in prod), so it resolves a tick after render.
+    expect(await screen.findByText("Stocks", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByText("Gold")).toBeInTheDocument();
   });
 });
 

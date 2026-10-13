@@ -10,16 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/stat-card";
 import { useApiClient } from "@/lib/api";
 import { formatMoney, formatMoneyCompact, formatPercent, formatRatio } from "@/lib/utils";
+import { RevenueEarningsChartLegend } from "@/components/charts/revenue-earnings-legend";
+import { EpsActualEstimateChartLegend } from "@/components/charts/eps-actual-estimate-legend";
+import type { RevenueEarningsYear } from "@/components/charts/revenue-earnings-chart";
+import type { EpsQuarter } from "@/components/charts/eps-actual-estimate-chart";
 import {
-  RevenueEarningsChart,
-  RevenueEarningsChartLegend,
-  type RevenueEarningsYear,
-} from "@/components/charts/revenue-earnings-chart";
-import {
-  EpsActualEstimateChart,
-  EpsActualEstimateChartLegend,
-  type EpsQuarter,
-} from "@/components/charts/eps-actual-estimate-chart";
+  LazyEpsActualEstimateChart as EpsActualEstimateChart,
+  LazyRevenueEarningsChart as RevenueEarningsChart,
+} from "@/components/charts/lazy";
 
 type LoadState = "loading" | "ok" | "empty" | "error";
 
@@ -41,7 +39,7 @@ const KNOWN_RECOMMENDATIONS = new Set(["strong_buy", "buy", "hold", "sell", "str
  * range, volume — labeled "as of" the cache's refresh time), analyst recommendations,
  * a revenue-vs-earnings mini chart, next earnings + ex-dividend dates, and an external
  * link. Client-fetched on mount (not server-preloaded) so a slow/unreachable provider
- * doesn't block the rest of the page — mirrors `GoldTicker`'s fetch-on-mount pattern.
+ * doesn't block the rest of the page.
  *
  * Coverage-driven: Yahoo's fundamentals coverage varies by asset class (equities get the
  * full set; ETFs get a reduced set — no PE/EPS/analyst data) and can be entirely absent

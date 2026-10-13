@@ -10,7 +10,7 @@ import { StreaksCard } from "@/components/insights/streaks-card";
 import { BenchmarkCard } from "@/components/insights/benchmark-card";
 import { ConcentrationTrendCard } from "@/components/insights/concentration-trend-card";
 import { CompositionCard } from "@/components/insights/composition-card";
-import { YearlyReturnsCard } from "@/components/insights/yearly-returns-card";
+import { LazyYearlyReturnsCard as YearlyReturnsCard } from "@/components/charts/lazy";
 import {
   loadNetWorth,
   loadNetWorthHistory,

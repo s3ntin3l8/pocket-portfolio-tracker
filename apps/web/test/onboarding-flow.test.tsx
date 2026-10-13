@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
@@ -44,8 +45,15 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/components/import-flow-client", () => ({
   ImportFlowClient: () => <div data-testid="import-flow" />,
 }));
+// Real mounts (not re-renders) of the manual-entry stub — the single-tree assertion below.
+const entryTabsMounts = { current: 0 };
 vi.mock("@/components/new-entry-tabs", () => ({
-  NewEntryTabs: () => <div data-testid="entry-tabs" />,
+  NewEntryTabs: () => {
+    useEffect(() => {
+      entryTabsMounts.current += 1;
+    }, []);
+    return <div data-testid="entry-tabs" />;
+  },
 }));
 vi.mock("@/components/tr-connect-flow", () => ({
   TrConnectFlow: () => <div data-testid="tr-connect-flow" />,
@@ -61,14 +69,31 @@ function renderFlow() {
   );
 }
 
+// `isDesktop` is driven by `useMediaQuery("(min-width: 768px)")`, so mock matchMedia as a
+// pure function of the current `window.innerWidth` and notify subscribers on change.
+const mqListeners = new Set<() => void>();
+function installMatchMedia() {
+  window.matchMedia = ((query: string) => {
+    const min = Number(/min-width:\s*(\d+)px/.exec(query)?.[1] ?? 0);
+    return {
+      get matches() {
+        return window.innerWidth >= min;
+      },
+      addEventListener: (_: string, cb: () => void) => mqListeners.add(cb),
+      removeEventListener: (_: string, cb: () => void) => mqListeners.delete(cb),
+    } as unknown as MediaQueryList;
+  }) as typeof window.matchMedia;
+}
+
 function setViewport(width: number) {
+  installMatchMedia();
   act(() => {
     Object.defineProperty(window, "innerWidth", {
       writable: true,
       configurable: true,
       value: width,
     });
-    window.dispatchEvent(new Event("resize"));
+    mqListeners.forEach((cb) => cb());
   });
 }
 
@@ -233,6 +258,35 @@ describe("OnboardingFlow", () => {
     fireEvent.click(screen.getByRole("button", { name: /Back/ }));
     expect(screen.getByText(messages.Onboarding.addData.manualTitle)).toBeInTheDocument();
     expect(screen.queryByTestId("tr-connect-flow")).not.toBeInTheDocument();
+  });
+
+  it("hosts the manual-entry form in ONE dialog tree that survives crossing the md breakpoint", async () => {
+    entryTabsMounts.current = 0;
+    renderFlow();
+    fireEvent.click(screen.getByRole("button", { name: /Get started/ }));
+    fireEvent.change(screen.getByPlaceholderText(messages.Onboarding.holder.namePlaceholder), {
+      target: { value: "Björn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Continue/ }));
+    fireEvent.change(
+      screen.getAllByPlaceholderText(messages.Onboarding.portfolio.namePlaceholder)[0],
+      { target: { value: "My Portfolio" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Create portfolio/ }));
+    await waitFor(() =>
+      expect(screen.getByText(messages.Onboarding.addData.manualTitle)).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText(messages.Onboarding.addData.manualTitle));
+    await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+    const node = screen.getByTestId("entry-tabs");
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+
+    setViewport(390); // desktop -> phone
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByTestId("entry-tabs")).toBe(node); // same DOM node: not remounted
+    expect(entryTabsMounts.current).toBe(1);
+    setViewport(1280);
   });
 
   describe("mobile", () => {

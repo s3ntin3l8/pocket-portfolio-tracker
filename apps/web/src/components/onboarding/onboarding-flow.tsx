@@ -8,10 +8,14 @@ import type { Portfolio } from "@portfolio/api-client";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { ImportTasksProvider } from "@/components/import-tasks-provider";
-import { ImportFlowClient } from "@/components/import-flow-client";
-import { NewEntryTabs, type NewEntryTab } from "@/components/new-entry-tabs";
+import type { NewEntryTab } from "@/components/new-entry-tabs";
+import {
+  LazyImportFlowClient as ImportFlowClient,
+  LazyNewEntryTabs as NewEntryTabs,
+} from "@/components/add-transaction-menu/lazy-bodies";
 import { Icon, ICONS } from "./icon";
 import { resolveTheme } from "./theme";
 import { BrandPanel } from "./brand-panel";
@@ -54,16 +58,11 @@ export function OnboardingFlow() {
   useEffect(() => setMounted(true), []);
   const isDark = mounted ? resolvedTheme === "dark" : true;
 
-  // Desktop/mobile breakpoint (900px), synced on resize — default true (desktop) so
-  // server and first client render agree; corrected right after mount, same pattern
-  // as the design's own `componentDidMount` resize sync.
-  const [isDesktop, setIsDesktop] = useState(true);
-  useEffect(() => {
-    const sync = () => setIsDesktop(window.innerWidth >= 900);
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
-  }, []);
+  // Desktop/mobile layout switch at the app-wide `md` breakpoint (768px) — the same one
+  // every overlay uses. `useMediaQuery` reports `false` for the server render and
+  // corrects to the real value on the client, so a phone never paints the desktop split
+  // layout first (the old `useState(true)` + 900px resize listener did).
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const [step, setStep] = useState(0);
   const [taxRegime, setTaxRegime] = useState<"DE" | "ID">("DE");
@@ -734,12 +733,12 @@ export function OnboardingFlow() {
 
       {/* "Import a CSV or screenshot" — reuses the real import flow (same component the
           app-wide Add-transaction sheet uses), scoped to the portfolio just created. */}
-      <Sheet open={importOpen} onOpenChange={setImportOpen} dismissible>
-        <SheetContent className="max-w-3xl">
-          <SheetHeader className="px-5 pb-3 pt-3">
-            <SheetTitle>{t("addData.importSheetTitle")}</SheetTitle>
-          </SheetHeader>
-          <div className="px-5 pb-7 pt-1.5">
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent size="lg" mobileHeader={{ title: t("addData.importSheetTitle") }}>
+          <div className="p-5 md:p-[26px]">
+            <DialogTitle className="hidden text-[19px] font-extrabold md:mb-3 md:block">
+              {t("addData.importSheetTitle")}
+            </DialogTitle>
             {importOpen && createdPortfolio && (
               <Suspense fallback={null}>
                 <ImportFlowClient
@@ -753,19 +752,23 @@ export function OnboardingFlow() {
               </Suspense>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* "Add manually" — reuses the real manual-entry tabs (same component the
           app-wide Add-transaction sheet uses). Onboarding is marked complete the
           moment this opens (see handleAddDataSelect) since a successful save here
           navigates straight to /transactions on its own. */}
-      <Sheet open={manualOpen} onOpenChange={setManualOpen}>
-        <SheetContent>
-          <SheetHeader className="px-5 pb-3 pt-3">
-            <SheetTitle>{t("addData.manualSheetTitle")}</SheetTitle>
-          </SheetHeader>
-          <div className="px-5 pb-7 pt-1.5">
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent
+          size="lg"
+          mobileHeader={{ title: t("addData.manualSheetTitle") }}
+          footer={true}
+        >
+          <div className="p-5 md:p-[26px]">
+            <DialogTitle className="hidden text-[19px] font-extrabold md:mb-3 md:block">
+              {t("addData.manualSheetTitle")}
+            </DialogTitle>
             {manualOpen && createdPortfolio && (
               <NewEntryTabs
                 portfolios={targetPortfolios}
@@ -776,8 +779,8 @@ export function OnboardingFlow() {
               />
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </ImportTasksProvider>
   );
 }

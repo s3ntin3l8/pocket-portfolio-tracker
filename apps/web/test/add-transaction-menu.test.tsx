@@ -167,7 +167,8 @@ describe("AddTransactionMenu", () => {
     expect(
       screen.queryByRole("dialog", { name: messages.Manage.addMenu.title }),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("import-flow")).toBeInTheDocument();
+    // The import flow body is code-split (next/dynamic) — it mounts a tick after the step.
+    expect(await screen.findByTestId("import-flow")).toBeInTheDocument();
   });
 
   // Regression test for #471: the CSV card called the same `openImport()` path as
@@ -181,7 +182,7 @@ describe("AddTransactionMenu", () => {
     await waitFor(() =>
       expect(screen.getByRole("dialog", { name: messages.Import.title })).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("import-flow")).toBeInTheDocument();
+    expect(await screen.findByTestId("import-flow")).toBeInTheDocument();
   });
 
   it("returns from the import step to the method cards via back, without closing the sheet", async () => {
@@ -390,6 +391,55 @@ describe("AddTransactionMenu", () => {
         ).toBeInTheDocument(),
       );
       expect(replace).toHaveBeenCalledWith("/transactions");
+    });
+  });
+
+  describe("default portfolio follows the global switcher (audit E9)", () => {
+    const two = [
+      { id: "p1", name: "First", brokerage: null, accountHolder: null, accountHolderId: "h1" },
+      { id: "p2", name: "Second", brokerage: null, accountHolder: null, accountHolderId: "h2" },
+    ];
+    afterEach(() => {
+      document.cookie = "pf=; path=/; max-age=0";
+    });
+
+    it("preselects the cookie-selected portfolio instead of the first one", async () => {
+      document.cookie = "pf=p2; path=/";
+      listPortfolios.mockResolvedValue(two);
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(lastEntryTabsProps.current).toMatchObject({ initialPortfolioId: "p2" });
+    });
+
+    it("falls back to the first portfolio in the aggregate scope", async () => {
+      document.cookie = "pf=all; path=/";
+      listPortfolios.mockResolvedValue(two);
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(lastEntryTabsProps.current).toMatchObject({ initialPortfolioId: "p1" });
+    });
+
+    it("uses the selected portfolio for the harvest prefill too", async () => {
+      document.cookie = "pf=p2; path=/";
+      listPortfolios.mockResolvedValue(two);
+      getInstrument.mockResolvedValue({
+        id: "i1",
+        symbol: "NVDA",
+        name: "NVIDIA Corp",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "USD",
+      });
+      getSummary.mockResolvedValue({ displayCurrency: "IDR", holdings: [] });
+      search.value = "harvestInstrument=i1";
+      renderMenu({ autoOpenFromParams: true });
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(getSummary).toHaveBeenCalledWith("p2");
+      expect(lastEntryTabsProps.current).toMatchObject({ initialPortfolioId: "p2" });
     });
   });
 

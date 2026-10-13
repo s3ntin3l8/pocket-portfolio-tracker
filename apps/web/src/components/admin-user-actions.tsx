@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { History, MoreVertical, RotateCw, Trash2 } from "lucide-react";
+import { useId, useState } from "react";
+import { AlertCircle, History, MoreVertical, RotateCw, Trash2 } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
-import { ConfirmActionDialog } from "@/components/confirm-action-dialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,14 +93,14 @@ export function AdminUserActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ConfirmActionDialog
+      <UserActionConfirm
         open={revokeOpen}
         onOpenChange={setRevokeOpen}
         title={t("revokeTokens")}
         description={t("revokeTokensConfirm", { email })}
         entityLabel={email}
         confirmLabel={t("revokeTokens")}
-        confirmVariant="default"
+        variant="default"
         requiresTyping={false}
         onConfirm={async () => {
           const { revoked } = await api.adminRevokeUserTokens(userId);
@@ -107,14 +108,14 @@ export function AdminUserActions({
           router.refresh();
         }}
       />
-      <ConfirmActionDialog
+      <UserActionConfirm
         open={resetOpen}
         onOpenChange={setResetOpen}
         title={t("resetOnboarding")}
         description={t("resetOnboardingConfirm", { email })}
         entityLabel={email}
         confirmLabel={t("resetOnboarding")}
-        confirmVariant="default"
+        variant="default"
         requiresTyping={false}
         onConfirm={async () => {
           await api.adminResetUserOnboarding(userId);
@@ -122,14 +123,14 @@ export function AdminUserActions({
           router.refresh();
         }}
       />
-      <ConfirmActionDialog
+      <UserActionConfirm
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t("deleteUser")}
         description={t("deleteUserConfirm", { email })}
         entityLabel={email}
         confirmLabel={t("deleteUser")}
-        confirmVariant="destructive"
+        variant="destructive"
         requiresTyping={true}
         onConfirm={async () => {
           await api.adminDeleteUser(userId);
@@ -138,5 +139,105 @@ export function AdminUserActions({
         }}
       />
     </>
+  );
+}
+
+/**
+ * One admin confirm step on top of the shared `ui/ConfirmActionDialog`: shows the
+ * affected user, optionally gates the confirm button behind typing the localised
+ * confirmation word, and keeps the dialog open with an inline error if the action fails.
+ * (This used to be a second, parallel `components/confirm-action-dialog.tsx`.)
+ */
+function UserActionConfirm({
+  open,
+  onOpenChange,
+  title,
+  description,
+  entityLabel,
+  confirmLabel,
+  variant = "destructive",
+  requiresTyping = false,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  entityLabel: string;
+  confirmLabel: string;
+  variant?: "destructive" | "default";
+  requiresTyping?: boolean;
+  onConfirm: () => Promise<void>;
+}) {
+  const t = useTranslations("Admin");
+  // The word to type is localised (placeholder key doubles as the expected word).
+  const confirmWord = t("confirmActionInputPlaceholder");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const [typed, setTyped] = useState("");
+  const inputId = useId();
+
+  function handleOpenChange(next: boolean) {
+    if (!next) {
+      setError(false);
+      setBusy(false);
+      setTyped("");
+    }
+    onOpenChange(next);
+  }
+
+  async function handleConfirm() {
+    setBusy(true);
+    setError(false);
+    try {
+      await onConfirm();
+      handleOpenChange(false);
+    } catch {
+      setError(true);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ConfirmActionDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      variant={variant}
+      busy={busy}
+      confirmDisabled={requiresTyping && typed.trim() !== confirmWord}
+      onConfirm={() => void handleConfirm()}
+    >
+      {entityLabel && (
+        <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-medium text-foreground">
+          {entityLabel}
+        </p>
+      )}
+      {requiresTyping && (
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground" htmlFor={inputId}>
+            {t("confirmActionTypeToConfirm", { word: confirmWord })}
+          </label>
+          <Input
+            id={inputId}
+            placeholder={t("confirmActionInputPlaceholder")}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoFocus
+          />
+        </div>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          <AlertCircle className="size-4 shrink-0" />
+          {t("updateError")}
+        </div>
+      )}
+    </ConfirmActionDialog>
   );
 }

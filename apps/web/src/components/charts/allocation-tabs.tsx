@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatFixed } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { AllocationDonut } from "./allocation-donut";
+import { LazyAllocationDonut as AllocationDonut } from "./lazy";
 import { TargetDialog, type TargetSlice } from "@/components/allocation/target-dialog";
 import { getDrillDownInstruments, type DrillDownDimension } from "@/lib/sector-drilldown";
 import type { AllocationBreakdown, DriftRow, HoldingValuation } from "@portfolio/api-client";

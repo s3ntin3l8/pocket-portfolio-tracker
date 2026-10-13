@@ -4,7 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PiggyBank } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
-import { ContributionsChart } from "@/components/charts/contributions-chart";
+import { LazyContributionsChart as ContributionsChart } from "@/components/charts/lazy";
 import { ForecastPanel } from "@/components/savings/forecast-panel";
 import { SparplanSection } from "@/components/savings/sparplan-section";
 import { ReportHeader } from "@/components/report-header";

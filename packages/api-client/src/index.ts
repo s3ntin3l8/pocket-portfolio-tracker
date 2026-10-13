@@ -2096,6 +2096,56 @@ export interface ApiClientConfig {
   /** Extra headers sent on every request (e.g. `x-forwarded-for` from server-side loaders,
    *  so the API can attribute the call to the end user rather than the web container). */
   headers?: Record<string, string>;
+  /** Default per-request timeout in ms (default {@link DEFAULT_TIMEOUT_MS}). A request
+   *  that exceeds it rejects with an {@link ApiError} (`status` 408, `body`
+   *  `"request_timeout"`). Uploads and long-running sync/import POSTs use
+   *  {@link LONG_TIMEOUT_MS} instead unless a per-call `timeoutMs` says otherwise. */
+  timeoutMs?: number;
+}
+
+/** Per-call options accepted by the read helpers that take them. */
+export interface RequestOptions {
+  /** Caller-owned cancellation (route change, stale-response guard, unmount). Merged with
+   *  the timeout; an abort from this signal propagates as the platform `AbortError`, NOT
+   *  as an {@link ApiError}. */
+  signal?: AbortSignal;
+  /** Override the timeout for this one call. */
+  timeoutMs?: number;
+}
+
+export const DEFAULT_TIMEOUT_MS = 15_000;
+/** Uploads (multipart parse), imports and broker sync/verify POSTs legitimately run for
+ *  minutes (LLM vision parse, a Trade Republic push-approval wait). */
+export const LONG_TIMEOUT_MS = 300_000;
+const LONG_RUNNING_PATH =
+  /^\/(imports|documents|tr\/connection|ibkr\/connection|admin\/jobs)(\/|$|\?)/;
+
+/** A list response plus the server's truncation marker. */
+export interface CappedList<T> {
+  rows: T[];
+  /** The server-side row cap when the response was cut short (`x-result-truncated`
+   *  header), else `null`. Callers that export or total the rows must not present a
+   *  truncated list as complete. */
+  truncatedAt: number | null;
+}
+
+/** Merge the timeout with an optional caller signal. */
+function requestSignal(timeoutMs: number, external?: AbortSignal) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = external
+    ? typeof AbortSignal.any === "function"
+      ? AbortSignal.any([timeout, external])
+      : (() => {
+          const ctrl = new AbortController();
+          const abort = () => ctrl.abort();
+          for (const sig of [timeout, external]) {
+            if (sig.aborted) abort();
+            else sig.addEventListener("abort", abort, { once: true });
+          }
+          return ctrl.signal;
+        })()
+    : timeout;
+  return { signal, timedOut: () => timeout.aborted && !external?.aborted };
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
@@ -2119,7 +2169,12 @@ export function createApiClient(config: ApiClientConfig) {
     ((globalThis as Record<string, unknown>).process as Record<string, Record<string, string>>).env
       ?.TIMING_ENABLED === "true";
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function requestWithHeaders<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    opts: RequestOptions = {},
+  ): Promise<{ data: T; headers: Headers | undefined }> {
     const t0 = timingEnabled ? performance.now() : 0;
     const token = await config.getToken?.();
     // Only declare a JSON content-type when we actually send a body. A bodyless
@@ -2129,46 +2184,82 @@ export function createApiClient(config: ApiClientConfig) {
     // must set it with the multipart boundary; setting it manually breaks the boundary.
     const hasBody = body !== undefined;
     const isForm = typeof FormData !== "undefined" && body instanceof FormData;
-    const res = await doFetch(`${config.baseUrl}${path}`, {
-      method,
-      headers: {
-        ...config.headers,
-        ...(hasBody && !isForm ? { "content-type": "application/json" } : {}),
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: isForm ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
-    });
-    if (!res.ok) {
-      throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
+    const long = isForm || (method !== "GET" && LONG_RUNNING_PATH.test(path));
+    const timeoutMs =
+      opts.timeoutMs ?? (long ? LONG_TIMEOUT_MS : (config.timeoutMs ?? DEFAULT_TIMEOUT_MS));
+    const { signal, timedOut } = requestSignal(timeoutMs, opts.signal);
+    try {
+      const res = await doFetch(`${config.baseUrl}${path}`, {
+        method,
+        headers: {
+          ...config.headers,
+          ...(hasBody && !isForm ? { "content-type": "application/json" } : {}),
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: isForm ? (body as FormData) : hasBody ? JSON.stringify(body) : undefined,
+        signal,
+      });
+      if (!res.ok) {
+        throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
+      }
+      if (res.status === 204) return { data: undefined as T, headers: res.headers };
+      const result = (await res.json()) as T;
+      if (timingEnabled) {
+        const durationMs = performance.now() - t0;
+        console.log(
+          JSON.stringify({
+            level: "info",
+            msg: `[timing] api-client request`,
+            method,
+            path,
+            durationMs: Math.round(durationMs * 100) / 100,
+          }),
+        );
+      }
+      return { data: result, headers: res.headers };
+    } catch (err) {
+      // Our own timeout fired (and the caller didn't abort): surface it as an ApiError so
+      // `classifyFailure` and every `err.status` consumer treat it like any other
+      // unavailable-API failure instead of an opaque DOMException.
+      if (!(err instanceof ApiError) && timedOut()) {
+        throw new ApiError(408, "request_timeout");
+      }
+      throw err;
     }
-    if (res.status === 204) return undefined as T;
-    const result = (await res.json()) as T;
-    if (timingEnabled) {
-      const durationMs = performance.now() - t0;
-      console.log(
-        JSON.stringify({
-          level: "info",
-          msg: `[timing] api-client request`,
-          method,
-          path,
-          durationMs: Math.round(durationMs * 100) / 100,
-        }),
-      );
-    }
-    return result;
+  }
+
+  async function request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    opts?: RequestOptions,
+  ): Promise<T> {
+    return (await requestWithHeaders<T>(method, path, body, opts)).data;
   }
 
   /** Like `request` but returns a Blob — for binary downloads (zip exports etc.). */
-  async function requestBlob(method: string, path: string): Promise<Blob> {
+  async function requestBlob(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): Promise<Blob> {
     const token = await config.getToken?.();
-    const res = await doFetch(`${config.baseUrl}${path}`, {
-      method,
-      headers: { ...config.headers, ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    });
-    if (!res.ok) {
-      throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
+    // Zip exports are built on demand and can be large: the long budget, not the 15 s read one.
+    const { signal, timedOut } = requestSignal(opts.timeoutMs ?? LONG_TIMEOUT_MS, opts.signal);
+    try {
+      const res = await doFetch(`${config.baseUrl}${path}`, {
+        method,
+        headers: { ...config.headers, ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        signal,
+      });
+      if (!res.ok) {
+        throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
+      }
+      return await res.blob();
+    } catch (err) {
+      if (!(err instanceof ApiError) && timedOut()) throw new ApiError(408, "request_timeout");
+      throw err;
     }
-    return res.blob();
   }
 
   return {
@@ -2276,13 +2367,14 @@ export function createApiClient(config: ApiClientConfig) {
       costBasis?: "purchase_price" | "total_paid",
       holderId?: string,
       period?: string,
+      opts?: RequestOptions,
     ) => {
       const params = new URLSearchParams();
       if (costBasis) params.set("costBasis", costBasis);
       if (holderId) params.set("holderId", holderId);
       if (period && period !== "max") params.set("period", period);
       const qs = params.toString();
-      return request<NetWorth>("GET", qs ? `/networth?${qs}` : "/networth");
+      return request<NetWorth>("GET", qs ? `/networth?${qs}` : "/networth", undefined, opts);
     },
 
     getPreferences: () => request<UserPreferences>("GET", "/me/preferences"),
@@ -2391,11 +2483,24 @@ export function createApiClient(config: ApiClientConfig) {
      *  object instead; prefer {@link listTransactionsPaginated}, or
      *  {@link listTransactionsByIds} to look up specific rows.
      *  `convertTo` requests a per-row `displayRate`/`displayCurrency` (trade-date FX into
-     *  that currency) alongside each row's native amount — see issue #465. */
-    listTransactions: (portfolioId: string, convertTo?: string) => {
+     *  that currency) alongside each row's native amount — see issue #465.
+     *  Returns the rows plus `truncatedAt` (the server cap when the list was cut short, from
+     *  the `x-result-truncated` header) so an export never presents a capped list as whole. */
+    listTransactions: async (
+      portfolioId: string,
+      convertTo?: string,
+      opts?: RequestOptions,
+    ): Promise<CappedList<Transaction>> => {
       const params = new URLSearchParams({ all: "1" });
       if (convertTo) params.set("convertTo", convertTo);
-      return request<Transaction[]>("GET", `/portfolios/${portfolioId}/transactions?${params}`);
+      const { data, headers } = await requestWithHeaders<Transaction[]>(
+        "GET",
+        `/portfolios/${portfolioId}/transactions?${params}`,
+        undefined,
+        opts,
+      );
+      const cap = Number(headers?.get("x-result-truncated"));
+      return { rows: data, truncatedAt: Number.isFinite(cap) && cap > 0 ? cap : null };
     },
     /** Paginated variant: returns one page + total count. Enrichment only runs on the
      *  returned page, so this is ~10× faster than fetching all 945+ rows. Accepts optional
@@ -2410,6 +2515,7 @@ export function createApiClient(config: ApiClientConfig) {
       year?: string,
       q?: string,
       instrumentId?: string,
+      opts?: RequestOptions,
     ) => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (convertTo) params.set("convertTo", convertTo);
@@ -2428,7 +2534,7 @@ export function createApiClient(config: ApiClientConfig) {
           fxMissingCurrencies?: string[];
         };
         years?: string[];
-      }>("GET", `/portfolios/${portfolioId}/transactions?${params}`);
+      }>("GET", `/portfolios/${portfolioId}/transactions?${params}`, undefined, opts);
     },
     /** Aggregate paginated transactions across all portfolios (networth scope).
      *  Same enrichment + filter pattern as the per-portfolio paginated variant. */
@@ -2668,12 +2774,18 @@ export function createApiClient(config: ApiClientConfig) {
         transactionId,
         code,
       }),
-    getSummary: (portfolioId: string, costBasis?: "purchase_price" | "total_paid") =>
+    getSummary: (
+      portfolioId: string,
+      costBasis?: "purchase_price" | "total_paid",
+      opts?: RequestOptions,
+    ) =>
       request<PortfolioSummary>(
         "GET",
         costBasis
           ? `/portfolios/${portfolioId}/summary?costBasis=${costBasis}`
           : `/portfolios/${portfolioId}/summary`,
+        undefined,
+        opts,
       ),
     getPerformance: (portfolioId: string) =>
       request<PortfolioPerformance>("GET", `/portfolios/${portfolioId}/performance`),

@@ -125,7 +125,7 @@ describe("resolveSelection", () => {
 });
 
 describe("loadTransactionsAcrossPortfolios (holder scope)", () => {
-  it("filters to the holder's portfolios when holder scope is active", async () => {
+  it("still finds a row outside the active holder (id lookup is not scope-narrowed)", async () => {
     const pfWithHolders = [
       { id: "p1", name: "Self-A", baseCurrency: "IDR", accountHolderId: "h1" },
       { id: "p2", name: "Self-B", baseCurrency: "EUR", accountHolderId: "h1" },
@@ -140,9 +140,10 @@ describe("loadTransactionsAcrossPortfolios (holder scope)", () => {
 
     const res = await api.loadTransactionsAcrossPortfolios("t3");
     expect(res.status).toBe("ok");
-    // t3 lives in p3, which belongs to h2 — never queried, so not found in h1's scope.
-    expect(res.transactions).toHaveLength(0);
-    expect(listTransactionsByIds.mock.calls.map((c) => c[0]).sort()).toEqual(["p1", "p2"]);
+    // The edit page is addressed by a concrete id, so a holder scope must not 404 it.
+    expect(res.transactions).toHaveLength(1);
+    expect(res.transactions[0]?.portfolioName).toBe("Other");
+    expect(listTransactionsByIds.mock.calls.map((c) => c[0]).sort()).toEqual(["p1", "p2", "p3"]);
   });
 });
 

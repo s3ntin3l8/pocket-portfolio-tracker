@@ -1,10 +1,5 @@
 import type { Transaction } from "@portfolio/api-client";
-import {
-  getServerApi,
-  listPortfoliosCached,
-  resolveHolderScope,
-  type TransactionWithPortfolio,
-} from "./_shared";
+import { getServerApi, listPortfoliosCached, type TransactionWithPortfolio } from "./_shared";
 import { loadMe } from "./user";
 import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
@@ -24,13 +19,11 @@ export async function loadTransactionsAcrossPortfolios(txId: string): Promise<{
   const api = await getServerApi();
   if (!api) return { status: "unauthorized", transactions: [], scopeCurrency: "IDR" };
   try {
-    const allPortfolios = await listPortfoliosCached();
-    if (allPortfolios.length === 0)
-      return { status: "empty", transactions: [], scopeCurrency: "IDR" };
-    const holderId = await resolveHolderScope(allPortfolios);
-    const portfolios = holderId
-      ? allPortfolios.filter((p) => p.accountHolderId === holderId)
-      : allPortfolios;
+    // Deliberately NOT narrowed by the holder scope: the edit page is addressed by a
+    // concrete transaction id (deep link, bookmark, a row opened before the scope was
+    // switched), and the id lookup is owner-scoped by the API anyway. Filtering to the
+    // holder's portfolios 404'd any such row that sat outside the active holder.
+    const portfolios = await listPortfoliosCached();
     if (portfolios.length === 0) return { status: "empty", transactions: [], scopeCurrency: "IDR" };
     const me = await loadMe();
     const scopeCurrency = me?.displayCurrency ?? "IDR";

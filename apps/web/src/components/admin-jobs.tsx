@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useApiClient } from "@/lib/api";
+import { useInterval } from "@/lib/use-interval";
 import { Spinner } from "@/components/ui/spinner";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
@@ -138,10 +139,10 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
 
   const hasPending = Object.values(pending).some((e) => !e.timedOut);
 
-  useEffect(() => {
-    if (!hasPending) return;
-
-    const id = setInterval(async () => {
+  // Polls only while a job is pending and the tab is visible (`useInterval` pauses on
+  // `document.hidden`).
+  useInterval(
+    async () => {
       let fresh: AdminJob[] | null = null;
       try {
         const result = await api.getAdminJobs();
@@ -196,10 +197,9 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
       if (fresh) {
         setJobs((prev) => prev.map((job) => fresh!.find((f) => f.name === job.name) ?? job));
       }
-    }, POLL_INTERVAL_MS);
-
-    return () => clearInterval(id);
-  }, [hasPending, api]);
+    },
+    hasPending ? POLL_INTERVAL_MS : null,
+  );
 
   if (!schedulerAvailable) {
     return <p className="text-sm italic text-muted-foreground">{t("schedulerUnavailable")}</p>;

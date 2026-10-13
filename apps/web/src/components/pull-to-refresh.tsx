@@ -60,8 +60,26 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
           e.preventDefault();
         }
         const dist = Math.min(MAX_PULL, dy * RESISTANCE);
+        // Written synchronously: `touchend` can land before the state->ref sync effect.
+        pullDistanceRef.current = dist;
         setPullDistance(dist);
+      } else if (pullDistanceRef.current !== 0) {
+        // The finger came back to (or above) where it started: the pull is undone, so
+        // releasing here must NOT refresh off the stale deepest-pull distance.
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
       }
+    };
+
+    // The OS took the gesture (notification shade, system back-swipe, a call...): no
+    // `touchend` will follow, so abandon the pull without refreshing instead of leaving
+    // the indicator and the content offset stuck open.
+    const handleTouchCancel = () => {
+      if (!activeRef.current) return;
+      activeRef.current = false;
+      pullDistanceRef.current = 0;
+      setIsDragging(false);
+      setPullDistance(0);
     };
 
     const handleTouchEnd = () => {
@@ -70,11 +88,13 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
       setIsDragging(false);
 
       if (pullDistanceRef.current >= TRIGGER_HEIGHT) {
+        pullDistanceRef.current = REFRESH_HEIGHT;
         setPullDistance(REFRESH_HEIGHT);
         startTransition(() => {
           router.refresh();
         });
       } else {
+        pullDistanceRef.current = 0;
         setPullDistance(0);
       }
     };
@@ -82,11 +102,13 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
     container.addEventListener("touchstart", handleTouchStart, { passive: true });
     container.addEventListener("touchmove", handleTouchMove, { passive: false });
     container.addEventListener("touchend", handleTouchEnd, { passive: true });
+    container.addEventListener("touchcancel", handleTouchCancel, { passive: true });
 
     return () => {
       container.removeEventListener("touchstart", handleTouchStart);
       container.removeEventListener("touchmove", handleTouchMove);
       container.removeEventListener("touchend", handleTouchEnd);
+      container.removeEventListener("touchcancel", handleTouchCancel);
     };
   }, [scrollContainerRef, router]);
 
