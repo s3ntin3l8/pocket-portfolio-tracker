@@ -67,148 +67,157 @@ export async function recordDailySnapshots(
   const portfoliosWithTx = new Set(withTxRows.map((r) => r.portfolioId));
 
   let count = 0;
+  let failed = 0;
   for (const p of pfs) {
-    if (!portfoliosWithTx.has(p.id)) {
-      // A portfolio that never had transactions never had a snapshot either — nothing to
-      // terminate, skip entirely. But one whose transactions were REMOVED (it has prior,
-      // non-zero snapshot history) needs exactly ONE final marketValue:0 row: aggregateValueFlows
-      // (packages/core/src/twr.ts) needs an explicit zero to recognize "this leg has ended" —
-      // an absent row is read as "hasn't reported today yet" and its last value is carried
-      // forward into the aggregate INDEFINITELY, not as a termination. Writing this once and
-      // then never again (the zero row itself is the signal it's already terminated) is what
-      // keeps this from becoming the same unbounded-growth problem this skip exists to fix.
-      //
-      // This gate assumes the only way the MOST RECENT row reaches marketValue:0 is via
-      // this exact terminal write. A stray zero row from an unrelated source (e.g. a
-      // one-off manual backfill) would be indistinguishable from "already terminated" and
-      // permanently stop writes for this portfolio — harmless while it has zero
-      // transactions (there's nothing real to miss), but worth knowing if this portfolio
-      // ever gets transactions again, since the `portfoliosWithTx` check above (not this
-      // one) is what re-admits it to the normal valuation path once it does.
-      const [lastSnap] = await db
-        .select({ marketValue: portfolioSnapshots.marketValue })
-        .from(portfolioSnapshots)
-        .where(eq(portfolioSnapshots.portfolioId, p.id))
-        .orderBy(desc(portfolioSnapshots.date))
-        .limit(1);
-      if (!lastSnap || Number(lastSnap.marketValue) === 0) continue;
+    // One portfolio's failure (provider outage, bad data) must not skip the rest (audit D8).
+    try {
+      if (!portfoliosWithTx.has(p.id)) {
+        // A portfolio that never had transactions never had a snapshot either — nothing to
+        // terminate, skip entirely. But one whose transactions were REMOVED (it has prior,
+        // non-zero snapshot history) needs exactly ONE final marketValue:0 row: aggregateValueFlows
+        // (packages/core/src/twr.ts) needs an explicit zero to recognize "this leg has ended" —
+        // an absent row is read as "hasn't reported today yet" and its last value is carried
+        // forward into the aggregate INDEFINITELY, not as a termination. Writing this once and
+        // then never again (the zero row itself is the signal it's already terminated) is what
+        // keeps this from becoming the same unbounded-growth problem this skip exists to fix.
+        //
+        // This gate assumes the only way the MOST RECENT row reaches marketValue:0 is via
+        // this exact terminal write. A stray zero row from an unrelated source (e.g. a
+        // one-off manual backfill) would be indistinguishable from "already terminated" and
+        // permanently stop writes for this portfolio — harmless while it has zero
+        // transactions (there's nothing real to miss), but worth knowing if this portfolio
+        // ever gets transactions again, since the `portfoliosWithTx` check above (not this
+        // one) is what re-admits it to the normal valuation path once it does.
+        const [lastSnap] = await db
+          .select({ marketValue: portfolioSnapshots.marketValue })
+          .from(portfolioSnapshots)
+          .where(eq(portfolioSnapshots.portfolioId, p.id))
+          .orderBy(desc(portfolioSnapshots.date))
+          .limit(1);
+        if (!lastSnap || Number(lastSnap.marketValue) === 0) continue;
+        await db
+          .insert(portfolioSnapshots)
+          .values({
+            portfolioId: p.id,
+            date,
+            netWorth: "0",
+            marketValue: "0",
+            effectiveFlow: "0",
+            currency: p.baseCurrency,
+          })
+          .onConflictDoUpdate({
+            target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
+            set: { netWorth: "0", marketValue: "0", effectiveFlow: "0", currency: p.baseCurrency },
+          });
+        count++;
+        continue;
+      }
+      const { summary, coreTxns, metaById, prices, corporateActions, fxRates } =
+        await valuePortfolio(
+          db,
+          marketData,
+          ttlMs,
+          p.id,
+          p.baseCurrency,
+          undefined,
+          p.cashCounted,
+          undefined,
+          now,
+        );
+      if (summary.fxMissingCurrencies.length > 0) {
+        log?.warn(
+          { portfolioId: p.id, date, missing: summary.fxMissingCurrencies },
+          "daily snapshot skipped: FX rate missing",
+        );
+        continue;
+      }
+
+      // Compute today's effectiveFlow: -Σ cashFlow(tx) for qualifying txns executed today,
+      // plus the market value moved by depot transfers. This measures flows into/out of the
+      // SECURITIES sleeve only (holdings market value), mirroring the TWR definition in
+      // packages/core/src/twr.ts — the canonical source. TWR pairs it with marketValue (not
+      // net worth), so it is robust to unrecorded cash. buy/savings_plan/sell and
+      // dividend/coupon (realSeries) count at their cash flow. deposit/withdrawal/fee/
+      // interest are INTENTIONALLY excluded: they land in cash and don't move market value,
+      // so effectiveFlow is 0 on a pure-deposit day BY DESIGN (not a bug). Depot transfers
+      // (transfer_in/transfer_out, legacy bonus+kind:"transfer_in") are the exception: they
+      // move shares — and market value — with no cash, so they are booked at the value they
+      // add/remove today (`transferValueFlow`, same valuation rule as `summary`'s market
+      // value), making the transfer day return-neutral (audit B1). That is the TWR flow
+      // only; the contribution/XIRR lens keeps valuing transfers at carried cost. This is
+      // deliberately NOT boundary-aware — external cash is instead captured by the money-
+      // weighted XIRR lens (boundaryFlows/externalFlows in routes/transactions.ts).
+      // PriceSeriesKind for each instrument: equity/etf/crypto/gold → realSeries; bond/nav → flatProxy.
+      function kindOf(instrId: string): PriceSeriesKind {
+        const meta = instrId ? metaById.get(instrId) : undefined;
+        if (!meta) return "none";
+        if (meta.assetClass === "bond" || meta.assetClass === "mutual_fund") return "flatProxy";
+        return "realSeries";
+      }
+
+      const todayMs = new Date(`${date}T00:00:00.000Z`).getTime();
+      const tomorrowMs = todayMs + 86_400_000;
+      // Every currency here is convertible: a missing rate already skipped the portfolio above.
+      const fx = makeFxRateFn(fxRates, p.baseCurrency);
+      const base = p.baseCurrency;
+      const toBase = (amount: string, ccy: string): Decimal =>
+        new Decimal(convert(amount, ccy, base, fx));
+      // Mirrors summarizePortfolio's per-holding market value (quote → qty × price, else the
+      // #744 cost-basis fallback), so a transfer's flow offsets exactly the value it moves.
+      const valueHolding = (h: Holding): Decimal => {
+        const quote = prices[h.instrumentId];
+        if (quote) return toBase(marketValue(h.quantity, quote.price), quote.currency);
+        if (h.costCurrency) return toBase(h.costBasis, h.costCurrency);
+        return new Decimal(0);
+      };
+      const asOf = new Date(`${date}T23:59:59.999Z`);
+      let holdingsToday: Holding[] | undefined;
+      let effectiveFlow = new Decimal(0);
+      for (const tx of coreTxns) {
+        const exMs = tx.executedAt.getTime();
+        if (exMs < todayMs || exMs >= tomorrowMs) continue;
+        const { type } = tx;
+        if (isDepotTransfer(tx)) {
+          holdingsToday ??= computeHoldings(coreTxns, corporateActions, asOf);
+          effectiveFlow = effectiveFlow.add(
+            transferValueFlow(tx, coreTxns, corporateActions, asOf, valueHolding, holdingsToday),
+          );
+        } else if (isTradeType(type)) {
+          effectiveFlow = effectiveFlow.sub(toBase(cashFlow(tx).toString(), tx.currency));
+        } else if ((type === "dividend" || type === "coupon") && tx.instrumentId) {
+          if (kindOf(tx.instrumentId) === "realSeries") {
+            effectiveFlow = effectiveFlow.sub(toBase(cashFlow(tx).toString(), tx.currency));
+          }
+        }
+        // deposit/withdrawal/fee/interest: cash only, no MV change → not a flow (by design).
+      }
+
       await db
         .insert(portfolioSnapshots)
         .values({
           portfolioId: p.id,
           date,
-          netWorth: "0",
-          marketValue: "0",
-          effectiveFlow: "0",
-          currency: p.baseCurrency,
-        })
-        .onConflictDoUpdate({
-          target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
-          set: { netWorth: "0", marketValue: "0", effectiveFlow: "0", currency: p.baseCurrency },
-        });
-      count++;
-      continue;
-    }
-    const { summary, coreTxns, metaById, prices, corporateActions, fxRates } = await valuePortfolio(
-      db,
-      marketData,
-      ttlMs,
-      p.id,
-      p.baseCurrency,
-      undefined,
-      p.cashCounted,
-      undefined,
-      now,
-    );
-    if (summary.fxMissingCurrencies.length > 0) {
-      log?.warn(
-        { portfolioId: p.id, date, missing: summary.fxMissingCurrencies },
-        "daily snapshot skipped: FX rate missing",
-      );
-      continue;
-    }
-
-    // Compute today's effectiveFlow: -Σ cashFlow(tx) for qualifying txns executed today,
-    // plus the market value moved by depot transfers. This measures flows into/out of the
-    // SECURITIES sleeve only (holdings market value), mirroring the TWR definition in
-    // packages/core/src/twr.ts — the canonical source. TWR pairs it with marketValue (not
-    // net worth), so it is robust to unrecorded cash. buy/savings_plan/sell and
-    // dividend/coupon (realSeries) count at their cash flow. deposit/withdrawal/fee/
-    // interest are INTENTIONALLY excluded: they land in cash and don't move market value,
-    // so effectiveFlow is 0 on a pure-deposit day BY DESIGN (not a bug). Depot transfers
-    // (transfer_in/transfer_out, legacy bonus+kind:"transfer_in") are the exception: they
-    // move shares — and market value — with no cash, so they are booked at the value they
-    // add/remove today (`transferValueFlow`, same valuation rule as `summary`'s market
-    // value), making the transfer day return-neutral (audit B1). That is the TWR flow
-    // only; the contribution/XIRR lens keeps valuing transfers at carried cost. This is
-    // deliberately NOT boundary-aware — external cash is instead captured by the money-
-    // weighted XIRR lens (boundaryFlows/externalFlows in routes/transactions.ts).
-    // PriceSeriesKind for each instrument: equity/etf/crypto/gold → realSeries; bond/nav → flatProxy.
-    function kindOf(instrId: string): PriceSeriesKind {
-      const meta = instrId ? metaById.get(instrId) : undefined;
-      if (!meta) return "none";
-      if (meta.assetClass === "bond" || meta.assetClass === "mutual_fund") return "flatProxy";
-      return "realSeries";
-    }
-
-    const todayMs = new Date(`${date}T00:00:00.000Z`).getTime();
-    const tomorrowMs = todayMs + 86_400_000;
-    // Every currency here is convertible: a missing rate already skipped the portfolio above.
-    const fx = makeFxRateFn(fxRates, p.baseCurrency);
-    const base = p.baseCurrency;
-    const toBase = (amount: string, ccy: string): Decimal =>
-      new Decimal(convert(amount, ccy, base, fx));
-    // Mirrors summarizePortfolio's per-holding market value (quote → qty × price, else the
-    // #744 cost-basis fallback), so a transfer's flow offsets exactly the value it moves.
-    const valueHolding = (h: Holding): Decimal => {
-      const quote = prices[h.instrumentId];
-      if (quote) return toBase(marketValue(h.quantity, quote.price), quote.currency);
-      if (h.costCurrency) return toBase(h.costBasis, h.costCurrency);
-      return new Decimal(0);
-    };
-    const asOf = new Date(`${date}T23:59:59.999Z`);
-    let holdingsToday: Holding[] | undefined;
-    let effectiveFlow = new Decimal(0);
-    for (const tx of coreTxns) {
-      const exMs = tx.executedAt.getTime();
-      if (exMs < todayMs || exMs >= tomorrowMs) continue;
-      const { type } = tx;
-      if (isDepotTransfer(tx)) {
-        holdingsToday ??= computeHoldings(coreTxns, corporateActions, asOf);
-        effectiveFlow = effectiveFlow.add(
-          transferValueFlow(tx, coreTxns, corporateActions, asOf, valueHolding, holdingsToday),
-        );
-      } else if (isTradeType(type)) {
-        effectiveFlow = effectiveFlow.sub(toBase(cashFlow(tx).toString(), tx.currency));
-      } else if ((type === "dividend" || type === "coupon") && tx.instrumentId) {
-        if (kindOf(tx.instrumentId) === "realSeries") {
-          effectiveFlow = effectiveFlow.sub(toBase(cashFlow(tx).toString(), tx.currency));
-        }
-      }
-      // deposit/withdrawal/fee/interest: cash only, no MV change → not a flow (by design).
-    }
-
-    await db
-      .insert(portfolioSnapshots)
-      .values({
-        portfolioId: p.id,
-        date,
-        netWorth: summary.netWorth,
-        marketValue: summary.totalMarketValue,
-        effectiveFlow: effectiveFlow.toString(),
-        currency: p.baseCurrency,
-      })
-      .onConflictDoUpdate({
-        target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
-        set: {
           netWorth: summary.netWorth,
           marketValue: summary.totalMarketValue,
           effectiveFlow: effectiveFlow.toString(),
           currency: p.baseCurrency,
-        },
-      });
-    count++;
+        })
+        .onConflictDoUpdate({
+          target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
+          set: {
+            netWorth: summary.netWorth,
+            marketValue: summary.totalMarketValue,
+            effectiveFlow: effectiveFlow.toString(),
+            currency: p.baseCurrency,
+          },
+        });
+      count++;
+    } catch (err) {
+      log?.error({ err, portfolioId: p.id, date }, "daily snapshot failed for portfolio");
+      failed++;
+    }
   }
+  if (failed > 0) log?.warn({ failed, written: count, date }, "daily snapshot run had failures");
   return count;
 }
 
