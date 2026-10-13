@@ -3,6 +3,7 @@ import {
   caretForDigits,
   digitsBefore,
   formatGrouped,
+  localeSeparators,
   sanitizeNumericInput,
 } from "../src/components/add-transaction-form/number-format";
 
@@ -53,6 +54,39 @@ describe("formatGrouped", () => {
   it("returns an empty string for blank input", () => {
     expect(formatGrouped("")).toBe("");
     expect(formatGrouped(null)).toBe("");
+  });
+});
+
+describe("locale-aware parsing and formatting", () => {
+  it("localeSeparators detects group/decimal per locale", () => {
+    expect(localeSeparators("en")).toEqual({ group: ",", decimal: "." });
+    expect(localeSeparators("id")).toEqual({ group: ".", decimal: "," });
+    expect(localeSeparators("de")).toEqual({ group: ".", decimal: "," });
+  });
+  it("localeSeparators falls back to the English pair on a malformed tag", () => {
+    expect(localeSeparators("not a locale!!")).toEqual({ group: ",", decimal: "." });
+  });
+  it.each(["id", "de"])("%s: a decimal comma is a decimal point, not dropped", (loc) => {
+    expect(sanitizeNumericInput("1,5", loc)).toBe("1.5");
+    expect(sanitizeNumericInput("1.234,56", loc)).toBe("1234.56");
+    expect(sanitizeNumericInput("1.234", loc)).toBe("1234");
+    expect(sanitizeNumericInput("-0,5", loc)).toBe("-0.5");
+    expect(sanitizeNumericInput(",5", loc)).toBe("0.5");
+  });
+  it("en: 1,234.56 stays 1234.56", () => {
+    expect(sanitizeNumericInput("1,234.56", "en")).toBe("1234.56");
+  });
+  it.each([
+    ["en", "1,234,567.5"],
+    ["id", "1.234.567,5"],
+    ["de", "1.234.567,5"],
+  ])("%s: formatGrouped renders with the locale and round-trips", (loc, shown) => {
+    expect(formatGrouped("1234567.5", loc)).toBe(shown);
+    expect(sanitizeNumericInput(shown, loc)).toBe("1234567.5");
+  });
+  it("id: a trailing decimal comma is preserved while typing", () => {
+    expect(formatGrouped("123.", "id")).toBe("123,");
+    expect(sanitizeNumericInput("123,", "id")).toBe("123.");
   });
 });
 

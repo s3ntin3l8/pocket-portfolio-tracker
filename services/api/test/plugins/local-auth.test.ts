@@ -304,7 +304,9 @@ describe("local auth routes", () => {
         headers: auth(sessionJwt),
         payload: { currentPassword: "wrong", newPassword: "anything" },
       });
-      expect(res.statusCode).toBe(401);
+      // 400 (not 401) so the web client's 401 interceptor doesn't sign the user out.
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: "invalid_current_password" });
     });
 
     it("rejects a PAT — change-password requires an interactive session", async () => {

@@ -1244,7 +1244,7 @@
     "passwordTooShort": "Kata sandi harus terdiri dari minimal {min} karakter.",
     "changePasswordErrors": {
       "generic": "Gagal mengubah kata sandi. Silakan coba lagi.",
-      "Invalid password": "Kata sandi saat ini salah.",
+      "invalid_current_password": "Kata sandi saat ini salah.",
       "no_local_password_set": "Akun ini belum memiliki kata sandi — masuk melalui Authentik, atau minta admin untuk mengaturnya.",
       "reauthFailed": "Kata sandi diubah, tetapi gagal masuk kembali secara otomatis — silakan masuk lagi dengan kata sandi baru Anda."
     },

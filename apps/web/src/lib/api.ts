@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { createApiClient, type ApiClient } from "@portfolio/api-client";
 
 /**
@@ -15,7 +17,20 @@ export const apiBaseUrl = "/api/backend";
 
 /** A typed api-client bound to the same-origin proxy. No client-held token: the proxy
  *  attaches the current session's Authentik access token server-side (see apiBaseUrl). */
+/** 401 error codes that mean "the session is gone" — only these send the user to sign-in.
+ *  `unauthorized` is the same-origin proxy's own no-session answer (api/backend route); the
+ *  rest come from the API's auth plugin. Any other 401 body (or a non-401) is a normal
+ *  failure the calling component surfaces itself. */
+const SESSION_LOST_CODES = new Set([
+  "missing_token",
+  "invalid_token",
+  "auth_migrated_relogin",
+  "unauthorized",
+]);
+
 export function useApiClient(): ApiClient {
+  const router = useRouter();
+  const locale = useLocale();
   return useMemo(() => {
     return createApiClient({
       baseUrl: apiBaseUrl,
@@ -28,25 +43,29 @@ export function useApiClient(): ApiClient {
           // landing page can show "account linked, please sign in again" instead of
           // dropping them at the form with no explanation. The flag is read once on
           // landing-page mount and cleared, so it can't outlive the redirect.
+          let code: unknown;
           if (res.headers.get("content-type")?.includes("application/json")) {
             const body = await res
               .clone()
               .json()
               .catch(() => ({}));
-            if (body?.error === "auth_migrated_relogin") {
-              sessionStorage.setItem("pocket:auth-migrated", "1");
-            }
+            code = body?.error;
           }
-          // Not gated on which auth mode is configured (unlike session-error-guard.tsx,
-          // this hook has no component tree to thread that flag through) — routing to
-          // the login page itself, which already renders the right form for whichever
-          // mode is active, needs no flag at all. Was: `signIn("authentik")` here,
-          // which 404/lands on Auth.js's bare, provider-less signin page whenever
-          // Authentik isn't the configured auth mode (e.g. local-auth-only).
-          window.location.assign("/");
+          if (code === "auth_migrated_relogin") {
+            sessionStorage.setItem("pocket:auth-migrated", "1");
+          }
+          // Only a genuinely lost session redirects; e.g. a wrong current password is a 400
+          // now, and an unrelated 401 must not discard the user's in-progress form.
+          // Not gated on which auth mode is configured — routing to the locale's landing
+          // page, which already renders the right form for whichever mode is active, needs
+          // no flag at all. (Was: `signIn("authentik")`, which lands on Auth.js's bare
+          // signin page whenever Authentik isn't the configured auth mode.)
+          if (typeof code === "string" && SESSION_LOST_CODES.has(code)) {
+            router.push(`/${locale}`);
+          }
         }
         return res;
       },
     });
-  }, []);
+  }, [router, locale]);
 }

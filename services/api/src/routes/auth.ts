@@ -202,7 +202,9 @@ export const authRoute = fp(async (app) => {
       }
 
       if (!verifyPassword(currentPassword, user.passwordHash)) {
-        return reply.code(401).send({ error: "Invalid password" });
+        // 400, not 401: the web client treats any 401 as "session gone" and bounces to sign-in,
+        // but here the session is fine — the user just mistyped the current password.
+        return reply.code(400).send({ error: "invalid_current_password" });
       }
 
       await app.db
