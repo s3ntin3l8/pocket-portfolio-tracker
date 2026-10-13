@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { BasisLabel } from "@/components/basis-label";
 
 /** Direction of a gain figure — drives the value colour (green up / red down / neutral). */
 export type Tone = "up" | "down" | "flat";
@@ -75,7 +76,7 @@ export function GainFigure({
           <p className={cn("tabular text-[13px] font-bold", colour, pctClassName)}>{pct}</p>
         )}
       </div>
-      <p className="mt-0.5 text-[11px] font-medium text-text-2">{label}</p>
+      <BasisLabel>{label}</BasisLabel>
     </div>
   );
 }

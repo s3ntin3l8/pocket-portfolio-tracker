@@ -112,6 +112,7 @@ export function useTransactionBanners(
             label: tBanner("income"),
             value: summary.totalIncome ? money(incomeTotal) : "—",
             sub: periodLabel,
+            basis: tBanner("incomeBasis"),
             tone: "neutral" as const,
           },
         ],

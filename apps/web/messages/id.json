@@ -525,7 +525,8 @@
     "calendarLegendProjected": "Proyeksi",
     "calendarLegendGrown": "Proyeksi +",
     "calendarLegendAnnounced": "Diumumkan",
-    "calendarLegendPaid": "Dibayar"
+    "calendarLegendPaid": "Dibayar",
+    "lifetimeBasis": "Dividen dan kupon, sebelum biaya"
   },
   "Savings": {
     "title": "Tabungan",
@@ -1521,7 +1522,8 @@
       "chipSells": "Jual",
       "chipIncome": "Pendapatan",
       "chipIssues": "Perlu ditinjau · {count}",
-      "allTime": "Sepanjang waktu"
+      "allTime": "Sepanjang waktu",
+      "incomeBasis": "Semua jenis pendapatan, setelah biaya dan pajak"
     },
     "transactionCol": "Transaksi",
     "price": "Harga",

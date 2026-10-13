@@ -1,5 +1,6 @@
 import { AlertTriangle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BasisLabel } from "@/components/basis-label";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
 
@@ -17,12 +18,15 @@ function StatBlock({
   sub,
   tone = "neutral",
   bordered = false,
+  basis,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: "up" | "down" | "neutral";
   bordered?: boolean;
+  /** What the figure counts, when that isn't obvious from the label. */
+  basis?: string;
 }) {
   return (
     <div
@@ -46,6 +50,7 @@ function StatBlock({
           {sub}
         </p>
       )}
+      {basis && <BasisLabel>{basis}</BasisLabel>}
     </div>
   );
 }
@@ -80,6 +85,7 @@ export function AllFilterBanner({
             sub={t.sub}
             tone={t.tone}
             bordered={i > 0}
+            basis={t.basis}
           />
         ))}
         {data.mix.length > 0 && (

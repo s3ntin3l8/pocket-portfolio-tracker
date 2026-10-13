@@ -58,7 +58,14 @@ function yoyIncome(incomeRows: TxRow[], now: Date): { ytdTotal: number; trendPct
 
 export interface AllBannerData {
   currency: string;
-  tiles: Array<{ label: string; value: string; sub: string; tone: "up" | "down" | "neutral" }>;
+  tiles: Array<{
+    label: string;
+    value: string;
+    sub: string;
+    tone: "up" | "down" | "neutral";
+    /** What the figure counts (see `BasisLabel`); only set where the definition is non-obvious. */
+    basis?: string;
+  }>;
   mix: FlowMixRow[];
 }
 

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { BasisLabel } from "@/components/basis-label";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function StatCard({
@@ -7,6 +8,7 @@ export function StatCard({
   delta,
   deltaTone = "neutral",
   caption,
+  basis,
   className,
 }: {
   label: string;
@@ -16,6 +18,8 @@ export function StatCard({
   /** A short muted line under the value/delta — e.g. "Top: Gold · moderate". No trend
    *  semantics (unlike `delta`); used for tiles that describe rather than compare. */
   caption?: string;
+  /** What the figure counts — rendered as a `BasisLabel` under the value. */
+  basis?: string;
   /** Escape hatch for grid placement (e.g. `col-span-2` on an odd trailing tile) — kept
    *  separate from the card's own visual styling. */
   className?: string;
@@ -41,6 +45,7 @@ export function StatCard({
             {delta}
           </p>
         )}
+        {basis && <BasisLabel>{basis}</BasisLabel>}
         {caption && <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">{caption}</p>}
       </CardContent>
     </Card>

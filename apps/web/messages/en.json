@@ -525,7 +525,8 @@
     "calendarLegendAnnounced": "Announced",
     "calendarLegendPaid": "Paid",
     "calendarDayEvents": "{count, plural, one {# payment} other {# payments}}",
-    "calendarMoreAfter": "+{count} more after this window"
+    "calendarMoreAfter": "+{count} more after this window",
+    "lifetimeBasis": "Dividends and coupons, before fees"
   },
   "Savings": {
     "title": "Savings",
@@ -1521,7 +1522,8 @@
       "chipSells": "Sells",
       "chipIncome": "Income",
       "chipIssues": "Needs review · {count}",
-      "allTime": "All time"
+      "allTime": "All time",
+      "incomeBasis": "All income types, net of fees and tax"
     },
     "transactionCol": "Transaction",
     "price": "Price",
