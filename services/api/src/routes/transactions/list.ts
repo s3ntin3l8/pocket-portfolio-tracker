@@ -27,13 +27,18 @@ import { enrichRows, enrichAggregateRows } from "./list-enrichment.js";
 // client already knows every flagged transaction's id (from the anomalies endpoint) but
 // those rows may sit past the current page. `ids` lets it fetch exactly those rows,
 // regardless of pagination, instead of filtering only what's already loaded client-side.
+// Only UUID-shaped ids reach the query — a malformed one would be a Postgres cast error
+// (500). A present-but-all-invalid list stays an (empty) array lookup, never falls back to
+// the default page (a caller expecting an array would get the page object).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function parseIdsParam(raw: string | undefined): string[] | null {
-  if (!raw) return null;
-  const ids = raw
+  if (raw === undefined) return null;
+  const tokens = raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  return ids.length > 0 ? ids : null;
+  if (tokens.length === 0) return null;
+  return tokens.filter((t) => UUID_RE.test(t));
 }
 
 /**

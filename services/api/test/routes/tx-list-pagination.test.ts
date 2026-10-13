@@ -138,6 +138,23 @@ describe("transaction list pagination contract (audit D5) + ids cache key (audit
     expect(rows.map((r) => r.id).sort()).toEqual([ids[0], ids[1]].sort());
   });
 
+  it("a malformed ?ids= value is an empty array lookup, not a 500 or the default page", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/transactions?ids=not-a-uuid`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([]);
+    const mixed = await app.inject({
+      method: "GET",
+      url: `/networth/transactions?ids=garbage,${ids[0]}`,
+      headers: auth(t),
+    });
+    expect(mixed.statusCode).toBe(200);
+    expect((mixed.json() as { id: string }[]).map((r) => r.id)).toEqual([ids[0]]);
+  });
+
   it("an ?ids= page and a plain page do not share a cache entry (audit D4)", async () => {
     const plain = await app.inject({
       method: "GET",
