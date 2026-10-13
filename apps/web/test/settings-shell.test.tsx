@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "../messages/en.json";
 import { UserRound, Briefcase } from "lucide-react";
 
 let mockPathname = "/settings";
@@ -21,7 +23,14 @@ vi.mock("@/i18n/navigation", () => ({
   usePathname: () => mockPathname,
 }));
 
+vi.mock("@/components/scope-link", () => ({
+  ScopeLink: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
 import { SettingsShell, type ShellNavItem } from "../src/components/settings-shell";
+import { SectionHeader } from "../src/components/section-header";
 
 const NAV_ITEMS: ShellNavItem[] = [
   {
@@ -51,7 +60,7 @@ describe("SettingsShell", () => {
 
   it("renders every nav item as a rail link with the right href", () => {
     render(
-      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings">
+      <SettingsShell title="Settings" navItems={NAV_ITEMS} indexHref="/settings">
         <div>content</div>
       </SettingsShell>,
     );
@@ -64,7 +73,7 @@ describe("SettingsShell", () => {
   it("shows the mobile landing menu (grouped nav rows) at the exact index route", () => {
     mockPathname = "/settings";
     render(
-      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings">
+      <SettingsShell title="Settings" navItems={NAV_ITEMS} indexHref="/settings">
         <div>account content</div>
       </SettingsShell>,
     );
@@ -76,7 +85,7 @@ describe("SettingsShell", () => {
   it("renders children (not the landing menu content) on a sub-route", () => {
     mockPathname = "/settings/portfolios";
     render(
-      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings">
+      <SettingsShell title="Settings" navItems={NAV_ITEMS} indexHref="/settings">
         <div>portfolios content</div>
       </SettingsShell>,
     );
@@ -88,6 +97,7 @@ describe("SettingsShell", () => {
   it("renders railTop/railBottom/landingTop slots", () => {
     render(
       <SettingsShell
+        title="Settings"
         navItems={NAV_ITEMS}
         indexHref="/settings"
         railTop={<div>rail-top-slot</div>}
@@ -104,11 +114,37 @@ describe("SettingsShell", () => {
 
   it("always renders rail links inside a <nav> card wrapper", () => {
     render(
-      <SettingsShell navItems={NAV_ITEMS} indexHref="/settings">
+      <SettingsShell title="Settings" navItems={NAV_ITEMS} indexHref="/settings">
         <div>content</div>
       </SettingsShell>,
     );
     const nav = screen.getAllByRole("link")[0]!.closest("nav");
     expect(nav).toHaveClass("bg-card");
+  });
+
+  describe("heading outline", () => {
+    const renderShell = () =>
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <SettingsShell title="Settings" navItems={NAV_ITEMS} indexHref="/settings">
+            <SectionHeader title="Account" backHref="/settings" />
+          </SettingsShell>
+        </NextIntlClientProvider>,
+      );
+
+    it("has exactly one h1 at the index — the shell's; the section title is an h2", () => {
+      mockPathname = "/settings";
+      renderShell();
+      const h1s = screen.getAllByRole("heading", { level: 1, hidden: true });
+      expect(h1s.map((h) => h.textContent)).toEqual(["Settings"]);
+      expect(screen.getByRole("heading", { level: 2, hidden: true, name: "Account" })).toBeTruthy();
+    });
+
+    it("has exactly one h1 on a sub-route — the section header's", () => {
+      mockPathname = "/settings/account";
+      renderShell();
+      const h1s = screen.getAllByRole("heading", { level: 1, hidden: true });
+      expect(h1s.map((h) => h.textContent)).toEqual(["Account"]);
+    });
   });
 });

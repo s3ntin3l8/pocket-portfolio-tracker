@@ -109,6 +109,7 @@ export default async function AdminLayout({
     <SettingsShell
       navItems={navItems}
       indexHref="/admin"
+      title={t("title")}
       landingTop={
         <div className="mb-4 flex items-center gap-3">
           <Link
@@ -119,7 +120,7 @@ export default async function AdminLayout({
             <ChevronLeft className="size-[18px]" />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-extrabold tracking-tight">{t("title")}</h1>
+            <p className="truncate text-xl font-extrabold tracking-tight">{t("title")}</p>
             <p className="truncate text-xs text-muted-foreground">{t("subtitle")}</p>
           </div>
         </div>

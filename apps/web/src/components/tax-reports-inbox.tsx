@@ -141,6 +141,7 @@ export function TaxReportsInbox({
         type="file"
         accept="application/pdf"
         className="hidden"
+        aria-label={t("upload")}
         disabled={!canUpload}
         onChange={(e) => {
           const file = e.target.files?.[0];

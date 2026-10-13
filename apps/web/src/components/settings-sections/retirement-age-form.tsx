@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
@@ -32,11 +32,15 @@ export function RetirementAgeForm({ age }: { age: number | null }) {
     }
   };
 
+  const ageId = useId();
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label className="text-xs font-medium text-text-3">{t("retirementAge")}</label>
+        <label htmlFor={ageId} className="text-xs font-medium text-text-3">
+          {t("retirementAge")}
+        </label>
         <Input
+          id={ageId}
           type="number"
           min={50}
           max={80}
