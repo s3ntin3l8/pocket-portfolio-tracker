@@ -170,8 +170,12 @@ export default async function HoldingsPage({
   // Rendered unconditionally there rather than gated on `holdings.length > 0` as before:
   // that guard also hid it for a cash-only portfolio, even though `exportRows` already
   // included its cash rows.
+  // Explicit key: this element is created in the server component and handed to the client
+  // `PositionsPanel` → `TableToolbar`; once serialized across the RSC boundary React treats it as
+  // a list child there, and a keyless one trips the "unique key" warning (audit E8).
   const exportButton = (
     <ExportCsvButton
+      key="export-csv"
       filename="holdings.csv"
       headers={[
         "Symbol",
