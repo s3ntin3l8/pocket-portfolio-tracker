@@ -215,13 +215,15 @@ export async function loadBoundaryFlowsForUser(
     list.push(r);
     byPortfolio.set(r.portfolioId, list);
   }
+  // One query for every instrument's actions, partitioned per portfolio client-side
+  // (global actions + that portfolio's own) — same scoping as `corporateActionsFor(…, pfId)`.
+  const allCas = await corporateActionsFor(
+    app,
+    rows.map((r) => r.instrumentId),
+  );
   const perPortfolio = await Promise.all(
-    [...byPortfolio].map(async ([pfId, pfRows]) => {
-      const cas = await corporateActionsFor(
-        app,
-        pfRows.map((r) => r.instrumentId),
-        pfId,
-      );
+    [...byPortfolio].map(([pfId, pfRows]) => {
+      const cas = allCas.filter((ca) => ca.portfolioId == null || ca.portfolioId === pfId);
       return boundaryFlows(app, pfRows, boundary, displayCurrency, cas);
     }),
   );
