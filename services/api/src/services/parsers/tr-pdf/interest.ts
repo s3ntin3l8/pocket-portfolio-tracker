@@ -1,5 +1,6 @@
 import { toDateKey } from "@portfolio/core";
 import type { ParsedTransaction, TaxComponents } from "@portfolio/schema";
+import { toDecimalSafe } from "../../../lib/decimal-safe.js";
 import {
   parseGerman,
   addMoney,
@@ -18,13 +19,14 @@ export function parseTrInterest(text: string): TrPdfResult {
 
   const kapst = parseGerman(text.match(/Kapitalertrags?steuer\s+([\d.,]+)\s+EUR/)?.[1]);
   const solz = parseGerman(text.match(/Solidaritätszuschlag\s+([\d.,]+)\s+EUR/)?.[1]);
-  const kapstNum = kapst ? Number(kapst) : 0;
-  const solzNum = solz ? Number(solz) : 0;
-  const taxNum = kapstNum + solzNum;
-  const tax = taxNum > 0 ? taxNum.toFixed(2) : undefined;
+  // Decimal, never a float sum (audit B12).
+  const kapstDec = toDecimalSafe(kapst);
+  const solzDec = toDecimalSafe(solz);
+  const taxDec = kapstDec.add(solzDec);
+  const tax = taxDec.gt(0) ? taxDec.toFixed(2) : undefined;
   const taxComponents: TaxComponents = {};
-  if (kapstNum > 0) taxComponents.kapitalertragsteuer = kapst!;
-  if (solzNum > 0) taxComponents.solidaritaetszuschlag = solz!;
+  if (kapstDec.gt(0)) taxComponents.kapitalertragsteuer = kapst!;
+  if (solzDec.gt(0)) taxComponents.solidaritaetszuschlag = solz!;
 
   const buchung = extractBuchung(text);
   const payDate = buchung.date ?? headerDate;

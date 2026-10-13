@@ -14,6 +14,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { detectTrPdf, parseTrPdf } from "../../../src/services/parsers/tr-pdf.js";
+import { addMoney } from "../../../src/services/parsers/tr-pdf/helpers.js";
 
 // --- Fixtures (sanitised real text) ----------------------------------------
 
@@ -334,5 +335,20 @@ describe("parseTrPdf — tax optimisation (new branch)", () => {
     expect(d.tax).toBe("1.77");
     expect(d.taxComponents?.kapitalertragsteuer).toBe("1.68");
     expect(d.taxComponents?.solidaritaetszuschlag).toBe("0.09");
+  });
+});
+
+describe("tr-pdf money helpers (audit B12)", () => {
+  it("addMoney matches the old integer-cent path on ordinary 2-dp amounts", () => {
+    expect(addMoney("5.51", "0.98")).toBe("6.49");
+    expect(addMoney("0.1", "0.2")).toBe("0.30");
+    expect(addMoney(null, undefined, "1.67")).toBe("1.67");
+    expect(addMoney("-1.68", "-0.09")).toBe("-1.77");
+  });
+
+  it("addMoney rounds the decimal value, not its binary approximation", () => {
+    // Math.round(1.005 × 100) = 100 in floats (1.00499…), so the old path returned 1.00.
+    expect(addMoney("1.005")).toBe("1.01");
+    expect(addMoney("not-a-number", "2")).toBe("2.00");
   });
 });

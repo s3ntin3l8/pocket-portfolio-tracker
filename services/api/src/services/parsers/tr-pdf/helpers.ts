@@ -1,3 +1,5 @@
+import { Decimal } from "decimal.js";
+import { toDecimalSafe } from "../../../lib/decimal-safe.js";
 import { parsedTransactionSchema, type ParsedTransaction } from "@portfolio/schema";
 import { parseEuroDecimal, parseDkbDate } from "../dkb.js";
 import { tryAddDraft, type ParserError } from "../shared.js";
@@ -21,12 +23,19 @@ export function parseUs(raw: string | null | undefined): string | null {
   return Number.isFinite(n) ? n.toString() : null;
 }
 
+/**
+ * Sum decimal-string money values to cents with decimal.js (audit B12). Each addend is
+ * rounded to cents first, half toward +∞ — the old integer-cent float path's
+ * `Math.round(n · 100)` convention, minus its binary-approximation misses (1.005 → 1.01).
+ * Missing/unparseable values count as 0.
+ */
 export function addMoney(...values: (string | null | undefined)[]): string {
-  const cents = values.reduce((acc, v) => {
-    const n = v == null ? null : parseFloat(v);
-    return acc + (n == null || !Number.isFinite(n) ? 0 : Math.round(n * 100));
-  }, 0);
-  return (cents / 100).toFixed(2);
+  return values
+    .reduce<Decimal>(
+      (acc, v) => acc.add(toDecimalSafe(v).toDecimalPlaces(2, Decimal.ROUND_HALF_CEIL)),
+      new Decimal(0),
+    )
+    .toFixed(2);
 }
 
 export function parseTrDate(raw: string | null | undefined): Date | null {
