@@ -63,8 +63,11 @@ route returns `taxUnavailable: true` instead of erroring.
 
 ### Teilfreistellung (partial exemption)
 
-Fund gains/losses and Vorabpauschale are multiplied by `(1 − tfRate)` before counting
-against the allowance. The rate comes from `instruments.partialExemptionRate` when set,
+Fund gains/losses, fund **distributions** and Vorabpauschale are multiplied by
+`(1 − tfRate)` before counting against the allowance. Distributions are carried
+per instrument in `TradeLog.incomeByInstrumentYear` (the instrument-attributed part of
+`dividendsByYear`); instrument-less income such as account interest stays unadjusted.
+An equity-ETF distribution of €100 therefore counts as €70 in the general pot. The rate comes from `instruments.partialExemptionRate` when set,
 else a hardcoded default by asset class (`services/api/src/routes/transactions/tax.ts`):
 ETF → **30%**, mutual fund → **15%**, everything else → **0%** (no exemption). Worked
 example (from `packages/core/test/tax.test.ts`): a closed equity-ETF trade with a
@@ -73,17 +76,33 @@ example (from `packages/core/test/tax.test.ts`): a closed equity-ETF trade with 
 
 ### Two-pot loss netting (Verlustverrechnungstöpfe)
 
-Gains/losses are split into two pots that **never spill into each other**:
+Gains/losses are split into two pots:
 
 - **Aktienverlusttopf (stock pot)** — realized share-sale (assetClass `"equity"`)
   gains/losses only.
 - **Allgemeiner Verlusttopf (general pot)** — fund/bond/derivative gains/losses, all
   dividend/interest/coupon income, and the Vorabpauschale net (accrual − credit).
 
-Each pot nets internally and floors at 0 independently _before_ summing into `usedYtd` —
-a big stock loss can never offset a fund gain. **Gold and crypto are excluded from both
+**Netting is one-way (§20 Abs. 6 EStG, owner-confirmed):** a loss in the _general_ pot
+offsets _stock_ gains; a loss in the _stock_ pot only ever offsets stock gains, never
+general gains. `computePotsUsage` (`packages/core/src/tax-helpers.ts`) applies each pot's
+own carry-forward first, then nets a still-negative general pot against the stock gain
+before clamping; whatever is still negative afterwards is carried forward separately
+(the stock loss in the stock pot, the remaining general loss in the general pot).
+
+| Stock pot | General pot | Counts against allowance | Note                                |
+| --------- | ----------- | ------------------------ | ----------------------------------- |
+| +1,000    | −400        | 600                      | general loss nets the stock gain    |
+| −1,000    | +400        | 400                      | stock loss carried forward, unused  |
+| −400      | +1,000      | 1,000                    | stock loss NOT used on general gain |
+| +400      | −1,000      | 0                        | 600 general loss carried forward    |
+
+`lossCarryForward.general` follows the same direction (a general carry-forward larger
+than the general subtotal also absorbs stock gains); `lossCarryForward.stock` only ever
+reduces the stock pot. **Gold and crypto are excluded from both
 pots entirely**: they fall under §23 EStG private-sale rules, a separate regime from the
-§20 Kapitalerträge this allowance covers.
+§20 Kapitalerträge this allowance covers. The same exclusion applies to harvest
+suggestions (they never propose realising gold/crypto gains "to use the allowance").
 
 A per-pot, per-holder **loss carry-forward** from the prior year's tax certificate
 (`lossCarryforward` table, keyed by `holderId` + `taxYear` + `pot`) is subtracted from

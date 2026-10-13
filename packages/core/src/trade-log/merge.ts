@@ -1,6 +1,6 @@
 import type { Decimal } from "decimal.js";
 import { ZERO } from "../decimal.js";
-import type { TradeLog, TradeMethod, YearTax, YearAmount } from "./types.js";
+import type { InstrumentYearTax, TradeLog, TradeMethod, YearTax, YearAmount } from "./types.js";
 import { finalizeLog } from "./finalize.js";
 
 /**
@@ -17,7 +17,15 @@ export function mergeTradeLogs(
   const trades = logs.flatMap((l) => l.trades);
   const divMap = new Map<number, { amount: Decimal; tax: Decimal }>();
   const bonusMap = new Map<number, Decimal>();
+  const instrMap = new Map<string, { year: number; id: string; amount: Decimal; tax: Decimal }>();
   for (const l of logs) {
+    for (const d of l.incomeByInstrumentYear ?? []) {
+      const key = `${d.instrumentId}:${d.year}`;
+      const e = instrMap.get(key) ?? { year: d.year, id: d.instrumentId, amount: ZERO, tax: ZERO };
+      e.amount = e.amount.add(d.amount);
+      e.tax = e.tax.add(d.tax);
+      instrMap.set(key, e);
+    }
     for (const d of l.dividendsByYear) {
       const e = divMap.get(d.year) ?? { amount: ZERO, tax: ZERO };
       e.amount = e.amount.add(d.amount);
@@ -35,8 +43,23 @@ export function mergeTradeLogs(
       amount: amount.toString(),
       tax: tax.toString(),
     }));
+  const incomeByInstrumentYear: InstrumentYearTax[] = [...instrMap.values()]
+    .sort((a, b) => a.year - b.year || a.id.localeCompare(b.id))
+    .map((e) => ({
+      instrumentId: e.id,
+      year: e.year,
+      amount: e.amount.toString(),
+      tax: e.tax.toString(),
+    }));
   const bonusesByYear: YearAmount[] = [...bonusMap.entries()]
     .sort(([a], [b]) => a - b)
     .map(([year, amount]) => ({ year, amount: amount.toString() }));
-  return finalizeLog(trades, dividendsByYear, bonusesByYear, method, displayCurrency);
+  return finalizeLog(
+    trades,
+    dividendsByYear,
+    bonusesByYear,
+    method,
+    displayCurrency,
+    incomeByInstrumentYear,
+  );
 }

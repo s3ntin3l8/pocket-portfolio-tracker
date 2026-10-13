@@ -70,6 +70,13 @@ export interface YearTax {
   tax: string; // withholding tax, display currency
 }
 
+/** Income (dividend/coupon/interest) attributed to one instrument in one year; display
+ * currency, same net/withholding split as `YearTax`. Lets tax.ts apply the instrument's
+ * Teilfreistellung to fund distributions (§20 InvStG) before pooling. */
+export interface InstrumentYearTax extends YearTax {
+  instrumentId: string;
+}
+
 export interface TradeLog {
   displayCurrency: string;
   method: TradeMethod;
@@ -81,6 +88,11 @@ export interface TradeLog {
   winRate: number | null;
   realizedByYear: YearAmount[]; // method-aware (from leg tax years)
   dividendsByYear: YearTax[]; // all income incl. instrument-less interest
+  /** The instrument-attributed part of `dividendsByYear`, split per instrument. Gross,
+   * unadjusted — tax.ts applies Teilfreistellung per instrument; the remainder
+   * (`dividendsByYear` minus this) is instrument-less interest, taxed in full. Optional:
+   * omitted on hand-written fixtures; computeTrades/mergeTradeLogs always set it. */
+  incomeByInstrumentYear?: InstrumentYearTax[];
   /** Broker-credited bonuses by year: bonus_cash (e.g. Kindergeld) and saveback buy
    * legs. Purely informational — NOT included in totalReturn or totalDividends.
    * Excludes roundup (user's own spare change). Note: first-class transfer_in

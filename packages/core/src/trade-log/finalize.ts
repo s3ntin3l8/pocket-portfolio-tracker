@@ -1,6 +1,13 @@
 import { Decimal } from "decimal.js";
 import { ZERO } from "../decimal.js";
-import type { Trade, TradeLog, TradeMethod, YearAmount, YearTax } from "./types.js";
+import type {
+  InstrumentYearTax,
+  Trade,
+  TradeLog,
+  TradeMethod,
+  YearAmount,
+  YearTax,
+} from "./types.js";
 
 /** Open first, then most-recent entry date on top. */
 export function sortTrades(trades: Trade[]): void {
@@ -17,6 +24,7 @@ export function finalizeLog(
   bonusesByYear: YearAmount[],
   method: TradeMethod,
   display: string,
+  incomeByInstrumentYear: InstrumentYearTax[] = [],
 ): TradeLog {
   sortTrades(trades);
 
@@ -56,6 +64,7 @@ export function finalizeLog(
     winRate: closed > 0 ? wins / closed : null,
     realizedByYear,
     dividendsByYear,
+    incomeByInstrumentYear,
     bonusesByYear,
   };
 }

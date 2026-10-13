@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js";
 import { D, ZERO } from "../decimal.js";
-import { positionHarvestMath } from "../tax-helpers.js";
+import { isSection23Class, positionHarvestMath } from "../tax-helpers.js";
 import { allowanceUsageYTD } from "./compute.js";
 import type {
   HarvestSuggestionsInput,
@@ -31,6 +31,10 @@ export function harvestSuggestions(input: HarvestSuggestionsInput): HarvestSugge
 
   for (const trade of input.tradeLog.trades) {
     if (trade.status !== "open") continue;
+    // Gold/crypto fall under §23 EStG (private sales), not the §20 Sparerpauschbetrag —
+    // same filter allowanceUsageYTD applies, otherwise we'd suggest realising gains
+    // "to use the allowance" that the allowance can never absorb.
+    if (isSection23Class(input.assetClasses?.[trade.instrumentId])) continue;
 
     const grossGain = D(trade.unrealizedPnL);
     if (grossGain.lte(ZERO)) continue;

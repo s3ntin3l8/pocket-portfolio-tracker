@@ -622,7 +622,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     expect(result.usedYtd).toBe("300.00");
   });
 
-  it("a general-pot (fund) loss does NOT offset a stock gain — no cross-pot spill", () => {
+  it("a general-pot (fund) loss DOES offset a stock gain (one-way, §20 Abs. 6 EStG)", () => {
     const log = makeTradeLog({
       trades: [gainTrade("stock-a", "300"), gainTrade("fund-a", "-500")],
     });
@@ -633,9 +633,10 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
       year: 2026,
       assetClasses: { "stock-a": "equity", "fund-a": "etf" },
     });
-    expect(result.stockPot.used).toBe("300.00");
+    // 300 stock gain - 500 general loss -> fully absorbed; 200 general loss carries on.
+    expect(result.stockPot.used).toBe("0.00");
     expect(result.generalPot.used).toBe("0.00");
-    expect(result.usedYtd).toBe("300.00");
+    expect(result.usedYtd).toBe("0.00");
   });
 
   it("a stock loss DOES offset another stock gain — same-pot netting still works", () => {
