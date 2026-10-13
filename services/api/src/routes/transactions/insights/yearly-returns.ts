@@ -13,6 +13,7 @@ import {
   getBenchmarkPricesMulti,
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
+import { toCoreTxns } from "../../../services/tx-core.js";
 import { boundaryFlows } from "../shared/flows.js";
 import { corporateActionsFor } from "../shared/helpers.js";
 import type { FastifyInstance } from "fastify";
@@ -188,25 +189,19 @@ export async function loadBoundaryFlowsForUser(
   boundary: "inside" | "outside",
 ): Promise<{ amount: string; date: Date }[]> {
   if (portfolioIds.length === 0) return [];
-  const rows = await app.db
-    .select({
-      type: transactions.type,
-      kind: transactions.kind,
-      price: transactions.price,
-      currency: transactions.currency,
-      quantity: transactions.quantity,
-      fees: transactions.fees,
-      instrumentId: transactions.instrumentId,
-      executedAt: transactions.executedAt,
-      portfolioId: transactions.portfolioId,
-      // Without this, archived/draft/cash_neutral rows arrived in core with
-      // `status: undefined` and slipped past its status guards entirely (issue #736).
-      status: transactions.status,
-    })
-    .from(transactions)
-    .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))
-    .where(and(inArray(transactions.portfolioId, portfolioIds), eq(portfolios.userId, userId)))
-    .orderBy(asc(transactions.executedAt));
+  // Load FULL rows and map them through `toCoreTxns` — the same chokepoint the hero
+  // XIRR's `loadValuation` uses — rather than a hand-picked column subset. The subset
+  // used to omit `status` (archived/draft rows slipped past core's guards, issue #736)
+  // and then `tax` (audit B13: `cashFlow(sell)` nets the withheld tax, so without the
+  // column every taxed sale entered the per-year XIRR at its gross proceeds).
+  const rows = (
+    await app.db
+      .select({ tx: transactions })
+      .from(transactions)
+      .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))
+      .where(and(inArray(transactions.portfolioId, portfolioIds), eq(portfolios.userId, userId)))
+      .orderBy(asc(transactions.executedAt))
+  ).map((r) => r.tx);
   // One walk per portfolio, each with its own split/bonus actions (audit B9) — the
   // average-cost pool behind transfer valuation is per depot, never shared across them.
   const byPortfolio = new Map<string, typeof rows>();
@@ -224,7 +219,7 @@ export async function loadBoundaryFlowsForUser(
   const perPortfolio = await Promise.all(
     [...byPortfolio].map(([pfId, pfRows]) => {
       const cas = allCas.filter((ca) => ca.portfolioId == null || ca.portfolioId === pfId);
-      return boundaryFlows(app, pfRows, boundary, displayCurrency, cas);
+      return boundaryFlows(app, toCoreTxns(pfRows), boundary, displayCurrency, cas);
     }),
   );
   return perPortfolio

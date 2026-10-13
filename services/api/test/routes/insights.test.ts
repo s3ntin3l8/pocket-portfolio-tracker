@@ -4,10 +4,13 @@ import {
   corporateActions,
   instruments,
   portfolioSnapshots,
+  portfolios,
   prices,
   transactions,
 } from "@portfolio/db";
+import { eq } from "drizzle-orm";
 import { buildApp } from "../../src/app.js";
+import { loadBoundaryFlowsForUser } from "../../src/routes/transactions/insights/yearly-returns.js";
 import { closeDb } from "../../src/db/client.js";
 
 const ISSUER = "https://auth.test/application/o/portfolio/";
@@ -860,6 +863,70 @@ describe("GET /insights", () => {
       // must not move this number at all.
       expect(xirr).toBeGreaterThan(0);
       expect(xirr).toBeLessThan(0.5);
+    });
+
+    // Audit B13: the yearly XIRR's flow loader omitted the `tax` column, so
+    // `cashFlow(sell)` (proceeds − fees − tax) saw tax = 0 and every taxed sale entered
+    // the per-year XIRR at its GROSS proceeds — more cash than the user ever received.
+    it("nets withheld tax out of an outside-boundary sell flow", async () => {
+      const t = await token("insights-yearly-xirr-tax-user");
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Taxed Sell Test", baseCurrency: "EUR", cashCounted: false },
+      });
+      const portfolioId = create.json().id;
+      const [pf] = await app.db
+        .select({ userId: portfolios.userId })
+        .from(portfolios)
+        .where(eq(portfolios.id, portfolioId));
+      const [inst] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: "TAXSELL",
+          name: "Taxed Sell Co",
+          assetClass: "equity",
+          unit: "shares",
+          market: "XETRA",
+          currency: "EUR",
+        })
+        .returning();
+      await app.db.insert(transactions).values([
+        {
+          portfolioId,
+          instrumentId: inst!.id,
+          type: "buy",
+          quantity: "10",
+          price: "100",
+          fees: "1",
+          currency: "EUR",
+          executedAt: new Date("2026-01-10"),
+        },
+        {
+          portfolioId,
+          instrumentId: inst!.id,
+          type: "sell",
+          quantity: "10",
+          price: "150",
+          fees: "1",
+          tax: "131.88",
+          currency: "EUR",
+          executedAt: new Date("2026-06-10"),
+        },
+      ]);
+
+      const flows = await loadBoundaryFlowsForUser(
+        app,
+        pf!.userId,
+        [portfolioId],
+        "EUR",
+        "outside",
+      );
+      const sell = flows.find((f) => f.date.toISOString().startsWith("2026-06-10"));
+      expect(sell).toBeTruthy();
+      // 10 × 150 − 1 fee − 131.88 tax = 1367.12 (pre-fix: 1499, the gross proceeds).
+      expect(sell!.amount).toBe("1367.12");
     });
   });
 });
