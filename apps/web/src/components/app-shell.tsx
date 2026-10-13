@@ -66,7 +66,8 @@ export function AppShell({
   holders?: Pick<AccountHolder, "id" | "name">[];
   selectedId?: string | null;
   selectedHolderId?: string | null;
-  /** The scope (cookie encoding) the layout was rendered for; drives `ScopeSync`. */
+  /** The scope (cookie encoding) the layout was rendered for; drives `ScopeSync`. The
+   *  layout always passes it; it is optional only so shell-only tests can omit it. */
   serverScope?: string | null;
   isAdmin?: boolean;
   anomalyCount?: number;

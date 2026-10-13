@@ -10,8 +10,13 @@ import { SCOPE_PARAM, effectiveScopeValue } from "@/lib/portfolio-selection";
  * scope. A search-param navigation doesn't re-render the layout, and browser
  * back/forward across two scopes restores the cached one, so the sidebar could show the
  * previous scope's figure. `serverScope` is the scope (cookie encoding) the layout was
- * rendered for; whenever the URL's effective scope differs, refresh once. The ref stops
- * a scope the server can't honour from refreshing in a loop.
+ * rendered for; whenever the URL's effective scope differs, refresh once. The ref is
+ * defensive: both sides resolve identically today, but it keeps a scope the server can't
+ * settle on from refreshing in a loop.
+ *
+ * `document.cookie` is deliberately not an effect dependency: it only matters on
+ * scope-less URLs, where `param` is null, and a cookie write (the switcher) is always
+ * paired with a `?scope=` push that changes `param`.
  */
 export function ScopeSync({ serverScope }: { serverScope: string }) {
   const router = useRouter();
