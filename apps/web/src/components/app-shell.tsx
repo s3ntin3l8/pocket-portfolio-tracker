@@ -7,6 +7,7 @@ import type { Portfolio, AccountHolder } from "@portfolio/api-client";
 import { usePathname } from "@/i18n/navigation";
 import { ScopeLink } from "@/components/scope-link";
 import { LastVisitedTracker } from "@/components/last-visited-tracker";
+import { ScopeSync } from "@/components/scope-sync";
 import { cn } from "@/lib/utils";
 import { GainFigure, toneOf } from "@/components/gain-figure";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -54,6 +55,7 @@ export function AppShell({
   holders = [],
   selectedId = null,
   selectedHolderId = null,
+  serverScope = null,
   isAdmin = false,
   anomalyCount = 0,
   anomalyError = false,
@@ -64,6 +66,9 @@ export function AppShell({
   holders?: Pick<AccountHolder, "id" | "name">[];
   selectedId?: string | null;
   selectedHolderId?: string | null;
+  /** The scope (cookie encoding) the layout was rendered for; drives `ScopeSync`. The
+   *  layout always passes it; it is optional only so shell-only tests can omit it. */
+  serverScope?: string | null;
   isAdmin?: boolean;
   anomalyCount?: number;
   anomalyError?: boolean;
@@ -106,6 +111,11 @@ export function AppShell({
     <FullScreenOverlayProvider>
       <NavProgressProvider>
         <LastVisitedTracker />
+        {serverScope !== null && (
+          <Suspense fallback={null}>
+            <ScopeSync serverScope={serverScope} />
+          </Suspense>
+        )}
         {/* Skip link: first focusable element; jumps past the sidebar/topbar to <main>. */}
         <a
           href="#main"

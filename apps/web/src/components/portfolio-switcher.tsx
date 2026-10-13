@@ -96,10 +96,9 @@ export function PortfolioSwitcher({
     for (const key of SCOPE_RESET_PARAMS) params.delete(key);
     params.set(SCOPE_PARAM, formatScopeParam(scope));
     // push (not replace): a scope change is a navigation the back button should undo.
+    // `ScopeSync` (in the app shell) refreshes the layout for the new scope — for this
+    // push and for back/forward alike.
     router.push(`${pathname}?${params.toString()}`);
-    // The layout (sidebar net worth, switcher props) isn't re-rendered by a search-param
-    // navigation; refresh re-reads it for the new scope.
-    router.refresh();
   }
 
   const selectedPortfolio = portfolios.find((p) => p.id === effectiveSelectedId);

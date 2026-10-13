@@ -17,6 +17,7 @@ export { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib
 // Re-export shared types/helpers used directly by consumers
 export {
   getSelectedPortfolioId,
+  getRawScope,
   resolveSelection,
   type Scope,
   type Selection,
