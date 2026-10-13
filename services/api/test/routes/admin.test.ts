@@ -1023,6 +1023,7 @@ describe("admin provider config", () => {
       method: "POST",
       url: `/admin/users/${id}/set-password`,
       headers: auth(await token("admin-set-password", [ADMIN_GROUP])),
+      payload: { allowLocalFallback: true },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json() as { id: string; tempPassword: string };
@@ -1034,7 +1035,6 @@ describe("admin provider config", () => {
       .from(users)
       .where(eq(users.id, id));
     expect(row.passwordChangedAt).not.toBeNull();
-
     await app.db.delete(users).where(eq(users.id, id));
   });
 

@@ -20,6 +20,13 @@ const createUserSchema = z.object({
   isAdmin: z.boolean().optional().default(false),
 });
 
+const setPasswordBodySchema = z.object({
+  // Keep the user's PATs through the reset (default: revoke them).
+  keepTokens: z.boolean().optional(),
+  // Allow creating a local password for a user who has none and signs in via OIDC.
+  allowLocalFallback: z.boolean().optional(),
+});
+
 const setAdminSchema = z.object({
   isAdmin: z.boolean(),
 });
@@ -144,8 +151,29 @@ export function registerUsersRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const tempPassword = generateTempPassword();
+      const parsedBody = setPasswordBodySchema.safeParse(request.body ?? {});
+      if (!parsedBody.success) {
+        return reply.code(400).send({ error: "validation_error", issues: parsedBody.error.issues });
+      }
+      const { keepTokens, allowLocalFallback } = parsedBody.data;
 
+      const [target] = await app.db
+        .select({ authSub: users.authSub, passwordHash: users.passwordHash })
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      if (!target) {
+        return reply.code(404).send({ error: "user_not_found" });
+      }
+      // An OIDC-only user (no local password, not a locally-created account) is managed in
+      // the IdP. Planting a password here creates a parallel login that would survive the
+      // account being disabled in Authentik, so it needs an explicit opt-in.
+      const oidcOnly = !target.passwordHash && !target.authSub.startsWith("local|");
+      if (oidcOnly && !allowLocalFallback) {
+        return reply.code(409).send({ error: "oidc_user_requires_allow_local_fallback" });
+      }
+
+      const tempPassword = generateTempPassword();
       const [updated] = await app.db
         .update(users)
         .set({ passwordHash: hashPassword(tempPassword), passwordChangedAt: new Date() })
@@ -156,11 +184,16 @@ export function registerUsersRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: "user_not_found" });
       }
 
+      // Same rule as a self-service change: PATs do not survive a password reset.
+      if (!keepTokens) {
+        await app.db.delete(apiTokens).where(eq(apiTokens.userId, id));
+      }
+
       await app.db.insert(adminAuditLog).values({
         actorSub: request.user!.authSub,
         action: "admin_set_password",
         target: id,
-        meta: {},
+        meta: { keepTokens: keepTokens === true, allowLocalFallback: oidcOnly },
       });
 
       return { ...updated, tempPassword };

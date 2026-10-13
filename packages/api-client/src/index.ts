@@ -2184,8 +2184,13 @@ export function createApiClient(config: ApiClientConfig) {
 
     // Local password auth — 503s (auth_not_configured) when AUTH_LOCAL_SECRET isn't
     // set. Both require an interactive session; a PAT gets 403 interactive_session_required.
-    changeLocalPassword: (input: { currentPassword: string; newPassword: string }) =>
-      request<{ ok: true }>("POST", "/auth/local/change-password", input),
+    // Revokes the user's personal access tokens unless `keepTokens: true`.
+    changeLocalPassword: (input: {
+      currentPassword: string;
+      newPassword: string;
+      keepTokens?: boolean;
+    }) =>
+      request<{ ok: true; revokedTokens?: number }>("POST", "/auth/local/change-password", input),
     // Only succeeds once, for an account with no existing password (e.g. an OIDC user
     // attaching a local one) — 400 password_already_set otherwise.
     setLocalPassword: (input: { newPassword: string }) =>

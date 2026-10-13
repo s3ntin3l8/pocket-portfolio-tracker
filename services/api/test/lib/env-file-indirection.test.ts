@@ -21,6 +21,8 @@ describe("env plugin _FILE indirection", () => {
     delete process.env.DB_ENCRYPTION_KEY_FILE;
     delete process.env.STORAGE_SECRET_KEY;
     delete process.env.STORAGE_SECRET_KEY_FILE;
+    delete process.env.AUTH_LOCAL_SECRET;
+    delete process.env.AUTH_LOCAL_SECRET_FILE;
     await closeDb();
   });
 
@@ -67,5 +69,26 @@ describe("env plugin _FILE indirection", () => {
   it("fails fast at startup when the encryption key is not 32 bytes", async () => {
     process.env.DB_ENCRYPTION_KEY = "too-short";
     await expect(buildApp()).rejects.toThrow(/exactly 32 bytes/);
+  });
+
+  it("reads AUTH_LOCAL_SECRET from AUTH_LOCAL_SECRET_FILE", async () => {
+    const value = crypto.randomBytes(48).toString("base64url");
+    fs.writeFileSync(secretPath, `${value}\n`);
+    process.env.AUTH_LOCAL_SECRET_FILE = secretPath;
+
+    const app = await buildApp();
+    expect(app.config.AUTH_LOCAL_SECRET).toBe(value);
+    await app.close();
+  });
+
+  it("refuses to start with an AUTH_LOCAL_SECRET shorter than 32 characters", async () => {
+    process.env.AUTH_LOCAL_SECRET = "x".repeat(31);
+    await expect(buildApp()).rejects.toThrow(/at least 32 characters/);
+  });
+
+  it("accepts an AUTH_LOCAL_SECRET of exactly 32 characters", async () => {
+    process.env.AUTH_LOCAL_SECRET = "y".repeat(32);
+    const app = await buildApp();
+    await app.close();
   });
 });

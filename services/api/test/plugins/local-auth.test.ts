@@ -279,7 +279,7 @@ describe("local auth routes", () => {
         payload: { currentPassword: "secure-password", newPassword: "updated-password" },
       });
       expect(res.statusCode).toBe(200);
-      expect(res.json()).toEqual({ ok: true });
+      expect(res.json()).toMatchObject({ ok: true });
 
       // Verify login with the new password
       const loginRes = await app.inject({

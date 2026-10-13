@@ -19,6 +19,10 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/** `iss` / `aud` stamped on local-login JWTs and required when verifying them. */
+export const LOCAL_JWT_ISSUER = "pocket-portfolio-tracker:local";
+export const LOCAL_JWT_AUDIENCE = "pocket-portfolio-tracker:api";
+
 // Methods a read-scoped PAT may not use. GET/HEAD/OPTIONS are always allowed.
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -256,7 +260,11 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     // Try local auth (symmetric HS256 JWT signed by /auth/local/login)
     if (!authMethod && localJwtKey) {
       try {
-        const { payload } = await jwtVerify(token, localJwtKey);
+        const { payload } = await jwtVerify(token, localJwtKey, {
+          algorithms: ["HS256"],
+          issuer: LOCAL_JWT_ISSUER,
+          audience: LOCAL_JWT_AUDIENCE,
+        });
         if (payload.sub) {
           sub = payload.sub;
           email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
