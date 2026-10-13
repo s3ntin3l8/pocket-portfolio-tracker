@@ -193,11 +193,13 @@ export {
   annualizedVolatility,
   sharpeRatio,
   sortinoRatio,
+  periodsPerYear,
   type IndexPoint as VolIndexPoint,
 } from "./volatility.js";
 export { streakAnalysis, type StreakResult, type Streak } from "./streaks.js";
 export {
   computeYearlyReturns,
+  calendarYearReturn,
   type ComputeYearlyReturnsInput,
   type YearlyReturnRow,
   type YearlyReturnBenchmarkInput,

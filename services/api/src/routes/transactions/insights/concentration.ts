@@ -170,7 +170,32 @@ export async function computeConcentrationSection(
     const isStaleAsOfLatest = (priceDate: string): boolean =>
       daysBetween(priceDate, latestDate) > MAX_PRICE_CARRY_FORWARD_DAYS;
 
-    const coreTxns = toCoreTxns(allTxRows);
+    // Holdings are computed PER PORTFOLIO and their quantities summed per instrument —
+    // never by pooling every portfolio's transactions into one computeHoldings call. The
+    // cost-basis walk requires one currency per instrument, and the same instrument held
+    // in two depots in two currencies (e.g. a EUR and a USD listing booked under one
+    // instrument) is legitimate per depot but throws when pooled, which used to take the
+    // whole /insights response down with a 500 (audit B13). Per-portfolio also keeps one
+    // depot's sells from netting against another depot's position.
+    const rowsByPortfolio = new Map<string, (typeof allTxRows)[number][]>();
+    for (const r of allTxRows) {
+      const list = rowsByPortfolio.get(r.portfolioId) ?? [];
+      list.push(r);
+      rowsByPortfolio.set(r.portfolioId, list);
+    }
+    const coreTxnsByPortfolio = [...rowsByPortfolio.values()].map((rows) => toCoreTxns(rows));
+    const pooledQuantities = (asOf: Date): Map<string, Decimal> => {
+      const out = new Map<string, Decimal>();
+      for (const coreTxns of coreTxnsByPortfolio) {
+        for (const h of computeHoldings(coreTxns, corpActions, asOf)) {
+          if (!h.instrumentId) continue;
+          const q = new Decimal(h.quantity);
+          if (q.lte(0)) continue;
+          out.set(h.instrumentId, (out.get(h.instrumentId) ?? new Decimal(0)).add(q));
+        }
+      }
+      return out;
+    };
     for (const month of months) {
       const monthDates = dates.filter((d) => d.startsWith(month));
       if (monthDates.length === 0) continue;
@@ -178,14 +203,12 @@ export async function computeConcentrationSection(
       const isCurrentMonth = asOfDate === latestDate;
       const asOf = new Date(`${asOfDate}T23:59:59.999Z`);
 
-      const holdings = computeHoldings(coreTxns, corpActions, asOf);
+      const holdings = pooledQuantities(asOf);
       const fx = makeFxRateFn(concentrationFxRates.get(asOfDate) ?? {}, display);
 
       let totalMv = 0;
       const mvByInst: { mv: number; assetClass: string }[] = [];
-      for (const h of holdings) {
-        const qty = Number(h.quantity);
-        if (qty <= 0 || !h.instrumentId) continue;
+      for (const [instrumentId, qty] of holdings) {
         // For the CURRENT month, prefer manualPrice directly when set — the
         // stored prices series for legacy bonds contains synthetic par rows that
         // a backward lookup would prefer over the manual price. Earlier months
@@ -193,10 +216,10 @@ export async function computeConcentrationSection(
         // then is, by definition, the correct value for that point in time.
         let price: { date: string; close: string; currency: string } | null = null;
         if (isCurrentMonth) {
-          price = manualPriceByInst.get(h.instrumentId) ?? null;
+          price = manualPriceByInst.get(instrumentId) ?? null;
         }
         if (!price) {
-          price = latestPriceBefore(h.instrumentId, asOfDate);
+          price = latestPriceBefore(instrumentId, asOfDate);
         }
         if (!price) continue;
         // No FX rate for the quote currency: left out of the weights (never 1:1, audit B2)
@@ -206,16 +229,10 @@ export async function computeConcentrationSection(
         // would silently hold a dead instrument's last-known weight steady forever.
         // Earlier months are historical and unaffected: whatever was the last known
         // price back then is, by definition, the correct value for that point in time.
-        if (
-          isCurrentMonth &&
-          !manualPriceByInst.has(h.instrumentId) &&
-          isStaleAsOfLatest(price.date)
-        )
+        if (isCurrentMonth && !manualPriceByInst.has(instrumentId) && isStaleAsOfLatest(price.date))
           continue;
-        const mv = Number(
-          convert((qty * Number(price.close)).toString(), price.currency, display, fx),
-        );
-        const inst = instMap.get(h.instrumentId);
+        const mv = Number(convert(qty.mul(price.close).toString(), price.currency, display, fx));
+        const inst = instMap.get(instrumentId);
         mvByInst.push({ mv, assetClass: inst?.assetClass ?? "equity" });
         totalMv += mv;
       }
@@ -240,21 +257,11 @@ export async function computeConcentrationSection(
     const yearStart = latestDate.slice(0, 4) + "-01-01";
     const periodEnd = new Date(`${latestDate}T23:59:59.999Z`);
 
-    const heldAtStart = new Set(
-      computeHoldings(coreTxns, corpActions, new Date(`${monthStart}T00:00:00.000Z`))
-        .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
-        .map((h) => h.instrumentId!),
-    );
+    const heldAtStart = new Set(pooledQuantities(new Date(`${monthStart}T00:00:00.000Z`)).keys());
     const heldAtYearStart = new Set(
-      computeHoldings(coreTxns, corpActions, new Date(`${yearStart}T00:00:00.000Z`))
-        .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
-        .map((h) => h.instrumentId!),
+      pooledQuantities(new Date(`${yearStart}T00:00:00.000Z`)).keys(),
     );
-    const heldAtEnd = new Map(
-      computeHoldings(coreTxns, corpActions, periodEnd)
-        .filter((h) => Number(h.quantity) > 0 && h.instrumentId)
-        .map((h) => [h.instrumentId!, h]),
-    );
+    const heldAtEnd = pooledQuantities(periodEnd);
 
     const computePeriodMovers = (startDate: string, heldAtStartSet: Set<string>): BestWorstPair => {
       const movers: PeriodMoverResult[] = [];

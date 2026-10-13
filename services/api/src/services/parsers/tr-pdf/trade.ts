@@ -1,4 +1,5 @@
 import type { ParsedTransaction, TaxComponents } from "@portfolio/schema";
+import { toDecimalSafe } from "../../../lib/decimal-safe.js";
 import { collapse } from "../shared.js";
 import { TR_ISIN_LABELED_RE } from "./detect.js";
 import {
@@ -93,18 +94,20 @@ export function parseTrTrade(text: string): TrPdfResult {
   const settlementDate = buchung.date ?? headerDate;
 
   const isOptimierung = /(?:Kapitalertrags?steuer|Solidaritätszuschlag)\s+Optimierung/.test(text);
-  const compSum =
-    (kapst ? Number(kapst) : 0) + (solz ? Number(solz) : 0) + (kirche ? Number(kirche) : 0);
+  // Decimal throughout (audit B12) — these become the stored `tax`/`taxComponents`.
+  const compSum = toDecimalSafe(kapst).add(toDecimalSafe(solz)).add(toDecimalSafe(kirche));
   let tax: string | undefined;
   const taxComponents: TaxComponents = {};
   if (action === "sell" && isOptimierung) {
     const signed =
-      gross != null && net != null ? Number(gross) - Number(fees) - Number(net) : -compSum;
-    if (Math.abs(signed) >= 0.005) {
+      gross != null && net != null
+        ? toDecimalSafe(gross).sub(toDecimalSafe(fees)).sub(toDecimalSafe(net))
+        : compSum.neg();
+    if (signed.abs().gte("0.005")) {
       tax = signed.toFixed(2);
-      const sgn = signed < 0 ? -1 : 1;
+      const sgn = signed.isNeg() ? -1 : 1;
       const sign = (v: string | null): string | null =>
-        v && Number(v) > 0 ? (sgn * Number(v)).toFixed(2) : null;
+        v && toDecimalSafe(v).gt(0) ? toDecimalSafe(v).mul(sgn).toFixed(2) : null;
       const k = sign(kapst);
       const s = sign(solz);
       const ki = sign(kirche);
@@ -112,11 +115,11 @@ export function parseTrTrade(text: string): TrPdfResult {
       if (s) taxComponents.solidaritaetszuschlag = s;
       if (ki) taxComponents.kirchensteuer = ki;
     }
-  } else if (compSum > 0) {
+  } else if (compSum.gt(0)) {
     tax = compSum.toFixed(2);
-    if (kapst && Number(kapst) > 0) taxComponents.kapitalertragsteuer = kapst;
-    if (solz && Number(solz) > 0) taxComponents.solidaritaetszuschlag = solz;
-    if (kirche && Number(kirche) > 0) taxComponents.kirchensteuer = kirche;
+    if (kapst && toDecimalSafe(kapst).gt(0)) taxComponents.kapitalertragsteuer = kapst;
+    if (solz && toDecimalSafe(solz).gt(0)) taxComponents.solidaritaetszuschlag = solz;
+    if (kirche && toDecimalSafe(kirche).gt(0)) taxComponents.kirchensteuer = kirche;
   }
 
   const externalId = ausfuehrung ? `tr:exec:${ausfuehrung}` : undefined;

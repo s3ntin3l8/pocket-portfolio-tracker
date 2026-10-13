@@ -181,7 +181,11 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   distinction there was judged not worth the complexity for a single day's number; revisit if it
   proves visibly wrong in practice. Both paths share one staleness threshold,
   `MAX_PRICE_CARRY_FORWARD_DAYS` (`packages/core/src/sanity-gates.ts`) — they used to disagree
-  (7 vs. 10 days) before issue #744 unified them.
+  (7 vs. 10 days) before issue #744 unified them. The same threshold also gates _live_ provider
+  quotes by their own `asOf` (`isStaleQuote`, `services/api/src/services/price-cache.ts`, used
+  by `getCachedQuotes` and `refreshHeldPrices`): an older quote counts as a miss and is not
+  cached, so a dead feed drops to the cost path instead of being marked to its last price
+  forever (audit B13).
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

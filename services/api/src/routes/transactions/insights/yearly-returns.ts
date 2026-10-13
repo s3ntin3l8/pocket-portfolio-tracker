@@ -1,3 +1,4 @@
+import { Decimal } from "decimal.js";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   chainIndex,
@@ -13,6 +14,7 @@ import {
   getBenchmarkPricesMulti,
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
+import { toCoreTxns } from "../../../services/tx-core.js";
 import { boundaryFlows } from "../shared/flows.js";
 import { corporateActionsFor } from "../shared/helpers.js";
 import type { FastifyInstance } from "fastify";
@@ -78,28 +80,10 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     flowsByYear.set(year, arr);
   }
 
-  // Compute per-year end NAV (in display currency) by summing the last snapshot of
-  // each year across all portfolios. `pf.flows[].marketValue` actually carries each
-  // portfolio's NAV (net worth — see ComputeYearlyReturnsArgs.perPortfolio); the field
-  // name is inherited from the shared per-portfolio flow shape. `computeYearlyReturns`
-  // also reads this same map at `year - 1` as each year's OPENING NAV.
-  const endNavByYear = new Map<number, string>();
-  for (const year of new Set(pfIndex.map((p) => Number(p.date.slice(0, 4))))) {
-    const lastByPortfolio = new Map<string, { date: string; marketValue: string }>();
-    for (const pf of perPortfolio) {
-      let last: { date: string; marketValue: string } | null = null;
-      for (const f of pf.flows) {
-        if (Number(f.date.slice(0, 4)) !== year) continue;
-        if (!last || f.date > last.date) last = { date: f.date, marketValue: f.marketValue };
-      }
-      if (last) lastByPortfolio.set(pf.id, last);
-    }
-    let total = "0";
-    for (const v of lastByPortfolio.values()) {
-      total = (Number(total) + Number(v.marketValue)).toString();
-    }
-    endNavByYear.set(year, total);
-  }
+  const endNavByYear = yearEndNavs(
+    perPortfolio,
+    new Set(pfIndex.map((p) => Number(p.date.slice(0, 4)))),
+  );
 
   // Benchmarks: read user's selected symbols, backfill missing dates, compute
   // the per-symbol chained index.
@@ -188,25 +172,19 @@ export async function loadBoundaryFlowsForUser(
   boundary: "inside" | "outside",
 ): Promise<{ amount: string; date: Date }[]> {
   if (portfolioIds.length === 0) return [];
-  const rows = await app.db
-    .select({
-      type: transactions.type,
-      kind: transactions.kind,
-      price: transactions.price,
-      currency: transactions.currency,
-      quantity: transactions.quantity,
-      fees: transactions.fees,
-      instrumentId: transactions.instrumentId,
-      executedAt: transactions.executedAt,
-      portfolioId: transactions.portfolioId,
-      // Without this, archived/draft/cash_neutral rows arrived in core with
-      // `status: undefined` and slipped past its status guards entirely (issue #736).
-      status: transactions.status,
-    })
-    .from(transactions)
-    .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))
-    .where(and(inArray(transactions.portfolioId, portfolioIds), eq(portfolios.userId, userId)))
-    .orderBy(asc(transactions.executedAt));
+  // Load FULL rows and map them through `toCoreTxns` — the same chokepoint the hero
+  // XIRR's `loadValuation` uses — rather than a hand-picked column subset. The subset
+  // used to omit `status` (archived/draft rows slipped past core's guards, issue #736)
+  // and then `tax` (audit B13: `cashFlow(sell)` nets the withheld tax, so without the
+  // column every taxed sale entered the per-year XIRR at its gross proceeds).
+  const rows = (
+    await app.db
+      .select({ tx: transactions })
+      .from(transactions)
+      .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))
+      .where(and(inArray(transactions.portfolioId, portfolioIds), eq(portfolios.userId, userId)))
+      .orderBy(asc(transactions.executedAt))
+  ).map((r) => r.tx);
   // One walk per portfolio, each with its own split/bonus actions (audit B9) — the
   // average-cost pool behind transfer valuation is per depot, never shared across them.
   const byPortfolio = new Map<string, typeof rows>();
@@ -224,11 +202,39 @@ export async function loadBoundaryFlowsForUser(
   const perPortfolio = await Promise.all(
     [...byPortfolio].map(([pfId, pfRows]) => {
       const cas = allCas.filter((ca) => ca.portfolioId == null || ca.portfolioId === pfId);
-      return boundaryFlows(app, pfRows, boundary, displayCurrency, cas);
+      return boundaryFlows(app, toCoreTxns(pfRows), boundary, displayCurrency, cas);
     }),
   );
   return perPortfolio
     .flat()
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .map((p) => ({ amount: String(p.amount), date: p.date }));
+}
+
+/**
+ * Per-year end NAV (in display currency): the sum, across portfolios, of each
+ * portfolio's last snapshot in that year. `pf.flows[].marketValue` actually carries each
+ * portfolio's NAV (net worth — see ComputeYearlyReturnsArgs.perPortfolio); the field
+ * name is inherited from the shared per-portfolio flow shape. `computeYearlyReturns`
+ * also reads this same map at `year - 1` as each year's OPENING NAV. Summed with
+ * Decimal (audit B12) — the old string→Number→string round trip drifted.
+ */
+export function yearEndNavs(
+  perPortfolio: ComputeYearlyReturnsArgs["perPortfolio"],
+  years: Iterable<number>,
+): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const year of years) {
+    let total = new Decimal(0);
+    for (const pf of perPortfolio) {
+      let last: { date: string; marketValue: string } | null = null;
+      for (const f of pf.flows) {
+        if (Number(f.date.slice(0, 4)) !== year) continue;
+        if (!last || f.date > last.date) last = f;
+      }
+      if (last) total = total.add(last.marketValue);
+    }
+    out.set(year, total.toFixed());
+  }
+  return out;
 }

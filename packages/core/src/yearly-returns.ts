@@ -97,12 +97,7 @@ export function computeYearlyReturns(input: ComputeYearlyReturnsInput): YearlyRe
     // first point WITHIN the year — the latter silently omits the Dec 31 → first-
     // trading-day move for every year after the first. Falls back to the in-year
     // first point for the inception year, when no prior close exists.
-    const priorClose = priorYearClose(pfIndex, year);
-    let portfolioTwr: string | null = null;
-    if (pfSlice.length > 0 && (priorClose !== null || pfSlice.length >= 2)) {
-      const startPoint = priorClose ?? pfSlice[0];
-      portfolioTwr = yearReturn(startPoint, pfSlice[pfSlice.length - 1]);
-    }
+    const portfolioTwr = calendarYearReturn(pfIndex, year);
 
     const portfolioXirr = computeYearlyXirr(
       pfFlowsByYear.get(year) ?? [],
@@ -113,8 +108,10 @@ export function computeYearlyReturns(input: ComputeYearlyReturnsInput): YearlyRe
     );
 
     const benchmarkOutputs: YearlyReturnBenchmarkOutput[] = benchmarks.map((bm) => {
-      const bmSlice = sliceByYear(bm.index, year);
-      const twr = bmSlice.length >= 2 ? yearReturn(bmSlice[0], bmSlice[bmSlice.length - 1]) : null;
+      // Same prior-close anchor as the portfolio (audit B13) — anchoring the benchmark at
+      // its first in-year point would compare the two over different windows and charge
+      // the portfolio's Dec 31 → first-trading-day move against a benchmark that skips it.
+      const twr = calendarYearReturn(bm.index, year);
       const activeReturn =
         portfolioTwr !== null && twr !== null ? D(portfolioTwr).sub(D(twr)).toString() : null;
       return {
@@ -145,7 +142,7 @@ function collectYears(pfIndex: IndexPoint[], benchmarks: YearlyReturnBenchmarkIn
   return [...set].sort((a, b) => a - b);
 }
 
-function sliceByYear(index: IndexPoint[], year: number): IndexPoint[] {
+function sliceByYear<P extends { date: string }>(index: readonly P[], year: number): P[] {
   const prefix = String(year);
   return index.filter((p) => p.date.startsWith(prefix));
 }
@@ -156,9 +153,9 @@ function sliceByYear(index: IndexPoint[], year: number): IndexPoint[] {
  * assumed sorted ascending; date strings are fixed-width ISO (YYYY-MM-DD), so a plain
  * lexicographic comparison against the year prefix is safe.
  */
-function priorYearClose(index: IndexPoint[], year: number): IndexPoint | null {
+function priorYearClose<P extends { date: string }>(index: readonly P[], year: number): P | null {
   const prefix = String(year);
-  let prior: IndexPoint | null = null;
+  let prior: P | null = null;
   for (const p of index) {
     // A full "YYYY-MM-DD" date always compares greater than its own bare 4-digit
     // year prefix (it has trailing characters), so this also catches an exact
@@ -169,8 +166,29 @@ function priorYearClose(index: IndexPoint[], year: number): IndexPoint | null {
   return prior;
 }
 
+/**
+ * A calendar year's return from a chained index, anchored at the PRIOR year's close
+ * (falling back to the year's first point for the inception year, when no prior close
+ * exists). Null when the year has no points, or only one point and no prior close.
+ *
+ * The single definition of "this year's return" shared by the yearly-returns table
+ * (portfolio and every benchmark) and `streakAnalysis`'s best/worst year, so the two
+ * cards can never disagree about the same year (audit B13). `index` must be sorted
+ * ascending by ISO date.
+ */
+export function calendarYearReturn(
+  index: readonly { date: string; index: string }[],
+  year: number,
+): string | null {
+  const slice = sliceByYear(index, year);
+  if (slice.length === 0) return null;
+  const priorClose = priorYearClose(index, year);
+  if (priorClose === null && slice.length < 2) return null;
+  return yearReturn(priorClose ?? slice[0], slice[slice.length - 1]);
+}
+
 /** TWR between two index points, as a decimal fraction (e.g. 0.10 = +10%). */
-function yearReturn(first: IndexPoint, last: IndexPoint): string {
+function yearReturn(first: { index: string }, last: { index: string }): string {
   return D(last.index).div(D(first.index)).sub(1).toString();
 }
 

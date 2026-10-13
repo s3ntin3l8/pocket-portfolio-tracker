@@ -1047,3 +1047,69 @@ describe("extractReportDocuments", () => {
     expect(extractReportDocuments([{ garbage: true }, null, "not-an-event"])).toEqual([]);
   });
 });
+
+describe("pytr mapper decimal arithmetic (audit B12)", () => {
+  it("matches the old float results on representative fixtures", () => {
+    // Buy: (amount − fees) / shares.
+    expect(
+      draftOf({
+        ...base,
+        eventType: "ORDER_EXECUTED",
+        amount: -1001,
+        fees: -1,
+        shares: 10,
+        isin: "DE0007236101",
+      }),
+    ).toMatchObject({ action: "buy", price: "100" });
+    // Sell without executedPrice: (amount + fees + tax) / shares.
+    expect(
+      draftOf({
+        ...base,
+        eventType: "ORDER_EXECUTED",
+        amount: 497,
+        fees: -1,
+        tax: -2,
+        shares: -5,
+        isin: "DE0007236101",
+      }),
+    ).toMatchObject({ action: "sell", price: "100" });
+    // Non-terminating division keeps the same 10-digit precision as before.
+    expect(
+      draftOf({
+        ...base,
+        eventType: "ORDER_EXECUTED",
+        amount: -100,
+        shares: 3,
+        isin: "DE0007236101",
+      }),
+    ).toMatchObject({ price: "33.3333333333" });
+  });
+
+  it("derives the sell tax without float drift at a half-cent boundary", () => {
+    // notional − fees − amount = 2 × 0.2825 − 0 − 0.5 = 0.065 exactly. In floats that is
+    // 0.06499999…, which Math.round(x·100)/100 rounded DOWN to 0.06; Decimal rounds the
+    // exact half-cent up (half toward +∞, Math.round's own convention) → 0.07.
+    const sell = draftOf({
+      ...base,
+      eventType: "ORDER_EXECUTED",
+      amount: 0.5,
+      shares: -2,
+      isin: "DE0007236101",
+      executedPrice: 0.2825,
+    });
+    expect(sell).toMatchObject({ action: "sell", price: "0.2825", tax: "0.07" });
+  });
+
+  it("0.1 + 0.2-style inputs produce exact cents, not float noise", () => {
+    // 3 × 0.1 − 0.2 = 0.1 exactly (floats: 0.10000000000000003).
+    const sell = draftOf({
+      ...base,
+      eventType: "ORDER_EXECUTED",
+      amount: 0.2,
+      shares: -3,
+      isin: "DE0007236101",
+      executedPrice: 0.1,
+    });
+    expect(sell).toMatchObject({ tax: "0.1" });
+  });
+});

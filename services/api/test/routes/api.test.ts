@@ -3430,6 +3430,63 @@ describe("auth + portfolios + transactions", () => {
     expect(cross.statusCode).toBe(404);
   });
 
+  // Audit B12: the aggregate history sums were JS float additions serialised as strings.
+  it("sums aggregate intraday and daily net worth with Decimal (0.1 + 0.2 = 0.3)", async () => {
+    const { portfolioIntradaySnapshots } = await import("@portfolio/db");
+    const t = await token("history-decimal-user");
+    const mk = async (name: string) =>
+      (
+        await app.inject({
+          method: "POST",
+          url: "/portfolios",
+          headers: auth(t),
+          payload: { name, baseCurrency: "IDR" },
+        })
+      ).json().id;
+    const p1 = await mk("HD1");
+    const p2 = await mk("HD2");
+    const capturedAt = new Date(Date.now() - 60 * 60 * 1000);
+    await app.db.insert(portfolioIntradaySnapshots).values([
+      { portfolioId: p1, capturedAt, netWorth: "0.1", marketValue: "0.1", currency: "IDR" },
+      { portfolioId: p2, capturedAt, netWorth: "0.2", marketValue: "0.2", currency: "IDR" },
+    ]);
+    const intraday = await app.inject({
+      method: "GET",
+      url: "/networth/history?range=1d",
+      headers: auth(t),
+    });
+    expect(intraday.statusCode).toBe(200);
+    expect(intraday.json()[0]).toMatchObject({ netWorth: "0.3", marketValue: "0.3" });
+
+    const date = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+    await app.db.insert(portfolioSnapshots).values([
+      {
+        portfolioId: p1,
+        date,
+        netWorth: "0.1",
+        marketValue: "0.1",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+      {
+        portfolioId: p2,
+        date,
+        netWorth: "0.2",
+        marketValue: "0.2",
+        effectiveFlow: "0",
+        currency: "IDR",
+      },
+    ]);
+    const daily = await app.inject({
+      method: "GET",
+      url: "/networth/history?range=1m",
+      headers: auth(t),
+    });
+    expect(daily.statusCode).toBe(200);
+    const point = daily.json().find((p: { date: string }) => p.date === date);
+    expect(point.netWorth).toBe("0.3"); // float: "0.30000000000000004"
+  });
+
   it("computes XIRR performance from external cash flows", async () => {
     const t = await token("perf-user");
     const portfolioId = (

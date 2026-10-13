@@ -35,6 +35,14 @@ export function cashFlow(tx: CoreTransaction): Decimal {
       // Gross sell proceeds minus fees and capital-gains tax withheld. `price` must be
       // the gross per-share price (not net-of-tax) so that P&L stays pre-tax while cash
       // is correctly net-of-tax. See PR #312 for the pytr/CSV path alignment.
+      //
+      // Deliberately the FULL quantity's proceeds, even when the sell exceeds the held
+      // quantity (an over-sell). Holdings/trade-log clamp the disposal to what is held,
+      // but cash is a ledger of money that actually moved: the broker credited every
+      // share sold, so clamping here would make the derived balance disagree with the
+      // broker's (and break the IBKR/TR cash reconciliation). The over-sell itself is a
+      // missing-acquisition data defect, surfaced by detectAnomalies' `oversell` /
+      // `sell_before_acquisition` with the disputed amount as `excessProceeds` (audit B13).
       return notional.sub(f).sub(D(tx.tax ?? "0"));
     case "dividend":
     case "coupon":

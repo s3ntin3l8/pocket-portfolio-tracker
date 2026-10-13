@@ -17,7 +17,14 @@ export class FixtureProvider implements MarketDataProvider {
 
   constructor(
     private readonly prices: Record<string, string> = DEFAULT_PRICES,
-    private readonly asOf: string = "2026-02-08T00:00:00.000Z",
+    /**
+     * Fixed quote timestamp. Omitted (the default, and how the production fallback
+     * registers it) → each quote is stamped with the time it is served: a stand-in price
+     * has no real observation time, and a hard-coded past date made it look like a
+     * genuinely stale market quote, which the API's stale-quote gate
+     * (`MAX_PRICE_CARRY_FORWARD_DAYS`, audit B13) would rightly discard.
+     */
+    private readonly asOf?: string,
     private readonly prevCloses: Record<string, string> = DEFAULT_PREV_CLOSES,
     private readonly catalogue: InstrumentSearchResult[] = DEFAULT_CATALOGUE,
   ) {}
@@ -32,7 +39,7 @@ export class FixtureProvider implements MarketDataProvider {
     return {
       price,
       currency: ref.currency,
-      asOf: this.asOf,
+      asOf: this.asOf ?? new Date().toISOString(),
       previousClose: this.prevCloses[ref.symbol] ?? null,
     };
   }

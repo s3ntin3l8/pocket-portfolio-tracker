@@ -118,7 +118,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       }
 
       const asOf = new Date();
-      flows.push({ amount: Number(aggregated.netWorth), date: asOf });
+      flows.push({ amount: aggregated.netWorth, date: asOf });
       const rate = xirr(flows);
 
       const allocation = allocationBreakdown(aggregated, meta);

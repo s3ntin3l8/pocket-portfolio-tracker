@@ -85,15 +85,17 @@ export async function restOfYearForecastGross(
 
   const yearAgo = new Date(now);
   yearAgo.setUTCFullYear(yearAgo.getUTCFullYear() - 1);
-  const grossUpNet = new Map<string, number>();
-  const grossUpTax = new Map<string, number>();
+  // Trailing-12-month net/tax per instrument, as Decimal (audit B12) — they feed a
+  // money total returned to the client, so no float sums anywhere in this function.
+  const grossUpNet = new Map<string, Decimal>();
+  const grossUpTax = new Map<string, Decimal>();
   for (const t of coreTxns) {
     if (t.type !== "dividend" || !t.instrumentId || t.executedAt < yearAgo) continue;
-    const net = Number(cashFlow(t).toString());
-    const tax = Number(t.tax ?? "0");
-    if (net <= 0) continue;
-    grossUpNet.set(t.instrumentId, (grossUpNet.get(t.instrumentId) ?? 0) + net);
-    grossUpTax.set(t.instrumentId, (grossUpTax.get(t.instrumentId) ?? 0) + tax);
+    const net = cashFlow(t);
+    const tax = new Decimal(t.tax ?? "0");
+    if (net.lte(0)) continue;
+    grossUpNet.set(t.instrumentId, (grossUpNet.get(t.instrumentId) ?? new Decimal(0)).add(net));
+    grossUpTax.set(t.instrumentId, (grossUpTax.get(t.instrumentId) ?? new Decimal(0)).add(tax));
   }
 
   const projectedDivs = projectDividends(pastDivEvents, heldQtyMap, qtyAt, now);
@@ -116,7 +118,7 @@ export async function restOfYearForecastGross(
   for (const row of announcedRows) {
     const qty = heldQtyMap.get(row.instrumentId);
     if (!qty) continue;
-    const totalAmount = String(Number(row.amountPerShare) * Number(qty));
+    const totalAmount = new Decimal(row.amountPerShare).mul(qty).toString();
     const list = futureByInstrument.get(row.instrumentId) ?? [];
     list.push({ exDate: row.exDate, amount: totalAmount, currency: row.currency });
     futureByInstrument.set(row.instrumentId, list);
@@ -172,26 +174,27 @@ export async function restOfYearForecastGross(
   // reported via the request's fxMissingCurrencies.
   const fx = excludeMissingFx(makeFxRateFn(rates, display));
 
-  let totalGross = 0;
+  let totalGross = new Decimal(0);
 
   for (const d of blendedProjected) {
-    const net = Number(convert(d.amount, d.currency, display, fx));
+    const net = new Decimal(convert(d.amount, d.currency, display, fx));
     const instrumentId = d.instrumentId!;
-    const netSum = grossUpNet.get(instrumentId) ?? 0;
-    const taxSum = grossUpTax.get(instrumentId) ?? 0;
-    const ratio = netSum > 0 ? (netSum + taxSum) / netSum : 1.0;
-    totalGross += net * ratio;
+    const netSum = grossUpNet.get(instrumentId) ?? new Decimal(0);
+    const taxSum = grossUpTax.get(instrumentId) ?? new Decimal(0);
+    // gross = net × (net + tax) / net — multiply before dividing so a ratio like 1/3 isn't
+    // rounded first. No withholding recorded → ratio 1.
+    totalGross = totalGross.add(netSum.gt(0) ? net.mul(netSum.add(taxSum)).div(netSum) : net);
   }
 
   for (const d of announcedRestOfYear) {
-    totalGross += Number(convert(d.amount, d.currency, display, fx));
+    totalGross = totalGross.add(convert(d.amount, d.currency, display, fx));
   }
 
   for (const c of restOfYearCoupons) {
-    totalGross += Number(convert(c.amount, c.currency, display, fx));
+    totalGross = totalGross.add(convert(c.amount, c.currency, display, fx));
   }
 
-  return totalGross > 0 ? totalGross.toFixed(2) : "0";
+  return totalGross.gt(0) ? totalGross.toFixed(2) : "0";
 }
 
 export function buildTfRates(

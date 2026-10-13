@@ -640,6 +640,20 @@ describe("rangeStart", () => {
 });
 
 describe("aggregateByDate", () => {
+  it("sums with Decimal, not floats (audit B12)", () => {
+    const same = () => () => "1";
+    const out = aggregateByDate(
+      [
+        { date: "2026-02-01", netWorth: "0.1", currency: "EUR" },
+        { date: "2026-02-01", netWorth: "0.2", currency: "EUR" },
+      ],
+      same,
+      "EUR",
+    );
+    // Float sum: "0.30000000000000004".
+    expect(out).toEqual([{ date: "2026-02-01", netWorth: "0.3" }]);
+  });
+
   it("sums same-date snapshots, FX-converting to the display currency", () => {
     const fxFor = () => (from: string, to: string) =>
       from === "USD" && to === "IDR" ? "16000" : "1";

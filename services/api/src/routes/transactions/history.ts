@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { Decimal } from "decimal.js";
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import {
   accountHolders,
@@ -177,7 +178,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             corporateActions,
           );
           const asOf = new Date();
-          flows.push({ amount: Number(summary.netWorth), date: asOf });
+          flows.push({ amount: summary.netWorth, date: asOf });
 
           const rate = xirr(flows);
           return {
@@ -271,20 +272,23 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         // the miss is reported as fxMissingCurrencies via the request scope.
         const rows = intradayRows.filter((r) => fxAvailable(r.currency, display, fx));
 
-        const byAt = new Map<string, { netWorth: number; marketValue: number }>();
+        // Decimal sums (audit B12) — these are serialised as money strings.
+        const byAt = new Map<string, { netWorth: Decimal; marketValue: Decimal }>();
         for (const r of rows) {
           const at = r.capturedAt.toISOString();
-          const entry = byAt.get(at) ?? { netWorth: 0, marketValue: 0 };
-          entry.netWorth += Number(convert(r.netWorth, r.currency, display, fx));
-          entry.marketValue += Number(convert(r.marketValue ?? "0", r.currency, display, fx));
+          const entry = byAt.get(at) ?? { netWorth: new Decimal(0), marketValue: new Decimal(0) };
+          entry.netWorth = entry.netWorth.add(convert(r.netWorth, r.currency, display, fx));
+          entry.marketValue = entry.marketValue.add(
+            convert(r.marketValue ?? "0", r.currency, display, fx),
+          );
           byAt.set(at, entry);
         }
         return [...byAt.entries()]
           .sort(([a], [b]) => (a < b ? -1 : 1))
           .map(([at, v]) => ({
             at,
-            netWorth: String(v.netWorth),
-            marketValue: String(v.marketValue),
+            netWorth: v.netWorth.toFixed(),
+            marketValue: v.marketValue.toFixed(),
           }));
       }
 
@@ -340,16 +344,16 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const indexed = chainIndex(aggregated);
       const indexById = new Map(indexed.map((p) => [p.date, p]));
 
-      const nwByDate = new Map<string, number>();
+      const nwByDate = new Map<string, Decimal>();
       for (const r of rows) {
         const fx = makeFxRateFn(ratesByDate.get(r.date) ?? {}, display);
-        const nw = Number(convert(r.netWorth, r.currency, display, fx));
-        nwByDate.set(r.date, (nwByDate.get(r.date) ?? 0) + nw);
+        const nw = convert(r.netWorth, r.currency, display, fx);
+        nwByDate.set(r.date, (nwByDate.get(r.date) ?? new Decimal(0)).add(nw));
       }
 
       const result = aggregated.map((p) => ({
         date: p.date,
-        netWorth: String(nwByDate.get(p.date) ?? 0),
+        netWorth: (nwByDate.get(p.date) ?? new Decimal(0)).toFixed(),
         marketValue: p.marketValue,
         index: indexById.get(p.date)?.index ?? "100",
         pct: indexById.get(p.date)?.pct ?? "0",

@@ -1,3 +1,5 @@
+import type { Decimal } from "decimal.js";
+
 // Shared numeric-string helpers for the import parsers/mappers.
 //
 // These convert already-computed JS numbers into the plain decimal-string form the schema
@@ -24,5 +26,16 @@ export function num(raw: string): string {
 export function formatDecimal(n: number, precision = 10): string {
   if (!Number.isFinite(n)) return "0";
   const s = n.toFixed(precision).replace(/\.?0+$/, "");
+  return s === "" || s === "-" || s === "-0" ? "0" : s;
+}
+
+/**
+ * {@link formatDecimal} for a `Decimal` — the same normalization (fixed `precision`
+ * fractional digits, trailing zeros trimmed, no exponent, `-0`/empty → "0", non-finite →
+ * "0") without ever round-tripping the value through a JS float.
+ */
+export function formatDec(d: Decimal, precision = 10): string {
+  if (!d.isFinite()) return "0";
+  const s = d.toFixed(precision).replace(/\.?0+$/, "");
   return s === "" || s === "-" || s === "-0" ? "0" : s;
 }

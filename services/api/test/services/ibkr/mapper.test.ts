@@ -343,3 +343,50 @@ describe("mapFlexToDrafts — opening cash balance", () => {
     expect(opening.price).toBe("250.00"); // absolute amount
   });
 });
+
+describe("mapFlexToDrafts — decimal sums (audit B12)", () => {
+  it("sums commission + trade taxes as Decimal (0.1 + 0.2 = 0.3, not 0.30000000000000004)", () => {
+    const s = stmt();
+    s.trades.push({
+      assetCategory: "STK",
+      symbol: "AAPL",
+      tradeID: "DEC-1",
+      tradeDate: "2024-03-01",
+      currency: "USD",
+      quantity: "1",
+      tradePrice: "100",
+      ibCommission: "-0.1",
+      taxes: "-0.2",
+      buySell: "BUY",
+      levelOfDetail: "EXECUTION",
+    });
+    const d = mapFlexToDrafts(s).drafts.find((x) => x.externalId === "ibkr:trade:DEC-1")!;
+    expect(d.fees).toBe("0.3");
+    // Parity with the old float path on a non-drifting fixture.
+    const buy = mapFlexToDrafts(stmt()).drafts.find((x) => x.externalId === "ibkr:trade:1001")!;
+    expect(buy.fees).toBe(String(Math.abs(-0.35) + Math.abs(0)));
+  });
+
+  it("accumulates several withholding rows for one dividend as Decimal", () => {
+    const s = stmt();
+    s.cashTransactions = s.cashTransactions.filter((t) => t.type !== "Withholding Tax");
+    for (const [id, amount] of [
+      ["5101", "-0.1"],
+      ["5102", "-0.2"],
+    ] as const) {
+      s.cashTransactions.push({
+        assetCategory: "STK",
+        symbol: "AAPL",
+        isin: "US0378331005",
+        currency: "USD",
+        amount,
+        dateTime: "2024-05-16",
+        type: "Withholding Tax",
+        transactionID: id,
+      });
+    }
+    const div = mapFlexToDrafts(s).drafts.find((x) => x.externalId === "ibkr:cash:5001")!;
+    expect(div.tax).toBe("0.3"); // float: 0.30000000000000004
+    expect(div.price).toBe("1.83"); // 2.13 − 0.3
+  });
+});

@@ -5,7 +5,8 @@ import type {
   ImportIssue,
   ParsedTransaction,
 } from "@portfolio/schema";
-import { formatDecimal } from "../parsers/numeric.js";
+import { Decimal } from "decimal.js";
+import { formatDec, formatDecimal } from "../parsers/numeric.js";
 import { collapsePerkFundedAcquisitions } from "../parsers/perk-pairing.js";
 import {
   trEventSchema,
@@ -117,7 +118,7 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
   let quantity = "0";
   let price = formatDecimal(amount);
   let confidence = 1;
-  let sellTaxOverride: number | null = null;
+  let sellTaxOverride: Decimal | null = null;
   let attention: DraftAttention[] | null = null;
 
   if (isTradeType(action)) {
@@ -126,17 +127,27 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
       return skip(`${ev.eventType} without a share count`, "attention", ev);
     }
     quantity = formatDecimal(shares);
+    // Reconstructed per-share price / withheld tax are stored money: Decimal throughout
+    // (audit B12), only the original event numbers enter as JS values.
+    const sharesD = new Decimal(shares);
+    const amountD = new Decimal(amount);
+    const feesD = new Decimal(fees);
     if (action === "sell") {
       if (ev.executedPrice != null) {
         price = formatDecimal(Math.abs(ev.executedPrice));
-        const notional = shares * Math.abs(ev.executedPrice);
-        sellTaxOverride = Math.round((notional - fees - amount) * 100) / 100;
+        const notional = sharesD.mul(Math.abs(ev.executedPrice));
+        // ROUND_HALF_CEIL = Math.round's half-toward-+∞, so the cents match the old
+        // float path exactly whenever float arithmetic didn't drift.
+        sellTaxOverride = notional
+          .sub(feesD)
+          .sub(amountD)
+          .toDecimalPlaces(2, Decimal.ROUND_HALF_CEIL);
       } else {
-        const sellTax = Math.abs(ev.tax ?? 0);
-        price = formatDecimal((amount + fees + sellTax) / shares);
+        const sellTax = new Decimal(Math.abs(ev.tax ?? 0));
+        price = formatDec(amountD.add(feesD).add(sellTax).div(sharesD));
       }
     } else {
-      price = formatDecimal((amount - fees) / shares);
+      price = formatDec(amountD.sub(feesD).div(sharesD));
     }
 
     if (ev.executedPrice != null && amount > 0) {
@@ -217,7 +228,7 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
       action === "tax"
         ? null
         : sellTaxOverride != null
-          ? formatDecimal(sellTaxOverride)
+          ? formatDec(sellTaxOverride)
           : ev.tax != null
             ? formatDecimal(Math.abs(ev.tax))
             : null,

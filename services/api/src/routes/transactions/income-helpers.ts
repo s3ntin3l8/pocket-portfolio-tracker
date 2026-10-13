@@ -145,12 +145,43 @@ export async function buildIncomeStats(
   const heldQtyMap = new Map(
     summary.holdings.filter((h) => Number(h.quantity) > 0).map((h) => [h.instrumentId, h.quantity]),
   );
+  // Held quantity at a date, computed PER PORTFOLIO and summed — never one computeHoldings
+  // over every portfolio's pooled rows: the cost-basis walk throws when one instrument is
+  // booked in different currencies in different depots (valid per depot), which used to
+  // 500 the aggregate income route (audit B13).
+  const txnsByPortfolio = new Map<string, CoreTransaction[]>();
+  // Without `portfolioIdOf` the caller is asserting a single portfolio (one bucket). With
+  // it, every row must resolve to its portfolio — a silent fallback bucket would re-pool
+  // unattributed rows and bring back the mixed-currency throw this split exists to avoid.
+  for (const t of coreTxns) {
+    let pfKey = "";
+    if (portfolioIdOf) {
+      const pf = t.id ? portfolioIdOf(t.id) : undefined;
+      if (pf === undefined) {
+        throw new Error(
+          `buildIncomeStats: transaction ${t.id ?? "(no id)"} has no portfolio attribution`,
+        );
+      }
+      pfKey = pf;
+    }
+    const list = txnsByPortfolio.get(pfKey) ?? [];
+    list.push(t);
+    txnsByPortfolio.set(pfKey, list);
+  }
   const holdingsCache = new Map<number, Map<string, string>>();
   const qtyAt = (instrumentId: string, at: Date): string => {
     const key = at.getTime();
     if (!holdingsCache.has(key)) {
-      const hs = computeHoldings(coreTxns, corpActions, at);
-      holdingsCache.set(key, new Map(hs.map((h) => [h.instrumentId, h.quantity])));
+      const pooled = new Map<string, Decimal>();
+      for (const txns of txnsByPortfolio.values()) {
+        for (const h of computeHoldings(txns, corpActions, at)) {
+          pooled.set(
+            h.instrumentId,
+            (pooled.get(h.instrumentId) ?? new Decimal(0)).add(h.quantity),
+          );
+        }
+      }
+      holdingsCache.set(key, new Map([...pooled].map(([id, q]) => [id, q.toString()])));
     }
     return holdingsCache.get(key)!.get(instrumentId) ?? "0";
   };
