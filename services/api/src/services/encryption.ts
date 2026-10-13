@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 const AES_PREFIX = "enc:";
+const KEY_BYTES = 32;
 
 export class DecryptionError extends Error {
   constructor(message: string) {
@@ -12,10 +13,29 @@ export class DecryptionError extends Error {
 export class EncryptionService {
   private key: Buffer | null;
   private _isEnabled: boolean;
+  private readonly allowPlaintext: boolean;
 
-  constructor(opts: { key: string }) {
+  /**
+   * `key`: base64url of exactly 32 bytes (e.g. `openssl rand -base64 32`); empty disables
+   * encryption. A key of any other length throws at construction (startup), rather than
+   * failing at the first encrypt or silently truncating.
+   *
+   * `allowPlaintext` (default false): accept stored values that lack the `enc:` prefix and
+   * return them as-is on decrypt. Only for migrating a database written before encryption
+   * was enabled; otherwise a plaintext value under an enabled key is rejected, so a
+   * downgrade/plaintext write is not silently accepted.
+   */
+  constructor(opts: { key: string; allowPlaintext?: boolean }) {
+    this.allowPlaintext = opts.allowPlaintext ?? false;
     if (opts.key) {
-      this.key = Buffer.from(opts.key, "base64url").subarray(0, 32);
+      const decoded = Buffer.from(opts.key, "base64url");
+      if (decoded.length !== KEY_BYTES) {
+        throw new Error(
+          `DB_ENCRYPTION_KEY must decode to exactly ${KEY_BYTES} bytes (base64url); got ${decoded.length}. ` +
+            `Generate one with: openssl rand -base64 32`,
+        );
+      }
+      this.key = decoded;
       this._isEnabled = true;
     } else {
       this.key = null;
@@ -40,7 +60,8 @@ export class EncryptionService {
     if (!this.key) return ciphertext;
 
     if (!ciphertext.startsWith(AES_PREFIX)) {
-      return ciphertext;
+      if (this.allowPlaintext) return ciphertext;
+      throw new DecryptionError("Value is not encrypted (missing enc: prefix)");
     }
 
     try {

@@ -12,7 +12,10 @@ export const dbPlugin = fp(async (app: FastifyInstance) => {
   await warmPool();
 
   const db = getDb();
-  const encryption = new EncryptionService({ key: app.config.DB_ENCRYPTION_KEY });
+  const encryption = new EncryptionService({
+    key: app.config.DB_ENCRYPTION_KEY,
+    allowPlaintext: app.config.DB_ENCRYPTION_ALLOW_PLAINTEXT,
+  });
 
   app.decorate("db", db);
   app.decorate("encryption", encryption);

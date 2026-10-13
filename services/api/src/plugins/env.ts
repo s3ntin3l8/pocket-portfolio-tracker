@@ -28,6 +28,12 @@ const schema = {
       type: "string",
       default: "",
     },
+    // Migration aid only: accept stored values lacking the `enc:` prefix (rows written
+    // before encryption was enabled). Leave false once existing rows are re-encrypted.
+    DB_ENCRYPTION_ALLOW_PLAINTEXT: {
+      type: "boolean",
+      default: false,
+    },
     AUTHENTIK_ISSUER: {
       type: "string",
       default: "",
@@ -234,6 +240,7 @@ declare module "fastify" {
       LOG_LEVEL: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
       DATABASE_URL: string;
       DB_ENCRYPTION_KEY: string;
+      DB_ENCRYPTION_ALLOW_PLAINTEXT: boolean;
       AUTHENTIK_ISSUER: string;
       AUTHENTIK_AUDIENCE: string;
       AUTHENTIK_JWKS_URL: string;
