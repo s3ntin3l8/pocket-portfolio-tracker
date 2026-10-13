@@ -141,10 +141,9 @@ export default async function SettingsLayout({
           />
         </div>
       }
+      title={tNav("settings")}
       landingTop={
         <>
-          {/* The mobile landing has no visible page title; keep one h1 for the outline. */}
-          <h1 className="sr-only">{tNav("settings")}</h1>
           {identityCard && (
             <Link
               href="/settings/account"

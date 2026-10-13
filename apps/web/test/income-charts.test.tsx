@@ -217,6 +217,23 @@ describe("IncomeHeatmap", () => {
     expect(peak).toHaveStyle({ opacity: "1" });
   });
 
+  it("lays months down the rows with 44px-high cells and one column per year", () => {
+    const { container } = wrap(
+      <IncomeHeatmap
+        currency="IDR"
+        monthly={[
+          { month: "2025-03", total: "50" },
+          { month: "2026-03", total: "100" },
+        ]}
+      />,
+    );
+    const grid = container.querySelector("div[style*='grid-template-columns']") as HTMLElement;
+    expect(grid.style.gridTemplateColumns).toContain("repeat(2,");
+    const cells = screen.getAllByRole("button");
+    expect(cells).toHaveLength(24); // 12 months × 2 years
+    for (const cell of cells) expect(cell).toHaveClass("min-h-11", "min-w-11");
+  });
+
   it("defaults to a 'tap a cell' hint and updates it on click", () => {
     wrap(<IncomeHeatmap currency="IDR" monthly={[{ month: "2026-06", total: "532000" }]} />);
     expect(screen.getByText("Tap a cell to see the month's income")).toBeInTheDocument();

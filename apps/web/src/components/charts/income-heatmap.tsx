@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocale, useTranslations } from "next-intl";
 import { cn, formatMoney } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { useChartTooltip } from "@/components/ui/use-chart-tooltip";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
 
 /**
- * Monthly seasonality grid: one row per year, twelve month columns, each cell's
+ * Monthly seasonality grid: one row per month, one column per year, each cell's
  * fill scaled by its share of the busiest month. A plain CSS grid (no recharts) so
  * it stays compact and legible on a phone.
  *
@@ -47,10 +47,6 @@ export function IncomeHeatmap({
   }
   const years = [...byYear.keys()].sort();
 
-  const monthFmt = new Intl.DateTimeFormat(locale, { month: "narrow" });
-  const monthLabels = Array.from({ length: 12 }, (_, i) =>
-    monthFmt.format(new Date(Date.UTC(2020, i, 1))),
-  );
   const monthFullFmt = new Intl.DateTimeFormat(locale, { month: "short" });
   const monthFullLabels = Array.from({ length: 12 }, (_, i) =>
     monthFullFmt.format(new Date(Date.UTC(2020, i, 1))),
@@ -67,71 +63,69 @@ export function IncomeHeatmap({
   return (
     <div className="space-y-2 text-xs">
       <p className="min-h-4 font-medium text-muted-foreground">{subtitle}</p>
-      <div className="grid grid-cols-[2.5rem_repeat(12,minmax(0,1fr))] gap-1 text-center text-muted-foreground">
-        <span />
-        {monthLabels.map((label, i) => (
-          <span key={i}>{label}</span>
-        ))}
+      {/* Months run down the rows and years across the columns, so each cell can be a 44px
+          target on a phone; many years scroll sideways rather than shrinking the cells. */}
+      <div className="-mx-1 overflow-x-auto px-1">
+        <div
+          className="grid items-center gap-1 text-center text-muted-foreground"
+          style={{ gridTemplateColumns: `2.5rem repeat(${years.length}, minmax(2.75rem, 1fr))` }}
+        >
+          <span />
+          {years.map((year) => (
+            <span key={year} className="tabular">
+              {year}
+            </span>
+          ))}
+          {monthFullLabels.map((monthLabel, i) => (
+            <Fragment key={i}>
+              <span className="text-left">{monthLabel}</span>
+              {years.map((year) => {
+                const value = byYear.get(year)?.[i] ?? 0;
+                const cellTitle =
+                  value > 0
+                    ? `${monthLabel} ${year}: ${formatMoney(value, currency, locale)}`
+                    : `${monthLabel} ${year}`;
+                const isActive = active?.year === year && active.monthIdx === i;
+                // Pull the bind's listeners into a const so the explicit onClick below
+                // composes with the hook's click-toggle rather than overwriting it (JSX
+                // props merge left-to-right — the bug the #478 review caught).
+                const listeners = tip.bind({
+                  title: `${monthLabel} ${year}`,
+                  rows: [
+                    {
+                      label: t("heatmapCellAmount"),
+                      value: value > 0 ? formatMoney(value, currency, locale) : "—",
+                      dot: "var(--color-primary)",
+                    },
+                  ],
+                });
+                return (
+                  <button
+                    key={year}
+                    {...listeners}
+                    type="button"
+                    title={cellTitle}
+                    aria-label={cellTitle}
+                    aria-pressed={isActive}
+                    onClick={(e) => {
+                      setActive({ year, monthIdx: i });
+                      // Run the hook's tap-toggle after the subtitle update so the floating
+                      // tooltip opens on touch devices (no real mouseenter there).
+                      listeners.onClick(e);
+                    }}
+                    className={cn(
+                      "min-h-11 min-w-11 rounded-[6px] p-0",
+                      value > 0 ? "bg-primary" : "bg-muted",
+                      isActive && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
+                    )}
+                    style={value > 0 ? { opacity: 0.14 + 0.86 * (value / max) } : undefined}
+                  />
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
       </div>
-      {years.map((year) => {
-        const row = byYear.get(year) ?? [];
-        return (
-          <div
-            key={year}
-            className="grid grid-cols-[2.5rem_repeat(12,minmax(0,1fr))] items-center gap-1"
-          >
-            <span className="tabular text-muted-foreground">{year}</span>
-            {row.map((value, i) => {
-              const cellTitle =
-                value > 0
-                  ? `${monthFullLabels[i]} ${year}: ${formatMoney(value, currency, locale)}`
-                  : `${monthFullLabels[i]} ${year}`;
-              const isActive = active?.year === year && active.monthIdx === i;
-              // Pull the bind's listeners into a const so the explicit
-              // onClick below can compose with the hook's click-toggle
-              // rather than overwrite it. JSX prop merge is left-to-right:
-              // if `tip.bind({...})` were spread inline and `onClick` were
-              // declared after it, the explicit handler would win and the
-              // hook's tap-to-toggle would be silently dropped — that's
-              // the bug the #478 review caught (item #1). Extracting
-              // `listeners` keeps both behaviors wired.
-              const listeners = tip.bind({
-                title: `${monthFullLabels[i]} ${year}`,
-                rows: [
-                  {
-                    label: t("heatmapCellAmount"),
-                    value: value > 0 ? formatMoney(value, currency, locale) : "—",
-                    dot: "var(--color-primary)",
-                  },
-                ],
-              });
-              return (
-                <button
-                  key={i}
-                  {...listeners}
-                  type="button"
-                  title={cellTitle}
-                  aria-label={cellTitle}
-                  aria-pressed={isActive}
-                  onClick={(e) => {
-                    setActive({ year, monthIdx: i });
-                    // Run the hook's tap-toggle after the subtitle update
-                    // so the floating tooltip opens on touch devices (where
-                    // there's no real mouseenter).
-                    listeners.onClick(e);
-                  }}
-                  className={cn(
-                    "aspect-square rounded-[4px] p-0",
-                    value > 0 ? "bg-primary" : "bg-muted",
-                    isActive && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
-                  )}
-                  style={value > 0 ? { opacity: 0.14 + 0.86 * (value / max) } : undefined}
-                />
-              );
-            })}
-          </div>
-        );
-      })}
       <div className="flex items-center justify-end gap-1.5 pt-1 text-muted-foreground">
         <span>{t("heatmapLess")}</span>
         {[0.14, 0.4, 0.66, 1].map((opacity) => (

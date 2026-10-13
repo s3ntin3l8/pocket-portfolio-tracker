@@ -177,6 +177,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
               <SourceBadge source={s3.forcePathStyleSource} />
             </div>
             <Switch
+              aria-label={t("storageForcePathStyle")}
               checked={s3.forcePathStyle}
               onCheckedChange={(v) =>
                 setS3((p) => ({ ...p, forcePathStyle: v, forcePathStyleSource: "db" }))

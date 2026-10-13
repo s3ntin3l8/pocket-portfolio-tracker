@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Eye, EyeOff, Lock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -53,6 +53,7 @@ export function CredentialEditorPanel({
     { fallbackMessage: t("credentialError") },
   );
 
+  const inputId = useId();
   const busy = saveState.busy || clearState.busy;
   const error = saveState.error ?? clearState.error;
   const trimmed = value.trim();
@@ -60,11 +61,12 @@ export function CredentialEditorPanel({
   return (
     <div className="border-t border-line bg-card px-3.5 pb-3.5 pt-2.5">
       <div className="rounded-[13px] border border-border bg-card-2 p-3.5">
-        <label className="mb-1.5 block px-0.5 text-xs font-semibold text-text-2">
+        <label htmlFor={inputId} className="mb-1.5 block px-0.5 text-xs font-semibold text-text-2">
           {t("credentialEditorLabel", { label })}
         </label>
         <div className="relative">
           <Input
+            id={inputId}
             type={isUrl ? "url" : showValue ? "text" : "password"}
             placeholder={isUrl ? t("visionUrlPlaceholder") : t("credentialPlaceholder")}
             value={value}

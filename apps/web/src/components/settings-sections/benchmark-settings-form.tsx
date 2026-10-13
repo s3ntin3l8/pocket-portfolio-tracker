@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
@@ -65,10 +65,14 @@ export function BenchmarkSettingsForm({
     }
   };
 
+  const symbolId = useId();
+  const rateId = useId();
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label className="text-xs font-medium text-text-3">{t("benchmarkSymbolLabel")}</label>
+        <label htmlFor={symbolId} className="text-xs font-medium text-text-3">
+          {t("benchmarkSymbolLabel")}
+        </label>
         <p className="px-0.5 text-xs text-muted-foreground">{t("benchmarkSymbolHint")}</p>
         <div className="flex flex-wrap gap-1.5">
           {list.map((s, i) => (
@@ -91,6 +95,7 @@ export function BenchmarkSettingsForm({
         {list.length < MAX && (
           <div className="flex gap-1.5">
             <Input
+              id={symbolId}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -116,8 +121,11 @@ export function BenchmarkSettingsForm({
         )}
       </div>
       <div className="space-y-2">
-        <label className="text-xs font-medium text-text-3">{t("riskFreeRateLabel")}</label>
+        <label htmlFor={rateId} className="text-xs font-medium text-text-3">
+          {t("riskFreeRateLabel")}
+        </label>
         <Input
+          id={rateId}
           type="number"
           step="0.001"
           min="0"

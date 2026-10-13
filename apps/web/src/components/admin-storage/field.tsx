@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SourceBadge } from "./source-badge";
@@ -24,13 +25,17 @@ export function Field({
   monospace?: boolean;
   onChange: (v: string) => void;
 }) {
+  const id = useId();
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-1 px-0.5">
-        <label className="text-xs font-semibold text-text-2">{label}</label>
+        <label htmlFor={id} className="text-xs font-semibold text-text-2">
+          {label}
+        </label>
         <SourceBadge source={source} />
       </div>
       <Input
+        id={id}
         type={type}
         value={value ?? ""}
         placeholder={placeholder}

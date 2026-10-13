@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { DisposalTable } from "../src/components/tax/disposal-table";
 import { Field } from "../src/components/import-review/edit-dialog";
+import { Field as StorageField } from "../src/components/admin-storage/field";
 import { Input } from "../src/components/ui/input";
 import { onActivateKey } from "../src/lib/a11y";
 import { signTone } from "../src/lib/utils";
@@ -104,5 +105,16 @@ describe("import-review Field", () => {
       </Field>,
     );
     expect(screen.getByLabelText("Quantity")).toHaveValue("3");
+  });
+});
+
+describe("admin storage Field", () => {
+  it("ties its label to the input", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <StorageField label="Bucket" value="b" source="db" onChange={() => {}} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByLabelText("Bucket")).toBeInstanceOf(HTMLInputElement);
   });
 });

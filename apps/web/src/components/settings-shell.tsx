@@ -3,6 +3,7 @@
 import { ChevronRight } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { SectionHeadingContext } from "@/components/section-heading-context";
 
 export interface ShellNavItem {
   key: string;
@@ -38,6 +39,7 @@ export function SettingsShell({
   navItems,
   groups,
   indexHref,
+  title,
   railTop,
   railBottom,
   railExtra,
@@ -56,6 +58,9 @@ export function SettingsShell({
    *  (including any pushed after the initial list, e.g. Admin) — for action rows that
    *  aren't a plain link, such as the PWA install button. */
   railExtra?: React.ReactNode;
+  /** The page's `<h1>` at the bare index route (sr-only; the visible landing title is
+   *  plain text). Sub-routes get theirs from `SectionHeader`. */
+  title: string;
   landingTop?: React.ReactNode;
   /** Rendered at the bottom of the mobile landing (the rail's `railBottom` is desktop-only). */
   landingBottom?: React.ReactNode;
@@ -105,76 +110,79 @@ export function SettingsShell({
     });
 
   return (
-    <div className="md:grid md:grid-cols-[270px_1fr] md:gap-6 md:items-start">
-      <div className="hidden md:sticky md:top-[calc(70px+env(safe-area-inset-top))] md:flex md:flex-col md:gap-3 md:self-start">
-        {railTop}
-        <nav className={cn("divide-y divide-line rounded-[18px] bg-card p-2", CARD_SHADOW)}>
-          {railLinks}
-          {railExtra}
-        </nav>
-        {railBottom}
-      </div>
+    <SectionHeadingContext.Provider value={isIndex}>
+      <div className="md:grid md:grid-cols-[270px_1fr] md:gap-6 md:items-start">
+        <div className="hidden md:sticky md:top-[calc(70px+env(safe-area-inset-top))] md:flex md:flex-col md:gap-3 md:self-start">
+          {railTop}
+          <nav className={cn("divide-y divide-line rounded-[18px] bg-card p-2", CARD_SHADOW)}>
+            {railLinks}
+            {railExtra}
+          </nav>
+          {railBottom}
+        </div>
 
-      <div className="min-w-0 max-w-2xl">
-        {isIndex && (
-          <div className="space-y-4 md:hidden">
-            {landingTop}
-            {landingGroups.map((group, i) => (
-              <div
-                key={`group-${i}`}
-                className={cn(
-                  "divide-y divide-line overflow-hidden rounded-2xl bg-card",
-                  CARD_SHADOW,
-                )}
-              >
-                {group.map((item) => (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
-                  >
-                    <span
-                      className="flex size-9 shrink-0 items-center justify-center rounded-xl [&>svg]:size-[18px]"
-                      style={{ background: item.bg, color: item.color }}
+        <div className="min-w-0 max-w-2xl">
+          {isIndex && <h1 className="sr-only">{title}</h1>}
+          {isIndex && (
+            <div className="space-y-4 md:hidden">
+              {landingTop}
+              {landingGroups.map((group, i) => (
+                <div
+                  key={`group-${i}`}
+                  className={cn(
+                    "divide-y divide-line overflow-hidden rounded-2xl bg-card",
+                    CARD_SHADOW,
+                  )}
+                >
+                  {group.map((item) => (
+                    <Link
+                      key={item.key}
+                      href={item.href}
+                      className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
                     >
-                      {item.icon}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-bold">{item.title}</span>
-                        {item.badge && (
-                          <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-primary">
-                            {item.badge}
-                          </span>
+                      <span
+                        className="flex size-9 shrink-0 items-center justify-center rounded-xl [&>svg]:size-[18px]"
+                        style={{ background: item.bg, color: item.color }}
+                      >
+                        {item.icon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-sm font-bold">{item.title}</span>
+                          {item.badge && (
+                            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-primary">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                        {item.subtitle && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {item.subtitle}
+                          </div>
                         )}
                       </div>
-                      {item.subtitle && (
-                        <div className="truncate text-xs text-muted-foreground">
-                          {item.subtitle}
-                        </div>
-                      )}
-                    </div>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </Link>
-                ))}
-              </div>
-            ))}
-            {landingExtra && (
-              <div
-                className={cn(
-                  "divide-y divide-line overflow-hidden rounded-2xl bg-card",
-                  CARD_SHADOW,
-                )}
-              >
-                {landingExtra}
-              </div>
-            )}
-            {landingBottom}
-          </div>
-        )}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </div>
+              ))}
+              {landingExtra && (
+                <div
+                  className={cn(
+                    "divide-y divide-line overflow-hidden rounded-2xl bg-card",
+                    CARD_SHADOW,
+                  )}
+                >
+                  {landingExtra}
+                </div>
+              )}
+              {landingBottom}
+            </div>
+          )}
 
-        <div className={isIndex ? "hidden md:block" : ""}>{children}</div>
+          <div className={isIndex ? "hidden md:block" : ""}>{children}</div>
+        </div>
       </div>
-    </div>
+    </SectionHeadingContext.Provider>
   );
 }
