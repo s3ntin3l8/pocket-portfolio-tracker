@@ -94,7 +94,7 @@ async function buildGoldReport(
       holdingByKey.set(`${portfolioId}:${h.instrumentId}`, row);
     }
   }
-  holdings.sort((a, b) => Number(b.value ?? 0) - Number(a.value ?? 0));
+  holdings.sort((a, b) => new Decimal(b.value ?? 0).cmp(a.value ?? 0));
 
   let grams = new Decimal(0);
   let value = new Decimal(0);
@@ -103,6 +103,8 @@ async function buildGoldReport(
   let unrealized = new Decimal(0);
   for (const h of holdings) {
     grams = grams.add(h.grams);
+    // Everything below is a display-currency figure: skip rows with no FX rate (their
+    // `costBasisDisplay` stays in the native currency) and unpriced rows entirely.
     if (h.fxMissing || h.value === null) continue;
     value = value.add(h.value);
     cost = cost.add(h.cost);

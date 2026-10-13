@@ -79,7 +79,14 @@ describe("gold report", () => {
     app = await buildApp({ authKey: kp.publicKey });
     // 1 g = 1200 for the financed bar; the loose bar has no quote → valued at cost.
     overrideMarketData(
-      new MarketDataService([new FixtureProvider({ "G24:PLAN-1": "1200", BBCA: "9500" })]),
+      new MarketDataService([
+        new FixtureProvider({
+          "G24:PLAN-1": "1200",
+          BBCA: "9500",
+          "G24:IDRBAR": "1200",
+          "G24:USDBAR": "60",
+        }),
+      ]),
     );
 
     owner = await token("gold-owner");
@@ -258,6 +265,69 @@ describe("gold report", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().plans).toHaveLength(1);
     expect(res.json().totals.grams).toBe("5");
+  });
+
+  it("excludes a gold holding with no FX rate from every display-currency total (audit B2)", async () => {
+    const fx = await token("gold-fx");
+    await app.inject({ method: "GET", url: "/me", headers: auth(fx) });
+    const pf = await createPortfolio(fx, "Mixed gold");
+    const [idrBar, usdBar] = await app.db
+      .insert(instruments)
+      .values([
+        {
+          symbol: "G24:IDRBAR",
+          market: "GALERI24",
+          assetClass: "gold",
+          currency: "IDR",
+          unit: "grams",
+          name: "IDR bar",
+        },
+        {
+          symbol: "G24:USDBAR",
+          market: "GALERI24",
+          assetClass: "gold",
+          currency: "USD",
+          unit: "grams",
+          name: "USD bar",
+        },
+      ])
+      .returning();
+    const base = { portfolioId: pf, source: "manual" as const, type: "buy" as const, fees: "0" };
+    await app.db.insert(transactions).values([
+      {
+        ...base,
+        instrumentId: idrBar.id,
+        quantity: "2",
+        price: "1000",
+        currency: "IDR",
+        executedAt: new Date("2026-01-02T00:00:00Z"),
+        externalId: "fx1",
+      },
+      {
+        ...base,
+        instrumentId: usdBar.id,
+        quantity: "3",
+        price: "50",
+        currency: "USD",
+        executedAt: new Date("2026-01-03T00:00:00Z"),
+        externalId: "fx2",
+      },
+    ]);
+
+    const res = await app.inject({ method: "GET", url: "/networth/gold", headers: auth(fx) });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const usd = body.holdings.find((h: { symbol: string }) => h.symbol === "G24:USDBAR");
+    expect(usd).toMatchObject({ fxMissing: true, value: null, grams: "3" });
+    // The IDR bar alone: 2 g × 1,200 value on 2,000 cost. The USD bar's native-currency cost
+    // (3 × 50) must not leak into any total, and its value was never converted 1:1.
+    expect(body.totals.value).toBe("2400");
+    expect(body.totals.cost).toBe("2000");
+    expect(body.totals.measuredCost).toBe("2000");
+    expect(Number(body.totals.unrealized)).toBeCloseTo(400, 6);
+    expect(body.totals.grams).toBe("5"); // weight is weight, whatever the currency
+    expect(body.fxMissingCurrencies).toEqual(["USD"]);
+    expect(res.headers["x-fx-missing-currencies"]).toBe("USD");
   });
 
   it("scopes to the owner: another user gets 404 for the portfolio and an empty network report", async () => {

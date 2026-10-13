@@ -29,7 +29,7 @@ export interface GoldPlanScheduleRow {
   sewaModal: string;
   /** Installment total (principal + margin). */
   angsuran: string;
-  /** A `loan_repayment` is booked on this due date. */
+  /** Covered by a booked repayment: the earliest N installments are paid, N = repayments booked. */
   paid: boolean;
   /** Unpaid and past its due date. */
   overdue: boolean;
@@ -41,7 +41,7 @@ export interface GoldPlanSummary {
   provider: string | null;
   contractNo: string | null;
   currency: string;
-  /** Grams financed — quantity of the gold purchase leg. */
+  /** Grams financed — quantity of the gold purchase leg(s); not reduced by later sells. */
   grams: string;
   purchasePrice: string;
   downPayment: string;

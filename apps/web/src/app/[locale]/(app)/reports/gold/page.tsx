@@ -28,16 +28,26 @@ export default async function GoldReportPage({ params }: { params: Promise<{ loc
     </>
   );
 
-  if (
-    result.status !== "ok" ||
-    (result.data.holdings.length === 0 && result.data.plans.length === 0)
-  ) {
+  if (result.status !== "ok") {
     return (
       <div className="space-y-5">
         {heading}
         <DataState
-          status={result.status === "ok" ? "empty" : result.status}
+          status={result.status}
           retryAfter={retryAfterOf(result)}
+          icon={Gem}
+          empty={{ title: t("emptyTitle"), description: t("emptyBody") }}
+        />
+      </div>
+    );
+  }
+
+  if (result.data.holdings.length === 0 && result.data.plans.length === 0) {
+    return (
+      <div className="space-y-5">
+        {heading}
+        <DataState
+          status="empty"
           icon={Gem}
           empty={{ title: t("emptyTitle"), description: t("emptyBody") }}
         />

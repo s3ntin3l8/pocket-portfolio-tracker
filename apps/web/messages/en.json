@@ -2511,7 +2511,7 @@
     "statusOverdue": "Overdue",
     "statusOnTrack": "On track",
     "progress": "{paid} of {total} installments paid",
-    "planGrams": "Gold",
+    "planGrams": "Financed gold",
     "planValue": "Buyback value",
     "planOutstanding": "Still owed",
     "planMonthly": "Per month",
