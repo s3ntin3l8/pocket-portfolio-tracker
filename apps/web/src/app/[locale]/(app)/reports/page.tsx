@@ -2,7 +2,7 @@ import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import type React from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Coins, ScrollText, PiggyBank, Receipt, FileText } from "lucide-react";
+import { Coins, ScrollText, PiggyBank, Receipt, FileText, Gem } from "lucide-react";
 import { ReportCard } from "@/components/reports/report-card";
 import { EmptyState } from "@/components/empty-state";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
@@ -10,6 +10,7 @@ import { collectFxMissing } from "@/lib/fx-missing";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
   loadIncomeStats,
+  loadGoldReport,
   loadTrades,
   loadContributions,
   loadNetworthTaxResult,
@@ -17,7 +18,13 @@ import {
   loadPreferences,
   loadDocuments,
 } from "@/lib/server-api";
-import { formatMoney, formatMoneyCompact, formatPercent, formatSignedMoney } from "@/lib/utils";
+import {
+  formatMoney,
+  formatMoneyCompact,
+  formatPercent,
+  formatQuantity,
+  formatSignedMoney,
+} from "@/lib/utils";
 import { GainFigure, toneOf } from "@/components/gain-figure";
 import type { TrendTone } from "@/components/reports/trend-chip";
 
@@ -26,6 +33,7 @@ const ICONS = {
   trades: { icon: ScrollText, bg: "rgba(224,165,58,.14)", fg: "var(--gold-fg)" },
   savings: { icon: PiggyBank, bg: "rgba(124,92,252,.12)", fg: "#7C5CFC" },
   tax: { icon: Receipt, bg: "rgba(13,148,136,.12)", fg: "var(--color-chart-3)" },
+  gold: { icon: Gem, bg: "rgba(224,165,58,.14)", fg: "var(--gold-fg)" },
   documents: { icon: FileText, bg: "rgba(59,130,246,.12)", fg: "#3B82F6" },
 } as const;
 
@@ -48,17 +56,19 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
   const incomePromise = loadIncomeStats();
   const contributionsPromise = loadContributions();
   const documentsPromise = loadDocuments("tax_report");
+  const goldPromise = loadGoldReport();
 
   const prefs = await prefsPromise;
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
   const taxRegime = prefs?.taxRegime ?? "DE";
 
-  const [income, trades, contributions, taxResult, taxReports] = await Promise.all([
+  const [income, trades, contributions, taxResult, taxReports, gold] = await Promise.all([
     incomePromise,
     loadTrades(undefined, costBasis),
     contributionsPromise,
     loadNetworthTaxResult(undefined, taxRegime),
     documentsPromise,
+    goldPromise,
   ]);
   const taxHolders = taxResult.status === "ok" ? taxResult.holders : [];
   // A failed loader must not masquerade as "no data" — and must not leave a silently
@@ -404,6 +414,56 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     );
   }
 
+  // ── Gold (holdings + purchase plans) ─────────────────────────────────────
+  if (gold.status === "ok" && (gold.data.holdings.length > 0 || gold.data.plans.length > 0)) {
+    const g = gold.data;
+    const currency = g.displayCurrency;
+    const unrealized = Number(g.totals.unrealized);
+    const measuredCost = Number(g.totals.measuredCost);
+    const openPlans = g.plans.filter((p) => !p.completed).length;
+    const owed = Object.entries(g.totals.outstandingByCurrency)
+      .filter(([, v]) => Number(v) !== 0)
+      .map(([c, v]) => formatMoneyCompact(Number(v), c, locale))
+      .join(" · ");
+    cards.push(
+      <ReportCard
+        key="gold"
+        icon={ICONS.gold.icon}
+        iconBg={ICONS.gold.bg}
+        iconFg={ICONS.gold.fg}
+        title={t("gold.title")}
+        value={formatMoney(Number(g.totals.value), currency, locale)}
+        valueCompact={formatMoneyCompact(Number(g.totals.value), currency, locale)}
+        caption={t("gold.caption")}
+        gain={
+          measuredCost > 0 ? (
+            <GainFigure
+              amount={formatSignedMoney(unrealized, currency, locale)}
+              pct={formatPercent(unrealized / measuredCost, locale)}
+              tone={toneOf(unrealized)}
+              basis="cost"
+              amountClassName="text-[14px]"
+              pctClassName="text-[12px]"
+            />
+          ) : undefined
+        }
+        metrics={[
+          {
+            label: t("gold.metricGrams"),
+            value: formatQuantity(Number(g.totals.grams), "grams", locale),
+          },
+          // The footer fits two figures: what is still owed when there are open plans,
+          // otherwise the (zero) open-plan count.
+          owed
+            ? { label: t("gold.metricOwed"), value: owed }
+            : { label: t("gold.metricPlans"), value: String(openPlans) },
+        ]}
+        href="/reports/gold"
+        openLabel={openLabel}
+      />,
+    );
+  }
+
   // ── Tax reports (inbox) ──────────────────────────────────────────────────
   // Always shown (unlike the KPI cards above, which need real data to render) — this is a
   // discovery entry point to the inbox even with zero documents yet, since the upload flow
@@ -456,6 +516,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     income.status === "ok" ? income.data : null,
     trades.status === "ok" ? trades.data : null,
     contributions.status === "ok" ? contributions.data : null,
+    gold.status === "ok" ? gold.data : null,
   );
 
   return (

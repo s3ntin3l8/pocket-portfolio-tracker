@@ -49,6 +49,7 @@ import type {
   TradeLog,
   TradeMethod,
   IncomeStats,
+  GoldReport,
 } from "@portfolio/api-client";
 import {
   getServerApi,
@@ -191,6 +192,24 @@ export async function loadIncomeStats(): Promise<IncomeStatsView> {
     const data = selected
       ? await api.getPortfolioIncome(selected.id)
       : await api.getIncome(holderId);
+    return { status: "ok", data };
+  } catch (err) {
+    return classifyFailure(err);
+  }
+}
+
+export type GoldReportView = { status: "ok"; data: GoldReport } | { status: "empty" } | DataFailure;
+
+export async function loadGoldReport(): Promise<GoldReportView> {
+  const api = await getServerApi();
+  if (!api) return { status: "unauthorized" };
+  try {
+    const portfolios = await listPortfoliosCached();
+    if (portfolios.length === 0) return { status: "empty" };
+    const wanted = await getSelectedPortfolioId();
+    const selected = portfolios.find((p) => p.id === wanted);
+    const holderId = selected ? undefined : await resolveHolderScope(portfolios);
+    const data = selected ? await api.getPortfolioGold(selected.id) : await api.getGold(holderId);
     return { status: "ok", data };
   } catch (err) {
     return classifyFailure(err);

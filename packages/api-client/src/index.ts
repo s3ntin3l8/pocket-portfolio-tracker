@@ -1439,6 +1439,83 @@ export interface IncomeInterest {
  * Dividend/coupon analytics + forward outlook for the active scope. All monetary
  * fields are in `displayCurrency` unless noted; `byCurrency` keeps the native sums.
  */
+/** One gold holding in the gold report, valued at its buyback rate (display-currency values). */
+export interface GoldHoldingRow {
+  portfolioId: string;
+  instrumentId: string;
+  symbol: string;
+  name: string;
+  /** Buyback market (ANTAM / GALERI24 / UBS) or the spot market. */
+  market: string;
+  grams: string;
+  /** Buyback price per gram in the instrument's own `currency`; null when unpriced. */
+  pricePerGram: string | null;
+  currency: string | null;
+  value: string | null;
+  cost: string;
+  unrealized: string | null;
+  /** No usable price: valued at cost, so no measured gain. */
+  valuedAtCost: boolean;
+  /** No FX rate into the display currency: excluded from every total. */
+  fxMissing: boolean;
+}
+
+export interface GoldPlanScheduleRow {
+  n: number;
+  dueDate: string;
+  pokok: string;
+  sewaModal: string;
+  angsuran: string;
+  paid: boolean;
+  overdue: boolean;
+}
+
+/** A financed gold-purchase (cicilan) plan with its progress, in the contract's own currency. */
+export interface GoldPlan {
+  loanId: string;
+  instrumentId: string;
+  portfolioId: string;
+  provider: string | null;
+  contractNo: string | null;
+  currency: string;
+  grams: string;
+  purchasePrice: string;
+  downPayment: string;
+  principal: string;
+  marginTotal: string;
+  tenorMonths: number;
+  monthlyInstallment: string;
+  startDate: string;
+  paidCount: number;
+  remainingCount: number;
+  paidPrincipal: string;
+  paidMargin: string;
+  outstandingPrincipal: string;
+  nextDue: { n: number; dueDate: string; amount: string; overdue: boolean } | null;
+  schedule: GoldPlanScheduleRow[];
+  completed: boolean;
+  /** Current buyback value of the plan's gold in the display currency; null when unconvertible. */
+  value: string | null;
+  valuedAtCost: boolean;
+  fxMissing: boolean;
+}
+
+export interface GoldReport {
+  displayCurrency: string;
+  totals: {
+    grams: string;
+    value: string;
+    cost: string;
+    unrealized: string;
+    /** Cost of the rows that have a measured gain (excludes at-cost and no-FX rows). */
+    measuredCost: string;
+    outstandingByCurrency: Record<string, string>;
+  };
+  holdings: GoldHoldingRow[];
+  plans: GoldPlan[];
+  fxMissingCurrencies?: string[];
+}
+
 export interface IncomeStats {
   /**
    * Currencies with no FX rate into the display currency (audit B2). Amounts in them are
@@ -2465,6 +2542,13 @@ export function createApiClient(config: ApiClientConfig) {
         "GET",
         holderId ? `/networth/income?holderId=${encodeURIComponent(holderId)}` : "/networth/income",
       ),
+    getGold: (holderId?: string) =>
+      request<GoldReport>(
+        "GET",
+        holderId ? `/networth/gold?holderId=${encodeURIComponent(holderId)}` : "/networth/gold",
+      ),
+    getPortfolioGold: (portfolioId: string) =>
+      request<GoldReport>("GET", `/portfolios/${portfolioId}/gold`),
     getPortfolioIncome: (portfolioId: string) =>
       request<IncomeStats>("GET", `/portfolios/${portfolioId}/income`),
     getIncomeEventsByYear: (year: number, holderId?: string) =>

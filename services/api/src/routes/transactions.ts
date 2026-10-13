@@ -7,6 +7,7 @@ import { registerCrudRoutes } from "./transactions/crud.js";
 import { registerHoldingsRoutes } from "./transactions/holdings.js";
 import { registerTradesRoutes } from "./transactions/trades.js";
 import { registerIncomeRoutes } from "./transactions/income.js";
+import { registerGoldRoutes } from "./transactions/gold.js";
 import { registerTaxRoutes } from "./transactions/tax.js";
 import { registerContributionsRoutes } from "./transactions/contributions.js";
 import { registerSparplanRoutes } from "./transactions/sparplan.js";
@@ -20,6 +21,7 @@ export async function transactionsRoute(app: FastifyInstance) {
   registerHoldingsRoutes(app);
   registerTradesRoutes(app);
   registerIncomeRoutes(app);
+  registerGoldRoutes(app);
   registerTaxRoutes(app);
   registerContributionsRoutes(app);
   registerSparplanRoutes(app);
