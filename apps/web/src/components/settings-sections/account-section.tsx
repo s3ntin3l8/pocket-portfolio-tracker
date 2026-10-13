@@ -1,4 +1,5 @@
-import { authViaKey, isDevAuthBypass } from "@/lib/auth-label";
+import { authViaKey } from "@/lib/auth-label";
+import { isDevAuthBypass } from "@/lib/dev-auth";
 import { getTranslations } from "next-intl/server";
 import { Lock } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";

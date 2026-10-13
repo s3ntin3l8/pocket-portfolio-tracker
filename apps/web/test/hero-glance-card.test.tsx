@@ -246,4 +246,19 @@ describe("HeroGlanceCard", () => {
     expect(screen.getByRole("button", { name: "1D" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "7D" })).toBeInTheDocument();
   });
+
+  it("keeps the 1D/7D chips when the intraday check itself failed", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1y"
+          hasIntraday="unavailable"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("button", { name: "1D" })).toBeInTheDocument();
+  });
 });

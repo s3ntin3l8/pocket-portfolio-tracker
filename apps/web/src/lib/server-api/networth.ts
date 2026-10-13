@@ -64,14 +64,15 @@ async function currentHolderScope(portfolios: Awaited<ReturnType<typeof listPort
   return { selected, holderId };
 }
 
-/** Whether intraday (1D/7D) history exists yet; `false` on any failure (hides the chips). */
-export async function loadHasIntraday(): Promise<boolean> {
+/** Whether intraday (1D/7D) history exists yet. `"unavailable"` when the check itself failed
+ *  (no session, API error): callers must not treat that as "no data" and hide anything. */
+export async function loadHasIntraday(): Promise<boolean | "unavailable"> {
   const api = await getServerApi();
-  if (!api) return false;
+  if (!api) return "unavailable";
   try {
     return (await api.getIntradayStatus()).hasIntraday;
   } catch {
-    return false;
+    return "unavailable";
   }
 }
 

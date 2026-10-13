@@ -27,6 +27,7 @@ import {
 import { toApiRange, type InstrumentPriceRange } from "@/lib/instrument-price-range";
 import { accessTokenFromCookieHeader } from "@/lib/session-token";
 import { firstForwardedHop } from "@/lib/client-ip";
+import { isDevAuthBypass } from "@/lib/dev-auth";
 import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
 export type Scope =
@@ -58,7 +59,7 @@ const authConfigured = Boolean(
 );
 // DEV_AUTH_TOKEN is a dev-only bypass — never active in production (same NODE_ENV
 // guard pattern as isAllowedHost in apps/web/src/proxy.ts).
-const devToken = process.env.NODE_ENV !== "production" ? process.env.DEV_AUTH_TOKEN : undefined;
+const devToken = isDevAuthBypass() ? process.env.DEV_AUTH_TOKEN : undefined;
 
 const getServerApi = cache(async (): Promise<ApiClient | null> => {
   let token: string | null = null;

@@ -252,18 +252,6 @@
   }
 }
 
-/* Keeps the last row of a mobile list reachable above the floating "+" button (audit G5).
-   FAB = 3.5rem tall, lifted 5rem + safe-area above the viewport bottom (add-transaction-menu);
-   the shell already reserves the bottom-nav height, so reserve the FAB's own height plus a
-   gap on top of it. Mobile only — the FAB is `md:hidden`. `scroll-padding-bottom` keeps
-   scrollIntoView/focus from landing underneath it too. */
-@utility fab-inset {
-  @media (width < 48rem) {
-    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
-    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
-  }
-}
-
 /* Hide scrollbar but keep scroll functional — used by the income calendar's
    horizontal month strip on screens where all 12 months don't fit. */
 @utility scrollbar-none {

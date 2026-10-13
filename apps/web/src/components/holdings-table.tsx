@@ -296,7 +296,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
 
       {/* ── List (< lg) ── reference row: badge, symbol over "name · quantity",
           a price-course sparkline, then value + percent. No avg-cost/price columns. ── */}
-      <div className="fab-inset flex flex-col lg:hidden">
+      <div className="flex flex-col lg:hidden">
         {sorted.map((h, i) => {
           const { pnl, pct, display } = computeRowValues(h, currency, locale);
           const pnlColor =

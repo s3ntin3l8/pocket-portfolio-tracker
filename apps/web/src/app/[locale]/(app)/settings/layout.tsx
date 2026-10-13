@@ -1,4 +1,5 @@
-import { authViaKey, isDevAuthBypass } from "@/lib/auth-label";
+import { authViaKey } from "@/lib/auth-label";
+import { isDevAuthBypass } from "@/lib/dev-auth";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { UserRound, TrendingUp, Briefcase, KeyRound, ShieldCheck } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";

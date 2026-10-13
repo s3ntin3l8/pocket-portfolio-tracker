@@ -82,11 +82,10 @@ describe("tables never clip silently (audit G5)", () => {
     expect(container.querySelector("table")!.className).toContain("sticky-first-col");
   });
 
-  it("defines the shadow, sticky-column and FAB utilities in globals.css", () => {
+  it("defines the shadow, sticky-column utilities in globals.css", () => {
     const css = src("src/app/globals.css");
     expect(css).toMatch(/@utility scroll-shadow-x/);
     expect(css).toMatch(/@utility sticky-first-col/);
-    expect(css).toMatch(/@utility fab-inset[\s\S]*scroll-padding-bottom/);
   });
 
   it("the Holdings filter chips take the remaining row width instead of running under search", () => {
@@ -96,8 +95,8 @@ describe("tables never clip silently (audit G5)", () => {
   });
 });
 
-describe("FAB inset on the mobile lists (audit G5)", () => {
-  it("Activity's list carries fab-inset and switches to the table at lg, not md", () => {
+describe("list/table breakpoint and FAB clearance (audit G5)", () => {
+  it("Activity's list switches to the table at lg, not md", () => {
     const { container } = wrap(
       <MobileView
         dayGroups={[]}
@@ -116,22 +115,25 @@ describe("FAB inset on the mobile lists (audit G5)", () => {
       />,
     );
     const list = container.firstElementChild!;
-    expect(list.className).toContain("fab-inset");
     expect(list.className).toContain("lg:hidden");
   });
 
-  it("Holdings' list carries fab-inset; the six-column table only shows from lg", () => {
+  it("Holdings' list shows below lg; the six-column table only shows from lg", () => {
     const { container } = wrap(<HoldingsTable rows={[]} currency="EUR" cash={{ EUR: "10" }} />);
-    const list = container.querySelector(".fab-inset");
-    expect(list).not.toBeNull();
-    expect(list!.className).toContain("lg:hidden");
+    expect(container.querySelector(".lg\\:hidden")).not.toBeNull();
     const tableWrap = container.querySelector(".scroll-shadow-x")!.parentElement!;
     expect(tableWrap.className).toContain("hidden");
     expect(tableWrap.className).toContain("lg:block");
   });
 
-  it("Savings applies the shared fab-inset to its page content", () => {
-    expect(src("src/app/[locale]/(app)/savings/page.tsx")).toContain('className="fab-inset');
+  it("the app shell's <main> reserves enough bottom padding to clear the nav and the FAB", () => {
+    // 11rem on mobile > FAB top edge (5rem lift + 3.5rem button = 8.5rem), so no list needs
+    // its own inset; if this reservation shrinks, the lists need one again.
+    const shell = src("src/components/app-shell.tsx");
+    expect(shell).toMatch(/pb-\[max\(11rem,/);
+    expect(src("src/components/add-transaction-menu.tsx")).toContain(
+      "bottom-[calc(5rem+env(safe-area-inset-bottom))]",
+    );
   });
 });
 
