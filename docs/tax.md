@@ -61,29 +61,78 @@ A portfolio with no FSA configured (`taxAllowanceAnnual` is `null`) can't comput
 tax at all — the route returns `422 tax_allowance_not_configured`, and the `/sparplan`
 route returns `taxUnavailable: true` instead of erroring.
 
+### Tax rate (`capitalGainsTaxRate` / `churchTax`)
+
+`effectiveCapitalGainsTaxRate` (`packages/core/src/tax/rates.ts`) resolves the flat rate
+used for "tax saving" figures, in this order:
+
+1. The holder's explicit `accountHolders.capitalGainsTaxRate`, if set (always wins).
+2. Otherwise, with `churchTax` unset: Abgeltungsteuer 25% + Solidaritätszuschlag 5.5% of
+   it = **26.375%** (previously a bare 25%).
+3. Otherwise, with `churchTax` set (§32d Abs. 1 EStG): the Kapitalertragsteuer is reduced
+   because the church tax is deductible, `e = 25% / (1 + 0.25·k)`, and the total is
+   `e · (1 + 0.055 + k)` with `k` = church-tax rate on the KapESt (default **9%**; 8% in
+   Baden-Württemberg and Bayern, passed as `churchTaxRate`). k = 9% gives 27.9951%,
+   k = 8% gives 27.8186%. `churchTax` is a boolean, so 9% is assumed unless an explicit
+   rate is configured.
+
+### Holding period (§23 EStG)
+
+Gold/crypto gains are tax-free only if held **more than one year**. The test is calendar
+arithmetic (`heldMoreThanOneYear`, `packages/core/src/trade-log/helpers.ts`): a sale on
+the one-year anniversary is still inside the period, the next day is not, and a 29 Feb
+acquisition ends on 28 Feb (§188 Abs. 2 BGB) — no 365-day count, so leap years are right.
+Long-term flags are decided **per lot**: a FIFO leg by its own lot; an average-method leg
+only if every lot consumed by that sale is older than a year, so a recent top-up does not
+inherit the first lot's status. An open trade is long-term when every lot still held is.
+
 ### Teilfreistellung (partial exemption)
 
-Fund gains/losses and Vorabpauschale are multiplied by `(1 − tfRate)` before counting
-against the allowance. The rate comes from `instruments.partialExemptionRate` when set,
+Fund gains/losses, fund **distributions** and Vorabpauschale are multiplied by
+`(1 − tfRate)` before counting against the allowance. Distributions are carried
+per instrument in `TradeLog.incomeByInstrumentYear` (the instrument-attributed part of
+`dividendsByYear`); instrument-less income such as account interest stays unadjusted.
+An equity-ETF distribution of €100 therefore counts as €70 in the general pot. The rate comes from `instruments.partialExemptionRate` when set,
 else a hardcoded default by asset class (`services/api/src/routes/transactions/tax.ts`):
-ETF → **30%**, mutual fund → **15%**, everything else → **0%** (no exemption). Worked
+ETF → **30%**, mutual fund → **15%**, everything else → **0%** (no exemption). The
+class default is only a fallback: bond/real-estate/mixed funds have different statutory
+rates (e.g. 60% real estate, 15% mixed), so the **per-instrument
+`instruments.partialExemptionRate` is the documented override**. There is currently no
+write path for it in the API or the instrument edit dialog — it is set in the database
+only (tracked as a follow-up). Worked
 example (from `packages/core/test/tax.test.ts`): a closed equity-ETF trade with a
 €1,000 realized gain and a 30% Teilfreistellung rate tf-adjusts to **€700** — against a
 €1,000 allowance, that leaves €300 remaining.
 
 ### Two-pot loss netting (Verlustverrechnungstöpfe)
 
-Gains/losses are split into two pots that **never spill into each other**:
+Gains/losses are split into two pots:
 
 - **Aktienverlusttopf (stock pot)** — realized share-sale (assetClass `"equity"`)
   gains/losses only.
 - **Allgemeiner Verlusttopf (general pot)** — fund/bond/derivative gains/losses, all
   dividend/interest/coupon income, and the Vorabpauschale net (accrual − credit).
 
-Each pot nets internally and floors at 0 independently _before_ summing into `usedYtd` —
-a big stock loss can never offset a fund gain. **Gold and crypto are excluded from both
+**Netting is one-way (§20 Abs. 6 EStG, owner-confirmed):** a loss in the _general_ pot
+offsets _stock_ gains; a loss in the _stock_ pot only ever offsets stock gains, never
+general gains. `computePotsUsage` (`packages/core/src/tax-helpers.ts`) applies each pot's
+own carry-forward first, then nets a still-negative general pot against the stock gain
+before clamping; whatever is still negative afterwards is carried forward separately
+(the stock loss in the stock pot, the remaining general loss in the general pot).
+
+| Stock pot | General pot | Counts against allowance | Note                                |
+| --------- | ----------- | ------------------------ | ----------------------------------- |
+| +1,000    | −400        | 600                      | general loss nets the stock gain    |
+| −1,000    | +400        | 400                      | stock loss carried forward, unused  |
+| −400      | +1,000      | 1,000                    | stock loss NOT used on general gain |
+| +400      | −1,000      | 0                        | 600 general loss carried forward    |
+
+`lossCarryForward.general` follows the same direction (a general carry-forward larger
+than the general subtotal also absorbs stock gains); `lossCarryForward.stock` only ever
+reduces the stock pot. **Gold and crypto are excluded from both
 pots entirely**: they fall under §23 EStG private-sale rules, a separate regime from the
-§20 Kapitalerträge this allowance covers.
+§20 Kapitalerträge this allowance covers. The same exclusion applies to harvest
+suggestions (they never propose realising gold/crypto gains "to use the allowance").
 
 A per-pot, per-holder **loss carry-forward** from the prior year's tax certificate
 (`lossCarryforward` table, keyed by `holderId` + `taxYear` + `pot`) is subtracted from
@@ -101,6 +150,28 @@ side (per-instrument accrual pool on `Trade.vorabByYear`, and a disposal credit 
 sold); `tax.ts` owns the _tax-netting_ side — it Teilfreistellung-adjusts both the
 accrual and the credit, in the same per-trade loop that handles realized gains, and
 folds the net (accrual − credit) into the general pot.
+
+### Basiszins and the Vorabpauschale
+
+The Vorabpauschale base normally comes from the broker (`vorabBase` on the `tax`/
+`vorabpauschale` row); without it the accrual is 0. `BASISZINS_BY_YEAR`
+(`packages/core/src/tax/rates.ts`) holds the official Basiszins (§18 Abs. 4 InvStG,
+derived by the Bundesbank at the first trading day of the year and published by the
+Bundesfinanzministerium) and `estimateVorabpauschale` applies
+`value on 1 Jan × Basiszins × 70%`, prorated by months held, capped at the actual
+increase, minus distributions. Sources (BMF-Schreiben "Basiszins zur Berechnung der
+Vorabpauschale gem. § 18 Absatz 4 InvStG"):
+
+| Year | Basiszins | BMF-Schreiben                                                 |
+| ---- | --------- | ------------------------------------------------------------- |
+| 2023 | 2.55%     | 4 Jan 2023                                                    |
+| 2024 | 2.29%     | 5 Jan 2024, IV C 1 - S 1980-1/19/10038 :008                   |
+| 2025 | 2.53%     | 10 Jan 2025, IV C 1 - S 1980/00230/009/002                    |
+| 2026 | 3.20%     | Jan 2026, IV C 1 - S 1980/00230/012/001 (BStBl 2026 I S. 155) |
+
+A year with no entry returns `null` and logs a warning — values are never guessed. The
+estimate is not yet wired into the trade log automatically (it needs 1 Jan / 31 Dec
+fund prices); it is available for callers that have them.
 
 ### Harvest suggestions
 
@@ -132,10 +203,16 @@ A flat, **withheld-at-source** tax with no annual allowance, no loss-netting, an
 realization dependency on when a gain was locked in — it taxes _proceeds and gross
 income_, not gains:
 
-| Event                    | Rate     | Base                                                                     |
-| ------------------------ | -------- | ------------------------------------------------------------------------ |
-| Every disposal (sell)    | **0.1%** | Gross sale proceeds (not gain)                                           |
-| Dividend / coupon income | **10%**  | Gross amount (net received + any withholding already on the transaction) |
+| Event                         | Rate     | Base                                                                     |
+| ----------------------------- | -------- | ------------------------------------------------------------------------ |
+| Disposal of IDX-listed shares | **0.1%** | Gross sale proceeds (not gain)                                           |
+| Dividend / coupon income      | **10%**  | Gross amount (net received + any withholding already on the transaction) |
+
+The 0.1% sales tax is scoped to `market === "IDX" && assetClass === "equity"`
+(`computeIndonesianFinalTaxFromTradeLog` in `services/api/src/routes/transactions/
+tax-helpers.ts`); gold, crypto, foreign-listed ETFs/stocks and bonds incur none, in both
+the per-disposal rows and the by-year rollup. Dividend rows are display-currency
+amounts and are labelled with the display currency (not the transaction's native one).
 
 **Design-fidelity note (intentional):** dividend/coupon tax is always computed as
 `gross × 10%`, ignoring whatever a broker may have already withheld on the underlying
@@ -156,7 +233,11 @@ allowance/carry-forward state to fetch.
 ## `costBasisMode` — not a tax setting
 
 `userPreferences.costBasisMode` (`"purchase_price"` default, or `"total_paid"`) is a
-**separate** global preference from `taxRegime` — it changes how cost basis is computed
+**separate** global preference. Server-side it is resolved by `resolveCostBasisMode`
+(`services/api/src/routes/transactions/shared/helpers.ts`): an explicit valid
+`?costBasis=` query wins, otherwise the saved preference — used by the tax, contributions,
+history, sparplan, trades, holdings and net-worth routes.
+It is a **separate** global preference from `taxRegime` — it changes how cost basis is computed
 for FIFO/average-cost trade logs and P&L generally (`packages/core/src/valuation.ts`,
 `CostBasisMode`), not anything tax-specific. It's unrelated to either tax module above;
 don't assume a `taxRegime` change implies a `costBasisMode` change or vice versa. (A

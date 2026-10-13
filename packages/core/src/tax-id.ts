@@ -3,7 +3,8 @@
  * proceeds and on dividend/coupon gross income.
  *
  * Scope:
- *   - Sales tax: 0.1% of gross sale PROCEEDS (not gain) for every disposal.
+ *   - Sales tax: 0.1% of gross sale PROCEEDS (not gain) for disposals of IDX-listed shares
+ *     (the caller filters disposals to `market === "IDX" && assetClass === "equity"`).
  *   - Dividend/coupon tax: 10% of GROSS income (net received + any withholding already
  *     recorded on the transaction — see the design-fidelity note below).
  *   - Both are "final" taxes withheld at source: no annual allowance, no tax-loss

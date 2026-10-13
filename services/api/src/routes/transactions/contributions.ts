@@ -21,6 +21,7 @@ import {
   networthContributionsCache,
   enrichContributions,
   PORTFOLIO_VALUATION_CONCURRENCY,
+  resolveCostBasisMode,
 } from "./shared.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
@@ -34,6 +35,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
       const id = request.userId;
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
+      const costBasisMode = await resolveCostBasisMode(app, id);
       const [pref] = await app.db
         .select({ retirementAge: userPreferences.retirementAge })
         .from(userPreferences)
@@ -43,7 +45,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
         app,
         portfolioId,
         portfolio.baseCurrency,
-        undefined,
+        costBasisMode,
         portfolio.cashCounted,
       );
       const result = buildContributions(
@@ -116,9 +118,10 @@ export function registerContributionsRoutes(app: FastifyInstance) {
             : eq(portfolios.userId, id),
         );
 
+      const costBasisMode = await resolveCostBasisMode(app, id);
       const result = await withDerivationCache(
         networthContributionsCache,
-        cacheKey(id, display, holderId ?? ""),
+        cacheKey(id, display, holderId ?? "", costBasisMode ?? ""),
         async () => {
           const perPortfolioLoad = await mapPool(
             pfs,
@@ -128,7 +131,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
                 app,
                 p.id,
                 display,
-                undefined,
+                costBasisMode,
                 p.cashCounted,
               );
               return {

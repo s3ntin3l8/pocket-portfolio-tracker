@@ -19,7 +19,7 @@ import { mapPool } from "../../lib/promise-pool.js";
 import {
   instrumentMeta,
   loadValuation,
-  costBasisFromQuery,
+  resolveCostBasisMode,
   loadDrift,
   boundaryFlows,
   excludeFxMissingInstruments,
@@ -40,7 +40,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
         .where(eq(users.id, id))
         .limit(1);
       const display = u?.displayCurrency ?? "IDR";
-      const costBasisMode = costBasisFromQuery(request.query);
+      const costBasisMode = await resolveCostBasisMode(app, id, request.query);
 
       // Period selector: ytd | 1y | 5y | max (default)
       const period = ["ytd", "1y", "5y"].includes(request.query.period ?? "")

@@ -8,7 +8,7 @@ import { mapPool } from "../../lib/promise-pool.js";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
-  costBasisFromQuery,
+  resolveCostBasisMode,
   methodFromQuery,
   buildTradeLog,
   attachInstruments,
@@ -26,7 +26,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
       const method = methodFromQuery(request.query);
-      const costBasisMode = costBasisFromQuery(request.query);
+      const costBasisMode = await resolveCostBasisMode(app, request.userId, request.query);
       const cached = await withDerivationCache(
         tradesCache,
         cacheKey(portfolioId, method, costBasisMode),
@@ -67,7 +67,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
       const id = request.userId;
       const { holderId } = request.query;
       const method = methodFromQuery(request.query);
-      const costBasisMode = costBasisFromQuery(request.query);
+      const costBasisMode = await resolveCostBasisMode(app, request.userId, request.query);
 
       if (holderId != null) {
         const [holder] = await app.db

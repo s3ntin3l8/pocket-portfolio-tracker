@@ -187,7 +187,11 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   other value routes to the Indonesian final-tax module) and `costBasisMode` (default
   `"purchase_price"`). Changing either changes which `packages/core` tax module and
   cost-basis convention every portfolio's numbers are computed with — check both before
-  assuming DE-style realization-based tax logic applies.
+  assuming DE-style realization-based tax logic applies. Server-side, `costBasisMode` is
+  resolved by `resolveCostBasisMode` (`?costBasis=` query wins, else the saved preference) —
+  never read `?costBasis=` alone. Loss netting is one-way (`computePotsUsage`): general-pot
+  losses offset stock gains, stock losses only offset stock gains; the default capital-gains
+  rate is 26.375% (`effectiveCapitalGainsTaxRate`); see `docs/tax.md`.
 - **Imports never auto-commit.** Screenshot/CSV parses become _draft_ records that the
   user confirms before a transaction is written. Dedup runs at three levels: **file-level**
   (same file re-upload → `contentHash`), **within-source transaction-level** (the

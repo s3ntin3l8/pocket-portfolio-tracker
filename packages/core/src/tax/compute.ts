@@ -1,13 +1,14 @@
 import { Decimal } from "decimal.js";
 import { D, ZERO } from "../decimal.js";
-import { effectiveMultiplier, computePotUsage } from "../tax-helpers.js";
+import { effectiveMultiplier, computePotsUsage, isSection23Class } from "../tax-helpers.js";
 import type { YearTax } from "../trade-log.js";
+import { DEFAULT_CAPITAL_GAINS_TAX_RATE } from "./rates.js";
 import type { AllowanceUsageInput, AllowanceUsage } from "./types.js";
 
 export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   const year = input.year ?? new Date().getUTCFullYear();
   const allowance = D(input.allowanceAnnual);
-  const taxRate = D(input.taxRate ?? "0.25");
+  const taxRate = D(input.taxRate ?? DEFAULT_CAPITAL_GAINS_TAX_RATE);
   const currency = input.tradeLog.displayCurrency;
   const assetClasses = input.assetClasses ?? {};
 
@@ -17,7 +18,7 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   let vorabCredited = ZERO;
   for (const trade of input.tradeLog.trades) {
     const assetClass = assetClasses[trade.instrumentId];
-    if (assetClass === "gold" || assetClass === "crypto") continue;
+    if (isSection23Class(assetClass)) continue;
     const isStock = assetClass === "equity";
 
     const multiplier = effectiveMultiplier(input.tfRates[trade.instrumentId] ?? "0");
@@ -43,10 +44,23 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
     }
   }
 
+  // Income pool. dividendsByYear is the gross-able total; the instrument-attributed part
+  // (incomeByInstrumentYear) gets that instrument's Teilfreistellung (30% equity ETF,
+  // 15% mutual fund, or the per-instrument override) — fund DISTRIBUTIONS are partially
+  // exempt just like fund gains. Instrument-less income (e.g. account interest) and
+  // fixtures without the per-instrument split stay unadjusted.
   const incomeEntry: YearTax | undefined = input.tradeLog.dividendsByYear.find(
     (e) => e.year === year,
   );
-  const incomeGross = incomeEntry ? D(incomeEntry.amount).plus(D(incomeEntry.tax)) : ZERO;
+  let incomeGross = incomeEntry ? D(incomeEntry.amount).plus(D(incomeEntry.tax)) : ZERO;
+  for (const e of input.tradeLog.incomeByInstrumentYear ?? []) {
+    if (e.year !== year) continue;
+    const gross = D(e.amount).plus(D(e.tax));
+    const exempt = gross.minus(
+      gross.times(effectiveMultiplier(input.tfRates[e.instrumentId] ?? "0")),
+    );
+    incomeGross = incomeGross.minus(exempt);
+  }
   const positiveIncome = Decimal.max(ZERO, incomeGross);
 
   const vorabNet = vorabAccrued.minus(vorabCredited);
@@ -56,14 +70,18 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
 
   const stockCF = Decimal.max(ZERO, D(input.lossCarryForward?.stock ?? "0"));
   const generalCF = Decimal.max(ZERO, D(input.lossCarryForward?.general ?? "0"));
-  const stockUsed = computePotUsage(stockSubtotal, input.lossCarryForward?.stock);
-  const generalUsedYtd = computePotUsage(
+  // One-way loss netting (see computePotsUsage): general-pot losses offset stock gains;
+  // stock losses never offset general gains. Projected (with rest-of-year forecast
+  // income) is netted separately because the forecast can flip the general pot positive.
+  const { stockUsed, generalUsed: generalUsedYtd } = computePotsUsage(
+    stockSubtotal,
     generalSubtotalNoForecast,
-    input.lossCarryForward?.general,
+    input.lossCarryForward,
   );
-  const generalUsedProjected = computePotUsage(
+  const { stockUsed: stockUsedProjected, generalUsed: generalUsedProjected } = computePotsUsage(
+    stockSubtotal,
     generalSubtotalWithForecast,
-    input.lossCarryForward?.general,
+    input.lossCarryForward,
   );
 
   const rawUsed = stockUsed.plus(generalUsedYtd);
@@ -72,7 +90,7 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   const taxSavingAvailable = remaining.times(taxRate);
   const taxableExcess = Decimal.max(ZERO, rawUsed.minus(allowance));
 
-  const rawProjected = stockUsed.plus(generalUsedProjected);
+  const rawProjected = stockUsedProjected.plus(generalUsedProjected);
   const projectedUsedFullYear = Decimal.min(rawProjected, allowance);
   const projectedRemaining = Decimal.max(ZERO, allowance.minus(projectedUsedFullYear));
   const projectedTaxSavingAvailable = projectedRemaining.times(taxRate);

@@ -115,6 +115,7 @@ export {
   type TradeLog,
   type YearAmount,
   type YearTax,
+  type InstrumentYearTax,
   type ComputeTradesInput,
 } from "./trade-log.js";
 export {
@@ -147,6 +148,12 @@ export {
   type HarvestPlanStep,
   type AllowanceUsageInput,
   type HarvestSuggestionsInput,
+  effectiveCapitalGainsTaxRate,
+  DEFAULT_CAPITAL_GAINS_TAX_RATE,
+  DEFAULT_CHURCH_TAX_RATE,
+  BASISZINS_BY_YEAR,
+  basiszinsFor,
+  estimateVorabpauschale,
 } from "./tax.js";
 export {
   indonesianFinalTax,

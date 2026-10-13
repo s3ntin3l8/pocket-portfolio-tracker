@@ -32,6 +32,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -85,6 +86,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -136,6 +138,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-world": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -154,6 +157,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -174,6 +178,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -225,6 +230,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -243,6 +249,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -297,6 +304,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -351,6 +359,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025, // asking about 2025
     });
@@ -364,6 +373,7 @@ describe("allowanceUsageYTD", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
     });
     expect(result.year).toBe(new Date().getUTCFullYear());
@@ -445,6 +455,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-1": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -463,6 +474,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-1": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -477,6 +489,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-1": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -504,6 +517,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-1": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -525,6 +539,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-1": "0.30" }, // credit tf-adjusted: 50 × 0.70 = 35
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -542,6 +557,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "etf-30": "0.30", "bond-fund-0": "0" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -554,6 +570,7 @@ describe("allowanceUsageYTD — Vorabpauschale netting", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
     });
@@ -610,6 +627,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity", "fund-a": "etf" },
@@ -622,20 +640,22 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     expect(result.usedYtd).toBe("300.00");
   });
 
-  it("a general-pot (fund) loss does NOT offset a stock gain — no cross-pot spill", () => {
+  it("a general-pot (fund) loss DOES offset a stock gain (one-way, §20 Abs. 6 EStG)", () => {
     const log = makeTradeLog({
       trades: [gainTrade("stock-a", "300"), gainTrade("fund-a", "-500")],
     });
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity", "fund-a": "etf" },
     });
-    expect(result.stockPot.used).toBe("300.00");
+    // 300 stock gain - 500 general loss -> fully absorbed; 200 general loss carries on.
+    expect(result.stockPot.used).toBe("0.00");
     expect(result.generalPot.used).toBe("0.00");
-    expect(result.usedYtd).toBe("300.00");
+    expect(result.usedYtd).toBe("0.00");
   });
 
   it("a stock loss DOES offset another stock gain — same-pot netting still works", () => {
@@ -645,6 +665,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity", "stock-b": "equity" },
@@ -665,6 +686,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "gold-a": "gold", "crypto-a": "crypto", "stock-a": "equity" },
@@ -681,6 +703,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "fund-a": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "fund-a": "etf" },
@@ -694,6 +717,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       // assetClasses omitted entirely — matches today's pre-two-pot behavior.
@@ -709,6 +733,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: { "fund-a": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "fund-a": "etf" },
@@ -729,6 +754,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity", "fund-a": "etf" },
@@ -744,6 +770,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity" },
@@ -767,6 +794,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "fund-a": "etf" },
@@ -783,6 +811,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity" },
@@ -796,6 +825,7 @@ describe("allowanceUsageYTD — two-pot Verlustverrechnung", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2026,
       assetClasses: { "stock-a": "equity" },
@@ -839,6 +869,7 @@ describe("harvestSuggestions", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -875,6 +906,7 @@ describe("harvestSuggestions", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -924,6 +956,7 @@ describe("harvestSuggestions", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: { "etf-world": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -969,6 +1002,7 @@ describe("harvestSuggestions", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -1017,6 +1051,7 @@ describe("harvestSuggestions", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -1076,6 +1111,7 @@ describe("harvestSuggestions", () => {
       // ETF with 30% tf: adjusted = 200 × 0.70 = 140
       // Stock with 0% tf: adjusted = 500 × 1.00 = 500
       tfRates: { "etf-small": "0.30" },
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -1115,6 +1151,7 @@ describe("harvestSuggestions", () => {
     const usage = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "500",
       year: 2025,
     });
@@ -1122,6 +1159,7 @@ describe("harvestSuggestions", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "500",
       year: 2025,
       usage,
@@ -1144,6 +1182,7 @@ describe("allowanceUsageYTD with forecastIncomeRestOfYear", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
     });
@@ -1160,6 +1199,7 @@ describe("allowanceUsageYTD with forecastIncomeRestOfYear", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       forecastIncomeRestOfYear: "310",
@@ -1181,6 +1221,7 @@ describe("allowanceUsageYTD with forecastIncomeRestOfYear", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       forecastIncomeRestOfYear: "600",
@@ -1196,6 +1237,7 @@ describe("allowanceUsageYTD with forecastIncomeRestOfYear", () => {
     const result = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       forecastIncomeRestOfYear: "-50",
@@ -1237,6 +1279,7 @@ describe("harvestSuggestions with forecast-aware projectedRemaining", () => {
     const usage = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       forecastIncomeRestOfYear: "700",
@@ -1246,6 +1289,7 @@ describe("harvestSuggestions with forecast-aware projectedRemaining", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       usage,
@@ -1267,6 +1311,7 @@ describe("harvestSuggestions with forecast-aware projectedRemaining", () => {
     const usage = allowanceUsageYTD({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       forecastIncomeRestOfYear: "600",
@@ -1276,6 +1321,7 @@ describe("harvestSuggestions with forecast-aware projectedRemaining", () => {
     const result = harvestSuggestions({
       tradeLog: log,
       tfRates: {},
+      taxRate: "0.25",
       allowanceAnnual: "1000",
       year: 2025,
       usage,

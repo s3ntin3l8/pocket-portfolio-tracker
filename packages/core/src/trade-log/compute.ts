@@ -12,12 +12,13 @@ import type {
   TradeLog,
   YearAmount,
   YearTax,
+  InstrumentYearTax,
   ComputeTradesInput,
   Lot,
   Episode,
   Event,
 } from "./types.js";
-import { LONG_TERM_DAYS, DEFAULT_DUST, makeEpisode, calcAvgHoldingDays } from "./helpers.js";
+import { heldMoreThanOneYear, DEFAULT_DUST, makeEpisode, calcAvgHoldingDays } from "./helpers.js";
 import { finalizeLog } from "./finalize.js";
 import { augmentTransactionsWithSyntheticMergerLegs } from "../merger-augment.js";
 
@@ -101,6 +102,22 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
     // ~0, since a full-close sell's ratio is 1); reset defensively at the dust-close snap.
     let vorabPool = ZERO;
 
+    // Long-term (§23): a closed trade is long-term when every disposal leg was; an open
+    // one when every lot still held is older than a year. Per-lot dates matter for the
+    // average method too — a recent top-up must not inherit the first lot's status.
+    const tradeLongTerm = (
+      status: "open" | "closed",
+      entry: Date,
+      end: Date,
+      legs: { longTerm: boolean }[],
+    ): boolean => {
+      if (status === "closed") return legs.length > 0 && legs.every((l) => l.longTerm);
+      const held = lots.filter((l) => l.qty.gt(0));
+      return held.length > 0
+        ? held.every((l) => heldMoreThanOneYear(l.acqDate, end))
+        : heldMoreThanOneYear(entry, end);
+    };
+
     const finalizeTrade = (ep: Episode, status: "open" | "closed", exitAt: Date | null) => {
       const currentQty = avgQty; // remaining units (0 when closed)
       const entryDate = ep.entryDate;
@@ -173,7 +190,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         exitDate: exitDate ? toDateKey(exitDate) : null,
         holdingDays,
         avgHoldingDays,
-        longTerm: holdingDays >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+        longTerm:
+          tradeLongTerm(status, entryDate, periodEnd, ep.legs) && isTaxFreeEligible(instrumentId),
         quantity: qtyShown.toString(),
         avgEntryPrice,
         avgExitPrice,
@@ -252,7 +270,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         // proportional to the fraction of currently-held shares this sell disposes, before
         // any lot/quantity mutation below. Already display currency (accrued that way —
         // see the "tax"/vorabpauschale branch), so no further conv() needed here. Stays
-        // gross; tax.ts applies Teilfreistellung when netting it against the FSA.
+        // gross; allowanceUsageYTD (tax/compute.ts) applies Teilfreistellung when netting it.
         const vorabCreditThis = qtyBeforeSale.gt(0)
           ? vorabPool.mul(sellQty).div(qtyBeforeSale)
           : ZERO;
@@ -300,7 +318,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
               proceeds: conv(sliceProceeds, costCcy).toString(),
               gain: conv(sliceProceeds.sub(s.cost), costCcy).toString(),
               holdingDays: days,
-              longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+              longTerm: heldMoreThanOneYear(s.acqDate, sellDate) && isTaxFreeEligible(instrumentId),
               taxYear,
               vorabCredit: sliceVorabCredit.toString(),
             });
@@ -315,7 +333,9 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
             proceeds: conv(proceeds, costCcy).toString(),
             gain: conv(realizedSlice, costCcy).toString(),
             holdingDays: days,
-            longTerm: days >= LONG_TERM_DAYS && isTaxFreeEligible(instrumentId),
+            longTerm:
+              fifoSlices.every((s) => heldMoreThanOneYear(s.acqDate, sellDate)) &&
+              isTaxFreeEligible(instrumentId),
             taxYear,
             vorabCredit: vorabCreditThis.toString(),
           });
@@ -363,7 +383,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         // Don't close the episode — remaining shares may still be held.
       } else if (tx.type === "tax" && tx.kind === "vorabpauschale") {
         // Vorabpauschale accrual (§18(3) InvStG): a non-cash advance lump-sum fund tax
-        // base, gross (Teilfreistellung is applied by tax.ts, not here — see the file
+        // base, gross (Teilfreistellung is applied by tax/compute.ts, not here — see the file
         // header's ownership split). Requires an open episode (shares held) and a parsed
         // base; either being absent degrades silently to today's zero-effect booking
         // rather than guessing.
@@ -384,17 +404,45 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
   }
 
   // dividendsByYear — all income (dividend/coupon/interest), net amount + withholding.
+  // Also split per instrument (incomeByInstrumentYear) so tax.ts can apply each
+  // instrument's Teilfreistellung to fund distributions before pooling.
   const divMap = new Map<number, { amount: Decimal; tax: Decimal }>();
+  const instrIncomeMap = new Map<
+    string,
+    { instrumentId: string; year: number; amount: Decimal; tax: Decimal }
+  >();
   for (const tx of input.transactions) {
     if (tx.type !== "dividend" && tx.type !== "coupon" && tx.type !== "interest") {
       continue;
     }
     const year = tx.executedAt.getUTCFullYear();
+    const amt = conv(cashFlow(tx), tx.currency);
+    const wht = conv(tx.tax ?? "0", tx.currency);
     const entry = divMap.get(year) ?? { amount: ZERO, tax: ZERO };
-    entry.amount = entry.amount.add(conv(cashFlow(tx), tx.currency));
-    entry.tax = entry.tax.add(conv(tx.tax ?? "0", tx.currency));
+    entry.amount = entry.amount.add(amt);
+    entry.tax = entry.tax.add(wht);
     divMap.set(year, entry);
+    if (tx.instrumentId) {
+      const key = `${tx.instrumentId}:${year}`;
+      const ie = instrIncomeMap.get(key) ?? {
+        instrumentId: tx.instrumentId,
+        year,
+        amount: ZERO,
+        tax: ZERO,
+      };
+      ie.amount = ie.amount.add(amt);
+      ie.tax = ie.tax.add(wht);
+      instrIncomeMap.set(key, ie);
+    }
   }
+  const incomeByInstrumentYear: InstrumentYearTax[] = [...instrIncomeMap.values()]
+    .sort((a, b) => a.year - b.year || a.instrumentId.localeCompare(b.instrumentId))
+    .map((e) => ({
+      instrumentId: e.instrumentId,
+      year: e.year,
+      amount: e.amount.toString(),
+      tax: e.tax.toString(),
+    }));
   const dividendsByYear: YearTax[] = [...divMap.entries()]
     .sort(([a], [b]) => a - b)
     .map(([year, { amount, tax }]) => ({
@@ -430,5 +478,12 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
     .sort(([a], [b]) => a - b)
     .map(([year, amount]) => ({ year, amount: amount.toString() }));
 
-  return finalizeLog(trades, dividendsByYear, bonusesByYear, method, display);
+  return finalizeLog(
+    trades,
+    dividendsByYear,
+    bonusesByYear,
+    method,
+    display,
+    incomeByInstrumentYear,
+  );
 }

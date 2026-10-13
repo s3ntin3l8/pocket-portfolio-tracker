@@ -16,15 +16,18 @@ import {
   rebalancingTrades,
   contributionSplit,
   allowanceUsageYTD,
+  effectiveCapitalGainsTaxRate,
   harvestSuggestions,
   type DriftRow,
   type TradeAction,
   partitionConvertible,
 } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
+import { buildTfRates } from "./tax-helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
+  resolveCostBasisMode,
   buildSparplanStats,
   excludeFxMissingInstruments,
   buildTradeLog,
@@ -48,11 +51,12 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       const { portfolioId } = request.params;
       const includeSales = request.query.includeSales === "true";
       const portfolio = request.portfolio;
+      const costBasisMode = await resolveCostBasisMode(app, id);
       const { coreTxns, summary, prices, metaById } = await loadValuation(
         app,
         portfolioId,
         portfolio.baseCurrency,
-        undefined,
+        costBasisMode,
         portfolio.cashCounted,
       );
       const stats = await withDerivationCache(
@@ -166,15 +170,19 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       // Fetch the portfolio's holder tax profile for the personal tax rate.
       // The FSA slice (Freistellungsauftrag allocation) lives on the portfolio itself.
       const holderId = portfolio.accountHolderId;
-      let holderTaxRate: string | null = null;
+      let holderProfile: { capitalGainsTaxRate: string | null; churchTax: boolean | null } | null =
+        null;
 
       if (holderId) {
         const [holder] = await app.db
-          .select({ capitalGainsTaxRate: accountHolders.capitalGainsTaxRate })
+          .select({
+            capitalGainsTaxRate: accountHolders.capitalGainsTaxRate,
+            churchTax: accountHolders.churchTax,
+          })
           .from(accountHolders)
           .where(and(eq(accountHolders.id, holderId), eq(accountHolders.userId, id)))
           .limit(1);
-        if (holder) holderTaxRate = holder.capitalGainsTaxRate;
+        if (holder) holderProfile = holder;
       }
 
       if (!portfolio.taxAllowanceAnnual) {
@@ -195,29 +203,28 @@ export function registerSparplanRoutes(app: FastifyInstance) {
         prices,
         portfolio.baseCurrency,
         "fifo",
-        undefined,
+        costBasisMode,
         metaById,
       );
-      const tfRates: Record<string, string> = {};
-      for (const t of tradeLog.trades) {
-        const meta = metaById.get(t.instrumentId);
-        if (!meta) continue;
-        if (meta.partialExemptionRate !== null) {
-          tfRates[t.instrumentId] = meta.partialExemptionRate;
-        } else if (meta.assetClass === "etf") {
-          tfRates[t.instrumentId] = "0.30";
-        } else if (meta.assetClass === "mutual_fund") {
-          tfRates[t.instrumentId] = "0.15";
-        }
-      }
+      const tfRates = buildTfRates(tradeLog.trades, metaById);
+      const assetClasses = Object.fromEntries(
+        [...metaById.entries()].map(([iid, m]) => [iid, m.assetClass]),
+      );
       const allowanceAnnual = portfolio.taxAllowanceAnnual;
-      const taxRate = holderTaxRate ?? "0.25";
-      const usage = allowanceUsageYTD({ tradeLog, tfRates, allowanceAnnual, taxRate });
+      const taxRate = effectiveCapitalGainsTaxRate(holderProfile ?? {});
+      const usage = allowanceUsageYTD({
+        tradeLog,
+        tfRates,
+        allowanceAnnual,
+        taxRate,
+        assetClasses,
+      });
       const suggestions = harvestSuggestions({
         tradeLog,
         tfRates,
         allowanceAnnual,
         taxRate,
+        assetClasses,
         usage,
       });
 
@@ -307,6 +314,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
             : eq(portfolios.userId, id),
         );
 
+      const costBasisMode = await resolveCostBasisMode(app, id);
       const result = await withDerivationCache(
         networthSparplanCache,
         cacheKey(id, display, holderId ?? ""),
@@ -322,7 +330,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
                 app,
                 p.id,
                 display,
-                undefined,
+                costBasisMode,
                 p.cashCounted,
               );
               const ccys = [...new Set(coreTxns.map((t) => t.currency))];

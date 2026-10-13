@@ -22,7 +22,7 @@ import {
   loadValuation,
   loadDrift,
   computePortfolioAnomalies,
-  costBasisFromQuery,
+  resolveCostBasisMode,
 } from "./shared.js";
 
 export function registerHoldingsRoutes(app: FastifyInstance) {
@@ -102,7 +102,7 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
         app,
         portfolioId,
         portfolio.baseCurrency,
-        costBasisFromQuery(request.query),
+        await resolveCostBasisMode(app, id, request.query),
         portfolio.cashCounted,
         request.log,
       )) as unknown as { summary: PortfolioSummary; metaById: Map<string, InstrumentMeta> };

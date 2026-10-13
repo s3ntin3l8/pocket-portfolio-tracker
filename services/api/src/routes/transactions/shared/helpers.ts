@@ -8,6 +8,7 @@ import {
   transactions,
   dismissedAnomalies,
   trConnections,
+  userPreferences,
 } from "@portfolio/db";
 import {
   type Anomaly,
@@ -283,6 +284,26 @@ export async function loadValuation(
 
 export function costBasisFromQuery(q: { costBasis?: string }): CostBasisMode | undefined {
   return q.costBasis === "total_paid" || q.costBasis === "purchase_price" ? q.costBasis : undefined;
+}
+
+/**
+ * Cost-basis mode for a request: an explicit valid `?costBasis=` wins; otherwise the
+ * user's saved `userPreferences.costBasisMode`. `purchase_price` (the default) maps to
+ * `undefined` so derivation-cache keys stay identical to the pre-preference behaviour.
+ */
+export async function resolveCostBasisMode(
+  app: FastifyInstance,
+  userId: string,
+  query: { costBasis?: string } = {},
+): Promise<CostBasisMode | undefined> {
+  const fromQuery = costBasisFromQuery(query);
+  if (fromQuery !== undefined) return fromQuery;
+  const [row] = await app.db
+    .select({ costBasisMode: userPreferences.costBasisMode })
+    .from(userPreferences)
+    .where(eq(userPreferences.userId, userId))
+    .limit(1);
+  return row?.costBasisMode === "total_paid" ? "total_paid" : undefined;
 }
 
 export function methodFromQuery(q: { method?: string }): TradeMethod {
