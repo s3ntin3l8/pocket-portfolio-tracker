@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { trConnections } from "@portfolio/db";
 import { PytrApprovalError, PytrUnavailableError } from "../../services/pytr/runner.js";
+import { sanitizeConnectionError } from "../../lib/sanitize-error.js";
 import { getConnection, lookupPortfolio } from "./_shared.js";
 
 const connectBodySchema = z.object({
@@ -90,7 +91,7 @@ export function registerPairingRoutes(app: FastifyInstance) {
     try {
       sessionData = await app.pytr.awaitApproval(id);
     } catch (err) {
-      const error = err instanceof Error ? err.message : "approval failed";
+      const error = sanitizeConnectionError(err, "approval failed");
       await app.db
         .update(trConnections)
         .set({ status: "error", lastError: error, updatedAt: new Date() })

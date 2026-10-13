@@ -9,6 +9,7 @@ import {
   transactions,
   trResolvedEvents,
 } from "@portfolio/db";
+import { sanitizeConnectionError } from "../../lib/sanitize-error.js";
 import type { ImportIssue, ParsedTransaction } from "@portfolio/schema";
 import type { DB } from "../../db/client.js";
 import type { EncryptionService } from "../encryption.js";
@@ -111,8 +112,8 @@ export async function syncIbkrConnection(
     xml = await flexClient.fetchFlexStatement(token, queryId);
   } catch (err) {
     const status = err instanceof IbkrFlexError && err.code === "expired" ? "expired" : "error";
-    const lastError = err instanceof Error ? err.message : "sync failed";
-    log?.warn({ connectionId, status, lastError }, "ibkr connection flipped");
+    const lastError = sanitizeConnectionError(err);
+    log?.error({ connectionId, status, err }, "ibkr connection flipped");
     await db
       .update(ibkrConnections)
       .set({ status, lastError, syncing: false, updatedAt: new Date() })
