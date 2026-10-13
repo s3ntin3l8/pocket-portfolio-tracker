@@ -49,7 +49,12 @@ export async function handleListDocuments(
     page: rawPage,
     pageSize: rawPageSize,
   } = documentListQuerySchema.parse(request.query);
-  const { page, pageSize } = parsePagination({ page: rawPage, pageSize: rawPageSize });
+  // The inbox's unpaginated read stays the default (bounded to one user's category);
+  // the transaction list's unbounded default was the audit D5 problem.
+  const { page, pageSize } = parsePagination(
+    { page: rawPage, pageSize: rawPageSize },
+    { unpaginatedByDefault: true },
+  );
   const hasPagination = pageSize > 0;
 
   request.timingName = "GET /documents";

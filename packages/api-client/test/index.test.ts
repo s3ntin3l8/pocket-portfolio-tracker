@@ -400,7 +400,13 @@ describe("createApiClient request methods", () => {
       name: "listTransactions",
       call: (c) => c.listTransactions("p1"),
       method: "GET",
-      url: "/portfolios/p1/transactions",
+      url: "/portfolios/p1/transactions?all=1",
+    },
+    {
+      name: "listTransactions with convertTo",
+      call: (c) => c.listTransactions("p1", "EUR"),
+      method: "GET",
+      url: "/portfolios/p1/transactions?all=1&convertTo=EUR",
     },
     {
       name: "createTransaction",

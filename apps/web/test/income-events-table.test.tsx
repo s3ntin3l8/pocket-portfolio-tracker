@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
-const listTransactions = vi.fn(async () => [
+const listTransactionsByIds = vi.fn(async (_portfolioId: string, _ids: string[]) => [
   {
     id: "tx1",
     portfolioId: "p1",
@@ -34,7 +34,7 @@ vi.mock("@/i18n/navigation", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 vi.mock("@/lib/api", () => ({
-  useApiClient: () => ({ listTransactions }),
+  useApiClient: () => ({ listTransactionsByIds }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
@@ -119,7 +119,8 @@ describe("IncomeEventsTable", () => {
     const row = container.querySelector('[role="button"]');
     expect(row).not.toBeNull();
     fireEvent.click(row!);
-    await waitFor(() => expect(listTransactions).toHaveBeenCalledWith("p1"));
+    // Fetches just the clicked row by id — not the whole list (audit D5).
+    await waitFor(() => expect(listTransactionsByIds).toHaveBeenCalledWith("p1", ["tx1"]));
     // The sheet renders the linked transaction once loaded (symbol appears again in the sheet).
     await waitFor(() => expect(screen.getAllByText("BBCA").length).toBeGreaterThan(2));
   });

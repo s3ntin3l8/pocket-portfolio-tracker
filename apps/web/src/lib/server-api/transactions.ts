@@ -8,7 +8,14 @@ import {
 import { loadMe } from "./user";
 import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
-export async function loadTransactionsAcrossPortfolios(): Promise<{
+/**
+ * Look one transaction up across the portfolios in scope (the edit page resolves a row
+ * regardless of which portfolio is selected). Fetches only that id from each portfolio
+ * (`?ids=`) — the unpaginated full-list read is a bounded export since audit D5, and
+ * pulling every row of every portfolio to find one was the unbounded read it replaced.
+ * `transactions` holds the match (0 or 1 rows).
+ */
+export async function loadTransactionsAcrossPortfolios(txId: string): Promise<{
   status: "ok" | "empty" | DataFailureStatus;
   retryAfter?: number | null;
   transactions: TransactionWithPortfolio[];
@@ -29,7 +36,7 @@ export async function loadTransactionsAcrossPortfolios(): Promise<{
     const scopeCurrency = me?.displayCurrency ?? "IDR";
     const nameById = new Map(portfolios.map((p) => [p.id, p.name]));
     const lists = await Promise.all(
-      portfolios.map((p) => api.listTransactions(p.id, scopeCurrency)),
+      portfolios.map((p) => api.listTransactionsByIds(p.id, [txId], scopeCurrency)),
     );
     const transactions = lists.flat().map((t) => ({
       ...t,

@@ -129,7 +129,7 @@ describe("transaction status (archived / cash_neutral)", () => {
     // The list endpoint still shows the archived row (so the UI can restore it).
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     expect(list.json()).toHaveLength(1);
@@ -230,7 +230,7 @@ describe("transaction status (archived / cash_neutral)", () => {
     // Draft is listed (so the table can show it) but excluded from derived holdings.
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     expect(list.json().find((r: { id: string }) => r.id === draftId).status).toBe("draft");
@@ -286,7 +286,7 @@ describe("transaction status (archived / cash_neutral)", () => {
     // Row is archived (kept + visible), still excluded from holdings.
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     expect(list.json().find((r: { id: string }) => r.id === draftId).status).toBe("archived");
@@ -508,7 +508,7 @@ describe("transaction status (archived / cash_neutral)", () => {
     // The row stays in A (not moved, not crashed on).
     const aList = await app.inject({
       method: "GET",
-      url: `/portfolios/${a}/transactions`,
+      url: `/portfolios/${a}/transactions?all=1`,
       headers: auth(t),
     });
     expect(aList.json().find((r: { id: string }) => r.id === aRow)).toBeTruthy();
@@ -550,7 +550,7 @@ describe("transaction status (archived / cash_neutral)", () => {
 
     const bList = await app.inject({
       method: "GET",
-      url: `/portfolios/${b}/transactions`,
+      url: `/portfolios/${b}/transactions?all=1`,
       headers: auth(t),
     });
     expect(bList.json().filter((r: { importId: string }) => r.importId === imp.id)).toHaveLength(2);

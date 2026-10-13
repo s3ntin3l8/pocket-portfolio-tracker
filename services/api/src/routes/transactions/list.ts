@@ -1,9 +1,20 @@
 import type { FastifyInstance } from "fastify";
-import { and, count, desc, eq, getTableColumns, gte, inArray, lt, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  inArray,
+  lt,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { portfolios, transactions, users } from "@portfolio/db";
 import { ACQUISITION_TYPES, INCOME_TYPES } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
-import { parsePagination, cacheKey } from "../helpers.js";
+import { parsePagination, cacheKey, ALL_ROWS_CAP } from "../helpers.js";
 import {
   yearRange,
   computeConvertedSummary,
@@ -16,13 +27,39 @@ import { enrichRows, enrichAggregateRows } from "./list-enrichment.js";
 // client already knows every flagged transaction's id (from the anomalies endpoint) but
 // those rows may sit past the current page. `ids` lets it fetch exactly those rows,
 // regardless of pagination, instead of filtering only what's already loaded client-side.
+// Only UUID-shaped ids reach the query — a malformed one would be a Postgres cast error
+// (500). A present-but-all-invalid list stays an (empty) array lookup, never falls back to
+// the default page (a caller expecting an array would get the page object).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function parseIdsParam(raw: string | undefined): string[] | null {
-  if (!raw) return null;
-  const ids = raw
+  if (raw === undefined) return null;
+  const tokens = raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  return ids.length > 0 ? ids : null;
+  if (tokens.length === 0) return null;
+  return tokens.filter((t) => UUID_RE.test(t));
+}
+
+/**
+ * The summary totals (Invested/Proceeds/Income) count confirmed rows only (audit B5):
+ * `normal` and `cash_neutral` — the same set every derivation reads through `toCoreTxns`
+ * (drafts are unconfirmed, archived rows are excluded from all derivations). The row list
+ * itself keeps showing drafts/archived rows so the user can confirm or un-archive them.
+ */
+const CONFIRMED_STATUSES = ["normal", "cash_neutral"] as const;
+function summaryConditions(conditions: SQL[]): SQL[] {
+  return [...conditions, inArray(transactions.status, [...CONFIRMED_STATUSES])];
+}
+
+/**
+ * Response shape for a list request (audit D5). No `page` used to mean "every row, no
+ * bound, no order"; now it means the first page. An unpaginated array is returned only
+ * for an explicit `?all=1` (hard-capped at {@link ALL_ROWS_CAP}, newest first) or an
+ * `?ids=` lookup (bounded by the id list itself).
+ */
+function wantsArray(query: { page?: string }, all: boolean, ids: string[] | null): boolean {
+  return query.page === undefined && (all || ids !== null);
 }
 
 export function registerListRoutes(app: FastifyInstance) {
@@ -37,18 +74,19 @@ export function registerListRoutes(app: FastifyInstance) {
       q?: string;
       ids?: string;
       instrumentId?: string;
+      all?: string;
     };
   }>(
     "/portfolios/:portfolioId/transactions",
     { preHandler: [app.authenticate, app.requirePortfolio] },
-    async (request) => {
+    async (request, reply) => {
       const t0 = performance.now();
       const portfolioName = request.portfolio.name;
-      const { page, pageSize } = parsePagination({
+      const { page, pageSize, all } = parsePagination({
         page: request.query.page,
         pageSize: request.query.pageSize,
+        all: request.query.all,
       });
-      const paginate = pageSize > 0;
 
       const convertTo = request.query.convertTo;
       const typeFilter = request.query.type;
@@ -56,6 +94,7 @@ export function registerListRoutes(app: FastifyInstance) {
       const searchQuery = request.query.q;
       const idsFilter = parseIdsParam(request.query.ids);
       const instrumentIdFilter = request.query.instrumentId;
+      const paginate = !wantsArray(request.query, all, idsFilter);
 
       const conditions = [eq(transactions.portfolioId, request.params.portfolioId)];
       if (idsFilter) conditions.push(inArray(transactions.id, idsFilter));
@@ -92,6 +131,7 @@ export function registerListRoutes(app: FastifyInstance) {
           yearFilter || "",
           searchQuery || "",
           instrumentIdFilter || "",
+          idsFilter?.join(",") ?? "",
           request.portfolio.baseCurrency,
         );
         const cached = await withDerivationCache(transactionsCache, ck, async () => {
@@ -109,7 +149,12 @@ export function registerListRoutes(app: FastifyInstance) {
             // The summary always folds to the portfolio's own baseCurrency, independent of
             // `convertTo` (which only tags rows with a client-side display rate, #465) —
             // no current caller requests the summary in a different currency.
-            computeConvertedSummary(app, conditions, request.portfolio.baseCurrency, request.log),
+            computeConvertedSummary(
+              app,
+              summaryConditions(conditions),
+              request.portfolio.baseCurrency,
+              request.log,
+            ),
           ]);
 
           let cnt: number;
@@ -151,10 +196,15 @@ export function registerListRoutes(app: FastifyInstance) {
         return { rows: cached.rows, total: cached.total, summary: cached.summary, years: yearList };
       }
 
-      const rows = await app.db
+      const fetched = await app.db
         .select()
         .from(transactions)
-        .where(and(...conditions));
+        .where(and(...conditions))
+        .orderBy(desc(transactions.executedAt))
+        .limit(ALL_ROWS_CAP + 1);
+      const truncated = fetched.length > ALL_ROWS_CAP;
+      const rows = truncated ? fetched.slice(0, ALL_ROWS_CAP) : fetched;
+      if (truncated) reply.header("x-result-truncated", String(ALL_ROWS_CAP));
       const result = await enrichRows(
         app,
         rows,
@@ -181,20 +231,22 @@ export function registerListRoutes(app: FastifyInstance) {
       q?: string;
       ids?: string;
       instrumentId?: string;
+      all?: string;
     };
-  }>("/networth/transactions", { preHandler: app.authenticate }, async (request, _reply) => {
+  }>("/networth/transactions", { preHandler: app.authenticate }, async (request, reply) => {
     request.timingName = "GET /networth/transactions";
     const id = request.userId;
-    const { page, pageSize } = parsePagination({
+    const { page, pageSize, all } = parsePagination({
       page: request.query.page,
       pageSize: request.query.pageSize,
+      all: request.query.all,
     });
-    const paginate = pageSize > 0;
     const typeFilter = request.query.type;
     const yearFilter = request.query.year;
     const searchQuery = request.query.q;
     const idsFilter = parseIdsParam(request.query.ids);
     const instrumentIdFilter = request.query.instrumentId;
+    const paginate = !wantsArray(request.query, all, idsFilter);
 
     const [pfs, [u]] = await Promise.all([
       app.db
@@ -247,6 +299,7 @@ export function registerListRoutes(app: FastifyInstance) {
         yearFilter ?? "",
         searchQuery ?? "",
         instrumentIdFilter ?? "",
+        idsFilter?.join(",") ?? "",
         displayCurrency,
       );
       const cached = await withDerivationCache(networthTransactionsCache, ck, async () => {
@@ -261,7 +314,7 @@ export function registerListRoutes(app: FastifyInstance) {
             .orderBy(desc(transactions.executedAt))
             .limit(pageSize)
             .offset((page - 1) * pageSize),
-          computeConvertedSummary(app, conditions, displayCurrency, request.log),
+          computeConvertedSummary(app, summaryConditions(conditions), displayCurrency, request.log),
         ]);
 
         let total: number;
@@ -303,11 +356,15 @@ export function registerListRoutes(app: FastifyInstance) {
       };
     }
 
-    const rows = await app.db
+    const fetched = await app.db
       .select()
       .from(transactions)
       .where(and(...conditions))
-      .orderBy(desc(transactions.executedAt));
+      .orderBy(desc(transactions.executedAt))
+      .limit(ALL_ROWS_CAP + 1);
+    const truncated = fetched.length > ALL_ROWS_CAP;
+    const rows = truncated ? fetched.slice(0, ALL_ROWS_CAP) : fetched;
+    if (truncated) reply.header("x-result-truncated", String(ALL_ROWS_CAP));
     const enriched = await enrichAggregateRows(app, rows, nameById, request.log);
     request.timingMeta = {
       rowCount: rows.length,

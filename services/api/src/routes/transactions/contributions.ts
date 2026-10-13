@@ -4,6 +4,7 @@ import { accountHolders, portfolios, users, userPreferences } from "@portfolio/d
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
 import {
   type CoreTransaction,
+  type CorporateAction,
   type PortfolioSummary,
   mergeContributionStats,
   aggregatePortfolios,
@@ -41,7 +42,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
         .from(userPreferences)
         .where(eq(userPreferences.userId, id))
         .limit(1);
-      const { coreTxns, summary } = await loadValuation(
+      const { coreTxns, summary, corporateActions } = await loadValuation(
         app,
         portfolioId,
         portfolio.baseCurrency,
@@ -57,6 +58,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
         portfolio.portfolioType === "child" ? "child" : "standard",
         portfolio.cashCounted ? "inside" : "outside",
         pref?.retirementAge ?? null,
+        corporateActions,
       );
       request.timingName = "GET /portfolios/:id/contributions";
       request.timingMeta = { portfolioId };
@@ -127,7 +129,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
             pfs,
             PORTFOLIO_VALUATION_CONCURRENCY,
             async (p) => {
-              const { coreTxns, summary } = await loadValuation(
+              const { coreTxns, summary, corporateActions } = await loadValuation(
                 app,
                 p.id,
                 display,
@@ -136,6 +138,7 @@ export function registerContributionsRoutes(app: FastifyInstance) {
               );
               return {
                 summary,
+                corporateActions,
                 // Same instruments out of the flows as out of the value (audit B2).
                 txns: excludeFxMissingInstruments(coreTxns, summary),
                 boundary: p.cashCounted ? ("inside" as const) : ("outside" as const),
@@ -143,26 +146,35 @@ export function registerContributionsRoutes(app: FastifyInstance) {
             },
           );
           const summaries: PortfolioSummary[] = perPortfolioLoad.map((r) => r.summary);
-          const loaded: { txns: CoreTransaction[]; boundary: "inside" | "outside" }[] =
-            perPortfolioLoad.map((r) => ({ txns: r.txns, boundary: r.boundary }));
+          const loaded: {
+            txns: CoreTransaction[];
+            boundary: "inside" | "outside";
+            corporateActions: CorporateAction[];
+          }[] = perPortfolioLoad.map((r) => ({
+            txns: r.txns,
+            boundary: r.boundary,
+            corporateActions: r.corporateActions,
+          }));
           const allTxns: CoreTransaction[] = perPortfolioLoad.flatMap((r) => r.txns);
           const fx = makeFxRateFn(
             await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], display),
             display,
           );
           // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies.
-          const perPortfolio = loaded.map(({ txns, boundary }) =>
+          const perPortfolio = loaded.map(({ txns, boundary, corporateActions }) =>
             contributionStats({
               txns: partitionConvertible(txns, display, fx).convertible,
               displayCurrency: display,
               fx,
               boundary,
+              corporateActions,
             }),
           );
           const flowsByPortfolio = await mapPool(
             loaded,
             PORTFOLIO_VALUATION_CONCURRENCY,
-            ({ txns, boundary }) => boundaryFlows(app, txns, boundary, display),
+            ({ txns, boundary, corporateActions }) =>
+              boundaryFlows(app, txns, boundary, display, corporateActions),
           );
           const flows: CashFlowPoint[] = flowsByPortfolio.flat();
           const aggregated = aggregatePortfolios(summaries, display);

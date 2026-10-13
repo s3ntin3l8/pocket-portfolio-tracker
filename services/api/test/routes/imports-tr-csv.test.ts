@@ -95,7 +95,7 @@ describe("Trade Republic CSV import path", () => {
     const list = (
       await app.inject({
         method: "GET",
-        url: `/portfolios/${portfolioId}/transactions`,
+        url: `/portfolios/${portfolioId}/transactions?all=1`,
         headers: auth(t),
       })
     ).json();

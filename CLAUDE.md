@@ -112,6 +112,12 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   `walkInsideDays`/`walkOutsideDays` (the shared boundary walk) + `summarizePortfolio`.
   `boundaryFlowPoints` (that walk's per-transaction projection) and `transferFlowPoints` (just
   its transfer-sourced points) are exported for XIRR-style consumers — see the next bullet.
+  The walks' average-cost pool is split-aware: pass the valuation's `corporateActions` to
+  `contributionStats`/`boundaryFlowPoints`/`transferFlowPoints`/`boundaryFlows` (#823). The
+  value side's cash/liabilities half is `netWorthInputs` (`packages/core/src/valuation.ts`) —
+  the live valuation and the backfill both write `portfolio_snapshots` through it; never
+  re-derive cash or loans inline (#820). Period P&L (`periodReturn`) nets out each portfolio's
+  own boundary flows after its own opening snapshot (#824).
 - **`transfer_in` / `transfer_out` are first-class transaction types** (since PR #309,
   migration 0044). Depot-to-depot share transfers (Depotübertrag): cash-neutral, shares move
   at carried cost basis — no P&L on `transfer_out` (not a disposal). This replaces the legacy

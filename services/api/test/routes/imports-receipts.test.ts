@@ -303,7 +303,7 @@ describe("retention=true — confirm retains bytes, download URL issued", () => 
     // downloadable via the import-linked receipt (hasDocument=true).
     const listRes = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     expect(listRes.statusCode).toBe(200);

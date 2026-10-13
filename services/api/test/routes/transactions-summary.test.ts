@@ -7,10 +7,10 @@ import { closeDb } from "../../src/db/client.js";
 // `price * quantity`, but for `interest` and `bonus_cash` rows the amount lives
 // in `price` (lump sum, quantity = 0). The naive SUM silently drops those
 // rows from `totalIncome`, while `cashFlow` returns `price` for them — so the
-// JS totals and the SQL summary disagreed. Mirror the JS switch:
-//   interest / bonus_cash → price
-//   dividend / coupon     → price * quantity
-//   tax                   → -(price * quantity)  (defense: not income)
+// JS totals and the SQL summary disagreed. The SQL now mirrors cashFlow() exactly
+// (audit B3 — full parity pinned in tx-summary-income-parity.test.ts):
+//   dividend / coupon / interest / bonus_cash → (qty > 0 ? price * qty : price) − fees
+//   tax                                       → −(price + fees)
 
 const ISSUER = "https://auth.test/application/o/portfolio/";
 const AUDIENCE = "portfolio-tracker";

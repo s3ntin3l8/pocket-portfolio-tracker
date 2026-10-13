@@ -157,7 +157,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         performanceCache,
         `${portfolioId}:${boundary}`,
         async () => {
-          const { coreTxns, summary } = await loadValuation(
+          const { coreTxns, summary, corporateActions } = await loadValuation(
             app,
             portfolioId,
             portfolio.baseCurrency,
@@ -171,6 +171,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             excludeFxMissingInstruments(coreTxns, summary),
             boundary,
             portfolio.baseCurrency,
+            corporateActions,
           );
           const asOf = new Date();
           flows.push({ amount: Number(summary.netWorth), date: asOf });

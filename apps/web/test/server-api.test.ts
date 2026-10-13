@@ -132,19 +132,17 @@ describe("loadTransactionsAcrossPortfolios (holder scope)", () => {
       { id: "p3", name: "Other", baseCurrency: "IDR", accountHolderId: "h2" },
     ];
     h.client.listPortfolios = async () => pfWithHolders;
-    h.client.listTransactions = async (id: string) =>
-      id === "p1"
-        ? [{ id: "t1", portfolioId: "p1", type: "buy" }]
-        : id === "p2"
-          ? [{ id: "t2", portfolioId: "p2", type: "sell" }]
-          : [{ id: "t3", portfolioId: "p3", type: "buy" }];
+    const listTransactionsByIds = vi.fn(async (id: string, ids: string[]) =>
+      id === "p3" && ids.includes("t3") ? [{ id: "t3", portfolioId: "p3", type: "buy" }] : [],
+    );
+    h.client.listTransactionsByIds = listTransactionsByIds;
     h.cookies = { pf: "holder:h1" };
 
-    const res = await api.loadTransactionsAcrossPortfolios();
+    const res = await api.loadTransactionsAcrossPortfolios("t3");
     expect(res.status).toBe("ok");
-    // Only p1 and p2 transactions — p3 belongs to h2, not h1.
-    expect(res.transactions).toHaveLength(2);
-    expect(res.transactions.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
+    // t3 lives in p3, which belongs to h2 — never queried, so not found in h1's scope.
+    expect(res.transactions).toHaveLength(0);
+    expect(listTransactionsByIds.mock.calls.map((c) => c[0]).sort()).toEqual(["p1", "p2"]);
   });
 });
 
@@ -325,30 +323,34 @@ describe("loadNetworthAnomalies", () => {
 });
 
 describe("loadTransactionsAcrossPortfolios", () => {
-  it("merges every portfolio's transactions and tags the portfolio name", async () => {
+  it("looks the id up in every portfolio by id (never the full list) and tags the portfolio name", async () => {
     h.client.listPortfolios = async () => PF;
-    h.client.listTransactions = async (id: string) =>
-      id === "p1"
-        ? [{ id: "t1", portfolioId: "p1", type: "buy" }]
-        : [{ id: "t2", portfolioId: "p2", type: "sell" }];
+    const listTransactionsByIds = vi.fn(async (id: string, ids: string[]) =>
+      id === "p2" && ids.includes("t2") ? [{ id: "t2", portfolioId: "p2", type: "sell" }] : [],
+    );
+    h.client.listTransactionsByIds = listTransactionsByIds;
+    const listTransactions = vi.fn();
+    h.client.listTransactions = listTransactions;
 
-    const res = await api.loadTransactionsAcrossPortfolios();
+    const res = await api.loadTransactionsAcrossPortfolios("t2");
     expect(res.status).toBe("ok");
-    expect(res.transactions).toHaveLength(2);
-    expect(res.transactions.find((t) => t.id === "t1")?.portfolioName).toBe("Main");
-    expect(res.transactions.find((t) => t.id === "t2")?.portfolioName).toBe("DKB");
+    expect(res.transactions).toHaveLength(1);
+    expect(res.transactions[0]?.portfolioName).toBe("DKB");
+    expect(listTransactionsByIds).toHaveBeenCalledWith("p1", ["t2"], "IDR");
+    expect(listTransactionsByIds).toHaveBeenCalledWith("p2", ["t2"], "IDR");
+    expect(listTransactions).not.toHaveBeenCalled();
   });
 
   it("is empty with no portfolios and unavailable on error", async () => {
     h.client.listPortfolios = async () => [];
-    expect(await api.loadTransactionsAcrossPortfolios()).toMatchObject({
+    expect(await api.loadTransactionsAcrossPortfolios("t1")).toMatchObject({
       status: "empty",
     });
 
     h.client.listPortfolios = async () => {
       throw new Error("x");
     };
-    expect(await api.loadTransactionsAcrossPortfolios()).toMatchObject({
+    expect(await api.loadTransactionsAcrossPortfolios("t1")).toMatchObject({
       status: "unavailable",
     });
   });

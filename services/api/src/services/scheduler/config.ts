@@ -2,7 +2,10 @@ export const QUEUE = "refresh-prices";
 export const SCHEDULE_CRON = "*/5 * * * *";
 
 export const SNAPSHOT_QUEUE = "daily-snapshot";
-export const SNAPSHOT_CRON = "0 16 * * *";
+// 22:00 UTC — after the US close (20:00/21:00 UTC depending on DST) and well after
+// Xetra/IDX, so the day's snapshot values every market at its closing price (audit D9;
+// 16:00 UTC was mid-session in New York and before the Xetra close in winter).
+export const SNAPSHOT_CRON = "0 22 * * *";
 
 export const INTRADAY_SNAPSHOT_QUEUE = "intraday-snapshot";
 export const INTRADAY_SNAPSHOT_CRON = "*/15 * * * *";

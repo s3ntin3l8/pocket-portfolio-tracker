@@ -2,73 +2,117 @@ import { describe, it, expect } from "vitest";
 import { parsePagination, paginate, cacheKey } from "../../src/routes/helpers.js";
 
 describe("parsePagination", () => {
-  it("returns page=1, pageSize=0 when no page param given", () => {
-    expect(parsePagination({})).toEqual({ page: 1, pageSize: 0 });
+  it("defaults to the first page of 25 when no page param is given (audit D5)", () => {
+    expect(parsePagination({})).toEqual({ page: 1, pageSize: 25, all: false });
+  });
+
+  it("returns the unpaginated marker only for an explicit all=1", () => {
+    expect(parsePagination({ all: "1" })).toEqual({ page: 1, pageSize: 0, all: true });
+    expect(parsePagination({ all: "true" })).toEqual({ page: 1, pageSize: 0, all: true });
+    expect(parsePagination({ all: "0" })).toEqual({ page: 1, pageSize: 25, all: false });
+  });
+
+  it("an explicit page wins over all=1", () => {
+    expect(parsePagination({ page: "2", all: "1" })).toEqual({ page: 2, pageSize: 25, all: false });
+  });
+
+  it("keeps the legacy unpaginated default for a caller that opts in", () => {
+    expect(parsePagination({}, { unpaginatedByDefault: true })).toEqual({
+      page: 1,
+      pageSize: 0,
+      all: false,
+    });
+    expect(parsePagination({ page: "2" }, { unpaginatedByDefault: true })).toEqual({
+      page: 2,
+      pageSize: 25,
+      all: false,
+    });
   });
 
   it("parses page and pageSize from string query params", () => {
-    expect(parsePagination({ page: "3", pageSize: "50" })).toEqual({ page: 3, pageSize: 50 });
+    expect(parsePagination({ page: "3", pageSize: "50" })).toEqual({
+      page: 3,
+      pageSize: 50,
+      all: false,
+    });
   });
 
   it("clamps page to at least 1", () => {
-    expect(parsePagination({ page: "0" })).toEqual({ page: 1, pageSize: 25 });
-    expect(parsePagination({ page: "-5" })).toEqual({ page: 1, pageSize: 25 });
+    expect(parsePagination({ page: "0" })).toMatchObject({ page: 1, pageSize: 25 });
+    expect(parsePagination({ page: "-5" })).toMatchObject({ page: 1, pageSize: 25 });
   });
 
   it("clamps pageSize to max 100", () => {
-    expect(parsePagination({ page: "1", pageSize: "200" })).toEqual({ page: 1, pageSize: 100 });
+    expect(parsePagination({ page: "1", pageSize: "200" })).toMatchObject({
+      page: 1,
+      pageSize: 100,
+    });
+    expect(parsePagination({ pageSize: "5000" })).toMatchObject({ page: 1, pageSize: 100 });
   });
 
   it("defaults pageSize to 25 when absent but page is given", () => {
-    expect(parsePagination({ page: "2" })).toEqual({ page: 2, pageSize: 25 });
+    expect(parsePagination({ page: "2" })).toMatchObject({ page: 2, pageSize: 25 });
   });
 
   it("falls back to defaults on NaN input", () => {
-    expect(parsePagination({ page: "abc" })).toEqual({ page: 1, pageSize: 25 });
-    expect(parsePagination({ page: "abc", pageSize: "xyz" })).toEqual({ page: 1, pageSize: 25 });
+    expect(parsePagination({ page: "abc" })).toMatchObject({ page: 1, pageSize: 25 });
+    expect(parsePagination({ page: "abc", pageSize: "xyz" })).toMatchObject({
+      page: 1,
+      pageSize: 25,
+    });
   });
 
   it("treats pageSize 0 as absent due to || fallback", () => {
-    expect(parsePagination({ page: "2", pageSize: "0" })).toEqual({ page: 2, pageSize: 25 });
+    expect(parsePagination({ page: "2", pageSize: "0" })).toMatchObject({ page: 2, pageSize: 25 });
   });
 
   it("clamps negative pageSize to 1", () => {
-    expect(parsePagination({ page: "1", pageSize: "-5" })).toEqual({ page: 1, pageSize: 1 });
+    expect(parsePagination({ page: "1", pageSize: "-5" })).toMatchObject({ page: 1, pageSize: 1 });
   });
 });
 
 describe("paginate", () => {
   it("returns empty object when pageSize ≤ 0 (no pagination)", () => {
-    expect(paginate({ page: 1, pageSize: 0 })).toEqual({});
+    expect(paginate({ page: 1, pageSize: 0, all: true })).toEqual({});
   });
 
   it("computes limit and offset for page 1", () => {
-    expect(paginate({ page: 1, pageSize: 25 })).toEqual({ limit: 25, offset: 0 });
+    expect(paginate({ page: 1, pageSize: 25, all: false })).toEqual({ limit: 25, offset: 0 });
   });
 
   it("computes limit and offset for page 3", () => {
-    expect(paginate({ page: 3, pageSize: 50 })).toEqual({ limit: 50, offset: 100 });
+    expect(paginate({ page: 3, pageSize: 50, all: false })).toEqual({ limit: 50, offset: 100 });
   });
 });
 
 describe("cacheKey", () => {
-  it("joins parts with colon", () => {
-    expect(cacheKey("a", "b", "c")).toBe("a:b:c");
+  it("joins parts positionally", () => {
+    expect(cacheKey("a", "b", "c")).toBe("a|b|c");
   });
 
-  it("filters out null and undefined", () => {
-    expect(cacheKey("pf1", null, "method", undefined)).toBe("pf1:method");
-  });
-
-  it("filters out empty strings", () => {
-    expect(cacheKey("id", "", "range")).toBe("id:range");
+  it("keeps a slot for null, undefined and empty strings", () => {
+    expect(cacheKey("pf1", null, "method", undefined)).toBe("pf1||method|");
+    expect(cacheKey("id", "", "range")).toBe("id||range");
   });
 
   it("handles numbers", () => {
-    expect(cacheKey("page", 1, "size", 25)).toBe("page:1:size:25");
+    expect(cacheKey("page", 1, "size", 25)).toBe("page|1|size|25");
   });
 
-  it("returns empty string for all-null input", () => {
-    expect(cacheKey(null, undefined)).toBe("");
+  // Audit D4: the three collisions the old filter-then-join produced.
+  it("year=2024 and q=2024 no longer share a key", () => {
+    const yearKey = cacheKey("transactions", "pf", 1, 25, "", "", "2024", "", "");
+    const searchKey = cacheKey("transactions", "pf", 1, 25, "", "", "", "2024", "");
+    expect(yearKey).not.toBe(searchKey);
+  });
+
+  it("include=X and exclude=X no longer share a key", () => {
+    expect(cacheKey("u", "1y", "", "X", "")).not.toBe(cacheKey("u", "1y", "", "", "X"));
+  });
+
+  it("an ids-filtered request and a plain one no longer share a key", () => {
+    expect(cacheKey("transactions", "pf", 1, 25, "")).not.toBe(
+      cacheKey("transactions", "pf", 1, 25, "id-a,id-b"),
+    );
   });
 });

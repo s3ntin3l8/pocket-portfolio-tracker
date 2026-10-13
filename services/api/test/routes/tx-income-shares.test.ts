@@ -143,7 +143,7 @@ describe("dividend perShare/shares (#508)", () => {
     });
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     const row = (list.json() as { id: string; perShare: string; sharesEstimated?: boolean }[]).find(
@@ -193,7 +193,7 @@ describe("dividend perShare/shares (#508)", () => {
 
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     const row = (
@@ -242,7 +242,7 @@ describe("dividend perShare/shares (#508)", () => {
 
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     const row = (

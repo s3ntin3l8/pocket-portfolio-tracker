@@ -153,7 +153,7 @@ describe("DKB PDF deterministic import path", () => {
     const list = (
       await app.inject({
         method: "GET",
-        url: `/portfolios/${portfolioId}/transactions`,
+        url: `/portfolios/${portfolioId}/transactions?all=1`,
         headers: auth(t),
       })
     ).json() as Array<{ id: string; status: string; source: string; type: string }>;
@@ -191,7 +191,7 @@ describe("DKB PDF deterministic import path", () => {
 
     const txns = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     const list = txns.json();

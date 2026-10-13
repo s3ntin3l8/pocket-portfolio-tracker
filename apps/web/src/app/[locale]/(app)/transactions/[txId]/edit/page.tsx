@@ -19,7 +19,7 @@ export default async function EditTransactionPage({
   const te = await getTranslations("Empty");
 
   // Resolve across all portfolios so an aggregate-view row edits regardless of scope.
-  const result = await loadTransactionsAcrossPortfolios();
+  const result = await loadTransactionsAcrossPortfolios(txId);
 
   const header = (title: string, subtitle: string) => (
     <>

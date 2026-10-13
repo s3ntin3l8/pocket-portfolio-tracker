@@ -44,18 +44,24 @@ function investedCase(t: typeof transactions): ReturnType<typeof sql> {
 function proceedsCase(t: typeof transactions): ReturnType<typeof sql> {
   return sql`case when ${t.type} = 'sell' then ${t.price}::numeric * ${t.quantity}::numeric - ${t.fees}::numeric else 0 end`;
 }
-// Mirror packages/core/src/cash.ts cashFlow(): interest / bonus_cash are lump sums
-// (no instrument, qty = 0, amount in `price`), so `price * quantity` would silently
-// drop them. dividend / coupon are per-share (`price * quantity`). `tax` is a
-// standalone debit whose magnitude lives in `price` (cashFlow ignores quantity for
-// this branch) — subtract `price` directly, NOT `price * quantity`, so a tax row
-// with non-zero qty still lands at its true cash magnitude.
+/**
+ * Income as a SQL CASE — must mirror `@portfolio/core`'s `cashFlow()` exactly for the
+ * income/tax types (audit B3; parity is pinned by `tx-summary-income-parity.test.ts`):
+ * - dividend / coupon / interest / bonus_cash: per-unit when `quantity > 0`, otherwise a
+ *   lump sum recorded in `price` (every importer books dividends that way, qty 0), minus
+ *   `fees`. The old `price × quantity` valued every lump-sum dividend at 0.
+ * - tax: a standalone debit, `−(price + fees)` (quantity ignored).
+ * - a `cash_neutral` row moves only its fees (`cashFlow` returns `−fees` for it).
+ * Callers pass confirmed rows only (see `list.ts` `summaryConditions`), the same set
+ * `cashFlow` is ever fed.
+ */
 function incomeCase(t: typeof transactions): ReturnType<typeof sql> {
   return sql`case \
-    when ${t.type} in ('interest','bonus_cash') then ${t.price}::numeric \
-    when ${t.type} in ('dividend','coupon')      then ${t.price}::numeric * ${t.quantity}::numeric \
-    when ${t.type} = 'tax'                        then -${t.price}::numeric \
-    else 0 end`;
+    when ${t.type} not in ('dividend','coupon','interest','bonus_cash','tax') then 0 \
+    when ${t.status} = 'cash_neutral' then -${t.fees}::numeric \
+    when ${t.type} = 'tax' then -(${t.price}::numeric + ${t.fees}::numeric) \
+    when ${t.quantity}::numeric > 0 then ${t.price}::numeric * ${t.quantity}::numeric - ${t.fees}::numeric \
+    else ${t.price}::numeric - ${t.fees}::numeric end`;
 }
 
 export interface TransactionSummary {

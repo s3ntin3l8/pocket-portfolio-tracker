@@ -2380,15 +2380,18 @@ export function createApiClient(config: ApiClientConfig) {
         data,
       ),
 
-    /** `convertTo` requests a per-row `displayRate`/`displayCurrency` (trade-date FX into
+    /** Every row of a portfolio, newest first, as one array — the explicit `?all=1`
+     *  export read (audit D5), hard-capped server-side (an `x-result-truncated` header
+     *  marks a capped response). Without `all=1` the endpoint returns the first page
+     *  object instead; prefer {@link listTransactionsPaginated}, or
+     *  {@link listTransactionsByIds} to look up specific rows.
+     *  `convertTo` requests a per-row `displayRate`/`displayCurrency` (trade-date FX into
      *  that currency) alongside each row's native amount — see issue #465. */
-    listTransactions: (portfolioId: string, convertTo?: string) =>
-      request<Transaction[]>(
-        "GET",
-        convertTo
-          ? `/portfolios/${portfolioId}/transactions?convertTo=${encodeURIComponent(convertTo)}`
-          : `/portfolios/${portfolioId}/transactions`,
-      ),
+    listTransactions: (portfolioId: string, convertTo?: string) => {
+      const params = new URLSearchParams({ all: "1" });
+      if (convertTo) params.set("convertTo", convertTo);
+      return request<Transaction[]>("GET", `/portfolios/${portfolioId}/transactions?${params}`);
+    },
     /** Paginated variant: returns one page + total count. Enrichment only runs on the
      *  returned page, so this is ~10× faster than fetching all 945+ rows. Accepts optional
      *  filter params (`type`, `year`, `q`) that are passed to the server and returns

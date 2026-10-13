@@ -211,7 +211,7 @@ describe("CSV import → confirm flow", () => {
     // The rows live in the transactions table as status='draft'.
     const list = await app.inject({
       method: "GET",
-      url: `/portfolios/${pid}/transactions`,
+      url: `/portfolios/${pid}/transactions?all=1`,
       headers: auth(t),
     });
     const rows = list.json() as Array<{ status: string; source: string }>;
@@ -2019,7 +2019,7 @@ describe("screenshot import → confirm flow", () => {
     const list = (
       await detectApp.inject({
         method: "GET",
-        url: `/portfolios/${pid1}/transactions`,
+        url: `/portfolios/${pid1}/transactions?all=1`,
         headers: auth(t),
       })
     ).json() as Array<{ status: string }>;
@@ -2533,7 +2533,11 @@ describe("import dedup + account mismatch (#196, #197)", () => {
 
     // The materialized draft carries the low parse confidence → flagged for review.
     const list = (
-      await a.inject({ method: "GET", url: `/portfolios/${pid}/transactions`, headers: auth(t) })
+      await a.inject({
+        method: "GET",
+        url: `/portfolios/${pid}/transactions?all=1`,
+        headers: auth(t),
+      })
     ).json() as Array<{ status: string; needsReview?: boolean; source: string }>;
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ status: "draft", source: "screenshot", needsReview: true });

@@ -24,7 +24,9 @@ import {
   type InstrumentRef,
   type Candle,
 } from "@portfolio/market-data";
+import { summarizePortfolio } from "@portfolio/core";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
+import { toCoreTxns } from "../../src/services/tx-core.js";
 import { backfillPortfolioHistory, computeBackfillSnapshots } from "../../src/services/backfill.js";
 
 class PartialCandleProvider implements MarketDataProvider {
@@ -174,6 +176,109 @@ describe("backfillPortfolioHistory vs computeBackfillSnapshots — valuation-sou
     // Excluded, not cost basis (80) — same semantics as a same-run gap (#744).
     expect(Number(beyond!.marketValue)).toBe(0);
     expect(Number(beyond!.netWorth)).toBe(0);
+  });
+
+  // Audit B6: the backfill writes the same `portfolio_snapshots` rows as the live
+  // valuation, so it must use the same net-worth definition — cash only when tracked
+  // (`hasCashMovement` gate), loans subtracted. Each case pins one day and compares the
+  // backfilled value with `summarizePortfolio` over the same transactions and price.
+  async function backfillVsLive(
+    label: string,
+    rows: (Omit<typeof transactions.$inferInsert, "portfolioId" | "instrumentId"> & {
+      onInstrument?: boolean;
+    })[],
+  ) {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: `nw-parity-${label}`, email: `nw-parity-${label}@example.com` })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: `NW parity ${label}`, baseCurrency: "IDR", cashCounted: true })
+      .returning();
+    const symbol = `NWP${label.toUpperCase().slice(0, 6)}`;
+    const [instr] = await db
+      .insert(instruments)
+      .values({ symbol, market: "IDX", assetClass: "equity", currency: "IDR", name: symbol })
+      .returning();
+    await db.insert(transactions).values(
+      rows.map(({ onInstrument, ...r }) => ({
+        ...r,
+        portfolioId: pf.id,
+        instrumentId: onInstrument ? instr.id : null,
+      })),
+    );
+    const svc = new MarketDataService([new PartialCandleProvider(symbol, REAL_CANDLES, "IDR")]);
+    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
+
+    const [snap] = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, pf.id))
+      .then((all) => all.filter((r) => r.date === LAST_REAL_CANDLE));
+    expect(snap, `${label}: snapshot on ${LAST_REAL_CANDLE}`).toBeDefined();
+
+    const txRows = await db.select().from(transactions).where(eq(transactions.portfolioId, pf.id));
+    const live = summarizePortfolio({
+      transactions: toCoreTxns(txRows),
+      prices: { [instr.id]: { price: REAL_CANDLES[LAST_REAL_CANDLE]!, currency: "IDR" } },
+      displayCurrency: "IDR",
+      cashCounted: true,
+    });
+    return { backfilled: Number(snap!.netWorth), live: Number(live.netWorth) };
+  }
+
+  const at = (day: string) => new Date(`${day}T10:00:00.000Z`);
+
+  it("untracked cash: a buy with no funding deposit is valued as the securities sleeve, not negative cash (B6)", async () => {
+    const { backfilled, live } = await backfillVsLive("untracked", [
+      {
+        onInstrument: true,
+        type: "buy",
+        quantity: "1",
+        price: "80",
+        fees: "0",
+        currency: "IDR",
+        executedAt: at(INCEPTION),
+      },
+    ]);
+    // 1 share × 100 — pre-fix the backfill added cash of −80 → 20.
+    expect(backfilled).toBe(100);
+    expect(backfilled).toBe(live);
+  });
+
+  it("loan: outstanding principal is subtracted, as in the live valuation (B6)", async () => {
+    const { backfilled, live } = await backfillVsLive("loan", [
+      {
+        type: "deposit",
+        quantity: "0",
+        price: "1000",
+        fees: "0",
+        currency: "IDR",
+        executedAt: at(INCEPTION),
+      },
+      {
+        onInstrument: true,
+        type: "buy",
+        quantity: "1",
+        price: "80",
+        fees: "0",
+        currency: "IDR",
+        executedAt: at(INCEPTION),
+      },
+      {
+        type: "loan_drawdown",
+        quantity: "0",
+        price: "500",
+        fees: "0",
+        currency: "IDR",
+        executedAt: at(INCEPTION),
+      },
+    ]);
+    // 100 securities + (1000 − 80 + 500) cash − 500 loan = 1020; pre-fix 1520.
+    expect(backfilled).toBe(1020);
+    expect(backfilled).toBe(live);
   });
 
   it("agrees with computeBackfillSnapshots (the fan-out path) on every pinned date", async () => {
