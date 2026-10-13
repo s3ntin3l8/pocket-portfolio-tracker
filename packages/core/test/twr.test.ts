@@ -1068,3 +1068,39 @@ describe("TWR: depot transfers are flows, not returns (audit B1)", () => {
     expect(flows[0].effectiveFlow).toBe("1020000");
   });
 });
+
+// ---------------------------------------------------------------------------
+// onHoldings: callers reuse the per-day holdings instead of replaying (audit D6)
+// ---------------------------------------------------------------------------
+
+describe("buildDailyValueFlows onHoldings", () => {
+  it("emits each date's end-of-day holdings, identical to computeHoldings(asOf)", () => {
+    const txns = [
+      tx({ instrumentId: "A", quantity: "10", price: "5", executedAt: new Date("2026-01-01") }),
+      tx({
+        instrumentId: "A",
+        type: "sell",
+        quantity: "4",
+        price: "6",
+        executedAt: new Date("2026-01-03"),
+      }),
+    ];
+    const dates = ["2026-01-01", "2026-01-02", "2026-01-03"];
+    const seen = new Map<string, string>();
+    buildDailyValueFlows({
+      transactions: txns,
+      corporateActions: [],
+      dates,
+      priceAt: () => ({ close: "5", currency: "IDR" }),
+      fxAt: noFx,
+      baseCurrency: "IDR",
+      kindOf: () => "realSeries",
+      onHoldings: (date, holdings) => seen.set(date, holdings[0]?.quantity ?? "none"),
+    });
+    expect([...seen]).toEqual([
+      ["2026-01-01", "10"],
+      ["2026-01-02", "10"],
+      ["2026-01-03", "6"],
+    ]);
+  });
+});

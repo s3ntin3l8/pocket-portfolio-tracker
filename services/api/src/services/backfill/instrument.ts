@@ -1,6 +1,7 @@
+import { upsertPriceRows } from "./price-upsert.js";
 import { eq, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
-import { instruments, prices, scrapedQuotes } from "@portfolio/db";
+import { instruments, scrapedQuotes } from "@portfolio/db";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { firstHeldDateFor, isManualPriceBond } from "./shared.js";
@@ -74,15 +75,15 @@ export async function fetchInstrumentPrices(
       }
     }
     const days = instrPrices.size;
-    for (const [date, { close, currency }] of instrPrices) {
-      await db
-        .insert(prices)
-        .values({ instrumentId, date, close, currency })
-        .onConflictDoUpdate({
-          target: [prices.instrumentId, prices.date],
-          set: { close, currency },
-        });
-    }
+    await upsertPriceRows(
+      db,
+      [...instrPrices].map(([date, { close, currency }]) => ({
+        instrumentId,
+        date,
+        close,
+        currency,
+      })),
+    );
     return { instrumentId, days, truncated: false, unpriced: false };
   }
 
@@ -103,15 +104,15 @@ export async function fetchInstrumentPrices(
       }
     }
     const days = instrPrices.size;
-    for (const [date, { close, currency }] of instrPrices) {
-      await db
-        .insert(prices)
-        .values({ instrumentId, date, close, currency })
-        .onConflictDoUpdate({
-          target: [prices.instrumentId, prices.date],
-          set: { close, currency },
-        });
-    }
+    await upsertPriceRows(
+      db,
+      [...instrPrices].map(([date, { close, currency }]) => ({
+        instrumentId,
+        date,
+        close,
+        currency,
+      })),
+    );
     return { instrumentId, days, truncated: false, unpriced: days === 0 };
   }
 
@@ -163,15 +164,15 @@ export async function fetchInstrumentPrices(
     }
 
     const days = instrPrices.size;
-    for (const [date, { close, currency }] of instrPrices) {
-      await db
-        .insert(prices)
-        .values({ instrumentId, date, close, currency })
-        .onConflictDoUpdate({
-          target: [prices.instrumentId, prices.date],
-          set: { close, currency },
-        });
-    }
+    await upsertPriceRows(
+      db,
+      [...instrPrices].map(([date, { close, currency }]) => ({
+        instrumentId,
+        date,
+        close,
+        currency,
+      })),
+    );
     return { instrumentId, days, truncated: false, unpriced: days === 0 };
   }
 
@@ -234,15 +235,15 @@ export async function fetchInstrumentPrices(
   }
 
   const days = instrPrices.size;
-  for (const [date, { close, currency }] of instrPrices) {
-    await db
-      .insert(prices)
-      .values({ instrumentId, date, close, currency })
-      .onConflictDoUpdate({
-        target: [prices.instrumentId, prices.date],
-        set: { close, currency },
-      });
-  }
+  await upsertPriceRows(
+    db,
+    [...instrPrices].map(([date, { close, currency }]) => ({
+      instrumentId,
+      date,
+      close,
+      currency,
+    })),
+  );
 
   await db
     .update(instruments)

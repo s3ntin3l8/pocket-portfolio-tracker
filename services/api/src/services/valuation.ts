@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { corporateActions, instruments, prices as pricesTable, transactions } from "@portfolio/db";
 import {
   summarizePortfolio,
@@ -187,10 +187,21 @@ export async function valuePortfolio(
     const today = toDateKey(now);
     const missingIds = instrumentIds.filter((id) => !prices[id]);
     if (missingIds.length > 0) {
+      // One newest row per instrument inside the carry-forward window (DISTINCT ON) —
+      // not every instrument's full price history (audit D6). Anything older than the
+      // window would be rejected by the age check below anyway.
+      const oldest = new Date(`${today}T00:00:00.000Z`);
+      oldest.setUTCDate(oldest.getUTCDate() - MAX_PRICE_CARRY_FORWARD_DAYS);
       const historical = await db
-        .select()
+        .selectDistinctOn([pricesTable.instrumentId])
         .from(pricesTable)
-        .where(and(inArray(pricesTable.instrumentId, missingIds), lte(pricesTable.date, today)))
+        .where(
+          and(
+            inArray(pricesTable.instrumentId, missingIds),
+            lte(pricesTable.date, today),
+            gte(pricesTable.date, toDateKey(oldest)),
+          ),
+        )
         .orderBy(pricesTable.instrumentId, desc(pricesTable.date));
       const todayMs = new Date(`${today}T00:00:00.000Z`).getTime();
       const seen = new Set<string>();

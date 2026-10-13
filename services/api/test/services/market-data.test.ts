@@ -204,9 +204,15 @@ describe("default scraped-quote providers", () => {
     expect((await antam.getQuote(antamRef))?.price).toBe("1234567");
     expect((await galeri24.getQuote(galeri24Ref))?.price).toBe("1234567");
     expect((await nav.getQuote(navRef))?.price).toBe("1000.5");
-    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/antam");
-    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/galeri24");
-    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/nav/RDPU");
+    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/antam", {
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/galeri24", {
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/nav/RDPU", {
+      signal: expect.any(AbortSignal),
+    });
   });
 });
 

@@ -179,6 +179,12 @@ export interface BuildDailyValueFlowsInput {
    * to their ex-date for accurate income-netting.
    */
   flowDateOf?: (tx: CoreTransaction) => string;
+  /**
+   * Called once per date with the end-of-day holdings this pass already computed, so a
+   * caller that needs the same per-day holdings (the backfill's net-worth column) reuses
+   * them instead of replaying every transaction a second time per day (audit D6).
+   */
+  onHoldings?: (date: string, holdings: Holding[]) => void;
 }
 
 /**
@@ -196,6 +202,7 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     baseCurrency,
     kindOf,
     flowDateOf = (tx) => toDateKey(tx.executedAt),
+    onHoldings,
   } = input;
 
   // Pre-build a date → transactions map using the (possibly remapped) flow date.
@@ -214,6 +221,7 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     // Holdings at end of this date. CAs always applied; txns filtered to ≤ date.
     const asOf = new Date(`${date}T23:59:59.999Z`);
     const holdings = computeHoldings(transactions, corporateActions, asOf);
+    onHoldings?.(date, holdings);
 
     // Market value: Σ qty × adjustedClose × FX. An instrument with no usable price
     // AND no price at all before this date is valued at cost basis instead of

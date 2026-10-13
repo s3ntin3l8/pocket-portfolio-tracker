@@ -515,7 +515,7 @@ describe("ensureBenchmarkPrices (audit D3)", () => {
     try {
       // Fri 2026-06-05 priced; Sat/Sun have no rows.
       const u = await seed(app, ["2026-06-05"]);
-      const getHistoryFrom = vi.fn(async () => []);
+      const getHistoryFrom = vi.fn(async (..._a: unknown[]) => [] as unknown[]);
       await ensureBenchmarkPrices(
         app.db,
         md(getHistoryFrom),
@@ -540,7 +540,7 @@ describe("ensureBenchmarkPrices (audit D3)", () => {
         close: "10",
         currency: "USD",
       }));
-      const getHistoryFrom = vi.fn(async () => candles);
+      const getHistoryFrom = vi.fn(async (..._a: unknown[]) => candles);
       const dates = ["2026-06-01", "2026-06-02", "2026-06-03"];
       await ensureBenchmarkPrices(app.db, md(getHistoryFrom), u.id, "^GSPC", dates, NOW);
       expect(getHistoryFrom).toHaveBeenCalledTimes(1);
@@ -550,7 +550,7 @@ describe("ensureBenchmarkPrices (audit D3)", () => {
 
       // A provider that cannot fill the range is not asked again the same day.
       const u2 = await seed(app, []);
-      const empty = vi.fn(async () => []);
+      const empty = vi.fn(async (..._a: unknown[]) => [] as unknown[]);
       await ensureBenchmarkPrices(app.db, md(empty), u2.id, "^GSPC", dates, NOW);
       await ensureBenchmarkPrices(app.db, md(empty), u2.id, "^GSPC", dates, NOW);
       expect(empty).toHaveBeenCalledTimes(1);

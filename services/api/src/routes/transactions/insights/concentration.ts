@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, desc, gte, inArray, lt } from "drizzle-orm";
 import { corporateActions, instruments, prices, transactions } from "@portfolio/db";
 import {
   type CorporateAction,
@@ -91,11 +91,23 @@ export async function computeConcentrationSection(
       exDate: new Date(ca.exDate),
     }));
 
-    const allPrices = await app.db
+    // Window query (audit D6): every lookup below is "latest price on or before X" for an X
+    // no earlier than the first trend month / this year's start, so only rows from that
+    // window onwards plus each instrument's single latest row BEFORE it (the backward-
+    // lookup anchor) are needed — not the full price history of every instrument.
+    const latestKey = dates[dates.length - 1] ?? toDateKey(new Date());
+    const windowStart = [`${months[0]}-01`, `${latestKey.slice(0, 4)}-01-01`].sort()[0]!;
+    const windowPrices = await app.db
       .select()
       .from(prices)
-      .where(inArray(prices.instrumentId, instIds))
+      .where(and(inArray(prices.instrumentId, instIds), gte(prices.date, windowStart)))
       .orderBy(asc(prices.date));
+    const anchorPrices = await app.db
+      .selectDistinctOn([prices.instrumentId])
+      .from(prices)
+      .where(and(inArray(prices.instrumentId, instIds), lt(prices.date, windowStart)))
+      .orderBy(prices.instrumentId, desc(prices.date));
+    const allPrices = [...anchorPrices, ...windowPrices];
     const pricesByInst: Map<string, { date: string; close: string; currency: string }[]> =
       new Map();
     for (const p of allPrices) {

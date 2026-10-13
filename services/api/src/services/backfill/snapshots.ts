@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { dividendEvents, portfolios, portfolioSnapshots } from "@portfolio/db";
 import {
@@ -6,12 +6,14 @@ import {
   computeHoldings,
   netWorth,
   netWorthInputs,
+  type Holding,
   splitAdjustmentFactor,
   toDateKey,
   MAX_PRICE_CARRY_FORWARD_DAYS,
   type PriceSeriesKind,
 } from "@portfolio/core";
 import type { DB } from "../../db/client.js";
+import { chunk } from "../../lib/chunk.js";
 import { toCoreTxns } from "../tx-core.js";
 import { getFxRatesForDates, makeFxRateFn } from "../fx.js";
 import type { BackfillContext } from "./shared.js";
@@ -191,6 +193,9 @@ export async function writeSnapshotSeries(
 
   const coreTxns = toCoreTxns(txRows);
 
+  // buildDailyValueFlows already replays holdings for every date; capture them instead of
+  // recomputing computeHoldings a second time per day below (audit D6).
+  const holdingsByDate = new Map<string, Holding[]>();
   const dailyFlows = buildDailyValueFlows({
     transactions: coreTxns,
     corporateActions: coreCas,
@@ -201,12 +206,14 @@ export async function writeSnapshotSeries(
     baseCurrency,
     kindOf,
     flowDateOf: (tx) => flowDateOf(tx),
+    onHoldings: (date, holdings) => holdingsByDate.set(date, holdings),
   });
 
-  let count = 0;
+  const rows: (typeof portfolioSnapshots.$inferInsert)[] = [];
   for (const flow of dailyFlows) {
     const asOf = new Date(`${flow.date}T23:59:59.999Z`);
-    const holdingsAtDate = computeHoldings(coreTxns, coreCas, asOf);
+    const holdingsAtDate =
+      holdingsByDate.get(flow.date) ?? computeHoldings(coreTxns, coreCas, asOf);
     const pricesForDate: Record<string, { price: string; currency: string }> = {};
     for (const h of holdingsAtDate) {
       const p = priceAt(h.instrumentId, flow.date);
@@ -233,27 +240,31 @@ export async function writeSnapshotSeries(
       hasEverPriced: (instrId) => hasEverPriced(instrId, flow.date),
     });
 
+    rows.push({
+      portfolioId,
+      date: flow.date,
+      netWorth: nw,
+      marketValue: flow.marketValue,
+      effectiveFlow: flow.effectiveFlow,
+      currency: baseCurrency,
+    });
+  }
+
+  // Chunked multi-row upsert (audit D6): ~500 rows/statement instead of one per day.
+  for (const part of chunk(rows)) {
     await db
       .insert(portfolioSnapshots)
-      .values({
-        portfolioId,
-        date: flow.date,
-        netWorth: nw,
-        marketValue: flow.marketValue,
-        effectiveFlow: flow.effectiveFlow,
-        currency: baseCurrency,
-      })
+      .values(part)
       .onConflictDoUpdate({
         target: [portfolioSnapshots.portfolioId, portfolioSnapshots.date],
         set: {
-          netWorth: nw,
-          marketValue: flow.marketValue,
-          effectiveFlow: flow.effectiveFlow,
-          currency: baseCurrency,
+          netWorth: sql`excluded.net_worth`,
+          marketValue: sql`excluded.market_value`,
+          effectiveFlow: sql`excluded.effective_flow`,
+          currency: sql`excluded.currency`,
         },
       });
-    count++;
   }
 
-  return count;
+  return rows.length;
 }
