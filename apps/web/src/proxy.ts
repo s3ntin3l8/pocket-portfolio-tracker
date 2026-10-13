@@ -1,6 +1,7 @@
 import createMiddleware from "next-intl/middleware";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
+import { SCOPE_HEADER, SCOPE_PARAM, parseScopeParam } from "./lib/portfolio-selection";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -69,7 +70,22 @@ export default function proxy(request: NextRequest) {
   if (bypassI18n(request.nextUrl.pathname)) {
     return NextResponse.next();
   }
-  return intlMiddleware(request);
+  return intlMiddleware(withScopeHeader(request));
+}
+
+/**
+ * Surface a valid `?scope=` as a request header for RSC loaders (they can't see the URL).
+ * A client-supplied header of the same name is always dropped first.
+ */
+export function withScopeHeader(request: NextRequest): NextRequest {
+  const param = request.nextUrl.searchParams.get(SCOPE_PARAM);
+  const valid = parseScopeParam(param) !== null;
+  // No-op only when there's no spoofed header to drop AND no valid scope to add.
+  if (!valid && !request.headers.has(SCOPE_HEADER)) return request;
+  const headers = new Headers(request.headers);
+  headers.delete(SCOPE_HEADER);
+  if (valid && param) headers.set(SCOPE_HEADER, param);
+  return new NextRequest(request, { headers });
 }
 
 export const config = {

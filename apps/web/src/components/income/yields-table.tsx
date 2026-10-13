@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { InstrumentLogo } from "@/components/instrument-logo";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatPercent, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
@@ -99,12 +99,12 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
                       assetClass={y.assetClass}
                     />
                     <div className="min-w-0">
-                      <Link
+                      <ScopeLink
                         href={`/instruments/${y.instrumentId}`}
                         className={cn(TABLE_LABEL, "hover:underline")}
                       >
                         {y.symbol}
-                      </Link>
+                      </ScopeLink>
                       {(y.displayName ?? y.name) ? (
                         <div className={TABLE_SUBLABEL}>{y.displayName ?? y.name}</div>
                       ) : null}
@@ -135,7 +135,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
       <div className="@md:hidden">
         <div className="divide-y divide-line">
           {sorted.map((y) => (
-            <Link
+            <ScopeLink
               key={y.instrumentId}
               href={`/instruments/${y.instrumentId}`}
               data-testid="yield-card"
@@ -177,7 +177,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
                   </>
                 ) : null}
               </div>
-            </Link>
+            </ScopeLink>
           ))}
         </div>
       </div>

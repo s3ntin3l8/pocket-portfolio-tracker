@@ -1,6 +1,8 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { replaceUrlParam } from "@/lib/url-state";
 import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronRight, Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -60,7 +62,23 @@ export function IncomeTimeline({
   olderYears?: string[];
 }) {
   const t = useTranslations("Income");
-  const [yearFilter, setYearFilter] = useState("all");
+  // The year filter is URL state (`?year=`), shallow: a deep link opens on that year.
+  const searchParams = useSearchParams();
+  const urlYearRaw = searchParams?.get("year");
+  const urlYear = urlYearRaw && /^\d{4}$/.test(urlYearRaw) ? urlYearRaw : "all";
+  const [yearFilter, setYearFilterState] = useState(urlYear);
+  // Browser back/forward changes the URL without remounting this component (the page
+  // does not read searchParams), so follow the URL whenever it changes (adjusting state
+  // during render, the React-endorsed alternative to a syncing effect).
+  const [seenUrlYear, setSeenUrlYear] = useState(urlYear);
+  if (seenUrlYear !== urlYear) {
+    setSeenUrlYear(urlYear);
+    setYearFilterState(urlYear);
+  }
+  const setYearFilter = (y: string) => {
+    setYearFilterState(y);
+    replaceUrlParam("year", y === "all" ? null : y);
+  };
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
   const [groupByInstrument, setGroupByInstrument] = useState(false);

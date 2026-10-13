@@ -1,5 +1,6 @@
 "use client";
 
+import { PwaRestore } from "@/components/pwa-restore";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
@@ -128,6 +129,7 @@ export function Landing({
 
   return (
     <main className="flex min-h-dvh flex-col md:flex-row">
+      <PwaRestore />
       {/* Brand / hero panel */}
       <section className="relative flex flex-col justify-between overflow-hidden bg-[linear-gradient(150deg,#11211a_0%,#12271c_46%,#0e3123_100%)] p-8 text-white md:w-[54%] md:p-12 dark:bg-[linear-gradient(150deg,#0c1a13_0%,#0f2419_46%,#0b2e21_100%)]">
         {/* ambient glow */}

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
@@ -7,6 +7,8 @@ vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
+let mockSearch = new URLSearchParams();
+vi.mock("next/navigation", () => ({ useSearchParams: () => mockSearch }));
 vi.mock("@/lib/api", () => ({
   useApiClient: () => ({ listTransactions: vi.fn(async () => []) }),
 }));
@@ -49,13 +51,44 @@ const sap2025: IncomeEventRow = {
   currency: "EUR",
 };
 
-function wrap(rows: IncomeEventRow[]) {
-  return render(
+function tree(rows: IncomeEventRow[]) {
+  return (
     <NextIntlClientProvider locale="en" messages={messages}>
       <IncomeTimeline rows={rows} locale="en" />
-    </NextIntlClientProvider>,
+    </NextIntlClientProvider>
   );
 }
+function wrap(rows: IncomeEventRow[]) {
+  return render(tree(rows));
+}
+
+describe("IncomeTimeline year as URL state", () => {
+  afterEach(() => {
+    mockSearch = new URLSearchParams();
+  });
+
+  it("opens on ?year= and follows back/forward URL changes", () => {
+    const rows = [bbca2026, sap2025];
+    mockSearch = new URLSearchParams("year=2025");
+    const { rerender } = wrap(rows);
+    // Older years start collapsed — expand the (only) 2025 group header.
+    fireEvent.click(screen.getByRole("button", { name: /^2025/ }));
+    expect(screen.getAllByText("SAP").length).toBeGreaterThan(0);
+    expect(screen.queryByText("BBCA")).toBeNull();
+
+    // Back/forward to a URL with a different year: no remount, URL differs from state.
+    mockSearch = new URLSearchParams("year=2026");
+    rerender(tree(rows));
+    expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+    expect(screen.queryByText("SAP")).toBeNull();
+
+    // And back to no param => All years.
+    mockSearch = new URLSearchParams();
+    rerender(tree(rows));
+    expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2025").length).toBeGreaterThan(0);
+  });
+});
 
 describe("IncomeTimeline", () => {
   it("groups rows by year, newest first, under the 'All' chip by default", () => {

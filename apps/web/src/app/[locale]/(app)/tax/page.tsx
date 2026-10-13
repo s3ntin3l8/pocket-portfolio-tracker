@@ -17,6 +17,7 @@ import {
   CoverageCard,
   type TaxTranslator,
 } from "@/components/tax/tax-cards";
+import { PeriodSelect } from "@/components/period-select";
 import { RegimeIndicator } from "@/components/tax/regime-indicator";
 import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
 import { loadNetworthTaxResult, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
@@ -38,9 +39,11 @@ export default async function TaxPage({
   const t0 = TIMING ? performance.now() : 0;
   const { locale } = await params;
   const { year: yearParam } = await searchParams;
-  const year = yearParam ? parseInt(yearParam, 10) : undefined;
+  // `?year=` is URL state; anything but a 4-digit year is ignored (current year).
+  const year = yearParam && /^\d{4}$/.test(yearParam) ? parseInt(yearParam, 10) : undefined;
   setRequestLocale(locale);
   const t = await getTranslations("Tax");
+  const tp = await getTranslations("Period");
 
   const prefs = await loadPreferences();
   const regime = prefs?.taxRegime ?? "DE";
@@ -104,9 +107,21 @@ export default async function TaxPage({
 
   const hasMultipleHolders = holders.length > 1;
 
+  // Selectable tax years: every year with activity across holders, plus the current year
+  // and whichever year is selected (so a deep link to an empty year stays selectable).
+  const currentYear = new Date().getUTCFullYear();
+  const yearOptions = new Set<number>([currentYear, year ?? currentYear]);
+  for (const d of detailByHolder.values()) for (const y of d.byYear) yearOptions.add(y.year);
+
   return (
     <div className="space-y-5">
       {Heading}
+      <PeriodSelect
+        label={tp("taxYear")}
+        value={String(year ?? currentYear)}
+        defaultValue={String(currentYear)}
+        options={[...yearOptions].sort((a, b) => b - a).map(String)}
+      />
       {holders.map((entry, idx) => {
         const detail = detailByHolder.get(entry.holder.id) ?? null;
         const currency = regime === "ID" ? (detail?.currency ?? entry.currency) : entry.currency;

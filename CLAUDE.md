@@ -196,6 +196,15 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   same `GainExplainer` dialog. A row valued at cost or without an FX rate has no measured gain:
   its P&L cells render "—" (neutral), never a green "+0.00". Headline net worth is formatted
   by `formatNetWorth` everywhere (hero, rail, sidebar) so no surface rounds differently.
+- **The URL is the view state (web).** Scope is `?scope=all|p:<id>|h:<id>`: the proxy
+  (`apps/web/src/proxy.ts`) copies a valid value into the `x-pocket-scope` request header and
+  `getRawScope` (`lib/server-api/_shared.ts`) prefers it over the `pf` cookie (default for
+  scope-less URLs, still written by the switcher). Internal links that should keep scope use
+  `ScopeLink`/`withScope`. The hero chart range (`?range=`) and the Income year filter
+  (`?year=`) are shallow `history.replaceState` writes (`lib/url-state.ts`); the Tax year
+  (`PeriodSelect`) is a `router.replace`. Scope changes `router.push`; range/period never add
+  history entries. The URL is the source of truth; the `pf` cookie is the fallback for
+  scope-less URLs only (written on a switcher click, not on a deep link). Ids only in params — never personal data.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

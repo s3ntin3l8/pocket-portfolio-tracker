@@ -19,7 +19,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { MonogramBadge } from "@/components/monogram-badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { HoldingSparkline } from "@/components/holding-sparkline";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
@@ -188,12 +188,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                         assetClass={h.instrument?.assetClass}
                       />
                       <div>
-                        <Link
+                        <ScopeLink
                           href={`/instruments/${h.instrumentId}`}
                           className={cn(TABLE_LABEL, "hover:underline")}
                         >
                           {h.instrument?.symbol ?? "—"}
-                        </Link>
+                        </ScopeLink>
                         <div className={TABLE_SUBLABEL}>
                           {h.instrument?.displayName ?? h.instrument?.name ?? h.instrumentId}
                         </div>
@@ -323,12 +323,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                 className="size-[42px] rounded-[13px]"
               />
               <div className="min-w-0 flex-1">
-                <Link
+                <ScopeLink
                   href={`/instruments/${h.instrumentId}`}
                   className="block truncate text-[15px] font-bold hover:underline"
                 >
                   {h.instrument?.symbol ?? "—"}
-                </Link>
+                </ScopeLink>
                 <div className="truncate text-xs font-medium text-text-2">{subtitle}</div>
               </div>
               {hasSpark && <HoldingSparkline values={h.sparkline!} />}

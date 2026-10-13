@@ -313,3 +313,52 @@ describe("NetWorthHistoryChart", () => {
     });
   });
 });
+
+describe("NetWorthHistoryChart hero range as URL state", () => {
+  beforeEach(() => {
+    getNetWorthHistory.mockClear();
+    window.history.replaceState(null, "", "/holdings?scope=p%3Ap1");
+  });
+
+  function renderHero(props: Record<string, unknown> = {}) {
+    return render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <NetWorthHistoryChart initial={initial} currency="IDR" variant="hero" {...props} />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  it("writes ?range= with a shallow replace (no new history entry), keeping other params", async () => {
+    const push = vi.spyOn(window.history, "pushState");
+    const replaceSpy = vi.spyOn(window.history, "replaceState");
+    const lengthBefore = window.history.length;
+    renderHero();
+    fireEvent.click(screen.getByRole("button", { name: "1M" }));
+    await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1m"));
+    expect(window.location.search).toBe("?scope=p%3Ap1&range=1m");
+    expect(replaceSpy).toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(lengthBefore);
+    push.mockRestore();
+    replaceSpy.mockRestore();
+  });
+
+  it("removes the param again when the default range is picked", async () => {
+    renderHero({ initialRange: "1m" });
+    window.history.replaceState(null, "", "/holdings?range=1m");
+    fireEvent.click(screen.getByRole("button", { name: "1Y" }));
+    await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1y"));
+    expect(window.location.search).toBe("");
+  });
+
+  it("opens on the server-resolved initialRange chip", () => {
+    renderHero({ initialRange: "all" });
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hides the 1D/7D chips when intraday data is absent", () => {
+    renderHero({ hasIntraday: false });
+    expect(screen.queryByRole("button", { name: "1D" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "7D" })).not.toBeInTheDocument();
+  });
+});

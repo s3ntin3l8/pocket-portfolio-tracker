@@ -10,7 +10,7 @@ import {
 import type { ChartRange } from "@/components/charts/range-toggle";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import { formatMoney, formatNetWorth, formatPercent } from "@/lib/utils";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 
 /**
  * The Holdings "glance" hero: green gradient card with the current total portfolio
@@ -110,13 +110,13 @@ export function HeroGlanceCard({
       </p>
       {(atCostCount > 0 || fxMissingCount > 0) && (
         <p className="mt-0.5 text-[11px] font-medium text-white/70">
-          <Link
+          <ScopeLink
             href={atCostHref}
             aria-label={atCostLabel}
             className="underline underline-offset-2 hover:text-white"
           >
             {atCostLabel}
-          </Link>
+          </ScopeLink>
         </p>
       )}
 

@@ -1,6 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -33,7 +33,7 @@ export function ReportHeader({
           : "flex items-center gap-3",
       )}
     >
-      <Link
+      <ScopeLink
         href={backHref}
         aria-label={tA("back")}
         // Visual size stays the reference's 36px card button; `before:` pads the tap
@@ -41,7 +41,7 @@ export function ReportHeader({
         className="relative flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-transform before:absolute before:-inset-1 active:scale-95 md:hidden"
       >
         <ChevronLeft className="size-[19px]" strokeWidth={2.2} />
-      </Link>
+      </ScopeLink>
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-2xl font-bold md:sr-only">{title}</h1>
         {subtitle && (

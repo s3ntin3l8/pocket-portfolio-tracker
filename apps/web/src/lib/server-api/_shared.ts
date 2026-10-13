@@ -21,8 +21,10 @@ import type {
 import type { IdYearInput } from "@portfolio/core";
 import {
   SELECTED_PORTFOLIO_COOKIE,
-  HOLDER_SCOPE_PREFIX,
+  SCOPE_HEADER,
+  resolveScope,
   qualifyingHolders,
+  type ScopeSelection,
 } from "@/lib/portfolio-selection";
 import { toApiRange, type InstrumentPriceRange } from "@/lib/instrument-price-range";
 import { accessTokenFromCookieHeader } from "@/lib/session-token";
@@ -30,18 +32,24 @@ import { firstForwardedHop } from "@/lib/client-ip";
 import { isDevAuthBypass } from "@/lib/dev-auth";
 import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib/data-status";
 
-export type Scope =
-  | { kind: "all" }
-  | { kind: "portfolio"; portfolioId: string }
-  | { kind: "holder"; holderId: string };
+export type Scope = ScopeSelection;
 
+/**
+ * The scope for this request: a valid `?scope=` URL param (surfaced by the proxy as a
+ * request header — loaders have no access to `searchParams`) wins over the `pf` cookie,
+ * which stays the default for scope-less URLs.
+ */
 async function getRawScope(): Promise<Scope> {
-  const value = (await cookies()).get(SELECTED_PORTFOLIO_COOKIE)?.value;
-  if (!value || value === "all") return { kind: "all" };
-  if (value.startsWith(HOLDER_SCOPE_PREFIX)) {
-    return { kind: "holder", holderId: value.slice(HOLDER_SCOPE_PREFIX.length) };
+  let param: string | null = null;
+  try {
+    param = (await headers()).get(SCOPE_HEADER);
+  } catch {
+    // No request scope — fall through to the cookie.
   }
-  return { kind: "portfolio", portfolioId: value };
+  return resolveScope({
+    param,
+    cookie: (await cookies()).get(SELECTED_PORTFOLIO_COOKIE)?.value,
+  });
 }
 
 export async function getSelectedPortfolioId(): Promise<string | null> {

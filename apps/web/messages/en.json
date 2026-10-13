@@ -2466,5 +2466,8 @@
     "boundaryMixed": "This scope combines portfolios with different cash boundaries. Each portfolio pairs its value and contributions on its own boundary before they are added up.",
     "holdingsGainLine": "Holdings gain: value of open positions against what they cost.",
     "savingsGainLine": "Savings gain: value now against net contributed."
+  },
+  "Period": {
+    "taxYear": "Tax year"
   }
 }

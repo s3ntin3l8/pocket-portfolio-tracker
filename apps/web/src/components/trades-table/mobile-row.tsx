@@ -6,7 +6,7 @@ import type { Trade } from "@portfolio/api-client";
 import { TABLE_LABEL, TABLE_SUBLABEL, TABLE_SUBVALUE } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
-import { Link } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { formatSignedMoney, formatPercent, cn } from "@/lib/utils";
 import { tradeKey, toneClass } from "./constants";
 
@@ -39,12 +39,12 @@ export function MobileRow({
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Link
+            <ScopeLink
               href={`/instruments/${tr.instrumentId}`}
               className={cn(TABLE_LABEL, "truncate hover:underline")}
             >
               {tr.instrument?.symbol ?? "—"}
-            </Link>
+            </ScopeLink>
             <Badge variant={tr.status === "open" ? "default" : "outline"}>
               {t(`status_${tr.status}`)}
             </Badge>

@@ -22,7 +22,11 @@ import type { AddTransactionInitial } from "@/components/add-transaction-form";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
-import { pickDefaultPortfolioId, readSelectedScope } from "@/lib/portfolio-selection";
+import {
+  pickDefaultPortfolioId,
+  effectiveScopeValue,
+  SCOPE_PARAM,
+} from "@/lib/portfolio-selection";
 import type { ImportTargetPortfolio } from "@/components/import-flow/types";
 import {
   LazyHolderFormBody as HolderFormBody,
@@ -209,9 +213,12 @@ export function AddTransactionMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harvestInstrumentParam, entryParam]);
 
-  /** The globally selected portfolio (cookie scope), not blindly the first one. */
+  /** The selected portfolio (URL scope, else cookie scope), not blindly the first one. */
   function currentDefaultPortfolioId() {
-    return pickDefaultPortfolioId(fetchedRef.current, readSelectedScope(document.cookie));
+    return pickDefaultPortfolioId(
+      fetchedRef.current,
+      effectiveScopeValue(searchParams.get(SCOPE_PARAM), document.cookie),
+    );
   }
 
   async function loadPortfolios() {

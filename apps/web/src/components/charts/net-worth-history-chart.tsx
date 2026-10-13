@@ -17,6 +17,8 @@ import {
 import { RangeToggle, type ChartRange } from "@/components/charts/range-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { useApiClient } from "@/lib/api";
+import { DEFAULT_HERO_RANGE, HERO_RANGES, RANGE_PARAM } from "@/lib/chart-range";
+import { replaceUrlParam } from "@/lib/url-state";
 import { cn } from "@/lib/utils";
 
 type ChartMode = "performance" | "value";
@@ -27,7 +29,7 @@ function isIntradayRange(range: ChartRange): boolean {
 }
 
 /** Ranges shown as chips inside the compact "hero" variant (Holdings glance card). */
-const HERO_RANGES: ChartRange[] = ["1d", "7d", "1m", "1y", "all"];
+const HERO_CHIPS: readonly ChartRange[] = HERO_RANGES;
 
 /** A resolved chart point — same numeric shape regardless of source range. */
 export interface ChartSeriesPoint {
@@ -97,6 +99,17 @@ export function NetWorthHistoryChart({
   const [data, setData] = useState<HistoryPoint[]>(initial);
   const [loading, setLoading] = useState(false);
 
+  // If the server re-renders with a different range/series (e.g. a non-scope URL change),
+  // adopt it. Skipped on mount; chip picks never change `initialRange` (shallow write).
+  const seededRange = useRef(initialRange);
+  useEffect(() => {
+    if (seededRange.current === initialRange) return;
+    seededRange.current = initialRange;
+    setRange(initialRange ?? "1y");
+    setData(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRange]);
+
   // Monotonic request token: a slow earlier response must not overwrite a newer pick. (The
   // range chips stay clickable while a fetch is in flight, so overlapping picks are possible.)
   const requestSeq = useRef(0);
@@ -110,6 +123,9 @@ export function NetWorthHistoryChart({
   async function pick(r: ChartRange) {
     if (r === range) return;
     setRange(r);
+    // The range is URL state (`?range=`): shallow replace — no navigation, no history
+    // entry. Hero only; the default range keeps a clean URL.
+    if (isHero) replaceUrlParam(RANGE_PARAM, r === DEFAULT_HERO_RANGE ? null : r);
     setLoading(true);
     const seq = ++requestSeq.current;
     try {
@@ -213,7 +229,7 @@ export function NetWorthHistoryChart({
 
   // Only a definite "no intraday data" hides the chips; a failed check keeps them.
   const heroRanges =
-    hasIntraday === false ? HERO_RANGES.filter((r) => !isIntradayRange(r)) : HERO_RANGES;
+    hasIntraday === false ? HERO_CHIPS.filter((r) => !isIntradayRange(r)) : HERO_CHIPS;
 
   if (isHero) {
     return (

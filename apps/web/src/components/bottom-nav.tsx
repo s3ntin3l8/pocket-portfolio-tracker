@@ -2,7 +2,8 @@
 
 import { useRef } from "react";
 import { useTranslations } from "next-intl";
-import { Link, usePathname } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
+import { ScopeLink } from "@/components/scope-link";
 import { cn } from "@/lib/utils";
 import { MAIN_NAV, navActiveKey } from "@/components/nav-items";
 import { useRepaintOnResume } from "@/lib/use-repaint-on-resume";
@@ -45,7 +46,7 @@ export function BottomNav({
         const active = key === activeKey;
         const badge = key === "activity" && anomalyCount > 0 ? anomalyCount : null;
         return (
-          <Link
+          <ScopeLink
             key={key}
             href={href}
             aria-current={active ? "page" : undefined}
@@ -72,7 +73,7 @@ export function BottomNav({
             <span className={cn("text-[10px]", active ? "font-bold" : "font-semibold")}>
               {t(key)}
             </span>
-          </Link>
+          </ScopeLink>
         );
       })}
     </nav>
