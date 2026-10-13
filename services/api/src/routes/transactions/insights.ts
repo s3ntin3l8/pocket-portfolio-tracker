@@ -9,6 +9,7 @@ import {
   annualizedVolatility,
   sharpeRatio,
   sortinoRatio,
+  periodsPerYear,
   streakAnalysis,
   maxDrawdown,
   fxAvailable,
@@ -194,11 +195,19 @@ export function registerInsightsRoutes(app: FastifyInstance) {
           .limit(1);
         const autoRfr: Record<string, number> = { EUR: 0.03, USD: 0.05, IDR: 0.06 };
         const riskFreeRate = Number(rfrPref?.rate ?? autoRfr[display] ?? 0.04);
-        const volatility = {
-          annualizedVolatility: returns.length >= 2 ? String(annualizedVolatility(returns)) : null,
-          sharpeRatio: returns.length >= 2 ? String(sharpeRatio(returns, riskFreeRate)) : null,
-          sortinoRatio: returns.length >= 2 ? String(sortinoRatio(returns, riskFreeRate)) : null,
-        };
+        // The snapshot index is calendar-daily, so annualize with the series' own
+        // sampling frequency rather than the trading-day constant 252 (audit B13).
+        // A metric that is undefined (zero volatility, no downside) stays null, never "null".
+        const ppy = periodsPerYear(idxPoints);
+        const str = (v: number | null): string | null => (v === null ? null : String(v));
+        const volatility =
+          returns.length >= 2 && ppy !== null
+            ? {
+                annualizedVolatility: str(annualizedVolatility(returns, ppy)),
+                sharpeRatio: str(sharpeRatio(returns, riskFreeRate, ppy)),
+                sortinoRatio: str(sortinoRatio(returns, riskFreeRate, ppy)),
+              }
+            : { annualizedVolatility: null, sharpeRatio: null, sortinoRatio: null };
 
         // ── Streaks ────────────────────────────────────────────────────
         const streaks = streakAnalysis(idxPoints);

@@ -17,6 +17,24 @@ export function dailyReturns(points: IndexPoint[]): number[] {
   return result;
 }
 
+/**
+ * The series' actual sampling frequency, in periods per year: `(N − 1)` return periods
+ * over the calendar span between the first and last point. Portfolio snapshot series are
+ * calendar-daily (weekends and holidays included), so annualizing them with the
+ * trading-day constant 252 understates volatility (audit B13) — this derives the factor
+ * from the data instead, so it is right for a calendar-daily (~365), a trading-day (~252)
+ * or a monthly (~12) series alike. Returns null when the span is zero or there are fewer
+ * than two points (no periods to measure).
+ */
+export function periodsPerYear(points: IndexPoint[]): number | null {
+  if (points.length < 2) return null;
+  const first = Date.parse(points[0].date);
+  const last = Date.parse(points[points.length - 1].date);
+  const spanDays = (last - first) / 86_400_000;
+  if (!Number.isFinite(spanDays) || spanDays <= 0) return null;
+  return (points.length - 1) / (spanDays / 365.25);
+}
+
 function mean(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
@@ -50,14 +68,18 @@ export function sharpeRatio(
   return (annRet - riskFreeRate) / annVol;
 }
 
+/**
+ * Annualized downside deviation (target 0): `sqrt(Σ min(r, 0)² / N) · √periodsPerYear`,
+ * where N is the FULL number of periods — positive periods contribute 0 to the sum but
+ * still count in the denominator. Dividing by the number of negative periods only (the
+ * pre-audit-B13 shape) overstates downside risk whenever the series has few down days,
+ * deflating Sortino. Returns 0 when there is no downside at all (→ Sortino undefined).
+ */
 function downsideDeviation(returns: number[], periodsPerYear: number): number {
-  const negative = returns.filter((r) => r < 0);
-  if (negative.length < 2) return 0;
-  const sqDiffs = negative.map((v) => v ** 2);
-  return (
-    Math.sqrt(sqDiffs.reduce((a, b) => a + b, 0) / (negative.length - 1)) *
-    Math.sqrt(periodsPerYear)
-  );
+  if (returns.length === 0) return 0;
+  const sumSq = returns.reduce((acc, r) => (r < 0 ? acc + r * r : acc), 0);
+  if (sumSq === 0) return 0;
+  return Math.sqrt(sumSq / returns.length) * Math.sqrt(periodsPerYear);
 }
 
 export function sortinoRatio(
