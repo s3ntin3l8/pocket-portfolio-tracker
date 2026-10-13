@@ -199,6 +199,7 @@ export {
 export { streakAnalysis, type StreakResult, type Streak } from "./streaks.js";
 export {
   computeYearlyReturns,
+  calendarYearReturn,
   type ComputeYearlyReturnsInput,
   type YearlyReturnRow,
   type YearlyReturnBenchmarkInput,

@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   computeYearlyReturns,
+  calendarYearReturn,
   type YearlyReturnBenchmarkInput,
   type YearlyPortfolioFlow,
 } from "../src/yearly-returns.js";
 import type { IndexPoint } from "../src/index.js";
+import { streakAnalysis } from "../src/streaks.js";
 
 const d = (s: string) => new Date(s);
 
@@ -302,5 +304,60 @@ describe("computeYearlyReturns", () => {
     });
     expect(rows2025.find((r) => r.year === 2024)?.isCurrentYear).toBe(false);
     expect(rows2025.find((r) => r.year === 2025)?.isCurrentYear).toBe(true);
+  });
+});
+
+describe("year anchor parity (audit B13)", () => {
+  // A big Dec 31 → first-trading-day move in both series: the year's return must
+  // include it for the benchmark exactly as for the portfolio, and streakAnalysis's
+  // best/worst year must agree with the yearly table.
+  const pt = (date: string, index: string): IndexPoint => ({ date, index, pct: "0" });
+  const pfIndex: IndexPoint[] = [
+    pt("2024-06-03", "100"),
+    pt("2024-12-31", "110"),
+    pt("2025-01-02", "121"), // +10% overnight into the new year
+    pt("2025-12-31", "121"),
+  ];
+  const bmIndex: IndexPoint[] = [
+    pt("2024-06-03", "200"),
+    pt("2024-12-31", "200"),
+    pt("2025-01-02", "220"), // the same +10% gap
+    pt("2025-12-31", "220"),
+  ];
+
+  it("anchors the benchmark at the prior year's close, like the portfolio", () => {
+    const rows = computeYearlyReturns({
+      pfIndex,
+      pfFlowsByYear: new Map(),
+      pfEndNavByYear: new Map(),
+      benchmarks: [{ symbol: "^X", displayName: "X", nativeCurrency: "EUR", index: bmIndex }],
+      asOf: d("2025-12-31"),
+    });
+    const y2025 = rows.find((r) => r.year === 2025)!;
+    expect(Number(y2025.portfolioTwr)).toBeCloseTo(0.1, 10);
+    // Pre-fix the benchmark was anchored at its first 2025 point → 0%, active +10%.
+    expect(Number(y2025.benchmarks[0].twr)).toBeCloseTo(0.1, 10);
+    expect(Number(y2025.benchmarks[0].activeReturn)).toBeCloseTo(0, 10);
+  });
+
+  it("streakAnalysis best/worst year equals the yearly table's portfolioTwr", () => {
+    const rows = computeYearlyReturns({
+      pfIndex,
+      pfFlowsByYear: new Map(),
+      pfEndNavByYear: new Map(),
+      benchmarks: [],
+      asOf: d("2025-12-31"),
+    });
+    const streaks = streakAnalysis(pfIndex);
+    const byYear = new Map(rows.map((r) => [r.year, r.portfolioTwr]));
+    expect(streaks.bestYear?.returnPct).toBe(byYear.get(streaks.bestYear!.year));
+    expect(streaks.worstYear?.returnPct).toBe(byYear.get(streaks.worstYear!.year));
+    // 2025's return includes the Jan 2 gap (pre-fix streaks reported 0 for 2025).
+    expect(Number(calendarYearReturn(pfIndex, 2025))).toBeCloseTo(0.1, 10);
+  });
+
+  it("calendarYearReturn is null for an empty year or a lone inception-year point", () => {
+    expect(calendarYearReturn(pfIndex, 2023)).toBeNull();
+    expect(calendarYearReturn([pt("2025-03-01", "100")], 2025)).toBeNull();
   });
 });

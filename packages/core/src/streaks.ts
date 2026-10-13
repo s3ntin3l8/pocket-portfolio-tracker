@@ -1,3 +1,5 @@
+import { calendarYearReturn } from "./yearly-returns.js";
+
 export interface IndexPoint {
   date: string;
   index: string;
@@ -107,27 +109,23 @@ export function streakAnalysis(points: IndexPoint[]): StreakResult {
     }
   }
 
-  const years = new Map<number, { start: number; end: number }>();
-  for (const p of points) {
-    const year = Number(p.date.slice(0, 4));
-    const value = Number(p.index);
-    if (!years.has(year)) {
-      years.set(year, { start: value, end: value });
-    } else {
-      const y = years.get(year)!;
-      y.end = value;
-    }
-  }
+  // Best/worst calendar year use the SAME definition as the yearly-returns table —
+  // anchored at the prior year's close, inception year from its first point — so the
+  // streaks card and the yearly table never report different numbers for one year
+  // (audit B13). A year with no computable return (a lone inception-year point) is skipped.
+  const years = [...new Set(points.map((p) => Number(p.date.slice(0, 4))))].sort((a, b) => a - b);
 
   let bestYear: { year: number; returnPct: string } | null = null;
   let worstYear: { year: number; returnPct: string } | null = null;
-  for (const [year, { start, end }] of years) {
-    const ret = start !== 0 ? end / start - 1 : 0;
+  for (const year of years) {
+    const yr = calendarYearReturn(points, year);
+    if (yr === null) continue;
+    const ret = Number(yr);
     if (!bestYear || ret > Number(bestYear.returnPct)) {
-      bestYear = { year, returnPct: String(ret) };
+      bestYear = { year, returnPct: yr };
     }
     if (!worstYear || ret < Number(worstYear.returnPct)) {
-      worstYear = { year, returnPct: String(ret) };
+      worstYear = { year, returnPct: yr };
     }
   }
 
