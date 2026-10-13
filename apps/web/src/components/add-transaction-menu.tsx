@@ -17,16 +17,20 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
-import { ImportFlowClient } from "@/components/import-flow-client";
-import { NewEntryTabs, type NewEntryTab } from "@/components/new-entry-tabs";
+import type { NewEntryTab } from "@/components/new-entry-tabs";
 import type { AddTransactionInitial } from "@/components/add-transaction-form";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { pickDefaultPortfolioId, readSelectedScope } from "@/lib/portfolio-selection";
 import type { ImportTargetPortfolio } from "@/components/import-flow/types";
-import { PortfolioFormBody } from "@/components/portfolio-form-dialog/body";
-import { HolderFormBody } from "@/components/holder-form-dialog/body";
+import {
+  LazyHolderFormBody as HolderFormBody,
+  LazyImportFlowClient as ImportFlowClient,
+  LazyNewEntryTabs as NewEntryTabs,
+  LazyPortfolioFormBody as PortfolioFormBody,
+  preloadAddMenuBodies,
+} from "@/components/add-transaction-menu/lazy-bodies";
 import { MethodCard } from "@/components/add-transaction-menu/method-card";
 import { loadHarvestPrefill } from "@/components/add-transaction-menu/helpers";
 import { NavRail, type DesktopStep } from "@/components/add-transaction-menu/nav-rail";
@@ -417,6 +421,8 @@ export function AddTransactionMenu({
       <Button
         aria-label={tm("addTransaction")}
         onClick={() => onAddOpenChange(true)}
+        onPointerEnter={preloadAddMenuBodies}
+        onFocus={preloadAddMenuBodies}
         className={autoOpenFromParams ? "hidden md:inline-flex" : undefined}
       >
         <Plus className="size-4" />
@@ -429,6 +435,7 @@ export function AddTransactionMenu({
             className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 size-14 rounded-[18px] shadow-lg md:hidden"
             aria-label={tm("addTransaction")}
             onClick={() => onAddOpenChange(true)}
+            onTouchStart={preloadAddMenuBodies}
           >
             <Plus className="size-6" />
           </Button>,

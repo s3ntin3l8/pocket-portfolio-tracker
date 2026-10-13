@@ -21,23 +21,7 @@ interface EpsChartRow extends EpsQuarter {
   forecast?: boolean;
 }
 
-/** Estimate / Actual key, rendered inline with the section title (2 series → a legend
- *  is always present, per the app's chart conventions). */
-export function EpsActualEstimateChartLegend() {
-  const t = useTranslations("Instrument");
-  return (
-    <div className="ml-auto flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
-      <span className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-[var(--color-chart-1)]" />
-        {t("epsEstimateLabel")}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-[var(--color-chart-2)]" />
-        {t("epsActualLabel")}
-      </span>
-    </div>
-  );
-}
+export { EpsActualEstimateChartLegend } from "./eps-actual-estimate-legend";
 
 /**
  * Per-quarter hover breakdown (estimate vs. actual + surprise), exported for direct unit

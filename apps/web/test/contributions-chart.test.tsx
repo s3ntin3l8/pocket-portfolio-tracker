@@ -104,9 +104,10 @@ describe("ContributionsChart — overlay path", () => {
 // ── Degraded path ─────────────────────────────────────────────────────────────
 
 describe("ContributionsChart — degraded path (no value history)", () => {
-  it("renders the legacy PriceChart with cumulative contributions", () => {
+  it("renders the legacy PriceChart with cumulative contributions", async () => {
     renderChart(series, []);
-    const chart = screen.getByTestId("price-chart");
+    // The chart is code-split (next/dynamic), so it arrives a tick after first render.
+    const chart = await screen.findByTestId("price-chart");
     expect(chart).toHaveAttribute("data-points", "3");
     expect(chart).toHaveAttribute("data-last", "350"); // 100 + 100 + 150
   });
@@ -122,8 +123,8 @@ describe("ContributionsChart — degraded path (no value history)", () => {
     expect(screen.getByText(messages.Empty.historyTitle)).toBeInTheDocument();
   });
 
-  it("degrades gracefully when value history has only 1 point", () => {
+  it("degrades gracefully when value history has only 1 point", async () => {
     renderChart(series, [{ date: "2026-01-15", netWorth: "95" }]);
-    expect(screen.getByTestId("price-chart")).toBeInTheDocument();
+    expect(await screen.findByTestId("price-chart")).toBeInTheDocument();
   });
 });

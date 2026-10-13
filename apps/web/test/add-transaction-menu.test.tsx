@@ -167,7 +167,8 @@ describe("AddTransactionMenu", () => {
     expect(
       screen.queryByRole("dialog", { name: messages.Manage.addMenu.title }),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("import-flow")).toBeInTheDocument();
+    // The import flow body is code-split (next/dynamic) — it mounts a tick after the step.
+    expect(await screen.findByTestId("import-flow")).toBeInTheDocument();
   });
 
   // Regression test for #471: the CSV card called the same `openImport()` path as
@@ -181,7 +182,7 @@ describe("AddTransactionMenu", () => {
     await waitFor(() =>
       expect(screen.getByRole("dialog", { name: messages.Import.title })).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("import-flow")).toBeInTheDocument();
+    expect(await screen.findByTestId("import-flow")).toBeInTheDocument();
   });
 
   it("returns from the import step to the method cards via back, without closing the sheet", async () => {

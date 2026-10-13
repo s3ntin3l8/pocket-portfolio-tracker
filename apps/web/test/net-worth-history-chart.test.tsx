@@ -61,9 +61,9 @@ describe("NetWorthHistoryChart", () => {
     getPortfolioHistory.mockClear();
   });
 
-  it("renders the initial series without fetching", () => {
+  it("renders the initial series without fetching", async () => {
     renderChart();
-    expect(screen.getByTestId("chart")).toBeInTheDocument();
+    expect(await screen.findByTestId("chart")).toBeInTheDocument();
     expect(getNetWorthHistory).not.toHaveBeenCalled();
   });
 

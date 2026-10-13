@@ -5,8 +5,11 @@ import { Coins } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { EmptyState } from "@/components/empty-state";
-import { AllocationDonut } from "@/components/charts/allocation-donut";
-import { IncomeBarChart, IncomeBarChartLegend } from "@/components/charts/income-bar-chart";
+import {
+  LazyAllocationDonut as AllocationDonut,
+  LazyIncomeBarChart as IncomeBarChart,
+} from "@/components/charts/lazy";
+import { IncomeBarChartLegend } from "@/components/charts/income-bar-legend";
 import { IncomeHeatmap } from "@/components/charts/income-heatmap";
 import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";

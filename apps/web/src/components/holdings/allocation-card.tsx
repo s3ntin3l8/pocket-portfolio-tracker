@@ -1,4 +1,5 @@
-import { AllocationDonut, type DonutSlice } from "@/components/charts/allocation-donut";
+import type { DonutSlice } from "@/components/charts/allocation-donut";
+import { AllocationDonutSsr as AllocationDonut } from "@/components/charts/lazy";
 
 /**
  * The Holdings "Allocation" card: the class-donut (reused wholesale, incl. its own

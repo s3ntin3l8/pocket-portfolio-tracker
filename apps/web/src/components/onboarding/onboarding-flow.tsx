@@ -11,8 +11,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { ImportTasksProvider } from "@/components/import-tasks-provider";
-import { ImportFlowClient } from "@/components/import-flow-client";
-import { NewEntryTabs, type NewEntryTab } from "@/components/new-entry-tabs";
+import type { NewEntryTab } from "@/components/new-entry-tabs";
+import {
+  LazyImportFlowClient as ImportFlowClient,
+  LazyNewEntryTabs as NewEntryTabs,
+} from "@/components/add-transaction-menu/lazy-bodies";
 import { Icon, ICONS } from "./icon";
 import { resolveTheme } from "./theme";
 import { BrandPanel } from "./brand-panel";

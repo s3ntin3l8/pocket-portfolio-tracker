@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { LineChart } from "lucide-react";
 import type { Candle } from "@portfolio/api-client";
-import { PriceChart } from "@/components/charts/price-chart";
+import { LazyPriceChart as PriceChart } from "@/components/charts/lazy";
 import { InstrumentRangeToggle } from "@/components/charts/instrument-range-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { useApiClient } from "@/lib/api";

@@ -15,7 +15,7 @@ import {
   useIsTooltipActive,
 } from "recharts";
 import type { PerformancePoint } from "@portfolio/api-client";
-import { PriceChart } from "@/components/charts/price-chart";
+import { LazyPriceChart as PriceChart } from "@/components/charts/lazy";
 import { EmptyState } from "@/components/empty-state";
 import { mergeContributionValue } from "@/lib/chart-series";
 import { formatMoney } from "@/lib/utils";

@@ -10,8 +10,10 @@ import { isIntradayPoint } from "@portfolio/api-client";
 function isDailyPoint(p: HistoryPoint): p is PerformancePoint {
   return !isIntradayPoint(p);
 }
-import { PriceChart } from "@/components/charts/price-chart";
-import { HeroOverlayChart } from "@/components/charts/hero-overlay-chart";
+import {
+  HeroOverlayChartSsr as HeroOverlayChart,
+  PriceChartSsr as PriceChart,
+} from "@/components/charts/lazy";
 import { RangeToggle, type ChartRange } from "@/components/charts/range-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { useApiClient } from "@/lib/api";

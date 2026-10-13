@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { forecastSeries } from "@portfolio/core";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ForecastChart } from "@/components/charts/forecast-chart";
+import { LazyForecastChart as ForecastChart } from "@/components/charts/lazy";
 import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/utils";
 
 /** Parse a numeric input, treating blank/invalid as 0 and clamping to a range. */
