@@ -228,6 +228,7 @@ export function registerGoldRoutes(app: FastifyInstance) {
     { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request) => {
       request.timingName = "GET /portfolios/:id/gold";
+      request.timingMeta = { portfolioId: request.portfolio.id };
       const portfolio = request.portfolio;
       return buildGoldReport(
         app,

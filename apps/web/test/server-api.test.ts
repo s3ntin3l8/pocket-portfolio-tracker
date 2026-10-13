@@ -591,6 +591,21 @@ describe("aggregate + misc loaders", () => {
     expect(getGold).toHaveBeenCalledWith(undefined);
     expect(getPortfolioGold).not.toHaveBeenCalled();
 
+    // Holder scope cookie → passes holderId to getGold.
+    // resolveHolderScope validates: need ≥2 portfolios owned by the holder.
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "IDR", accountHolderId: "holder-abc" },
+      { id: "p2", name: "B", baseCurrency: "EUR", accountHolderId: "holder-abc" },
+    ];
+    h.cookies = { pf: "holder:holder-abc" };
+    getGold.mockClear();
+    res = await api.loadGoldReport();
+    expect(res).toMatchObject({ status: "ok" });
+    expect(getGold).toHaveBeenCalledWith("holder-abc");
+    expect(getPortfolioGold).not.toHaveBeenCalled();
+    // Restore PF for the next assertion.
+    h.client.listPortfolios = async () => PF;
+
     // A selected portfolio cookie → portfolio path wins.
     h.cookies = { pf: "p2" };
     getGold.mockClear();
