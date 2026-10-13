@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
-import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, countDistinct, eq, gte, inArray } from "drizzle-orm";
 import {
   accountHolders,
   portfolios,
@@ -187,6 +187,26 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       return cached;
     },
   );
+
+  // Whether the 1D/7D hero ranges have anything to draw yet (audit G8): at least two
+  // distinct intraday capture times in the last 7 days across the user's portfolios — the
+  // same "two points make a line" threshold the chart itself uses. Lets a fresh install hide
+  // those chips instead of showing a "collecting" placeholder. Prospective-only data, so
+  // this flips true on its own a day or so after the intraday job starts running.
+  app.get("/networth/intraday-status", { preHandler: app.authenticate }, async (request) => {
+    const since = new Date(Date.now() - 7 * 86_400_000);
+    const [row] = await app.db
+      .select({ n: countDistinct(portfolioIntradaySnapshots.capturedAt) })
+      .from(portfolioIntradaySnapshots)
+      .innerJoin(portfolios, eq(portfolios.id, portfolioIntradaySnapshots.portfolioId))
+      .where(
+        and(
+          eq(portfolios.userId, request.userId),
+          gte(portfolioIntradaySnapshots.capturedAt, since),
+        ),
+      );
+    return { hasIntraday: Number(row?.n ?? 0) >= 2 };
+  });
 
   // Aggregate net-worth-over-time across all of the user's portfolios, summing each
   // day's snapshots converted to the display currency.

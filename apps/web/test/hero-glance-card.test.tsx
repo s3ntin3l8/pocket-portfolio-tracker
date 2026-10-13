@@ -216,4 +216,34 @@ describe("HeroGlanceCard", () => {
     expect(screen.getAllByText(/Nasdaq Composite/).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText(/S&P 500/)).not.toBeInTheDocument();
   });
+
+  it("hides the 1D/7D chips until intraday data exists (audit G8)", () => {
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1y"
+          hasIntraday={false}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByRole("button", { name: "1D" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "7D" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1M" })).toBeInTheDocument();
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1y"
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("button", { name: "1D" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "7D" })).toBeInTheDocument();
+  });
 });

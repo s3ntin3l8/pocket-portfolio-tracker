@@ -211,6 +211,59 @@
   }
 }
 
+/* Scroll affordance for wide tables (audit G5) — CSS only, no JS measurement. Classic
+   "scrolling shadows": opaque card-coloured covers are `local` (they scroll with the
+   content, so they hide the edge shadow once you reach that edge), the soft shadows are
+   `scroll` (pinned to the wrapper's edges). Net effect: a shadow appears on an edge only
+   while there is more content beyond it. Apply to the `overflow-x` wrapper. */
+@utility scroll-shadow-x {
+  overflow-x: auto;
+  background-image:
+    linear-gradient(to right, var(--scroll-shadow-bg, var(--card)) 30%, transparent),
+    linear-gradient(to left, var(--scroll-shadow-bg, var(--card)) 30%, transparent),
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.22), transparent),
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.22), transparent);
+  background-position:
+    left center,
+    right center,
+    left center,
+    right center;
+  background-size:
+    36px 100%,
+    36px 100%,
+    14px 100%,
+    14px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Pins a table's first column while the rest scrolls horizontally. The cell needs an
+   opaque background to cover what slides under it. Put on the `<table>`. */
+@utility sticky-first-col {
+  & :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--card);
+    box-shadow: 1px 0 0 var(--line);
+  }
+  & tr:hover > :is(th, td):first-child {
+    background-color: var(--row-hover);
+  }
+}
+
+/* Keeps the last row of a mobile list reachable above the floating "+" button (audit G5).
+   FAB = 3.5rem tall, lifted 5rem + safe-area above the viewport bottom (add-transaction-menu);
+   the shell already reserves the bottom-nav height, so reserve the FAB's own height plus a
+   gap on top of it. Mobile only — the FAB is `md:hidden`. `scroll-padding-bottom` keeps
+   scrollIntoView/focus from landing underneath it too. */
+@utility fab-inset {
+  @media (width < 48rem) {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* Hide scrollbar but keep scroll functional — used by the income calendar's
    horizontal month strip on screens where all 12 months don't fit. */
 @utility scrollbar-none {

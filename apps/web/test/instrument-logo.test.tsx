@@ -1,12 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
 import { MARKET_YAHOO_SUFFIX } from "@portfolio/market-data";
-import { InstrumentLogo, MARKET_LOGO_SUFFIX } from "../src/components/instrument-logo";
+import {
+  InstrumentLogo,
+  MARKET_LOGO_SUFFIX,
+  resetFailedLogoCache,
+} from "../src/components/instrument-logo";
 
 const ORIGINAL_TOKEN = process.env.NEXT_PUBLIC_LOGODEV_TOKEN;
 
 describe("InstrumentLogo", () => {
   beforeEach(() => {
+    resetFailedLogoCache();
     process.env.NEXT_PUBLIC_LOGODEV_TOKEN = "pk_test123";
   });
 
@@ -66,6 +71,37 @@ describe("InstrumentLogo", () => {
     fireEvent.error(img);
     expect(container.querySelector("img")).toBeNull();
     expect(container).toHaveTextContent("AA");
+  });
+
+  it("remembers a 404 for the session: the second render skips the image request", () => {
+    const first = render(
+      <InstrumentLogo label="VFV" symbol="VFV" market="US" assetClass="equity" />,
+    );
+    fireEvent.error(first.container.querySelector("img")!);
+    first.unmount();
+
+    // A different row (fresh mount) for the same instrument renders the monogram straight
+    // away — no <img> element means no network request.
+    const second = render(
+      <InstrumentLogo label="VFV" symbol="VFV" market="US" assetClass="equity" />,
+    );
+    expect(second.container.querySelector("img")).toBeNull();
+    expect(second.container).toHaveTextContent("VF");
+  });
+
+  it("catches an image that failed before hydration attached onError", () => {
+    const spy = vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(true);
+    const cur = vi
+      .spyOn(HTMLImageElement.prototype, "currentSrc", "get")
+      .mockReturnValue("https://img.logo.dev/x");
+    const { container } = render(
+      <InstrumentLogo label="BYON" symbol="BYON" market="IDX" assetClass="equity" />,
+    );
+    // jsdom reports naturalWidth 0 for an unloaded image.
+    expect(container.querySelector("img")).toBeNull();
+    expect(container).toHaveTextContent("BY");
+    spy.mockRestore();
+    cur.mockRestore();
   });
 
   it("falls back to the monogram when no token is configured", () => {

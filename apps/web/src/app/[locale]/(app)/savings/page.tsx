@@ -80,7 +80,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
     : new Decimal(c.currentValue).minus(c.netContributed).toNumber();
 
   return (
-    <div className="space-y-5">
+    <div className="fab-inset space-y-5">
       {heading}
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">

@@ -64,6 +64,17 @@ async function currentHolderScope(portfolios: Awaited<ReturnType<typeof listPort
   return { selected, holderId };
 }
 
+/** Whether intraday (1D/7D) history exists yet; `false` on any failure (hides the chips). */
+export async function loadHasIntraday(): Promise<boolean> {
+  const api = await getServerApi();
+  if (!api) return false;
+  try {
+    return (await api.getIntradayStatus()).hasIntraday;
+  } catch {
+    return false;
+  }
+}
+
 export async function loadNetWorthHistory(range = "1y"): Promise<HistoryPoint[]> {
   const api = await getServerApi();
   if (!api) return [];

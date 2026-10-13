@@ -85,7 +85,7 @@ export function DesktopTable({
   };
 
   return (
-    <div className="hidden overflow-x-auto rounded-2xl bg-card shadow-card md:block">
+    <div className="scroll-shadow-x hidden rounded-2xl bg-card shadow-card lg:block">
       <Table>
         <TableHeader>
           <TableRow>

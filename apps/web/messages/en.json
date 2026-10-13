@@ -1209,6 +1209,7 @@
     "email": "Email",
     "authVia": "Signed in via Authentik (OIDC) · {email}",
     "authViaLocal": "Signed in with email and password · {email}",
+    "authViaDev": "Development bypass · {email}",
     "version": "Version {version} — release notes",
     "manage": "Manage",
     "portfoliosLink": "Portfolios & holders",

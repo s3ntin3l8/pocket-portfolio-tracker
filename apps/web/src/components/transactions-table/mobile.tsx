@@ -40,7 +40,7 @@ export function MobileView({
   const m = (n: number, currency: string) => formatMoney(n, currency, locale);
 
   return (
-    <div className="space-y-4 md:hidden">
+    <div className="fab-inset space-y-4 lg:hidden">
       {dayGroups.map((group) => (
         <div key={group.day}>
           <div className="mb-2 ml-1 text-[12px] font-bold uppercase tracking-[0.04em] text-text-3">

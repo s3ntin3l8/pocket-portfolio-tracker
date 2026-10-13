@@ -1,3 +1,4 @@
+import { authViaKey, isDevAuthBypass } from "@/lib/auth-label";
 import { getTranslations } from "next-intl/server";
 import { Lock } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -63,11 +64,7 @@ export async function AccountSection({
 
       <div className="flex items-center gap-2.5 rounded-xl bg-card px-4 py-3 text-xs text-muted-foreground shadow-card">
         <Lock className="size-4 shrink-0" />
-        <span>
-          {me?.authSub.startsWith("local|")
-            ? t("authViaLocal", { email: me?.email ?? "" })
-            : t("authVia", { email: me?.email ?? "" })}
-        </span>
+        <span>{t(authViaKey(me?.authSub, isDevAuthBypass()), { email: me?.email ?? "" })}</span>
       </div>
       <AppVersion
         ariaLabel={t("version", { version: APP_VERSION })}
