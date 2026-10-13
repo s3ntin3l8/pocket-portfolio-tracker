@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { detectAnomalies } from "../src/anomalies.js";
+import { cashBalances, cashFlow } from "../src/cash.js";
+import { computeHoldings } from "../src/holdings.js";
 import type { CoreTransaction, CorporateAction } from "../src/types.js";
 
 const tx = (
@@ -716,5 +718,53 @@ describe("edge cases", () => {
     const codes = anomalies.map((a) => a.code);
     expect(codes).toEqual(["sell_before_acquisition"]);
     expect(anomalies[0].instrumentId).toBe("B");
+  });
+});
+
+describe("over-sell: cash vs holdings (audit B13)", () => {
+  it("cash keeps the full proceeds, holdings clamp, and the anomaly carries the excess", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2024-01-01") }),
+      tx({
+        type: "sell",
+        id: "over",
+        quantity: "15",
+        price: "120",
+        fees: "2",
+        tax: "10",
+        executedAt: new Date("2024-02-01"),
+      }),
+    ];
+    // Cash: −1000 buy, + (15 × 120 − 2 − 10) = +1788 → 788.
+    expect(cashFlow(txns[1]).toString()).toBe("1788");
+    expect(cashBalances(txns).EUR).toBe("788");
+    // Holdings clamp: position closed, realized only on the 10 shares held.
+    const [h] = computeHoldings(txns);
+    expect(h.quantity).toBe("0");
+    const anomalies = detectAnomalies(txns);
+    expect(anomalies).toHaveLength(1);
+    expect(anomalies[0]).toMatchObject({
+      code: "oversell",
+      transactionId: "over",
+      meta: { available: "10", attempted: "15", excessQuantity: "5", excessProceeds: "600" },
+    });
+  });
+
+  it("a sell with nothing held reports the whole sell as excess", () => {
+    const anomalies = detectAnomalies([
+      tx({ type: "sell", id: "naked", quantity: "3", price: "50" }),
+    ]);
+    expect(anomalies[0]).toMatchObject({
+      code: "sell_before_acquisition",
+      meta: { attempted: "3", excessQuantity: "3", excessProceeds: "150" },
+    });
+  });
+
+  it("a transfer_out over-sell carries no excessProceeds (no cash moves)", () => {
+    const anomalies = detectAnomalies([
+      tx({ type: "buy", quantity: "2", executedAt: new Date("2024-01-01") }),
+      tx({ type: "transfer_out", id: "t", quantity: "5", executedAt: new Date("2024-02-01") }),
+    ]);
+    expect(anomalies[0].meta).toEqual({ available: "2", attempted: "5", excessQuantity: "3" });
   });
 });

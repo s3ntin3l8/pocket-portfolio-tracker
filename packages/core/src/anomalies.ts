@@ -156,8 +156,19 @@ export function detectAnomalies(
         });
       }
 
-      // Quantity integrity — check BEFORE clamping (mirrors holdings.ts:94 Decimal.min)
+      // Quantity integrity — check BEFORE clamping (mirrors computeHoldings' Decimal.min).
+      // An over-sell is surfaced here rather than "fixed" in cash: holdings/trade-log clamp
+      // the disposal to the held quantity (no position or realized P&L on shares that were
+      // never recorded), while cashFlow() keeps crediting the FULL proceeds because the
+      // broker really paid them — the defect is a missing acquisition, not phantom cash.
+      // `excessQuantity`/`excessProceeds` quantify exactly the part the two disagree on
+      // (gross proceeds for a sell; a transfer_out moves no cash, so none).
       if (type === "sell" || type === "transfer_out") {
+        const excess = q.sub(Decimal.min(q, qty));
+        const excessMeta = {
+          excessQuantity: excess.toString(),
+          ...(type === "sell" ? { excessProceeds: excess.mul(p).toString() } : {}),
+        };
         if (qty.isZero()) {
           anomalies.push({
             code: "sell_before_acquisition",
@@ -165,7 +176,7 @@ export function detectAnomalies(
             scope: "transaction",
             transactionId: txId,
             instrumentId,
-            meta: { attempted: quantity },
+            meta: { attempted: quantity, ...excessMeta },
           });
         } else if (q.gt(qty)) {
           anomalies.push({
@@ -174,7 +185,7 @@ export function detectAnomalies(
             scope: "transaction",
             transactionId: txId,
             instrumentId,
-            meta: { available: qty.toString(), attempted: quantity },
+            meta: { available: qty.toString(), attempted: quantity, ...excessMeta },
           });
         }
         // Mirror the Decimal.min clamp so the running qty stays consistent.
