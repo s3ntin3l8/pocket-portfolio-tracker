@@ -10,7 +10,7 @@ import { portfolios, transactions } from "@portfolio/db";
 import { getMarketData } from "../../../services/market-data.js";
 import {
   computeBenchmarkIndex,
-  fetchBenchmarkPrices,
+  ensureBenchmarkPrices,
   getBenchmarkPricesMulti,
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
@@ -99,20 +99,10 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   }
 
   const allDates = pfIndex.map((p) => p.date);
-  const minDate = allDates[0];
   const symbolNames = benchmarkSymbols.map((b) => b.symbol);
 
-  try {
-    const md = await getMarketData();
-    for (const sym of symbolNames) {
-      try {
-        await fetchBenchmarkPrices(db, md, userId, sym, minDate);
-      } catch {
-        // Non-fatal: missing data shows as null cells.
-      }
-    }
-  } catch {
-    // Market data not available at all; we'll fall back to whatever rows are already in benchmark_prices.
+  for (const sym of symbolNames) {
+    await ensureBenchmarkPrices(db, getMarketData, userId, sym, allDates);
   }
 
   const priceMap = await getBenchmarkPricesMulti(db, userId, symbolNames, allDates);

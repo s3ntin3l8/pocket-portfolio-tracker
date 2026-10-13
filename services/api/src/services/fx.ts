@@ -1,9 +1,10 @@
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { fxRates } from "@portfolio/db";
 import { FX_MAX_CARRY_FORWARD_DAYS, toDateKey, type FxRateFn } from "@portfolio/core";
 import type { DB } from "../db/client.js";
 import { recordFxMissing } from "../lib/fx-missing.js";
+import { chunk } from "../lib/chunk.js";
 
 export { recordFxMissing } from "../lib/fx-missing.js";
 
@@ -138,6 +139,45 @@ async function cacheFxRate(
     });
 }
 
+/** Cache many `(from → base, date)` rates with chunked multi-row upserts. */
+async function cacheFxRates(
+  db: DB,
+  from: string,
+  base: string,
+  rates: { date: string; rate: string }[],
+): Promise<void> {
+  for (const part of chunk(rates)) {
+    await db
+      .insert(fxRates)
+      .values(part.map((r) => ({ base: from, quote: base, rate: r.rate, date: r.date })))
+      .onConflictDoUpdate({
+        target: [fxRates.base, fxRates.quote, fxRates.date],
+        set: { rate: sql`excluded.rate` },
+      });
+  }
+}
+
+/**
+ * Negative lookups for the current UTC day (audit D3): `from|base|missingMin|missingMax`
+ * ranges the provider was already asked for and still could not fill (outage, currency
+ * the ECB does not publish). Without it every history/insights/backfill call re-fetched
+ * the same unfillable range. In-process and day-scoped by design — a restart or the next
+ * day retries.
+ */
+const negativeLookups = new Map<string, string>();
+
+/** Test hook: forget remembered negative lookups. */
+export function clearFxNegativeCache(): void {
+  negativeLookups.clear();
+}
+
+/** Shift a YYYY-MM-DD key by whole days (UTC). */
+function shiftDateKey(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return toDateKey(d);
+}
+
 /**
  * Read-through FX cache: returns each foreign currency's rate to `base`, served
  * from today's fx_rates rows and back-filled live via the provider. A currency the
@@ -237,29 +277,44 @@ export async function getFxRatesForDates(
     );
   for (const r of cached) byCurrency.get(r.base)?.set(r.date, r.rate);
 
-  // Back-fill any currency that lacks an exact rate for one of the wanted dates.
-  // All missing currencies are fetched in parallel (was a serial for-loop) — the
-  // Frankfurter API supports up to ~30 currencies per request, but to keep the
-  // provider interface generic we fan out with Promise.all instead.
+  // Back-fill dates that carry-forward cannot already satisfy. A wanted date is satisfied
+  // when a cached row exists within FX_MAX_CARRY_FORWARD_DAYS on or before it — ECB
+  // (Frankfurter) publishes no weekend/holiday rows, so "no row for this exact date" must
+  // not count as missing (audit D3), or every call refetches and re-upserts the range.
   if (fxProvider?.getRateHistory) {
-    const minDate = wanted[0];
-    const missing = foreign.filter((from) => {
-      const known = byCurrency.get(from)!;
-      return !wanted.every((d) => known.has(d));
-    });
-    const cacheOps: Promise<void>[] = [];
+    const today = toDateKey(new Date());
+    const unsatisfied = (known: Map<string, string>): string[] => {
+      const knownDates = [...known.keys()].sort();
+      let i = 0;
+      let lastKnown: string | undefined;
+      const out: string[] = [];
+      for (const d of wanted) {
+        while (i < knownDates.length && knownDates[i]! <= d) lastKnown = knownDates[i++];
+        if (!lastKnown || lastKnown < shiftDateKey(d, -FX_MAX_CARRY_FORWARD_DAYS)) out.push(d);
+      }
+      return out;
+    };
     await Promise.all(
-      missing.map(async (from) => {
+      foreign.map(async (from) => {
         const known = byCurrency.get(from)!;
-        const history = await fxProvider.getRateHistory!(from, base, minDate, maxDate);
+        const gaps = unsatisfied(known);
+        if (gaps.length === 0) return;
+        const lo = gaps[0]!;
+        const hi = gaps[gaps.length - 1]!;
+        const key = `${from}|${base}|${lo}|${hi}`;
+        if (negativeLookups.get(key) === today) return;
+        const history = await fxProvider.getRateHistory!(from, base, lo, hi);
+        const rows: { date: string; rate: string }[] = [];
         for (const [date, rate] of Object.entries(history)) {
           const str = fmtRate(rate);
           known.set(date, str);
-          cacheOps.push(cacheFxRate(db, from, base, str, date));
+          rows.push({ date, rate: str });
         }
+        await cacheFxRates(db, from, base, rows);
+        // Still unfillable after a real fetch -> don't ask again today.
+        if (unsatisfied(known).length > 0) negativeLookups.set(key, today);
       }),
     );
-    await Promise.all(cacheOps);
   }
 
   for (const from of foreign) {

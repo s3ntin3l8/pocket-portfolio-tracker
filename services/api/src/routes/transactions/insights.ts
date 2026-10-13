@@ -18,7 +18,7 @@ import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { getMarketData } from "../../services/market-data.js";
 import {
   getUserBenchmarkConfig,
-  fetchBenchmarkPrices,
+  ensureBenchmarkPrices,
   getBenchmarkPrices,
   computeBenchmarkIndex,
   computeActiveReturn,
@@ -221,16 +221,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         } | null = null;
         if (indexed.length > 0) {
           const bmDates = indexed.map((p) => p.date);
-          const existingBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
-          const missingDates = bmDates.filter((d) => !existingBm.has(d));
-          if (missingDates.length > 0) {
-            try {
-              const md = await getMarketData();
-              await fetchBenchmarkPrices(app.db, md, id, bmConfig.symbol, missingDates[0]);
-            } catch {
-              /* non-fatal */
-            }
-          }
+          await ensureBenchmarkPrices(app.db, getMarketData, id, bmConfig.symbol, bmDates);
           const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
           if (refreshedBm.size > 1) {
             let bmFxMissingDates = 0;
