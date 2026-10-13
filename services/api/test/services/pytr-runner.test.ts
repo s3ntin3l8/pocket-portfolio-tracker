@@ -72,8 +72,12 @@ describe("PytrRunner pairing", () => {
     const { spawn, nextChild } = makeSpawn();
     const runner = makeRunner(spawn);
 
+    process.env.DB_ENCRYPTION_KEY = "must-not-leak"; // pragma: allowlist secret
     const startP = runner.startPairing("u1", { phone: "+4915", pin: "1234" });
     const child = await nextChild();
+    delete process.env.DB_ENCRYPTION_KEY;
+    // The child gets an allow-listed env, never the API's own secrets (audit A10).
+    expect(child.opts.env).not.toHaveProperty("DB_ENCRYPTION_KEY");
     // argv allowlist + env (secrets via env, never argv)
     expect(child.args).toEqual([
       "/scripts/tr_login.py",
@@ -302,6 +306,7 @@ describe("PytrRunner.downloadDocuments", () => {
     expect(child.args[0]).toBe("/scripts/tr_documents.py");
     expect(child.args).toContain("--out");
     // Secrets go via env, never argv.
+    expect(child.opts.env).not.toHaveProperty("DATABASE_URL");
     expect(child.opts.env?.TR_PHONE).toBe("+4915");
     expect(child.opts.env?.TR_PIN).toBe("1234");
 

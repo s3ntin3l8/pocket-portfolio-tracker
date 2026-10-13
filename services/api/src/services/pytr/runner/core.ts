@@ -1,4 +1,5 @@
 import { spawn as nodeSpawn } from "node:child_process";
+import { buildSubprocessEnv } from "../../../lib/subprocess-env.js";
 import type { ChildProcess } from "node:child_process";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -64,12 +65,11 @@ export class PytrRunner {
           input.wafToken ? "token" : this.opts.wafStrategy,
         ],
         {
-          env: {
-            ...process.env,
+          env: buildSubprocessEnv({
             TR_PHONE: input.phone,
             TR_PIN: input.pin,
             ...(input.wafToken ? { TR_WAF_TOKEN: input.wafToken } : {}),
-          },
+          }),
           stdio: ["pipe", "pipe", "pipe"],
         },
       );
