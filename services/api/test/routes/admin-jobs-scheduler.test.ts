@@ -107,7 +107,7 @@ describe("GET /admin/jobs — live pgboss query path (scheduler available)", () 
     expect(body.schedulerAvailable).toBe(true);
 
     // All known job descriptors are still listed.
-    expect(body.jobs).toHaveLength(11);
+    expect(body.jobs).toHaveLength(12);
 
     // The seeded job has a "completed" row more recent than the "failed" row.
     const prices = body.jobs.find((j) => j.name === "refresh-prices");

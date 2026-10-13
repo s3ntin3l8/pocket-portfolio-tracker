@@ -12,6 +12,8 @@ export {
   IBKR_SYNC_QUEUE,
   ANTAM_QUEUE,
   ANTAM_CRON,
+  LOAN_INSTALLMENT_QUEUE,
+  LOAN_INSTALLMENT_CRON,
   NAV_QUEUE,
   NAV_CRON,
   DIVIDEND_QUEUE,
@@ -59,6 +61,7 @@ import { runRecomputeJobs } from "./scheduler/recompute.js";
 import { refreshDividends } from "./dividends.js";
 import { refreshInstrumentMetadata } from "./instrument-metadata.js";
 import { recordDailySnapshots, recordIntradaySnapshots } from "./snapshots.js";
+import { bookDueInstallments } from "./loan-installments.js";
 import {
   refreshAntamBuyback,
   refreshGaleri24Buyback,
@@ -95,6 +98,8 @@ import {
   IBKR_SYNC_QUEUE,
   ANTAM_QUEUE,
   ANTAM_CRON,
+  LOAN_INSTALLMENT_QUEUE,
+  LOAN_INSTALLMENT_CRON,
   NAV_QUEUE,
   NAV_CRON,
   DIVIDEND_QUEUE,
@@ -319,6 +324,19 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     }
   });
   await boss.schedule(ANTAM_QUEUE, ANTAM_CRON);
+
+  // Book financed gold-purchase (cicilan) installments as they fall due, so the loan balance
+  // (and net worth) tracks the contract's schedule instead of freezing at the import date.
+  await boss.createQueue(LOAN_INSTALLMENT_QUEUE);
+  await boss.work(LOAN_INSTALLMENT_QUEUE, async () => {
+    try {
+      const { booked } = await bookDueInstallments(getDb());
+      app.log.info({ booked }, "loan installment booking complete");
+    } catch (err) {
+      app.log.error({ err }, "loan installment booking failed");
+    }
+  });
+  await boss.schedule(LOAN_INSTALLMENT_QUEUE, LOAN_INSTALLMENT_CRON);
 
   // Scrape the reksa-dana NAV catalogue (Bibit) into scraped_quotes; read in-process by the
   // default NavProvider (see market-data.ts).
@@ -617,6 +635,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
       trSyncCron: TR_SYNC_CRON,
       ibkrSyncCron,
       antamCron: ANTAM_CRON,
+      loanInstallmentCron: LOAN_INSTALLMENT_CRON,
       navCron: NAV_CRON,
       dividendCron: DIVIDEND_CRON,
       recomputeQueue: RECOMPUTE_QUEUE,
