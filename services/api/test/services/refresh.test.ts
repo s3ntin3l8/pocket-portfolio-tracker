@@ -70,6 +70,19 @@ describe("refreshHeldPrices", () => {
     expect(cached.every((r) => r.price === "100")).toBe(true);
   });
 
+  it("does not write a quote older than the carry-forward window (audit B13)", async () => {
+    const db = getDb();
+    const before = await db.select().from(lastPrices);
+    // Monday 03:00 UTC, 2026-03-09 — the stub's asOf (2026-02-09) is four weeks old.
+    const n = await refreshHeldPrices(db, service({ n: 0 }), new Date(Date.UTC(2026, 2, 9, 3)));
+    expect(n).toBe(0);
+    const after = await db.select().from(lastPrices);
+    // Nothing re-stamped: every row keeps its previous asOf.
+    expect(after.map((r) => r.asOf.toISOString()).sort()).toEqual(
+      before.map((r) => r.asOf.toISOString()).sort(),
+    );
+  });
+
   it("refreshes nothing when all markets are closed", async () => {
     const counter = { n: 0 };
     // Saturday → IDX and gold both closed.

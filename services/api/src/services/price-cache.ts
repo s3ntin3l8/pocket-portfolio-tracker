@@ -1,6 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { lastPrices } from "@portfolio/db";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
+import { MAX_PRICE_CARRY_FORWARD_DAYS } from "@portfolio/core";
 import type { DB } from "../db/client.js";
 
 export interface PricedRef {
@@ -80,7 +81,15 @@ export async function getCachedQuotes(
   const stale = refs.filter((r) => !fresh.has(r.id));
   if (stale.length === 0) return prices;
 
-  const quotes = await service.getQuotes(stale.map((r) => ({ id: r.id, ref: r.ref })));
+  const fetched = await service.getQuotes(stale.map((r) => ({ id: r.id, ref: r.ref })));
+  // A provider can answer with a quote whose own `asOf` is long past (a delisted or
+  // suspended symbol, a feed that stopped updating). Older than the shared carry-forward
+  // window it counts as MISSING — same threshold as the historical fallback and the
+  // backfill (`MAX_PRICE_CARRY_FORWARD_DAYS`) — so the holding drops to the valuation's
+  // stale-history/valued-at-cost path instead of being marked to a dead price forever
+  // (audit B13). Not written back either: the cache's `asOf` is the FETCH time, so caching
+  // it would launder the dead quote into a "fresh" row for the next TTL window.
+  const quotes = dropStaleQuotes(fetched, now);
   for (const [instrumentId, q] of Object.entries(quotes)) {
     prices[instrumentId] = {
       price: q.price,
@@ -90,4 +99,24 @@ export async function getCachedQuotes(
   }
   await upsertLastPrices(db, quotes, now);
   return prices;
+}
+
+/**
+ * True when a provider quote's own timestamp is older than `MAX_PRICE_CARRY_FORWARD_DAYS`
+ * before `now`. A missing or unparseable `asOf` is NOT treated as stale — a provider that
+ * omits the field must not have every quote silently discarded.
+ */
+export function isStaleQuote(asOf: string | null | undefined, now: Date): boolean {
+  if (!asOf) return false;
+  const t = Date.parse(asOf);
+  if (!Number.isFinite(t)) return false;
+  return now.getTime() - t > MAX_PRICE_CARRY_FORWARD_DAYS * 86_400_000;
+}
+
+/** `quotes` without the entries {@link isStaleQuote} rejects. */
+export function dropStaleQuotes<Q extends { asOf?: string | null }>(
+  quotes: Record<string, Q>,
+  now: Date,
+): Record<string, Q> {
+  return Object.fromEntries(Object.entries(quotes).filter(([, q]) => !isStaleQuote(q.asOf, now)));
 }

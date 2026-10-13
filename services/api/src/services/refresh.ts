@@ -2,7 +2,7 @@ import { inArray, isNotNull } from "drizzle-orm";
 import { instruments, transactions } from "@portfolio/db";
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
-import { upsertLastPrices } from "./price-cache.js";
+import { dropStaleQuotes, upsertLastPrices } from "./price-cache.js";
 import { isMarketOpen } from "./market-hours.js";
 
 /**
@@ -26,7 +26,7 @@ export async function refreshHeldPrices(
   const open = rows.filter((i) => isMarketOpen(i.market, now));
   if (open.length === 0) return 0;
 
-  const quotes = await service.getQuotes(
+  const fetched = await service.getQuotes(
     open.map((i) => ({
       id: i.id,
       ref: {
@@ -40,6 +40,9 @@ export async function refreshHeldPrices(
       } satisfies InstrumentRef,
     })),
   );
+  // Same stale-quote gate as getCachedQuotes (audit B13): last_prices stamps `asOf` with
+  // the fetch time, so writing a long-dead quote here would serve it as fresh.
+  const quotes = dropStaleQuotes(fetched, now);
   await upsertLastPrices(db, quotes, now);
   return Object.keys(quotes).length;
 }
