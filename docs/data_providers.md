@@ -26,8 +26,9 @@ Priority is the default tried-first order (lower = earlier). Cells reflect each 
 | EODHD          | 6        | ✓      | ✓   | —           | —              | —           | —      | US, XETRA, …         | `EODHD_API_KEY`                  | Yes      |
 | CoinGecko      | 7        | —      | —   | —           | —              | —           | ✓      | CRYPTO               | — (optional `COINGECKO_API_KEY`) | Optional |
 | Yahoo Finance  | 8        | ✓      | ✓   | ✓           | —              | —           | ✓      | (any, suffixed), XAU | — (keyless)                      | No       |
+| UBS            | 10       | —      | —   | —           | ✓              | —           | —      | UBS                  | `UBS_BUYBACK_URL`                | Scraper  |
 
-Antam and Galeri24 are both **gold buyback** sources backed by one shared `BuybackProvider`
+Antam, Galeri24 and UBS are all **gold buyback** sources backed by one shared `BuybackProvider`
 (`packages/market-data/src/buyback.ts`), one instance per brand/market.
 
 CoinGecko is the **crypto** primary, with Yahoo (`<TICKER>-<CURRENCY>` pairs, e.g. `BTC-USD`)
@@ -40,7 +41,7 @@ to a coin id (`bitcoin`) via `/search` (memoised) since its price/history endpoi
 Yahoo also backs **gold spot** as the keyless fallback behind Twelve Data and GoldAPI. It quotes
 the `XAU<CCY>=X` currency pair (e.g. `XAUIDR=X`, `XAUUSD=X`) — priced per troy ounce in that
 currency, so no FX hop — and divides by the troy-ounce gram factor to match the per-gram
-convention the keyed providers use. It is restricted to the `XAU` market; the `ANTAM`/`GALERI24`
+convention the keyed providers use. It is restricted to the `XAU` market; the `ANTAM`/`GALERI24`/`UBS`
 buyback markets stay with their own providers.
 
 Always-on, outside the configurable registry:
@@ -90,12 +91,13 @@ so the effective chain per asset is:
 - **Gold spot (XAU):** Twelve Data → GoldAPI → Yahoo → Fixture
 - **Gold buyback (ANTAM):** Antam → Fixture
 - **Gold buyback (GALERI24):** Galeri24 → Fixture
+- **Gold buyback (UBS):** UBS → Fixture
 - **Mutual fund (reksa dana):** Reksa Dana NAV → Fixture
 - **Crypto (CRYPTO):** CoinGecko → Yahoo → Fixture
 
 Gold is sourced multiple ways on purpose: **spot** (market `XAU`, via Twelve Data / GoldAPI,
 with a keyless Yahoo fallback on the `XAU<CCY>=X` pair) prices paper/abstract gold, while each
-**buyback** market (`ANTAM`, `GALERI24`) values
+**buyback** market (`ANTAM`, `GALERI24`, `UBS`) values
 physical holdings at that dealer's own buyback rate — the rates differ, so the markets never
 substitute for one another. The add-transaction gold flow lets the user pick the buyback
 source per holding.
@@ -117,13 +119,13 @@ Fixture need no configuration (CoinGecko's key is optional — it works keyless)
 | `COINGECKO_API_KEY`    | CoinGecko      | No       | Crypto. Keyless works at a low rate limit; a free Demo key raises it and enables live quota reporting (`/key`).               |
 | `OPENFIGI_API_KEY`     | OpenFIGI       | No       | Optional; only raises the discovery rate limit.                                                                               |
 
-Unlike the keyed providers, **Antam, Galeri24, Reksa Dana NAV and CoinGecko are always on**:
+Unlike the keyed providers, **Antam, Galeri24, UBS, Reksa Dana NAV and CoinGecko are always on**:
 the gold/NAV providers read the built-in `scraped_quotes` cache when their env var is blank,
 and CoinGecko falls back to keyless access — none of them drop out of the chain.
 
 ## Built-in scrapers
 
-Gold buyback (Antam, Galeri24) and reksa-dana NAV have no official free API, so the API
+Gold buyback (Antam, Galeri24, UBS) and reksa-dana NAV have no official free API, so the API
 scrapes them itself (scheduler jobs → `scraped_quotes` cache → in-process providers).
 Failures degrade gracefully: a missing/stale value just makes the provider fall through to
 Fixture. The internal routes below expose the same cached values for authenticated callers
@@ -133,6 +135,7 @@ and external integrations.
 | -------------- | ------------------------------------------------- | ----------------------- | ------------------------------------- | ---------------------------------- |
 | harga-emas.org | Antam LM buyback (`Harga pembelian kembali`)      | `gold:antam-buyback`    | `GET /internal/gold/antam-buyback`    | every 4h (`0 */4 * * *`)           |
 | galeri24.co.id | Galeri24 buyback (1 g `Harga Buyback`)            | `gold:galeri24-buyback` | `GET /internal/gold/galeri24-buyback` | every 4h (`0 */4 * * *`)           |
+| galeri24.co.id | UBS buyback (1 g, `UBS` section)                  | `gold:ubs-buyback`      | `GET /internal/gold/ubs-buyback`      | every 4h (`0 */4 * * *`)           |
 | api.bibit.id   | Reksa-dana NAV catalogue (`symbol` → `nav.value`) | `nav:<symbol>`          | `GET /internal/nav/:symbol`           | 16:00 & 01:00 UTC (`0 1,16 * * *`) |
 
 - **Gold source (Antam):** the canonical Antam page (`logammulia.com/id/sell/gold`) sits
@@ -143,6 +146,11 @@ and external integrations.
   (static Nuxt HTML). The page lists several brands; extraction scopes to the `GALERI 24`
   section and reads the 1 g `Harga Buyback`, isolated in
   `services/api/src/services/scrapers/galeri24-buyback.ts`.
+- **Gold source (UBS):** `ubslifestyle.com` sits behind a Cloudflare challenge (HTTP 403 to
+  non-browser clients), so UBS is read from the `UBS` section of the same Galeri24 page — the
+  same grid, same 1 g `Harga Buyback` extraction, reused via
+  `services/api/src/services/scrapers/ubs-buyback.ts`. It is Galeri24's UBS buyback quote, a
+  close proxy for UBS's own rate.
 - **NAV source & symbol scheme:** Bibit's `products/list` returns an AES-encrypted catalogue
   (decrypted in `bibit-nav.ts`). The **canonical fund symbol is Bibit's `symbol` field**
   (e.g. `RD4196`) — store that on the `mutual_fund` instrument so `/internal/nav/<symbol>`
@@ -155,7 +163,7 @@ and external integrations.
 **Run the scrapers on demand** (e.g. right after a deploy, so you don't wait for the cron):
 
 - Admin API: `POST /admin/market-data/scrape` (Authentik admin group) → runs all scrapers
-  and returns `{ antamBuyback, galeri24Buyback, navFunds }`.
+  and returns `{ antamBuyback, galeri24Buyback, ubsBuyback, navFunds }`.
 - CLI: `npm run scrape` (in `services/api`, loads `../../.env`), or in a container
   `node dist/db/scrape.js` with `DATABASE_URL` set.
 

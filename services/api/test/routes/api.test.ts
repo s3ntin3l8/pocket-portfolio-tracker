@@ -934,9 +934,10 @@ describe("auth + portfolios + transactions", () => {
       headers: auth(t),
     });
     expect(res.statusCode).toBe(200);
-    // Antam + Galeri24 are always configured; with no DB override both appear as gold sources.
+    // Antam, Galeri24 and UBS are always configured; with no DB override all appear as gold sources.
     expect(res.json()).toContainEqual({ market: "ANTAM", label: "Antam buyback" });
     expect(res.json()).toContainEqual({ market: "GALERI24", label: "Galeri24 buyback" });
+    expect(res.json()).toContainEqual({ market: "UBS", label: "UBS buyback (via Galeri24)" });
   });
 
   it("looks up instrument metadata from market data (auto-discovery)", async () => {

@@ -205,6 +205,7 @@ describe("isKnownMarket", () => {
     expect(isKnownMarket("XAU")).toBe(true);
     expect(isKnownMarket("ANTAM")).toBe(true);
     expect(isKnownMarket("GALERI24")).toBe(true);
+    expect(isKnownMarket("UBS")).toBe(true);
     expect(isKnownMarket("CRYPTO")).toBe(true);
   });
 
@@ -584,6 +585,7 @@ describe("YahooFinanceProvider", () => {
     // Spot only — the Antam/Galeri24 buyback markets belong to their own providers.
     expect(provider.supports("gold", "ANTAM")).toBe(false);
     expect(provider.supports("gold", "GALERI24")).toBe(false);
+    expect(provider.supports("gold", "UBS")).toBe(false);
   });
 
   it("quotes a Xetra ETF via the .DE suffix, without double-suffixing", async () => {

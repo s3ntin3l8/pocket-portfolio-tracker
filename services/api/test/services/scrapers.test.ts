@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
+import { scrapedQuotes } from "@portfolio/db";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import { extractBuybackFromHtml } from "../../src/services/scrapers/antam-buyback.js";
 import { extractBuybackFromHtml as extractGaleri24Buyback } from "../../src/services/scrapers/galeri24-buyback.js";
+import { scrapeUbsBuyback } from "../../src/services/scrapers/ubs-buyback.js";
 import { decryptBibitEnvelope, refreshBibitNav } from "../../src/services/scrapers/bibit-nav.js";
 import {
   upsertScrapedQuote,
@@ -11,8 +14,12 @@ import {
   refreshAntamBuyback,
   refreshGaleri24Buyback,
   refreshNav,
+  refreshUbsBuyback,
+  isBuybackGoldMarket,
+  BUYBACK_GOLD_MARKETS,
   ANTAM_BUYBACK_KEY,
   GALERI24_BUYBACK_KEY,
+  UBS_BUYBACK_KEY,
   navKey,
 } from "../../src/services/scrapers/store.js";
 
@@ -82,6 +89,34 @@ describe("galeri24 extractBuybackFromHtml", () => {
       '<div class="p-3 col-span-1 whitespace-nowrap w-fit">1.5</div>',
     );
     expect(extractGaleri24Buyback(noOneGram)).toBeNull();
+  });
+});
+
+describe("UBS extraction (galeri24 UBS section)", () => {
+  it("reads the 1g buyback from the exact UBS section, not UBS ELSA", () => {
+    expect(extractGaleri24Buyback(GALERI24_HTML, "UBS")).toBe(2348000);
+  });
+
+  it("keeps the default brand on GALERI 24", () => {
+    expect(extractGaleri24Buyback(GALERI24_HTML)).toBe(2549000);
+  });
+
+  it("returns null when the UBS section is missing", () => {
+    expect(extractGaleri24Buyback('<div id="ANTAM">…</div>', "UBS")).toBeNull();
+  });
+
+  it("scrapeUbsBuyback fetches the page and returns the UBS buyback", async () => {
+    expect(await scrapeUbsBuyback(mockFetch(() => ({ text: GALERI24_HTML })))).toBe(2348000);
+  });
+
+  it("scrapeUbsBuyback returns null on a failed fetch", async () => {
+    expect(await scrapeUbsBuyback(mockFetch(() => ({ ok: false })))).toBeNull();
+  });
+
+  it("registers UBS as a buyback gold market", () => {
+    expect(isBuybackGoldMarket("UBS")).toBe(true);
+    expect(isBuybackGoldMarket("XAU")).toBe(false);
+    expect(BUYBACK_GOLD_MARKETS.map((m) => m.key)).toContain(UBS_BUYBACK_KEY);
   });
 });
 
@@ -165,6 +200,27 @@ describe("scraped_quotes store", () => {
       mockFetch(() => ({ ok: false })),
     );
     expect(value).toBeNull();
+  });
+
+  it("refreshUbsBuyback scrapes and caches the buyback", async () => {
+    const db = getDb();
+    const value = await refreshUbsBuyback(
+      db,
+      mockFetch(() => ({ text: GALERI24_HTML })),
+    );
+    expect(value).toBe(2348000);
+    expect(await getScrapedQuote(db, UBS_BUYBACK_KEY)).toBe(2348000);
+  });
+
+  it("refreshUbsBuyback caches nothing on failure", async () => {
+    const db = getDb();
+    await db.delete(scrapedQuotes).where(eq(scrapedQuotes.key, UBS_BUYBACK_KEY));
+    const value = await refreshUbsBuyback(
+      db,
+      mockFetch(() => ({ ok: false })),
+    );
+    expect(value).toBeNull();
+    expect(await getScrapedQuote(db, UBS_BUYBACK_KEY)).toBeNull();
   });
 
   it("refreshNav scrapes the catalogue and caches each fund's nav", async () => {

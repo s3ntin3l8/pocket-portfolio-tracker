@@ -9,7 +9,7 @@ import {
   YahooFinanceProvider,
 } from "@portfolio/market-data";
 import { type ProviderSetting } from "@portfolio/db";
-import { ANTAM_BUYBACK_KEY, GALERI24_BUYBACK_KEY } from "../scrapers/store.js";
+import { ANTAM_BUYBACK_KEY, GALERI24_BUYBACK_KEY, UBS_BUYBACK_KEY } from "../scrapers/store.js";
 import {
   type ResolvedSecret,
   type ProviderDescriptor,
@@ -108,6 +108,23 @@ export const PROVIDER_REGISTRY: ProviderDescriptor[] = [
     defaultPriority: 9,
     configured: () => true,
     create: () => new JustEtfProvider(),
+  },
+  {
+    id: "ubs",
+    label: "UBS buyback (via Galeri24)",
+    defaultPriority: 10,
+    goldMarket: "UBS",
+    configured: () => true,
+    create: (s) => {
+      const baseUrl = s?.url ?? process.env.UBS_BUYBACK_URL;
+      return baseUrl
+        ? new BuybackProvider({ name: "ubs", market: "UBS", baseUrl })
+        : new ScrapedBuybackProvider({
+            name: "ubs",
+            market: "UBS",
+            key: UBS_BUYBACK_KEY,
+          });
+    },
   },
 ];
 

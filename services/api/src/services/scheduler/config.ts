@@ -192,7 +192,7 @@ export const JOB_DESCRIPTORS = [
   {
     name: ANTAM_QUEUE,
     label: "Gold buyback scrape",
-    description: "Scrape Antam and Galeri24 buyback rates into the scraped-quotes cache.",
+    description: "Scrape Antam, Galeri24 and UBS buyback rates into the scraped-quotes cache.",
     cron: ANTAM_CRON,
     cronOnlyActiveInFlight: true,
   },

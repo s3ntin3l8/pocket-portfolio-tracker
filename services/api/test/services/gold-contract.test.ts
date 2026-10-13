@@ -65,6 +65,18 @@ describe("goldInstrumentForContract", () => {
     expect(g.symbol).toBe("G24:1411125370001253");
     expect(g.name).toBe("LM 50 Gram");
   });
+
+  it("routes UBS and Antam bar names to their own buyback market", () => {
+    const ubs = goldInstrumentForContract({ ...CONTRACT, goldName: "UBS 25 Gram" });
+    expect(ubs.market).toBe("UBS");
+    expect(ubs.symbol).toBe("G24:1411125370001253");
+    expect(goldInstrumentForContract({ ...CONTRACT, goldName: "Antam 10 gr" }).market).toBe(
+      "ANTAM",
+    );
+    expect(goldInstrumentForContract({ ...CONTRACT, goldName: "RUBS Gram" }).market).toBe(
+      "GALERI24",
+    );
+  });
 });
 
 describe("buildContractLegs", () => {

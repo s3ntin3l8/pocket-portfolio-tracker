@@ -16,6 +16,7 @@ import {
   getScrapedQuote,
   ANTAM_BUYBACK_KEY,
   GALERI24_BUYBACK_KEY,
+  UBS_BUYBACK_KEY,
   navKey,
 } from "../../src/services/scrapers/store.js";
 
@@ -26,6 +27,9 @@ const GALERI24_HTML =
   `<html><body><div data-id="GALERI 24"><div class="grid grid-cols-5">` +
   `<div>Berat</div><div>Harga Jual</div><div>Harga Buyback</div></div>` +
   `<div class="grid grid-cols-5"><div>1</div><div>Rp2.718.000</div><div>Rp2.549.000</div></div>` +
+  `</div><div id="UBS"><div class="grid grid-cols-5">` +
+  `<div>Berat</div><div>Harga Jual</div><div>Harga Buyback</div></div>` +
+  `<div class="grid grid-cols-5"><div>1</div><div>Rp2.546.000</div><div>Rp2.348.000</div></div>` +
   `</div></body></html>`;
 
 // Build the same self-describing envelope Bibit returns (iv hex + cipher hex + key utf8).
@@ -210,10 +214,12 @@ describe("admin provider config", () => {
       expect(res.json()).toEqual({
         antamBuyback: 2591100,
         galeri24Buyback: 2549000,
+        ubsBuyback: 2348000,
         navFunds: 1,
       });
       expect(await getScrapedQuote(app.db, ANTAM_BUYBACK_KEY)).toBe(2591100);
       expect(await getScrapedQuote(app.db, GALERI24_BUYBACK_KEY)).toBe(2549000);
+      expect(await getScrapedQuote(app.db, UBS_BUYBACK_KEY)).toBe(2348000);
       expect(await getScrapedQuote(app.db, navKey("RDPU"))).toBe(1234.56);
     } finally {
       globalThis.fetch = realFetch;

@@ -91,6 +91,7 @@ export const KNOWN_MARKETS: ReadonlySet<string> = new Set([
   "XAU",
   "ANTAM",
   "GALERI24",
+  "UBS",
   CRYPTO_MARKET,
 ]);
 

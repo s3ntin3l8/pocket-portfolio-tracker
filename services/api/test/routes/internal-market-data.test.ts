@@ -7,6 +7,7 @@ import {
   upsertScrapedQuote,
   ANTAM_BUYBACK_KEY,
   GALERI24_BUYBACK_KEY,
+  UBS_BUYBACK_KEY,
   navKey,
 } from "../../src/services/scrapers/store.js";
 import type { FastifyInstance } from "fastify";
@@ -40,6 +41,7 @@ describe("internal market-data routes", () => {
       .sign(privateKey);
     await upsertScrapedQuote(app.db, ANTAM_BUYBACK_KEY, 2591100, "harga-emas");
     await upsertScrapedQuote(app.db, GALERI24_BUYBACK_KEY, 2549000, "galeri24");
+    await upsertScrapedQuote(app.db, UBS_BUYBACK_KEY, 2348000, "galeri24-ubs");
     await upsertScrapedQuote(app.db, navKey("RDPU"), 1234.56, "bibit");
   });
 
@@ -69,6 +71,16 @@ describe("internal market-data routes", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ buyback: 2549000 });
+  });
+
+  it("serves the cached UBS buyback in the provider's shape", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/internal/gold/ubs-buyback",
+      headers: auth(token),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ buyback: 2348000 });
   });
 
   it("serves a cached fund NAV by symbol", async () => {

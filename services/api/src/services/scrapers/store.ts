@@ -3,12 +3,14 @@ import { scrapedQuotes } from "@portfolio/db";
 import type { DB } from "../../db/client.js";
 import { scrapeAntamBuyback, ANTAM_BUYBACK_SOURCE } from "./antam-buyback.js";
 import { scrapeGaleri24Buyback, GALERI24_BUYBACK_SOURCE } from "./galeri24-buyback.js";
+import { scrapeUbsBuyback, UBS_BUYBACK_SOURCE } from "./ubs-buyback.js";
 import { refreshBibitNav, BIBIT_SOURCE } from "./bibit-nav.js";
 
 // Cache keys in `scraped_quotes`. Shared by the writers (scheduler) and the readers
 // (internal market-data routes) so they can never drift.
 export const ANTAM_BUYBACK_KEY = "gold:antam-buyback";
 export const GALERI24_BUYBACK_KEY = "gold:galeri24-buyback";
+export const UBS_BUYBACK_KEY = "gold:ubs-buyback";
 export const navKey = (symbol: string): string => `nav:${symbol}`;
 
 /** Upsert one scraped value (stored as a numeric string to preserve precision). */
@@ -63,6 +65,35 @@ export async function refreshGaleri24Buyback(
     await upsertScrapedQuote(db, GALERI24_BUYBACK_KEY, value, GALERI24_BUYBACK_SOURCE, now);
   }
   return value;
+}
+
+/** Scrape the UBS buyback and cache it. Returns the value, or `null` if unavailable. */
+export async function refreshUbsBuyback(
+  db: DB,
+  doFetch?: typeof fetch,
+  now: Date = new Date(),
+): Promise<number | null> {
+  const value = await scrapeUbsBuyback(doFetch);
+  if (value !== null) {
+    await upsertScrapedQuote(db, UBS_BUYBACK_KEY, value, UBS_BUYBACK_SOURCE, now);
+  }
+  return value;
+}
+
+/**
+ * Gold markets valued at a scraped buyback rate, with the `scraped_quotes` key each reads.
+ * The single list the historical backfill keys off — add a new buyback source here, not in
+ * the backfill. The market code is the key's middle segment, uppercased.
+ */
+export const BUYBACK_GOLD_MARKETS: ReadonlyArray<{ market: string; key: string }> = [
+  { market: "ANTAM", key: ANTAM_BUYBACK_KEY },
+  { market: "GALERI24", key: GALERI24_BUYBACK_KEY },
+  { market: "UBS", key: UBS_BUYBACK_KEY },
+];
+
+/** Whether `market` is a gold market valued at a scraped buyback rate. */
+export function isBuybackGoldMarket(market: string): boolean {
+  return BUYBACK_GOLD_MARKETS.some((m) => m.market === market);
 }
 
 /** Scrape the Bibit fund catalogue and cache each fund's NAV. Returns how many were cached. */

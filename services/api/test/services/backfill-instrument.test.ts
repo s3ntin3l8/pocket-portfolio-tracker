@@ -27,6 +27,7 @@ import {
 } from "@portfolio/market-data";
 import { ensureDb, closeDb } from "../../src/db/client.js";
 import { fetchInstrumentPrices } from "../../src/services/backfill.js";
+import { upsertScrapedQuote, UBS_BUYBACK_KEY } from "../../src/services/scrapers/store.js";
 
 /** Reports zero candles for `getHistoryFrom` always; `getHistory("max")` would return
  * real candles if called — tests assert it is NOT called under `tailOnly`. Mirrors
@@ -335,6 +336,68 @@ describe("fetchInstrumentPrices (#761, #773)", () => {
 
     const rows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
     expect(rows).toHaveLength(3);
+  });
+
+  it("proxies a UBS gold instrument's history from XAU spot scaled by today's UBS buyback", async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "instr-ubs-user", email: "instr-ubs@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Instr UBS", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "UBS",
+        market: "UBS",
+        assetClass: "gold",
+        currency: "IDR",
+        name: "UBS Gold",
+      })
+      .returning();
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    await db.insert(transactions).values([
+      {
+        portfolioId: pf.id,
+        instrumentId: instr.id,
+        type: "buy",
+        quantity: "5",
+        price: "2000000",
+        fees: "0",
+        currency: "IDR",
+        executedAt: new Date(`${yesterday}T10:00:00.000Z`),
+      },
+    ]);
+    await upsertScrapedQuote(db, UBS_BUYBACK_KEY, 2348000, "galeri24-ubs");
+
+    // Spot 90 yesterday, 100 today → k = 2348000 / 100 = 23480 → yesterday's proxy 2113200.
+    const svc = new MarketDataService([
+      new FixedCandleProvider(
+        "XAUIDR",
+        [
+          { date: yesterday, close: "90" },
+          { date: TODAY, close: "100" },
+        ],
+        "IDR",
+      ),
+    ]);
+
+    const result = await fetchInstrumentPrices(db, svc, {
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      chunkStart: yesterday,
+      chunkEnd: TODAY,
+    });
+
+    expect(result.unpriced).toBe(false);
+    expect(result.days).toBe(2);
+    const rows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+    const byDate = new Map(rows.map((r) => [r.date, Number(r.close)]));
+    expect(byDate.get(yesterday)).toBe(2113200);
+    expect(byDate.get(TODAY)).toBe(2348000);
   });
 
   it("returns unpriced for an unknown instrument without touching the DB further", async () => {
