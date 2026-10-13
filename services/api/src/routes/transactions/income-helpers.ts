@@ -145,12 +145,31 @@ export async function buildIncomeStats(
   const heldQtyMap = new Map(
     summary.holdings.filter((h) => Number(h.quantity) > 0).map((h) => [h.instrumentId, h.quantity]),
   );
+  // Held quantity at a date, computed PER PORTFOLIO and summed — never one computeHoldings
+  // over every portfolio's pooled rows: the cost-basis walk throws when one instrument is
+  // booked in different currencies in different depots (valid per depot), which used to
+  // 500 the aggregate income route (audit B13).
+  const txnsByPortfolio = new Map<string, CoreTransaction[]>();
+  for (const t of coreTxns) {
+    const pfKey = (t.id && portfolioIdOf?.(t.id)) ?? "";
+    const list = txnsByPortfolio.get(pfKey) ?? [];
+    list.push(t);
+    txnsByPortfolio.set(pfKey, list);
+  }
   const holdingsCache = new Map<number, Map<string, string>>();
   const qtyAt = (instrumentId: string, at: Date): string => {
     const key = at.getTime();
     if (!holdingsCache.has(key)) {
-      const hs = computeHoldings(coreTxns, corpActions, at);
-      holdingsCache.set(key, new Map(hs.map((h) => [h.instrumentId, h.quantity])));
+      const pooled = new Map<string, Decimal>();
+      for (const txns of txnsByPortfolio.values()) {
+        for (const h of computeHoldings(txns, corpActions, at)) {
+          pooled.set(
+            h.instrumentId,
+            (pooled.get(h.instrumentId) ?? new Decimal(0)).add(h.quantity),
+          );
+        }
+      }
+      holdingsCache.set(key, new Map([...pooled].map(([id, q]) => [id, q.toString()])));
     }
     return holdingsCache.get(key)!.get(instrumentId) ?? "0";
   };

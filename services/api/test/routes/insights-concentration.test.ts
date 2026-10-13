@@ -290,4 +290,89 @@ describe("computeConcentrationSection with manualPrice", () => {
     expect(result.bestWorstMonthly.worst!.pct).toBeCloseTo(-0.015, 3);
     expect(result.bestWorstMonthly.worst!.symbol).toBe("SR021T3-MOVER");
   });
+
+  // Audit B13: the same instrument held in two portfolios with transactions in two
+  // different currencies is valid per depot, but pooling every portfolio's rows into one
+  // computeHoldings call threw ("multiple currencies") and took /insights down with a 500.
+  it("tolerates one instrument booked in different currencies across portfolios", async () => {
+    const db = app.db;
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "conc-multiccy-user", email: "conc-multiccy@example.com" })
+      .returning();
+    const [pfA] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Ccy A", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [pfB] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Ccy B", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [x, y] = await db
+      .insert(instruments)
+      .values([
+        {
+          market: "IDX",
+          assetClass: "equity",
+          unit: "shares",
+          currency: "IDR",
+          symbol: "MULTICCY-X",
+          name: "Multi-currency X",
+        },
+        {
+          market: "IDX",
+          assetClass: "etf",
+          unit: "shares",
+          currency: "IDR",
+          symbol: "MULTICCY-Y",
+          name: "Multi-currency Y",
+        },
+      ])
+      .returning();
+    const at = new Date("2026-09-01T10:00:00.000Z");
+    await db.insert(transactions).values([
+      {
+        portfolioId: pfA.id,
+        instrumentId: x.id,
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        currency: "IDR",
+        executedAt: at,
+      },
+      // Same instrument, different booking currency, different depot.
+      {
+        portfolioId: pfB.id,
+        instrumentId: x.id,
+        type: "buy",
+        quantity: "30",
+        price: "0.01",
+        currency: "USD",
+        executedAt: at,
+      },
+      {
+        portfolioId: pfA.id,
+        instrumentId: y.id,
+        type: "buy",
+        quantity: "60",
+        price: "100",
+        currency: "IDR",
+        executedAt: at,
+      },
+    ]);
+    const dates = ["2026-09-01", "2026-09-02", "2026-09-03"];
+    await db.insert(prices).values(
+      dates.flatMap((date) => [
+        { instrumentId: x.id, date, close: "100", currency: "IDR" },
+        { instrumentId: y.id, date, close: "100", currency: "IDR" },
+      ]),
+    );
+
+    const result = await computeConcentrationSection(app, [pfA.id, pfB.id], dates, "IDR");
+    const sept = result.concentrationTrend.find((r) => r.date === "2026-09");
+    expect(sept).toBeDefined();
+    // X pooled across both depots: 40 × 100 = 4,000; Y: 60 × 100 = 6,000 → top1 = 60%.
+    expect(sept!.top1Pct).toBe(60);
+    expect(sept!.classCount).toBe(2);
+  });
 });
