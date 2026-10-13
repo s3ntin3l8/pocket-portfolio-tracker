@@ -72,23 +72,26 @@ describe("createHoldingsCursor parity with computeHoldings", () => {
     it(`holdingWithout(tx) matches a full replay without that row (seed ${seed})`, () => {
       const { txns, cas } = generate(seed);
       const cursor = createHoldingsCursor(txns, cas);
-      const asOf = new Date(T0 + 33 * DAY);
       const candidates = txns.filter(
         (t) => (t.type === "transfer_in" || t.type === "buy") && !t.status,
       );
-      for (const tx of candidates.slice(0, 24)) {
-        const got = cursor.holdingWithout(tx, asOf);
-        if (tx.instrumentId === "C" || tx.instrumentId === "D") {
-          // Merger-linked: synthetic legs depend on held quantity → caller must replay.
-          expect(got).toBeUndefined();
-          continue;
+      // Several dates, so rows and corporate actions that are not yet due are exercised too.
+      for (const day of [5, 15, 25, 33]) {
+        const asOf = new Date(T0 + day * DAY);
+        for (const tx of candidates.slice(0, 24)) {
+          const got = cursor.holdingWithout(tx, asOf);
+          if (tx.instrumentId === "C" || tx.instrumentId === "D") {
+            // Merger-linked: synthetic legs depend on held quantity → caller must replay.
+            expect(got).toBeUndefined();
+            continue;
+          }
+          const full = computeHoldings(
+            txns.filter((t) => t !== tx),
+            cas,
+            asOf,
+          ).find((h) => h.instrumentId === tx.instrumentId);
+          expect(got ?? undefined).toEqual(full);
         }
-        const full = computeHoldings(
-          txns.filter((t) => t !== tx),
-          cas,
-          asOf,
-        ).find((h) => h.instrumentId === tx.instrumentId);
-        expect(got ?? undefined).toEqual(full);
       }
     });
   }
