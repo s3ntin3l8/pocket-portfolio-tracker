@@ -343,12 +343,13 @@ export function aggregateByDate(
   fxFor: (date: string) => FxRateFn,
   displayCurrency: string,
 ): NetWorthPoint[] {
-  const byDate = new Map<string, number>();
+  // Decimal sum (audit B12): the result is serialised as a money string.
+  const byDate = new Map<string, Decimal>();
   for (const r of rows) {
-    const converted = Number(convert(r.netWorth, r.currency, displayCurrency, fxFor(r.date)));
-    byDate.set(r.date, (byDate.get(r.date) ?? 0) + converted);
+    const converted = convert(r.netWorth, r.currency, displayCurrency, fxFor(r.date));
+    byDate.set(r.date, (byDate.get(r.date) ?? new Decimal(0)).add(converted));
   }
   return [...byDate.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-    .map(([date, netWorth]) => ({ date, netWorth: String(netWorth) }));
+    .map(([date, netWorth]) => ({ date, netWorth: netWorth.toFixed() }));
 }

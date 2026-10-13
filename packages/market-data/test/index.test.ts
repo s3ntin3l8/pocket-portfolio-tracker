@@ -3304,3 +3304,15 @@ describe("YahooFinanceProvider getFundamentals", () => {
     expect(f?.epsHistory).toEqual({ quarters: [], currentQuarterEstimate: 1.55 });
   });
 });
+
+describe("FixtureProvider quote timestamp", () => {
+  it("stamps quotes with the serve time unless a fixed asOf is given (audit B13)", async () => {
+    const before = Date.now();
+    const q = await new FixtureProvider({ BBCA: "9500" }).getQuote(bbca);
+    expect(Date.parse(q!.asOf)).toBeGreaterThanOrEqual(before);
+    const fixed = await new FixtureProvider({ BBCA: "9500" }, "2026-02-08T00:00:00.000Z").getQuote(
+      bbca,
+    );
+    expect(fixed!.asOf).toBe("2026-02-08T00:00:00.000Z");
+  });
+});

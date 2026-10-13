@@ -10,7 +10,10 @@ import {
 } from "@portfolio/db";
 import { eq } from "drizzle-orm";
 import { buildApp } from "../../src/app.js";
-import { loadBoundaryFlowsForUser } from "../../src/routes/transactions/insights/yearly-returns.js";
+import {
+  loadBoundaryFlowsForUser,
+  yearEndNavs,
+} from "../../src/routes/transactions/insights/yearly-returns.js";
 import { closeDb } from "../../src/db/client.js";
 
 const ISSUER = "https://auth.test/application/o/portfolio/";
@@ -928,5 +931,36 @@ describe("GET /insights", () => {
       // 10 × 150 − 1 fee − 131.88 tax = 1367.12 (pre-fix: 1499, the gross proceeds).
       expect(sell!.amount).toBe("1367.12");
     });
+  });
+});
+
+describe("yearEndNavs (audit B12)", () => {
+  const pf = (id: string, flows: [string, string][]) => ({
+    id,
+    flows: flows.map(([date, marketValue]) => ({ date, marketValue, currency: "EUR" })),
+  });
+
+  it("sums each portfolio's last snapshot of the year (parity with the float path)", () => {
+    const navs = yearEndNavs(
+      [
+        pf("a", [
+          ["2025-06-30", "100"],
+          ["2025-12-31", "150"],
+          ["2026-03-31", "160"],
+        ]),
+        pf("b", [["2025-11-30", "50"]]),
+      ],
+      [2025, 2026],
+    );
+    expect(navs.get(2025)).toBe(String(150 + 50));
+    expect(navs.get(2026)).toBe("160");
+  });
+
+  it("does not drift: 0.1 + 0.2 = 0.3", () => {
+    const navs = yearEndNavs(
+      [pf("a", [["2025-12-31", "0.1"]]), pf("b", [["2025-12-31", "0.2"]])],
+      [2025],
+    );
+    expect(navs.get(2025)).toBe("0.3"); // float: "0.30000000000000004"
   });
 });

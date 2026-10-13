@@ -1,3 +1,4 @@
+import { Decimal } from "decimal.js";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   chainIndex,
@@ -79,28 +80,10 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     flowsByYear.set(year, arr);
   }
 
-  // Compute per-year end NAV (in display currency) by summing the last snapshot of
-  // each year across all portfolios. `pf.flows[].marketValue` actually carries each
-  // portfolio's NAV (net worth — see ComputeYearlyReturnsArgs.perPortfolio); the field
-  // name is inherited from the shared per-portfolio flow shape. `computeYearlyReturns`
-  // also reads this same map at `year - 1` as each year's OPENING NAV.
-  const endNavByYear = new Map<number, string>();
-  for (const year of new Set(pfIndex.map((p) => Number(p.date.slice(0, 4))))) {
-    const lastByPortfolio = new Map<string, { date: string; marketValue: string }>();
-    for (const pf of perPortfolio) {
-      let last: { date: string; marketValue: string } | null = null;
-      for (const f of pf.flows) {
-        if (Number(f.date.slice(0, 4)) !== year) continue;
-        if (!last || f.date > last.date) last = { date: f.date, marketValue: f.marketValue };
-      }
-      if (last) lastByPortfolio.set(pf.id, last);
-    }
-    let total = "0";
-    for (const v of lastByPortfolio.values()) {
-      total = (Number(total) + Number(v.marketValue)).toString();
-    }
-    endNavByYear.set(year, total);
-  }
+  const endNavByYear = yearEndNavs(
+    perPortfolio,
+    new Set(pfIndex.map((p) => Number(p.date.slice(0, 4)))),
+  );
 
   // Benchmarks: read user's selected symbols, backfill missing dates, compute
   // the per-symbol chained index.
@@ -226,4 +209,32 @@ export async function loadBoundaryFlowsForUser(
     .flat()
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .map((p) => ({ amount: String(p.amount), date: p.date }));
+}
+
+/**
+ * Per-year end NAV (in display currency): the sum, across portfolios, of each
+ * portfolio's last snapshot in that year. `pf.flows[].marketValue` actually carries each
+ * portfolio's NAV (net worth — see ComputeYearlyReturnsArgs.perPortfolio); the field
+ * name is inherited from the shared per-portfolio flow shape. `computeYearlyReturns`
+ * also reads this same map at `year - 1` as each year's OPENING NAV. Summed with
+ * Decimal (audit B12) — the old string→Number→string round trip drifted.
+ */
+export function yearEndNavs(
+  perPortfolio: ComputeYearlyReturnsArgs["perPortfolio"],
+  years: Iterable<number>,
+): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const year of years) {
+    let total = new Decimal(0);
+    for (const pf of perPortfolio) {
+      let last: { date: string; marketValue: string } | null = null;
+      for (const f of pf.flows) {
+        if (Number(f.date.slice(0, 4)) !== year) continue;
+        if (!last || f.date > last.date) last = f;
+      }
+      if (last) total = total.add(last.marketValue);
+    }
+    out.set(year, total.toFixed());
+  }
+  return out;
 }
