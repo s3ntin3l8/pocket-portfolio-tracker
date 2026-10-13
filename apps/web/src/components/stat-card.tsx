@@ -18,7 +18,8 @@ export function StatCard({
   /** A short muted line under the value/delta — e.g. "Top: Gold · moderate". No trend
    *  semantics (unlike `delta`); used for tiles that describe rather than compare. */
   caption?: string;
-  /** What the figure counts — rendered as a `BasisLabel` under the value. */
+  /** What the figure counts — rendered as a `BasisLabel` under the value. Use `basis` or
+   *  `caption`, not both (they use different top gaps). */
   basis?: string;
   /** Escape hatch for grid placement (e.g. `col-span-2` on an odd trailing tile) — kept
    *  separate from the card's own visual styling. */

@@ -89,7 +89,7 @@ export interface PortfolioSummary {
   totalRealizedPnL: string;
   /** Outstanding loan liabilities in the display currency (subtracted from net worth). */
   totalLiabilities: string;
-  /** Cash income received — dividends, bond coupons and cash interest, net of fees — in the display currency. */
+  /** Cash income received — dividends, bond coupons and cash interest, net of fees (via `cashFlow()`; don't subtract fees again) — in the display currency. */
   totalIncome: string;
   /** Sum of per-holding day change, in the display currency. */
   totalDayChange: string;

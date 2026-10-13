@@ -112,6 +112,9 @@ export function useTransactionBanners(
             label: tBanner("income"),
             value: summary.totalIncome ? money(incomeTotal) : "—",
             sub: periodLabel,
+            // Only this server-summary tile names its basis. The no-summary fallback
+            // (`computeAllBanner`) is a page-scoped "Income · YTD" over loaded rows with a
+            // different definition, so it deliberately has none — don't "fix" the asymmetry.
             basis: tBanner("incomeBasis"),
             tone: "neutral" as const,
           },

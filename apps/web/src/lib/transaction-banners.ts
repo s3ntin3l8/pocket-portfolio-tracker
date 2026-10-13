@@ -63,7 +63,8 @@ export interface AllBannerData {
     value: string;
     sub: string;
     tone: "up" | "down" | "neutral";
-    /** What the figure counts (see `BasisLabel`); only set where the definition is non-obvious. */
+    /** What the figure counts (see `BasisLabel`). Set only by the server-summary path in
+     *  `useTransactionBanners`; `computeAllBanner`'s page-scoped YTD fallback never sets it. */
     basis?: string;
   }>;
   mix: FlowMixRow[];
