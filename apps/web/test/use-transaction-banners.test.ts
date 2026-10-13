@@ -57,6 +57,16 @@ describe("useTransactionBanners", () => {
       expect(b.tiles[0].value).toContain("50.000");
     });
 
+    it("labels the summary Income tile with its definition (audit G2)", () => {
+      const summary = { totalInvested: "50000", totalProceeds: "30000", totalIncome: "5000" };
+      const { result } = renderHook(() =>
+        useTransactionBanners("all", summary, rows, "EUR", "de", tBanner, undefined),
+      );
+      const [invested, , income] = result.current.allBanner!.tiles;
+      expect(income.basis).toBe("banner:incomeBasis");
+      expect(invested.basis).toBeUndefined();
+    });
+
     it("shows em dash for tile values when a summary field is null", () => {
       const summary = { totalInvested: null, totalProceeds: "0", totalIncome: null } as unknown as {
         totalInvested: string;

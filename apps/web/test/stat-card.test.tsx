@@ -13,6 +13,11 @@ describe("StatCard", () => {
     expect(screen.getByText("Top: Gold")).toBeInTheDocument();
   });
 
+  it("renders a basis label under the value", () => {
+    render(<StatCard label="Lifetime" value="€570" basis="Dividends and coupons, before fees" />);
+    expect(screen.getByText("Dividends and coupons, before fees")).toBeInTheDocument();
+  });
+
   // Regression test for #483: an escape-hatch className lets a page span an odd trailing
   // tile across both mobile grid columns instead of leaving it alone in a half-width cell.
   it("forwards a className to the root card for grid-placement overrides", () => {

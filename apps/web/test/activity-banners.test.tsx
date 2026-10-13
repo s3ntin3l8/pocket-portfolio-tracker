@@ -25,6 +25,27 @@ describe("FlowBreakdownRow", () => {
   });
 });
 
+describe("AllFilterBanner basis label", () => {
+  it("renders a tile's basis under its value, and nothing for tiles without one", () => {
+    const data: AllBannerData = {
+      currency: "EUR",
+      tiles: [
+        { label: "Invested", value: "€1", sub: "All time", tone: "neutral" },
+        {
+          label: "Income",
+          value: "€2",
+          sub: "All time",
+          tone: "neutral",
+          basis: "All income types, net of fees and tax rows",
+        },
+      ],
+      mix: [],
+    };
+    render(<AllFilterBanner data={data} cashFlowMixLabel="Mix" />);
+    expect(screen.getAllByText("All income types, net of fees and tax rows")).toHaveLength(1);
+  });
+});
+
 describe("AllFilterBanner", () => {
   const data: AllBannerData = {
     currency: "IDR",

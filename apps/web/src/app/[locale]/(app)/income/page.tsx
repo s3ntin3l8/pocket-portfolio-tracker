@@ -244,7 +244,11 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
             />
             <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
             <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
-            <StatCard label={t("lifetime")} value={m(Number(s.lifetimeTotal))} />
+            <StatCard
+              label={t("lifetime")}
+              value={m(Number(s.lifetimeTotal))}
+              basis={t("lifetimeBasis")}
+            />
             <StatCard
               label={t("payments")}
               value={String(s.paymentCount)}
