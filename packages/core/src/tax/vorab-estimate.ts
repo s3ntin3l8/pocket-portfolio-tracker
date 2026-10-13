@@ -27,8 +27,9 @@ const DISPOSE = new Set(["sell", "transfer_out"]);
 const dateKey = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Calendar year a broker-booked Vorabpauschale row is "for": the amount is deemed received
- *  on the first working day of Y+1, so a row dated in December of Y or anywhere in Y+1 is
- *  for year Y. This matches how the trade log buckets it (by the row's own year), so a
+ *  on the first working day of Y+1, so a row dated in December of Y or in January–November of
+ *  Y+1 is for year Y (December always belongs to its own year, every other month to the
+ *  previous one). This matches how the trade log buckets it (by the row's own year), so a
  *  late-booked broker row can never be accrued on top of an estimate for the same year. */
 function brokerRowYear(at: Date): number {
   return at.getUTCMonth() === 11 ? at.getUTCFullYear() : at.getUTCFullYear() - 1;

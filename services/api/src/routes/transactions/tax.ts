@@ -378,7 +378,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
           } = await loadValuation(app, p.id, display, costBasisMode, p.cashCounted);
           const estimatedVorab =
             regime === "DE"
-              ? await loadEstimatedVorabRows(app.db, coreTxns, pCas, metaById, new Date(), app.log)
+              ? await loadEstimatedVorabRows(app.db, coreTxns, pCas, metaById, now, app.log)
               : [];
           const log = await buildTradeLog(
             app,

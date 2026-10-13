@@ -85,6 +85,8 @@ export function vorabpauschalePerUnit(input: {
   const basisertrag = start.times(zins).times("0.7");
   const mehrbetrag = D(input.priceEndOfYear).minus(start).plus(dist);
   const capped = Decimal.min(basisertrag, Decimal.max(ZERO, mehrbetrag));
+  // `mehrbetrag` (hence `capped`) already includes `dist`; subtracting it back out reverses
+  // that, because distributions are taxed separately as income, not as Vorabpauschale.
   return Decimal.max(ZERO, capped.minus(dist));
 }
 

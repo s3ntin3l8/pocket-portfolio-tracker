@@ -193,7 +193,7 @@ verified against the statute text):
 - **Deemed received** (Abs. 3) on the first working day of the next year
   (`vorabZuflussDate`: weekends skipped, e.g. 4 Jan 2027 for 2026), so the accrual lands in
   year Y+1's allowance figures — the same year a broker row would be dated.
-- **A broker row always wins:** if a `vorabpauschale` row is dated December Y or anywhere in Y+1
+- **A broker row always wins:** if a `vorabpauschale` row is dated December Y or in January–November of Y+1
   for the instrument, no estimate is made for Y. The next broker import therefore replaces the
   estimate without any cleanup.
 - **No row rather than a wrong one:** a missing boundary price, a price quoted in another
