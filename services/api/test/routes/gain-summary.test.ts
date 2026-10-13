@@ -4,6 +4,7 @@ import { transactions, users } from "@portfolio/db";
 import { eq } from "drizzle-orm";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
+import { netWorthResponseSchema, portfolioSummaryResponseSchema } from "@portfolio/schema";
 
 // Audit G2: /networth and /portfolios/:id/summary expose one GainSummary whose
 // netContributed is on the same boundary as the value.
@@ -88,6 +89,8 @@ describe("GainSummary on the summary + networth responses (audit G2)", () => {
       headers: auth(t),
     });
     expect(summary.statusCode).toBe(200);
+    // Contract lock: the response matches the shared schema the api-client validates with.
+    portfolioSummaryResponseSchema.parse(summary.json());
     const g = summary.json().gain;
     expect(g).toMatchObject({
       displayCurrency: "EUR",
@@ -102,6 +105,7 @@ describe("GainSummary on the summary + networth responses (audit G2)", () => {
 
     const nw = await app.inject({ method: "GET", url: "/networth", headers: auth(t) });
     expect(nw.statusCode).toBe(200);
+    netWorthResponseSchema.parse(nw.json());
     // Same figures at aggregate scope, and the value is the response's own net worth.
     expect(nw.json().gain).toMatchObject({ boundary: "inside", netContributed: "800" });
     expect(nw.json().gain.value).toBe(nw.json().netWorth);
