@@ -4,10 +4,10 @@ import {
   chainIndex,
   aggregateValueFlows,
   splitAdjustmentFactor,
+  computeHoldings,
   type DailyValueFlow,
   type PriceSeriesKind,
 } from "../src/index.js";
-import { computeHoldings } from "../src/index.js";
 import type { CoreTransaction, CorporateAction } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
