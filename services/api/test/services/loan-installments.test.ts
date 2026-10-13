@@ -175,6 +175,53 @@ describe("bookDueInstallments", () => {
     expect(await db.select().from(transactions).where(eq(transactions.loanId, loanId))).toEqual([]);
   });
 
+  it("does not re-book an installment the user settled on a different day", async () => {
+    const [l] = await db
+      .insert(loans)
+      .values({
+        portfolioId,
+        instrumentId,
+        contractNo: "LATE",
+        provider: "GALERI24",
+        purchasePrice: "3000",
+        principal: "3000",
+        tenorMonths: 3,
+        startDate: "2026-01-01",
+        schedule: [1, 2, 3].map((n) => ({
+          n,
+          dueDate: `2026-0${n}-10`,
+          pokok: "1000",
+          sewaModal: "0",
+          angsuran: "1000",
+          sisaPokok: String(3000 - n * 1000),
+        })),
+        currency: "IDR",
+      })
+      .returning();
+    // Installment 1 (due Jan 10) was paid by hand three days late and recorded on Jan 13.
+    await db.insert(transactions).values({
+      portfolioId,
+      instrumentId: null,
+      type: "loan_repayment",
+      quantity: "0",
+      price: "1000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: new Date("2026-01-13T00:00:00.000Z"),
+      source: "manual",
+      loanId: l.id,
+      externalId: "manual-late-1",
+    });
+
+    const res = await bookDueInstallments(db, new Date("2026-03-20T00:00:00.000Z"), {
+      loanId: l.id,
+    });
+    expect(res.booked).toBe(2); // installments 2 and 3 — not a second copy of 1
+    const rows = await db.select().from(transactions).where(eq(transactions.loanId, l.id));
+    expect(rows.filter((t) => t.type === "loan_repayment")).toHaveLength(3);
+    expect(rows.map((t) => t.externalId)).not.toContain(`loan:${l.id}:inst:1`);
+  });
+
   it("skips loans without a schedule and honours the loanId filter", async () => {
     const mk = async (contractNo: string, schedule: unknown) => {
       const [l] = await db

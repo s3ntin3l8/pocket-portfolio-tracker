@@ -1,7 +1,6 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { loans, transactions } from "@portfolio/db";
-import { toDateKey } from "@portfolio/core";
 import type { DB } from "../db/client.js";
 import { enqueueRecompute } from "./scheduler/enqueue.js";
 
@@ -34,13 +33,21 @@ function asScheduleRows(schedule: unknown): ScheduleRow[] {
  * Without this job the outstanding loan — and so net worth — stays frozen at the import
  * date. Run daily (and safe to run any time): each due installment is written once.
  *
- * Idempotent two ways: installments the import already booked are matched by due **date**
- * (their externalIds are leg-indexed, not installment-numbered), and auto-booked rows carry a
+ * Idempotent two ways. A loan's already-booked repayments — however they got there: the
+ * import's leg-indexed rows, earlier runs of this job, or a repayment the user recorded by
+ * hand on whatever day they actually paid — are counted, and that many of the earliest due
+ * installments are treated as covered. (Matching by due *date* would re-book an installment
+ * the user settled a few days late and over-repay the loan.) Auto-booked rows also carry a
  * stable `loan:<loanId>:inst:<n>` externalId under the `(portfolioId, source, externalId)`
- * unique index. The rows inherit the loan's `importId`, so undoing the import removes them.
+ * unique index, so a concurrent run can't double-write. The rows inherit the loan's
+ * `importId`, so undoing the import removes them.
  *
- * Known limitation: a booked installment the user deletes is re-booked on the next run —
- * there is no "skip" or early-payoff state yet.
+ * This is a deliberate exception to "imports never auto-commit": it writes transactions
+ * without a review step, but only to materialise the repayment schedule the user already
+ * confirmed when they imported the contract.
+ *
+ * Known limitation: there is no "skip" or early-payoff state yet, and an installment the user
+ * deletes can be re-booked on a later run (tracked in #912).
  */
 export async function bookDueInstallments(
   db: DB,
@@ -61,27 +68,27 @@ export async function bookDueInstallments(
   const earliestByPortfolio = new Map<string, string>();
 
   for (const loan of loanRows) {
-    const due = asScheduleRows(loan.schedule).filter(
-      (r) => new Date(`${r.dueDate}T00:00:00.000Z`).getTime() <= now.getTime(),
-    );
+    const due = asScheduleRows(loan.schedule)
+      .filter((r) => new Date(`${r.dueDate}T00:00:00.000Z`).getTime() <= now.getTime())
+      .sort((a, b) => a.n - b.n);
     if (due.length === 0) continue;
 
+    // Only the financing legs matter (repayments to count, the drawdown for its source), so
+    // the lookup stays one row per booked installment however long the loan has run.
     const existing = await db
-      .select({
-        type: transactions.type,
-        executedAt: transactions.executedAt,
-        source: transactions.source,
-      })
+      .select({ type: transactions.type, source: transactions.source })
       .from(transactions)
-      .where(eq(transactions.loanId, loan.id));
-    const bookedDays = new Set(
-      existing.filter((t) => t.type === "loan_repayment").map((t) => toDateKey(t.executedAt)),
-    );
+      .where(
+        and(
+          eq(transactions.loanId, loan.id),
+          inArray(transactions.type, ["loan_repayment", "loan_drawdown"]),
+        ),
+      );
+    const covered = existing.filter((t) => t.type === "loan_repayment").length;
     // Inherit the contract's own source (screenshot/pdf/…) so the rows group with its legs.
     const source = existing.find((t) => t.type === "loan_drawdown")?.source ?? "manual";
 
-    for (const row of due) {
-      if (bookedDays.has(row.dueDate)) continue;
+    for (const row of due.slice(covered)) {
       const [written] = await db
         .insert(transactions)
         .values({
