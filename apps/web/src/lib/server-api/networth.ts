@@ -64,8 +64,13 @@ async function currentHolderScope(portfolios: Awaited<ReturnType<typeof listPort
   return { selected, holderId };
 }
 
-/** Whether intraday (1D/7D) history exists yet. `"unavailable"` when the check itself failed
- *  (no session, API error): callers must not treat that as "no data" and hide anything. */
+/**
+ * Whether intraday (1D/7D) history exists yet.
+ *
+ * @returns `true` (>= 2 captures), `false` (definitely none yet), or `"unavailable"` when the
+ *   check itself failed (no session, API error). Callers must hide things only on a strict
+ *   `=== false`; `"unavailable"` is truthy, so never use a bare truthiness test.
+ */
 export async function loadHasIntraday(): Promise<boolean | "unavailable"> {
   const api = await getServerApi();
   if (!api) return "unavailable";

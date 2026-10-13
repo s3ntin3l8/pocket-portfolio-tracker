@@ -3483,6 +3483,9 @@ describe("auth + portfolios + transactions", () => {
       return res.json();
     };
     expect(await status(t)).toEqual({ hasIntraday: false });
+    // Direct DB writes (the intraday job) don't flush the derivation cache; the answer is
+    // cached until a write request or the 60 s TTL, so flush by hand to simulate expiry.
+    const { clearDerivationCache } = await import("../../src/lib/derivation-cache.js");
 
     const p = (
       await app.inject({
@@ -3500,6 +3503,7 @@ describe("auth + portfolios + transactions", () => {
       marketValue: "1",
       currency: "IDR",
     });
+    clearDerivationCache();
     expect(await status(t)).toEqual({ hasIntraday: false });
 
     await app.db.insert(portfolioIntradaySnapshots).values({
@@ -3509,6 +3513,8 @@ describe("auth + portfolios + transactions", () => {
       marketValue: "2",
       currency: "IDR",
     });
+    expect(await status(t)).toEqual({ hasIntraday: false }); // still cached
+    clearDerivationCache();
     expect(await status(t)).toEqual({ hasIntraday: true });
     // Another user's snapshots never count.
     expect(await status(await token("intraday-status-other"))).toEqual({ hasIntraday: false });

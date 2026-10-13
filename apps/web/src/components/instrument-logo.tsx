@@ -25,7 +25,7 @@ export const MARKET_LOGO_SUFFIX: Record<string, string> = {
  * logo.dev URLs that already failed to load this session (module-level, so it survives
  * remounts and is shared by every row/page in the SPA). A known-missing logo renders the
  * monogram immediately instead of re-requesting the 404 on every row, filter change and
- * route transition. Resets on a full page reload — deliberately not persisted, so a logo
+ * route transition. Resets on a full page reload — deliberately not persisted, so a logo that
  * logo.dev adds later is picked up on the next session.
  */
 const failedLogoUrls = new Set<string>();
