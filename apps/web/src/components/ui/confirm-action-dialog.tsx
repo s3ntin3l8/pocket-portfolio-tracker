@@ -20,6 +20,8 @@ interface ConfirmActionDialogProps {
   confirmLabel?: string;
   variant?: "destructive" | "default";
   busy?: boolean;
+  /** Disable the confirm button independent of `busy` (e.g. a type-to-confirm gate). */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   children?: ReactNode;
 }
@@ -32,6 +34,7 @@ export function ConfirmActionDialog({
   confirmLabel,
   variant = "destructive",
   busy,
+  confirmDisabled,
   onConfirm,
   children,
 }: ConfirmActionDialogProps) {
@@ -50,7 +53,7 @@ export function ConfirmActionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("cancel")}
           </Button>
-          <Button variant={variant} onClick={onConfirm} disabled={busy}>
+          <Button variant={variant} onClick={onConfirm} disabled={busy || confirmDisabled}>
             {busy && <Spinner className="mr-2" />}
             {confirmLabel ?? t("confirm")}
           </Button>

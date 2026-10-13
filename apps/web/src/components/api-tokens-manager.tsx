@@ -202,7 +202,7 @@ export function ApiTokensManager({
       </button>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-[420px] rounded-[22px]">
+        <DialogContent size="sm">
           {newSecret ? (
             <>
               <DialogHeader>

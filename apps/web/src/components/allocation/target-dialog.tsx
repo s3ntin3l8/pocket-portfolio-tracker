@@ -155,7 +155,7 @@ export function TargetDialog({ portfolioId, dimension, dimensionLabel, slices, t
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-sm">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{t("title", { dimension: dimensionLabel })}</DialogTitle>
           <DialogDescription>{t("description")}</DialogDescription>
