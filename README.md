@@ -149,7 +149,8 @@ All config is read from `app.config` (typed in `services/api/src/plugins/env.ts`
 - **Market data** — provider keys (`TWELVEDATA_API_KEY`, `GOLDAPI_KEY`, `EODHD_API_KEY`,
   …) and source URLs; see [docs/data_providers.md](docs/data_providers.md).
 - **Broker sync** — `DB_ENCRYPTION_KEY` (required — encrypts Trade Republic
-  phone/PIN/session at rest) and `PYTR_PYTHON_BIN` for Trade Republic (see
+  phone/PIN/session at rest; must decode to exactly 32 bytes, e.g. `openssl rand -base64 32`,
+  or the API refuses to start) and `PYTR_PYTHON_BIN` for Trade Republic (see
   [docs/trade_republic.md](docs/trade_republic.md)); Interactive Brokers needs no server
   config, just a Flex token pasted per-portfolio (see
   [docs/interactive_brokers.md](docs/interactive_brokers.md)).
@@ -165,6 +166,17 @@ from `/settings`. An admin can create further users, reset a locked-out user's p
 and promote/demote admin via `POST`/`PATCH /admin/users/*` (API-only for now — no UI yet
 for those three; there's also no self-service password reset, since this project has no
 mailer). `docker-compose.prod.yml` forwards `AUTH_LOCAL_SECRET` to both `api` and `web`.
+
+`AUTH_LOCAL_SECRET` must be at least 32 characters (`openssl rand -base64 48`); the API
+refuses to start with a shorter value. It can also be supplied as a file via
+`AUTH_LOCAL_SECRET_FILE` (Docker/Kubernetes secrets; the file wins over the inline value) —
+the web container only checks that the variable is non-empty, so keep setting it there too.
+Locally issued tokens carry an `iss`/`aud` and are verified against them, so tokens issued
+by an older version stop working after the upgrade and users sign in again. Changing a
+password (`POST /auth/local/change-password`, or an admin reset) revokes that user's
+personal access tokens unless `keepTokens: true` is passed, and an admin reset of an
+OIDC-only user (no local password, signs in via Authentik) is refused unless the request
+sets `allowLocalFallback: true`.
 
 **Moving from local accounts to Authentik.** If both are configured, a first OIDC login
 whose e-mail matches an existing local account re-binds that account to the OIDC identity

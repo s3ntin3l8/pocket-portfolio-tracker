@@ -2,8 +2,10 @@ import fp from "fastify-plugin";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { eq, sql } from "drizzle-orm";
 import { SignJWT } from "jose";
-import { users } from "@portfolio/db";
+import { apiTokens, users } from "@portfolio/db";
 import {
+  LOCAL_JWT_AUDIENCE,
+  LOCAL_JWT_ISSUER,
   hashPassword,
   verifyPassword,
   timingSafeVerifyPassword,
@@ -30,6 +32,8 @@ const loginSchema = z.object({
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(MIN_PASSWORD_LENGTH),
+  // Personal access tokens are revoked on a password change unless explicitly kept.
+  keepTokens: z.boolean().optional(),
 });
 
 const setPasswordSchema = z.object({
@@ -106,6 +110,8 @@ export const authRoute = fp(async (app) => {
   async function signLocalJwt(sub: string, email: string): Promise<string> {
     return new SignJWT({ sub, email })
       .setProtectedHeader({ alg: "HS256" })
+      .setIssuer(LOCAL_JWT_ISSUER)
+      .setAudience(LOCAL_JWT_AUDIENCE)
       .setIssuedAt()
       .setExpirationTime(LOCAL_JWT_EXPIRY)
       .sign(signingKey);
@@ -186,7 +192,7 @@ export const authRoute = fp(async (app) => {
         return reply.code(400).send({ error: "validation_error", issues: parsed.error.issues });
       }
 
-      const { currentPassword, newPassword } = parsed.data;
+      const { currentPassword, newPassword, keepTokens } = parsed.data;
       const { id, authMethod } = requireUser(request);
       // Only from an interactive session — a leaked PAT must not be able to change the
       // password it was minted under (mirrors /me/tokens' "no credential self-
@@ -212,7 +218,18 @@ export const authRoute = fp(async (app) => {
         .set({ passwordHash: hashPassword(newPassword), passwordChangedAt: new Date() })
         .where(eq(users.id, id));
 
-      return { ok: true };
+      // A password change is the "my credentials may be compromised" signal: PATs minted
+      // earlier would otherwise outlive it. Opt out with keepTokens for rotation-only changes.
+      let revokedTokens = 0;
+      if (!keepTokens) {
+        const revoked = await app.db
+          .delete(apiTokens)
+          .where(eq(apiTokens.userId, id))
+          .returning({ id: apiTokens.id });
+        revokedTokens = revoked.length;
+      }
+
+      return { ok: true, revokedTokens };
     },
   );
 

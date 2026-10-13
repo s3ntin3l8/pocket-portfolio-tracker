@@ -34,7 +34,22 @@ const searchQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 const lookupQuerySchema = z.object({ q: z.string().trim().min(1) });
-const historyQuerySchema = z.object({ range: z.string().default("1y") });
+// Chart-API range tokens understood by the provider chain (Yahoo vocabulary; CoinGecko maps
+// the same tokens). An enum keeps free text out of third-party query strings.
+export const HISTORY_RANGES = [
+  "1d",
+  "5d",
+  "1mo",
+  "3mo",
+  "6mo",
+  "1y",
+  "2y",
+  "5y",
+  "10y",
+  "ytd",
+  "max",
+] as const;
+const historyQuerySchema = z.object({ range: z.enum(HISTORY_RANGES).default("1y") });
 const patchInstrumentSchema = z.object({
   isin: z.string().nullable().optional(),
   wkn: z.string().nullable().optional(),
@@ -244,7 +259,8 @@ export async function instrumentsRoute(app: FastifyInstance) {
   // (e.g. getMarketData() itself throwing).
   app.get<{ Params: { id: string } }>(
     "/instruments/:id/fundamentals",
-    { preHandler: app.authenticate },
+    // Refreshes and persists the row on a stale cache, so a read-scoped PAT is refused.
+    { preHandler: app.authenticate, config: { scope: "write" } },
     async (request, reply) => {
       request.timingName = "GET /instruments/:id/fundamentals";
       const [inst] = await app.db
@@ -371,15 +387,20 @@ export async function instrumentsRoute(app: FastifyInstance) {
 
   // On-demand enrichment via Börse Frankfurt. Returns ISIN + WKN + ticker together for a
   // given query. Only available when BORSE_FRANKFURT_ENABLED=true. Not on the typeahead.
-  app.get("/instruments/enrich", { preHandler: app.authenticate }, async (request, reply) => {
-    const { q } = enrichQuerySchema.parse(request.query);
-    const bf = getBorseFrankfurt();
-    if (!bf) return reply.code(503).send({ error: "enrichment_unavailable" });
-    try {
-      return await bf.search(q);
-    } catch (err) {
-      request.log.warn({ err }, "BF enrichment failed");
-      return [];
-    }
-  });
+  app.get(
+    "/instruments/enrich",
+    // Spends third-party quota on every call, so a read-scoped PAT is refused.
+    { preHandler: app.authenticate, config: { scope: "write" } },
+    async (request, reply) => {
+      const { q } = enrichQuerySchema.parse(request.query);
+      const bf = getBorseFrankfurt();
+      if (!bf) return reply.code(503).send({ error: "enrichment_unavailable" });
+      try {
+        return await bf.search(q);
+      } catch (err) {
+        request.log.warn({ err }, "BF enrichment failed");
+        return [];
+      }
+    },
+  );
 }

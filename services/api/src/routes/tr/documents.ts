@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { and, count, eq, isNotNull, sql } from "drizzle-orm";
 import { documents, portfolios, screenshotImports, transactions } from "@portfolio/db";
-import { PytrAuthError, PytrError } from "../../services/pytr/runner.js";
+import { PytrAuthError } from "../../services/pytr/runner.js";
+import { oneLine, sanitizeConnectionError } from "../../lib/sanitize-error.js";
 import { enrichTransactionsFromStoredDocuments } from "../../services/enrichment.js";
 import {
   storeReceipt,
@@ -44,6 +45,7 @@ export function registerDocumentRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const id = request.userId;
+      const isAdmin = request.user?.isAdmin === true;
       const conn = await getConnection(app, id);
       if (!conn || conn.status !== "connected") {
         return reply.code(409).send({ error: "not_connected" });
@@ -73,9 +75,11 @@ export function registerDocumentRoutes(app: FastifyInstance) {
       } catch (err) {
         const e = err as Record<string, unknown>;
         const meta = e["$metadata"] as Record<string, unknown> | undefined;
+        request.log.error({ err }, "tr diagnose-documents: storage check failed");
         storageResult.error = {
           name: typeof e["name"] === "string" ? e["name"] : "Error",
-          message: err instanceof Error ? err.message : String(err),
+          // Raw storage/SDK text can carry endpoints, bucket and key names: admins only.
+          message: isAdmin ? (err instanceof Error ? err.message : String(err)) : "storage error",
           ...(meta?.["httpStatusCode"] !== undefined
             ? { httpStatusCode: meta["httpStatusCode"] as number }
             : {}),
@@ -131,17 +135,22 @@ export function registerDocumentRoutes(app: FastifyInstance) {
             pythonResult = {
               status: "ok",
               downloaded: downloaded.docs.size,
-              failures: downloaded.failures,
+              failures: isAdmin
+                ? downloaded.failures
+                : downloaded.failures.map((f) => ({ docId: f.docId, error: oneLine(f.error) })),
               candidate: { txId: candidate.id, eventId: pair.eventId, docId },
             };
           } catch (err) {
-            if (err instanceof PytrAuthError) {
-              pythonResult = { status: "session_expired", error: err.message };
-            } else if (err instanceof PytrError || err instanceof Error) {
-              pythonResult = { status: "process_failed", error: err.message };
-            } else {
-              pythonResult = { status: "process_failed", error: String(err) };
-            }
+            request.log.error({ err }, "tr diagnose-documents: document download failed");
+            const error = isAdmin
+              ? err instanceof Error
+                ? err.message
+                : String(err)
+              : sanitizeConnectionError(err);
+            pythonResult = {
+              status: err instanceof PytrAuthError ? "session_expired" : "process_failed",
+              error,
+            };
           }
         }
       }

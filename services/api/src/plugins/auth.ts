@@ -19,6 +19,10 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/** `iss` / `aud` stamped on local-login JWTs and required when verifying them. */
+export const LOCAL_JWT_ISSUER = "pocket-portfolio-tracker:local";
+export const LOCAL_JWT_AUDIENCE = "pocket-portfolio-tracker:api";
+
 // Methods a read-scoped PAT may not use. GET/HEAD/OPTIONS are always allowed.
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -113,6 +117,15 @@ export interface AuthedUser {
   scope: "read" | "write";
 }
 
+/**
+ * True when the request authenticated with a read-scoped PAT. Side-effecting GETs
+ * (enqueueing jobs, persisting provider results) must degrade to read-through-only
+ * for these callers instead of spending quota or writing rows.
+ */
+export function isReadOnlyPat(request: FastifyRequest): boolean {
+  return request.user?.authMethod === "pat" && request.user.scope === "read";
+}
+
 /** Returns the authenticated user or throws — use inside `authenticate`d handlers. */
 export function requireUser(request: FastifyRequest): AuthedUser {
   if (!request.user) throw new Error("unauthenticated");
@@ -192,7 +205,10 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         .set({ lastUsedAt: new Date() })
         .where(eq(apiTokens.id, row.id));
       const scope = row.scope === "write" ? "write" : "read";
-      if (scope === "read" && MUTATING_METHODS.has(request.method)) {
+      // Method-based gate, plus a route-level opt-in (`config: { scope: "write" }`)
+      // for GETs that mutate state or spend provider quota.
+      const routeNeedsWrite = request.routeOptions?.config?.scope === "write";
+      if (scope === "read" && (MUTATING_METHODS.has(request.method) || routeNeedsWrite)) {
         return reply.code(403).send({ error: "read_only_token" });
       }
       request.user = {
@@ -244,7 +260,11 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     // Try local auth (symmetric HS256 JWT signed by /auth/local/login)
     if (!authMethod && localJwtKey) {
       try {
-        const { payload } = await jwtVerify(token, localJwtKey);
+        const { payload } = await jwtVerify(token, localJwtKey, {
+          algorithms: ["HS256"],
+          issuer: LOCAL_JWT_ISSUER,
+          audience: LOCAL_JWT_AUDIENCE,
+        });
         if (payload.sub) {
           sub = payload.sub;
           email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
@@ -383,6 +403,10 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
 });
 
 declare module "fastify" {
+  interface FastifyContextConfig {
+    /** `"write"`: even a GET on this route needs a write-scoped credential (PATs). */
+    scope?: "write";
+  }
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
     requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;

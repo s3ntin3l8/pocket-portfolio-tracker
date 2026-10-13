@@ -17,6 +17,7 @@ import { getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { loadSparklines } from "../../services/sparklines.js";
 import { enqueueInstrumentMetadata } from "../../services/scheduler.js";
 import { needsSectorEnrichment, needsNameEnrichment } from "../../services/instrument-metadata.js";
+import { isReadOnlyPat } from "../../plugins/auth.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import {
   instrumentMeta,
@@ -113,7 +114,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       // Self-heal: enqueue a sector sweep if any held instrument hasn't been
       // enriched yet (or has a stale attempt). Debounced to once per 6h.
       if (needsSectorEnrichment([...meta.values()]) || needsNameEnrichment([...meta.values()])) {
-        void enqueueInstrumentMetadata();
+        if (!isReadOnlyPat(request)) void enqueueInstrumentMetadata();
       }
 
       const asOf = new Date();

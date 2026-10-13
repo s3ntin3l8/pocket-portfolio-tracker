@@ -14,6 +14,7 @@ import {
   extractReportDocuments,
 } from "../mapper.js";
 import { PytrAuthError } from "../runner.js";
+import { sanitizeConnectionError } from "../../../lib/sanitize-error.js";
 import type { PytrRunner } from "../runner.js";
 import {
   asReconciliation,
@@ -89,8 +90,10 @@ export async function syncTrConnection(
     result = await runner.export({ phone, pin, sessionData });
   } catch (err) {
     const status = err instanceof PytrAuthError ? "expired" : "error";
-    const lastError = err instanceof Error ? err.message : "sync failed";
-    log?.warn({ connectionId, status, lastError }, "tr connection flipped");
+    // Persist/echo only a sanitized one-liner; the raw text (may include pytr stderr)
+    // stays in the server log at error level.
+    const lastError = sanitizeConnectionError(err);
+    log?.error({ connectionId, status, err }, "tr connection flipped");
     await db
       .update(trConnections)
       .set({

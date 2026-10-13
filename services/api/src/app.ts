@@ -104,6 +104,33 @@ export async function resolveLogDestination(
   return pino.multistream([{ stream: process.stdout }, { stream: rollStream }]);
 }
 
+/**
+ * Request serializer for the access log. Mirrors Fastify's default shape but drops the
+ * query string for `/storage/*`: those URLs are signed (`?exp=&sig=`) and the signature is a
+ * bearer credential that must not be written to logs.
+ */
+export function serializeRequest(req: {
+  method?: string;
+  url?: string;
+  originalUrl?: string;
+  host?: string;
+  hostname?: string;
+  ip?: string;
+  socket?: { remotePort?: number };
+  remoteAddress?: string;
+  remotePort?: number;
+}) {
+  const rawUrl = req.originalUrl ?? req.url ?? "";
+  const url = /^\/storage(\/|\?|$)/.test(rawUrl) ? rawUrl.split("?")[0] : rawUrl;
+  return {
+    method: req.method,
+    url,
+    host: req.host ?? req.hostname,
+    remoteAddress: req.ip ?? req.remoteAddress,
+    remotePort: req.socket?.remotePort ?? req.remotePort,
+  };
+}
+
 export async function buildApp(opts: BuildAppOptions = {}) {
   // Build the pino logger eagerly so we can (a) set redact paths at construction time
   // (they can't be patched in after the fact) and (b) accept a custom stream for test
@@ -129,12 +156,27 @@ export async function buildApp(opts: BuildAppOptions = {}) {
           // Encryption key — should never appear in logs, but guard the config object.
           "DB_ENCRYPTION_KEY",
           "config.DB_ENCRYPTION_KEY",
+          // Generic credential-bearing field names (one level deep, like phone/pin above).
+          "token",
+          "password",
+          "apiKey",
+          "*.token",
+          "*.password",
+          "*.apiKey",
+          // Local-auth and storage secrets, bare or nested under a config-like object.
+          "AUTH_LOCAL_SECRET",
+          "STORAGE_SECRET_KEY",
+          "STORAGE_ACCESS_KEY",
+          "*.AUTH_LOCAL_SECRET",
+          "*.STORAGE_SECRET_KEY",
+          "*.STORAGE_ACCESS_KEY",
           // Raw image/document bytes — log only `bytes` (length), never the base64 payload.
           "image",
           "data",
         ],
         censor: "[Redacted]",
       },
+      serializers: { req: serializeRequest },
     },
     await resolveLogDestination(opts.logStream),
   );

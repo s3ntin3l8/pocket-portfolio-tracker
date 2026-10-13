@@ -28,6 +28,12 @@ const schema = {
       type: "string",
       default: "",
     },
+    // Migration aid only: accept stored values lacking the `enc:` prefix (rows written
+    // before encryption was enabled). Leave false once existing rows are re-encrypted.
+    DB_ENCRYPTION_ALLOW_PLAINTEXT: {
+      type: "boolean",
+      default: false,
+    },
     AUTHENTIK_ISSUER: {
       type: "string",
       default: "",
@@ -191,7 +197,7 @@ const schema = {
  * up but authenticates with the wrong key (or no key at all).
  */
 export function resolveFileSecrets(
-  prefixes: readonly string[] = ["DB_ENCRYPTION_KEY", "STORAGE_SECRET_KEY"],
+  prefixes: readonly string[] = ["DB_ENCRYPTION_KEY", "STORAGE_SECRET_KEY", "AUTH_LOCAL_SECRET"],
 ) {
   for (const prefix of prefixes) {
     const filePath = process.env[`${prefix}_FILE`];
@@ -217,6 +223,9 @@ export function resolveFileSecrets(
   }
 }
 
+/** Minimum length of AUTH_LOCAL_SECRET (the HS256 signing key for local-login JWTs). */
+export const MIN_AUTH_LOCAL_SECRET_LENGTH = 32;
+
 export const envPlugin = fp(async (app) => {
   resolveFileSecrets();
   await app.register(env, {
@@ -224,6 +233,13 @@ export const envPlugin = fp(async (app) => {
     // Don't read the developer's .env during tests — keep them hermetic.
     dotenv: process.env.NODE_ENV !== "test",
   });
+  const localSecret = app.config.AUTH_LOCAL_SECRET;
+  if (localSecret && localSecret.length < MIN_AUTH_LOCAL_SECRET_LENGTH) {
+    throw new Error(
+      `AUTH_LOCAL_SECRET must be at least ${MIN_AUTH_LOCAL_SECRET_LENGTH} characters ` +
+        `(got ${localSecret.length}). Generate one with: openssl rand -base64 48`,
+    );
+  }
 });
 
 declare module "fastify" {
@@ -234,6 +250,7 @@ declare module "fastify" {
       LOG_LEVEL: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
       DATABASE_URL: string;
       DB_ENCRYPTION_KEY: string;
+      DB_ENCRYPTION_ALLOW_PLAINTEXT: boolean;
       AUTHENTIK_ISSUER: string;
       AUTHENTIK_AUDIENCE: string;
       AUTHENTIK_JWKS_URL: string;

@@ -695,6 +695,20 @@ describe("TR document diagnose + backfill", () => {
     fake.downloadResult = null;
   });
 
+  it("does not echo raw pytr stderr to a non-admin in the diagnose report", async () => {
+    const { t, portfolioId } = await connect("doc-pyfail-raw");
+    await seedPytrTx(portfolioId, "evt-r", "doc-r");
+    fake.downloadResult = new PytrError("Traceback (most recent call last): RAWSTDERRDETAIL");
+    const res = await app.inject({
+      method: "POST",
+      url: "/tr/connection/diagnose-documents",
+      headers: auth(t),
+    });
+    expect(res.json().python.status).toBe("process_failed");
+    expect(JSON.stringify(res.json())).not.toContain("RAWSTDERRDETAIL");
+    fake.downloadResult = null;
+  });
+
   it("backfills documents: downloads, stores, links, and is idempotent", async () => {
     const { t, portfolioId } = await connect("doc-backfill");
     const txId = await seedPytrTx(portfolioId, "evt-b", "doc-b");

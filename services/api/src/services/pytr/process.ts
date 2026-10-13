@@ -2,6 +2,7 @@ import type { spawn as nodeSpawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { rm } from "node:fs/promises";
 import type { FastifyBaseLogger } from "fastify";
+import { buildSubprocessEnv } from "../../lib/subprocess-env.js";
 import { PytrError, PytrUnavailableError } from "./errors.js";
 
 // Low-level subprocess plumbing shared by every pytr entrypoint (login / export / documents):
@@ -36,7 +37,7 @@ export function runProcess(
     let child: ChildProcess;
     try {
       child = cfg.spawn(cfg.pythonBin, [first, ...args], {
-        env: { ...process.env, ...extraEnv },
+        env: buildSubprocessEnv(extraEnv),
         // Use "pipe" for stdin so we can write to it; keep stdout/stderr piped.
         stdio: [stdinData !== null ? "pipe" : "ignore", "pipe", "pipe"],
       });

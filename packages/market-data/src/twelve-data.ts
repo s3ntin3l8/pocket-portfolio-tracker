@@ -171,7 +171,7 @@ export class TwelveDataProvider implements MarketDataProvider {
 
   async getHistory(ref: InstrumentRef, range = "30"): Promise<Candle[]> {
     const res = await this.doFetch(
-      `${this.baseUrl}/time_series?${this.query(ref)}&interval=1day&outputsize=${range}&apikey=${this.apiKey}`,
+      `${this.baseUrl}/time_series?${this.query(ref)}&interval=1day&outputsize=${encodeURIComponent(range)}&apikey=${this.apiKey}`,
     );
     if (res.status === 404) return [];
     if (!res.ok) {

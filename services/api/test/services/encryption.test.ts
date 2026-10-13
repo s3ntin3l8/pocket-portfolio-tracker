@@ -27,8 +27,29 @@ describe("EncryptionService", () => {
       expect(() => svc.decryptString("enc:AAAA:BBBB:CCCC")).toThrow(DecryptionError);
     });
 
-    it("returns legacy plaintext unchanged if it lacks the prefix", () => {
-      expect(svc.decryptString("legacy-plaintext")).toBe("legacy-plaintext");
+    it("rejects a value lacking the enc: prefix by default (no silent plaintext)", () => {
+      expect(() => svc.decryptString("legacy-plaintext")).toThrow(DecryptionError);
+    });
+
+    it("returns unprefixed values unchanged only with allowPlaintext (migration path)", () => {
+      const lenient = new EncryptionService({ key, allowPlaintext: true });
+      expect(lenient.decryptString("legacy-plaintext")).toBe("legacy-plaintext");
+      expect(lenient.decryptString(lenient.encryptString("x"))).toBe("x");
+    });
+  });
+
+  describe("key validation", () => {
+    it.each([
+      ["too short", crypto.randomBytes(16).toString("base64url")],
+      ["too long", crypto.randomBytes(48).toString("base64url")],
+      ["not base64", "!!!"],
+    ])("fails fast on a key that is %s", (_n, bad) => {
+      expect(() => new EncryptionService({ key: bad })).toThrow(/exactly 32 bytes/);
+    });
+
+    it("accepts standard-base64 output of openssl rand -base64 32", () => {
+      const std = crypto.randomBytes(32).toString("base64");
+      expect(new EncryptionService({ key: std }).isEnabled).toBe(true);
     });
   });
 
