@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { FxMissingBanner, collectFxMissing } from "../src/components/fx-missing-banner";
+import { FxMissingBanner } from "../src/components/fx-missing-banner";
+import { collectFxMissing } from "../src/lib/fx-missing";
 import messages from "../messages/en.json";
 
 function renderBanner(currencies: string[] | null | undefined) {
