@@ -44,6 +44,23 @@ export function PortfolioSyncWatcher({
   const trTicks = useRef(0);
   const ibkrTicks = useRef(0);
 
+  // A later `router.refresh()` can flip `initialSyncing` false -> true without remounting
+  // us (an in-place sync start); the useState initializers above only see mount-time
+  // props. Adjust state during render on the flip (React's "derive from props" pattern)
+  // instead of ignoring it.
+  const trSyncing = Boolean(trSync?.initialSyncing);
+  const ibkrSyncing = Boolean(ibkrSync?.initialSyncing);
+  const [seenTrSyncing, setSeenTrSyncing] = useState(trSyncing);
+  const [seenIbkrSyncing, setSeenIbkrSyncing] = useState(ibkrSyncing);
+  if (seenTrSyncing !== trSyncing) {
+    setSeenTrSyncing(trSyncing);
+    if (trSyncing) setTrPolling(true);
+  }
+  if (seenIbkrSyncing !== ibkrSyncing) {
+    setSeenIbkrSyncing(ibkrSyncing);
+    if (ibkrSyncing) setIbkrPolling(true);
+  }
+
   useInterval(
     async () => {
       trTicks.current += 1;

@@ -91,3 +91,19 @@ describe("PortfolioSyncWatcher", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+describe("PortfolioSyncWatcher prop flips", () => {
+  it("starts polling when initialSyncing flips false -> true without a remount", async () => {
+    getTrConnection.mockClear();
+    const ui = (p: React.ComponentProps<typeof PortfolioSyncWatcher>) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <PortfolioSyncWatcher {...p} />
+      </NextIntlClientProvider>
+    );
+    const { rerender } = render(ui({ trSync: { initialSyncing: false } }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(getTrConnection).not.toHaveBeenCalled();
+    rerender(ui({ trSync: { initialSyncing: true } }));
+    await waitFor(() => expect(getTrConnection).toHaveBeenCalled(), { timeout: 8000 });
+  });
+});

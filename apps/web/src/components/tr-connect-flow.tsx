@@ -132,7 +132,8 @@ export function TrConnectFlow({
 
   // The status poll runs only while `awaiting` and the tab is visible (`useInterval`
   // pauses on `document.hidden`); the approval window is wall-clock, so a long
-  // backgrounding correctly times the pairing out when the tab returns.
+  // backgrounding correctly times the pairing out when the tab returns — on the first
+  // tick after the tab is shown again (up to STATUS_POLL_INTERVAL_MS later, by design).
   useInterval(
     async ({ isCancelled }) => {
       try {

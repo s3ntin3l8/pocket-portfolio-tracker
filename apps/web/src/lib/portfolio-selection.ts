@@ -39,7 +39,7 @@ export function readSelectedScope(cookieString: string): string | null {
 
 /**
  * Which portfolio a "new entry" form should preselect: the globally selected portfolio
- * (cookie scope), the holder's first portfolio under a holder scope, otherwise the first
+ * (cookie scope), the holder's first LISTED portfolio (API list order) under a holder scope, otherwise the first
  * portfolio. Falls back to the first when the cookie names a portfolio that no longer
  * exists. Returns "" only when there are no portfolios at all.
  */
