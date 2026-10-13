@@ -160,12 +160,22 @@ describe("getCachedQuotes", () => {
       ).toEqual({ price: "123", currency: "IDR" });
     });
 
+    it("keeps a quote aged exactly the window and drops one a millisecond older", () => {
+      // Strict `>` — same inclusive edge as valuation's historical carry-forward (`<=`).
+      const windowMs = MAX_PRICE_CARRY_FORWARD_DAYS * 86_400_000;
+      expect(isStaleQuote(new Date(now.getTime() - windowMs).toISOString(), now)).toBe(false);
+      expect(isStaleQuote(new Date(now.getTime() - windowMs - 1).toISOString(), now)).toBe(true);
+    });
+
     it("isStaleQuote treats missing/unparseable asOf as fresh", () => {
       expect(isStaleQuote(undefined, now)).toBe(false);
       expect(isStaleQuote("not-a-date", now)).toBe(false);
       expect(isStaleQuote("2020-01-01T00:00:00.000Z", now)).toBe(true);
     });
 
+    // Wall-clock dependent: valuation.ts calls getCachedQuotes without its `now`, so the
+    // staleness check runs against the real clock — the 2025-06-30 quote below is stale
+    // for any run date after mid-July 2025, regardless of the `now` passed here.
     it("a stale quote leaves the holding valued at cost", async () => {
       const db = getDb();
       const [u] = await db

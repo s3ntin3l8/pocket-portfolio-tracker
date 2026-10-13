@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { detectAnomalies } from "../src/anomalies.js";
 import { cashBalances, cashFlow } from "../src/cash.js";
 import { computeHoldings } from "../src/holdings.js";
+import { computeTrades } from "../src/trade-log.js";
+import { D } from "../src/decimal.js";
 import type { CoreTransaction, CorporateAction } from "../src/types.js";
 
 const tx = (
@@ -738,9 +740,20 @@ describe("over-sell: cash vs holdings (audit B13)", () => {
     // Cash: −1000 buy, + (15 × 120 − 2 − 10) = +1788 → 788.
     expect(cashFlow(txns[1]).toString()).toBe("1788");
     expect(cashBalances(txns).EUR).toBe("788");
-    // Holdings clamp: position closed, realized only on the 10 shares held.
+    // Holdings clamp: position closed, realized only on the 10 shares held
+    // (10 × 120 − 2 fee − 1000 cost = 198; tax is not part of pre-tax P&L).
     const [h] = computeHoldings(txns);
     expect(h.quantity).toBe("0");
+    expect(h.realizedPnL).toBe("198");
+    // Trade log clamps the same way: one closed episode of 10 shares, one leg whose
+    // proceeds are the clamped disposal (10 × 120 − 2) and the same realized P&L.
+    const log = computeTrades({ transactions: txns, displayCurrency: "EUR", prices: {} });
+    expect(log.trades).toHaveLength(1);
+    const [trade] = log.trades;
+    expect(trade).toMatchObject({ status: "closed", quantity: "10", realizedPnL: "198" });
+    expect(trade.legs).toHaveLength(1);
+    expect(trade.legs[0]).toMatchObject({ quantity: "10", proceeds: "1198", gain: "198" });
+    expect(log.totalRealized).toBe("198");
     const anomalies = detectAnomalies(txns);
     expect(anomalies).toHaveLength(1);
     expect(anomalies[0]).toMatchObject({
@@ -748,6 +761,14 @@ describe("over-sell: cash vs holdings (audit B13)", () => {
       transactionId: "over",
       meta: { available: "10", attempted: "15", excessQuantity: "5", excessProceeds: "600" },
     });
+    // The identity across all three views: cash credit = clamped disposal proceeds
+    // (trade-log leg, net of fees) + excessProceeds − tax withheld.
+    expect(cashFlow(txns[1]).toString()).toBe(
+      D(trade.legs[0].proceeds)
+        .add(String(anomalies[0].meta!.excessProceeds))
+        .sub(txns[1].tax!)
+        .toString(),
+    );
   });
 
   it("a sell with nothing held reports the whole sell as excess", () => {
