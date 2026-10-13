@@ -82,6 +82,7 @@ describe("tax disposal rows", () => {
       screen.getByText(symbol).closest("tr")!.querySelector("td:last-child span")!.className;
     expect(tones("GAIN")).toContain("text-success");
     expect(tones("LOSS")).toContain("text-destructive");
+    // Literal class-substring guard only: jsdom does not compile Tailwind, so this cannot see computed colour.
     expect(tones("LOSS")).not.toContain("emerald");
   });
 });
