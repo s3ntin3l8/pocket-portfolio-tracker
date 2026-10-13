@@ -168,6 +168,7 @@ export {
   effectiveCapitalGainsTaxRate,
   DEFAULT_CAPITAL_GAINS_TAX_RATE,
   DEFAULT_CHURCH_TAX_RATE,
+  defaultPartialExemptionRate,
   BASISZINS_BY_YEAR,
   basiszinsFor,
   estimateVorabpauschale,
