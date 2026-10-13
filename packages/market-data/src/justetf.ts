@@ -1,3 +1,4 @@
+import { PROVIDER_FETCH_TIMEOUT_MS } from "./http.js";
 import type {
   AssetClass,
   InstrumentProfile,
@@ -88,6 +89,7 @@ export class JustEtfProvider implements MarketDataProvider {
     await this.rateLimit();
     const profileUrl = `https://www.justetf.com/en/etf-profile.html?isin=${isin}`;
     const profileResp = await fetch(profileUrl, {
+      signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS),
       headers: {
         "User-Agent": userAgent,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -108,6 +110,7 @@ export class JustEtfProvider implements MarketDataProvider {
     const ajaxUrl = `https://www.justetf.com/en/etf-profile.html?0-1.0-holdingsSection-countries-loadMoreCountries&isin=${isin}&_wicket=1`;
 
     const response = await fetch(ajaxUrl, {
+      signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS),
       headers: {
         "User-Agent": userAgent,
         "X-Requested-With": "XMLHttpRequest",

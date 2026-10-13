@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { benchmarkPrices, userBenchmarkSymbols } from "@portfolio/db";
 import { chainIndex, type DailyValueFlow } from "@portfolio/core";
 import { MarketDataError, type MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
+import { chunk } from "../lib/chunk.js";
 
 export interface BenchmarkIndexPoint {
   date: string;
@@ -144,21 +145,112 @@ export async function fetchBenchmarkPrices(
     existing.set(r.date, true);
   }
 
-  for (const c of candles) {
-    if (existing.has(c.date)) continue;
+  // Chunked multi-row insert (audit D3): one statement per ~500 rows instead of one
+  // round-trip per candle.
+  const fresh = candles
+    .filter((c) => !existing.has(c.date))
+    .map((c) => ({
+      userId,
+      symbol,
+      date: c.date,
+      close: c.close,
+      currency: c.currency ?? DEFAULT_BENCHMARK_CURRENCY,
+      source: "yahoo",
+    }));
+  for (const part of chunk(fresh)) {
     await db
       .insert(benchmarkPrices)
-      .values({
-        userId,
-        symbol,
-        date: c.date,
-        close: c.close,
-        currency: c.currency ?? DEFAULT_BENCHMARK_CURRENCY,
-        source: "yahoo",
-      })
+      .values(part)
       .onConflictDoNothing({
         target: [benchmarkPrices.userId, benchmarkPrices.symbol, benchmarkPrices.date],
       });
+  }
+}
+
+/**
+ * How far back a cached benchmark close satisfies a wanted date (audit D3): weekends and
+ * market holidays have no row, so "no row for this exact calendar date" is not "missing".
+ */
+export const BENCHMARK_CARRY_FORWARD_DAYS = 5;
+
+/** (user|symbol|earliestWanted) lookups already attempted on a given UTC day. */
+const attemptedToday = new Map<string, string>();
+
+/** Test hook: forget remembered fetch attempts. */
+export function clearBenchmarkFetchCache(): void {
+  attemptedToday.clear();
+}
+
+function shiftDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Earliest wanted date that cached rows cannot satisfy, or null. A date is satisfied by a
+ * cached row on it or within {@link BENCHMARK_CARRY_FORWARD_DAYS} before it — except the
+ * most recent two days, which need an exact row so the series' last point is not frozen
+ * for up to five days (that one is bounded by the once-per-day attempt cache instead).
+ */
+export async function earliestUnsatisfiedBenchmarkDate(
+  db: DB,
+  userId: string,
+  symbol: string,
+  dates: string[],
+  now: Date = new Date(),
+): Promise<string | null> {
+  if (dates.length === 0) return null;
+  const sorted = [...new Set(dates)].sort();
+  const rows = await db
+    .select({ date: benchmarkPrices.date })
+    .from(benchmarkPrices)
+    .where(
+      and(
+        eq(benchmarkPrices.userId, userId),
+        eq(benchmarkPrices.symbol, symbol),
+        gte(benchmarkPrices.date, shiftDays(sorted[0]!, -BENCHMARK_CARRY_FORWARD_DAYS)),
+        lte(benchmarkPrices.date, sorted[sorted.length - 1]!),
+      ),
+    )
+    .orderBy(asc(benchmarkPrices.date));
+  const known = rows.map((r) => r.date);
+  const recentFrom = shiftDays(now.toISOString().slice(0, 10), -1);
+  let i = 0;
+  let last: string | undefined;
+  for (const d of sorted) {
+    while (i < known.length && known[i]! <= d) last = known[i++];
+    const exact = last === d;
+    const carried = last !== undefined && last >= shiftDays(d, -BENCHMARK_CARRY_FORWARD_DAYS);
+    if (d >= recentFrom ? !exact : !carried) return d;
+  }
+  return null;
+}
+
+/**
+ * Backfill benchmark closes for `dates` only when cached rows leave a gap that
+ * carry-forward cannot cover, and at most once per (user, symbol, earliest-gap) per UTC
+ * day — a provider that cannot fill the gap is not hammered on every request (audit D3).
+ * Best-effort: never throws.
+ */
+export async function ensureBenchmarkPrices(
+  db: DB,
+  getMarketData: () => Promise<MarketDataService>,
+  userId: string,
+  symbol: string,
+  dates: string[],
+  now: Date = new Date(),
+): Promise<void> {
+  try {
+    const earliest = await earliestUnsatisfiedBenchmarkDate(db, userId, symbol, dates, now);
+    if (earliest === null) return;
+    const key = `${userId}|${symbol}|${earliest}`;
+    const day = now.toISOString().slice(0, 10);
+    if (attemptedToday.get(key) === day) return;
+    attemptedToday.set(key, day);
+    await fetchBenchmarkPrices(db, await getMarketData(), userId, symbol, earliest);
+  } catch {
+    // non-fatal — the benchmark series is best-effort
   }
 }
 

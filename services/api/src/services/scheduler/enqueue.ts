@@ -92,19 +92,44 @@ export async function enqueueTrSync(connectionId: string): Promise<{ queued: boo
 }
 
 /**
- * Enqueue a history recompute for a portfolio. The singleton window collapses bursts
- * (imports and syncs) while pg-boss refreshes the pending job with the latest payload.
- * Callers must pass the earliest affected date so the coalesced request keeps the widest
- * recompute window.
+ * Per-portfolio singleton key shared by the recompute and backfill-portfolio enqueues
+ * (audit D8). pg-boss scopes uniqueness per queue, so this does not by itself serialize
+ * the two queues — `withPortfolioLock` (portfolio-lock.ts) does that in the workers — but
+ * one key namespace keeps `pgboss.job` rows greppable per portfolio.
+ */
+export const portfolioSingletonKey = (portfolioId: string): string => `portfolio:${portfolioId}`;
+
+/**
+ * Enqueue a history recompute for a portfolio.
+ *
+ * pg-boss `singletonSeconds` is a time-slot THROTTLE, not a debounce: the job is inserted
+ * with `singleton_on = floor(now / window)` and any further send with the same key in the
+ * same slot hits `ON CONFLICT DO NOTHING` and returns `null` — the dropped send's payload
+ * is NOT merged into the queued job. So a later `fromDate` earlier than the queued one
+ * would be lost (days never recomputed). When a send is dropped we therefore enqueue a
+ * follow-up job, delayed past the slot, carrying this call's own `fromDate`. Follow-ups
+ * for the same date dedupe among themselves.
  */
 export async function enqueueRecompute(portfolioId: string, fromDate: string): Promise<void> {
   if (!activeBoss) return;
   try {
-    await activeBoss.send(
+    const key = portfolioSingletonKey(portfolioId);
+    const id = await activeBoss.send(
       RECOMPUTE_QUEUE,
       { portfolioId, fromDate },
-      { singletonKey: portfolioId, singletonSeconds: RECOMPUTE_SINGLETON_SECONDS },
+      { singletonKey: key, singletonSeconds: RECOMPUTE_SINGLETON_SECONDS },
     );
+    if (id === null) {
+      await activeBoss.send(
+        RECOMPUTE_QUEUE,
+        { portfolioId, fromDate },
+        {
+          singletonKey: `${key}:follow:${fromDate}`,
+          singletonSeconds: RECOMPUTE_SINGLETON_SECONDS,
+          startAfter: RECOMPUTE_SINGLETON_SECONDS,
+        },
+      );
+    }
   } catch {
     // non-fatal
   }
@@ -135,7 +160,10 @@ export async function enqueueBackfillPortfolio(
     await activeBoss.send(
       BACKFILL_PORTFOLIO_QUEUE,
       { portfolioId, fromDate, tailOnly },
-      { singletonKey: portfolioId, singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS },
+      {
+        singletonKey: portfolioSingletonKey(portfolioId),
+        singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS,
+      },
     );
     return true;
   } catch (err) {

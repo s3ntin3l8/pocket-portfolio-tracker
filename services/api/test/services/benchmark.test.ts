@@ -1,10 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   computeActiveReturn,
   getUserBenchmarkConfig,
   getUserBenchmarkSymbols,
   getBenchmarkPricesMulti,
   carryForwardBenchmark,
+  ensureBenchmarkPrices,
+  clearBenchmarkFetchCache,
 } from "../../src/services/benchmark.js";
 import { buildApp } from "../../src/app.js";
 import { users, userBenchmarkSymbols, benchmarkPrices } from "@portfolio/db";
@@ -477,5 +479,83 @@ describe("carryForwardBenchmark", () => {
 
     expect(result[0].benchmarkPct).toBeUndefined();
     expect(result[1].benchmarkPct).toBeUndefined();
+  });
+});
+
+describe("ensureBenchmarkPrices (audit D3)", () => {
+  const NOW = new Date("2026-06-20T12:00:00.000Z");
+
+  async function seed(app: Awaited<ReturnType<typeof buildApp>>, dates: string[]) {
+    const authSub = crypto.randomUUID();
+    const [u] = await app.db
+      .insert(users)
+      .values({ authSub, email: `${authSub}@example.com` })
+      .returning();
+    if (dates.length > 0) {
+      await app.db.insert(benchmarkPrices).values(
+        dates.map((date) => ({
+          userId: u.id,
+          symbol: "^GSPC",
+          date,
+          close: "100",
+          currency: "USD",
+          source: "yahoo",
+        })),
+      );
+    }
+    return u;
+  }
+
+  const md = (getHistoryFrom: ReturnType<typeof vi.fn>) =>
+    (async () => ({ getHistoryFrom })) as never;
+
+  it("a weekend-only gap triggers no provider call", async () => {
+    clearBenchmarkFetchCache();
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      // Fri 2026-06-05 priced; Sat/Sun have no rows.
+      const u = await seed(app, ["2026-06-05"]);
+      const getHistoryFrom = vi.fn(async (..._a: unknown[]) => [] as unknown[]);
+      await ensureBenchmarkPrices(
+        app.db,
+        md(getHistoryFrom),
+        u.id,
+        "^GSPC",
+        ["2026-06-05", "2026-06-06", "2026-06-07"],
+        NOW,
+      );
+      expect(getHistoryFrom).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("fetches from the earliest real gap, writes chunked rows, and only once per day", async () => {
+    clearBenchmarkFetchCache();
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      const u = await seed(app, []);
+      const candles = Array.from({ length: 3 }, (_, i) => ({
+        date: `2026-06-0${i + 1}`,
+        close: "10",
+        currency: "USD",
+      }));
+      const getHistoryFrom = vi.fn(async (..._a: unknown[]) => candles);
+      const dates = ["2026-06-01", "2026-06-02", "2026-06-03"];
+      await ensureBenchmarkPrices(app.db, md(getHistoryFrom), u.id, "^GSPC", dates, NOW);
+      expect(getHistoryFrom).toHaveBeenCalledTimes(1);
+      expect(getHistoryFrom.mock.calls[0]![1]).toBe("2026-06-01");
+      const rows = await app.db.select().from(benchmarkPrices);
+      expect(rows.filter((r) => r.userId === u.id)).toHaveLength(3);
+
+      // A provider that cannot fill the range is not asked again the same day.
+      const u2 = await seed(app, []);
+      const empty = vi.fn(async (..._a: unknown[]) => [] as unknown[]);
+      await ensureBenchmarkPrices(app.db, md(empty), u2.id, "^GSPC", dates, NOW);
+      await ensureBenchmarkPrices(app.db, md(empty), u2.id, "^GSPC", dates, NOW);
+      expect(empty).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
   });
 });

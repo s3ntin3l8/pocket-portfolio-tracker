@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import { toDateKey } from "@portfolio/core";
 import type {
   AssetClass,
@@ -53,7 +54,7 @@ export class EodhdProvider implements MarketDataProvider {
   constructor(opts: EodhdOptions) {
     this.apiKey = opts.apiKey;
     this.baseUrl = opts.baseUrl ?? "https://eodhd.com/api";
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(assetClass: AssetClass, market: string): boolean {

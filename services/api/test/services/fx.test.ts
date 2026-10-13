@@ -6,6 +6,7 @@ import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
   getFxRates,
   getFxRatesForDates,
+  clearFxNegativeCache,
   makeFxRateFn,
   HttpFxProvider,
   FrankfurterFxProvider,
@@ -213,6 +214,71 @@ describe("getFxRatesForDates", () => {
     expect(called).toBe(false);
     expect(out.get("2026-04-01")?.JPY).toBe("105");
     expect(out.get("2026-04-02")?.JPY).toBe("106");
+  });
+
+  it("a weekend-only gap triggers no provider call (audit D3)", async () => {
+    const db = getDb();
+    // Fri 2026-05-01 has a row; Sat/Sun have none (ECB publishes no weekend rows).
+    await db
+      .insert(fxRates)
+      .values({ base: "PLN", quote: "IDR", rate: "1500", date: "2026-05-01" });
+    let calls = 0;
+    const fxProvider: FxProvider = {
+      getRate: async () => null,
+      getRateHistory: async () => {
+        calls++;
+        return {};
+      },
+    };
+    const out = await getFxRatesForDates(
+      db,
+      ["PLN"],
+      "IDR",
+      ["2026-05-01", "2026-05-02", "2026-05-03"],
+      fxProvider,
+    );
+    expect(calls).toBe(0);
+    expect(out.get("2026-05-03")?.PLN).toBe("1500");
+  });
+
+  it("only fetches the unsatisfied tail, not the whole range (audit D3)", async () => {
+    const db = getDb();
+    await db
+      .insert(fxRates)
+      .values({ base: "DKK", quote: "IDR", rate: "2300", date: "2026-06-01" });
+    const ranges: string[] = [];
+    const fxProvider: FxProvider = {
+      getRate: async () => null,
+      getRateHistory: async (_f, _t, start, end) => {
+        ranges.push(`${start}..${end}`);
+        return { "2026-06-30": 2400 };
+      },
+    };
+    // 06-01 satisfied; 06-02..06-15 satisfied by carry-forward (<=14d); 06-30 is not.
+    await getFxRatesForDates(
+      db,
+      ["DKK"],
+      "IDR",
+      ["2026-06-01", "2026-06-10", "2026-06-30"],
+      fxProvider,
+    );
+    expect(ranges).toEqual(["2026-06-30..2026-06-30"]);
+  });
+
+  it("remembers a negative lookup for the day (audit D3)", async () => {
+    clearFxNegativeCache();
+    const db = getDb();
+    let calls = 0;
+    const fxProvider: FxProvider = {
+      getRate: async () => null,
+      getRateHistory: async () => {
+        calls++;
+        return {};
+      },
+    };
+    await getFxRatesForDates(db, ["XYZ"], "IDR", ["2026-07-01"], fxProvider);
+    await getFxRatesForDates(db, ["XYZ"], "IDR", ["2026-07-01"], fxProvider);
+    expect(calls).toBe(1);
   });
 
   it("returns empty per-date maps when every currency is the base", async () => {

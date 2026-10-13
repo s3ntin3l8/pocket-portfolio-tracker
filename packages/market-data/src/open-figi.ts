@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import type { AssetClass, InstrumentRef, MarketDataProvider, Quote } from "./types.js";
 import { isIsin, isWkn } from "./types.js";
 import { mapExchange } from "./instrument-mapping.js";
@@ -33,7 +34,7 @@ export class OpenFigiProvider implements MarketDataProvider {
   constructor(opts: OpenFigiOptions = {}) {
     this.baseUrl = opts.baseUrl ?? "https://api.openfigi.com";
     this.apiKey = opts.apiKey;
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(_assetClass: AssetClass, _market: string): boolean {

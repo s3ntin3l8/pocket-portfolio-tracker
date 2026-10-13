@@ -54,6 +54,8 @@ import { backfillJobs, ibkrConnections, trConnections } from "@portfolio/db";
 import { getDb } from "../db/client.js";
 import { getMarketData, flushUsage } from "./market-data.js";
 import { refreshHeldPrices } from "./refresh.js";
+import { withPortfolioLock } from "./scheduler/portfolio-lock.js";
+import { runRecomputeJobs } from "./scheduler/recompute.js";
 import { refreshDividends } from "./dividends.js";
 import { refreshInstrumentMetadata } from "./instrument-metadata.js";
 import { recordDailySnapshots, recordIntradaySnapshots } from "./snapshots.js";
@@ -400,42 +402,47 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
       // setInterval/boss.touch() needed here. See BACKFILL_PORTFOLIO_QUEUE_OPTIONS'
       // doc comment in scheduler/config.ts for what heartbeat does and doesn't cover.
       try {
-        // Planner path (#761/#773): compute per-instrument chunk boundaries and claim
-        // backfill_jobs coordination rows. planFanOut/runFanOut own the fan-out/poll/
-        // cleanup lifecycle end to end — see backfill/fan-out.ts for the testable core
-        // this used to be inlined here.
-        const plan = await planFanOut(getDb(), portfolioId, { fromDate, tailOnly });
+        await withPortfolioLock(portfolioId, async () => {
+          // Planner path (#761/#773): compute per-instrument chunk boundaries and claim
+          // backfill_jobs coordination rows. planFanOut/runFanOut own the fan-out/poll/
+          // cleanup lifecycle end to end — see backfill/fan-out.ts for the testable core
+          // this used to be inlined here.
+          const plan = await planFanOut(getDb(), portfolioId, { fromDate, tailOnly });
 
-        if (plan.pending > 0) {
+          if (plan.pending > 0) {
+            app.log.info(
+              { portfolioId, subJobs: plan.pending },
+              "backfill-portfolio: fanning out to per-instrument sub-jobs",
+            );
+
+            // job.signal is pg-boss's own AbortSignal for this job — it's aborted once
+            // pg-boss's resolveWithinSeconds race against expireInSeconds settles.
+            // Threading it into runFanOut lets pollFanOutCompletion notice a
+            // force-resolve immediately instead of continuing to poll as a zombie after
+            // pg-boss has already failed/retried this job (see fan-out.ts's doc
+            // comments for the pg-boss-source-verified mechanism).
+            const outcome = await runFanOut(getDb(), plan, {
+              enqueue: (sub) => enqueueBackfillInstrument({ ...sub, portfolioId }),
+              pollIntervalMs: BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
+              maxWaitMs: BACKFILL_FAN_OUT_MAX_WAIT_MS,
+              signal: job.signal,
+            });
+
+            app.log.info(
+              { portfolioId, ...outcome },
+              "backfill-portfolio: sub-jobs complete, computing snapshots",
+            );
+          }
+
+          // Compute snapshots from the prices written by sub-jobs (or from an earlier
+          // inline/tailOnly run with no instruments needing a fan-out).
+          const result = await computeBackfillSnapshots(getDb(), portfolioId, { fromDate });
+          await flushUsage();
           app.log.info(
-            { portfolioId, subJobs: plan.pending },
-            "backfill-portfolio: fanning out to per-instrument sub-jobs",
+            { portfolioId, fromDate, tailOnly, ...result },
+            "backfill-portfolio complete",
           );
-
-          // job.signal is pg-boss's own AbortSignal for this job — it's aborted once
-          // pg-boss's resolveWithinSeconds race against expireInSeconds settles.
-          // Threading it into runFanOut lets pollFanOutCompletion notice a
-          // force-resolve immediately instead of continuing to poll as a zombie after
-          // pg-boss has already failed/retried this job (see fan-out.ts's doc
-          // comments for the pg-boss-source-verified mechanism).
-          const outcome = await runFanOut(getDb(), plan, {
-            enqueue: (sub) => enqueueBackfillInstrument({ ...sub, portfolioId }),
-            pollIntervalMs: BACKFILL_FAN_OUT_POLL_INTERVAL_MS,
-            maxWaitMs: BACKFILL_FAN_OUT_MAX_WAIT_MS,
-            signal: job.signal,
-          });
-
-          app.log.info(
-            { portfolioId, ...outcome },
-            "backfill-portfolio: sub-jobs complete, computing snapshots",
-          );
-        }
-
-        // Compute snapshots from the prices written by sub-jobs (or from an earlier
-        // inline/tailOnly run with no instruments needing a fan-out).
-        const result = await computeBackfillSnapshots(getDb(), portfolioId, { fromDate });
-        await flushUsage();
-        app.log.info({ portfolioId, fromDate, tailOnly, ...result }, "backfill-portfolio complete");
+        });
       } catch (err) {
         app.log.error({ err, portfolioId, fromDate, tailOnly }, "backfill-portfolio failed");
         throw err; // let pg-boss record a genuine failure instead of a false "completed"
@@ -576,21 +583,24 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   await boss.createQueue(RECOMPUTE_QUEUE, RECOMPUTE_QUEUE_OPTIONS);
   await boss.updateQueue(RECOMPUTE_QUEUE, RECOMPUTE_QUEUE_OPTIONS);
   await boss.work(RECOMPUTE_QUEUE, async (jobs) => {
-    for (const job of jobs) {
-      try {
-        const { portfolioId, fromDate } = job.data as { portfolioId: string; fromDate: string };
-        const result = await backfillPortfolioHistory(
+    await runRecomputeJobs(jobs, {
+      recompute: async (portfolioId, fromDate) =>
+        backfillPortfolioHistory(
           getDb(),
           await getMarketData(),
           app.config.MARKET_DATA_TTL_MS,
           portfolioId,
           { fromDate },
-        );
-        app.log.info({ portfolioId, fromDate, ...result }, "history recompute complete");
-      } catch (err) {
-        app.log.error({ err }, "history recompute failed");
-      }
-    }
+        ),
+      onDone: (portfolioId, fromDate, result) =>
+        app.log.info(
+          { portfolioId, fromDate, ...(result as object) },
+          "history recompute complete",
+        ),
+      // Rethrown by runRecomputeJobs afterwards so pg-boss retries the job.
+      onError: (err, portfolioId, fromDate) =>
+        app.log.error({ err, portfolioId, fromDate }, "history recompute failed"),
+    });
   });
 
   app.log.info(

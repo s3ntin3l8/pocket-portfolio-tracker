@@ -1,3 +1,4 @@
+import { withTimeout } from "../http.js";
 import type {
   AssetClass,
   Candle,
@@ -77,7 +78,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
 
   constructor(opts: YahooProviderOptions = {}) {
     this.baseUrl = opts.baseUrl ?? "https://query1.finance.yahoo.com";
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
     this.defaultHeaders = {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

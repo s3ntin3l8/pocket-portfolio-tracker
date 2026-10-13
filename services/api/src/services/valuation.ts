@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { corporateActions, instruments, prices as pricesTable, transactions } from "@portfolio/db";
 import {
   summarizePortfolio,
@@ -187,21 +187,25 @@ export async function valuePortfolio(
     const today = toDateKey(now);
     const missingIds = instrumentIds.filter((id) => !prices[id]);
     if (missingIds.length > 0) {
+      // One newest row per instrument inside the carry-forward window (DISTINCT ON) —
+      // not every instrument's full price history (audit D6). Anything older than the
+      // window would be rejected by the age check below anyway.
+      const oldest = new Date(`${today}T00:00:00.000Z`);
+      oldest.setUTCDate(oldest.getUTCDate() - MAX_PRICE_CARRY_FORWARD_DAYS);
       const historical = await db
-        .select()
+        .selectDistinctOn([pricesTable.instrumentId])
         .from(pricesTable)
-        .where(and(inArray(pricesTable.instrumentId, missingIds), lte(pricesTable.date, today)))
+        .where(
+          and(
+            inArray(pricesTable.instrumentId, missingIds),
+            lte(pricesTable.date, today),
+            gte(pricesTable.date, toDateKey(oldest)),
+          ),
+        )
         .orderBy(pricesTable.instrumentId, desc(pricesTable.date));
-      const todayMs = new Date(`${today}T00:00:00.000Z`).getTime();
-      const seen = new Set<string>();
+      // DISTINCT ON already yields one newest row per instrument, inside the window.
       for (const row of historical) {
-        if (seen.has(row.instrumentId)) continue;
-        seen.add(row.instrumentId);
-        const rowMs = new Date(`${row.date}T00:00:00.000Z`).getTime();
-        const daysAgo = (todayMs - rowMs) / 86_400_000;
-        if (daysAgo <= MAX_PRICE_CARRY_FORWARD_DAYS) {
-          prices[row.instrumentId] = { price: row.close, currency: row.currency };
-        }
+        prices[row.instrumentId] = { price: row.close, currency: row.currency };
       }
     }
   }

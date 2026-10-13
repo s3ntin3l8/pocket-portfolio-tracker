@@ -1,4 +1,5 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { upsertPriceRows } from "./price-upsert.js";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { instruments, prices, scrapedQuotes } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
@@ -264,17 +265,12 @@ export async function backfillPortfolioHistory(
     }
   }
 
-  for (const [instrId, dateMap] of rawPrices) {
-    for (const [date, { close, currency }] of dateMap) {
-      await db
-        .insert(prices)
-        .values({ instrumentId: instrId, date, close, currency })
-        .onConflictDoUpdate({
-          target: [prices.instrumentId, prices.date],
-          set: { close, currency },
-        });
-    }
-  }
+  await upsertPriceRows(
+    db,
+    [...rawPrices].flatMap(([instrumentId, dateMap]) =>
+      [...dateMap].map(([date, { close, currency }]) => ({ instrumentId, date, close, currency })),
+    ),
+  );
 
   // Merge in previously-persisted prices for dates this run's fetch didn't refresh
   // (issue #775). A candle fetch above only covers THIS run — on a dead feed
@@ -291,7 +287,11 @@ export async function backfillPortfolioHistory(
     if (instr.assetClass === "bond" && isManualPriceBond(instr)) continue;
     const instrPrices = rawPrices.get(instr.id);
     if (!instrPrices) continue;
-    const priceRows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+    // Window query (audit D6): only rows from the run's start date are ever merged below.
+    const priceRows = await db
+      .select()
+      .from(prices)
+      .where(and(eq(prices.instrumentId, instr.id), gte(prices.date, startDate)));
     for (const row of priceRows) {
       if (row.date < startDate) continue;
       if (!instrPrices.has(row.date)) {
@@ -344,7 +344,11 @@ export async function computeBackfillSnapshots(
 
     let firstPricedDate: string | null = null;
     if (!manualBond) {
-      const priceRows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+      // Window query (audit D6): only rows from the run's start date are ever merged below.
+      const priceRows = await db
+        .select()
+        .from(prices)
+        .where(and(eq(prices.instrumentId, instr.id), gte(prices.date, startDate)));
       for (const row of priceRows) {
         if (row.date >= startDate) {
           instrPrices.set(row.date, { close: row.close, currency: row.currency });

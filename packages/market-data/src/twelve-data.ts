@@ -1,3 +1,4 @@
+import { withTimeout } from "./http.js";
 import { toDateKey } from "@portfolio/core";
 import {
   MarketDataError,
@@ -33,7 +34,7 @@ export class TwelveDataProvider implements MarketDataProvider {
     opts: ProviderOptions = {},
   ) {
     this.baseUrl = opts.baseUrl ?? "https://api.twelvedata.com";
-    this.doFetch = opts.fetch ?? globalThis.fetch;
+    this.doFetch = withTimeout(opts.fetch ?? globalThis.fetch);
   }
 
   supports(assetClass: AssetClass, market: string): boolean {

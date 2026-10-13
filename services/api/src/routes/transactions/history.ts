@@ -26,7 +26,7 @@ import {
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import {
   getUserBenchmarkConfig,
-  fetchBenchmarkPrices,
+  ensureBenchmarkPrices,
   getBenchmarkPrices,
   computeBenchmarkIndex,
   carryForwardBenchmark,
@@ -111,16 +111,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
           const bmConfig = await getUserBenchmarkConfig(app.db, userId, "");
           if (result.length > 0) {
             const bmDates = result.map((p) => p.date);
-            const existingBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
-            const missingDates = bmDates.filter((d) => !existingBm.has(d));
-            if (missingDates.length > 0 && !isReadOnlyPat(request)) {
-              const earliest = missingDates[0];
-              try {
-                const md = await getMarketData();
-                await fetchBenchmarkPrices(app.db, md, userId, bmConfig.symbol, earliest);
-              } catch {
-                /* non-fatal — benchmark is best-effort */
-              }
+            if (!isReadOnlyPat(request)) {
+              await ensureBenchmarkPrices(app.db, getMarketData, userId, bmConfig.symbol, bmDates);
             }
             const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
             if (refreshedBm.size >= 1) {
@@ -363,16 +355,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
       if (result.length > 0) {
         const bmDates = result.map((p) => p.date);
-        const existingBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
-        const missingDates = bmDates.filter((d) => !existingBm.has(d));
-        if (missingDates.length > 0 && !readOnlyPat) {
-          const earliest = missingDates[0];
-          try {
-            const md = await getMarketData();
-            await fetchBenchmarkPrices(app.db, md, id, bmConfig.symbol, earliest);
-          } catch {
-            /* non-fatal — benchmark is best-effort */
-          }
+        if (!readOnlyPat) {
+          await ensureBenchmarkPrices(app.db, getMarketData, id, bmConfig.symbol, bmDates);
         }
         const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
         if (refreshedBm.size >= 1) {
