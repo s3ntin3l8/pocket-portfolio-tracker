@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ApiError } from "@portfolio/api-client";
+
+// Structural stand-in for `ApiError` (classifyFailure only reads `status`/`retryAfter`), so
+// this suite doesn't need the built `@portfolio/api-client` dist to load.
+const apiError = (status: number, retryAfter: number | null = null) =>
+  Object.assign(new Error(`API request failed (${status})`), { status, retryAfter });
 
 const h = vi.hoisted(() => ({
   api: {} as object | null,
@@ -25,19 +29,19 @@ describe("admin gate", () => {
   });
 
   it("a 429 on the me lookup is rate_limited with its countdown, not notFound", async () => {
-    h.me.mockRejectedValue(new ApiError(429, "rate_limited", "7"));
+    h.me.mockRejectedValue(apiError(429, 7));
     await expect(requireAdmin()).resolves.toEqual({ status: "rate_limited", retryAfter: 7 });
     expect(h.notFound).not.toHaveBeenCalled();
   });
 
   it("a 5xx is unavailable, not notFound", async () => {
-    h.me.mockRejectedValue(new ApiError(503, "down"));
+    h.me.mockRejectedValue(apiError(503));
     await expect(requireAdmin()).resolves.toEqual({ status: "unavailable" });
     expect(h.notFound).not.toHaveBeenCalled();
   });
 
   it("a 401 / missing API client is unauthorized, not notFound", async () => {
-    h.me.mockRejectedValue(new ApiError(401, "nope"));
+    h.me.mockRejectedValue(apiError(401));
     await expect(requireAdmin()).resolves.toEqual({ status: "unauthorized" });
     h.api = null;
     await expect(loadMeResult()).resolves.toEqual({ status: "unauthorized" });
