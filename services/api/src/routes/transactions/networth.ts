@@ -5,8 +5,10 @@ import {
   aggregatePortfolios,
   allocationBreakdown,
   xirr,
-  periodXirr,
+  periodReturn,
+  periodStartFor,
   type CashFlowPoint,
+  type PeriodAnchor,
   convert,
   toDateKey,
   fxAvailable,
@@ -46,15 +48,8 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       const period = ["ytd", "1y", "5y"].includes(request.query.period ?? "")
         ? (request.query.period as "ytd" | "1y" | "5y")
         : "max";
-      const today = new Date();
-      let periodStart: Date | null = null;
-      if (period === "ytd") {
-        periodStart = new Date(today.getFullYear(), 0, 1);
-      } else if (period === "1y") {
-        periodStart = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-      } else if (period === "5y") {
-        periodStart = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
-      }
+      // UTC calendar day (audit D9) — snapshot dates are UTC day keys.
+      const periodStart = periodStartFor(period, new Date());
 
       if (holderId != null) {
         const [holder] = await app.db
@@ -82,7 +77,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       // trips blocked the next's. mapPool preserves input order, so the merge below is
       // byte-for-byte identical to the old sequential push loop.
       const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
-        const { coreTxns, summary } = await loadValuation(
+        const { coreTxns, summary, corporateActions } = await loadValuation(
           app,
           p.id,
           display,
@@ -95,6 +90,7 @@ export function registerNetworthRoutes(app: FastifyInstance) {
           excludeFxMissingInstruments(coreTxns, summary),
           p.cashCounted ? "inside" : "outside",
           display,
+          corporateActions,
         );
         return { summary, flows };
       });
@@ -127,86 +123,56 @@ export function registerNetworthRoutes(app: FastifyInstance) {
       const allocation = allocationBreakdown(aggregated, meta);
       const drift = await loadDrift(app, id, null, allocation);
 
-      // Period-scoped XIRR and P&L: look up the earliest snapshot per portfolio at or
-      // after periodStart, FX-convert each to display currency on its own snapshot date,
-      // and sum them. One query per portfolio avoids the cross-portfolio ordering hazard.
-      //
-      // We track the actual snapshot anchor date (not the nominal periodStart) so that
-      // the flow-filter in periodXirr is aligned: flows embedded in the snapshot value
-      // must not be re-added as explicit post-flows.
-      let startNav: number | null = null;
-      let anchorDate: Date | null = null; // actual snapshot date (may lag periodStart by a day or two)
+      // Period-scoped XIRR and P&L (audit B10): each portfolio is anchored at its OWN
+      // earliest snapshot at or after periodStart (FX-converted on that snapshot's date),
+      // and only its own boundary flows after that snapshot are netted out — so a deposit
+      // inside the period is not reported as profit, and no portfolio's flows are dropped
+      // or double-counted by a shared cross-portfolio anchor date.
+      let periodResult: { pnl: string; pnlPct: number | null; xirr: number | null } | null = null;
       if (periodStart !== null && pfs.length > 0) {
         const periodStartStr = toDateKey(periodStart);
-        // Per-portfolio snapshot + FX fetch is independent — bounded-concurrency instead
-        // of a serial `for` await. The reduction below (sum, count, max-date) is
-        // order-independent, so parallelizing the I/O doesn't change the result.
-        const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (pf) => {
-          // Fetch the earliest snapshot at or after periodStart for this portfolio.
-          const [snap] = await app.db
-            .select()
-            .from(portfolioSnapshots)
-            .where(
-              and(
-                eq(portfolioSnapshots.portfolioId, pf.id),
-                gte(portfolioSnapshots.date, periodStartStr),
-              ),
-            )
-            .orderBy(asc(portfolioSnapshots.date))
-            .limit(1);
-          if (!snap) {
-            // Portfolio has no snapshot at or after periodStart (brand-new or no history).
-            return null;
-          }
-          const ratesByDate = await getFxRatesForDates(app.db, [snap.currency], display, [
-            snap.date,
-          ]);
-          const fx = makeFxRateFn(ratesByDate.get(snap.date) ?? {}, display);
-          // No rate: treat like a missing snapshot — the period figures are withheld
-          // rather than built on a 1:1 start NAV (audit B2); reported as fxMissingCurrencies.
-          if (!fxAvailable(snap.currency, display, fx)) return null;
-          return {
-            nav: Number(convert(snap.netWorth, snap.currency, display, fx)),
-            date: snap.date,
-          };
-        });
-
-        let totalStartNav = 0;
-        let missingPortfolios = 0;
-        let latestSnapDate: string | null = null;
-        for (const r of perPortfolio) {
-          if (!r) {
-            missingPortfolios++;
-            continue;
-          }
-          totalStartNav += r.nav;
-          // Use the latest snapshot date across all portfolios as the flow-filter anchor.
-          // This ensures no portfolio's snapshot embeds flows that are then re-added.
-          if (latestSnapDate === null || r.date > latestSnapDate) {
-            latestSnapDate = r.date;
-          }
-        }
-        // Only produce a startNav when all portfolios contributed — partial sums would
-        // under-count the denominator and manufacture phantom period gains.
-        if (missingPortfolios === 0 && latestSnapDate !== null) {
-          startNav = totalStartNav;
-          anchorDate = new Date(`${latestSnapDate}T00:00:00.000Z`);
+        const anchors = await mapPool(
+          pfs.map((pf, i) => ({ pf, flows: perPortfolio[i]!.flows })),
+          PORTFOLIO_VALUATION_CONCURRENCY,
+          async ({ pf, flows: pfFlows }): Promise<PeriodAnchor | null> => {
+            const [snap] = await app.db
+              .select()
+              .from(portfolioSnapshots)
+              .where(
+                and(
+                  eq(portfolioSnapshots.portfolioId, pf.id),
+                  gte(portfolioSnapshots.date, periodStartStr),
+                ),
+              )
+              .orderBy(asc(portfolioSnapshots.date))
+              .limit(1);
+            // No snapshot at or after periodStart (brand-new or no history).
+            if (!snap) return null;
+            const ratesByDate = await getFxRatesForDates(app.db, [snap.currency], display, [
+              snap.date,
+            ]);
+            const fx = makeFxRateFn(ratesByDate.get(snap.date) ?? {}, display);
+            // No rate: treat like a missing snapshot — the period figures are withheld
+            // rather than built on a 1:1 start NAV (audit B2); reported as fxMissingCurrencies.
+            if (!fxAvailable(snap.currency, display, fx)) return null;
+            return {
+              startNav: convert(snap.netWorth, snap.currency, display, fx),
+              snapshotDate: snap.date,
+              flows: pfFlows,
+            };
+          },
+        );
+        // Only produce period figures when every portfolio has an anchor — a partial sum
+        // would under-count the denominator and manufacture phantom period gains.
+        if (anchors.every((a) => a !== null)) {
+          periodResult = periodReturn(anchors as PeriodAnchor[], aggregated.netWorth, asOf);
         }
       }
 
-      const currentNetWorth = Number(aggregated.netWorth);
-      // flows has the terminal inflow as its last entry; strip it to get boundary-only flows.
-      const boundaryOnlyFlows = flows.slice(0, -1);
-      const pXirr =
-        anchorDate !== null && startNav !== null
-          ? periodXirr(boundaryOnlyFlows, currentNetWorth, startNav, anchorDate, asOf)
-          : null;
-      const periodPnL =
-        anchorDate !== null && startNav !== null ? String(currentNetWorth - startNav) : null;
+      const pXirr = periodResult?.xirr ?? null;
+      const periodPnL = periodResult?.pnl ?? null;
       const periodPnLPct =
-        anchorDate !== null && startNav !== null && startNav > 0
-          ? String((currentNetWorth - startNav) / startNav)
-          : null;
+        periodResult && periodResult.pnlPct !== null ? String(periodResult.pnlPct) : null;
 
       request.timingName = "GET /networth";
       request.timingMeta = {

@@ -14,6 +14,7 @@ import {
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
 import { boundaryFlows } from "../shared/flows.js";
+import { corporateActionsFor } from "../shared/helpers.js";
 import type { FastifyInstance } from "fastify";
 
 export interface ComputeYearlyReturnsArgs {
@@ -206,8 +207,26 @@ export async function loadBoundaryFlowsForUser(
     .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))
     .where(and(inArray(transactions.portfolioId, portfolioIds), eq(portfolios.userId, userId)))
     .orderBy(asc(transactions.executedAt));
-  return (await boundaryFlows(app, rows, boundary, displayCurrency)).map((p) => ({
-    amount: String(p.amount),
-    date: p.date,
-  }));
+  // One walk per portfolio, each with its own split/bonus actions (audit B9) — the
+  // average-cost pool behind transfer valuation is per depot, never shared across them.
+  const byPortfolio = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const list = byPortfolio.get(r.portfolioId) ?? [];
+    list.push(r);
+    byPortfolio.set(r.portfolioId, list);
+  }
+  const perPortfolio = await Promise.all(
+    [...byPortfolio].map(async ([pfId, pfRows]) => {
+      const cas = await corporateActionsFor(
+        app,
+        pfRows.map((r) => r.instrumentId),
+        pfId,
+      );
+      return boundaryFlows(app, pfRows, boundary, displayCurrency, cas);
+    }),
+  );
+  return perPortfolio
+    .flat()
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((p) => ({ amount: String(p.amount), date: p.date }));
 }

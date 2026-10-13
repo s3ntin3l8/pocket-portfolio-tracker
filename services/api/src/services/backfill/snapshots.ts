@@ -3,9 +3,9 @@ import { Decimal } from "decimal.js";
 import { dividendEvents, portfolios, portfolioSnapshots } from "@portfolio/db";
 import {
   buildDailyValueFlows,
-  cashBalances,
   computeHoldings,
   netWorth,
+  netWorthInputs,
   splitAdjustmentFactor,
   toDateKey,
   MAX_PRICE_CARRY_FORWARD_DAYS,
@@ -212,12 +212,22 @@ export async function writeSnapshotSeries(
       const p = priceAt(h.instrumentId, flow.date);
       if (p) pricesForDate[h.instrumentId] = { price: p.close, currency: p.currency };
     }
-    const cash = cashCounted ? cashBalances(coreTxns.filter((t) => t.executedAt <= asOf)) : {};
     const fx = fxAt(flow.date);
+    // Same cash/liabilities definition the live valuation writes into this row
+    // (audit B6): cash only when inside the boundary AND tracked as of that day, loans
+    // subtracted. FX is all-or-nothing for the run (checked above), so every currency
+    // converts here.
+    const { convertibleCash, liabilities } = netWorthInputs({
+      transactions: coreTxns.filter((t) => t.executedAt <= asOf),
+      cashCounted,
+      displayCurrency: baseCurrency,
+      fx,
+    });
     const nw = netWorth({
       holdings: holdingsAtDate,
       prices: pricesForDate,
-      cash,
+      cash: convertibleCash,
+      liabilities,
       displayCurrency: baseCurrency,
       fx,
       hasEverPriced: (instrId) => hasEverPriced(instrId, flow.date),

@@ -436,7 +436,7 @@ describe("auth + portfolios + transactions", () => {
     // The transaction list carries instrument metadata for rendering.
     const txList = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     expect(txList.json()[0].instrument).toMatchObject({
@@ -727,8 +727,8 @@ describe("auth + portfolios + transactions", () => {
       totalInvested: "30000",
       // pf1: 1×10×1200 = 12000
       totalProceeds: "12000",
-      // pf1: 1×0×50 = 0
-      totalIncome: "0",
+      // pf1: a qty-0 dividend is a lump sum in `price` (cashFlow parity, audit B3) → 50
+      totalIncome: "50",
     });
 
     // --- out-of-range page (fallback path) ---
@@ -1395,7 +1395,7 @@ describe("auth + portfolios + transactions", () => {
     const remaining = (
       await app.inject({
         method: "GET",
-        url: `/portfolios/${portfolioId}/transactions`,
+        url: `/portfolios/${portfolioId}/transactions?all=1`,
         headers: auth(t),
       })
     ).json();
@@ -1488,7 +1488,7 @@ describe("auth + portfolios + transactions", () => {
     ).toHaveLength(0);
     const txAfter = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(t),
     });
     expect(txAfter.statusCode).toBe(404);
@@ -3147,7 +3147,7 @@ describe("auth + portfolios + transactions", () => {
     // ...and cannot read user-a's transactions.
     const cross = await app.inject({
       method: "GET",
-      url: `/portfolios/${portfolioId}/transactions`,
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
       headers: auth(tB),
     });
     expect(cross.statusCode).toBe(404);

@@ -6,19 +6,20 @@ import {
   type CashFlowPoint,
   type ContributionStats,
   type CoreTransaction,
+  type CorporateAction,
   type PortfolioSummary,
   type SparplanStats,
   partitionConvertible,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
-import { boundaryFlows, excludeFxMissingInstruments } from "./flows.js";
+import { boundaryFlows, excludeFxMissingInstruments, type KindedCashFlowPoint } from "./flows.js";
 import { instrumentMeta } from "./helpers.js";
 import { Decimal } from "decimal.js";
 
 export function enrichContributions(
   stats: ContributionStats,
   currentValue: string,
-  flows: CashFlowPoint[],
+  flows: KindedCashFlowPoint[],
   birthYear: number | null = null,
   portfolioType: "standard" | "child" = "standard",
   opts: {
@@ -36,8 +37,17 @@ export function enrichContributions(
   const simpleGainPct = net.gt(0) ? currentValueDec.minus(net).div(net).toNumber() : null;
 
   const gross = new Decimal(stats.totalContributed);
+  // What came back out of the boundary (sale proceeds, dividends). A `merger` sell leg and
+  // the dividend behind a `reinvestment` buy are NOT money the user received — their value
+  // stayed invested and is already in `currentValue`, while `gross` (rightly) excludes the
+  // merger/reinvestment buys. So those kinds count at their SIGNED amount: the merger sell
+  // (+P) nets against its buy leg (−P), the reinvestment buy (−D) nets out the dividend
+  // (+D) it was paid from (audit B8). The XIRR flow list below keeps every point — there
+  // the pairs cancel naturally.
+  const SWAP_KINDS = new Set(["merger", "reinvestment"]);
   const positiveFlows = flows.reduce((s, f) => {
     const amt = new Decimal(f.amount);
+    if (f.kind && SWAP_KINDS.has(f.kind)) return s.plus(amt);
     return amt.gt(0) ? s.plus(amt) : s;
   }, new Decimal(0));
   const totalReturnPct =
@@ -78,6 +88,7 @@ export async function buildContributions(
   portfolioType: "standard" | "child" = "standard",
   boundary: "inside" | "outside" = "outside",
   retirementAge: number | null = null,
+  corporateActions: CorporateAction[] = [],
 ) {
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
@@ -93,8 +104,9 @@ export async function buildContributions(
     displayCurrency: display,
     fx,
     boundary,
+    corporateActions,
   });
-  const flows = await boundaryFlows(app, valued, boundary, display);
+  const flows = await boundaryFlows(app, valued, boundary, display, corporateActions);
   return enrichContributions(stats, summary.netWorth, flows, birthYear, portfolioType, {
     totalReturn: boundary === "outside",
     retirementAge,

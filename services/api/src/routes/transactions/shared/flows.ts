@@ -3,6 +3,7 @@ import {
   isAcquisitionType,
   isTransferType,
   type CoreTransaction,
+  type CorporateAction,
   type CashFlowPoint,
   convert,
   cashFlow,
@@ -54,12 +55,25 @@ export function excludeFxMissingInstruments<T extends { instrumentId?: string | 
   return txns.filter((t) => !t.instrumentId || !missing.has(t.instrumentId));
 }
 
+/**
+ * A boundary flow point tagged with the source row's `kind`, so a consumer can tell the
+ * legs of an internal swap (a `merger` sell/buy pair, a dividend `reinvestment` buy) from
+ * external capital — see `enrichContributions`' `totalReturnPct` (audit B8). XIRR ignores
+ * the extra field; transfer points carry no kind.
+ */
+export interface KindedCashFlowPoint extends CashFlowPoint {
+  kind?: string | null;
+}
+
 export async function boundaryFlows(
   app: FastifyInstance,
   allTxns: CoreTransaction[],
   boundary: "inside" | "outside",
   target: string,
-): Promise<CashFlowPoint[]> {
+  /** Split/bonus actions for the pool replay behind transfer valuation (audit B9) —
+   *  pass the valuation's `corporateActions`. */
+  corporateActions: CorporateAction[] = [],
+): Promise<KindedCashFlowPoint[]> {
   const rates = await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], target);
   const fx = makeFxRateFn(rates, target);
   // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies; the
@@ -67,7 +81,7 @@ export async function boundaryFlows(
   const txns = partitionConvertible(allTxns, target, fx).convertible;
 
   if (boundary === "inside") {
-    return boundaryFlowPoints(txns, "inside", target, fx);
+    return boundaryFlowPoints(txns, "inside", target, fx, corporateActions);
   }
 
   const isLegacyTransferBonus = (t: CoreTransaction): boolean =>
@@ -78,11 +92,12 @@ export async function boundaryFlows(
     if (isAcquisitionType(t.type)) return t.kind !== "saveback";
     return false;
   };
-  const cashValued = txns.filter(isInvestmentFlow).map((t) => ({
+  const cashValued: KindedCashFlowPoint[] = txns.filter(isInvestmentFlow).map((t) => ({
     amount: Number(convert(cashFlow(t).toString(), t.currency, target, fx)),
     date: t.executedAt,
+    kind: t.kind ?? null,
   }));
-  const transferValued = transferFlowPoints(txns, "outside", target, fx);
+  const transferValued = transferFlowPoints(txns, "outside", target, fx, corporateActions);
   return [...cashValued, ...transferValued].sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
@@ -91,6 +106,7 @@ export async function externalFlows(
   app: FastifyInstance,
   txns: CoreTransaction[],
   target: string,
+  corporateActions: CorporateAction[] = [],
 ): Promise<CashFlowPoint[]> {
-  return boundaryFlows(app, txns, "inside", target);
+  return boundaryFlows(app, txns, "inside", target, corporateActions);
 }
