@@ -25,6 +25,13 @@
  *     stopped updating for an instrument should exclude it from movers/
  *     concentration weighting rather than silently reporting a stale 0.00%
  *     move or an outdated weight.
+ *   - FX_MAX_CARRY_FORWARD_DAYS (14): the live FX lookup (`getFxRates` in
+ *     services/api) carries the latest cached rate forward when the provider
+ *     can't serve today's — but only from within this window. A rate older
+ *     than that counts as MISSING (the amount is excluded and the currency
+ *     reported as `fxMissingCurrencies`), never presented as today's rate.
+ *     Two weeks rides out holidays and a provider outage; beyond it a stale
+ *     rate is a guess, not a conversion (audit B2).
  *   - DEAD_FEED_MISS_THRESHOLD (7): consecutive backfill attempts that return
  *     zero candles for an instrument before the nightly sweep stops treating
  *     it as "temporarily lagging" and starts treating it as a feed with
@@ -50,5 +57,6 @@ export const SINGLE_DAY_MAX_PCT = 50;
 export const PERIOD_GAIN_MAX_PCT = 200;
 export const PERIOD_LOSS_MAX_PCT = 90;
 export const MAX_PRICE_CARRY_FORWARD_DAYS = 10;
+export const FX_MAX_CARRY_FORWARD_DAYS = 14;
 export const DEAD_FEED_MISS_THRESHOLD = 7;
 export const XIRR_MAX_RATE = 50;

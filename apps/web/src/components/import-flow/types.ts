@@ -24,6 +24,8 @@ export interface ImportDraft {
   orderRef?: string | null;
   taxComponents?: Record<string, string> | null;
   likelyDuplicate?: import("@portfolio/api-client").LikelyDuplicate | null;
+  /** Review-time attention reasons set by the parser (e.g. "needs_cost_basis"). */
+  attention?: string[] | null;
 }
 
 export interface ImportContractScheduleRow {

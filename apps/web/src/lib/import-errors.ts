@@ -19,6 +19,7 @@ export type ImportSkipReason =
   | "alreadyConfirmed"
   | "noDrafts"
   | "reportSaveFailed" // recognized as an account-level report, but the inbox save failed
+  | "transferCostBasisRequired" // 400 transfer_cost_basis_required — an inbound transfer has no cost basis
   | "generic";
 
 /** Richer classification result: the reason plus optional context the UI can surface. */
@@ -43,6 +44,11 @@ export function classifyImportError(err: unknown): ImportErrorInfo {
   const status = (err as { status?: number })?.status;
   // Top-level 401/403 = the user's own session token, not the vision provider's key.
   if (status === 401 || status === 403) return { reason: "sessionExpired", status };
+  // Confirm refused an inbound depot transfer at price 0 (audit B4): the user must enter
+  // its carried cost basis in the review screen first.
+  if (status === 400 && apiErrorCode(err) === "transfer_cost_basis_required") {
+    return { reason: "transferCostBasisRequired" };
+  }
   if (status === 503) return { reason: "notConfigured" };
   if (status === 413) return { reason: "tooLarge" };
   if (status === 415) return { reason: "parseFailed" };

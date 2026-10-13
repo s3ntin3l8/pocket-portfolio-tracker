@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins, ScrollText, PiggyBank, Receipt, FileText } from "lucide-react";
 import { ReportCard } from "@/components/reports/report-card";
 import { EmptyState } from "@/components/empty-state";
+import { FxMissingBanner, collectFxMissing } from "@/components/fx-missing-banner";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import {
   loadIncomeStats,
@@ -430,12 +431,21 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
     );
   }
 
+  // Currencies with no FX rate in any of the report sources (audit B2): left out of the
+  // totals on these cards, never converted 1:1.
+  const fxMissing = collectFxMissing(
+    income.status === "ok" ? income.data : null,
+    trades.status === "ok" ? trades.data : null,
+    contributions.status === "ok" ? contributions.data : null,
+  );
+
   return (
     <div className="space-y-5">
       <header className="space-y-1">
         <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>
       </header>
+      <FxMissingBanner currencies={fxMissing} />
 
       {failure && (
         <DataState

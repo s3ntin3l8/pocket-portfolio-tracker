@@ -117,10 +117,10 @@ Required fields:
 | `Direction`        | Fallback direction field                                                       |
 | `Cost Basis Price` | Per-share carried cost basis (used as transfer price)                          |
 | `Cost Basis Money` | Total carried cost (fallback when per-share unavailable)                       |
-| `Position Amount`  | Market value at transfer date (last-resort cost proxy)                         |
+| `Position Amount`  | Market value at transfer date — read, but never used as cost basis             |
 | `Transaction ID`   | Stable external ID — used for dedup                                            |
 
-Transfers are mapped to `transfer_in` / `transfer_out` at the carried cost basis. If cost basis is unavailable the price defaults to 0 and is flagged as low-confidence in the review screen.
+Transfers are mapped to `transfer_in` / `transfer_out` at the carried cost basis (`Cost Basis Price`, else `Cost Basis Money` / quantity). `Position Amount` is market value, so it is never booked as cost — that would erase the pre-transfer gain from tax and P&L history. If no cost basis is available, an inbound transfer is staged at price 0 with confidence 0.5 and a "Cost basis needed" flag, and confirming it is refused (`transfer_cost_basis_required`) until you enter the carried cost per share on the draft. Outbound transfers need no price: they leave at the position's running average cost.
 
 ---
 
@@ -238,6 +238,6 @@ Flex statements are end-of-day — intraday data is not available. The tracker s
 | Status: "Token expired"              | The Flex Web Service token has passed its expiry date — regenerate it in IBKR portal and reconnect                |
 | Status: "Error"                      | Invalid token, IP mismatch, or the Flex query was deleted — check the last error in the dialog                    |
 | Dividends imported with wrong amount | `Withholding Tax` rows are missing from your query — enable the field in Cash Transactions                        |
-| Transfers show price 0               | `Cost Basis Price` / `Cost Basis Money` fields not included in Transfers section                                  |
+| Transfer can't be confirmed          | `Cost Basis Price` / `Cost Basis Money` missing from the Transfers section — enter the cost basis on the draft    |
 | No data after sync                   | Query date range may not cover the activity period, or the query has no Trades/Cash Transactions sections enabled |
 | Duplicate drafts                     | Unlikely with dedup active — if it happens, use "Re-import everything" to wipe and re-stage                       |

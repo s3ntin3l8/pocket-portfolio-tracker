@@ -259,15 +259,40 @@ export function mapFlexToDrafts(
     const qty = absStr(xfer.quantity);
 
     // Carried cost per share: prefer explicit costBasisPrice, then derive from
-    // costBasisMoney / quantity; fall back to 0 (unknown cost basis).
+    // costBasisMoney / quantity; otherwise unknown (0). `positionAmount` is deliberately
+    // NOT used as a fallback (owner decision on #818): no Flex statement with an inbound
+    // transfer was available to confirm its semantics, so it is assumed to be MARKET
+    // value — booking it as cost would silently erase the pre-transfer gain from tax and
+    // P&L history. An unknown basis is recoverable in the review screen instead: the
+    // inbound draft is flagged `needs_cost_basis` and confirm refuses it at price 0.
+    // Unparseable → 0 (falls through to `needs_cost_basis`), but logged distinctly so a
+    // corrupt cost-basis field isn't indistinguishable from an absent one.
+    const dec = (v: string | undefined | null, field: string): Decimal => {
+      try {
+        return new Decimal(strNum(v));
+      } catch {
+        process.stderr.write(
+          JSON.stringify({
+            level: "warn",
+            event: "ibkr_invalid_cost_basis",
+            transactionID: xfer.transactionID ?? null,
+            field,
+            raw: v ?? null,
+          }) + "\n",
+        );
+        return new Decimal(0);
+      }
+    };
+    const qtyDec = dec(qty, "quantity");
+    const costBasisPrice = dec(xfer.costBasisPrice, "costBasisPrice");
+    const costBasisMoney = dec(xfer.costBasisMoney, "costBasisMoney");
     let price = "0";
-    if (xfer.costBasisPrice && Number(strNum(xfer.costBasisPrice)) > 0) {
+    if (costBasisPrice.gt(0)) {
       price = strNum(xfer.costBasisPrice);
-    } else if (xfer.costBasisMoney && Number(qty) > 0) {
-      price = String(Math.abs(Number(strNum(xfer.costBasisMoney))) / Number(qty));
-    } else if (xfer.positionAmount && Number(qty) > 0) {
-      price = String(Math.abs(Number(strNum(xfer.positionAmount))) / Number(qty));
+    } else if (qtyDec.gt(0) && !costBasisMoney.isZero()) {
+      price = costBasisMoney.abs().div(qtyDec).toFixed();
     }
+    const needsCostBasis = isIn && price === "0";
 
     const externalId = xfer.transactionID
       ? `ibkr:xfer:${xfer.transactionID}`
@@ -287,7 +312,9 @@ export function mapFlexToDrafts(
         currency: xfer.currency ?? "USD",
         executedAt: date,
         externalId,
-        confidence: 0.85, // carried-cost derivation is best-effort
+        // carried-cost derivation is best-effort; no basis at all → review required
+        confidence: needsCostBasis ? 0.5 : 0.85,
+        attention: needsCostBasis ? ["needs_cost_basis"] : undefined,
       },
       xfer,
     );

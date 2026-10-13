@@ -1,8 +1,8 @@
 import { Decimal } from "decimal.js";
 import { computeHoldings, marketValue } from "./holdings.js";
 import { cashBalances, cashFlow } from "./cash.js";
-import { netWorth, convert, type FxRateFn } from "./networth.js";
-import { financingByInstrument, totalLiabilities } from "./loans.js";
+import { netWorth, convert, fxAvailable, type FxRateFn } from "./networth.js";
+import { financingByInstrument, liabilityBalances } from "./loans.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
 import type { LotView } from "./lots.js";
 import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
@@ -39,6 +39,14 @@ export interface HoldingValuation extends Holding {
    * for a normally-priced holding.
    */
   valuedAtCost?: boolean;
+  /**
+   * True when this holding's quote or cost currency has no known FX rate into the
+   * display currency (audit B2). The display-currency fields (`marketValueDisplay`,
+   * `unrealizedPnLDisplay`) are then null, `costBasisDisplay` stays in the native cost
+   * currency, and the holding is excluded from every display-currency total — a
+   * missing rate is never treated as 1:1. Undefined when FX resolved normally.
+   */
+  fxMissing?: boolean;
   /** Prior session's close (instrument currency), when known. */
   previousClose: string | null;
   /** Today's value change for the position (instrument currency), when known. */
@@ -91,6 +99,15 @@ export interface PortfolioSummary {
    * value converted to the display currency for comparable magnitudes.
    */
   exposureByCurrency: Record<string, string>;
+  /**
+   * Currencies (sorted) that hold some of this portfolio's value — a holding's quote/cost
+   * currency, a cash balance, income or a liability — but have no known FX rate into the
+   * display currency (audit B2). Everything denominated in them is excluded from the
+   * display-currency totals above, so those totals are incomplete whenever this is
+   * non-empty; the daily snapshot job skips the portfolio rather than persisting them.
+   * Empty when every rate resolved.
+   */
+  fxMissingCurrencies: string[];
 }
 
 export interface SummarizeInput {
@@ -119,6 +136,17 @@ export interface SummarizeInput {
 export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
   const fx: FxRateFn = input.fx ?? (() => "1");
   const holdings = computeHoldings(input.transactions, input.corporateActions);
+
+  // Audit B2: a currency with no known rate into the display currency is never
+  // converted 1:1. Probe each currency once; amounts in a missing one are flagged and
+  // left out of the display-currency totals instead.
+  const fxMissing = new Set<string>();
+  const canConvert = (ccy: string): boolean => {
+    if (fxMissing.has(ccy)) return false;
+    if (fxAvailable(ccy, input.displayCurrency, fx)) return true;
+    fxMissing.add(ccy);
+    return false;
+  };
 
   // Total-paid cost basis adds financing incurred to date onto the purchase
   // price; purchase-price mode leaves cost basis untouched.
@@ -151,6 +179,30 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     const cbStr = cb.toString();
     const qty = new Decimal(h.quantity);
     const avgCost = qty.isZero() ? h.avgCost : cb.div(qty).toString();
+
+    // Either currency unconvertible → nothing about this holding can be expressed in
+    // the display currency. Same shape as the "nothing to value" branch below, plus
+    // the flag; excluded from every total (realized P&L included).
+    const quoteOk = quote ? canConvert(quoteCcy) : true;
+    const costOk = canConvert(costCcy);
+    if (!quoteOk || !costOk) {
+      return {
+        ...h,
+        costBasis: cbStr,
+        avgCost,
+        price: quote?.price ?? null,
+        currency: quote?.currency ?? null,
+        marketValue: quote ? marketValue(h.quantity, quote.price) : null,
+        unrealizedPnL: null,
+        marketValueDisplay: null,
+        costBasisDisplay: cbStr,
+        unrealizedPnLDisplay: null,
+        previousClose: quote?.previousClose ?? null,
+        dayChange: null,
+        dayChangePct: null,
+        fxMissing: true,
+      };
+    }
 
     totalRealized = totalRealized.add(
       new Decimal(convert(h.realizedPnL, costCcy, input.displayCurrency, fx)),
@@ -297,14 +349,25 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
   );
   const cashTracked = cashCounted && hasCashMovement;
   const cash = cashTracked ? cashBalances(input.transactions) : {};
+  // Cash in an unconvertible currency stays in `cash` (native amounts) but is left
+  // out of exposure and net worth (audit B2).
+  const convertibleCash: Record<string, string> = {};
   for (const [ccy, amount] of Object.entries(cash)) {
+    if (!canConvert(ccy)) continue;
+    convertibleCash[ccy] = amount;
     addExposure(ccy, convert(amount, ccy, input.displayCurrency, fx));
   }
-  const liabilities = totalLiabilities(input.transactions, input.displayCurrency, fx);
+  let liabilitiesDec = new Decimal(0);
+  for (const [ccy, amount] of Object.entries(liabilityBalances(input.transactions))) {
+    if (!canConvert(ccy)) continue;
+    liabilitiesDec = liabilitiesDec.add(convert(amount, ccy, input.displayCurrency, fx));
+  }
+  const liabilities = liabilitiesDec.toString();
+  const fxMissingIds = new Set(valuations.filter((v) => v.fxMissing).map((v) => v.instrumentId));
   const nw = netWorth({
-    holdings,
+    holdings: holdings.filter((h) => !fxMissingIds.has(h.instrumentId)),
     prices: input.prices,
-    cash,
+    cash: convertibleCash,
     displayCurrency: input.displayCurrency,
     fx,
     liabilities,
@@ -313,7 +376,7 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
   let totalIncome = new Decimal(0);
   for (const tx of input.transactions) {
     const isDivOrCoup = tx.type === "dividend" || tx.type === "coupon" || tx.type === "interest";
-    if (isDivOrCoup) {
+    if (isDivOrCoup && canConvert(tx.currency)) {
       totalIncome = totalIncome.add(
         convert(cashFlow(tx).toString(), tx.currency, input.displayCurrency, fx),
       );
@@ -336,6 +399,7 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     exposureByCurrency: Object.fromEntries(
       Object.entries(exposure).map(([k, v]) => [k, v.toString()]),
     ),
+    fxMissingCurrencies: [...fxMissing].sort(),
   };
 }
 
@@ -351,6 +415,7 @@ export function aggregatePortfolios(
   const holdings = new Map<string, HoldingValuation>();
   const cash: Record<string, string> = {};
   const exposure: Record<string, string> = {};
+  const fxMissingCurrencies = new Set<string>();
   let totalCost = new Decimal(0);
   let totalMarketValue = new Decimal(0);
   let totalRealized = new Decimal(0);
@@ -367,6 +432,7 @@ export function aggregatePortfolios(
 
   for (const s of summaries) {
     netWorth = netWorth.add(s.netWorth);
+    for (const c of s.fxMissingCurrencies ?? []) fxMissingCurrencies.add(c);
     totalCost = totalCost.add(s.totalCost);
     totalMarketValue = totalMarketValue.add(s.totalMarketValue);
     totalRealized = totalRealized.add(s.totalRealizedPnL);
@@ -415,6 +481,9 @@ export function aggregatePortfolios(
         // usable price, the other doesn't) — true if EITHER contributed an at-cost
         // valuation, so the merged total is flagged whenever any part of it is.
         valuedAtCost: ex.valuedAtCost || h.valuedAtCost || undefined,
+        // Same OR-merge as valuedAtCost: the merged display figures omit any part whose
+        // FX rate was missing, so flag the merged holding if either side was.
+        fxMissing: ex.fxMissing || h.fxMissing || undefined,
         // Merge lots from both portfolios (acquisition order, oldest first). Undefined
         // on both sides stays undefined; either side present yields a merged array.
         lots:
@@ -443,5 +512,6 @@ export function aggregatePortfolios(
     totalIncome: totalIncome.toString(),
     totalDayChange: totalDayChange.toString(),
     exposureByCurrency: exposure,
+    fxMissingCurrencies: [...fxMissingCurrencies].sort(),
   };
 }

@@ -8,6 +8,7 @@ import {
   cashFlow,
   boundaryFlowPoints,
   transferFlowPoints,
+  partitionConvertible,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
 
@@ -35,14 +36,35 @@ import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
  * dividend income from XIRR/`totalReturnPct`. Only the transfer valuation is shared;
  * see `boundaryFlowPoints`'s doc comment in `@portfolio/core` for the full rationale.
  */
+/**
+ * Drop every row of the instruments the value side couldn't value for lack of an FX rate
+ * (`summary.holdings[].fxMissing` — quote OR cost currency unrated; audit B2), so a
+ * contribution/XIRR flow list and the net worth it is paired with exclude the SAME
+ * instruments. `partitionConvertible` on transaction currencies alone is not enough:
+ * a stock bought in EUR but quoted in an unrated USD keeps its EUR buy convertible
+ * while `summarizePortfolio` drops the holding — the buy would stay in the contribution
+ * with no value against it (a phantom near-total loss).
+ */
+export function excludeFxMissingInstruments<T extends { instrumentId?: string | null }>(
+  txns: T[],
+  summary: { holdings: { instrumentId: string; fxMissing?: boolean }[] },
+): T[] {
+  const missing = new Set(summary.holdings.filter((h) => h.fxMissing).map((h) => h.instrumentId));
+  if (missing.size === 0) return txns;
+  return txns.filter((t) => !t.instrumentId || !missing.has(t.instrumentId));
+}
+
 export async function boundaryFlows(
   app: FastifyInstance,
-  txns: CoreTransaction[],
+  allTxns: CoreTransaction[],
   boundary: "inside" | "outside",
   target: string,
 ): Promise<CashFlowPoint[]> {
-  const rates = await getFxRates(app.db, [...new Set(txns.map((t) => t.currency))], target);
+  const rates = await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], target);
   const fx = makeFxRateFn(rates, target);
+  // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies; the
+  // matching value (summary net worth) excludes the same currencies.
+  const txns = partitionConvertible(allTxns, target, fx).convertible;
 
   if (boundary === "inside") {
     return boundaryFlowPoints(txns, "inside", target, fx);

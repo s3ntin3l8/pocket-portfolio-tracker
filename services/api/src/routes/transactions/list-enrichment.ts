@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { documents, transactionSources, transactions } from "@portfolio/db";
 import { buildShareTimelines, sharesHeldAt, toDateKey } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
-import { getFxRatesForDates } from "../../services/fx.js";
+import { getFxRatesForDates, recordFxMissing } from "../../services/fx.js";
 import { toCoreTxns } from "../../services/tx-core.js";
 import { sourcesFromPreFetched, txFlagsFromSourcesRows } from "../../services/enrichment.js";
 import { corporateActionsFor, instrumentMeta } from "./shared.js";
@@ -199,10 +199,18 @@ export async function enrichRows(
 
   const responseRows = rows.map((r) => {
     let displayRate: string | undefined;
+    let fxMissing = false;
     if (ratesByDate && convertTo) {
       const date = toDateKey(r.executedAt);
       const rates = ratesByDate.get(date) ?? {};
-      displayRate = r.currency === convertTo ? "1" : (rates[r.currency] ?? "1");
+      if (r.currency === convertTo) displayRate = "1";
+      else if (rates[r.currency]) displayRate = rates[r.currency];
+      else {
+        // No rate: the row stays in its native currency, flagged — never shown 1:1
+        // (audit B2). The currency is reported as fxMissingCurrencies on the response.
+        fxMissing = true;
+        recordFxMissing([r.currency]);
+      }
     }
     return {
       ...r,
@@ -214,6 +222,7 @@ export async function enrichRows(
       sources: sourcesMap.get(r.id) ?? [],
       ...(incomeSharesPatch.get(r.id) ?? {}),
       ...(displayRate ? { displayCurrency: convertTo, displayRate } : {}),
+      ...(fxMissing ? { fxMissing: true } : {}),
     };
   });
 

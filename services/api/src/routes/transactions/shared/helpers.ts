@@ -24,7 +24,7 @@ import { valuePortfolioCached, type InstrumentMeta } from "../../../services/val
 import { toCoreTxns } from "../../../services/tx-core.js";
 import { netManualAdjustments } from "../../../services/pytr/reconcile.js";
 import { withDerivationCache } from "../../../lib/derivation-cache.js";
-import { getFxRatesForDates, makeFxRateFn } from "../../../services/fx.js";
+import { getFxRatesForDates, makeFxRateFn, recordFxMissing } from "../../../services/fx.js";
 import { anomaliesCache } from "./caches.js";
 
 export function yearRange(year: number): { start: Date; end: Date } {
@@ -113,7 +113,11 @@ export async function computeConvertedSummary(
   let totalIncome = new Decimal(0);
   for (const g of groups) {
     if (g.currency !== targetCurrency && !ratesByDate.get(g.day)?.[g.currency]) {
+      // No rate: exclude the bucket (never 1:1, audit B2); reported below and as the
+      // response's fxMissingCurrencies.
       missing.push({ currency: g.currency, day: g.day });
+      recordFxMissing([g.currency]);
+      continue;
     }
     const fx = fxByDay.get(g.day)!;
     totalInvested = totalInvested.plus(convert(g.totalInvested, g.currency, targetCurrency, fx));
@@ -124,14 +128,16 @@ export async function computeConvertedSummary(
   if (missing.length > 0) {
     log?.warn(
       { targetCurrency, missing },
-      "computeConvertedSummary: no FX rate for some buckets, falling back to 1:1",
+      "computeConvertedSummary: no FX rate for some buckets, excluded from the totals",
     );
   }
 
+  const fxMissingCurrencies = [...new Set(missing.map((m) => m.currency))].sort();
   return {
     totalInvested: totalInvested.toString(),
     totalProceeds: totalProceeds.toString(),
     totalIncome: totalIncome.toString(),
+    ...(fxMissingCurrencies.length > 0 ? { fxMissingCurrencies } : {}),
   };
 }
 

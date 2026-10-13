@@ -82,8 +82,13 @@ export function allocationBreakdown(
       add(byIndustry, m?.industry ?? "uncategorized", mv);
     }
 
-    if (h.currency != null) {
-      add(holdingsByCcy, h.currency, mv);
+    // At-cost holdings (`valuedAtCost`, no usable quote) carry `currency: null` but
+    // `summarizePortfolio` books their value into `exposureByCurrency` under the
+    // cost currency — attribute them there too, or the residual below would count
+    // them a second time as "cash" (audit B7).
+    const holdingCcy = h.currency ?? h.costCurrency;
+    if (holdingCcy != null) {
+      add(holdingsByCcy, holdingCcy, mv);
     }
 
     holdingsTotal = holdingsTotal.add(mv);

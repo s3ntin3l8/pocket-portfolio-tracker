@@ -106,6 +106,8 @@ export interface TxRow {
   sharesEstimated?: boolean;
   currency: string;
   displayRate?: string | null;
+  /** No FX rate into the display currency: shown native, no displayRate (audit B2). */
+  fxMissing?: boolean;
   displayCurrency?: string | null;
   executedAt: string;
   source: string;

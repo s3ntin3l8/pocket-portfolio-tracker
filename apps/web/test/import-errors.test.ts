@@ -103,3 +103,18 @@ describe("importErrorDetail", () => {
     expect(importErrorDetail({ reason: "rateLimited", provider: "claude" })).toBeNull();
   });
 });
+
+describe("classifyImportError — transfer without cost basis (audit B4)", () => {
+  it("maps a 400 transfer_cost_basis_required to its own reason", () => {
+    const err = new ApiError(
+      400,
+      JSON.stringify({ error: "transfer_cost_basis_required", draftIndices: [2] }),
+    );
+    expect(classifyImportError(err)).toEqual({ reason: "transferCostBasisRequired" });
+  });
+
+  it("keeps other 400s generic", () => {
+    const err = new ApiError(400, JSON.stringify({ error: "nothing_to_confirm" }));
+    expect(classifyImportError(err).reason).toBe("generic");
+  });
+});

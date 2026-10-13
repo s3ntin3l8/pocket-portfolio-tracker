@@ -2,7 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { portfolios, screenshotImports, trResolvedEvents } from "@portfolio/db";
-import { parsedGoldContractSchema, parsedTransactionSchema } from "@portfolio/schema";
+import {
+  parsedGoldContractSchema,
+  parsedTransactionSchema,
+  transferNeedsCostBasis,
+} from "@portfolio/schema";
 import { accountMismatchVerdict } from "./helpers.js";
 import { ownedPortfolio } from "../helpers.js";
 import { isCashMovementAction } from "../../services/pytr/mapper.js";
@@ -67,6 +71,16 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
       let drafts = confirmBody.transactions;
       if (drafts.length === 0 && contracts.length === 0) {
         return reply.code(400).send({ error: "nothing_to_confirm" });
+      }
+      // An inbound depot transfer at price 0 would land the shares at zero cost basis (a
+      // later sale then reports 100% gain and fully taxable proceeds). Refuse until the
+      // user enters the carried cost in the review screen (audit B4). `draftIndices` are
+      // positions in the submitted `transactions` array.
+      const missingCostBasis = drafts.flatMap((d, i) => (transferNeedsCostBasis(d) ? [i] : []));
+      if (missingCostBasis.length > 0) {
+        return reply
+          .code(400)
+          .send({ error: "transfer_cost_basis_required", draftIndices: missingCostBasis });
       }
       // Resolve the target portfolio: prefer the request body, fall back to what was
       // stored on the import (pytr always has one; legacy uploads may too). New-style

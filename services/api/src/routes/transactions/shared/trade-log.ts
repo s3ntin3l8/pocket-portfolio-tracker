@@ -9,6 +9,7 @@ import {
   type CorporateAction,
   type DriftRow,
   computeTrades,
+  partitionConvertible,
   rebalancingDrift,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
@@ -38,8 +39,11 @@ export async function buildTradeLog(
       app,
       coreTxns.map((t) => t.instrumentId),
     ));
+  // Exclude instruments/cash rows whose currency has no FX rate (audit B2): the misses
+  // are recorded into the request scope and reported as `fxMissingCurrencies`.
+  const { convertible } = partitionConvertible(coreTxns, target, fx, (id) => prices[id]?.currency);
   return computeTrades({
-    transactions: coreTxns,
+    transactions: convertible,
     corporateActions: cas,
     prices,
     displayCurrency: target,

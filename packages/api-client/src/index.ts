@@ -19,7 +19,7 @@ import type {
   DocumentCategory,
 } from "@portfolio/schema";
 
-export { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/schema";
+export { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/schema";
 export type { ImportIssue, ParsedGoldContract, ProviderCredentialInput } from "@portfolio/schema";
 export type { ImportStrategy, ImportSettingsUpdate } from "@portfolio/schema";
 export type { StorageSettingsUpdate, StorageSecretInput } from "@portfolio/schema";
@@ -803,6 +803,9 @@ export interface SourceSummary {
 export type TransactionStatus = "normal" | "archived" | "cash_neutral" | "draft";
 
 export interface Transaction {
+  /** True when the list was converted to a display currency but this row's currency
+   *  had no FX rate — no `displayRate` is attached and it stays native (audit B2). */
+  fxMissing?: boolean;
   id: string;
   portfolioId: string;
   instrumentId: string | null;
@@ -956,6 +959,12 @@ export interface HoldingValuation extends Holding {
    * (e.g. a "shown at cost" badge) rather than let it read as a real, flat market value.
    */
   valuedAtCost?: boolean;
+  /**
+   * True when this holding's currency has no known FX rate into the display currency
+   * (audit B2): display-currency fields are null and it's excluded from totals rather
+   * than converted 1:1. Undefined when FX resolved normally.
+   */
+  fxMissing?: boolean;
   previousClose: string | null;
   dayChange: string | null;
   dayChangePct: string | null;
@@ -989,6 +998,11 @@ export interface PortfolioSummary {
   totalDayChange: string;
   /** Wealth denominated in each currency (display-currency magnitudes). */
   exposureByCurrency: Record<string, string>;
+  /**
+   * Currencies with no known FX rate into the display currency (audit B2); amounts in
+   * them are excluded from the totals above. Empty/absent when every rate resolved.
+   */
+  fxMissingCurrencies?: string[];
   /** Allocation breakdown across asset class, currency, region, sector + concentration. */
   allocation?: AllocationBreakdown;
   /**
@@ -1026,6 +1040,11 @@ export interface NetWorth {
   totalDayChange: string;
   /** Wealth denominated in each currency (display-currency magnitudes). */
   exposureByCurrency: Record<string, string>;
+  /**
+   * Currencies with no known FX rate into the display currency (audit B2); amounts in
+   * them are excluded from the totals above. Empty/absent when every rate resolved.
+   */
+  fxMissingCurrencies?: string[];
   /** Allocation breakdown across asset class, currency, region, sector + concentration. */
   allocation?: AllocationBreakdown;
   /**
@@ -1382,6 +1401,12 @@ export interface IncomeInterest {
  * fields are in `displayCurrency` unless noted; `byCurrency` keeps the native sums.
  */
 export interface IncomeStats {
+  /**
+   * Currencies with no FX rate into the display currency (audit B2). Amounts in them are
+   * excluded from this response's converted totals — never converted 1:1. Absent when
+   * every rate resolved; the web shows `FxMissingBanner` when non-empty.
+   */
+  fxMissingCurrencies?: string[];
   displayCurrency: string;
   byYear: YearIncome[];
   monthly: MonthIncome[];
@@ -1412,6 +1437,12 @@ export interface IncomeStats {
 
 /** Contribution analytics + forecast seed for a savings/Sparplan account. */
 export interface ContributionStats {
+  /**
+   * Currencies with no FX rate into the display currency (audit B2). Amounts in them are
+   * excluded from this response's converted totals — never converted 1:1. Absent when
+   * every rate resolved; the web shows `FxMissingBanner` when non-empty.
+   */
+  fxMissingCurrencies?: string[];
   displayCurrency: string;
   totalContributed: string;
   totalWithdrawn: string;
@@ -1605,6 +1636,12 @@ export interface YearTax {
 
 /** The trade log for a scope: round-trip trades + tax-by-year breakdowns. */
 export interface TradeLog {
+  /**
+   * Currencies with no FX rate into the display currency (audit B2). Amounts in them are
+   * excluded from this response's converted totals — never converted 1:1. Absent when
+   * every rate resolved; the web shows `FxMissingBanner` when non-empty.
+   */
+  fxMissingCurrencies?: string[];
   displayCurrency: string;
   method: TradeMethod;
   trades: Trade[];
@@ -2375,7 +2412,13 @@ export function createApiClient(config: ApiClientConfig) {
       return request<{
         rows: Transaction[];
         total: number;
-        summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
+        summary?: {
+          totalInvested: string;
+          totalProceeds: string;
+          totalIncome: string;
+          /** Currencies excluded from these totals for lack of an FX rate (audit B2). */
+          fxMissingCurrencies?: string[];
+        };
         years?: string[];
       }>("GET", `/portfolios/${portfolioId}/transactions?${params}`);
     },
@@ -2397,7 +2440,13 @@ export function createApiClient(config: ApiClientConfig) {
       return request<{
         rows: Transaction[];
         total: number;
-        summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
+        summary?: {
+          totalInvested: string;
+          totalProceeds: string;
+          totalIncome: string;
+          /** Currencies excluded from these totals for lack of an FX rate (audit B2). */
+          fxMissingCurrencies?: string[];
+        };
         years?: string[];
       }>("GET", `/networth/transactions?${params}`);
     },

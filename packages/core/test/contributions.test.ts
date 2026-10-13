@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { contributionStats, mergeContributionStats, type CoreTransaction } from "../src/index.js";
+import {
+  boundaryFlowPoints,
+  contributionStats,
+  mergeContributionStats,
+  transferFlowPoints,
+  type CoreTransaction,
+} from "../src/index.js";
 
 function tx(p: Partial<CoreTransaction>): CoreTransaction {
   return {
@@ -556,5 +562,54 @@ describe("contributionStats — mixed-currency acquisitions (Hermes #1)", () => 
     } finally {
       stderrSpy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit B4 — inside-boundary transfer_out leaves at running average cost, never the
+// row price (broker feeds carry transfer_out at price 0)
+// ---------------------------------------------------------------------------
+describe("contributionStats / boundaryFlowPoints — inside transfer_out at average cost (audit B4)", () => {
+  it("buy 10@100 then transfer_out 10 with price 0 → outflow 1,000", () => {
+    const txns: CoreTransaction[] = [
+      tx({
+        type: "deposit",
+        instrumentId: null,
+        price: "1000",
+        executedAt: new Date("2026-01-02"),
+      }),
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2026-01-05") }),
+      tx({ type: "transfer_out", quantity: "10", price: "0", executedAt: new Date("2026-02-05") }),
+    ];
+    const s = contributionStats({ txns, displayCurrency: "EUR", boundary: "inside" });
+    expect(s.totalContributed).toBe("1000");
+    expect(s.totalWithdrawn).toBe("1000");
+    expect(s.netContributed).toBe("0");
+
+    const fx = (from: string, to: string) => (from === to ? "1" : null);
+    const pts = boundaryFlowPoints(txns, "inside", "EUR", fx);
+    expect(pts.map((p) => p.amount)).toEqual([-1000, 1000]);
+    expect(transferFlowPoints(txns, "inside", "EUR", fx).map((p) => p.amount)).toEqual([1000]);
+  });
+
+  it("values a partial transfer_out at the running average cost across several buys", () => {
+    const txns: CoreTransaction[] = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2026-01-05") }),
+      tx({ type: "buy", quantity: "10", price: "200", executedAt: new Date("2026-01-20") }),
+      // Out of order on purpose: the replay must be chronological.
+      tx({ type: "transfer_out", quantity: "5", price: "999", executedAt: new Date("2026-03-01") }),
+      tx({ type: "sell", quantity: "10", price: "300", executedAt: new Date("2026-02-01") }),
+    ];
+    const fx = (from: string, to: string) => (from === to ? "1" : null);
+    // avg 150 after both buys; the sell keeps avg 150; 5 × 150 = 750.
+    expect(transferFlowPoints(txns, "inside", "EUR", fx).map((p) => p.amount)).toEqual([750]);
+  });
+
+  it("a transfer_out with nothing held moves no capital", () => {
+    const txns: CoreTransaction[] = [
+      tx({ type: "transfer_out", quantity: "5", price: "100", executedAt: new Date("2026-03-01") }),
+    ];
+    const fx = (from: string, to: string) => (from === to ? "1" : null);
+    expect(boundaryFlowPoints(txns, "inside", "EUR", fx)).toEqual([]);
   });
 });

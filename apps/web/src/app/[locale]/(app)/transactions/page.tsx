@@ -2,6 +2,7 @@ import { retryAfterOf, type DataFailureStatus } from "@/lib/data-status";
 import { DataState } from "@/components/data-state";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt } from "lucide-react";
+import { FxMissingBanner, collectFxMissing } from "@/components/fx-missing-banner";
 import { EmptyState } from "@/components/empty-state";
 import { TransactionsTable, type TxRow } from "@/components/transactions-table";
 import { ExportCsvButton } from "@/components/export-csv-button";
@@ -55,8 +56,12 @@ export default async function TransactionsPage({
   let retryAfter: number | null = null;
   let rows: TxRow[] = [];
   let total = 0;
-  let txSummary: { totalInvested: string; totalProceeds: string; totalIncome: string } | null =
-    null;
+  let txSummary: {
+    totalInvested: string;
+    totalProceeds: string;
+    totalIncome: string;
+    fxMissingCurrencies?: string[];
+  } | null = null;
   let txYears: string[] = [];
   let singlePortfolio: { id: string; name: string; documentRetention: boolean } | null = null;
   let anomalies: Anomaly[] | null = null;
@@ -242,9 +247,17 @@ export default async function TransactionsPage({
     }
   }
 
+  // Currencies with no FX rate (audit B2): excluded from the converted totals; rows in
+  // them stay in their native currency.
+  const fxMissing = collectFxMissing(
+    txSummary,
+    rows.filter((r) => r.fxMissing).map((r) => r.currency),
+  );
+
   return (
     <div className="space-y-5">
       {heading}
+      <FxMissingBanner currencies={fxMissing} />
       <TransactionsTable
         rows={rows}
         showPortfolio={aggregate}

@@ -352,3 +352,45 @@ describe("ImportReview", () => {
     expect(screen.getAllByText("Antam Gold").length).toBeGreaterThan(0);
   });
 });
+
+describe("ImportReview — inbound transfer without cost basis (audit B4)", () => {
+  const XFER: ReviewDraft = {
+    uid: "x",
+    importId: "imp1",
+    _serverIdx: 3,
+    assetClass: "equity",
+    action: "transfer_in",
+    name: "Transferred Co",
+    quantity: "4",
+    unit: "shares",
+    price: "0",
+    fees: "0",
+    currency: "EUR",
+    executedAt: "2026-02-04",
+    confidence: 0.5,
+    attention: ["needs_cost_basis"],
+  };
+
+  it("flags the row and lets the cost basis be entered inline", () => {
+    const { onUpdate } = renderReview([...DRAFTS, XFER]);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText(tr.needsCostBasis)).toBeInTheDocument();
+    const input = within(table).getByLabelText(tr.costBasisLabel);
+    fireEvent.change(input, { target: { value: "95.20" } });
+    expect(onUpdate).toHaveBeenCalledWith("x", { price: "95.20" });
+  });
+
+  it("drops the badge once a positive cost basis is set, but keeps the input editable", () => {
+    renderReview([...DRAFTS, { ...XFER, price: "95.20" }]);
+    const table = screen.getByRole("table");
+    expect(within(table).queryByText(tr.needsCostBasis)).not.toBeInTheDocument();
+    expect(within(table).getByLabelText(tr.costBasisLabel)).toHaveValue("95.20");
+  });
+
+  it("does not flag a transfer_out at price 0", () => {
+    renderReview([...DRAFTS, { ...XFER, action: "transfer_out", attention: null }]);
+    const table = screen.getByRole("table");
+    expect(within(table).queryByText(tr.needsCostBasis)).not.toBeInTheDocument();
+    expect(within(table).queryByLabelText(tr.costBasisLabel)).not.toBeInTheDocument();
+  });
+});

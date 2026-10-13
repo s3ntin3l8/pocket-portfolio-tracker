@@ -161,6 +161,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         await getMarketData(),
         app.config.MARKET_DATA_TTL_MS,
         new Date(),
+        app.log,
       );
       app.log.info({ count }, "daily snapshot complete");
     } catch (err) {
@@ -179,6 +180,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         await getMarketData(),
         app.config.MARKET_DATA_TTL_MS,
         new Date(),
+        app.log,
       );
       app.log.info({ count }, "intraday snapshot complete");
     } catch (err) {

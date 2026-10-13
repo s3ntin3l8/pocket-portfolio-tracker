@@ -16,6 +16,11 @@ export { periodXirr } from "./period-xirr.js";
 export {
   netWorth,
   convert,
+  tryConvert,
+  fxAvailable,
+  partitionConvertible,
+  excludeMissingFx,
+  FxRateMissingError,
   type FxRateFn,
   type PriceQuote,
   type NetWorthInput,
@@ -85,6 +90,8 @@ export {
   chainAggregateIndex,
   aggregateValueFlows,
   splitAdjustmentFactor,
+  isDepotTransfer,
+  transferValueFlow,
   type PriceSeriesKind,
   type DailyValueFlow,
   type IndexPoint,
@@ -95,6 +102,7 @@ export {
   PERIOD_GAIN_MAX_PCT,
   PERIOD_LOSS_MAX_PCT,
   MAX_PRICE_CARRY_FORWARD_DAYS,
+  FX_MAX_CARRY_FORWARD_DAYS,
   DEAD_FEED_MISS_THRESHOLD,
   XIRR_MAX_RATE,
 } from "./sanity-gates.js";

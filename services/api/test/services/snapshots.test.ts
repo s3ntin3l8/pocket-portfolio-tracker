@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import {
+  fxRates as fxRatesTable,
   instruments,
   portfolioIntradaySnapshots,
   portfolios,
@@ -677,5 +678,185 @@ describe("aggregateByDate", () => {
       { date: "2026-02-01", netWorth: "1600000" }, // 100 × 16,000
       { date: "2026-02-02", netWorth: "1650000" }, // 100 × 16,500
     ]);
+  });
+});
+
+describe("recordDailySnapshots — missing FX rate (audit B2)", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("skips a portfolio whose holding has no FX rate into the base currency (no 1:1 row)", async () => {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "fx-missing-user", email: "fx-missing@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "FxMissing", baseCurrency: "IDR", cashCounted: true })
+      .returning();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "FXMISS",
+        market: "XETRA",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "EUR-quoted, no EUR/IDR rate",
+      })
+      .returning();
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: new Date("2026-01-10"),
+    });
+
+    // No fx_rates row for EUR→IDR and no provider under test.
+    const svc = new MarketDataService([new FixtureProvider({ FXMISS: "110" })]);
+    const warnings: unknown[] = [];
+    const log = { warn: (obj: unknown) => warnings.push(obj) } as never;
+    await recordDailySnapshots(db, svc, 10_000, new Date("2026-02-10T16:00:00.000Z"), log);
+
+    const rows = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, p.id));
+    expect(rows).toHaveLength(0);
+    expect(warnings).toContainEqual(
+      expect.objectContaining({ portfolioId: p.id, missing: ["EUR"] }),
+    );
+  });
+});
+
+describe("recordDailySnapshots — depot transfers (audit B1)", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("books a transfer_in at market value so the TWR index is flat across it", async () => {
+    const db = getDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "xfer-snap-user", email: "xfer-snap@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "XferSnap", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "XFERSNAP",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Transfer snapshot test",
+      })
+      .returning();
+    // Flat price on both days. The live job values the transactions as they stand when
+    // it runs, so each day's rows are inserted before that day's run.
+    const svc = new MarketDataService([new FixtureProvider({ XFERSNAP: "100" })]);
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      currency: "IDR",
+      executedAt: new Date("2026-04-01T09:00:00.000Z"),
+    });
+    await recordDailySnapshots(db, svc, 0, new Date("2026-04-01T16:00:00.000Z"));
+    // Depot transfer on day 2, carried cost 60 ≠ market 100.
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "transfer_in",
+      quantity: "10",
+      price: "60",
+      currency: "IDR",
+      executedAt: new Date("2026-04-02T09:00:00.000Z"),
+    });
+    await recordDailySnapshots(db, svc, 0, new Date("2026-04-02T16:00:00.000Z"));
+
+    const rows = (
+      await db.select().from(portfolioSnapshots).where(eq(portfolioSnapshots.portfolioId, p.id))
+    ).sort((a, b) => (a.date < b.date ? -1 : 1));
+    expect(rows.map((r) => r.date)).toEqual(["2026-04-01", "2026-04-02"]);
+    // Day 1 — the buy is the inception flow on the day it lands.
+    expect(rows[0].marketValue).toBe("1000");
+    // Day 2 — the transfer adds 10 × 100 of market value and the same as a flow.
+    expect(rows[1].marketValue).toBe("2000");
+    expect(rows[1].effectiveFlow).toBe("1000");
+
+    const index = chainIndex(
+      rows.map((r) => ({
+        date: r.date,
+        marketValue: r.marketValue ?? "0",
+        effectiveFlow: r.effectiveFlow ?? "0",
+      })),
+    );
+    for (const pt of index) expect(Number(pt.pct)).toBeCloseTo(0, 9);
+  });
+});
+
+describe("recordDailySnapshots — flows converted to the base currency", () => {
+  beforeAll(async () => {
+    await ensureDb();
+  });
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("FX-converts a foreign-currency trade's flow (it used to be added in the trade currency)", async () => {
+    const db = getDb();
+    const date = "2026-05-04";
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "flow-fx-user", email: "flow-fx@example.com" })
+      .returning();
+    const [p] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "FlowFx", baseCurrency: "IDR", cashCounted: false })
+      .returning();
+    const [inst] = await db
+      .insert(instruments)
+      .values({
+        symbol: "FLOWFX",
+        market: "XETRA",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "EUR stock",
+      })
+      .returning();
+    await db.insert(fxRatesTable).values({ base: "EUR", quote: "IDR", rate: "17000", date });
+    await db.insert(transactions).values({
+      portfolioId: p.id,
+      instrumentId: inst.id,
+      type: "buy",
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: new Date(`${date}T09:00:00.000Z`),
+    });
+    const svc = new MarketDataService([new FixtureProvider({ FLOWFX: "100" })]);
+    await recordDailySnapshots(db, svc, 0, new Date(`${date}T16:00:00.000Z`));
+    const [row] = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, p.id));
+    // 10 × 100 EUR × 17,000 in both market value and the inception flow — not 1,000.
+    expect(row.marketValue).toBe("17000000");
+    expect(row.effectiveFlow).toBe("17000000");
   });
 });

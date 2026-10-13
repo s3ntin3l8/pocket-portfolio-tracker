@@ -14,11 +14,16 @@
  * next write. Fine for single-instance; revisit before horizontal scaling.
  */
 
+import { captureFxMissing, recordFxMissing } from "./fx-missing.js";
+
 const DERIVATION_CACHE_TTL_MS = 60_000;
 
 export interface CacheEntry<T> {
   expiresAt: number;
   promise: Promise<T>;
+  /** Currencies the computation found no FX rate for (audit B2) — replayed into every
+   *  request served from this entry so its response still reports them. */
+  fxMissing?: string[];
 }
 
 const stores = new Set<Map<string, CacheEntry<unknown>>>();
@@ -57,16 +62,29 @@ export async function withDerivationCache<T>(
   }
 
   const hit = cache.get(key);
-  if (hit && hit.expiresAt > now) return hit.promise;
+  if (hit && hit.expiresAt > now) {
+    return hit.promise.then((v) => {
+      recordFxMissing(hit.fxMissing ?? []);
+      return v;
+    });
+  }
 
-  const promise = compute().catch((err) => {
-    // A failed computation must not poison the cache — drop it so the next call retries.
-    if (cache.get(key)?.promise === (promise as unknown as Promise<T>)) {
-      cache.delete(key);
-    }
-    throw err;
-  });
-  cache.set(key, { expiresAt: now + DERIVATION_CACHE_TTL_MS, promise } as CacheEntry<T>);
+  const entry = { expiresAt: now + DERIVATION_CACHE_TTL_MS } as CacheEntry<T>;
+  const promise = captureFxMissing(compute)
+    .then(({ value, missing }) => {
+      entry.fxMissing = missing;
+      recordFxMissing(missing);
+      return value;
+    })
+    .catch((err) => {
+      // A failed computation must not poison the cache — drop it so the next call retries.
+      if (cache.get(key)?.promise === (promise as unknown as Promise<T>)) {
+        cache.delete(key);
+      }
+      throw err;
+    });
+  entry.promise = promise;
+  cache.set(key, entry);
   return promise;
 }
 

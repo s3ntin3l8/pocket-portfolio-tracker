@@ -6,8 +6,16 @@
  *   Index_t = Index_{t-1} · (1 + r_t)   base 100; pct = index/base − 1
  *
  * V = holdings MARKET VALUE only (not net worth — robust to unrecorded cash).
- * effectiveFlow_t = buysCost − sellsProceeds − income(realSeries only)
+ * effectiveFlow_t = buysCost − sellsProceeds − income(realSeries only) + transfersValue
  *   = -Σ cashFlow(tx) for buy/savings_plan/sell + income(realSeries) on day t
+ *     + Σ {@link transferValueFlow} for depot transfers on day t
+ *
+ * Depot transfers (transfer_in/transfer_out, legacy bonus+kind:"transfer_in") move
+ * shares — and therefore V — without any cash, so they are booked at the market value
+ * they add/remove that day, making the transfer day exactly return-neutral (audit B1).
+ * This is the securities-sleeve TWR flow ONLY: the contribution/XIRR boundary walk in
+ * contributions.ts deliberately keeps valuing transfers at carried cost — do not share
+ * or collapse the two definitions (see CLAUDE.md, transfer_in/transfer_out bullet).
  *
  * Split-adjustment: store RAW closes in prices; adjust at read time:
  *   adjustedClose(d) = rawClose(d) / splitAdjustmentFactor(cas, id, d)
@@ -21,7 +29,7 @@ import { cashFlow } from "./cash.js";
 import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { toDateKey } from "./date-utils.js";
-import type { CoreTransaction, CorporateAction } from "./types.js";
+import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
 
 /** Classification of an instrument's price series for income-netting decisions. */
 export type PriceSeriesKind =
@@ -38,9 +46,10 @@ export interface DailyValueFlow {
   /** Sum of priced holdings market value in baseCurrency. */
   marketValue: string;
   /**
-   * Effective capital flow = buysCost − sellsProceeds − income(realSeries only).
-   * Equals -Σ cashFlow(tx) for buy/savings_plan/sell/realSeries-income txns on this day.
-   * FX-converted to baseCurrency at the day's rate.
+   * Effective capital flow = buysCost − sellsProceeds − income(realSeries only)
+   * + market value moved by depot transfers ({@link transferValueFlow}).
+   * Equals -Σ cashFlow(tx) for buy/savings_plan/sell/realSeries-income txns on this day,
+   * plus the transfers' own value change. FX-converted to baseCurrency at the day's rate.
    */
   effectiveFlow: string;
 }
@@ -81,6 +90,58 @@ export function splitAdjustmentFactor(
     }
   }
   return factor;
+}
+
+/**
+ * Whether a row is a depot transfer for the TWR securities-sleeve flow: a first-class
+ * `transfer_in`/`transfer_out`, or a legacy `bonus` row tagged `kind:"transfer_in"`
+ * (the pre-#309 pattern, until those rows are migrated). A plain `bonus` (free shares)
+ * is NOT a transfer — it is return and stays flow-free.
+ */
+export function isDepotTransfer(tx: CoreTransaction): boolean {
+  if (!tx.instrumentId) return false;
+  if (tx.type === "transfer_in" || tx.type === "transfer_out") return true;
+  return tx.type === "bonus" && tx.kind === "transfer_in";
+}
+
+/**
+ * Securities-sleeve TWR flow for one depot transfer (audit B1): the change in the
+ * instrument's end-of-day market value caused by this transfer alone — the instrument's
+ * value with every transaction up to `asOf`, minus its value with this one row left out.
+ * Positive for an inbound transfer, negative for an outbound one.
+ *
+ * `valueHolding` is the caller's own per-holding valuation rule in the base currency —
+ * the SAME rule its market-value series uses — so the flow always offsets exactly the
+ * value change the transfer causes there: `qty × close` (FX-converted) when priced; the
+ * carried cost basis (the row's `qty × price + fees` for an inbound transfer, the running
+ * average cost of the shares leaving for an outbound one) when the caller values an
+ * unpriced holding at cost; and 0 when the caller excludes the holding from value
+ * altogether. Quantities come from `computeHoldings`, so they are split-consistent with
+ * the market-value side by construction.
+ *
+ * Deliberately NOT the contribution/XIRR transfer valuation (`boundaryFlowPoints` /
+ * `transferFlowPoints`, carried cost) — see the module header.
+ */
+export function transferValueFlow(
+  tx: CoreTransaction,
+  transactions: CoreTransaction[],
+  corporateActions: CorporateAction[],
+  asOf: Date,
+  valueHolding: (h: Holding) => Decimal,
+  holdingsWithTx: Holding[] = computeHoldings(transactions, corporateActions, asOf),
+): Decimal {
+  const id = tx.instrumentId;
+  if (!id) return ZERO;
+  const valueOf = (hs: Holding[]): Decimal => {
+    const h = hs.find((x) => x.instrumentId === id);
+    return h && !D(h.quantity).isZero() ? valueHolding(h) : ZERO;
+  };
+  const without = computeHoldings(
+    transactions.filter((t) => t !== tx),
+    corporateActions,
+    asOf,
+  );
+  return valueOf(holdingsWithTx).sub(valueOf(without));
 }
 
 export interface BuildDailyValueFlowsInput {
@@ -158,18 +219,20 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     // AND no price at all before this date is valued at cost basis instead of
     // excluded (issue #744) — see hasEverPriced's doc comment for why an in-series
     // gap is deliberately NOT treated the same way.
+    const valueHolding = (h: Holding): Decimal => {
+      const p = priceAt(h.instrumentId, date);
+      if (p !== null) {
+        return D(convert(marketValue(h.quantity, p.close), p.currency, baseCurrency, fx));
+      }
+      if (h.costCurrency && hasEverPriced && !hasEverPriced(h.instrumentId, date)) {
+        return D(convert(h.costBasis, h.costCurrency, baseCurrency, fx));
+      }
+      return ZERO;
+    };
     let mv = ZERO;
     for (const h of holdings) {
       if (D(h.quantity).isZero()) continue;
-      const p = priceAt(h.instrumentId, date);
-      if (p !== null) {
-        const holdingMv = marketValue(h.quantity, p.close);
-        mv = mv.add(D(convert(holdingMv, p.currency, baseCurrency, fx)));
-        continue;
-      }
-      if (h.costCurrency && hasEverPriced && !hasEverPriced(h.instrumentId, date)) {
-        mv = mv.add(D(convert(h.costBasis, h.costCurrency, baseCurrency, fx)));
-      }
+      mv = mv.add(valueHolding(h));
     }
 
     // Effective flow: -Σ cashFlow(tx) for qualifying txns whose flow lands on this date.
@@ -177,7 +240,14 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
     const dayTxns = flowsByDate.get(date) ?? [];
     for (const tx of dayTxns) {
       const { type } = tx;
-      if (isTradeType(type)) {
+      if (isDepotTransfer(tx)) {
+        // Shares moved in/out with no cash: book the value they add/remove as a flow so
+        // the transfer day is return-neutral (audit B1). Checked before the trade/bonus
+        // branches so a legacy bonus+kind:"transfer_in" row lands here too.
+        flow = flow.add(
+          transferValueFlow(tx, transactions, corporateActions, asOf, valueHolding, holdings),
+        );
+      } else if (isTradeType(type)) {
         // effectiveFlow -= cashFlow(tx)
         // buy: cashFlow < 0 → -cashFlow > 0 (cost added to flow)
         // sell: cashFlow > 0 → -cashFlow < 0 (proceeds subtracted from flow)
@@ -190,8 +260,9 @@ export function buildDailyValueFlows(input: BuildDailyValueFlowsInput): DailyVal
           flow = flow.sub(D(convert(cf.toString(), tx.currency, baseCurrency, fx)));
         }
       }
-      // deposit/withdrawal/fee/interest/loan_*/split/bonus/rights:
-      // don't affect holdings MV → no effectiveFlow contribution.
+      // deposit/withdrawal/fee/interest/loan_*/split/rights: don't affect holdings MV →
+      // no effectiveFlow contribution. A plain `bonus` (free shares) does raise MV, but
+      // that is return, not capital — also no flow.
     }
 
     result.push({

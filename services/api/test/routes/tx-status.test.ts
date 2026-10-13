@@ -324,6 +324,118 @@ describe("transaction status (archived / cash_neutral)", () => {
     expect(res.json().updated).toBe(1);
   });
 
+  it("refuses to confirm a synced transfer_in draft at price 0 until its cost basis is set (audit B4)", async () => {
+    const { t, portfolioId } = await setup();
+    const [xfer] = await app.db
+      .insert(transactions)
+      .values({
+        portfolioId,
+        instrumentId: acmeId,
+        type: "transfer_in",
+        quantity: "5",
+        price: "0",
+        currency: "EUR",
+        executedAt: new Date("2026-02-02T00:00:00.000Z"),
+        source: "pytr",
+        externalId: "ev-xfer-nobasis",
+        status: "draft",
+      })
+      .returning({ id: transactions.id });
+    const otherDraft = await addDraftBuy(portfolioId, "ev-xfer-batchmate", "1");
+
+    // A batch containing it is refused as a whole (nothing half-applied).
+    const res = await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions/resolve-drafts`,
+      headers: auth(t),
+      payload: { ids: [xfer.id, otherDraft], action: "confirm" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: "transfer_cost_basis_required",
+      transactionIds: [xfer.id],
+    });
+    const [still] = await app.db
+      .select({ status: transactions.status })
+      .from(transactions)
+      .where(eq(transactions.id, otherDraft));
+    expect(still.status).toBe("draft");
+
+    // Once the carried cost is entered, confirm goes through.
+    await app.db.update(transactions).set({ price: "42.5" }).where(eq(transactions.id, xfer.id));
+    const ok = await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions/resolve-drafts`,
+      headers: auth(t),
+      payload: { ids: [xfer.id, otherDraft], action: "confirm" },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().updated).toBe(2);
+  });
+
+  it("PATCH …/status can't promote a price-0 transfer_in draft around the gate", async () => {
+    const { t, portfolioId } = await setup();
+    const [xfer] = await app.db
+      .insert(transactions)
+      .values({
+        portfolioId,
+        instrumentId: acmeId,
+        type: "transfer_in",
+        quantity: "5",
+        price: "0",
+        currency: "EUR",
+        executedAt: new Date("2026-02-02T00:00:00.000Z"),
+        source: "pytr",
+        externalId: "ev-xfer-status",
+        status: "draft",
+      })
+      .returning({ id: transactions.id });
+    for (const status of ["normal", "cash_neutral"]) {
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/portfolios/${portfolioId}/transactions/${xfer.id}/status`,
+        headers: auth(t),
+        payload: { status },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("transfer_cost_basis_required");
+    }
+    const archived = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}/transactions/${xfer.id}/status`,
+      headers: auth(t),
+      payload: { status: "archived" },
+    });
+    expect(archived.statusCode).toBe(200);
+  });
+
+  it("still lets the user discard a transfer_in draft with no cost basis", async () => {
+    const { t, portfolioId } = await setup();
+    const [xfer] = await app.db
+      .insert(transactions)
+      .values({
+        portfolioId,
+        instrumentId: acmeId,
+        type: "transfer_in",
+        quantity: "5",
+        price: "0",
+        currency: "EUR",
+        executedAt: new Date("2026-02-02T00:00:00.000Z"),
+        source: "pytr",
+        externalId: "ev-xfer-discard",
+        status: "draft",
+      })
+      .returning({ id: transactions.id });
+    const res = await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions/resolve-drafts`,
+      headers: auth(t),
+      payload: { ids: [xfer.id], action: "discard" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().updated).toBe(1);
+  });
+
   // ── Reassignment ──────────────────────────────────────────────────────────
   async function newPortfolio(t: string, name: string) {
     return (

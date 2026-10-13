@@ -10,10 +10,16 @@ import {
 import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
 import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
-import { aggregateValueFlows, xirr, chainIndex, convert } from "@portfolio/core";
+import { aggregateValueFlows, xirr, chainIndex, convert, fxAvailable } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
-import { loadValuation, historyCache, performanceCache, boundaryFlows } from "./shared.js";
+import {
+  loadValuation,
+  historyCache,
+  performanceCache,
+  boundaryFlows,
+  excludeFxMissingInstruments,
+} from "./shared.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import {
   getUserBenchmarkConfig,
@@ -157,7 +163,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             portfolio.cashCounted,
           );
 
-          const flows = await boundaryFlows(app, coreTxns, boundary, portfolio.baseCurrency);
+          // Flows and net worth exclude the same fxMissing instruments (audit B2).
+          const flows = await boundaryFlows(
+            app,
+            excludeFxMissingInstruments(coreTxns, summary),
+            boundary,
+            portfolio.baseCurrency,
+          );
           const asOf = new Date();
           flows.push({ amount: Number(summary.netWorth), date: asOf });
 
@@ -233,7 +245,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       // 1D/7D: aggregate the intraday (timestamped) table instead of the day-grained one.
       if (range === "1d" || range === "7d") {
         const since = new Date(Date.now() - (range === "1d" ? 1 : 7) * 86_400_000);
-        const rows = await app.db
+        const intradayRows = await app.db
           .select()
           .from(portfolioIntradaySnapshots)
           .where(
@@ -243,10 +255,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             ),
           )
           .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
-        if (rows.length === 0) return [];
+        if (intradayRows.length === 0) return [];
 
-        const currencies = [...new Set(rows.map((r) => r.currency))];
+        const currencies = [...new Set(intradayRows.map((r) => r.currency))];
         const fx = makeFxRateFn(await getFxRates(app.db, currencies, display), display);
+        // A portfolio whose base currency has no rate is left out (never 1:1, audit B2);
+        // the miss is reported as fxMissingCurrencies via the request scope.
+        const rows = intradayRows.filter((r) => fxAvailable(r.currency, display, fx));
 
         const byAt = new Map<string, { netWorth: number; marketValue: number }>();
         for (const r of rows) {
@@ -268,15 +283,21 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const start = rangeStart(range);
       const conds = [inArray(portfolioSnapshots.portfolioId, pfIds)];
       if (start) conds.push(gte(portfolioSnapshots.date, start));
-      const rows = await app.db
+      const snapRows = await app.db
         .select()
         .from(portfolioSnapshots)
         .where(and(...conds))
         .orderBy(asc(portfolioSnapshots.date));
 
-      const currencies = [...new Set(rows.map((r) => r.currency))];
-      const dates = [...new Set(rows.map((r) => r.date))];
+      const currencies = [...new Set(snapRows.map((r) => r.currency))];
+      const dates = [...new Set(snapRows.map((r) => r.date))];
       const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates);
+      // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported as
+      // fxMissingCurrencies. Rates carry forward/back over the whole date grid, so this
+      // drops a portfolio's whole leg consistently, never single days of it.
+      const rows = snapRows.filter((r) =>
+        fxAvailable(r.currency, display, makeFxRateFn(ratesByDate.get(r.date) ?? {}, display)),
+      );
 
       const perPortfolio = new Map<
         string,

@@ -8,9 +8,10 @@ import {
   type CoreTransaction,
   type PortfolioSummary,
   type SparplanStats,
+  partitionConvertible,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
-import { boundaryFlows } from "./flows.js";
+import { boundaryFlows, excludeFxMissingInstruments } from "./flows.js";
 import { instrumentMeta } from "./helpers.js";
 import { Decimal } from "decimal.js";
 
@@ -81,13 +82,19 @@ export async function buildContributions(
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
   const fx = makeFxRateFn(rates, display);
+  // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies. Drop the
+  // instruments the value side flagged `fxMissing` first (their QUOTE currency may be the
+  // unrated one, which a transaction-currency check can't see), so contributions, XIRR
+  // flows and `summary.netWorth` all exclude exactly the same instruments.
+  const valued = excludeFxMissingInstruments(coreTxns, summary);
+  const { convertible } = partitionConvertible(valued, display, fx);
   const stats = contributionStats({
-    txns: coreTxns,
+    txns: convertible,
     displayCurrency: display,
     fx,
     boundary,
   });
-  const flows = await boundaryFlows(app, coreTxns, boundary, display);
+  const flows = await boundaryFlows(app, valued, boundary, display);
   return enrichContributions(stats, summary.netWorth, flows, birthYear, portfolioType, {
     totalReturn: boundary === "outside",
     retirementAge,
@@ -109,7 +116,8 @@ export async function buildSparplanStats(
   const ccys = [...new Set(coreTxns.map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
   const fx = makeFxRateFn(rates, display);
-  const stats = detectSparplans({ txns: coreTxns, displayCurrency: display, fx });
+  const { convertible } = partitionConvertible(coreTxns, display, fx);
+  const stats = detectSparplans({ txns: convertible, displayCurrency: display, fx });
   const meta = await instrumentMeta(
     app,
     stats.plans.map((p) => p.instrumentId),

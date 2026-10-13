@@ -924,3 +924,49 @@ describe("allocationBreakdown — byIndustry", () => {
     expect(Math.abs(industryTotal - (TOTAL - 500_000))).toBeLessThan(TOLERANCE_IDR);
   });
 });
+
+// ---------------------------------------------------------------------------
+// allocationBreakdown — at-cost holdings are not double-counted as cash (audit B7)
+// ---------------------------------------------------------------------------
+
+describe("allocationBreakdown — at-cost holdings (audit B7)", () => {
+  it("one unpriced holding, no cash → cash slice is 0 and slices sum to total", () => {
+    const summary = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: XETR, type: "buy", quantity: "10", price: "100", currency: "EUR" }),
+      ],
+      prices: {},
+      displayCurrency: "EUR",
+      fx,
+      cashCounted: true,
+    });
+    expect(summary.holdings[0]?.valuedAtCost).toBe(true);
+
+    const result = allocationBreakdown(summary, instruments);
+    expect(result.byAssetClass.find((s) => s.key === "cash")).toBeUndefined();
+    const assetTotal = result.byAssetClass.reduce((s, sl) => s + Number(sl.value), 0);
+    const regionTotal = result.byRegion.reduce((s, sl) => s + Number(sl.value), 0);
+    expect(assetTotal).toBeCloseTo(1000, 6);
+    expect(regionTotal).toBeCloseTo(1000, 6);
+    expect(result.byAssetClass.reduce((s, sl) => s + sl.pct, 0)).toBeCloseTo(100, 1);
+  });
+
+  it("at-cost holding in a foreign cost currency is attributed to that currency", () => {
+    const summary = summarizePortfolio({
+      transactions: [
+        tx({ instrumentId: null, type: "deposit", price: "2000", currency: "EUR" }),
+        tx({ instrumentId: XETR, type: "buy", quantity: "10", price: "100", currency: "EUR" }),
+      ],
+      prices: {},
+      displayCurrency: "IDR",
+      fx,
+      cashCounted: true,
+    });
+    const result = allocationBreakdown(summary, instruments);
+    // 1,000 EUR at cost + 1,000 EUR cash, both × 16,000 → cash slice is exactly the cash.
+    const cash = result.byAssetClass.find((s) => s.key === "cash");
+    expect(Number(cash?.value)).toBeCloseTo(16_000_000, 0);
+    const assetTotal = result.byAssetClass.reduce((s, sl) => s + Number(sl.value), 0);
+    expect(assetTotal).toBeCloseTo(32_000_000, 0);
+  });
+});

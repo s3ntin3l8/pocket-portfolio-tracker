@@ -779,6 +779,7 @@
     "parsing": "Membaca transaksi Anda…",
     "parsingFile": "Membaca berkas {current} dari {total}…",
     "skipped": {
+      "transferCostBasisRequired": "{file}: transfer masuk memerlukan biaya perolehan — buka tinjauan untuk mengisinya.",
       "alreadyConfirmed": "{file}: sudah diimpor — dilewati.",
       "parseFailed": "{file}: tidak dapat dibaca (kesalahan provider) — dilewati.",
       "tooLarge": "{file}: terlalu besar (maks 25 MB) — dilewati.",
@@ -828,6 +829,10 @@
       "tax": "Pajak"
     },
     "review": {
+      "needsCostBasis": "Perlu biaya perolehan",
+      "needsCostBasisHint": "Transfer masuk tanpa harga beli. Isi harga beli awal per unit — jika tidak, penjualan berikutnya akan menampilkan seluruh hasil sebagai keuntungan.",
+      "costBasisLabel": "Biaya perolehan per unit",
+      "costBasisPlaceholder": "Harga beli",
       "filters": {
         "assetClass": "Kelas aset",
         "action": "Aksi",
@@ -884,6 +889,7 @@
       "history": "Lihat riwayat impor"
     },
     "errors": {
+      "transferCostBasisRequired": "Transfer masuk belum memiliki biaya perolehan. Isi harga beli awal per unit pada baris yang ditandai, lalu konfirmasi lagi.",
       "notConfigured": "Belum ada pembaca visi yang dikonfigurasi. Tambahkan kunci API untuk mengaktifkan impor tangkapan layar.",
       "parseFailed": "Tidak dapat membaca berkas itu. Coba gambar yang lebih jelas atau masukkan manual.",
       "tooLarge": "Berkas terlalu besar (maks 25 MB). Kompresi berkas lalu coba lagi.",
@@ -1339,6 +1345,9 @@
     "valuedAtCostBadge": "Nilai biaya",
     "valuedAtCostTooltip": "Harga pasar tidak tersedia — ditampilkan berdasarkan biaya perolehan, bukan nilai pasar.",
     "valuedAtCostFooterNote": "Termasuk {count, plural, other {# kepemilikan}} yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
+    "fxMissingBadge": "Tanpa kurs",
+    "fxMissingTooltip": "Kurs untuk mata uang ini tidak tersedia — tidak dihitung dalam total, bukan dikonversi 1:1.",
+    "fxMissingFooterNote": "Tidak termasuk {count, plural, other {# kepemilikan}} tanpa kurs yang tersedia.",
     "heroValuedAtCostNote": "Termasuk satu atau lebih kepemilikan yang ditampilkan berdasarkan biaya perolehan (harga pasar tidak tersedia).",
     "hero": {
       "label": "Total nilai portofolio",
@@ -1455,6 +1464,7 @@
     "filterDraftLabel": "Filter draf",
     "draftShowAll": "Semua",
     "draftOnly": "Hanya draf ({count})",
+    "draftTransferCostBasisRequired": "Transfer masuk belum memiliki biaya perolehan. Ubah draf dan isi harga beli awal per unit, lalu konfirmasi.",
     "reassign": {
       "title": "Pindahkan ke portofolio",
       "description": "Pindahkan transaksi ini ke portofolio lain. Holdings dan kontribusi ikut berpindah.",
@@ -2409,5 +2419,9 @@
     "rateLimitedTitle": "Terlalu banyak permintaan",
     "rateLimitedBody": "Server meminta kami melambat. Anda dapat mencoba lagi dalam {seconds} detik.",
     "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi."
+  },
+  "FxMissing": {
+    "title": "Kurs tidak tersedia.",
+    "body": "Tidak ada kurs untuk {currencies}, sehingga jumlah dalam mata uang tersebut tidak dihitung dalam total di sini, alih-alih dikonversi 1:1. Jumlah tersebut akan disertakan setelah kurs tersedia."
   }
 }

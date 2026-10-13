@@ -19,12 +19,14 @@ import {
   harvestSuggestions,
   type DriftRow,
   type TradeAction,
+  partitionConvertible,
 } from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
   buildSparplanStats,
+  excludeFxMissingInstruments,
   buildTradeLog,
   instrumentMeta,
   sparplanCache,
@@ -56,7 +58,13 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       const stats = await withDerivationCache(
         sparplanCache,
         cacheKey(portfolioId, portfolio.cashCounted ? "inside" : "outside"),
-        () => buildSparplanStats(app, coreTxns, portfolio.baseCurrency),
+        // Same fxMissing instruments out as the summary the drift is computed against (B2).
+        () =>
+          buildSparplanStats(
+            app,
+            excludeFxMissingInstruments(coreTxns, summary),
+            portfolio.baseCurrency,
+          ),
       );
 
       // Phase B: load instrument targets and compute drift + contribution split.
@@ -320,7 +328,9 @@ export function registerSparplanRoutes(app: FastifyInstance) {
               const ccys = [...new Set(coreTxns.map((t) => t.currency))];
               const rates = await getFxRates(app.db, ccys, display);
               const fx = makeFxRateFn(rates, display);
-              return detectSparplans({ txns: coreTxns, displayCurrency: display, fx });
+              // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies.
+              const { convertible } = partitionConvertible(coreTxns, display, fx);
+              return detectSparplans({ txns: convertible, displayCurrency: display, fx });
             },
           );
           const perPortfolio: SparplanStats[] = portfolioResults;

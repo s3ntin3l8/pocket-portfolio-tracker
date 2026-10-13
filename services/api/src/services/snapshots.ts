@@ -1,10 +1,16 @@
 import { desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
+import { Decimal } from "decimal.js";
 import {
   cashFlow,
+  computeHoldings,
   convert,
+  isDepotTransfer,
   isTradeType,
+  marketValue,
   toDateKey,
+  transferValueFlow,
   type FxRateFn,
+  type Holding,
   type PriceSeriesKind,
 } from "@portfolio/core";
 import {
@@ -15,8 +21,10 @@ import {
   transactions,
 } from "@portfolio/db";
 import type { MarketDataService } from "@portfolio/market-data";
+import type { FastifyBaseLogger } from "fastify";
 import type { DB } from "../db/client.js";
 import { valuePortfolio } from "./valuation.js";
+import { makeFxRateFn } from "./fx.js";
 import { isMarketOpen } from "./market-hours.js";
 
 /** Rows are pruned after ~8 days — comfortably enough for a 7D chart with headroom. */
@@ -32,12 +40,18 @@ export interface NetWorthPoint {
  * Record today's net-worth snapshot for every portfolio, in its base currency.
  * Idempotent per (portfolio, date) — re-running the job overwrites the day's value,
  * so a manual trigger or a retried cron never double-counts. Returns the row count.
+ *
+ * A portfolio whose valuation is missing an FX rate (`summary.fxMissingCurrencies`,
+ * audit B2) is skipped for the day — logged at warn — rather than persisting a value
+ * that silently omits (or, before B2, 1:1-converted) part of it. The history chart
+ * carries the previous snapshot forward over the gap.
  */
 export async function recordDailySnapshots(
   db: DB,
   marketData: MarketDataService,
   ttlMs: number,
   now: Date = new Date(),
+  log?: FastifyBaseLogger,
 ): Promise<number> {
   const date = toDateKey(now);
   const pfs = await db.select().from(portfolios);
@@ -95,7 +109,7 @@ export async function recordDailySnapshots(
       count++;
       continue;
     }
-    const { summary, coreTxns, metaById } = await valuePortfolio(
+    const { summary, coreTxns, metaById, prices, corporateActions, fxRates } = await valuePortfolio(
       db,
       marketData,
       ttlMs,
@@ -106,15 +120,28 @@ export async function recordDailySnapshots(
       undefined,
       now,
     );
+    if (summary.fxMissingCurrencies.length > 0) {
+      log?.warn(
+        { portfolioId: p.id, date, missing: summary.fxMissingCurrencies },
+        "daily snapshot skipped: FX rate missing",
+      );
+      continue;
+    }
 
-    // Compute today's effectiveFlow: -Σ cashFlow(tx) for qualifying txns executed today.
-    // This measures flows into/out of the SECURITIES sleeve only (holdings market value),
-    // mirroring the TWR definition in packages/core/src/twr.ts — the canonical source. TWR
-    // pairs it with marketValue (not net worth), so it is robust to unrecorded cash. Only
-    // buy/savings_plan/sell and dividend/coupon (realSeries) count. deposit/withdrawal/
-    // transfer_*/fee/interest are INTENTIONALLY excluded: they land in cash and don't move
-    // market value, so effectiveFlow is 0 on a pure-deposit day BY DESIGN (not a bug). This
-    // is deliberately NOT boundary-aware — external cash is instead captured by the money-
+    // Compute today's effectiveFlow: -Σ cashFlow(tx) for qualifying txns executed today,
+    // plus the market value moved by depot transfers. This measures flows into/out of the
+    // SECURITIES sleeve only (holdings market value), mirroring the TWR definition in
+    // packages/core/src/twr.ts — the canonical source. TWR pairs it with marketValue (not
+    // net worth), so it is robust to unrecorded cash. buy/savings_plan/sell and
+    // dividend/coupon (realSeries) count at their cash flow. deposit/withdrawal/fee/
+    // interest are INTENTIONALLY excluded: they land in cash and don't move market value,
+    // so effectiveFlow is 0 on a pure-deposit day BY DESIGN (not a bug). Depot transfers
+    // (transfer_in/transfer_out, legacy bonus+kind:"transfer_in") are the exception: they
+    // move shares — and market value — with no cash, so they are booked at the value they
+    // add/remove today (`transferValueFlow`, same valuation rule as `summary`'s market
+    // value), making the transfer day return-neutral (audit B1). That is the TWR flow
+    // only; the contribution/XIRR lens keeps valuing transfers at carried cost. This is
+    // deliberately NOT boundary-aware — external cash is instead captured by the money-
     // weighted XIRR lens (boundaryFlows/externalFlows in routes/transactions.ts).
     // PriceSeriesKind for each instrument: equity/etf/crypto/gold → realSeries; bond/nav → flatProxy.
     function kindOf(instrId: string): PriceSeriesKind {
@@ -126,21 +153,39 @@ export async function recordDailySnapshots(
 
     const todayMs = new Date(`${date}T00:00:00.000Z`).getTime();
     const tomorrowMs = todayMs + 86_400_000;
-    let effectiveFlow = new (await import("decimal.js")).Decimal(0);
+    // Every currency here is convertible: a missing rate already skipped the portfolio above.
+    const fx = makeFxRateFn(fxRates, p.baseCurrency);
+    const base = p.baseCurrency;
+    const toBase = (amount: string, ccy: string): Decimal =>
+      new Decimal(convert(amount, ccy, base, fx));
+    // Mirrors summarizePortfolio's per-holding market value (quote → qty × price, else the
+    // #744 cost-basis fallback), so a transfer's flow offsets exactly the value it moves.
+    const valueHolding = (h: Holding): Decimal => {
+      const quote = prices[h.instrumentId];
+      if (quote) return toBase(marketValue(h.quantity, quote.price), quote.currency);
+      if (h.costCurrency) return toBase(h.costBasis, h.costCurrency);
+      return new Decimal(0);
+    };
+    const asOf = new Date(`${date}T23:59:59.999Z`);
+    let holdingsToday: Holding[] | undefined;
+    let effectiveFlow = new Decimal(0);
     for (const tx of coreTxns) {
       const exMs = tx.executedAt.getTime();
       if (exMs < todayMs || exMs >= tomorrowMs) continue;
       const { type } = tx;
-      if (isTradeType(type)) {
-        const cf = cashFlow(tx);
-        effectiveFlow = effectiveFlow.sub(cf);
+      if (isDepotTransfer(tx)) {
+        holdingsToday ??= computeHoldings(coreTxns, corporateActions, asOf);
+        effectiveFlow = effectiveFlow.add(
+          transferValueFlow(tx, coreTxns, corporateActions, asOf, valueHolding, holdingsToday),
+        );
+      } else if (isTradeType(type)) {
+        effectiveFlow = effectiveFlow.sub(toBase(cashFlow(tx).toString(), tx.currency));
       } else if ((type === "dividend" || type === "coupon") && tx.instrumentId) {
         if (kindOf(tx.instrumentId) === "realSeries") {
-          const cf = cashFlow(tx);
-          effectiveFlow = effectiveFlow.sub(cf);
+          effectiveFlow = effectiveFlow.sub(toBase(cashFlow(tx).toString(), tx.currency));
         }
       }
-      // deposit/withdrawal/transfer/fee/interest: cash only, no MV change → not a flow (by design).
+      // deposit/withdrawal/fee/interest: cash only, no MV change → not a flow (by design).
     }
 
     await db
@@ -180,6 +225,7 @@ export async function recordIntradaySnapshots(
   marketData: MarketDataService,
   ttlMs: number,
   now: Date = new Date(),
+  log?: FastifyBaseLogger,
 ): Promise<number> {
   // Which instruments are held by which portfolio (mirrors refreshHeldPrices's
   // held-instruments query, but portfolio-scoped since the gate is per-portfolio).
@@ -237,6 +283,14 @@ export async function recordIntradaySnapshots(
       undefined,
       now,
     );
+    // Same FX-missing skip as the daily snapshot (audit B2).
+    if (summary.fxMissingCurrencies.length > 0) {
+      log?.warn(
+        { portfolioId: p.id, missing: summary.fxMissingCurrencies },
+        "intraday snapshot skipped: FX rate missing",
+      );
+      continue;
+    }
     await db.insert(portfolioIntradaySnapshots).values({
       portfolioId: p.id,
       capturedAt: now,

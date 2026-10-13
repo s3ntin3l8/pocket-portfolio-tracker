@@ -18,6 +18,7 @@ import {
 import type { DuplicateAnnotation, LikelyDuplicate } from "@portfolio/api-client";
 import { useApiClient } from "@/lib/api";
 import { useImportConfirm } from "@/lib/use-import-confirm";
+import { classifyImportError } from "@/lib/import-errors";
 import { useRouter } from "@/i18n/navigation";
 
 /**
@@ -88,7 +89,10 @@ export function DraftReviewClient({
       importedTimer.current = setTimeout(() => setImportedCount(null), 5000);
       router.refresh();
     },
-    getErrorMessage: () => t("reviewError"),
+    getErrorMessage: (err) =>
+      classifyImportError(err).reason === "transferCostBasisRequired"
+        ? ti("errors.transferCostBasisRequired")
+        : t("reviewError"),
   });
 
   function updateDraft(uid: string, patch: Partial<ImportDraft>) {

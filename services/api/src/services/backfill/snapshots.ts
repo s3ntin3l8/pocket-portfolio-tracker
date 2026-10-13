@@ -111,6 +111,27 @@ export async function writeSnapshotSeries(
 
   const fxByDate = await getFxRatesForDates(db, allCcys, baseCurrency, dateGrid);
 
+  // Missing FX (audit B2): never write a 1:1 value. getFxRatesForDates carries a rate
+  // forward/back over the whole grid, so a currency is either convertible on every day
+  // or on none — a missing one means every day's value is incomplete, so the run writes
+  // nothing (existing snapshots stay as they were) and logs once for the run, not per day.
+  const fxMissing = allCcys.filter(
+    (c) => c && c !== baseCurrency && !dateGrid.some((day) => fxByDate.get(day)?.[c]),
+  );
+  if (fxMissing.length > 0) {
+    process.stderr.write(
+      JSON.stringify({
+        level: "warn",
+        msg: "backfill skipped: FX rate missing",
+        portfolioId,
+        baseCurrency,
+        missing: fxMissing.sort(),
+        days: dateGrid.length,
+      }) + "\n",
+    );
+    return 0;
+  }
+
   function kindOf(instrId: string): PriceSeriesKind {
     const instr = instrById.get(instrId);
     if (!instr) return "none";

@@ -771,6 +771,7 @@
     "parsing": "Reading your transactions…",
     "parsingFile": "Parsing file {current} of {total}…",
     "skipped": {
+      "transferCostBasisRequired": "{file}: an incoming transfer needs its cost basis — open the review to enter it.",
       "alreadyConfirmed": "{file}: already imported — skipped.",
       "parseFailed": "{file}: couldn't be read (provider error) — skipped.",
       "tooLarge": "{file}: too large (max 25 MB) — skipped.",
@@ -820,6 +821,10 @@
       "tax": "Tax"
     },
     "review": {
+      "needsCostBasis": "Cost basis needed",
+      "needsCostBasisHint": "Incoming transfer without a purchase price. Enter what you originally paid per share — otherwise a later sale would show the full proceeds as gain.",
+      "costBasisLabel": "Cost basis per share",
+      "costBasisPlaceholder": "Price paid",
       "filters": {
         "assetClass": "Asset class",
         "action": "Action",
@@ -878,6 +883,7 @@
       "history": "View import history"
     },
     "errors": {
+      "transferCostBasisRequired": "An incoming transfer has no cost basis yet. Enter the price you originally paid per share on the highlighted rows, then confirm again.",
       "notConfigured": "No vision parser is configured yet. Add an API key to enable screenshot import.",
       "parseFailed": "Couldn't read that file. Try a clearer image or enter it manually.",
       "tooLarge": "That file is too large (max 25 MB). Please compress it and try again.",
@@ -1333,6 +1339,9 @@
     "valuedAtCostBadge": "At cost",
     "valuedAtCostTooltip": "No market price available — shown at cost basis, not market value.",
     "valuedAtCostFooterNote": "Includes {count, plural, one {1 holding} other {# holdings}} shown at cost (no market price available).",
+    "fxMissingBadge": "No FX rate",
+    "fxMissingTooltip": "No exchange rate available for this currency — excluded from totals rather than converted 1:1.",
+    "fxMissingFooterNote": "Excludes {count, plural, one {1 holding} other {# holdings}} with no exchange rate available.",
     "heroValuedAtCostNote": "Includes one or more holdings shown at cost (no market price available).",
     "hero": {
       "label": "Total portfolio value",
@@ -1449,6 +1458,7 @@
     "filterDraftLabel": "Draft filter",
     "draftShowAll": "All",
     "draftOnly": "Drafts only ({count})",
+    "draftTransferCostBasisRequired": "An incoming transfer has no cost basis yet. Edit the draft and enter the price you originally paid per share, then confirm it.",
     "reassign": {
       "title": "Reassign to portfolio",
       "description": "Move these transactions to another portfolio. Holdings and contributions follow them.",
@@ -2403,5 +2413,9 @@
     "rateLimitedTitle": "Too many requests",
     "rateLimitedBody": "The server asked us to slow down. You can retry in {seconds} seconds.",
     "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry."
+  },
+  "FxMissing": {
+    "title": "Exchange rate missing.",
+    "body": "No exchange rate is available for {currencies}, so {count, plural, one {amounts in that currency are} other {amounts in those currencies are}} left out of the totals here instead of being converted 1:1. They'll be included once a rate is available."
   }
 }

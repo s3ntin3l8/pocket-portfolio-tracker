@@ -17,7 +17,12 @@ describe("makeFxRateFn", () => {
     const fx = makeFxRateFn({ USD: "16000" }, "IDR");
     expect(fx("IDR", "IDR")).toBe("1");
     expect(fx("USD", "IDR")).toBe("16000");
-    expect(fx("EUR", "IDR")).toBe("1"); // unknown → unconverted
+  });
+
+  it("returns null (never 1:1) for an unknown pair (audit B2)", () => {
+    const fx = makeFxRateFn({ USD: "16000" }, "IDR");
+    expect(fx("EUR", "IDR")).toBeNull();
+    expect(fx("IDR", "USD")).toBeNull(); // only foreign → base is known
   });
 });
 
@@ -113,6 +118,38 @@ describe("getFxRates", () => {
       ),
     ).toBe(true);
     expect(row).toBeDefined();
+  });
+
+  it("carries forward the latest cached rate on or before today when the provider fails (audit B2)", async () => {
+    const db = getDb();
+    const now = new Date("2026-05-06T08:00:00.000Z");
+    await db.insert(fxRates).values([
+      { base: "NOK", quote: "IDR", rate: "11900", date: "2026-05-01" },
+      { base: "NOK", quote: "IDR", rate: "12000", date: "2026-05-04" },
+      // A future-dated row must never be used for "today".
+      { base: "NOK", quote: "IDR", rate: "99999", date: "2026-05-09" },
+    ]);
+    const out = await getFxRates(db, ["NOK"], "IDR", now, { getRate: async () => null });
+    expect(out.NOK).toBe("12000");
+  });
+
+  it("treats a cached rate older than FX_MAX_CARRY_FORWARD_DAYS as missing, not as today's", async () => {
+    const db = getDb();
+    const now = new Date("2026-05-20T08:00:00.000Z");
+    // 2026-05-06 is exactly 14 days back (still usable); 2026-05-05 is 15 days back.
+    await db.insert(fxRates).values([
+      { base: "SEK", quote: "IDR", rate: "1500", date: "2026-05-05" },
+      { base: "DKK", quote: "IDR", rate: "2300", date: "2026-05-05" },
+      { base: "DKK", quote: "IDR", rate: "2310", date: "2026-05-06" },
+    ]);
+    const out = await getFxRates(db, ["SEK", "DKK"], "IDR", now, { getRate: async () => null });
+    expect(out.SEK).toBeUndefined();
+    expect(out.DKK).toBe("2310");
+  });
+
+  it("omits a currency with no cached rate at all and no provider", async () => {
+    const out = await getFxRates(getDb(), ["CHF"], "IDR", new Date(), null);
+    expect(out.CHF).toBeUndefined();
   });
 });
 

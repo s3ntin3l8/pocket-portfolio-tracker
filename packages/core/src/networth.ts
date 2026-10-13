@@ -1,17 +1,106 @@
 import { Decimal } from "decimal.js";
-import type { Holding } from "./types.js";
+import type { CoreTransaction, Holding } from "./types.js";
 
-/** Returns the rate to multiply an amount in `from` to express it in `to`. */
-export type FxRateFn = (from: string, to: string) => string;
+/**
+ * Returns the rate to multiply an amount in `from` to express it in `to`, or `null`
+ * when no rate is known for the pair (audit B2). A missing rate must never be
+ * silently treated as 1:1 — `convert()` throws {@link FxRateMissingError} on it, and
+ * valuation paths that can degrade gracefully probe with {@link tryConvert} /
+ * {@link fxAvailable} first and flag the affected amounts (`fxMissing`) instead.
+ */
+export type FxRateFn = (from: string, to: string) => string | null;
+
+/** Thrown by {@link convert} when the FX function has no rate for the pair. */
+export class FxRateMissingError extends Error {
+  constructor(
+    readonly from: string,
+    readonly to: string,
+  ) {
+    super(`No FX rate available for ${from} -> ${to}`);
+    this.name = "FxRateMissingError";
+  }
+}
 
 export interface PriceQuote {
   price: string;
   currency: string;
 }
 
+/**
+ * Convert `amount` from `from` into `to`. Throws {@link FxRateMissingError} when the
+ * rate is unknown — callers that must keep going (valuation, snapshots) check
+ * {@link fxAvailable} or use {@link tryConvert} instead.
+ */
 export function convert(amount: string, from: string, to: string, fx: FxRateFn): string {
+  const out = tryConvert(amount, from, to, fx);
+  if (out === null) throw new FxRateMissingError(from, to);
+  return out;
+}
+
+/** Like {@link convert}, but returns `null` instead of throwing on an unknown rate. */
+export function tryConvert(amount: string, from: string, to: string, fx: FxRateFn): string | null {
   if (from === to) return amount;
-  return new Decimal(amount).mul(new Decimal(fx(from, to))).toString();
+  const rate = fx(from, to);
+  if (rate === null) return null;
+  return new Decimal(amount).mul(new Decimal(rate)).toString();
+}
+
+/** Whether `fx` can convert `from` into `to` (always true for the same currency). */
+export function fxAvailable(from: string, to: string, fx: FxRateFn): boolean {
+  return from === to || fx(from, to) !== null;
+}
+
+/**
+ * Wrap an FX function for PURE SUM aggregations (income totals, projections): a missing
+ * rate becomes "0", so the unconvertible amount is excluded from every converted sum
+ * rather than counted 1:1 or failing the computation (audit B2). The caller must still
+ * report the missing currencies (the API's `makeFxRateFn` records them per request).
+ * Never use where a converted amount is a divisor, a per-item display value, or a
+ * series point (a 0 there reads as a real value) — exclude those rows explicitly.
+ */
+export function excludeMissingFx(fx: FxRateFn): FxRateFn {
+  return (from, to) => fx(from, to) ?? "0";
+}
+
+/**
+ * Split transactions into those whose amounts can be expressed in `display` and the
+ * currencies that can't (audit B2), for consumers that convert per transaction and must
+ * EXCLUDE what they can't convert rather than fail or guess 1:1. Instrument rows are
+ * kept or dropped per instrument — every row of an instrument feeds one cost basis, so
+ * dropping a single leg would corrupt the rest — and an instrument is dropped when any of
+ * its rows' currencies, or its quote currency (`quoteCurrencyOf`), is unconvertible.
+ * Instrument-less (cash) rows are dropped individually. `missing` is sorted.
+ */
+export function partitionConvertible(
+  txns: CoreTransaction[],
+  display: string,
+  fx: FxRateFn,
+  quoteCurrencyOf?: (instrumentId: string) => string | undefined,
+): { convertible: CoreTransaction[]; missing: string[] } {
+  const ok = new Map<string, boolean>();
+  const missing = new Set<string>();
+  const canConvert = (ccy: string): boolean => {
+    let v = ok.get(ccy);
+    if (v === undefined) {
+      v = fxAvailable(ccy, display, fx);
+      ok.set(ccy, v);
+    }
+    if (!v) missing.add(ccy);
+    return v;
+  };
+  const droppedInstruments = new Set<string>();
+  for (const tx of txns) {
+    if (!tx.instrumentId) continue;
+    const quote = quoteCurrencyOf?.(tx.instrumentId);
+    // Evaluate both so every missing currency is reported, not just the first.
+    const txOk = canConvert(tx.currency);
+    const quoteOk = quote === undefined ? true : canConvert(quote);
+    if (!txOk || !quoteOk) droppedInstruments.add(tx.instrumentId);
+  }
+  const convertible = txns.filter((tx) =>
+    tx.instrumentId ? !droppedInstruments.has(tx.instrumentId) : canConvert(tx.currency),
+  );
+  return { convertible, missing: [...missing].sort() };
 }
 
 export interface NetWorthInput {

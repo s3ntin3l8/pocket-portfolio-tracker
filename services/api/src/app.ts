@@ -7,6 +7,8 @@ import compress from "@fastify/compress";
 import sensible from "@fastify/sensible";
 import multipart from "@fastify/multipart";
 import { ZodError } from "zod";
+import { FxRateMissingError } from "@portfolio/core";
+import { currentFxMissing, runInFxMissingScope } from "./lib/fx-missing.js";
 import { envPlugin } from "./plugins/env.js";
 import { loggingPlugin } from "./plugins/logging.js";
 import { securityPlugin } from "./plugins/security.js";
@@ -164,7 +166,16 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     if (error instanceof ZodError) {
       return reply.code(400).send({ error: "validation_error", issues: error.issues });
     }
-    app.log.error(error);
+    // Routes exclude what they can't convert and report `fxMissingCurrencies` (audit B2);
+    // reaching here means a conversion path forgot to — a bug, logged distinctly.
+    if (error instanceof FxRateMissingError) {
+      app.log.error(
+        { err: error, from: error.from, to: error.to },
+        "unhandled missing FX rate: a route converted without excluding unconvertible rows",
+      );
+    } else {
+      app.log.error(error);
+    }
     const err = error as { statusCode?: number; message?: string };
     const statusCode = err.statusCode ?? 500;
     // Never echo the raw error message for a server error (unset statusCode, or >= 500) —
@@ -175,6 +186,29 @@ export async function buildApp(opts: BuildAppOptions = {}) {
       return reply.code(statusCode).send({ error: "internal_error" });
     }
     return reply.code(statusCode).send({ error: err.message || "internal_error" });
+  });
+
+  // Missing-FX contract (audit B2): a conversion with no rate is never 1:1 and never a
+  // failed request. Each request gets its own scope that every missing rate records into
+  // (services/fx.ts); routes exclude the unconvertible rows, and this attaches the list to
+  // any JSON object response as `fxMissingCurrencies` (and, for every response shape incl.
+  // arrays, the `x-fx-missing-currencies` header). Absent when every rate resolved.
+  app.addHook("onRequest", (_request, _reply, done) => {
+    runInFxMissingScope(done);
+  });
+  app.addHook("preSerialization", async (_request, reply, payload) => {
+    const missing = currentFxMissing();
+    if (missing.length === 0) return payload;
+    reply.header("x-fx-missing-currencies", missing.join(","));
+    if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+      const existing = (payload as { fxMissingCurrencies?: unknown }).fxMissingCurrencies;
+      const merged = new Set([
+        ...(Array.isArray(existing) ? (existing as string[]) : []),
+        ...missing,
+      ]);
+      return { ...(payload as object), fxMissingCurrencies: [...merged].sort() };
+    }
+    return payload;
   });
 
   await app.register(envPlugin);

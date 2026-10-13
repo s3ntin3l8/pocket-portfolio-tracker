@@ -15,7 +15,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { PortfolioPicker } from "@/components/portfolio-picker";
 import { cn } from "@/lib/utils";
 import type { SortDir } from "@/lib/table-sort";
-import type { ReviewDraft, ImportIssue } from "./types";
+import type { ImportDraft, ReviewDraft, ImportIssue } from "./types";
 import type { ImportReviewGroup, ImportTargetPortfolio } from "./types";
 import { TABLE_COL_COUNT } from "./types";
 import { DraftRow } from "./draft-row";
@@ -42,6 +42,8 @@ export interface ImportTableProps {
   onToggleSort: (key: string) => void;
   onEdit: (uid: string) => void;
   onRemove: (uid: string) => void;
+  /** Inline row edits (e.g. a transfer's carried cost basis). */
+  onUpdate?: (uid: string, patch: Partial<ImportDraft>) => void;
   onMapIssue?: (issue: ImportIssue) => void;
   assetClassFilter: Set<string>;
   actionFilter: Set<string>;
@@ -69,6 +71,7 @@ export function ImportTable({
   onToggleSort,
   onEdit,
   onRemove,
+  onUpdate,
   onMapIssue,
   assetClassFilter,
   actionFilter,
@@ -250,6 +253,7 @@ export function ImportTable({
                             onToggle={onToggle}
                             onEdit={onEdit}
                             onRemove={onRemove}
+                            onUpdate={onUpdate}
                             showRemove={drafts.length > 1}
                           />
                         </TableRow>
@@ -271,6 +275,7 @@ export function ImportTable({
                     onToggle={onToggle}
                     onEdit={onEdit}
                     onRemove={onRemove}
+                    onUpdate={onUpdate}
                     showRemove={drafts.length > 1}
                   />
                 </TableRow>

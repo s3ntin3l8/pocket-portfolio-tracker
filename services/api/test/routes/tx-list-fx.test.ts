@@ -117,11 +117,14 @@ describe("GET /portfolios/:portfolioId/transactions ?convertTo=", () => {
     const rows = res.json() as {
       currency: string;
       executedAt: string;
-      displayCurrency: string;
-      displayRate: string;
+      displayCurrency?: string;
+      displayRate?: string;
+      fxMissing?: boolean;
     }[];
     expect(rows).toHaveLength(4);
-    for (const r of rows) expect(r.displayCurrency).toBe("EUR");
+    for (const r of rows.filter((r) => r.currency !== "SGD")) {
+      expect(r.displayCurrency).toBe("EUR");
+    }
 
     const byDateCcy = (ccy: string, date: string) =>
       rows.find((r) => r.currency === ccy && r.executedAt.startsWith(date))!;
@@ -130,8 +133,13 @@ describe("GET /portfolios/:portfolioId/transactions ?convertTo=", () => {
     expect(byDateCcy("USD", "2026-03-04").displayRate).toBe("0.92");
     // Same-currency row: identity rate.
     expect(byDateCcy("EUR", "2026-03-03").displayRate).toBe("1");
-    // Unknown pair: falls back to unconverted (1) rather than dropping the row.
-    expect(byDateCcy("SGD", "2026-03-03").displayRate).toBe("1");
+    // Unknown pair: the row is kept, flagged and left native — never a 1:1 displayRate
+    // (audit B2); the array response reports the currency via the header.
+    const sgd = byDateCcy("SGD", "2026-03-03");
+    expect(sgd.fxMissing).toBe(true);
+    expect(sgd.displayRate).toBeUndefined();
+    expect(sgd.displayCurrency).toBeUndefined();
+    expect(res.headers["x-fx-missing-currencies"]).toBe("SGD");
   });
 
   it("omits displayRate/displayCurrency when convertTo is not requested", async () => {

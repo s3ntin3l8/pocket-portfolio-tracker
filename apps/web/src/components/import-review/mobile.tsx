@@ -3,7 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown, Trash2 } from "lucide-react";
-import { LOW_CONFIDENCE_THRESHOLD } from "@portfolio/api-client";
+import { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PortfolioPicker } from "@/components/portfolio-picker";
@@ -78,6 +78,11 @@ function MobileDraftCard({
             {draft.likelyDuplicate && (
               <Badge variant={draft.likelyDuplicate.kind === "enrichment" ? "default" : "warning"}>
                 {dupLabel(draft)}
+              </Badge>
+            )}
+            {transferNeedsCostBasis(draft) && (
+              <Badge variant="warning" title={t("review.needsCostBasisHint")}>
+                {t("review.needsCostBasis")}
               </Badge>
             )}
           </div>
