@@ -64,10 +64,17 @@ export function IncomeTimeline({
   const t = useTranslations("Income");
   // The year filter is URL state (`?year=`), shallow: a deep link opens on that year.
   const searchParams = useSearchParams();
-  const [yearFilter, setYearFilterState] = useState(() => {
-    const fromUrl = searchParams?.get("year");
-    return fromUrl && /^\d{4}$/.test(fromUrl) ? fromUrl : "all";
-  });
+  const urlYearRaw = searchParams?.get("year");
+  const urlYear = urlYearRaw && /^\d{4}$/.test(urlYearRaw) ? urlYearRaw : "all";
+  const [yearFilter, setYearFilterState] = useState(urlYear);
+  // Browser back/forward changes the URL without remounting this component (the page
+  // does not read searchParams), so follow the URL whenever it changes (adjusting state
+  // during render, the React-endorsed alternative to a syncing effect).
+  const [seenUrlYear, setSeenUrlYear] = useState(urlYear);
+  if (seenUrlYear !== urlYear) {
+    setSeenUrlYear(urlYear);
+    setYearFilterState(urlYear);
+  }
   const setYearFilter = (y: string) => {
     setYearFilterState(y);
     replaceUrlParam("year", y === "all" ? null : y);

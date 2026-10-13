@@ -80,7 +80,9 @@ export function PortfolioSwitcher({
 
   // When the user drills into a portfolio from /portfolios (card click), we land on
   // /holdings?portfolio=<id> without touching the scope. Reflect that transient
-  // override in the switcher so the label is accurate.
+  // override in the switcher so the label is accurate. Precedence: the drill-in override
+  // beats `?scope=` for the label because it is what the positions table shows; the other
+  // cards on that page still follow the scope. Picking anything here drops the override.
   const overrideParam = pathname === "/holdings" ? searchParams.get("portfolio") : null;
   const overrideActive = !!overrideParam && portfolios.some((p) => p.id === overrideParam);
   const effectiveSelectedId = overrideActive ? overrideParam : scopedId;

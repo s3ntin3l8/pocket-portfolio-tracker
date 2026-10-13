@@ -203,7 +203,8 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   `ScopeLink`/`withScope`. The hero chart range (`?range=`) and the Income year filter
   (`?year=`) are shallow `history.replaceState` writes (`lib/url-state.ts`); the Tax year
   (`PeriodSelect`) is a `router.replace`. Scope changes `router.push`; range/period never add
-  history entries. Ids only in params — never personal data.
+  history entries. The URL is the source of truth; the `pf` cookie is the fallback for
+  scope-less URLs only (written on a switcher click, not on a deep link). Ids only in params — never personal data.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal
   per-person cap lives on `accountHolders.taxAllowanceAnnual` (Sparerpauschbetrag, default
   €1,000/€2,000 jointly assessed). The actual FSA is _allocated_ per depot via

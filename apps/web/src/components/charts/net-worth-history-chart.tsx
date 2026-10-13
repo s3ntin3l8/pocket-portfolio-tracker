@@ -99,6 +99,17 @@ export function NetWorthHistoryChart({
   const [data, setData] = useState<HistoryPoint[]>(initial);
   const [loading, setLoading] = useState(false);
 
+  // If the server re-renders with a different range/series (e.g. a non-scope URL change),
+  // adopt it. Skipped on mount; chip picks never change `initialRange` (shallow write).
+  const seededRange = useRef(initialRange);
+  useEffect(() => {
+    if (seededRange.current === initialRange) return;
+    seededRange.current = initialRange;
+    setRange(initialRange ?? "1y");
+    setData(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRange]);
+
   // Monotonic request token: a slow earlier response must not overwrite a newer pick. (The
   // range chips stay clickable while a fetch is in flight, so overlapping picks are possible.)
   const requestSeq = useRef(0);

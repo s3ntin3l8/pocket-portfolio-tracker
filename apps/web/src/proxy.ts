@@ -80,6 +80,7 @@ export default function proxy(request: NextRequest) {
 export function withScopeHeader(request: NextRequest): NextRequest {
   const param = request.nextUrl.searchParams.get(SCOPE_PARAM);
   const valid = parseScopeParam(param) !== null;
+  // No-op only when there's no spoofed header to drop AND no valid scope to add.
   if (!valid && !request.headers.has(SCOPE_HEADER)) return request;
   const headers = new Headers(request.headers);
   headers.delete(SCOPE_HEADER);
