@@ -16,6 +16,7 @@ import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
   ANTAM_BUYBACK_KEY,
   GALERI24_BUYBACK_KEY,
+  UBS_BUYBACK_KEY,
   navKey,
   upsertScrapedQuote,
 } from "../../src/services/scrapers/store.js";
@@ -115,10 +116,11 @@ describe("goldSources", () => {
     expect(goldSources(rows, configuredGamma).map((s) => s.market)).toEqual(["GAMMA", "ALPHA"]);
   });
 
-  it("exposes the real Antam and Galeri24 buyback sources (default registry)", () => {
+  it("exposes the real Antam, Galeri24 and UBS buyback sources (default registry)", () => {
     const sources = goldSources([]);
     expect(sources).toContainEqual({ market: "ANTAM", label: "Antam buyback" });
     expect(sources).toContainEqual({ market: "GALERI24", label: "Galeri24 buyback" });
+    expect(sources).toContainEqual({ market: "UBS", label: "UBS buyback (via Galeri24)" });
   });
 });
 
@@ -147,6 +149,12 @@ describe("default scraped-quote providers", () => {
     assetClass: "gold" as const,
     currency: "IDR",
   };
+  const ubsRef = {
+    symbol: "UBS",
+    market: "UBS",
+    assetClass: "gold" as const,
+    currency: "IDR",
+  };
   const navRef = {
     symbol: "RDPU",
     market: "ID",
@@ -162,6 +170,7 @@ describe("default scraped-quote providers", () => {
     vi.restoreAllMocks();
     delete process.env.ANTAM_BUYBACK_URL;
     delete process.env.GALERI24_BUYBACK_URL;
+    delete process.env.UBS_BUYBACK_URL;
     delete process.env.NAV_BASE_URL;
   });
 
@@ -172,15 +181,20 @@ describe("default scraped-quote providers", () => {
   it("reads Antam, Galeri24, and NAV defaults from scraped_quotes without HTTP", async () => {
     await upsertScrapedQuote(getDb(), ANTAM_BUYBACK_KEY, 2591100, "harga-emas");
     await upsertScrapedQuote(getDb(), GALERI24_BUYBACK_KEY, 2549000, "galeri24");
+    await upsertScrapedQuote(getDb(), UBS_BUYBACK_KEY, 2348000, "galeri24-ubs");
     await upsertScrapedQuote(getDb(), navKey("RDPU"), 1234.56, "bibit");
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     const antam = PROVIDER_REGISTRY.find((p) => p.id === "antam")!.create();
     const galeri24 = PROVIDER_REGISTRY.find((p) => p.id === "galeri24")!.create();
+    const ubs = PROVIDER_REGISTRY.find((p) => p.id === "ubs")!.create();
     const nav = PROVIDER_REGISTRY.find((p) => p.id === "nav")!.create();
 
     expect((await antam.getQuote(antamRef))?.price).toBe("2591100");
     expect((await galeri24.getQuote(galeri24Ref))?.price).toBe("2549000");
+    expect((await ubs.getQuote(ubsRef))?.price).toBe("2348000");
+    expect(ubs.supports("gold", "GALERI24")).toBe(false);
+    expect(ubs.supports("gold", "UBS")).toBe(true);
     expect((await nav.getQuote(navRef))?.price).toBe("1234.56");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -188,6 +202,7 @@ describe("default scraped-quote providers", () => {
   it("keeps external URL overrides on the HTTP provider path", async () => {
     process.env.ANTAM_BUYBACK_URL = "https://example.test/antam";
     process.env.GALERI24_BUYBACK_URL = "https://example.test/galeri24";
+    process.env.UBS_BUYBACK_URL = "https://example.test/ubs";
     process.env.NAV_BASE_URL = "https://example.test/nav";
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       const href = String(url);
@@ -199,15 +214,20 @@ describe("default scraped-quote providers", () => {
 
     const antam = PROVIDER_REGISTRY.find((p) => p.id === "antam")!.create();
     const galeri24 = PROVIDER_REGISTRY.find((p) => p.id === "galeri24")!.create();
+    const ubs = PROVIDER_REGISTRY.find((p) => p.id === "ubs")!.create();
     const nav = PROVIDER_REGISTRY.find((p) => p.id === "nav")!.create();
 
     expect((await antam.getQuote(antamRef))?.price).toBe("1234567");
     expect((await galeri24.getQuote(galeri24Ref))?.price).toBe("1234567");
+    expect((await ubs.getQuote(ubsRef))?.price).toBe("1234567");
     expect((await nav.getQuote(navRef))?.price).toBe("1000.5");
     expect(fetchSpy).toHaveBeenCalledWith("https://example.test/antam", {
       signal: expect.any(AbortSignal),
     });
     expect(fetchSpy).toHaveBeenCalledWith("https://example.test/galeri24", {
+      signal: expect.any(AbortSignal),
+    });
+    expect(fetchSpy).toHaveBeenCalledWith("https://example.test/ubs", {
       signal: expect.any(AbortSignal),
     });
     expect(fetchSpy).toHaveBeenCalledWith("https://example.test/nav/RDPU", {

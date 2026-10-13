@@ -6,6 +6,7 @@ import { getImportStrategy, IMPORT_SETTINGS_ID } from "../services/import-settin
 import {
   refreshAntamBuyback,
   refreshGaleri24Buyback,
+  refreshUbsBuyback,
   refreshNav,
 } from "../services/scrapers/store.js";
 import { FolderProvider, S3Provider } from "../storage/index.js";
@@ -45,8 +46,9 @@ export async function adminRoute(app: FastifyInstance) {
   app.post("/admin/market-data/scrape", { preHandler: app.requireAdmin }, async () => {
     const antamBuyback = await refreshAntamBuyback(app.db);
     const galeri24Buyback = await refreshGaleri24Buyback(app.db);
+    const ubsBuyback = await refreshUbsBuyback(app.db);
     const navFunds = await refreshNav(app.db);
-    return { antamBuyback, galeri24Buyback, navFunds };
+    return { antamBuyback, galeri24Buyback, ubsBuyback, navFunds };
   });
 
   // ─── DB statistics (#140) ────────────────────────────────────────────────

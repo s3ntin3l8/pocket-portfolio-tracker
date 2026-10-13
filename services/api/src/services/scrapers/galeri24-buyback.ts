@@ -52,10 +52,11 @@ function parseWeight(text: string): number {
  * `null` if the section or the 1 g row can't be found, so a layout change degrades to "no
  * quote" rather than throwing.
  */
-export function extractBuybackFromHtml(html: string): number | null {
+export function extractBuybackFromHtml(html: string, brand = "GALERI 24"): number | null {
   const $ = cheerio.load(html);
-  // Match on `data-id` (test fixture) or bare `id` (real galeri24.co.id markup).
-  const section = $('[data-id="GALERI 24"],[id="GALERI 24"]');
+  // Match on `data-id` (test fixture) or bare `id` (real galeri24.co.id markup). `brand` is
+  // one of the page's section ids (`GALERI 24`, `UBS`, `ANTAM`, …); the UBS scraper reuses this.
+  const section = $(`[data-id="${brand}"],[id="${brand}"]`);
   if (section.length === 0) return null;
 
   for (const row of section.find(".grid-cols-5").toArray()) {

@@ -59,7 +59,12 @@ import { runRecomputeJobs } from "./scheduler/recompute.js";
 import { refreshDividends } from "./dividends.js";
 import { refreshInstrumentMetadata } from "./instrument-metadata.js";
 import { recordDailySnapshots, recordIntradaySnapshots } from "./snapshots.js";
-import { refreshAntamBuyback, refreshGaleri24Buyback, refreshNav } from "./scrapers/store.js";
+import {
+  refreshAntamBuyback,
+  refreshGaleri24Buyback,
+  refreshNav,
+  refreshUbsBuyback,
+} from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
 import { syncIbkrConnection } from "./ibkr/sync.js";
 import {
@@ -299,7 +304,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   });
   await boss.schedule(IBKR_SYNC_QUEUE, ibkrSyncCron);
 
-  // Scrape the gold buyback rates (Antam + Galeri24) into scraped_quotes; read in-process by
+  // Scrape the gold buyback rates (Antam + Galeri24 + UBS) into scraped_quotes; read in-process by
   // the default BuybackProviders (see market-data.ts). Each scraper self-handles failures
   // (returns null), so one dead source doesn't block the other.
   await boss.createQueue(ANTAM_QUEUE);
@@ -307,7 +312,8 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     try {
       const antam = await refreshAntamBuyback(getDb());
       const galeri24 = await refreshGaleri24Buyback(getDb());
-      app.log.info({ antam, galeri24 }, "gold buyback scrape complete");
+      const ubs = await refreshUbsBuyback(getDb());
+      app.log.info({ antam, galeri24, ubs }, "gold buyback scrape complete");
     } catch (err) {
       app.log.error({ err }, "gold buyback scrape failed");
     }

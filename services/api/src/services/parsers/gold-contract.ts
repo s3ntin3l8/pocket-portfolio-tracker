@@ -23,8 +23,15 @@ export function goldInstrumentForContract(c: ParsedGoldContract): {
   market: string;
   name: string;
 } {
-  // Galeri 24 / Pegadaian MULIA gold is valued at the GALERI24 buyback per gram.
-  const market = "GALERI24";
+  // Galeri 24 / Pegadaian sells Antam and UBS bars on cicilan too; value those at their own
+  // brand's buyback. Anything else (Galeri 24's own MULIA gold) uses the GALERI24 buyback.
+  // A name mentioning both brands resolves to UBS (checked first) — ambiguous, rare, and the
+  // user can correct the instrument's market afterwards.
+  const market = /\bUBS\b/i.test(c.goldName ?? "")
+    ? "UBS"
+    : /\bANTAM\b/i.test(c.goldName ?? "")
+      ? "ANTAM"
+      : "GALERI24";
   // Key each contract to its own instrument so per-contract cost basis and the
   // loan↔instrument link stay 1:1 (all priced identically by the buyback provider).
   const key = c.contractNo ?? c.goldName ?? `${c.grams}g`;

@@ -5,6 +5,7 @@ import { instruments, prices, scrapedQuotes } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
+import { BUYBACK_GOLD_MARKETS, isBuybackGoldMarket } from "../scrapers/store.js";
 import {
   loadBackfillContext,
   firstHeldDateFrom,
@@ -54,16 +55,21 @@ export async function backfillPortfolioHistory(
   const buybackRows = await db
     .select()
     .from(scrapedQuotes)
-    .where(inArray(scrapedQuotes.key, ["gold:antam-buyback", "gold:galeri24-buyback"]));
+    .where(
+      inArray(
+        scrapedQuotes.key,
+        BUYBACK_GOLD_MARKETS.map((m) => m.key),
+      ),
+    );
   for (const r of buybackRows) {
-    const market = r.key.replace("gold:", "").replace("-buyback", "").toUpperCase();
-    goldBuybackByMarket.set(market, r.value);
+    const entry = BUYBACK_GOLD_MARKETS.find((m) => m.key === r.key);
+    if (entry) goldBuybackByMarket.set(entry.market, r.value);
   }
 
   let xauSpotHistory: Map<string, string> | null = null;
 
   const goldBuybackInstrs = instrRows.filter(
-    (i) => i.assetClass === "gold" && (i.market === "ANTAM" || i.market === "GALERI24"),
+    (i) => i.assetClass === "gold" && isBuybackGoldMarket(i.market),
   );
 
   if (goldBuybackInstrs.length > 0) {
@@ -139,7 +145,7 @@ export async function backfillPortfolioHistory(
       continue;
     }
 
-    if (instr.assetClass === "gold" && (instr.market === "ANTAM" || instr.market === "GALERI24")) {
+    if (instr.assetClass === "gold" && isBuybackGoldMarket(instr.market)) {
       const todayBuyback = goldBuybackByMarket.get(instr.market);
       if (!todayBuyback || !xauSpotHistory) continue;
 

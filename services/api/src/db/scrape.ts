@@ -3,6 +3,7 @@ import {
   refreshAntamBuyback,
   refreshGaleri24Buyback,
   refreshNav,
+  refreshUbsBuyback,
 } from "../services/scrapers/store.js";
 
 /**
@@ -17,6 +18,8 @@ async function main() {
   console.log(`Antam buyback: ${buyback ?? "unavailable"}`);
   const galeri24 = await refreshGaleri24Buyback(db);
   console.log(`Galeri24 buyback: ${galeri24 ?? "unavailable"}`);
+  const ubs = await refreshUbsBuyback(db);
+  console.log(`UBS buyback: ${ubs ?? "unavailable"}`);
   const navFunds = await refreshNav(db);
   console.log(`Reksa-dana NAV funds cached: ${navFunds}`);
   await closeDb();

@@ -4,6 +4,7 @@ import {
   getScrapedQuote,
   ANTAM_BUYBACK_KEY,
   GALERI24_BUYBACK_KEY,
+  UBS_BUYBACK_KEY,
   navKey,
 } from "../services/scrapers/store.js";
 
@@ -29,6 +30,16 @@ export async function internalMarketDataRoute(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (_request, reply) => {
       const buyback = await getScrapedQuote(app.db, GALERI24_BUYBACK_KEY);
+      if (buyback === null) return reply.code(404).send({ error: "no_quote" });
+      return { buyback };
+    },
+  );
+
+  app.get(
+    "/internal/gold/ubs-buyback",
+    { preHandler: app.authenticate },
+    async (_request, reply) => {
+      const buyback = await getScrapedQuote(app.db, UBS_BUYBACK_KEY);
       if (buyback === null) return reply.code(404).send({ error: "no_quote" });
       return { buyback };
     },
