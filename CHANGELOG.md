@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.2.0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.22...v0.2.0) (2026-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **security:** read-scope side effects, log redaction, input validation, subprocess env, encryption guards, token lifecycle, dep overrides ([#884](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/884))
+* **api:** income SQL parity, draft filter, backfill net-worth parity, return pct, split-aware walk, period P&L, cache keys, pagination, UTC anchors ([#882](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/882))
+
+### Features
+
+* **ux:** move tax-regime toggle to Settings ([#875](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/875)) ([54d3c6f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/54d3c6f04e0ff42cc1b5580f306caa373feb6ab7))
+* **ux:** no truncated money, table scroll affordance, FAB inset, unified instrument logo, observed nits ([#890](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/890)) ([22c8eb1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/22c8eb15084bda1028bcc5639ca09e6ec61ff810))
+* **ux:** one gain story and at-cost row treatment ([#888](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/888)) ([d88b8c5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d88b8c572ccfae875b0d7f9383a62ef2dd974a16))
+* **ux:** scope, range and period as URL state ([#892](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/892)) ([4bd9934](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4bd9934eb81fd665d721d81df942cb32a04e61ac))
+
+
+### Bug Fixes
+
+* **a11y,i18n:** keyboard targets, labels, names, colour, landmarks, motion, hit areas, locale formatting ([#883](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/883)) ([87683fe](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/87683fef869844a60ffee7f92e76ec3759ce248e))
+* **api:** income SQL parity, draft filter, backfill net-worth parity, return pct, split-aware walk, period P&L, cache keys, pagination, UTC anchors ([#882](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/882)) ([810f2a7](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/810f2a7686481f78bd2b2d6b2a7b791cc6223941))
+* **api:** key rate limit per credential, forward client IP, 429 UI state ([#877](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/877)) ([df1776f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/df1776f9bf517779d6f32ef75f41c78633c55e88))
+* **core,api:** finish the decimal sweep and [#691](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/691) core edges ([#887](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/887)) ([5b63791](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5b637913943ea7d82917665b5e15beb6e2d268d3))
+* **core:** transfer flows in TWR, FX fallback, transfer cost basis, at-cost allocation, same-day XIRR ([#876](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/876)) ([74535c4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/74535c4bb8d61bdd4681b92c758e75b5b1120132))
+* **security:** instrument upgrade tiers, PAT admin default, OIDC email_verified, audit-log order, inbox keys ([#873](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/873)) ([6c236a3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6c236a337712cb59583ba60dd133250ece9d5bad))
+* **security:** read-scope side effects, log redaction, input validation, subprocess env, encryption guards, token lifecycle, dep overrides ([#884](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/884)) ([1de3110](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1de3110faadc0e3211212aa4f763492efbbeb5de))
+* **tax:** harvest asset filter, TF on distributions, loss-pot netting, ID final-tax scope, rate/period defaults ([#881](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/881)) ([77db0cb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/77db0cbe61a234fba2bc3f1ec225580a2dab2eb9))
+* **web:** 401 handling, locale decimal input, chart holder scope, anomaly badge, offline locales, error boundaries, key warning ([#878](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/878)) ([a9a4b90](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a9a4b900bb31f00a244a503b92f937cdac7bfa24))
+* **web:** keep Holdings filter chips clear of the search box at tablet widths ([#893](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/893)) ([6c9891d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6c9891d8227144d746007051b28246d603b543ce))
+* **web:** move collectFxMissing out of the client banner module ([#879](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/879)) ([ad51498](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ad514989de341578ac627a5e282f5ae11bf9ff01))
+* **web:** portfolio edges, overlay sizes, polling/PWA hygiene, dead code, api-client timeout, code-splitting ([#886](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/886)) ([bc56bca](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bc56bca79f2fad157dd7803ec36dec85c0e33060))
+
+
+### Performance Improvements
+
+* **api:** refresh scope, FX/benchmark refetch, backfill batching, corp-action index, job robustness, provider timeouts ([#889](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/889)) ([1fe35d5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1fe35d515dc7095db42f2ff8c0f00efe80c4a167))
+
 ## [0.1.22](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.21...v0.1.22) (2026-10-12)
 
 
