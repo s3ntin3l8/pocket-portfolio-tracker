@@ -20,6 +20,7 @@ import {
   loadNetworthAnomalies,
   loadNetWorth,
   loadNetWorthHistory,
+  loadNetWorthHolderScope,
   loadPreferences,
   loadMe,
   getSelectedPortfolioId,
@@ -90,18 +91,20 @@ export default async function HoldingsPage({
   // all-portfolios view. Per-portfolio anomalies only work with a specific ID.
   const anomaliesPromise = portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies();
   const historyPromise = loadNetWorthHistory(HERO_INITIAL_RANGE);
+  const holderScopePromise = loadNetWorthHolderScope();
   const selectedIdPromise = getSelectedPortfolioId();
   const mePromise = loadMe();
 
   const prefs = await prefsPromise;
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
-  const [result, netWorthResult, anomalies, history, selectedId] = await Promise.all([
+  const [result, netWorthResult, anomalies, history, selectedId, holderId] = await Promise.all([
     loadHoldings(costBasis, portfolioParam),
     loadNetWorth(costBasis),
     anomaliesPromise,
     historyPromise,
     selectedIdPromise,
+    holderScopePromise,
   ]);
 
   if (TIMING) {
@@ -168,8 +171,12 @@ export default async function HoldingsPage({
   // Rendered unconditionally there rather than gated on `holdings.length > 0` as before:
   // that guard also hid it for a cash-only portfolio, even though `exportRows` already
   // included its cash rows.
+  // Explicit key: this element is created in the server component and handed to the client
+  // `PositionsPanel` → `TableToolbar`; once serialized across the RSC boundary React treats it as
+  // a list child there, and a keyless one trips the "unique key" warning (audit E8).
   const exportButton = (
     <ExportCsvButton
+      key="export-csv"
       filename="holdings.csv"
       headers={[
         "Symbol",
@@ -311,6 +318,7 @@ export default async function HoldingsPage({
           initialHistory={history}
           initialRange={HERO_INITIAL_RANGE}
           selectedId={selectedId}
+          holderId={holderId}
           benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
           hasValuedAtCostHoldings={summary.holdings.some((h) => h.valuedAtCost)}
         />

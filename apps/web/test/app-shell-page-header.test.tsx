@@ -39,4 +39,13 @@ describe("AppShell page header wiring", () => {
     expect(await screen.findByRole("heading", { name: "Income report" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/reports");
   });
+
+  it("renders the Activity anomaly badge in the sidebar when given a non-zero count", () => {
+    render(
+      <AppShell anomalyCount={4}>
+        <div />
+      </AppShell>,
+    );
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import { useLocale } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { caretForDigits, digitsBefore, formatGrouped, sanitizeNumericInput } from "./number-format";
 
@@ -17,6 +18,7 @@ interface NumberFieldProps extends Omit<
  *  Preserves caret position across reformatting so typing into the middle of a long number
  *  doesn't jump the cursor to the end. */
 export function NumberField({ value, onValueChange, ...props }: NumberFieldProps) {
+  const locale = useLocale();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
 
@@ -32,13 +34,13 @@ export function NumberField({ value, onValueChange, ...props }: NumberFieldProps
       {...props}
       ref={inputRef}
       inputMode="decimal"
-      value={formatGrouped(value)}
+      value={formatGrouped(value, locale)}
       onChange={(e) => {
         const el = e.target;
         const caret = el.selectionStart ?? el.value.length;
         const digits = digitsBefore(el.value, caret);
-        const raw = sanitizeNumericInput(el.value);
-        pendingCaret.current = caretForDigits(formatGrouped(raw), digits);
+        const raw = sanitizeNumericInput(el.value, locale);
+        pendingCaret.current = caretForDigits(formatGrouped(raw, locale), digits);
         onValueChange(raw);
       }}
     />

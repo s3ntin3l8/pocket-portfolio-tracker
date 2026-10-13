@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { LineChart } from "lucide-react";
 import type { HistoryPoint, PerformancePoint } from "@portfolio/api-client";
@@ -53,6 +53,7 @@ export function NetWorthHistoryChart({
   initial,
   currency,
   selectedId = null,
+  holderId,
   variant = "card",
   initialRange,
   onSeriesChange,
@@ -60,6 +61,9 @@ export function NetWorthHistoryChart({
   initial: HistoryPoint[];
   currency: string;
   selectedId?: string | null;
+  /** Holder scope the server used for `initial`; forwarded on refetch so a range change
+   *  doesn't silently widen to all holders. Ignored when `selectedId` is set. */
+  holderId?: string;
   /** "hero" renders a minimal (axis-less, white-on-brand) sparkline for the Holdings
    *  glance card: no mode toggle (always Value), and only 1D/7D/1M/1Y/ALL chips. */
   variant?: "card" | "hero";
@@ -86,18 +90,28 @@ export function NetWorthHistoryChart({
   const [data, setData] = useState<HistoryPoint[]>(initial);
   const [loading, setLoading] = useState(false);
 
+  // Monotonic request token: a slow earlier response must not overwrite a newer pick. (The
+  // range chips stay clickable while a fetch is in flight, so overlapping picks are possible.)
+  const requestSeq = useRef(0);
+
+  // A selected portfolio wins over the holder scope (which only applies to the aggregate view).
+  function fetchHistory(r: ChartRange): Promise<HistoryPoint[]> {
+    if (selectedId) return api.getPortfolioHistory(selectedId, r);
+    return holderId ? api.getNetWorthHistory(r, { holderId }) : api.getNetWorthHistory(r);
+  }
+
   async function pick(r: ChartRange) {
     if (r === range) return;
     setRange(r);
     setLoading(true);
+    const seq = ++requestSeq.current;
     try {
-      setData(
-        selectedId ? await api.getPortfolioHistory(selectedId, r) : await api.getNetWorthHistory(r),
-      );
+      const next = await fetchHistory(r);
+      if (seq === requestSeq.current) setData(next);
     } catch {
       // keep last good series on failed refetch
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }
 
@@ -204,13 +218,7 @@ export function NetWorthHistoryChart({
         ) : (
           <p className="py-8 text-center text-sm text-white/80">{te("historyTitle")}</p>
         )}
-        <RangeToggle
-          value={range}
-          onChange={pick}
-          disabled={loading}
-          ranges={HERO_RANGES}
-          theme="inverse"
-        />
+        <RangeToggle value={range} onChange={pick} ranges={HERO_RANGES} theme="inverse" />
       </div>
     );
   }
@@ -242,7 +250,7 @@ export function NetWorthHistoryChart({
             </button>
           ))}
         </div>
-        <RangeToggle value={range} onChange={pick} disabled={loading} />
+        <RangeToggle value={range} onChange={pick} />
       </div>
       {intraday && data.length < 2 ? (
         collectingNote

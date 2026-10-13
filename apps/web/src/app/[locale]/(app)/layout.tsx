@@ -6,7 +6,13 @@ import { ImportTasksProvider } from "@/components/import-tasks-provider";
 import { SessionErrorGuard } from "@/components/session-error-guard";
 import { PwaUpdater } from "@/components/pwa-updater";
 import { Toaster } from "@/components/ui/sonner";
-import { resolveSelection, loadMe, loadAccountHolders, loadNetWorth } from "@/lib/server-api";
+import {
+  resolveSelection,
+  loadMe,
+  loadAccountHolders,
+  loadNetWorth,
+  loadAnomalyBadge,
+} from "@/lib/server-api";
 import { qualifyingHolders } from "@/lib/portfolio-selection";
 import { formatMoney, formatPercent } from "@/lib/utils";
 import { getSessionState } from "@/lib/session-token";
@@ -55,11 +61,12 @@ export default async function AppLayout({
     serverSessionExpired = sessionState.isExpired;
   }
 
-  const [selection, holders, me, netWorthResult] = await Promise.all([
+  const [selection, holders, me, netWorthResult, anomalyBadge] = await Promise.all([
     resolveSelection(),
     loadAccountHolders(),
     loadMe(),
     loadNetWorth(),
+    loadAnomalyBadge(),
   ]);
 
   // Gate new users into onboarding until they finish it (or explicitly skip it) —
@@ -128,6 +135,8 @@ export default async function AppLayout({
           selectedHolderId={selection.selectedHolderId}
           isAdmin={Boolean(me?.isAdmin)}
           netWorthSummary={netWorthSummary}
+          anomalyCount={anomalyBadge.count}
+          anomalyError={anomalyBadge.hasError}
         >
           {children}
         </AppShell>

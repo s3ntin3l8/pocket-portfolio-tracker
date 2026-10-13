@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import createNextIntlPlugin from "next-intl/plugin";
 import withSerwistInit from "@serwist/next";
+import { routing } from "./src/i18n/routing.ts";
+import { offlinePrecacheEntries } from "./src/i18n/offline-precache.mjs";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -16,14 +18,15 @@ const rootPkg = JSON.parse(readFileSync(new URL("../../package.json", import.met
 // generated public/sw.js is a build artifact (gitignored). `@serwist/next` precaches
 // build assets but not App Router page HTML, so the offline fallback page (referenced in
 // src/app/sw.ts) is added explicitly; the per-build revision busts its cache on every
-// deploy. Registration is manual (`register: false`) — see PwaUpdater — so we can hold a
+// deploy; one entry per locale in `routing.locales`, matching sw.ts's per-locale fallbacks.
+// Registration is manual (`register: false`) — see PwaUpdater — so we can hold a
 // new worker in "waiting" and prompt the user to reload instead of updating silently.
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV !== "production",
   register: false,
-  additionalPrecacheEntries: [{ url: "/en/offline", revision: randomUUID() }],
+  additionalPrecacheEntries: offlinePrecacheEntries(routing.locales, randomUUID()),
 });
 
 /** @type {import('next').NextConfig} */

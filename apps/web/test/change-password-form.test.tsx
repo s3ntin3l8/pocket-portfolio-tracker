@@ -129,10 +129,10 @@ describe("ChangePasswordForm", () => {
     expect(client.changeLocalPassword).not.toHaveBeenCalled();
   });
 
-  it("maps a 401 'Invalid password' response to a specific message", async () => {
+  it("maps a 400 'invalid_current_password' response to a specific message", async () => {
     const client: ChangePasswordClient = {
       changeLocalPassword: vi.fn(async () => {
-        throw new ApiError(401, JSON.stringify({ error: "Invalid password" }));
+        throw new ApiError(400, JSON.stringify({ error: "invalid_current_password" }));
       }),
     };
     renderForm(client);
@@ -144,7 +144,7 @@ describe("ChangePasswordForm", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      messages.Settings.changePasswordErrors["Invalid password"],
+      messages.Settings.changePasswordErrors.invalid_current_password,
     );
     expect(signInMock).not.toHaveBeenCalled();
   });
