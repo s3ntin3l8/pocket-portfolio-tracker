@@ -9,6 +9,8 @@ export {
   buildShareTimelines,
   sharesHeldAt,
   applyShareCorporateAction,
+  createHoldingsCursor,
+  type HoldingsCursor,
   type ShareCheckpoint,
 } from "./holdings.js";
 export { cashFlow, cashBalances } from "./cash.js";

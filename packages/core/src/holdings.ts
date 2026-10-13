@@ -25,6 +25,90 @@ export function applyShareCorporateAction(qty: Decimal, ca: CorporateAction): De
   return qty;
 }
 
+/** Per-instrument average-cost fold state. */
+interface FoldState {
+  qty: Decimal;
+  costBasis: Decimal;
+  realized: Decimal;
+  // Cost basis is currency-blind, so every price-bearing transaction for one
+  // instrument must share a currency — otherwise the accumulated basis is
+  // meaningless. Fail loud rather than produce silently-wrong P&L.
+  costCurrency: string | null;
+}
+
+function newFoldState(): FoldState {
+  return { qty: ZERO, costBasis: ZERO, realized: ZERO, costCurrency: null };
+}
+
+function holdingOf(instrumentId: string, st: FoldState): Holding {
+  const avgCost = st.qty.gt(0) ? st.costBasis.div(st.qty) : ZERO;
+  return {
+    instrumentId,
+    quantity: st.qty.toString(),
+    avgCost: avgCost.toString(),
+    costBasis: st.costBasis.toString(),
+    realizedPnL: st.realized.toString(),
+    costCurrency: st.costCurrency,
+  };
+}
+
+/** The one per-event step of the average-cost fold, shared by {@link computeHoldings}
+ *  and {@link createHoldingsCursor} so the two can never drift. Mutates `st`. */
+function foldEvent(instrumentId: string, st: FoldState, ev: Event): void {
+  if (ev.kind === "ca") {
+    st.qty = applyShareCorporateAction(st.qty, ev.ca);
+    return;
+  }
+
+  const { type, quantity, price, fees } = ev.tx;
+  const q = D(quantity);
+  const p = D(price);
+  const f = D(fees);
+
+  if (isTradeType(type) || isTransferType(type) || type === "bonus") {
+    if (st.costCurrency === null) {
+      st.costCurrency = ev.tx.currency;
+    } else if (ev.tx.currency !== st.costCurrency) {
+      throw new Error(
+        `Instrument ${instrumentId} has transactions in multiple currencies ` +
+          `(${st.costCurrency} and ${ev.tx.currency}); cost basis can't be computed.`,
+      );
+    }
+  }
+
+  if (isAcquisitionType(type) || type === "bonus") {
+    // `bonus` = a zero-cash share *receipt* (free shares — TR perks, FREE_RECEIPT
+    // grants, reinvested rewards). The shares are real, so quantity rises; the
+    // recorded price is the FMV-at-grant carried as cost basis (price 0 → free shares
+    // at zero basis). Distinct from the corporate-action bonus *issue* handled above.
+    // It is never a contribution (see contributions.ts isExternalAcquisition).
+    st.qty = st.qty.add(q);
+    st.costBasis = st.costBasis.add(q.mul(p)).add(f);
+  } else if (type === "transfer_in") {
+    // Inbound depot transfer: shares arrive at the user's carried cost basis.
+    // Fees are typically 0 on a transfer but are added to basis if present.
+    st.qty = st.qty.add(q);
+    st.costBasis = st.costBasis.add(q.mul(p)).add(f);
+  } else if (type === "sell") {
+    const sellQty = Decimal.min(q, st.qty);
+    const avg = st.qty.gt(0) ? st.costBasis.div(st.qty) : ZERO;
+    const costOfSold = avg.mul(sellQty);
+    const proceeds = sellQty.mul(p).sub(f);
+    st.realized = st.realized.add(proceeds.sub(costOfSold));
+    st.qty = st.qty.sub(sellQty);
+    st.costBasis = st.costBasis.sub(costOfSold);
+  } else if (type === "transfer_out") {
+    // Outbound depot transfer: shares leave at average cost. NOT a disposal for
+    // P&L purposes (no realized gain/loss — the shares move to another depot, not sold).
+    const transferQty = Decimal.min(q, st.qty);
+    const avg = st.qty.gt(0) ? st.costBasis.div(st.qty) : ZERO;
+    const costOfTransferred = avg.mul(transferQty);
+    st.qty = st.qty.sub(transferQty);
+    st.costBasis = st.costBasis.sub(costOfTransferred);
+  }
+  // dividend/coupon/fee/deposit/withdrawal/split/rights don't change holdings.
+}
+
 /**
  * Derive per-instrument holdings from transactions using the **average cost**
  * method. Handles buys/savings-plan, sells (realized P&L), transfers, zero-cash
@@ -68,81 +152,179 @@ export function computeHoldings(
   for (const [instrumentId, events] of byInstrument) {
     events.sort((a, b) => a.at.getTime() - b.at.getTime());
 
-    let qty = ZERO;
-    let costBasis = ZERO;
-    let realized = ZERO;
-    // Cost basis is currency-blind, so every price-bearing transaction for one
-    // instrument must share a currency — otherwise the accumulated basis is
-    // meaningless. Fail loud rather than produce silently-wrong P&L.
-    let costCurrency: string | null = null;
+    const st = newFoldState();
+    for (const ev of events) foldEvent(instrumentId, st, ev);
 
-    for (const ev of events) {
-      if (ev.kind === "ca") {
-        qty = applyShareCorporateAction(qty, ev.ca);
-        continue;
-      }
-
-      const { type, quantity, price, fees } = ev.tx;
-      const q = D(quantity);
-      const p = D(price);
-      const f = D(fees);
-
-      if (isTradeType(type) || isTransferType(type) || type === "bonus") {
-        if (costCurrency === null) {
-          costCurrency = ev.tx.currency;
-        } else if (ev.tx.currency !== costCurrency) {
-          throw new Error(
-            `Instrument ${instrumentId} has transactions in multiple currencies ` +
-              `(${costCurrency} and ${ev.tx.currency}); cost basis can't be computed.`,
-          );
-        }
-      }
-
-      if (isAcquisitionType(type) || type === "bonus") {
-        // `bonus` = a zero-cash share *receipt* (free shares — TR perks, FREE_RECEIPT
-        // grants, reinvested rewards). The shares are real, so quantity rises; the
-        // recorded price is the FMV-at-grant carried as cost basis (price 0 → free shares
-        // at zero basis). Distinct from the corporate-action bonus *issue* handled above.
-        // It is never a contribution (see contributions.ts isExternalAcquisition).
-        qty = qty.add(q);
-        costBasis = costBasis.add(q.mul(p)).add(f);
-      } else if (type === "transfer_in") {
-        // Inbound depot transfer: shares arrive at the user's carried cost basis.
-        // Fees are typically 0 on a transfer but are added to basis if present.
-        qty = qty.add(q);
-        costBasis = costBasis.add(q.mul(p)).add(f);
-      } else if (type === "sell") {
-        const sellQty = Decimal.min(q, qty);
-        const avg = qty.gt(0) ? costBasis.div(qty) : ZERO;
-        const costOfSold = avg.mul(sellQty);
-        const proceeds = sellQty.mul(p).sub(f);
-        realized = realized.add(proceeds.sub(costOfSold));
-        qty = qty.sub(sellQty);
-        costBasis = costBasis.sub(costOfSold);
-      } else if (type === "transfer_out") {
-        // Outbound depot transfer: shares leave at average cost. NOT a disposal for
-        // P&L purposes (no realized gain/loss — the shares move to another depot, not sold).
-        const transferQty = Decimal.min(q, qty);
-        const avg = qty.gt(0) ? costBasis.div(qty) : ZERO;
-        const costOfTransferred = avg.mul(transferQty);
-        qty = qty.sub(transferQty);
-        costBasis = costBasis.sub(costOfTransferred);
-      }
-      // dividend/coupon/fee/deposit/withdrawal/split/rights don't change holdings.
-    }
-
-    const avgCost = qty.gt(0) ? costBasis.div(qty) : ZERO;
-    holdings.push({
-      instrumentId,
-      quantity: qty.toString(),
-      avgCost: avgCost.toString(),
-      costBasis: costBasis.toString(),
-      realizedPnL: realized.toString(),
-      costCurrency,
-    });
+    holdings.push(holdingOf(instrumentId, st));
   }
 
   return holdings;
+}
+
+// ---------------------------------------------------------------------------
+// Incremental holdings (issue #896)
+// ---------------------------------------------------------------------------
+
+export interface HoldingsCursor {
+  /** Fold every event up to and including `asOf`. Calls must be non-decreasing in `asOf`
+   *  (an earlier `asOf` than the last one rewinds and replays from the start). */
+  advanceTo(asOf: Date): void;
+  /** Exactly `computeHoldings(transactions, corporateActions, asOf)` for the last
+   *  `advanceTo(asOf)` — same rows, same order, same strings. */
+  snapshot(): Holding[];
+  /**
+   * The instrument's holding as of `asOf` with the single transaction `tx` left out
+   * (what `computeHoldings(transactions.filter(t => t !== tx), …)` would report for it),
+   * replaying only that instrument's events. `null` = it would not appear at all;
+   * `undefined` = `tx` isn't one of the cursor's rows, or its instrument is on either
+   * side of a merger (synthetic legs depend on the quantity held), so the caller must
+   * fall back to a full replay.
+   */
+  holdingWithout(tx: CoreTransaction, asOf: Date): Holding | null | undefined;
+}
+
+interface CursorEvent {
+  ev: Event;
+  /** Position of the transaction in the (merger-augmented) input — drives output order. */
+  idx: number;
+}
+
+interface CursorInstrument {
+  id: string;
+  events: CursorEvent[];
+  pos: number;
+  st: FoldState;
+  /** Smallest input index among the consumed transactions (Infinity = none yet). */
+  minTxIdx: number;
+  /** Index of the instrument's first corporate action in the input (Infinity = none). */
+  firstCaIdx: number;
+}
+
+/**
+ * A forward-only version of {@link computeHoldings}: the per-instrument event lists are
+ * built and sorted once, then `advanceTo` folds only the events that became due, so a
+ * walk over N dates costs one pass over the transactions instead of N full replays.
+ *
+ * Equivalence with `computeHoldings(…, asOf)` (guarded by a parity test): that function
+ * folds transactions ≤ asOf together with ALL corporate actions in time order. Every
+ * corporate action later than `asOf` sorts after every included transaction, so the
+ * cursor folds the due prefix and `snapshot` applies the not-yet-due corporate actions to
+ * a copy of the quantity, in the same order. Output order mirrors the Map insertion order
+ * there: instruments by the input position of their first included transaction, then
+ * corporate-action-only instruments by first appearance.
+ */
+export function createHoldingsCursor(
+  transactions: CoreTransaction[],
+  corporateActions: CorporateAction[] = [],
+): HoldingsCursor {
+  const txns = augmentTransactionsWithSyntheticMergerLegs(transactions, corporateActions);
+  const byInstrument = new Map<string, CursorInstrument>();
+  const instrumentOf = (id: string): CursorInstrument => {
+    let inst = byInstrument.get(id);
+    if (!inst) {
+      inst = {
+        id,
+        events: [],
+        pos: 0,
+        st: newFoldState(),
+        minTxIdx: Infinity,
+        firstCaIdx: Infinity,
+      };
+      byInstrument.set(id, inst);
+    }
+    return inst;
+  };
+
+  txns.forEach((tx, idx) => {
+    if (!tx.instrumentId) return;
+    if (tx.status === "archived" || tx.status === "draft") return;
+    instrumentOf(tx.instrumentId).events.push({ ev: { kind: "tx", at: tx.executedAt, tx }, idx });
+  });
+  corporateActions.forEach((ca, idx) => {
+    const inst = instrumentOf(ca.instrumentId);
+    inst.events.push({ ev: { kind: "ca", at: ca.exDate, ca }, idx });
+    inst.firstCaIdx = Math.min(inst.firstCaIdx, idx);
+  });
+  for (const inst of byInstrument.values()) {
+    inst.events.sort((a, b) => a.ev.at.getTime() - b.ev.at.getTime());
+  }
+  const instruments = [...byInstrument.values()];
+  // Synthetic merger legs are sized from the quantity held, so leaving one row out can
+  // change them — instruments on either side of a merger always take the full replay.
+  const mergerLinked = new Set<string>();
+  for (const ca of corporateActions) {
+    if (ca.type !== "merger") continue;
+    mergerLinked.add(ca.instrumentId);
+    if (ca.targetInstrumentId) mergerLinked.add(ca.targetInstrumentId);
+  }
+  let lastAsOf = -Infinity;
+
+  const reset = () => {
+    for (const inst of instruments) {
+      inst.pos = 0;
+      inst.st = newFoldState();
+      inst.minTxIdx = Infinity;
+    }
+  };
+
+  /** Holding for `inst` with its not-yet-folded corporate actions applied on top. */
+  const materialize = (inst: CursorInstrument, from: CursorEvent[], pos: number): Holding => {
+    const st: FoldState = { ...inst.st };
+    for (let i = pos; i < from.length; i++) {
+      const ev = from[i]!.ev;
+      if (ev.kind === "ca") st.qty = applyShareCorporateAction(st.qty, ev.ca);
+    }
+    return holdingOf(inst.id, st);
+  };
+
+  return {
+    advanceTo(asOf) {
+      const t = asOf.getTime();
+      if (t < lastAsOf) reset();
+      lastAsOf = t;
+      for (const inst of instruments) {
+        const { events } = inst;
+        while (inst.pos < events.length && events[inst.pos]!.ev.at.getTime() <= t) {
+          const e = events[inst.pos]!;
+          foldEvent(inst.id, inst.st, e.ev);
+          if (e.ev.kind === "tx") inst.minTxIdx = Math.min(inst.minTxIdx, e.idx);
+          inst.pos++;
+        }
+      }
+    },
+
+    snapshot() {
+      const live = instruments.filter((i) => i.minTxIdx !== Infinity || i.firstCaIdx !== Infinity);
+      live.sort((a, b) => {
+        const aTx = a.minTxIdx !== Infinity;
+        const bTx = b.minTxIdx !== Infinity;
+        if (aTx !== bTx) return aTx ? -1 : 1;
+        return aTx ? a.minTxIdx - b.minTxIdx : a.firstCaIdx - b.firstCaIdx;
+      });
+      return live.map((i) => materialize(i, i.events, i.pos));
+    },
+
+    holdingWithout(tx, asOf) {
+      const id = tx.instrumentId;
+      const inst = id ? byInstrument.get(id) : undefined;
+      if (!id || mergerLinked.has(id)) return undefined;
+      if (!inst || !inst.events.some((e) => e.ev.kind === "tx" && e.ev.tx === tx)) {
+        return undefined;
+      }
+      const t = asOf.getTime();
+      const scratch: CursorInstrument = { ...inst, st: newFoldState(), minTxIdx: Infinity };
+      const rest = inst.events.filter((e) => !(e.ev.kind === "tx" && e.ev.tx === tx));
+      let pos = 0;
+      while (pos < rest.length && rest[pos]!.ev.at.getTime() <= t) {
+        const e = rest[pos]!;
+        foldEvent(inst.id, scratch.st, e.ev);
+        if (e.ev.kind === "tx") scratch.minTxIdx = Math.min(scratch.minTxIdx, e.idx);
+        pos++;
+      }
+      if (scratch.minTxIdx === Infinity && inst.firstCaIdx === Infinity) return null;
+      return materialize(scratch, rest, pos);
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

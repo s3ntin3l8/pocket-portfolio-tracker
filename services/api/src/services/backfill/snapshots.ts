@@ -177,12 +177,21 @@ export async function writeSnapshotSeries(
     return earliest !== undefined && earliest <= date;
   }
 
+  // priceAt runs for every held instrument on every day (twice: flows + net worth), and
+  // splitAdjustmentFactor scans every corporate action — memoize per (instrument, date).
+  const factorCache = new Map<string, Decimal>();
+
   function priceAt(instrId: string, date: string): { close: string; currency: string } | null {
     const filled = filledPrices.get(instrId);
     if (!filled) return null;
     const raw = filled.get(date);
     if (!raw) return null;
-    const factor = splitAdjustmentFactor(coreCas, instrId, date);
+    const factorKey = `${instrId}|${date}`;
+    let factor = factorCache.get(factorKey);
+    if (!factor) {
+      factor = splitAdjustmentFactor(coreCas, instrId, date);
+      factorCache.set(factorKey, factor);
+    }
     if (factor.isZero() || factor.isNaN()) return raw;
     return { close: new Decimal(raw.close).div(factor).toString(), currency: raw.currency };
   }
@@ -209,11 +218,18 @@ export async function writeSnapshotSeries(
     onHoldings: (date, holdings) => holdingsByDate.set(date, holdings),
   });
 
+  // Transactions up to each day, via a moving prefix over a time-sorted copy instead of
+  // re-filtering the whole history per day (issue #896). The sums netWorthInputs derives
+  // (cash, liabilities) don't depend on row order.
+  const txByTime = [...coreTxns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
+  let txUpTo = 0;
+
   const rows: (typeof portfolioSnapshots.$inferInsert)[] = [];
   for (const flow of dailyFlows) {
     const asOf = new Date(`${flow.date}T23:59:59.999Z`);
     const holdingsAtDate =
       holdingsByDate.get(flow.date) ?? computeHoldings(coreTxns, coreCas, asOf);
+    while (txUpTo < txByTime.length && txByTime[txUpTo]!.executedAt <= asOf) txUpTo++;
     const pricesForDate: Record<string, { price: string; currency: string }> = {};
     for (const h of holdingsAtDate) {
       const p = priceAt(h.instrumentId, flow.date);
@@ -225,7 +241,7 @@ export async function writeSnapshotSeries(
     // subtracted. FX is all-or-nothing for the run (checked above), so every currency
     // converts here.
     const { convertibleCash, liabilities } = netWorthInputs({
-      transactions: coreTxns.filter((t) => t.executedAt <= asOf),
+      transactions: txByTime.slice(0, txUpTo),
       cashCounted,
       displayCurrency: baseCurrency,
       fx,

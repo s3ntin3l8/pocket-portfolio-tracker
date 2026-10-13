@@ -140,7 +140,12 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   book a transfer as an `effectiveFlow` equal to the market value it adds/removes that day
   (`transferValueFlow` — carried cost only when that path values the holding at cost), so the
   transfer day is return-neutral (#815). Don't reuse `transferFlowPoints` there, and don't move
-  market-value transfer valuation into the contribution/XIRR walk. **Cost basis on import:** a
+  market-value transfer valuation into the contribution/XIRR walk. `buildDailyValueFlows` walks holdings
+  incrementally via `createHoldingsCursor` (`packages/core/src/holdings.ts`, #896) instead of
+  replaying `computeHoldings` per day; the cursor shares `computeHoldings`' per-event fold and
+  must stay output-identical to it (rows, order, strings) — `test/holdings-cursor.test.ts` is the
+  parity guard, so change the fold in one place only. Instruments on either side of a merger
+  always take the full-replay path for the transfer "without this row" valuation. **Cost basis on import:** a
   broker feed without the carried basis (TR always; IBKR without `costBasisPrice`/`costBasisMoney`
   — `positionAmount` is market value and is never booked as cost) emits the `transfer_in` draft
   at price 0 with `attention: ["needs_cost_basis"]`; both confirm paths
