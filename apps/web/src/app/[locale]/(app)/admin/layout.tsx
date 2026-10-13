@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   LineChart,
@@ -12,7 +11,8 @@ import {
 } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
 import { Link } from "@/i18n/navigation";
-import { loadMe } from "@/lib/server-api";
+import { AdminGateFailure } from "@/components/admin-gate-failure";
+import { requireAdmin } from "@/lib/server-api";
 
 /**
  * Shared master-detail layout for every `/admin/*` route — the same `SettingsShell`
@@ -20,7 +20,9 @@ import { loadMe } from "@/lib/server-api";
  * "‹ Profile" exit above the list; mobile shows the grouped landing menu at the bare
  * `/admin` index, or the section's own content (with its own `SectionHeader` back-link)
  * on any sub-route. The admin gate lives here (DRY) — each sub-page also re-checks
- * `me.isAdmin` itself as a belt-and-suspenders guard, matching the existing convention.
+ * via `requireAdmin()` as a belt-and-suspenders guard. A failed `me` lookup renders
+ * `<AdminGateFailure>` (DataState + retry), never a 404; only a successful non-admin
+ * answer is `notFound()`.
  */
 export default async function AdminLayout({
   children,
@@ -34,8 +36,8 @@ export default async function AdminLayout({
   const t = await getTranslations("Admin");
   const tA = await getTranslations("A11y");
 
-  const me = await loadMe();
-  if (!me?.isAdmin) notFound();
+  const gate = await requireAdmin();
+  if (gate.status !== "ok") return <AdminGateFailure gate={gate} />;
 
   const navItems: ShellNavItem[] = [
     {

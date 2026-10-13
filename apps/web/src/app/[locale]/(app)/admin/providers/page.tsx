@@ -1,9 +1,9 @@
-import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminProviders } from "@/components/admin-providers";
 import { SectionHeader } from "@/components/section-header";
 import { PageHeaderSetter } from "@/components/page-header";
-import { loadMe, loadAdminProviders } from "@/lib/server-api";
+import { AdminGateFailure } from "@/components/admin-gate-failure";
+import { requireAdmin, loadAdminProviders } from "@/lib/server-api";
 
 export default async function AdminProvidersPage({
   params,
@@ -14,8 +14,8 @@ export default async function AdminProvidersPage({
   setRequestLocale(locale);
   const t = await getTranslations("Admin");
 
-  const me = await loadMe();
-  if (!me?.isAdmin) notFound();
+  const gate = await requireAdmin();
+  if (gate.status !== "ok") return <AdminGateFailure gate={gate} />;
 
   const result = await loadAdminProviders();
 

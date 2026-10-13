@@ -61,6 +61,7 @@ export default async function AppLayout({
     serverSessionExpired = sessionState.isExpired;
   }
 
+  // A failed `me` lookup just hides the Admin nav item and skips the onboarding redirect.
   const [selection, holders, me, netWorthResult, anomalyBadge] = await Promise.all([
     resolveSelection(),
     loadAccountHolders(),
