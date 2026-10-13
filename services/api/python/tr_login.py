@@ -7,14 +7,13 @@ phone+PIN with a device fingerprint, Trade Republic sends a **push to the mobile
 and the client polls the login process until the user approves it. There is no SMS code.
 
 We *vendor* that v2 flow here as a thin subclass of pytr's ``TradeRepublicApi`` rather than
-depend on an (unmerged) upstream fork: pytr 0.4.9 (the latest PyPI release) still does the
-AWS-WAF minting, cookie/session jar and timeline export correctly, so we reuse all of that
-and override only the broken login. ``requirements.txt`` therefore stays at ``pytr==0.4.9``
-and the Docker image is unchanged. The v2 request shape (endpoint, headers, device-info)
-mirrors pytr-org/pytr PR #355.
+depend on pytr's own v2 login: pytr (pinned in ``requirements.txt``) does the AWS-WAF
+minting, cookie/session jar and timeline export correctly, so we reuse all of that and
+override only the login. The v2 request shape (endpoint, headers, device-info) mirrors
+pytr-org/pytr PR #355, since merged upstream as ``use_v2_login``.
 
 Contract (the Node runner in services/pytr/runner.ts depends on this exactly):
-  argv:  pair --cookies-file PATH --waf-strategy {awswaf|playwright|token}
+  argv:  pair --cookies-file PATH --waf-strategy {awswaf|token}
   env:   TR_PHONE, TR_PIN, (when strategy == token) TR_WAF_TOKEN,
          (optional) PYTR_DEVICE_ID_FILE — stable device id path (default ~/.pytr/device_id)
   flow:
@@ -25,9 +24,9 @@ Contract (the Node runner in services/pytr/runner.ts depends on this exactly):
     5. exit 0 on success; exit 3 if the login is rejected/expired; exit 1 on any other
        failure (a human-readable reason is written to stderr)
 
-NOTE: validated live against pytr==0.4.9 + this vendored v2 flow on 2026-06-15. TR's
+NOTE: originally validated live against pytr 0.4.9 + this vendored v2 flow on 2026-06-15. TR's
 private protocol (endpoint, headers, app version) can change; PYTR_TR_APP_VERSION /
-PYTR_TR_USER_AGENT (read by pytr) and PYTR_DEVICE_ID_FILE allow overrides without a code
+PYTR_TR_USER_AGENT (read by pytr since #382) and PYTR_DEVICE_ID_FILE allow overrides without a code
 change.
 """
 
@@ -100,8 +99,6 @@ def _build_login_overlay(base_cls):
             """Mint the WAF token, POST the v2 login, return the processId. No polling."""
             if self._waf_token == "awswaf":
                 self._waf_token = self._fetch_waf_token_awswaf()
-            elif self._waf_token == "playwright":
-                self._waf_token = self._fetch_waf_token_playwright()
             if self._waf_token:
                 self._set_waf_cookie(self._waf_token)
 
@@ -172,7 +169,7 @@ def main() -> int:
         return 1
 
     # 'token' = use the literal AWS-WAF token from the environment (break-glass paste);
-    # otherwise pass the strategy string through ('awswaf' | 'playwright') for pytr to mint.
+    # otherwise pass the strategy string through ('awswaf') for pytr to mint.
     waf_token = args.waf_strategy
     if waf_token == "token":
         waf_token = os.environ.get("TR_WAF_TOKEN", "")

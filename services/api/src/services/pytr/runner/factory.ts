@@ -7,7 +7,7 @@ let runner: PytrRunner | null = null;
 export function getPytrRunner(
   config: {
     PYTR_PYTHON_BIN: string;
-    PYTR_WAF_STRATEGY: "awswaf" | "playwright";
+    PYTR_WAF_STRATEGY: "awswaf";
     PYTR_ENABLED: boolean;
   },
   log?: FastifyBaseLogger,
