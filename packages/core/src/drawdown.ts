@@ -25,6 +25,9 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
   // ratio (x/negative). Peak tracking therefore starts at the first positive value and
   // the points before it contribute no drawdown (audit B13).
   const firstPositive = series.findIndex((p) => D(p.netWorth).gt(0));
+  // No positive value at all: no drawdown. Dates point at the series start (rather than
+  // the empty-input nulls) because the series does exist — same shape as the "no
+  // drawdown" result for a rising series below.
   if (firstPositive === -1) {
     return {
       maxDrawdownPct: "0",

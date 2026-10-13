@@ -150,8 +150,20 @@ export async function buildIncomeStats(
   // booked in different currencies in different depots (valid per depot), which used to
   // 500 the aggregate income route (audit B13).
   const txnsByPortfolio = new Map<string, CoreTransaction[]>();
+  // Without `portfolioIdOf` the caller is asserting a single portfolio (one bucket). With
+  // it, every row must resolve to its portfolio — a silent fallback bucket would re-pool
+  // unattributed rows and bring back the mixed-currency throw this split exists to avoid.
   for (const t of coreTxns) {
-    const pfKey = (t.id && portfolioIdOf?.(t.id)) ?? "";
+    let pfKey = "";
+    if (portfolioIdOf) {
+      const pf = t.id ? portfolioIdOf(t.id) : undefined;
+      if (pf === undefined) {
+        throw new Error(
+          `buildIncomeStats: transaction ${t.id ?? "(no id)"} has no portfolio attribution`,
+        );
+      }
+      pfKey = pf;
+    }
     const list = txnsByPortfolio.get(pfKey) ?? [];
     list.push(t);
     txnsByPortfolio.set(pfKey, list);

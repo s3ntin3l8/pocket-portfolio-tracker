@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { fxRates, instruments, portfolioSnapshots, prices, transactions } from "@portfolio/db";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
-import { toDateKey } from "@portfolio/core";
+import { toDateKey, type PortfolioSummary } from "@portfolio/core";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import { overrideMarketData } from "../../src/services/market-data.js";
+import { buildIncomeStats } from "../../src/routes/transactions/income-helpers.js";
 
 // Audit B13: one instrument booked in a different currency in each of two portfolios is
 // valid per depot (each depot's cost basis has one currency), but the aggregate routes
@@ -140,5 +141,22 @@ describe("one instrument in different currencies across portfolios (audit B13)",
   it("/networth/income answers 200 instead of 500", async () => {
     const res = await app.inject({ method: "GET", url: "/networth/income", headers: auth(t) });
     expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it("buildIncomeStats refuses an unattributed row instead of silently re-pooling it", async () => {
+    const tx = {
+      id: "orphan",
+      instrumentId: null,
+      type: "interest" as const,
+      quantity: "0",
+      price: "1",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+    const summary = { holdings: [] } as unknown as PortfolioSummary;
+    await expect(buildIncomeStats(app, [tx], summary, "EUR", () => undefined)).rejects.toThrow(
+      /no portfolio attribution/,
+    );
   });
 });
