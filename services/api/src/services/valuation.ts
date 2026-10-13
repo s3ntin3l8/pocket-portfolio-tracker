@@ -203,16 +203,9 @@ export async function valuePortfolio(
           ),
         )
         .orderBy(pricesTable.instrumentId, desc(pricesTable.date));
-      const todayMs = new Date(`${today}T00:00:00.000Z`).getTime();
-      const seen = new Set<string>();
+      // DISTINCT ON already yields one newest row per instrument, inside the window.
       for (const row of historical) {
-        if (seen.has(row.instrumentId)) continue;
-        seen.add(row.instrumentId);
-        const rowMs = new Date(`${row.date}T00:00:00.000Z`).getTime();
-        const daysAgo = (todayMs - rowMs) / 86_400_000;
-        if (daysAgo <= MAX_PRICE_CARRY_FORWARD_DAYS) {
-          prices[row.instrumentId] = { price: row.close, currency: row.currency };
-        }
+        prices[row.instrumentId] = { price: row.close, currency: row.currency };
       }
     }
   }

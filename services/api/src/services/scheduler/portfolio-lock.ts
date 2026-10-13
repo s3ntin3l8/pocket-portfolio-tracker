@@ -17,6 +17,8 @@ export async function withPortfolioLock<T>(portfolioId: string, fn: () => Promis
   try {
     return await run;
   } finally {
+    // Only clear the entry if no newer caller has queued behind us (it would have
+    // replaced `tails[portfolioId]`); deleting unconditionally would drop their wait.
     if (tails.get(portfolioId) === tail) tails.delete(portfolioId);
   }
 }
