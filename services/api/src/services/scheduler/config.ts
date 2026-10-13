@@ -20,6 +20,11 @@ export const SYNC_CLAIM_LEASE_MS = 2 * 60 * 60_000; // 2 hours
 export const ANTAM_QUEUE = "scrape-antam";
 export const ANTAM_CRON = "0 */4 * * *";
 
+export const LOAN_INSTALLMENT_QUEUE = "book-loan-installments";
+// Just after midnight UTC, so an installment due "today" (stored as a date) is booked the
+// same calendar day it falls due.
+export const LOAN_INSTALLMENT_CRON = "15 0 * * *";
+
 export const NAV_QUEUE = "scrape-nav";
 export const NAV_CRON = "0 1,16 * * *";
 
@@ -194,6 +199,14 @@ export const JOB_DESCRIPTORS = [
     label: "Gold buyback scrape",
     description: "Scrape Antam, Galeri24 and UBS buyback rates into the scraped-quotes cache.",
     cron: ANTAM_CRON,
+    cronOnlyActiveInFlight: true,
+  },
+  {
+    name: LOAN_INSTALLMENT_QUEUE,
+    label: "Loan installment booking",
+    description:
+      "Book financed gold-purchase (cicilan) installments as repayments once they fall due.",
+    cron: LOAN_INSTALLMENT_CRON,
     cronOnlyActiveInFlight: true,
   },
   {
