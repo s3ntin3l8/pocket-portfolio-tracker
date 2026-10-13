@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -187,6 +187,25 @@ describe("mapFlexToDrafts — transfers", () => {
     expect(xfer.price).toBe("0");
     expect(xfer.confidence).toBe(0.5);
     expect(xfer.attention).toEqual(["needs_cost_basis"]);
+  });
+
+  it("logs a corrupt cost-basis field distinctly and still flags needs_cost_basis", () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    try {
+      const { drafts } = mapFlexToDrafts(withTransfer({ costBasisMoney: "n/a" }));
+      const xfer = drafts.find((d) => d.externalId === "ibkr:xfer:xfer-b4")!;
+      expect(xfer.attention).toEqual(["needs_cost_basis"]);
+    } finally {
+      spy.mockRestore();
+    }
+    const logged = writes
+      .map((w) => JSON.parse(w))
+      .find((e) => e.event === "ibkr_invalid_cost_basis");
+    expect(logged).toMatchObject({ transactionID: "xfer-b4", field: "costBasisMoney", raw: "n/a" });
   });
 
   it("does not flag an outbound transfer without cost basis (it leaves at average cost)", () => {

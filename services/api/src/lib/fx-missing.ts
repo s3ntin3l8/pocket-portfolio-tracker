@@ -13,9 +13,15 @@ import { AsyncLocalStorage } from "node:async_hooks";
 const scope = new AsyncLocalStorage<Set<string>>();
 
 /**
- * Run `fn` (and everything it continues into) inside a fresh scope. Called from a
- * callback-style onRequest hook as `runInFxMissingScope(done)`, so the rest of the
- * request lifecycle inherits it (same pattern as @fastify/request-context).
+ * Run `fn` inside a fresh scope. Called from a callback-style onRequest hook as
+ * `runInFxMissingScope(done)`: `run` only holds the store for `fn`'s synchronous
+ * execution, but Fastify's `done()` synchronously invokes the next hook and, from there,
+ * schedules the rest of the lifecycle — and every async continuation (promise, timer,
+ * I/O callback) CREATED inside `run` keeps the store it was created under. So the
+ * handler, its awaits and `preSerialization` all see this request's set, while
+ * concurrent requests each get their own. This is the shape `@fastify/request-context`
+ * uses (`als.run(store, () => done())`). Covered end to end by
+ * `test/routes/fx-missing.test.ts`, which asserts the header and body field.
  */
 export function runInFxMissingScope(fn: () => void): void {
   scope.run(new Set<string>(), fn);

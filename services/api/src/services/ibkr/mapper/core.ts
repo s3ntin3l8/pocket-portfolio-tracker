@@ -265,19 +265,32 @@ export function mapFlexToDrafts(
     // value — booking it as cost would silently erase the pre-transfer gain from tax and
     // P&L history. An unknown basis is recoverable in the review screen instead: the
     // inbound draft is flagged `needs_cost_basis` and confirm refuses it at price 0.
-    const dec = (v: string | undefined | null): Decimal => {
+    // Unparseable → 0 (falls through to `needs_cost_basis`), but logged distinctly so a
+    // corrupt cost-basis field isn't indistinguishable from an absent one.
+    const dec = (v: string | undefined | null, field: string): Decimal => {
       try {
         return new Decimal(strNum(v));
       } catch {
+        process.stderr.write(
+          JSON.stringify({
+            level: "warn",
+            event: "ibkr_invalid_cost_basis",
+            transactionID: xfer.transactionID ?? null,
+            field,
+            raw: v ?? null,
+          }) + "\n",
+        );
         return new Decimal(0);
       }
     };
-    const qtyDec = dec(qty);
+    const qtyDec = dec(qty, "quantity");
+    const costBasisPrice = dec(xfer.costBasisPrice, "costBasisPrice");
+    const costBasisMoney = dec(xfer.costBasisMoney, "costBasisMoney");
     let price = "0";
-    if (dec(xfer.costBasisPrice).gt(0)) {
+    if (costBasisPrice.gt(0)) {
       price = strNum(xfer.costBasisPrice);
-    } else if (qtyDec.gt(0) && !dec(xfer.costBasisMoney).isZero()) {
-      price = dec(xfer.costBasisMoney).abs().div(qtyDec).toFixed();
+    } else if (qtyDec.gt(0) && !costBasisMoney.isZero()) {
+      price = costBasisMoney.abs().div(qtyDec).toFixed();
     }
     const needsCostBasis = isIn && price === "0";
 

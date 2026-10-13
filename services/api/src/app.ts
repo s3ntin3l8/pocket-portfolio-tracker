@@ -170,11 +170,12 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     // reaching here means a conversion path forgot to — a bug, logged distinctly.
     if (error instanceof FxRateMissingError) {
       app.log.error(
-        { from: error.from, to: error.to },
+        { err: error, from: error.from, to: error.to },
         "unhandled missing FX rate: a route converted without excluding unconvertible rows",
       );
+    } else {
+      app.log.error(error);
     }
-    app.log.error(error);
     const err = error as { statusCode?: number; message?: string };
     const statusCode = err.statusCode ?? 500;
     // Never echo the raw error message for a server error (unset statusCode, or >= 500) —

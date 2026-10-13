@@ -194,6 +194,8 @@ export async function getFxRates(
         ),
       )
       .orderBy(desc(fxRates.date));
+    // Newest first, first row per base wins. Deterministic: `fx_rates` has a unique
+    // index on (base, quote, date), so there is exactly one row per base and date.
     for (const r of prior) {
       if (!(r.base in out)) out[r.base] = r.rate;
     }
