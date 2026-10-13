@@ -58,6 +58,12 @@ export {
   totalLiabilities,
   financingByInstrument,
 } from "./loans.js";
+export {
+  summarizeGoldPlan,
+  type GoldPlanLoan,
+  type GoldPlanScheduleRow,
+  type GoldPlanSummary,
+} from "./gold.js";
 export { inferIntervalMonths, MIN_PAYMENTS_FOR_GROWTH, computeGrowthFactor } from "./growth.js";
 export {
   projectCoupons,

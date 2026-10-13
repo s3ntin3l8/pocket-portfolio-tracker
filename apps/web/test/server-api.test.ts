@@ -573,6 +573,56 @@ describe("aggregate + misc loaders", () => {
     expect(await api.loadIncomeStats()).toMatchObject({ status: "unavailable" });
   });
 
+  it("loadGoldReport uses the aggregate, or the per-portfolio twin when selected", async () => {
+    h.client.listPortfolios = async () => PF;
+    const getGold = vi.fn(async () => ({ displayCurrency: "IDR", holdings: [], plans: [] }));
+    const getPortfolioGold = vi.fn(async (id: string) => ({
+      displayCurrency: "EUR",
+      holdings: [],
+      plans: [],
+      _id: id,
+    }));
+    h.client.getGold = getGold;
+    h.client.getPortfolioGold = getPortfolioGold;
+
+    // No selection → aggregate (no holderId).
+    let res = await api.loadGoldReport();
+    expect(res).toMatchObject({ status: "ok" });
+    expect(getGold).toHaveBeenCalledWith(undefined);
+    expect(getPortfolioGold).not.toHaveBeenCalled();
+
+    // Holder scope cookie → passes holderId to getGold.
+    // resolveHolderScope validates: need ≥2 portfolios owned by the holder.
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "IDR", accountHolderId: "holder-abc" },
+      { id: "p2", name: "B", baseCurrency: "EUR", accountHolderId: "holder-abc" },
+    ];
+    h.cookies = { pf: "holder:holder-abc" };
+    getGold.mockClear();
+    res = await api.loadGoldReport();
+    expect(res).toMatchObject({ status: "ok" });
+    expect(getGold).toHaveBeenCalledWith("holder-abc");
+    expect(getPortfolioGold).not.toHaveBeenCalled();
+    // Restore PF for the next assertion.
+    h.client.listPortfolios = async () => PF;
+
+    // A selected portfolio cookie → portfolio path wins.
+    h.cookies = { pf: "p2" };
+    getGold.mockClear();
+    res = await api.loadGoldReport();
+    expect(res).toMatchObject({ status: "ok" });
+    expect(getPortfolioGold).toHaveBeenCalledWith("p2");
+    expect(getGold).not.toHaveBeenCalled();
+
+    h.cookies = {};
+    h.client.listPortfolios = async () => [];
+    expect(await api.loadGoldReport()).toMatchObject({ status: "empty" });
+    h.client.listPortfolios = async () => {
+      throw new Error("x");
+    };
+    expect(await api.loadGoldReport()).toMatchObject({ status: "unavailable" });
+  });
+
   it("loadContributions reads holder scope from the cookie; portfolio cookie wins", async () => {
     h.client.listPortfolios = async () => PF;
     const getContributions = vi.fn(async () => ({ displayCurrency: "IDR", netContributed: "500" }));
