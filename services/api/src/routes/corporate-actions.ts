@@ -10,22 +10,38 @@ import {
   type CorporateActionType,
 } from "@portfolio/schema";
 
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; cause?: { code?: string }; message?: string };
+  return (
+    e.code === "23505" ||
+    e.cause?.code === "23505" ||
+    /duplicate key|unique constraint/i.test(e.message ?? "")
+  );
+}
+
 export async function corporateActionsRoute(app: FastifyInstance) {
   // Record a corporate action (split/bonus/rights) for an instrument. Shared
   // reference data — applied to every holder's derived holdings. Admin-gated (a bogus
   // split/ratio corrupts every holder's quantities and cost basis).
   app.post("/corporate-actions", { preHandler: app.requireAdmin }, async (request, reply) => {
     const input = corporateActionInputSchema.parse(request.body);
-    return createAndReturn(app.db, reply, corporateActions, {
-      instrumentId: input.instrumentId,
-      type: input.type,
-      ratio: input.ratio,
-      exDate: toDateKey(input.exDate),
-      terms: input.terms ?? null,
-      targetInstrumentId: input.targetInstrumentId ?? null,
-      ratioTo: input.ratioTo ?? null,
-      taxableMarketValue: input.taxableMarketValue ?? null,
-    });
+    try {
+      return await createAndReturn(app.db, reply, corporateActions, {
+        instrumentId: input.instrumentId,
+        type: input.type,
+        ratio: input.ratio,
+        exDate: toDateKey(input.exDate),
+        terms: input.terms ?? null,
+        targetInstrumentId: input.targetInstrumentId ?? null,
+        ratioTo: input.ratioTo ?? null,
+        taxableMarketValue: input.taxableMarketValue ?? null,
+      });
+    } catch (err) {
+      // (instrumentId, type, exDate, portfolioId) is unique (audit D7): a duplicate split
+      // would otherwise be double-applied. drizzle/PGlite may nest the code under `cause`.
+      if (isUniqueViolation(err)) return reply.code(409).send({ error: "corporate_action_exists" });
+      throw err;
+    }
   });
 
   // Update a corporate action (type / ratio / ex-date / terms). Reference data —

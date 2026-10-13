@@ -3,6 +3,7 @@ import { generateKeyPair, SignJWT, exportJWK, type JWK } from "jose";
 import { eq } from "drizzle-orm";
 import {
   benchmarkPrices,
+  corporateActions,
   instruments,
   portfolioSnapshots,
   prices,
@@ -1868,6 +1869,44 @@ describe("auth + portfolios + transactions", () => {
     });
     expect(list.json()).toHaveLength(1);
     expect(list.json()[0].type).toBe("split");
+  });
+
+  it("rejects a duplicate corporate action (same instrument/type/ex-date) with 409", async () => {
+    const admin = await adminToken("ca-dup-admin");
+    const [inst] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "DUPCA",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "Dupco",
+      })
+      .returning();
+    const payload = { instrumentId: inst.id, type: "split", ratio: "2", exDate: "2026-02-01" };
+    const first = await app.inject({
+      method: "POST",
+      url: "/corporate-actions",
+      headers: auth(admin),
+      payload,
+    });
+    expect(first.statusCode).toBe(201);
+    const dup = await app.inject({
+      method: "POST",
+      url: "/corporate-actions",
+      headers: auth(admin),
+      payload,
+    });
+    expect(dup.statusCode).toBe(409);
+    // The DB constraint itself also refuses a duplicate global row (NULLS NOT DISTINCT).
+    await expect(
+      app.db.insert(corporateActions).values({
+        instrumentId: inst.id,
+        type: "split",
+        ratio: "3",
+        exDate: "2026-02-01",
+      }),
+    ).rejects.toThrow();
   });
 
   it("edits and deletes a corporate action, recomputing holdings", async () => {
