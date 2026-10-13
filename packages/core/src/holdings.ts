@@ -8,6 +8,24 @@ type Event =
   { kind: "tx"; at: Date; tx: CoreTransaction } | { kind: "ca"; at: Date; ca: CorporateAction };
 
 /**
+ * Apply a share-count corporate action to a held quantity: a split multiplies it
+ * (2:1 → ratio 2 → quantity doubles), a bonus issue adds `ratio` extra shares per held
+ * share. Cost basis is unchanged by both — only the per-share average moves. `rights`
+ * (needs a paired subscription transaction) and `merger` (handled as sell+buy legs) are
+ * no-ops here. Shared by every average-cost pool that must stay split-consistent
+ * ({@link computeHoldings}, {@link buildShareTimelines}, the contribution walks).
+ *
+ * Ordering convention for callers: a transaction at the same instant as the action's
+ * `exDate` is processed BEFORE the action (stable sort, transactions queued first).
+ */
+export function applyShareCorporateAction(qty: Decimal, ca: CorporateAction): Decimal {
+  const ratio = D(ca.ratio);
+  if (ca.type === "split") return qty.mul(ratio);
+  if (ca.type === "bonus") return qty.add(qty.mul(ratio));
+  return qty;
+}
+
+/**
  * Derive per-instrument holdings from transactions using the **average cost**
  * method. Handles buys/savings-plan, sells (realized P&L), transfers, zero-cash
  * `bonus` share receipts (free shares at FMV/zero basis), and split/bonus
@@ -60,15 +78,7 @@ export function computeHoldings(
 
     for (const ev of events) {
       if (ev.kind === "ca") {
-        const ratio = D(ev.ca.ratio);
-        if (ev.ca.type === "split") {
-          // 2:1 split → ratio 2 → quantity doubles, avg cost halves (basis unchanged).
-          qty = qty.mul(ratio);
-        } else if (ev.ca.type === "bonus") {
-          // bonus ratio = extra shares per held share; basis unchanged.
-          qty = qty.add(qty.mul(ratio));
-        }
-        // 'rights' requires a paired subscription transaction; no-op here.
+        qty = applyShareCorporateAction(qty, ev.ca);
         continue;
       }
 
@@ -210,13 +220,7 @@ export function buildShareTimelines(
 
     for (const ev of events) {
       if (ev.kind === "ca") {
-        const ratio = D(ev.ca.ratio);
-        if (ev.ca.type === "split") {
-          qty = qty.mul(ratio);
-        } else if (ev.ca.type === "bonus") {
-          qty = qty.add(qty.mul(ratio));
-        }
-        // 'rights' is a no-op here too (see computeHoldings).
+        qty = applyShareCorporateAction(qty, ev.ca);
         checkpoints.push({ at: ev.at, qty });
         continue;
       }

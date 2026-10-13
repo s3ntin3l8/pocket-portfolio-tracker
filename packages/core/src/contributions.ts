@@ -3,7 +3,8 @@ import { D } from "./decimal.js";
 import { isAcquisitionType, isTransferType } from "./categorization.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { toDateKey } from "./date-utils.js";
-import type { CoreTransaction } from "./types.js";
+import { applyShareCorporateAction } from "./holdings.js";
+import type { CoreTransaction, CorporateAction } from "./types.js";
 
 /**
  * Acquisition `kind`s that are NOT the user's own external money and therefore
@@ -37,6 +38,13 @@ export interface ContributionInput {
    *   bonus shares) are return, never contribution.
    */
   boundary?: "inside" | "outside";
+  /**
+   * Split/bonus corporate actions for the instruments in `txns`. The average-cost pool
+   * both walks keep is rescaled on each action's ex-date (same rule as
+   * `computeHoldings`), so a sell after a 10:1 split removes the right fraction of cost
+   * (audit B9). Omitted → no actions (pre-B9 behavior).
+   */
+  corporateActions?: CorporateAction[];
 }
 
 export interface ContributionStats {
@@ -169,6 +177,31 @@ function isPoolAcquisition(tx: CoreTransaction): boolean {
 }
 
 /**
+ * Returns an `advance(to)` that applies, in ex-date order, every split/bonus action with
+ * `exDate` strictly before `to` to the pool's quantities (cost unchanged). Strictly
+ * before = a transaction at the action's exact instant is processed first, matching
+ * `computeHoldings`' stable event order. Call it with each transaction's `executedAt`
+ * while replaying the pool chronologically.
+ */
+function corporateActionCursor(
+  pool: Map<string, PoolPosition>,
+  corporateActions: CorporateAction[],
+): (to: Date) => void {
+  const pending = corporateActions
+    .filter((ca) => ca.type === "split" || ca.type === "bonus")
+    .slice()
+    .sort((a, b) => a.exDate.getTime() - b.exDate.getTime());
+  let i = 0;
+  return (to: Date) => {
+    while (i < pending.length && pending[i]!.exDate.getTime() < to.getTime()) {
+      const ca = pending[i++]!;
+      const p = pool.get(ca.instrumentId);
+      if (p) p.qty = applyShareCorporateAction(p.qty, ca);
+    }
+  };
+}
+
+/**
  * Instruments whose pool-building acquisitions span more than one currency. Their cost
  * basis is meaningless (currency-blind), so both walks drop them rather than crash the
  * whole summary. `warn` emits the structured warning once per instrument.
@@ -238,13 +271,16 @@ function poolRemove(
  */
 function transferOutCarriedCosts(
   txns: CoreTransaction[],
+  corporateActions: CorporateAction[],
 ): Map<CoreTransaction, { cost: Decimal; costCurrency: string }> {
   const out = new Map<CoreTransaction, { cost: Decimal; costCurrency: string }>();
   if (!txns.some((tx) => tx.type === "transfer_out")) return out;
   const sorted = [...txns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
   const skipped = mixedCurrencyInstruments(sorted, false);
   const pool = new Map<string, PoolPosition>();
+  const advanceCorporateActions = corporateActionCursor(pool, corporateActions);
   for (const tx of sorted) {
+    advanceCorporateActions(tx.executedAt);
     if (!tx.instrumentId || skipped.has(tx.instrumentId)) continue;
     if (isPoolAcquisition(tx)) {
       poolAcquire(pool, tx);
@@ -263,10 +299,15 @@ function transferOutCarriedCosts(
  * day-bucketed view {@link insideDays} needs and the per-transaction point view
  * {@link boundaryFlowPoints} needs — same amounts, same inclusion rules, two shapes.
  */
-function walkInsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): DayWalkResult {
+function walkInsideDays(
+  txns: CoreTransaction[],
+  fx: FxRateFn,
+  display: string,
+  corporateActions: CorporateAction[] = [],
+): DayWalkResult {
   const months = new Map<string, FlowAgg>();
   const points: FlowPoint[] = [];
-  const transferOutCosts = transferOutCarriedCosts(txns);
+  const transferOutCosts = transferOutCarriedCosts(txns, corporateActions);
   for (const tx of txns) {
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
@@ -303,8 +344,13 @@ function walkInsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string):
 }
 
 /** Per-day {inflow, outflow} when cash is INSIDE the boundary: net external cash. */
-function insideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
-  return walkInsideDays(txns, fx, display).days;
+function insideDays(
+  txns: CoreTransaction[],
+  fx: FxRateFn,
+  display: string,
+  corporateActions: CorporateAction[],
+): Map<string, FlowAgg> {
+  return walkInsideDays(txns, fx, display, corporateActions).days;
 }
 
 /**
@@ -315,7 +361,12 @@ function insideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map
  * All real acquisitions (incl. broker-credited ones) build the average-cost pool;
  * only externally-funded ones count toward `inflow`.
  */
-function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): DayWalkResult {
+function walkOutsideDays(
+  txns: CoreTransaction[],
+  fx: FxRateFn,
+  display: string,
+  corporateActions: CorporateAction[] = [],
+): DayWalkResult {
   const sorted = [...txns].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
   // Pool is denominated in costCurrency (the trade currency of the instrument's
   // buys) — mirror of computeHoldings. Mixing currencies for one instrument is
@@ -327,8 +378,12 @@ function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string)
   const pool = new Map<string, PoolPosition>();
   const months = new Map<string, FlowAgg>();
   const points: FlowPoint[] = [];
+  // Splits/bonus issues rescale pool quantities on their ex-date (audit B9) — without
+  // this a sale after a 10:1 split drew cost at the pre-split per-share average.
+  const advanceCorporateActions = corporateActionCursor(pool, corporateActions);
 
   for (const tx of sorted) {
+    advanceCorporateActions(tx.executedAt);
     if (!tx.instrumentId) continue;
     if (skippedInstruments.has(tx.instrumentId)) continue;
     const key = dayKey(tx.executedAt);
@@ -386,8 +441,13 @@ function walkOutsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string)
 
 /** Per-day {inflow, outflow} when cash is OUTSIDE the boundary: net invested
  * capital. See {@link walkOutsideDays} for the full rules. */
-function outsideDays(txns: CoreTransaction[], fx: FxRateFn, display: string): Map<string, FlowAgg> {
-  return walkOutsideDays(txns, fx, display).days;
+function outsideDays(
+  txns: CoreTransaction[],
+  fx: FxRateFn,
+  display: string,
+  corporateActions: CorporateAction[],
+): Map<string, FlowAgg> {
+  return walkOutsideDays(txns, fx, display, corporateActions).days;
 }
 
 /** One dated, signed cash-flow crossing a portfolio's investment boundary, in XIRR
@@ -426,13 +486,14 @@ export function boundaryFlowPoints(
   boundary: "inside" | "outside",
   displayCurrency: string,
   fx: FxRateFn,
+  corporateActions: CorporateAction[] = [],
 ): BoundaryFlowPoint[] {
   // Archived + draft rows are excluded from every derivation — mirror contributionStats.
   const relevant = txns.filter((t) => t.status !== "archived" && t.status !== "draft");
   const { points } =
     boundary === "outside"
-      ? walkOutsideDays(relevant, fx, displayCurrency)
-      : walkInsideDays(relevant, fx, displayCurrency);
+      ? walkOutsideDays(relevant, fx, displayCurrency, corporateActions)
+      : walkInsideDays(relevant, fx, displayCurrency, corporateActions);
   return points
     .slice()
     .sort((a, b) => a.date.getTime() - b.date.getTime())
@@ -455,12 +516,13 @@ export function transferFlowPoints(
   boundary: "inside" | "outside",
   displayCurrency: string,
   fx: FxRateFn,
+  corporateActions: CorporateAction[] = [],
 ): BoundaryFlowPoint[] {
   const relevant = txns.filter((t) => t.status !== "archived" && t.status !== "draft");
   const { points } =
     boundary === "outside"
-      ? walkOutsideDays(relevant, fx, displayCurrency)
-      : walkInsideDays(relevant, fx, displayCurrency);
+      ? walkOutsideDays(relevant, fx, displayCurrency, corporateActions)
+      : walkInsideDays(relevant, fx, displayCurrency, corporateActions);
   return points
     .filter((p) => p.isTransfer)
     .slice()
@@ -481,8 +543,11 @@ export function contributionStats(input: ContributionInput): ContributionStats {
 
   // Archived + draft rows are excluded from every derivation.
   const txns = input.txns.filter((t) => t.status !== "archived" && t.status !== "draft");
+  const cas = input.corporateActions ?? [];
   const days =
-    boundary === "outside" ? outsideDays(txns, fx, display) : insideDays(txns, fx, display);
+    boundary === "outside"
+      ? outsideDays(txns, fx, display, cas)
+      : insideDays(txns, fx, display, cas);
 
   // Day-resolution series: non-zero net days, ascending. Drives the overlay chart so the
   // contributed step lands on the actual transaction day.

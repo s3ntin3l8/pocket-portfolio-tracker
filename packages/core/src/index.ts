@@ -8,11 +8,19 @@ export {
   unrealizedPnL,
   buildShareTimelines,
   sharesHeldAt,
+  applyShareCorporateAction,
   type ShareCheckpoint,
 } from "./holdings.js";
 export { cashFlow, cashBalances } from "./cash.js";
 export { xirr, type CashFlowPoint } from "./xirr.js";
-export { periodXirr } from "./period-xirr.js";
+export {
+  periodXirr,
+  periodStartFor,
+  periodReturn,
+  type ReturnPeriod,
+  type PeriodAnchor,
+  type PeriodReturn,
+} from "./period-xirr.js";
 export {
   netWorth,
   convert,
@@ -28,6 +36,9 @@ export {
 export {
   summarizePortfolio,
   aggregatePortfolios,
+  netWorthInputs,
+  type NetWorthInputs,
+  type NetWorthInputsArgs,
   type PortfolioSummary,
   type HoldingValuation,
   type SummarizeInput,

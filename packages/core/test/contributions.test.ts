@@ -613,3 +613,93 @@ describe("contributionStats / boundaryFlowPoints — inside transfer_out at aver
     expect(boundaryFlowPoints(txns, "inside", "EUR", fx)).toEqual([]);
   });
 });
+
+describe("split-aware average-cost pool (audit B9)", () => {
+  const split = {
+    instrumentId: "inst-etf",
+    type: "split" as const,
+    ratio: "10",
+    exDate: new Date("2026-03-01T00:00:00Z"),
+  };
+  const fx = (from: string, to: string) => (from === to ? "1" : null);
+  // 10 @ 100 = 1,000 cost; 10:1 split → 100 shares @ 10; sell 5 (5% of the position).
+  const buyThenSell: CoreTransaction[] = [
+    tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2026-02-01") }),
+    tx({ type: "sell", quantity: "5", price: "12", executedAt: new Date("2026-04-01") }),
+  ];
+
+  it("outside walk: a sale after a 10:1 split removes 5% of the cost, not 50%", () => {
+    const stats = contributionStats({
+      txns: buyThenSell,
+      displayCurrency: "EUR",
+      boundary: "outside",
+      corporateActions: [split],
+    });
+    expect(stats.totalContributed).toBe("1000");
+    expect(stats.totalWithdrawn).toBe("50");
+    expect(stats.netContributed).toBe("950");
+    // Same walk, per-transaction view — kept in lockstep.
+    expect(boundaryFlowPoints(buyThenSell, "outside", "EUR", fx, [split])).toEqual([
+      { amount: -1000, date: new Date("2026-02-01") },
+      { amount: 50, date: new Date("2026-04-01") },
+    ]);
+  });
+
+  it("without the action the pre-B9 (split-blind) result is unchanged", () => {
+    const stats = contributionStats({
+      txns: buyThenSell,
+      displayCurrency: "EUR",
+      boundary: "outside",
+    });
+    expect(stats.totalWithdrawn).toBe("500");
+  });
+
+  it("a bonus issue scales the pool the same way (1 extra share per share)", () => {
+    const stats = contributionStats({
+      txns: buyThenSell,
+      displayCurrency: "EUR",
+      boundary: "outside",
+      corporateActions: [{ ...split, type: "bonus", ratio: "1" }],
+    });
+    // 20 shares @ 50 → selling 5 removes 250.
+    expect(stats.totalWithdrawn).toBe("250");
+  });
+
+  it("a trade on the ex-date instant is processed before the split (holdings' order)", () => {
+    const sameInstant: CoreTransaction[] = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2026-02-01") }),
+      tx({ type: "sell", quantity: "5", price: "120", executedAt: split.exDate }),
+    ];
+    const stats = contributionStats({
+      txns: sameInstant,
+      displayCurrency: "EUR",
+      boundary: "outside",
+      corporateActions: [split],
+    });
+    expect(stats.totalWithdrawn).toBe("500");
+  });
+
+  it("inside walk: a transfer_out after the split carries the split-adjusted average cost", () => {
+    const txns: CoreTransaction[] = [
+      tx({
+        type: "deposit",
+        instrumentId: null,
+        price: "1000",
+        executedAt: new Date("2026-01-15"),
+      }),
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2026-02-01") }),
+      tx({ type: "transfer_out", quantity: "50", price: "0", executedAt: new Date("2026-04-01") }),
+    ];
+    const stats = contributionStats({
+      txns,
+      displayCurrency: "EUR",
+      boundary: "inside",
+      corporateActions: [split],
+    });
+    // 50 of 100 post-split shares → half the 1,000 basis.
+    expect(stats.totalWithdrawn).toBe("500");
+    expect(transferFlowPoints(txns, "inside", "EUR", fx, [split])).toEqual([
+      { amount: 500, date: new Date("2026-04-01") },
+    ]);
+  });
+});

@@ -128,6 +128,70 @@ export interface SummarizeInput {
   cashCounted?: boolean;
 }
 
+export interface NetWorthInputsArgs {
+  transactions: CoreTransaction[];
+  /** The portfolio's boundary flag (`portfolios.cashCounted`). */
+  cashCounted: boolean;
+  displayCurrency: string;
+  fx: FxRateFn;
+  /** FX-availability probe (audit B2). Defaults to "rate known for this currency". */
+  canConvert?: (ccy: string) => boolean;
+}
+
+export interface NetWorthInputs {
+  /** Native cash balances by currency — `{}` unless cash is inside the boundary AND tracked. */
+  cash: Record<string, string>;
+  /** Cash is inside the boundary and at least one explicit cash-account movement exists. */
+  cashTracked: boolean;
+  /** The subset of `cash` whose currency converts to `displayCurrency` — what net worth sums. */
+  convertibleCash: Record<string, string>;
+  /** Outstanding loan principal, in `displayCurrency` (unconvertible currencies left out). */
+  liabilities: string;
+}
+
+/**
+ * The non-securities half of the net-worth definition — the cash that counts and the
+ * liabilities that are subtracted — shared by the live valuation ({@link summarizePortfolio})
+ * and the historical backfill (`writeSnapshotSeries`), which upsert the same
+ * `portfolio_snapshots` rows. Before audit B6 the backfill had its own inline copy with no
+ * cash-tracking gate and no liabilities, so a day's stored value flipped definition
+ * depending on which job wrote it last. Pass the transactions as of the valuation date.
+ *
+ * Cash is part of net worth only when it is inside the portfolio's boundary AND actually
+ * tracked — i.e. at least one explicit cash-account movement was imported: an external
+ * deposit/withdrawal, a financing leg (loan drawdown/repayment, whose negative cash
+ * legitimately captures out-of-pocket financing cost), or a manual adjustment. For
+ * cash-outside portfolios, or cash-inside ones whose only cash effects are plain
+ * securities buys/sells, the value is the securities sleeve only — this avoids the
+ * phantom negative-cash artifact when buys are imported without their funding deposits.
+ */
+export function netWorthInputs(args: NetWorthInputsArgs): NetWorthInputs {
+  const canConvert =
+    args.canConvert ?? ((ccy: string) => fxAvailable(ccy, args.displayCurrency, args.fx));
+  const hasCashMovement = args.transactions.some(
+    (tx) =>
+      tx.type === "deposit" ||
+      tx.type === "withdrawal" ||
+      tx.type === "loan_drawdown" ||
+      tx.type === "loan_repayment" ||
+      // A manual cash true-up is itself an explicit cash-account movement — it should
+      // switch on cash tracking the same as a deposit/withdrawal would.
+      tx.type === "adjustment",
+  );
+  const cashTracked = args.cashCounted && hasCashMovement;
+  const cash = cashTracked ? cashBalances(args.transactions) : {};
+  const convertibleCash: Record<string, string> = {};
+  for (const [ccy, amount] of Object.entries(cash)) {
+    if (canConvert(ccy)) convertibleCash[ccy] = amount;
+  }
+  let liabilities = new Decimal(0);
+  for (const [ccy, amount] of Object.entries(liabilityBalances(args.transactions))) {
+    if (!canConvert(ccy)) continue;
+    liabilities = liabilities.add(convert(amount, ccy, args.displayCurrency, args.fx));
+  }
+  return { cash, cashTracked, convertibleCash, liabilities: liabilities.toString() };
+}
+
 /**
  * Full portfolio valuation: per-holding market value + unrealized P&L, cash
  * balances, net worth and totals — all expressed in the display currency.
@@ -329,40 +393,18 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     };
   });
 
-  // Cash is part of net worth only when it is inside the portfolio's boundary AND
-  // actually tracked — i.e. at least one explicit cash-account movement was imported:
-  // an external deposit/withdrawal, or a financing leg (loan drawdown/repayment, whose
-  // negative cash legitimately captures out-of-pocket financing cost). For cash-outside
-  // portfolios, or cash-inside ones whose only cash effects are plain securities buys/
-  // sells, the value is the securities sleeve only — this avoids the phantom negative-cash
-  // artifact when buys are imported without their funding deposits.
-  const cashCounted = input.cashCounted ?? true;
-  const hasCashMovement = input.transactions.some(
-    (tx) =>
-      tx.type === "deposit" ||
-      tx.type === "withdrawal" ||
-      tx.type === "loan_drawdown" ||
-      tx.type === "loan_repayment" ||
-      // A manual cash true-up is itself an explicit cash-account movement — it should
-      // switch on cash tracking the same as a deposit/withdrawal would.
-      tx.type === "adjustment",
-  );
-  const cashTracked = cashCounted && hasCashMovement;
-  const cash = cashTracked ? cashBalances(input.transactions) : {};
+  const { cash, cashTracked, convertibleCash, liabilities } = netWorthInputs({
+    transactions: input.transactions,
+    cashCounted: input.cashCounted ?? true,
+    displayCurrency: input.displayCurrency,
+    fx,
+    canConvert,
+  });
   // Cash in an unconvertible currency stays in `cash` (native amounts) but is left
   // out of exposure and net worth (audit B2).
-  const convertibleCash: Record<string, string> = {};
-  for (const [ccy, amount] of Object.entries(cash)) {
-    if (!canConvert(ccy)) continue;
-    convertibleCash[ccy] = amount;
+  for (const [ccy, amount] of Object.entries(convertibleCash)) {
     addExposure(ccy, convert(amount, ccy, input.displayCurrency, fx));
   }
-  let liabilitiesDec = new Decimal(0);
-  for (const [ccy, amount] of Object.entries(liabilityBalances(input.transactions))) {
-    if (!canConvert(ccy)) continue;
-    liabilitiesDec = liabilitiesDec.add(convert(amount, ccy, input.displayCurrency, fx));
-  }
-  const liabilities = liabilitiesDec.toString();
   const fxMissingIds = new Set(valuations.filter((v) => v.fxMissing).map((v) => v.instrumentId));
   const nw = netWorth({
     holdings: holdings.filter((h) => !fxMissingIds.has(h.instrumentId)),
