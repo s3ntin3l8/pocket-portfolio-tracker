@@ -1,3 +1,4 @@
+import { Decimal } from "decimal.js";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -75,8 +76,8 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
   // From the shared payload when available, so this figure and the explainer cannot disagree;
   // the contributions response (same value/net pair) is only the fallback for an older API.
   const gainAmount = gain
-    ? Number(gain.value) - Number(gain.netContributed)
-    : Number(c.currentValue) - Number(c.netContributed);
+    ? new Decimal(gain.value).minus(gain.netContributed).toNumber()
+    : new Decimal(c.currentValue).minus(c.netContributed).toNumber();
 
   return (
     <div className="space-y-5">

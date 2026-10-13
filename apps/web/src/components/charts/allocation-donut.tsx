@@ -57,6 +57,12 @@ export function AllocationDonut({
       compactDisplay: "short",
       maximumFractionDigits: currency === "IDR" ? 0 : 1,
     }).format(n);
+  // Server pct when given, else value / sum; a non-finite result (empty or zero-sum data)
+  // renders as a dash rather than "NaN%".
+  const pctOf = (d: DonutSlice): number | null => {
+    const v = d.actualPct ?? (sum > 0 ? (d.value / sum) * 100 : Number.NaN);
+    return Number.isFinite(v) ? v : null;
+  };
   const formattedTotal = displayTotal > 0 ? compact(displayTotal) : null;
 
   // Split each slice into its market-priced part and its at-cost part; the latter gets a
@@ -196,7 +202,7 @@ export function AllocationDonut({
             </span>
             {showPercent && (
               <span className="tabular w-[50px] shrink-0 text-right text-xs font-bold">
-                {formatPercentPoints(d.actualPct ?? (d.value / sum) * 100, locale, 1)}
+                {pctOf(d) === null ? "—" : formatPercentPoints(pctOf(d)!, locale, 1)}
               </span>
             )}
           </li>

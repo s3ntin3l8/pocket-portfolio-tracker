@@ -64,4 +64,12 @@ describe("AllocationDonut (audit G2/G3)", () => {
     );
     expect(screen.queryByText("Hatched: valued at cost")).not.toBeInTheDocument();
   });
+
+  it("shows a dash, not NaN%, when there is nothing to divide by", () => {
+    render(
+      wrap(<AllocationDonut currency="EUR" data={[{ key: "cash", label: "Cash", value: 0 }]} />),
+    );
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
 });

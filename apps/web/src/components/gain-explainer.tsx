@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { formatMoney } from "@/lib/utils";
+import { formatNetWorth } from "@/lib/utils";
 
 const FIELDS = [
   { key: "value", label: "fieldValue", def: "fieldValueDef" },
@@ -61,7 +61,7 @@ export function GainExplainer({ gain }: { gain: GainSummary }) {
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-sm font-bold">{t(f.label)}</dt>
                 <dd className="tabular text-sm font-bold">
-                  {formatMoney(Number(gain[f.key]), gain.displayCurrency, locale)}
+                  {formatNetWorth(gain[f.key], gain.displayCurrency, locale)}
                 </dd>
               </div>
               <p className="mt-0.5 text-xs text-text-2">{t(f.def)}</p>
