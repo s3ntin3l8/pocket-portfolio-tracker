@@ -25,6 +25,8 @@ export function goldInstrumentForContract(c: ParsedGoldContract): {
 } {
   // Galeri 24 / Pegadaian sells Antam and UBS bars on cicilan too; value those at their own
   // brand's buyback. Anything else (Galeri 24's own MULIA gold) uses the GALERI24 buyback.
+  // A name mentioning both brands resolves to UBS (checked first) — ambiguous, rare, and the
+  // user can correct the instrument's market afterwards.
   const market = /\bUBS\b/i.test(c.goldName ?? "")
     ? "UBS"
     : /\bANTAM\b/i.test(c.goldName ?? "")

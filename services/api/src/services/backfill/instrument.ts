@@ -4,7 +4,7 @@ import { Decimal } from "decimal.js";
 import { instruments, scrapedQuotes } from "@portfolio/db";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
-import { BUYBACK_GOLD_MARKETS, isBuybackGoldMarket } from "../scrapers/store.js";
+import { buybackKeyFor, isBuybackGoldMarket } from "../scrapers/store.js";
 import { firstHeldDateFor, isManualPriceBond } from "./shared.js";
 
 export interface InstrumentChunkData {
@@ -143,7 +143,8 @@ export async function fetchInstrumentPrices(
     const xauSpotHistory = new Map(xauCandles.map((c) => [c.date, c.close]));
 
     // Get buyback rate for today
-    const buybackKey = BUYBACK_GOLD_MARKETS.find((m) => m.market === instr.market)!.key;
+    const buybackKey = buybackKeyFor(instr.market);
+    if (!buybackKey) return { instrumentId, days: 0, truncated: false, unpriced: true };
     const buybackRow = await db
       .select()
       .from(scrapedQuotes)

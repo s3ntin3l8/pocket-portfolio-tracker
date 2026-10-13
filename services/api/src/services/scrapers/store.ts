@@ -91,9 +91,14 @@ export const BUYBACK_GOLD_MARKETS: ReadonlyArray<{ market: string; key: string }
   { market: "UBS", key: UBS_BUYBACK_KEY },
 ];
 
+/** The `scraped_quotes` key holding `market`'s buyback rate, or `undefined` if it has none. */
+export function buybackKeyFor(market: string): string | undefined {
+  return BUYBACK_GOLD_MARKETS.find((m) => m.market === market)?.key;
+}
+
 /** Whether `market` is a gold market valued at a scraped buyback rate. */
 export function isBuybackGoldMarket(market: string): boolean {
-  return BUYBACK_GOLD_MARKETS.some((m) => m.market === market);
+  return buybackKeyFor(market) !== undefined;
 }
 
 /** Scrape the Bibit fund catalogue and cache each fund's NAV. Returns how many were cached. */
