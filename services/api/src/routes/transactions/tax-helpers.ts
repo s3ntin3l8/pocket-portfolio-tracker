@@ -254,6 +254,14 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     return amount.mul(rate);
   };
 
+  // The 0.1% final sales tax only covers disposals of IDX-listed shares; gold, crypto,
+  // foreign-listed ETFs/stocks and bonds are out of scope (audit C4). Unknown instruments
+  // (no metadata) are excluded rather than guessed.
+  const salesTaxApplies = (instrumentId: string): boolean => {
+    const meta = metaById.get(instrumentId);
+    return meta?.market === "IDX" && meta.assetClass === "equity";
+  };
+
   // Disposals for the selected year, grouped per (instrumentId, sellDate).
   type DisposalGroup = {
     instrumentId: string;
@@ -265,6 +273,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   };
   const disposalGroups = new Map<string, DisposalGroup>();
   for (const t of tradeLog.trades) {
+    if (!salesTaxApplies(t.instrumentId)) continue;
     for (const l of t.legs) {
       if (l.taxYear !== year) continue;
       const key = `${t.instrumentId}:${l.sellDate}`;
@@ -327,7 +336,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
       existing.gross = existing.gross.add(gross);
       existing.tax = existing.tax.add(tax);
     } else {
-      divBuckets.set(key, { symbol, currency: t.currency, gross, tax });
+      divBuckets.set(key, { symbol, currency: displayCurrency, gross, tax });
     }
   }
   const dividends: IdDividendInput[] = [...divBuckets.values()].map((b) => ({
@@ -341,6 +350,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   // so byYear rows stay in display currency end-to-end — no FX pass needed here.
   const proceedsByYearMap = new Map<number, Decimal>();
   for (const t of tradeLog.trades) {
+    if (!salesTaxApplies(t.instrumentId)) continue;
     for (const l of t.legs) {
       const prev = proceedsByYearMap.get(l.taxYear) ?? new Decimal(0);
       proceedsByYearMap.set(l.taxYear, prev.add(l.proceeds));

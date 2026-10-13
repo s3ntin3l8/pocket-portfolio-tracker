@@ -369,4 +369,50 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
     expect(totalProceeds).toBe(900);
     expect(totalSalesTax).toBeCloseTo(0.9, 2);
   });
+  it("applies no 0.1% sales tax to gold or EU-ETF disposals (IDX equity only)", async () => {
+    const t = await token("tax-id-c4");
+    const mk = async (symbol: string, market: string, assetClass: string) => {
+      const [row] = await app.db
+        .insert(instruments)
+        .values({ symbol, market, assetClass, currency: "EUR", name: symbol })
+        .returning();
+      return row;
+    };
+    const gold = await mk("C4-GOLD", "XAU", "gold");
+    const etf = await mk("C4-ETF", "XETRA", "etf");
+    const idx = await mk("C4-IDX", "IDX", "equity");
+    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR" });
+    await setTaxRegime(t, "ID");
+    for (const inst of [gold, etf, idx]) {
+      await seedTransaction(app, portfolioId, auth(t), {
+        type: "buy",
+        instrumentId: inst.id,
+        quantity: "10",
+        price: "100",
+        currency: "EUR",
+        executedAt: "2025-01-15T00:00:00.000Z",
+      });
+      await seedTransaction(app, portfolioId, auth(t), {
+        type: "sell",
+        instrumentId: inst.id,
+        quantity: "10",
+        price: "200",
+        currency: "EUR",
+        executedAt: "2025-06-15T00:00:00.000Z",
+      });
+    }
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const id = res.json().indonesianFinalTax;
+    // Only the IDX equity sale counts: 10 x 200 = 2000 proceeds, 0.1% = 2.00.
+    expect(id.disposals).toHaveLength(1);
+    expect(id.totalProceeds).toBe("2000.00");
+    expect(id.totalSalesTax).toBe("2.00");
+    const yearRow = id.byYear.find((r: { year: number }) => r.year === 2025);
+    expect(yearRow.tax).toBe("2.00");
+  });
 });

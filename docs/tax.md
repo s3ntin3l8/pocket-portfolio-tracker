@@ -151,10 +151,16 @@ A flat, **withheld-at-source** tax with no annual allowance, no loss-netting, an
 realization dependency on when a gain was locked in — it taxes _proceeds and gross
 income_, not gains:
 
-| Event                    | Rate     | Base                                                                     |
-| ------------------------ | -------- | ------------------------------------------------------------------------ |
-| Every disposal (sell)    | **0.1%** | Gross sale proceeds (not gain)                                           |
-| Dividend / coupon income | **10%**  | Gross amount (net received + any withholding already on the transaction) |
+| Event                         | Rate     | Base                                                                     |
+| ----------------------------- | -------- | ------------------------------------------------------------------------ |
+| Disposal of IDX-listed shares | **0.1%** | Gross sale proceeds (not gain)                                           |
+| Dividend / coupon income      | **10%**  | Gross amount (net received + any withholding already on the transaction) |
+
+The 0.1% sales tax is scoped to `market === "IDX" && assetClass === "equity"`
+(`computeIndonesianFinalTaxFromTradeLog` in `services/api/src/routes/transactions/
+tax-helpers.ts`); gold, crypto, foreign-listed ETFs/stocks and bonds incur none, in both
+the per-disposal rows and the by-year rollup. Dividend rows are display-currency
+amounts and are labelled with the display currency (not the transaction's native one).
 
 **Design-fidelity note (intentional):** dividend/coupon tax is always computed as
 `gross × 10%`, ignoring whatever a broker may have already withheld on the underlying
