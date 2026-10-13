@@ -1,7 +1,7 @@
 import { retryAfterOf, type DataFailureStatus } from "@/lib/data-status";
 import { DataState } from "@/components/data-state";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Receipt } from "lucide-react";
+import { Plus, Receipt } from "lucide-react";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
 import { collectFxMissing } from "@/lib/fx-missing";
 import { EmptyState } from "@/components/empty-state";
@@ -11,6 +11,8 @@ import { ExportDocumentsButton } from "@/components/export-documents-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { RecentImportsSection } from "@/components/recent-imports-section";
 import { PageTitle } from "@/components/page-header";
+import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
+import { Button } from "@/components/ui/button";
 import {
   getSelectedPortfolioId,
   loadImports,
@@ -39,6 +41,7 @@ export default async function TransactionsPage({
   setRequestLocale(locale);
   const t = await getTranslations("Transactions");
   const te = await getTranslations("Empty");
+  const tf = await getTranslations("PortfolioForm");
 
   // Aggregate across all portfolios unless one is selected in the global switcher.
   const selectedId = await getSelectedPortfolioId();
@@ -222,6 +225,31 @@ export default async function TransactionsPage({
     // When a filter/search is active, fall through to the table — it shows its own
     // "No transactions match your search" message with the filter controls still visible.
     if (!hasActiveFilter) {
+      // Zero portfolios: there is nothing to add a transaction TO (the form would open
+      // with `portfolioId=""`), so the CTA is "create a portfolio", not "add".
+      if (portfolioList.length === 0) {
+        return (
+          <div className="space-y-5">
+            {heading}
+            <EmptyState
+              icon={Receipt}
+              title={te("noPortfolioTitle")}
+              description={te("noPortfolioBody")}
+              action={
+                <PortfolioFormDialog
+                  mode="create"
+                  trigger={
+                    <Button>
+                      <Plus className="size-4" />
+                      {tf("new")}
+                    </Button>
+                  }
+                />
+              }
+            />
+          </div>
+        );
+      }
       return (
         <div className="space-y-5">
           {heading}

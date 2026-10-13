@@ -393,6 +393,55 @@ describe("AddTransactionMenu", () => {
     });
   });
 
+  describe("default portfolio follows the global switcher (audit E9)", () => {
+    const two = [
+      { id: "p1", name: "First", brokerage: null, accountHolder: null, accountHolderId: "h1" },
+      { id: "p2", name: "Second", brokerage: null, accountHolder: null, accountHolderId: "h2" },
+    ];
+    afterEach(() => {
+      document.cookie = "pf=; path=/; max-age=0";
+    });
+
+    it("preselects the cookie-selected portfolio instead of the first one", async () => {
+      document.cookie = "pf=p2; path=/";
+      listPortfolios.mockResolvedValue(two);
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(lastEntryTabsProps.current).toMatchObject({ initialPortfolioId: "p2" });
+    });
+
+    it("falls back to the first portfolio in the aggregate scope", async () => {
+      document.cookie = "pf=all; path=/";
+      listPortfolios.mockResolvedValue(two);
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(lastEntryTabsProps.current).toMatchObject({ initialPortfolioId: "p1" });
+    });
+
+    it("uses the selected portfolio for the harvest prefill too", async () => {
+      document.cookie = "pf=p2; path=/";
+      listPortfolios.mockResolvedValue(two);
+      getInstrument.mockResolvedValue({
+        id: "i1",
+        symbol: "NVDA",
+        name: "NVIDIA Corp",
+        assetClass: "equity",
+        unit: "shares",
+        currency: "USD",
+      });
+      getSummary.mockResolvedValue({ displayCurrency: "IDR", holdings: [] });
+      search.value = "harvestInstrument=i1";
+      renderMenu({ autoOpenFromParams: true });
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      expect(getSummary).toHaveBeenCalledWith("p2");
+      expect(lastEntryTabsProps.current).toMatchObject({ initialPortfolioId: "p2" });
+    });
+  });
+
   // #669: AddTransactionMenu and DesktopShell merged into one tree — the rail
   // (`max-md:hidden`) replaces the mobile chooser at `md:`+ instead of a second,
   // separately-mounted component swapped in via `isDesktop`.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import {
@@ -23,6 +23,7 @@ import type { AddTransactionInitial } from "@/components/add-transaction-form";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
+import { pickDefaultPortfolioId, readSelectedScope } from "@/lib/portfolio-selection";
 import type { ImportTargetPortfolio } from "@/components/import-flow/types";
 import { PortfolioFormBody } from "@/components/portfolio-form-dialog/body";
 import { HolderFormBody } from "@/components/holder-form-dialog/body";
@@ -99,6 +100,9 @@ export function AddTransactionMenu({
   const [footerEl, setFooterEl] = useState<HTMLDivElement | null>(null);
   const [portfolios, setPortfolios] = useState<ImportTargetPortfolio[] | null>(null);
   const [defaultPortfolioId, setDefaultPortfolioId] = useState("");
+  // Raw portfolio rows from the last fetch — kept so the default can be re-derived from
+  // the (possibly changed) global-switcher cookie on every open without re-fetching.
+  const fetchedRef = useRef<{ id: string; accountHolderId?: string | null }[]>([]);
   const [manualDefaultTab, setManualDefaultTab] = useState<NewEntryTab>("transaction");
   const [importEntryMode, setImportEntryMode] = useState<ImportEntryMode>("file");
   const [initialTransaction, setInitialTransaction] = useState<AddTransactionInitial | undefined>(
@@ -165,7 +169,7 @@ export function AddTransactionMenu({
     void (async () => {
       const loaded = await loadPortfolios();
       if (cancelled) return;
-      const targetPortfolioId = loaded[0]?.id ?? "";
+      const targetPortfolioId = currentDefaultPortfolioId();
 
       let targetTab: NewEntryTab = "transaction";
       if (harvestInstrumentParam) {
@@ -201,8 +205,16 @@ export function AddTransactionMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harvestInstrumentParam, entryParam]);
 
+  /** The globally selected portfolio (cookie scope), not blindly the first one. */
+  function currentDefaultPortfolioId() {
+    return pickDefaultPortfolioId(fetchedRef.current, readSelectedScope(document.cookie));
+  }
+
   async function loadPortfolios() {
-    if (portfolios !== null) return portfolios;
+    if (portfolios !== null) {
+      setDefaultPortfolioId(currentDefaultPortfolioId());
+      return portfolios;
+    }
     const [fetched, holders] = await Promise.all([api.listPortfolios(), api.listAccountHolders()]);
     const mapped = fetched.map((p) => ({
       id: p.id,
@@ -210,8 +222,9 @@ export function AddTransactionMenu({
       brokerage: p.brokerage,
       accountHolder: p.accountHolder,
     }));
+    fetchedRef.current = fetched.map((p) => ({ id: p.id, accountHolderId: p.accountHolderId }));
     setPortfolios(mapped);
-    setDefaultPortfolioId(mapped[0]?.id ?? "");
+    setDefaultPortfolioId(currentDefaultPortfolioId());
     setHasHolders(holders.length > 0);
     return mapped;
   }
