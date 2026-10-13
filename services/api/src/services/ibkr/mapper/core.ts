@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { Decimal } from "decimal.js";
+import { toDecimalSafe } from "../../../lib/decimal-safe.js";
 import {
   parsedTransactionSchema,
   type ParsedAction,
@@ -57,9 +58,11 @@ export function mapFlexToDrafts(
     const currency = trade.currency ?? "USD";
 
     // Commission is negative in Flex; taxes is the trade-level tax (stamp duty etc.).
-    const fees = String(
-      Math.abs(Number(strNum(trade.ibCommission))) + Math.abs(Number(strNum(trade.taxes))),
-    );
+    // Decimal, never a float sum (audit B12): 0.1 + 0.2 must store "0.3".
+    const fees = toDecimalSafe(strNum(trade.ibCommission))
+      .abs()
+      .add(toDecimalSafe(strNum(trade.taxes)).abs())
+      .toFixed();
 
     const externalId = trade.tradeID
       ? `ibkr:trade:${trade.tradeID}`
@@ -95,7 +98,7 @@ export function mapFlexToDrafts(
   // Index: symbol|date → index in dividendRows
   const dividendRows: {
     tx: (typeof statement.cashTransactions)[number];
-    taxAmt: number; // accumulated withholding tax (positive = cost to holder)
+    taxAmt: Decimal; // accumulated withholding tax (positive = cost to holder)
     idx: number; // index in the output drafts array (filled after push)
   }[] = [];
   const dividendIndex = new Map<string, number>(); // symbol|date → dividendRows index
@@ -113,7 +116,7 @@ export function mapFlexToDrafts(
       if (date) {
         const key = `${tx.symbol ?? ""}|${date}`;
         dividendIndex.set(key, dividendRows.length);
-        dividendRows.push({ tx, taxAmt: 0, idx: -1 });
+        dividendRows.push({ tx, taxAmt: new Decimal(0), idx: -1 });
       } else {
         otherCash.push(tx);
       }
@@ -123,7 +126,8 @@ export function mapFlexToDrafts(
       const dividendIdx = dividendIndex.get(key);
       if (dividendIdx !== undefined) {
         // Accumulate the absolute withholding tax amount for this dividend.
-        dividendRows[dividendIdx]!.taxAmt += Math.abs(Number(strNum(tx.amount)));
+        const row = dividendRows[dividendIdx]!;
+        row.taxAmt = row.taxAmt.add(toDecimalSafe(strNum(tx.amount)).abs());
       } else {
         // No matching dividend found — emit as a standalone fee.
         otherCash.push(tx);
@@ -151,8 +155,9 @@ export function mapFlexToDrafts(
     // withholding. When taxAmt is 0 (no matching withholding row — e.g. tax handled
     // via the annual return instead), net === gross, so this is a no-op in that case.
     const grossAmount = absStr(tx.amount);
-    const netPrice =
-      taxAmt > 0 ? Decimal.max(0, new Decimal(grossAmount).minus(taxAmt)).toFixed(2) : grossAmount;
+    const netPrice = taxAmt.gt(0)
+      ? Decimal.max(0, new Decimal(grossAmount).minus(taxAmt)).toFixed(2)
+      : grossAmount;
 
     push(
       {
@@ -165,7 +170,7 @@ export function mapFlexToDrafts(
         unit: "shares",
         price: netPrice,
         fees: "0",
-        tax: taxAmt > 0 ? String(taxAmt) : undefined,
+        tax: taxAmt.gt(0) ? taxAmt.toFixed() : undefined,
         currency: tx.currency ?? "USD",
         executedAt: date,
         externalId,
