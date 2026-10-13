@@ -94,6 +94,8 @@ const t = messages.Holdings;
 
 describe("PositionsPanel", () => {
   // React reports a missing/duplicate list `key` through console.error — fail on any (E8).
+  // Deliberately scoped to this panel (the Holdings toolbar is where the warning was reported);
+  // the fix itself is the explicit key on the export action in holdings/page.tsx.
   let consoleError: MockInstance;
   beforeEach(() => {
     consoleError = vi.spyOn(console, "error").mockImplementation(() => {});

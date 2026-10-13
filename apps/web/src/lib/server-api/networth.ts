@@ -50,12 +50,18 @@ export async function loadNetWorth(
 export async function loadNetWorthHolderScope(): Promise<string | undefined> {
   try {
     const portfolios = await listPortfoliosCached();
-    const wanted = await getSelectedPortfolioId();
-    if (portfolios.some((p) => p.id === wanted)) return undefined;
-    return await resolveHolderScope(portfolios);
+    return (await currentHolderScope(portfolios)).holderId;
   } catch {
     return undefined;
   }
+}
+
+/** Selected portfolio (if any) and, when none is selected, the active holder scope. */
+async function currentHolderScope(portfolios: Awaited<ReturnType<typeof listPortfoliosCached>>) {
+  const wanted = await getSelectedPortfolioId();
+  const selected = portfolios.find((p) => p.id === wanted);
+  const holderId = selected ? undefined : await resolveHolderScope(portfolios);
+  return { selected, holderId };
 }
 
 export async function loadNetWorthHistory(range = "1y"): Promise<HistoryPoint[]> {
@@ -63,10 +69,8 @@ export async function loadNetWorthHistory(range = "1y"): Promise<HistoryPoint[]>
   if (!api) return [];
   try {
     const portfolios = await listPortfoliosCached();
-    const wanted = await getSelectedPortfolioId();
-    const selected = portfolios.find((p) => p.id === wanted);
+    const { selected, holderId } = await currentHolderScope(portfolios);
     if (selected) return await api.getPortfolioHistory(selected.id, range);
-    const holderId = await resolveHolderScope(portfolios);
     return await api.getNetWorthHistory(range, holderId ? { holderId } : undefined);
   } catch {
     return [];

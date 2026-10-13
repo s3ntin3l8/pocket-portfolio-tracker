@@ -94,17 +94,19 @@ export function NetWorthHistoryChart({
   // range chips stay clickable while a fetch is in flight, so overlapping picks are possible.)
   const requestSeq = useRef(0);
 
+  // A selected portfolio wins over the holder scope (which only applies to the aggregate view).
+  function fetchHistory(r: ChartRange): Promise<HistoryPoint[]> {
+    if (selectedId) return api.getPortfolioHistory(selectedId, r);
+    return holderId ? api.getNetWorthHistory(r, { holderId }) : api.getNetWorthHistory(r);
+  }
+
   async function pick(r: ChartRange) {
     if (r === range) return;
     setRange(r);
     setLoading(true);
     const seq = ++requestSeq.current;
     try {
-      const next = selectedId
-        ? await api.getPortfolioHistory(selectedId, r)
-        : holderId
-          ? await api.getNetWorthHistory(r, { holderId })
-          : await api.getNetWorthHistory(r);
+      const next = await fetchHistory(r);
       if (seq === requestSeq.current) setData(next);
     } catch {
       // keep last good series on failed refetch

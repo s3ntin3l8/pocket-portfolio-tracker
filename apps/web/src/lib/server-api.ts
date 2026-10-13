@@ -89,12 +89,12 @@ export const loadNetworthAnomalies = cache(async (): Promise<Anomaly[] | null> =
  *  selected portfolio, else the aggregate). Backed by the `cache()`d loaders above, so it costs
  *  one API call per request that the page itself then reuses — nothing is cached across
  *  requests. A failed fetch yields no badge rather than a misleading zero-with-error. */
-export async function loadAnomalyBadge(): Promise<{ count: number; hasError: boolean }> {
+export const loadAnomalyBadge = cache(async (): Promise<{ count: number; hasError: boolean }> => {
   const selected = await getSelectedPortfolioId();
   const anomalies = selected ? await loadAnomalies(selected) : await loadNetworthAnomalies();
   if (!anomalies) return { count: 0, hasError: false };
   return { count: anomalies.length, hasError: anomalies.some((a) => a.severity === "error") };
-}
+});
 
 export type ContributionsView =
   | { status: "ok"; data: ContributionStats; valueHistory: PerformancePoint[] }

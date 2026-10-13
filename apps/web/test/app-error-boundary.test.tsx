@@ -15,7 +15,7 @@ describe("(app) error boundary", () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByText(messages.Error.title)).toBeInTheDocument();
-    expect(screen.getByText(/abc123/)).toBeInTheDocument();
+    expect(screen.getByText("REF · abc123")).toBeInTheDocument();
     expect(screen.queryByText(/hunter2/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: messages.Error.retry }));
     expect(reset).toHaveBeenCalled();
