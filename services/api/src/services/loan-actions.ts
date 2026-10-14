@@ -25,7 +25,7 @@ export const payoffExternalId = (loanId: string) => `loan:${loanId}:payoff`;
 
 /** Rewrite the raw schedule jsonb, flagging (or un-flagging) the given installments. */
 function withSkipped(schedule: unknown, ns: Set<number>, skipped: boolean): unknown {
-  if (!Array.isArray(schedule)) return schedule;
+  if (!Array.isArray(schedule) || ns.size === 0) return schedule;
   return schedule.map((r) => {
     if (typeof r !== "object" || r === null || !ns.has((r as { n: number }).n)) return r;
     const { skipped: _drop, ...rest } = r as Record<string, unknown>;

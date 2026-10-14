@@ -81,6 +81,8 @@ function readSchedule(schedule: unknown): ScheduleBase[] {
   const rows: ScheduleBase[] = [];
   for (const r of schedule) {
     if (typeof r !== "object" || r === null) continue;
+    // `loans.schedule` is untyped jsonb; the row shape (incl. the `skipped` flag) is defined by
+    // `loanScheduleRowSchema` in @portfolio/schema — keep the two in step.
     const { n, dueDate, pokok, sewaModal, angsuran, skipped } = r as Record<string, unknown>;
     if (
       typeof n === "number" &&
