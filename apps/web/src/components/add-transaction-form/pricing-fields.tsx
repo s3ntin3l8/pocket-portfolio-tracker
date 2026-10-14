@@ -18,6 +18,7 @@ interface PricingFieldsProps {
   showExtrasFields: boolean;
   showExtrasBtn: boolean;
   extrasLabelKey: string;
+  feesLabelKey: string;
   onOpenExtras: () => void;
   showFees: boolean;
   showTax: boolean;
@@ -50,6 +51,7 @@ export function PricingFields({
   showExtrasFields,
   showExtrasBtn,
   extrasLabelKey,
+  feesLabelKey,
   onOpenExtras,
   showFees,
   showTax,
@@ -109,7 +111,7 @@ export function PricingFields({
       {showExtrasFields && (
         <div className="mt-3 grid grid-cols-2 gap-3">
           {showFees && (
-            <Field label={t("fees")} htmlFor="tx-fees">
+            <Field label={t(feesLabelKey)} htmlFor="tx-fees">
               <NumberField id="tx-fees" value={fees} onValueChange={setFees} />
             </Field>
           )}

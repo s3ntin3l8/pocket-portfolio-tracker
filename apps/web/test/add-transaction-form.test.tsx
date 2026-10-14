@@ -814,6 +814,41 @@ describe("AddTransactionForm", () => {
     );
   });
 
+  it("keeps a loan repayment's margin on edit and lets it be changed (#954)", async () => {
+    const client = makeClient();
+    const onSuccess = vi.fn();
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AddTransactionForm
+          client={client}
+          portfolioId="p1"
+          transactionId="t-loan"
+          initial={{ ...EDIT_INITIAL, type: "loan_repayment", fees: "50000" }}
+          onSuccess={onSuccess}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    // Nonzero stored margin auto-opens the extras and is labelled as margin, not "Fees".
+    expect(screen.getByLabelText(m.loanMargin)).toHaveValue("50,000");
+    fireEvent.click(screen.getByRole("button", { name: m.save }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(client.updateTransaction).toHaveBeenCalledWith(
+      "p1",
+      "t-loan",
+      expect.objectContaining({ fees: "50000" }),
+    );
+
+    fireEvent.change(screen.getByLabelText(m.loanMargin), { target: { value: "75000" } });
+    fireEvent.click(screen.getByRole("button", { name: m.save }));
+    await waitFor(() => expect(client.updateTransaction).toHaveBeenCalledTimes(2));
+    expect(client.updateTransaction).toHaveBeenLastCalledWith(
+      "p1",
+      "t-loan",
+      expect.objectContaining({ fees: "75000" }),
+    );
+  });
+
   it("shows the tax field for a buy in edit mode (Edit mock: showTax = isAcq || isIncome, unlike Add's sell-only rule)", () => {
     const client = makeClient();
     render(

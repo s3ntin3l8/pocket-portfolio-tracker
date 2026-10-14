@@ -1735,6 +1735,8 @@
       "bucketSubtypeCategory": "Kategori",
       "details": "Detail",
       "extrasFees": "Tambah biaya",
+      "extrasMargin": "Tambah margin",
+      "loanMargin": "Margin (sewa modal)",
       "extrasFeesTax": "Tambah biaya / pajak",
       "customInstrumentToggle": "Tidak ditemukan? Tambahkan instrumen kustom"
     },
