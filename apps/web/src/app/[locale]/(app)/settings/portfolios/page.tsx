@@ -58,7 +58,7 @@ export default async function SettingsPortfoliosPage({
 
       <div className="space-y-6">
         {result.status !== "ok" ? (
-          <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={Briefcase} />
+          <DataState status={result.status} retryAfter={retryAfterOf(result)} />
         ) : result.portfolios.length > 0 ? (
           <div className="grid gap-3.5 sm:grid-cols-2">
             {result.portfolios.map(({ portfolio, netWorth }) => {

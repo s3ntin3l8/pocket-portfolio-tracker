@@ -86,7 +86,7 @@ export default async function TaxPage({
     return (
       <div className="space-y-5">
         {Heading}
-        <DataState status={taxResult.status} retryAfter={retryAfterOf(taxResult)} icon={Receipt} />
+        <DataState status={taxResult.status} retryAfter={retryAfterOf(taxResult)} />
       </div>
     );
   }

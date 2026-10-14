@@ -192,11 +192,7 @@ export default async function InstrumentPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">{back}</div>
-        <DataState
-          status={instrumentResult.status}
-          retryAfter={retryAfterOf(instrumentResult)}
-          icon={LineChart}
-        />
+        <DataState status={instrumentResult.status} retryAfter={retryAfterOf(instrumentResult)} />
       </div>
     );
   }

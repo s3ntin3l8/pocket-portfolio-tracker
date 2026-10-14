@@ -531,7 +531,6 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         <DataState
           status={failure.status as "unauthorized" | "rate_limited" | "unavailable"}
           retryAfter={retryAfterOf(failure)}
-          icon={Receipt}
         />
       )}
 

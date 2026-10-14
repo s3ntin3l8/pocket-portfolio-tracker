@@ -214,7 +214,7 @@ export default async function HoldingsPage({
     return (
       <div className="space-y-5">
         {Heading}
-        <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={Layers} />
+        <DataState status={result.status} retryAfter={retryAfterOf(result)} />
       </div>
     );
   }
