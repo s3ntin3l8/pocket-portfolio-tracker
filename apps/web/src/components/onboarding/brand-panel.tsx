@@ -1,20 +1,15 @@
-import { Icon, ICONS } from "./icon";
+import { BrandLogo } from "./brand-logo";
 import { StepBackground, BG_SEQUENCE } from "./brand-backgrounds";
-import type { OnboardingTheme } from "./theme";
-import styles from "./onboarding.module.css";
 
-/** Desktop-only (`isDesktop`) left brand panel: logo, per-step animated background,
- *  and the headline/subcopy/bullets block that syncs to the current step. Ported
- *  verbatim from the design's `isDesktop` brand block. */
+/** Desktop-only left brand panel: logo, per-step animated background, and the
+ *  headline/subcopy/bullets block that syncs to the current step. */
 export function BrandPanel({
-  th,
   step,
   stepTitle,
   brandHeadline,
   brandSub,
   brandBullets,
 }: {
-  th: OnboardingTheme;
   step: number;
   stepTitle: string;
   brandHeadline: string;
@@ -22,119 +17,32 @@ export function BrandPanel({
   brandBullets: string[];
 }) {
   return (
-    <div
-      style={{
-        flex: "1 1 44%",
-        minWidth: 0,
-        background: th.brandGrad,
-        color: "#fff",
-        padding: "56px 60px",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        className={styles.driftGlow}
-        style={{
-          position: "absolute",
-          right: "-140px",
-          top: "-120px",
-          width: 440,
-          height: 440,
-          borderRadius: "50%",
-          background: "radial-gradient(circle,rgba(14,159,110,.28),transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        className={styles.driftGlowReverse}
-        style={{
-          position: "absolute",
-          left: "-120px",
-          bottom: "-160px",
-          width: 420,
-          height: 420,
-          borderRadius: "50%",
-          background: "radial-gradient(circle,rgba(56,225,164,.10),transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
+    <div className="relative flex min-w-0 flex-[1_1_44%] flex-col overflow-hidden bg-brand-panel px-15 py-14 text-white">
+      <div className="pointer-events-none absolute -top-30 -right-35 size-110 animate-drift-glow rounded-full bg-glow-primary opacity-28" />
+      <div className="pointer-events-none absolute -bottom-40 -left-30 size-105 animate-drift-glow-rev rounded-full bg-glow-mint opacity-10" />
 
       {/* rotating background, faded in per step — remounted (key) so the
-          fadeIn+swayWave animation restarts on every step change */}
+          fade-in + sway animation restarts on every step change */}
       <div
         key={stepTitle}
-        className={styles.swayWaveBrand}
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          transformOrigin: "center bottom",
-        }}
+        className="pointer-events-none absolute inset-0 origin-bottom animate-sway-brand"
       >
         <StepBackground variant={BG_SEQUENCE[step]} />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, position: "relative" }}>
-        <span
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 13,
-            background: "#0E9F6E",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon d={ICONS.wallet} size={22} stroke="#fff" />
-        </span>
-        <span style={{ font: "800 20px 'Plus Jakarta Sans'" }}>Pocket</span>
-      </div>
+      <BrandLogo className="relative" />
 
-      <div style={{ marginTop: "auto", position: "relative", maxWidth: 420 }}>
-        <div key={stepTitle} className={styles.stepAnim}>
-          <h1
-            style={{
-              font: "800 clamp(28px,2.6vw,38px)/1.16 'Plus Jakarta Sans'",
-              margin: 0,
-              letterSpacing: "-.015em",
-            }}
-          >
+      <div className="relative mt-auto max-w-105">
+        <div key={stepTitle} className="animate-step-in">
+          <h1 className="text-display font-extrabold tracking-tight xl:text-hero">
             {brandHeadline}
           </h1>
-          <p
-            style={{
-              font: "500 15px/1.6 'Plus Jakarta Sans'",
-              color: "rgba(255,255,255,.62)",
-              margin: "16px 0 0",
-            }}
-          >
-            {brandSub}
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 22 }}>
+          <p className="mt-4 text-body text-white/62">{brandSub}</p>
+          <div className="mt-5.5 flex flex-col gap-2">
             {brandBullets.map((text, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-                <span
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: "#38E1A4",
-                    marginTop: 7,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    font: "500 12.5px/1.5 'Plus Jakarta Sans'",
-                    color: "rgba(255,255,255,.72)",
-                  }}
-                >
-                  {text}
-                </span>
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-1.75 size-1.25 shrink-0 rounded-full bg-brand-mint" />
+                <span className="text-xs/normal text-white/72">{text}</span>
               </div>
             ))}
           </div>

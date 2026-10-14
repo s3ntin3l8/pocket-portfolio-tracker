@@ -1,43 +1,30 @@
-import type { CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 import { Icon, ICONS } from "./icon";
-import type { OnboardingTheme } from "./theme";
 
 /** The onboarding flow's own theme toggle pill (distinct from the app-wide
- *  `theme-toggle.tsx` — this one is styled entirely from the `th` object to match
- *  the design, and is rendered both fixed-desktop and inline-mobile). */
+ *  `theme-toggle.tsx`, rendered both fixed-desktop and inline-mobile). */
 export function ThemeTogglePill({
-  th,
   isDark,
   label,
   onToggle,
-  style,
+  className,
 }: {
-  th: OnboardingTheme;
   isDark: boolean;
   /** The action label — i.e. the opposite of the current theme ("Light" while dark,
    *  "Dark" while light). Passed in already-translated so this component stays
    *  i18n-agnostic. */
   label: string;
   onToggle: () => void;
-  style?: CSSProperties;
+  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 7,
-        background: th.toggleBg,
-        border: `1px solid ${th.toggleBorder}`,
-        borderRadius: 999,
-        padding: "7px 12px",
-        cursor: "pointer",
-        font: "700 12px 'Plus Jakarta Sans'",
-        color: th.toggleText,
-        ...style,
-      }}
+      className={cn(
+        "flex cursor-pointer items-center gap-[7px] rounded-full border border-input bg-muted px-3 py-2 text-xs font-bold text-text-mute",
+        className,
+      )}
     >
       {!isDark && <Icon d={ICONS.sun} size={15} />}
       {isDark && (

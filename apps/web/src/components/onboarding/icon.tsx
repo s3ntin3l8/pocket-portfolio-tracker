@@ -4,13 +4,14 @@
 export function Icon({
   d,
   size = 17,
-  stroke = "currentColor",
   strokeWidth = 2,
+  className,
 }: {
   d: string;
   size?: number;
-  stroke?: string;
   strokeWidth?: number;
+  /** Colour comes from `currentColor` — set it with a `text-*` class. */
+  className?: string;
 }) {
   return (
     <svg
@@ -18,7 +19,8 @@ export function Icon({
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={stroke}
+      stroke="currentColor"
+      className={className}
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"

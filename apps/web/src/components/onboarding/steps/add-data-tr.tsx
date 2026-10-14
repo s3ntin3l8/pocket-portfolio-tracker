@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { ApiClient, TrConnection } from "@portfolio/api-client";
 import { Spinner } from "@/components/ui/spinner";
 import { TrConnectFlow } from "@/components/tr-connect-flow";
-import type { OnboardingTheme } from "../theme";
 
 /**
  * The "Connect Trade Republic" add-data card opens this dedicated sub-step (not the
@@ -13,7 +12,6 @@ import type { OnboardingTheme } from "../theme";
  * this flow, and calls `onConnected` once the connection actually completes.
  */
 export function AddDataTrConnect({
-  th,
   api,
   portfolioId,
   cashCounted,
@@ -21,7 +19,6 @@ export function AddDataTrConnect({
   loadingLabel,
   unavailableLabel,
 }: {
-  th: OnboardingTheme;
   api: Pick<
     ApiClient,
     | "connectTr"
@@ -68,18 +65,14 @@ export function AddDataTrConnect({
 
   if (connection === null) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "24px 0" }}>
+      <div className="flex items-center gap-2 py-6">
         <Spinner size="sm" />
-        <span style={{ font: "500 13px 'Plus Jakarta Sans'", color: th.subColor }}>
-          {loadingLabel}
-        </span>
+        <span className="text-body-sm font-medium text-text-2">{loadingLabel}</span>
       </div>
     );
   }
   if (connection === false) {
-    return (
-      <p style={{ font: "500 13px 'Plus Jakarta Sans'", color: th.subColor }}>{unavailableLabel}</p>
-    );
+    return <p className="text-body-sm font-medium text-text-2">{unavailableLabel}</p>;
   }
 
   return (
