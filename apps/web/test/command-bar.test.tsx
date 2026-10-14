@@ -36,6 +36,7 @@ vi.mock("@/lib/api", () => ({
 import { GlobalSearch } from "../src/components/global-search";
 import { RECENT_PAGES_KEY } from "../src/lib/recent-pages";
 import { isTypingContext, isOverlayOpen } from "../src/lib/shortcuts";
+import { COMMAND_PAGES } from "../src/components/nav-items";
 
 const s = messages.Search;
 const n = messages.Nav;
@@ -184,6 +185,7 @@ describe("command bar groups", () => {
     expect(screen.getByText(s.scopeTo.replace("{name}", "Sam"))).toBeInTheDocument();
     fireEvent.click(item);
     expect(push).toHaveBeenCalledWith("/holdings?scope=p%3Ap2");
+    expect(document.cookie).toContain("pf=p2");
   });
 
   it("no scope group with a single portfolio", async () => {
@@ -354,5 +356,23 @@ describe("typing-context guard", () => {
     expect(isTypingContext(document.createElement("button"))).toBe(false);
     expect(isTypingContext(document.createElement("input"))).toBe(true);
     expect(isOverlayOpen()).toBe(false);
+  });
+});
+
+describe("help sheet and chord table", () => {
+  it("modifier combo is joined with + not 'then'; chords keep 'then'", () => {
+    renderBar();
+    press("?", { shiftKey: true });
+    const dialog = screen.getByRole("dialog", { name: s.shortcutsTitle });
+    const row = within(dialog).getByText(s.shortcutOpenSearch).closest("li") as HTMLElement;
+    expect(within(row).getByText("+")).toBeInTheDocument();
+    expect(within(row).queryByText(s.shortcutThen)).not.toBeInTheDocument();
+    const chordRow = within(dialog).getByText(n.holdings).closest("li") as HTMLElement;
+    expect(within(chordRow).getByText(s.shortcutThen)).toBeInTheDocument();
+  });
+
+  it("chord keys are unique", () => {
+    const chords = COMMAND_PAGES.flatMap((p) => (p.chord ? [p.chord] : []));
+    expect(new Set(chords).size).toBe(chords.length);
   });
 });

@@ -10,12 +10,15 @@ import {
 } from "@/components/ui/dialog";
 import { COMMAND_PAGES } from "@/components/nav-items";
 
-function Keys({ keys, then }: { keys: string[]; then: string }) {
+/** `then`: sequential presses (`g` then `h`); `plus`: held together (modifier + key). */
+function Keys({ keys, joiner, then }: { keys: string[]; joiner: "then" | "plus"; then: string }) {
   return (
     <span className="flex shrink-0 items-center gap-1">
       {keys.map((k, i) => (
         <span key={`${k}-${i}`} className="flex items-center gap-1">
-          {i > 0 && <span className="text-xs text-muted-foreground">{then}</span>}
+          {i > 0 && (
+            <span className="text-xs text-muted-foreground">{joiner === "then" ? then : "+"}</span>
+          )}
           <kbd className="min-w-6 rounded border border-border bg-muted px-1.5 py-0.5 text-center font-mono text-xs">
             {k}
           </kbd>
@@ -37,15 +40,16 @@ export function ShortcutsHelp({
   const tNav = useTranslations("Nav");
   const then = t("shortcutThen");
 
-  const general: { label: string; keys: string[] }[] = [
-    { label: t("shortcutOpenSearch"), keys: ["⌘/Ctrl", "K"] },
-    { label: t("shortcutOpenSearchSlash"), keys: ["/"] },
-    { label: t("shortcutNewTransaction"), keys: ["n"] },
-    { label: t("shortcutHelp"), keys: ["?"] },
+  const general: { label: string; keys: string[]; joiner: "then" | "plus" }[] = [
+    { label: t("shortcutOpenSearch"), keys: ["⌘/Ctrl", "K"], joiner: "plus" },
+    { label: t("shortcutOpenSearchSlash"), keys: ["/"], joiner: "then" },
+    { label: t("shortcutNewTransaction"), keys: ["n"], joiner: "then" },
+    { label: t("shortcutHelp"), keys: ["?"], joiner: "then" },
   ];
   const goTo = COMMAND_PAGES.filter((p) => p.chord).map((p) => ({
     label: tNav(p.labelKey),
     keys: ["g", p.chord as string],
+    joiner: "then" as const,
   }));
 
   return (
@@ -65,7 +69,7 @@ export function ShortcutsHelp({
               {group.rows.map((row) => (
                 <li key={row.label} className="flex items-center justify-between gap-3 py-1.5">
                   <span className="text-sm">{row.label}</span>
-                  <Keys keys={row.keys} then={then} />
+                  <Keys keys={row.keys} joiner={row.joiner} then={then} />
                 </li>
               ))}
             </ul>
