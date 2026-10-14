@@ -3,7 +3,7 @@
 A chat that answers questions about **your own** portfolio. A model calls the same read-only tools the
 [MCP endpoint](mcp.md) serves (`packages/ai-tools`), in-process and with your own credentials, so per-user scoping,
 redaction (no account numbers/IBANs, no holder names, no memos) and the "model narrates, never computes" rules are
-identical. Nothing is stored: the conversation lives in the client.
+identical. Nothing is stored: the conversation lives in the client (see [Web UI](#web-ui)).
 
 ## Endpoints
 
@@ -79,3 +79,45 @@ The stream sets `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-
 `X-Accel-Buffering: no`, and sends a `: keepalive` comment every 15 s. Any proxy in front must not buffer or
 compress it (nginx: `proxy_buffering off`; Traefik does not buffer by default) and its idle timeout should exceed
 the longest model turn (the per-call upstream timeout is 120 s).
+
+## Web UI
+
+Entry points (both hidden unless `GET /assistant/status` reports `available`; if the lookup fails, nothing is shown):
+
+- the **Assistant** button in the top bar (every route);
+- **Ask the assistant to explain** in the gain explainer — closes the explainer, opens the panel and sends a seeded
+  question. If an answer is already streaming, the question waits for it to finish instead of being dropped.
+
+The panel (`apps/web/src/components/assistant/`):
+
+- **Disclosure first:** the header says which provider the figures are sent to, or that data stays on your own
+  server (`status.local`), plus the "explanations only" disclaimer.
+- **Conversation lives in memory.** It survives closing and reopening the panel, and is cleared by **New chat** or a
+  reload. History is clipped to the API caps (20 messages × 4000 chars) before sending; only text is sent back, never
+  tool results.
+- **Scope** is read from the URL's `?scope=` at send time (falling back to the scope the layout rendered for), so the
+  model is always told what you are looking at _now_.
+- **What it looked up:** each tool call shows as a chip (running → done/failed).
+- **Stop** aborts the request; the same-origin proxy (`api/backend/[...path]`) forwards the browser's abort signal, so
+  the API stops the in-flight model call. A stopped, cut-off (no `done`) or empty answer says so instead of leaving a
+  blank bubble.
+- **Errors** map to translated messages (`Assistant.errors.*`, EN + ID); a rate limit, an unconfigured server and an
+  invalid request each have their own text.
+
+### Rendering model output
+
+Answers are untrusted text and are rendered as Markdown with these rules (`assistant-markdown.tsx`, covered by tests):
+
+- **Images are never rendered** — a Markdown image would make the browser fetch an arbitrary URL as soon as the
+  answer appears, a data-exfiltration channel for a prompt-injected model.
+- Raw HTML is dropped (`skipHtml`).
+- Only `http(s)://` and root-relative links are clickable (`target=_blank`, `rel="noopener noreferrer nofollow"`,
+  `referrerpolicy="no-referrer"`); `javascript:`, `data:` and protocol-relative targets render as plain text.
+
+### Streaming through the web tier
+
+The proxy streams the upstream body unbuffered and keeps the API's headers. The API sends
+`Cache-Control: no-cache, no-transform`, which stops Next's gzip middleware from buffering the stream — keep that
+header if you put another proxy in front. `@portfolio/api-client` exposes `getAssistantStatus()`,
+`streamAssistantChat()` (an async generator of typed events) and the reader `parseAssistantStream()`, which is
+chunk-boundary agnostic (UTF-8 and CRLF safe), ignores unknown events and caps a single frame at 1 M characters.

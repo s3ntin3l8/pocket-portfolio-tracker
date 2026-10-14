@@ -1,10 +1,13 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { Info, Sparkles } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { GainSummary } from "@portfolio/api-client";
+import { useAssistant } from "@/components/assistant/assistant-provider";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -31,6 +34,8 @@ const FIELDS = [
  */
 export function GainExplainer({ gain }: { gain: GainSummary }) {
   const t = useTranslations("Gain");
+  const tAssistant = useTranslations("Assistant");
+  const assistant = useAssistant();
   const locale = useLocale();
   const boundaryNote =
     gain.boundary === "inside"
@@ -71,6 +76,21 @@ export function GainExplainer({ gain }: { gain: GainSummary }) {
         <p className="text-xs text-text-2">{t("holdingsGainLine")}</p>
         <p className="text-xs text-text-2">{t("savingsGainLine")}</p>
         <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-text-2">{boundaryNote}</p>
+        {assistant.available && (
+          // Closes this explainer, then hands the question to the assistant panel.
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
+              onClick={() => assistant.open(tAssistant("explainGainPrompt"))}
+            >
+              <Sparkles />
+              {tAssistant("explainGain")}
+            </Button>
+          </DialogClose>
+        )}
       </DialogContent>
     </Dialog>
   );

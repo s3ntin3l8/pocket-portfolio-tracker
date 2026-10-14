@@ -81,6 +81,9 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
     // footprint for large files. duplex:"half" is required by undici/fetch whenever a
     // body is attached to a streamed request.
     body: hasBody ? request.body : undefined,
+    // The browser going away (e.g. cancelling a streamed assistant reply) must reach the API:
+    // without this the upstream request keeps running — and keeps paying for model calls.
+    signal: request.signal,
     // @ts-expect-error -- `duplex` isn't in the DOM RequestInit type yet, but Node's
     // fetch (undici) requires it for a streamed body.
     duplex: hasBody ? "half" : undefined,

@@ -2213,6 +2213,20 @@ export function duplicatesFromError(err: unknown): DuplicateConflict | null {
   return null;
 }
 
+export {
+  parseAssistantStream,
+  type AssistantChatMessage,
+  type AssistantChatRequest,
+  type AssistantEvent,
+  type AssistantStatus,
+} from "./assistant.js";
+import {
+  parseAssistantStream,
+  type AssistantChatRequest,
+  type AssistantEvent,
+  type AssistantStatus,
+} from "./assistant.js";
+
 export interface ApiClientConfig {
   baseUrl: string;
   getToken?: () => string | undefined | Promise<string | undefined>;
@@ -3277,6 +3291,38 @@ export function createApiClient(config: ApiClientConfig) {
         portfolioId,
         enrichments,
       }),
+
+    // --- In-app assistant (docs/assistant.md) ---
+    getAssistantStatus: () => request<AssistantStatus>("GET", "/assistant/status"),
+    /**
+     * Stream one chat turn as typed events. No client-side timeout (a turn can run several
+     * model calls); the caller stops it with `signal`, which aborts the request and — through
+     * the same-origin proxy — the server-side model call. Non-2xx answers throw an
+     * {@link ApiError} before any event (400 invalid_request, 429 assistant_rate_limited,
+     * 503 chat_not_configured, …).
+     */
+    async *streamAssistantChat(
+      body: AssistantChatRequest,
+      opts: { signal?: AbortSignal } = {},
+    ): AsyncGenerator<AssistantEvent> {
+      const token = await config.getToken?.();
+      const res = await doFetch(`${config.baseUrl}/assistant/chat`, {
+        method: "POST",
+        headers: {
+          ...config.headers,
+          "content-type": "application/json",
+          accept: "text/event-stream",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: opts.signal,
+      });
+      if (!res.ok) {
+        throw new ApiError(res.status, await res.text(), res.headers?.get("retry-after"));
+      }
+      if (!res.body) throw new ApiError(502, "empty_stream");
+      yield* parseAssistantStream(res.body);
+    },
 
     // --- Interactive Brokers ---
     getIbkrConnection: () => request<IbkrConnection>("GET", "/ibkr/connection"),

@@ -2613,5 +2613,61 @@
     "details": "Detail",
     "disconnectTitle": "Putuskan {broker}?",
     "disconnectBody": "Sinkronisasi berhenti. Transaksi yang sudah diimpor tetap ada di portofolio ini."
+  },
+  "Assistant": {
+    "title": "Asisten",
+    "open": "Buka asisten",
+    "newChat": "Obrolan baru",
+    "conversation": "Percakapan",
+    "steps": "Yang dicari asisten",
+    "inputLabel": "Pesan untuk asisten",
+    "placeholder": "Tanyakan tentang portofolio Anda…",
+    "send": "Kirim",
+    "stop": "Berhenti",
+    "thinking": "Sedang berpikir…",
+    "stopped": "Dihentikan.",
+    "disclosureCloud": "Jawaban memakai angka portofolio Anda, yang dikirim ke {provider} untuk menyusun balasan. Nomor rekening dan IBAN tidak pernah dibagikan.",
+    "disclosureLocal": "Berjalan di server Anda sendiri — data tetap di infrastruktur Anda. Nomor rekening dan IBAN tidak pernah dibagikan.",
+    "disclaimer": "Hanya penjelasan — bukan nasihat keuangan, pajak, atau hukum. Periksa angka penting di aplikasi.",
+    "emptyHint": "Ajukan pertanyaan tentang portofolio Anda, atau coba salah satu ini:",
+    "suggestions": {
+      "overview": "Bagaimana kinerja portofolio saya?",
+      "gains": "Apa yang mendorong keuntungan saya?",
+      "allocation": "Apakah alokasi saya mendekati target?"
+    },
+    "explainGain": "Minta asisten menjelaskan",
+    "explainGainPrompt": "Jelaskan angka keuntungan saya untuk tampilan yang sedang saya lihat: arti tiap angka, dasar yang dipakai, dan hal yang tidak biasa (aset dinilai pada biaya perolehan, kurs yang hilang).",
+    "tools": {
+      "list_portfolios": "Portofolio",
+      "get_net_worth": "Kekayaan bersih",
+      "get_portfolio_summary": "Ringkasan portofolio",
+      "get_holdings": "Aset",
+      "search_transactions": "Transaksi",
+      "get_performance": "Riwayat nilai",
+      "get_income": "Pendapatan",
+      "get_contributions": "Kontribusi",
+      "get_tax_summary": "Ringkasan pajak",
+      "get_rebalancing": "Target dan selisih",
+      "get_insights": "Wawasan",
+      "lookup_instrument": "Pencarian instrumen"
+    },
+    "errors": {
+      "generic": "Terjadi kesalahan. Silakan coba lagi.",
+      "unauthorized": "Sesi Anda telah berakhir. Silakan masuk lagi.",
+      "empty": "Asisten tidak memberikan jawaban. Silakan coba lagi.",
+      "interrupted": "Koneksi terputus sebelum jawaban selesai.",
+      "network": "Tidak dapat menghubungi asisten. Periksa koneksi Anda lalu coba lagi.",
+      "provider_error": "Penyedia AI mengembalikan kesalahan. Silakan coba lagi sebentar lagi.",
+      "provider_unreachable": "Tidak dapat menghubungi penyedia AI. Silakan coba lagi sebentar lagi.",
+      "provider_bad_response": "Penyedia AI mengirim jawaban yang tidak terbaca. Silakan coba lagi.",
+      "provider_not_configured": "Asisten belum dikonfigurasi dengan benar. Minta admin memeriksa pengaturan penyedia AI.",
+      "refused": "Asisten menolak menjawab hal itu.",
+      "truncated": "Jawaban terpotong karena terlalu panjang. Coba pertanyaan yang lebih sempit.",
+      "too_many_tool_rounds": "Itu memerlukan lebih banyak pencarian daripada yang diizinkan. Coba pertanyaan yang lebih sempit.",
+      "chat_failed": "Terjadi kesalahan saat menjawab. Silakan coba lagi.",
+      "assistant_rate_limited": "Anda telah mencapai batas pertanyaan asisten per jam. Coba lagi nanti.",
+      "chat_not_configured": "Asisten belum diatur di server ini.",
+      "invalid_request": "Pesan itu tidak dapat dikirim. Coba yang lebih pendek atau mulai obrolan baru."
+    }
   }
 }

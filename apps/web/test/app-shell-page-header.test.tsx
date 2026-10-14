@@ -17,6 +17,11 @@ vi.mock("@/components/brand", () => ({ Brand: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 vi.mock("@/components/sign-out-button", () => ({ SignOutButton: () => null }));
 vi.mock("@/components/app-version", () => ({ AppVersion: () => null }));
+// The assistant provider fetches status through the api client; this test is about layout only.
+vi.mock("@/components/assistant/assistant-provider", () => ({
+  AssistantProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("@/components/assistant/assistant-button", () => ({ AssistantButton: () => null }));
 vi.mock("@/components/nav-progress", () => ({
   NavProgressProvider: ({ children }: { children: React.ReactNode }) => children,
   LinkPendingSignal: () => null,
