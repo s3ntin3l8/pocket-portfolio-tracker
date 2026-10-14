@@ -45,6 +45,17 @@ test.describe("command bar", () => {
   });
 
   test("Ctrl/Cmd-K toggles the palette, even from a text field", async ({ page }) => {
+    // A real text field outside the palette: single-key shortcuts are suppressed there
+    // (see the typing test below), but the modifier shortcut must still fire.
+    await page.evaluate(() => {
+      const input = document.createElement("input");
+      input.id = "e2e-text-field";
+      input.setAttribute("aria-label", "e2e text field");
+      input.style.cssText = "position:fixed;bottom:0;left:0;z-index:1";
+      document.body.appendChild(input);
+      input.focus();
+    });
+    await expect(page.locator("#e2e-text-field")).toBeFocused();
     await page.keyboard.press(`${mod}+k`);
     await expect(palette(page)).toBeVisible();
     await expect(page.getByPlaceholder(/Search or run a command/)).toBeFocused();

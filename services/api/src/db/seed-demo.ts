@@ -102,6 +102,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       // The demo user already owns a full dataset — without this, the first visit after
       // `make dev-setup` is bounced into the new-user onboarding wizard (the same
       // backfill rule the onboarding migration applies to users with real portfolios).
+      // Real users are gated in apps/web's (app) layout: a resolved `me` with a null
+      // `onboardingCompletedAt` redirects to /onboarding until /me's onboarding-complete
+      // route (routes/me.ts) sets it. Seeding it here only exempts the demo user.
       onboardingCompletedAt: new Date(),
     })
     .returning();
