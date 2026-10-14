@@ -153,7 +153,7 @@ export async function InstrumentTransactionsSection({
     getTranslations("Anomalies"),
     scopeOnce(id),
     anomaliesOnce(),
-    instrumentTxOnce(id, filters.page, filters.type, filters.year, filters.q, filters.status),
+    instrumentTxOnce(id, filters),
     selectedPortfolioIdOnce(),
   ]);
   const aggregate = selectedId === null;

@@ -4,7 +4,6 @@ import {
   loadInstrumentResult,
   loadInstrumentScope,
   loadAnomalies,
-  loadIncomeStats,
   loadPreferences,
   loadMe,
   loadTransactionsPaginated,
@@ -28,7 +27,10 @@ export const prefsOnce = cache(() => loadPreferences());
 export const meOnce = cache(() => loadMe());
 export const selectedPortfolioIdOnce = cache(() => getSelectedPortfolioId());
 export const anomaliesOnce = cache(() => loadAnomalies());
-export const incomeStatsOnce = cache(() => loadIncomeStats());
+// Re-exported (not redefined) so React `cache()` has a single key for the income payload
+// across the Income and Instrument routes.
+import { incomeStatsOnce } from "@/components/income/income-data";
+export { incomeStatsOnce };
 
 /**
  * Cost basis is a single global preference — threaded into loadInstrumentScope, which
@@ -58,7 +60,7 @@ export interface InstrumentTxFilters {
  * all operate server-side on this instrument's own transactions, not the whole scope (#585).
  * Keyed on primitives (cache compares args by identity) so every consumer shares one call.
  */
-export const instrumentTxOnce = cache(
+const instrumentTxCached = cache(
   async (
     id: string,
     page: number,
@@ -84,15 +86,28 @@ export const instrumentTxOnce = cache(
   },
 );
 
+/**
+ * Object-arg facade over the cached loader. `cache()` compares each argument with
+ * `Object.is`, so an object-literal arg would be a fresh key every call and never dedupe;
+ * the primitives are therefore spread positionally into ONE private call site here. Invariant:
+ * every caller goes through this function, so the argument order below is the only place it
+ * can drift.
+ */
+export function instrumentTxOnce(id: string, f: InstrumentTxFilters) {
+  return instrumentTxCached(id, f.page, f.type, f.year, f.q, f.status);
+}
+
 /** Fire every independent loader without awaiting, so they run in parallel. */
 export function startInstrumentLoads(id: string, f: InstrumentTxFilters): void {
-  // A rejection here is surfaced by whichever section awaits the same cached promise;
-  // swallow it on the fire-and-forget copy so a bail-out render can't leave it unhandled.
-  const fire = (p: Promise<unknown>) => void p.catch(() => {});
-  fire(instrumentOnce(id));
-  fire(meOnce());
-  fire(scopeOnce(id));
-  fire(anomaliesOnce());
-  fire(incomeStatsOnce());
-  fire(instrumentTxOnce(id, f.page, f.type, f.year, f.q, f.status));
+  // Only what the page does NOT await itself (it awaits instrumentOnce + meOnce directly).
+  // Safety invariant for ignoreRejection: every promise fired here has an awaiting section
+  // consumer that surfaces a rejection through its own Suspense/error boundary, so the
+  // fire-and-forget copy only needs to avoid an unhandled-rejection on a bail-out render.
+  // If you remove a section's await of one of these loaders, its failure becomes silent.
+  void scopeOnce(id).catch(ignoreRejection);
+  void anomaliesOnce().catch(ignoreRejection);
+  void incomeStatsOnce().catch(ignoreRejection);
+  void instrumentTxOnce(id, f).catch(ignoreRejection);
 }
+
+function ignoreRejection(): void {}
