@@ -6,6 +6,7 @@ import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { InstrumentFundamentalsCard } from "@/components/instrument-fundamentals-card";
 import { InstrumentManualPriceCard } from "@/components/instrument-manual-price-card";
+import { InstrumentVisitTracker } from "@/components/instrument-visit-tracker";
 import { PageHeaderSetter } from "@/components/page-header";
 import {
   instrumentOnce,
@@ -114,6 +115,7 @@ export default async function InstrumentPage({
   return (
     <div className="space-y-6">
       <PageHeaderSetter title={heroName} backHref="/holdings" />
+      <InstrumentVisitTracker id={id} symbol={instrument.symbol} />
       <InstrumentHeader instrument={instrument} heroName={heroName} isAdmin={isAdmin} />
 
       <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[minmax(0,1fr)_300px] @xl:items-start">

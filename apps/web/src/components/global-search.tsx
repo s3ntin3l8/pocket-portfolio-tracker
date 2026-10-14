@@ -8,6 +8,7 @@ import {
   Briefcase,
   CircleHelp,
   Clock,
+  Sparkles,
   Layers,
   Moon,
   Plus,
@@ -49,6 +50,9 @@ import {
   type ScopeSelection,
 } from "@/lib/portfolio-selection";
 import { readRecentPages } from "@/lib/recent-pages";
+import { readRecentInstruments, type RecentInstrument } from "@/lib/recent-instruments";
+import { readShortcutsEnabled } from "@/lib/shortcut-preference";
+import { useAssistant } from "@/components/assistant/assistant-provider";
 import { CHORD_TIMEOUT_MS, GO_CHORDS, shouldIgnoreShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +80,7 @@ export function GlobalSearch({
   const searchParams = useSearchParams();
   const scoped = useScopedHref();
   const { resolvedTheme, setTheme } = useTheme();
+  const assistant = useAssistant();
 
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -88,6 +93,7 @@ export function GlobalSearch({
     holders: [],
   });
   const [recent, setRecent] = useState<string[]>([]);
+  const [recentInstruments, setRecentInstruments] = useState<RecentInstrument[]>([]);
 
   // Debounce timer + stale-response guard.
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,6 +118,7 @@ export function GlobalSearch({
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecent(readRecentPages());
+    setRecentInstruments(readRecentInstruments());
     if (scopesLoadedRef.current) return;
     scopesLoadedRef.current = true;
     void (async () => {
@@ -245,7 +252,8 @@ export function GlobalSearch({
         setOpen((v) => !v);
         return;
       }
-      if (shouldIgnoreShortcut(e)) {
+      // Opt-out (Settings → Account): every single-key shortcut off; Cmd/Ctrl-K above stays.
+      if (!readShortcutsEnabled() || shouldIgnoreShortcut(e)) {
         disarm();
         return;
       }
@@ -295,6 +303,9 @@ export function GlobalSearch({
           .map((href) => pages.find((p) => p.href === href))
           .filter((p): p is (typeof pages)[number] => !!p && p.href !== pathname)
       : [];
+
+  const shownRecentInstruments = trimmedQuery === "" ? recentInstruments : [];
+  const showAssistant = assistant.available && trimmedQuery !== "";
 
   const isDark = resolvedTheme === "dark";
   const actions = [
@@ -346,6 +357,8 @@ export function GlobalSearch({
 
   const commandCount =
     recentPages.length +
+    shownRecentInstruments.length +
+    (showAssistant ? 1 : 0) +
     visiblePages.length +
     actions.length +
     rangeItems.length +
@@ -397,7 +410,22 @@ export function GlobalSearch({
           <CommandList>
             {emptyContent !== null && <CommandEmpty>{emptyContent}</CommandEmpty>}
 
-            {recentPages.length > 0 && (
+            {showAssistant && (
+              <CommandGroup heading={t("groupAssistant")}>
+                <CommandItem
+                  value="assistant-ask"
+                  onSelect={() => {
+                    handleOpenChange(false);
+                    assistant.open(trimmedQuery);
+                  }}
+                >
+                  <Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
+                  {t("actionAssistant", { query: trimmedQuery })}
+                </CommandItem>
+              </CommandGroup>
+            )}
+
+            {(recentPages.length > 0 || shownRecentInstruments.length > 0) && (
               <CommandGroup heading={t("groupRecent")}>
                 {recentPages.map((p) => (
                   <CommandItem
@@ -407,6 +435,16 @@ export function GlobalSearch({
                   >
                     <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
                     {p.label}
+                  </CommandItem>
+                ))}
+                {shownRecentInstruments.map((r) => (
+                  <CommandItem
+                    key={`instrument-${r.id}`}
+                    value={`recent-instrument-${r.id}`}
+                    onSelect={() => navigate(scoped(`/instruments/${r.id}`))}
+                  >
+                    <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="font-mono text-sm font-medium">{r.symbol}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
