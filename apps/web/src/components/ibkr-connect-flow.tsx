@@ -10,6 +10,9 @@ import type { ApiClient, IbkrConnection } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { ConnectedCompactRow } from "@/components/broker/connected-compact-row";
+import { ReconcileSummary } from "@/components/broker/reconcile-summary";
 
 export type IbkrConnectClient = Pick<
   ApiClient,
@@ -27,13 +30,18 @@ export function IbkrConnectFlow({
   portfolioId,
   initial,
   onChanged,
+  compact = false,
 }: {
   client: IbkrConnectClient;
   portfolioId: string;
   initial: IbkrConnection;
   onChanged?: () => void;
+  /** Collapse the connected state to a single row (last sync, Sync, ⋯ menu). Every other
+   *  status keeps the full flow. */
+  compact?: boolean;
 }) {
   const t = useTranslations("InteractiveBrokers");
+  const tB = useTranslations("BrokerConnection");
   const locale = useLocale();
   const [phase, setPhase] = useState<Phase>(phaseFor(initial.status));
   const [token, setToken] = useState("");
@@ -41,6 +49,7 @@ export function IbkrConnectFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingReimport, setConfirmingReimport] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
   const expired = initial.status === "expired";
 
@@ -88,6 +97,7 @@ export function IbkrConnectFlow({
   const disconnect = () =>
     void run(async () => {
       await client.disconnectIbkr();
+      setConfirmingDisconnect(false);
       setPhase("form");
       onChanged?.();
     });
@@ -147,7 +157,62 @@ export function IbkrConnectFlow({
         </form>
       )}
 
-      {phase === "connected" && (
+      {phase === "connected" && compact && initial.status === "connected" && (
+        <>
+          <ConnectedCompactRow
+            lastSyncAt={initial.lastSyncAt}
+            syncLabel={t("syncNow")}
+            onSync={doSync}
+            busy={busy}
+            menuItems={[
+              {
+                key: "reimport",
+                label: t("reimport.action"),
+                onSelect: () => setConfirmingReimport(true),
+              },
+              {
+                key: "disconnect",
+                label: t("disconnect"),
+                destructive: true,
+                onSelect: () => setConfirmingDisconnect(true),
+              },
+            ]}
+            details={
+              <>
+                {initial.flexAccountId && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("accountId")}: <span className="font-mono">{initial.flexAccountId}</span>
+                  </p>
+                )}
+                <ReconcileSummary
+                  recon={initial.lastReconciliation}
+                  namespace="InteractiveBrokers"
+                />
+              </>
+            }
+          />
+          <ConfirmActionDialog
+            open={confirmingDisconnect}
+            onOpenChange={setConfirmingDisconnect}
+            title={tB("disconnectTitle", { broker: "Interactive Brokers" })}
+            description={tB("disconnectBody")}
+            confirmLabel={t("disconnect")}
+            busy={busy}
+            onConfirm={disconnect}
+          />
+          <ConfirmActionDialog
+            open={confirmingReimport}
+            onOpenChange={setConfirmingReimport}
+            title={t("reimport.action")}
+            description={t("reimport.warning")}
+            confirmLabel={t("reimport.confirm")}
+            busy={busy}
+            onConfirm={reimport}
+          />
+        </>
+      )}
+
+      {phase === "connected" && !(compact && initial.status === "connected") && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">{t("connectedHint")}</p>
 
@@ -163,32 +228,7 @@ export function IbkrConnectFlow({
             </p>
           )}
 
-          {(() => {
-            const recon = initial.lastReconciliation;
-            if (!recon) return null;
-            return (
-              <div className="space-y-1 rounded-md border px-3 py-2 text-sm">
-                <p className="font-medium">{t("reconcile.title")}</p>
-                {recon.cash.map((c) => {
-                  const off = Number(c.diff) !== 0;
-                  return (
-                    <div key={c.currency} className="flex justify-between gap-2">
-                      <span className="text-muted-foreground">
-                        {t("reconcile.row", {
-                          currency: c.currency,
-                          reported: c.reported,
-                          derived: c.derived,
-                        })}
-                      </span>
-                      <span className={off ? "text-destructive" : "text-muted-foreground"}>
-                        {off ? t("reconcile.off", { diff: c.diff }) : t("reconcile.match")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+          <ReconcileSummary recon={initial.lastReconciliation} namespace="InteractiveBrokers" />
 
           <div className="flex items-center justify-end gap-3">
             <Button onClick={doSync} disabled={busy}>

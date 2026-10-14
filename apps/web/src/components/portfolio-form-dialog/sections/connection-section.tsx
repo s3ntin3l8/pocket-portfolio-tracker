@@ -84,7 +84,10 @@ export function TrConnectionSection({
   return (
     <ConnectionCard
       title={t("trSectionTitle")}
-      status={trConnection ? trConnection.status : undefined}
+      // The flow renders from `trInitForFlow` (rewritten to "disconnected" when the account is
+      // bound to another portfolio) — the pill must read the same value or it says "Connected"
+      // above a connect form.
+      status={trConnection ? (trInitForFlow ?? trConnection).status : undefined}
     >
       {trConnection === null ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -108,6 +111,7 @@ export function TrConnectionSection({
             portfolioId={effectivePortfolio.id}
             cashCounted={cashCounted}
             initial={trInitForFlow!}
+            compact
             onChanged={() => {
               onRefresh();
               onFetchTrigger();
@@ -153,6 +157,7 @@ export function IbkrConnectionSection({
           client={client}
           portfolioId={effectivePortfolio.id}
           initial={ibkrConnection}
+          compact
           onChanged={() => {
             onRefresh();
             onFetchTrigger();

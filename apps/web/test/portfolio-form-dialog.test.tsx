@@ -367,6 +367,59 @@ describe("PortfolioFormDialog", () => {
     expect(within(card).getByText(m.connectionNotConnected)).toBeInTheDocument();
   });
 
+  const TR_PORTFOLIO = {
+    id: "p-tr",
+    name: "TR Portfolio",
+    baseCurrency: "EUR",
+    accountHolderId: null,
+    portfolioType: "standard" as const,
+    brokerage: "Trade Republic",
+    accountNumber: null,
+    iban: null,
+    cashCounted: false,
+    allowNegativeCash: false,
+    documentRetention: false,
+    taxAllowanceAnnual: null,
+  };
+
+  it("collapses a connected broker to a compact row (last sync, Sync, ⋯ menu)", async () => {
+    getTrConnection.mockResolvedValueOnce({
+      status: "connected",
+      portfolioId: "p-tr",
+      lastSyncAt: "2026-10-01T10:00:00Z",
+      lastError: null,
+      lastReconciliation: null,
+      syncing: false,
+    });
+    renderEdit(TR_PORTFOLIO);
+    fireEvent.click(screen.getByRole("button", { name: m.edit }));
+    const card = (await screen.findByText(m.trSectionTitle)).closest("section")!;
+    expect(await within(card).findByText(m.connectionConnected)).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /Sync now/ })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "More options" })).toBeInTheDocument();
+    // Disconnect / re-import live in the ⋯ menu now, not as inline buttons.
+    expect(within(card).queryByRole("button", { name: "Disconnect" })).toBeNull();
+  });
+
+  it("shows 'Not connected' (not 'Connected') when the TR account is bound to another portfolio", async () => {
+    getTrConnection.mockResolvedValueOnce({
+      status: "connected",
+      portfolioId: "some-other-portfolio",
+      lastSyncAt: null,
+      lastError: null,
+      lastReconciliation: null,
+      syncing: false,
+    });
+    renderEdit(TR_PORTFOLIO);
+    fireEvent.click(screen.getByRole("button", { name: m.edit }));
+    const card = (await screen.findByText(m.trSectionTitle)).closest("section")!;
+    await waitFor(() =>
+      expect(within(card).getByText(messages.TradeRepublic.boundElsewhere)).toBeInTheDocument(),
+    );
+    expect(within(card).getByText(m.connectionNotConnected)).toBeInTheDocument();
+    expect(within(card).queryByText(m.connectionConnected)).toBeNull();
+  });
+
   it("does not offer the TR connection for a TR child account (Kinderdepot)", async () => {
     renderEdit({
       id: "p-tr-kid",

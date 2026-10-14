@@ -2571,5 +2571,12 @@
     "rowPaid": "Lunas",
     "rowOverdue": "Terlambat",
     "rowUpcoming": "Akan datang"
+  },
+  "BrokerConnection": {
+    "lastSync": "Sinkronisasi terakhir",
+    "never": "Belum pernah",
+    "details": "Detail",
+    "disconnectTitle": "Putuskan {broker}?",
+    "disconnectBody": "Sinkronisasi berhenti. Transaksi yang sudah diimpor tetap ada di portofolio ini."
   }
 }
