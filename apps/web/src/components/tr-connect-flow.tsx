@@ -128,13 +128,16 @@ export function TrConnectFlow({
   // failure is left to the status poll, which owns the outcome.
   const submitCode = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^\d{6}$/.test(code)) return;
+    // verifyFiredRef doubles as the single-flight guard: a second submit while a code is in
+    // flight would write another code to the same login. It is cleared on a refused code.
+    if (!/^\d{6}$/.test(code) || verifyFiredRef.current) return;
     setError(null);
     verifyFiredRef.current = true;
     setPhase("awaiting");
     void client.verifyTr({ code }).catch((err: unknown) => {
       const apiCode = apiErrorCode(err);
       if (apiCode === "code_invalid" || apiCode === "code_required") {
+        verifyFiredRef.current = false;
         setError(messageForError(err));
         setCode("");
         setPhase("code");

@@ -168,6 +168,17 @@ describe("TrConnectFlow", () => {
       expect(await screen.findByText("Waiting for approval…")).toBeTruthy();
     });
 
+    it("sends the code once when Continue is pressed twice in a row", async () => {
+      const client = totpClient({ verifyTr: vi.fn(() => new Promise<never>(() => undefined)) });
+      renderFlow(client);
+      const input = await connect();
+      fireEvent.change(input, { target: { value: "123456" } });
+      const form = input.closest("form")!;
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+      expect(client.verifyTr).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps Continue disabled until the code has six digits", async () => {
       renderFlow(totpClient());
       const input = await connect();

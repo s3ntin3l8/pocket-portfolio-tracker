@@ -213,10 +213,21 @@ describe("PytrRunner pairing", () => {
       const runner = makeRunner(spawn);
       const { child } = await startTotp(runner, nextChild);
       const approval = runner.awaitApproval("u1", "123456");
-      expect(child.stdin.write).toHaveBeenCalledWith("123456\n");
+      expect(child.stdin.write).toHaveBeenCalledWith("123456\n", expect.any(Function));
       await writeFile(child.cookiesFile()!, "COOKIES");
       child.emit("exit", 0);
       await expect(approval).resolves.toBe("COOKIES");
+    });
+
+    it("rejects the verify when the code cannot be written to the login process", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      const { child } = await startTotp(runner, nextChild);
+      child.stdin.write.mockImplementation((_d: string, cb: (e?: Error) => void) =>
+        cb(new Error("EPIPE")),
+      );
+      await expect(runner.awaitApproval("u1", "123456")).rejects.toThrow(PytrError);
+      expect(runner.hasPendingPairing("u1")).toBe(true);
     });
 
     it("code_invalid rejects only that verify; the next code goes to the same login", async () => {
@@ -230,7 +241,7 @@ describe("PytrRunner pairing", () => {
       expect(child.kill).not.toHaveBeenCalled();
 
       const second = runner.awaitApproval("u1", "222222");
-      expect(child.stdin.write).toHaveBeenLastCalledWith("222222\n");
+      expect(child.stdin.write).toHaveBeenLastCalledWith("222222\n", expect.any(Function));
       await writeFile(child.cookiesFile()!, "COOKIES");
       child.emit("exit", 0);
       await expect(second).resolves.toBe("COOKIES");

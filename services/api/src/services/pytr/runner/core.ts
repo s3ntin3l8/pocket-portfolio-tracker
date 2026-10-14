@@ -118,6 +118,10 @@ export class PytrRunner {
       child.stderr?.on("data", (d: Buffer) => {
         entry.stderr += d.toString();
       });
+      // A write to a login process that already exited surfaces here (EPIPE); without a
+      // listener it would be an unhandled 'error' event. The awaitApproval write callback
+      // rejects the caller, and onPairExit reports the exit itself.
+      child.stdin?.on?.("error", (err) => this.log?.warn({ userId, err }, "pytr stdin error"));
       child.on("error", (err) => this.failPairing(userId, err));
       child.on("exit", (code) => this.onPairExit(userId, code));
     });
@@ -136,11 +140,13 @@ export class PytrRunner {
       if (typeof parsed.processId === "string" && parsed.processId) {
         const { resolve } = entry.onInit;
         entry.onInit = null;
+        // Set the method BEFORE resolving: the resolve callback reads entry.method.
         entry.method = parsed.status === "awaiting_code" ? "authenticator" : "push";
         resolve(parsed.processId);
       }
       return;
     }
+    // Only the first line (processId + method) is read above; a later awaiting_code is ignored.
     // Trade Republic refused an authenticator code: fail this verify only. The login process
     // stays alive and waits for the next code on stdin.
     if (parsed.status === "code_invalid" && entry.onApproval) {
@@ -245,7 +251,12 @@ export class PytrRunner {
       if (!code) return Promise.reject(new PytrCodeRequiredError());
       return new Promise<string>((resolve, reject) => {
         entry.onApproval = { resolve, reject };
-        entry.child.stdin?.write(`${code}\n`);
+        entry.child.stdin?.write(`${code}\n`, (err) => {
+          if (!err) return;
+          // The login process is gone or its stdin closed: fail this verify now.
+          entry.onApproval = null;
+          reject(new PytrError("could not send the authenticator code"));
+        });
       });
     }
     return new Promise<string>((resolve, reject) => {
