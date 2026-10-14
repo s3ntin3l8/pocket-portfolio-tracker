@@ -386,7 +386,9 @@ export function registerTaxRoutes(app: FastifyInstance) {
       );
       const valuationById = new Map(allPfs.map((p, i) => [p.id, loaded[i]!]));
 
-      // Phase 2: ONE boundary-price query for the union of fund ids and years (DE only).
+      // Phase 2 needs every valuation from phase 1 (fund ids and first years come from the
+      // loaded transactions), so valuations must load before the batched price query.
+      // ONE boundary-price query for the union of fund ids and years (DE only).
       const vorabPriceOn =
         regime === "DE"
           ? await loadVorabPrices(

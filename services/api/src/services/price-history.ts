@@ -52,7 +52,8 @@ export async function getPricesOn(
     for (const w of windows) {
       if (r.date > w.date || r.date < w.from) continue;
       const key = priceKey(r.instrumentId, w.date);
-      // Rows arrive newest-first per instrument, so the first hit is the latest close.
+      // Relies on the (instrumentId, date) unique index (one row per day) and the
+      // `orderBy desc(date)` above: rows arrive newest-first, so the first hit is the latest close.
       if (!out.has(key)) out.set(key, { close: r.close, currency: r.currency });
     }
   }

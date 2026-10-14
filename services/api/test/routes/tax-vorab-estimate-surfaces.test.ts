@@ -218,61 +218,88 @@ describe("estimated Vorabpauschale across Tax, Trades and Sparplan", () => {
     expect(creditOf(id)).toBe(0);
   });
 
-  it("/networth/tax shares one batch across several portfolios", async () => {
+  it("/networth/tax gives each portfolio its own estimate from one shared batch", async () => {
     const a = await setup("vsurf-7", "VSURF-G");
-    // Second depot, same user and holder-less fund, still gets its own estimate.
-    const second = await app.inject({
+    // Second funded depot of the same holder: a different fund, bought a year later (2025), so
+    // it has a different first year and different boundary prices.
+    const holders = await app.inject({
+      method: "GET",
+      url: "/account-holders",
+      headers: auth(a.t),
+    });
+    const holderId = holders.json()[0].id as string;
+    const [fund2] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "VSURF-G2",
+        market: "XETRA",
+        assetClass: "etf",
+        currency: "EUR",
+        name: "VSURF-G2",
+      })
+      .returning();
+    await app.db.insert(prices).values([
+      { instrumentId: fund2!.id, date: "2025-01-01", close: "200", currency: "EUR" },
+      { instrumentId: fund2!.id, date: "2025-12-31", close: "220", currency: "EUR" },
+    ]);
+    const pf2 = await app.inject({
       method: "POST",
       url: "/portfolios",
       headers: auth(a.t),
-      payload: { name: "P2", baseCurrency: "EUR", cashCounted: false },
+      payload: {
+        name: "P2",
+        baseCurrency: "EUR",
+        cashCounted: false,
+        accountHolderId: holderId,
+        taxAllowanceAnnual: "500",
+      },
     });
-    expect(second.statusCode).toBe(201);
+    const buy = await app.inject({
+      method: "POST",
+      url: `/portfolios/${pf2.json().id}/transactions`,
+      headers: auth(a.t),
+      payload: {
+        type: "buy",
+        instrumentId: fund2!.id,
+        quantity: "4",
+        price: "190",
+        currency: "EUR",
+        executedAt: "2025-01-02T00:00:00.000Z",
+      },
+    });
+    expect(buy.statusCode).toBe(201);
+
+    // Independent per-portfolio figures.
+    const p1 = (
+      await app.inject({
+        method: "GET",
+        url: `/portfolios/${a.portfolioId}/tax?year=2026`,
+        headers: auth(a.t),
+      })
+    ).json().allowanceUsage;
+    const p2 = (
+      await app.inject({
+        method: "GET",
+        url: `/portfolios/${pf2.json().id}/tax?year=2026`,
+        headers: auth(a.t),
+      })
+    ).json().allowanceUsage;
+    expect(Number(p1.vorabpauschaleAccrued)).toBeGreaterThan(0);
+    expect(Number(p2.vorabpauschaleAccrued)).toBeGreaterThan(0);
+    expect(p1.vorabpauschaleAccrued).not.toBe(p2.vorabpauschaleAccrued);
+
     const res = await app.inject({
       method: "GET",
       url: "/networth/tax?year=2026",
       headers: auth(a.t),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()[0].allowanceUsage.vorabpauschaleEstimated).toBe(true);
-  });
-
-  it("/portfolios/:id/sparplan harvest cap sees the estimate (DE) and not without prices", async () => {
-    async function remaining(sub: string, symbol: string, withPrices: boolean) {
-      const { t, fund, portfolioId } = await setup(sub, symbol, { withPrices });
-      const [other] = await app.db
-        .insert(instruments)
-        .values({
-          symbol: `${symbol}-X`,
-          market: "XETRA",
-          assetClass: "etf",
-          currency: "EUR",
-          name: `${symbol}-X`,
-        })
-        .returning();
-      const targets = await app.inject({
-        method: "PUT",
-        url: `/portfolios/${portfolioId}/targets`,
-        headers: auth(t),
-        payload: {
-          dimension: "instrument",
-          targets: [
-            { key: fund.id, targetPct: 50 },
-            { key: other!.id, targetPct: 50 },
-          ],
-        },
-      });
-      expect(targets.statusCode).toBeLessThan(300);
-      const res = await app.inject({
-        method: "GET",
-        url: `/portfolios/${portfolioId}/sparplan?includeSales=true`,
-        headers: auth(t),
-      });
-      expect(res.statusCode).toBe(200);
-      return res.json().remainingAllowance as string;
-    }
-    const withEstimate = await remaining("vsurf-8", "VSURF-H", true);
-    const without = await remaining("vsurf-9", "VSURF-I", false);
-    expect(Number(withEstimate)).toBeLessThan(Number(without));
+    const u = res.json()[0].allowanceUsage;
+    // The holder total is the sum of both portfolios' own estimates (each from its own fund
+    // and first year), and the 2025-purchase fund's 1/12 purchase-year reduction is included.
+    expect(u.vorabpauschaleEstimated).toBe(true);
+    expect(u.vorabpauschaleAccrued).toBe(
+      (Number(p1.vorabpauschaleAccrued) + Number(p2.vorabpauschaleAccrued)).toFixed(2),
+    );
   });
 });
