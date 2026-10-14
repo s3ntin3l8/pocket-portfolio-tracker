@@ -1,3 +1,4 @@
+import { ApiError, apiErrorCode } from "@portfolio/api-client";
 import type {
   ApiClient,
   HoldingValuation,
@@ -71,6 +72,17 @@ function compactHeadline(s: PortfolioSummary | NetWorth) {
 }
 
 /**
+ * A failed call becomes data the model can act on ("tax_allowance_not_configured"), never the
+ * raw error: that carries the response body and a stack, which must not reach the provider.
+ */
+function toolError(err: unknown) {
+  if (err instanceof ApiError) {
+    return { error: apiErrorCode(err) ?? "request_failed", status: err.status };
+  }
+  return { error: "tool_failed" };
+}
+
+/**
  * Build the read-only tool set over an API client. The client carries the caller's
  * credentials, so every call is scoped to that user by the API exactly like the web app's.
  * Every handler's output is deep-stripped of sensitive keys before it is returned.
@@ -80,7 +92,13 @@ export function createTools(client: ApiClient): AiTool[] {
   const add = <S extends z.ZodType>(t: AiTool<S>) => {
     defs.push({
       ...t,
-      handler: async (input: unknown) => stripSensitive(await t.handler(input as z.infer<S>)),
+      handler: async (input: unknown) => {
+        try {
+          return stripSensitive(await t.handler(input as z.infer<S>));
+        } catch (err) {
+          return toolError(err);
+        }
+      },
     } as AiTool);
   };
 

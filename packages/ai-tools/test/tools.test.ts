@@ -1,4 +1,4 @@
-import type { ApiClient } from "@portfolio/api-client";
+import { ApiError, type ApiClient } from "@portfolio/api-client";
 import { describe, expect, it } from "vitest";
 import {
   createTools,
@@ -353,6 +353,25 @@ describe("ai-tools", () => {
     expect(GLOSSARY).toMatch(/net contributed/);
     expect(GLOSSARY).toMatch(/valuedAtCost/);
     expect(GLOSSARY).toMatch(/fxMissingCurrencies/);
+  });
+});
+
+describe("failures", () => {
+  it("returns an error code and status, never the raw error or body", async () => {
+    const failing = createTools({
+      getPortfolioTax: async () => {
+        throw new ApiError(422, '{"error":"tax_allowance_not_configured","trace":"SECRET-STACK"}');
+      },
+      listPortfolios: async () => {
+        throw new Error("boom at /srv/app/secret.ts");
+      },
+    } as unknown as ApiClient);
+    const tax = failing.find((t) => t.name === "get_tax_summary")!;
+    const out = await tax.handler({ portfolioId: "p1" });
+    expect(out).toEqual({ error: "tax_allowance_not_configured", status: 422 });
+    const list = await failing.find((t) => t.name === "list_portfolios")!.handler({});
+    expect(list).toEqual({ error: "tool_failed" });
+    expect(JSON.stringify([out, list])).not.toMatch(/SECRET|boom|srv/);
   });
 });
 

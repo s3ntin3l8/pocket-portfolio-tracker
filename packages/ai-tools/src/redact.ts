@@ -16,6 +16,7 @@ const SENSITIVE_KEYS = new Set([
   "token",
   "secret",
   "password",
+  // Not on any field today; reserved for upcoming tax-regime fields, so keep them.
   "taxId",
   "steuerId",
   "npwp",
