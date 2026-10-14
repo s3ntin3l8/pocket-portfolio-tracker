@@ -82,6 +82,7 @@ export function MobileView({
                     <Checkbox
                       aria-label={tb("selectRow")}
                       checked={isSelected}
+                      tabIndex={-1}
                       className="size-4 shrink-0"
                     />
                   )}

@@ -8,6 +8,10 @@ import { useThemeMode } from "@/lib/use-theme-mode";
 const THEMES = ["light", "dark", "system"] as const;
 type ThemeChoice = (typeof THEMES)[number];
 
+function isThemeChoice(v: string | undefined): v is ThemeChoice {
+  return THEMES.some((th) => th === v);
+}
+
 export function ThemeSwitcher() {
   const { theme, setTheme, mounted } = useThemeMode();
   const t = useTranslations("Settings");
@@ -29,7 +33,7 @@ export function ThemeSwitcher() {
 
   return (
     <ToggleGroup<ThemeChoice>
-      value={(theme as ThemeChoice) ?? "system"}
+      value={isThemeChoice(theme) ? theme : "system"}
       onValueChange={setTheme}
       aria-label={t("appearance")}
       className="w-full gap-[7px]"

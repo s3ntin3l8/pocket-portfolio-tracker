@@ -292,7 +292,12 @@ export function MobileRow({
       )}
     >
       {selectionMode && (
-        <Checkbox aria-label={t("selectRow")} checked={isSelected} className="size-4 shrink-0" />
+        <Checkbox
+          tabIndex={-1}
+          aria-label={t("selectRow")}
+          checked={isSelected}
+          className="size-4 shrink-0"
+        />
       )}
       <span
         className="flex size-10 shrink-0 items-center justify-center rounded-md"
