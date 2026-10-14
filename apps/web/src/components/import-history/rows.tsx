@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { onActivateKey } from "@/lib/a11y";
 import { sourceMeta, statusLabelKey } from "./utils";
 import { STATUS_VARIANT } from "./types";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
@@ -196,12 +197,11 @@ export function DesktopRow({
     <TableRow data-state={selected.has(imp.id) ? "selected" : undefined}>
       <TableCell className="w-16">
         {selectionMode && (
-          <input
-            type="checkbox"
-            className="size-4 align-middle accent-primary"
+          <Checkbox
+            className="size-4"
             aria-label={t("selectRow")}
             checked={selected.has(imp.id)}
-            onChange={() => onToggleOne(imp.id)}
+            onCheckedChange={() => onToggleOne(imp.id)}
           />
         )}
       </TableCell>
@@ -292,13 +292,7 @@ export function MobileRow({
       )}
     >
       {selectionMode && (
-        <input
-          type="checkbox"
-          readOnly
-          aria-label={t("selectRow")}
-          checked={isSelected}
-          className="size-4 shrink-0 accent-primary"
-        />
+        <Checkbox aria-label={t("selectRow")} checked={isSelected} className="size-4 shrink-0" />
       )}
       <span
         className="flex size-10 shrink-0 items-center justify-center rounded-md"

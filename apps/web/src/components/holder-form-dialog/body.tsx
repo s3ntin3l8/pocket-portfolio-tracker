@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { HolderTypeChips } from "@/components/holder-type-chips";
 import { useSheetFooter } from "@/components/ui/sheet";
 import { useHolderForm } from "./hooks";
+import { Checkbox } from "@/components/ui/checkbox";
 
 /**
  * The `HolderFormDialog` body — used inline by `add-transaction-menu.tsx`'s "holder"
@@ -148,10 +149,9 @@ export function HolderFormBody({
               <p className="text-xs text-muted-foreground">{t("capitalGainsTaxRateHint")}</p>
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={f.churchTax}
-                onChange={(e) => f.setChurchTax(e.target.checked)}
+                onCheckedChange={(c) => f.setChurchTax(c === true)}
                 className="size-4"
               />
               {t("churchTax")}

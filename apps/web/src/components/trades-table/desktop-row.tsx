@@ -17,6 +17,7 @@ import { InstrumentLogo } from "@/components/instrument-logo";
 import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatSignedMoney, formatPercent, cn } from "@/lib/utils";
 import { toneClass } from "./constants";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function DesktopRow({
   tr,
@@ -81,9 +82,11 @@ export function DesktopRow({
       <TableCell className={cn(TABLE_VALUE, "whitespace-nowrap")}>
         {heldLabel(tr.holdingDays)}
         {Math.abs(tr.holdingDays - tr.avgHoldingDays) > 7 && (
-          <div className={cn(TABLE_SUBVALUE, "text-muted-foreground")} title={t("avgHeldTooltip")}>
-            ~{heldLabel(tr.avgHoldingDays)} {t("avgHeld")}
-          </div>
+          <InfoTip label={t("avgHeldTooltip")} focusable>
+            <div className={cn(TABLE_SUBVALUE, "text-muted-foreground")}>
+              ~{heldLabel(tr.avgHoldingDays)} {t("avgHeld")}
+            </div>
+          </InfoTip>
         )}
         {tr.longTerm && <div className={cn(TABLE_SUBVALUE, "text-success")}>{t("longTerm")}</div>}
       </TableCell>

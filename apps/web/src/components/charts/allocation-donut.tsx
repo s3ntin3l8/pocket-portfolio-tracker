@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "next-intl";
 import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
+import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /** A single donut slice — any keyed category (asset class, currency, …). */
@@ -162,14 +163,21 @@ export function AllocationDonut({
               ))}
             </Pie>
             <Tooltip
-              formatter={(value) => formatMoney(Number(value), currency, locale)}
               wrapperStyle={{ zIndex: 50 }}
-              contentStyle={{
-                background: "var(--color-popover)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                color: "var(--color-popover-foreground)",
-                fontSize: 12,
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const p = payload[0];
+                if (!p) return null;
+                return (
+                  <ChartTooltipPanel
+                    rows={[
+                      {
+                        label: String(p.name ?? ""),
+                        value: formatMoney(Number(p.value), currency, locale),
+                      },
+                    ]}
+                  />
+                );
               }}
             />
           </PieChart>

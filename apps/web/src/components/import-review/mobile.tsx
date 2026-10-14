@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import type { ReviewDraft } from "./types";
 import type { ImportReviewGroup, ImportTargetPortfolio } from "./types";
 import { fmtQty, fmtAmt } from "./types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
 
 function MobileDraftCard({
   draft,
@@ -45,12 +47,11 @@ function MobileDraftCard({
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          className="mt-1 size-4 shrink-0 align-middle accent-primary"
+        <Checkbox
+          className="mt-1 size-4 shrink-0"
           aria-label={t("review.selectRow")}
           checked={selected}
-          onChange={() => onToggle(draft.uid)}
+          onCheckedChange={() => onToggle(draft.uid)}
         />
         <button
           type="button"
@@ -81,9 +82,9 @@ function MobileDraftCard({
               </Badge>
             )}
             {transferNeedsCostBasis(draft) && (
-              <Badge variant="warning" title={t("review.needsCostBasisHint")}>
-                {t("review.needsCostBasis")}
-              </Badge>
+              <InfoTip label={t("review.needsCostBasisHint")} focusable>
+                <Badge variant="warning">{t("review.needsCostBasis")}</Badge>
+              </InfoTip>
             )}
           </div>
           <div className="mt-1 tabular text-sm text-muted-foreground">

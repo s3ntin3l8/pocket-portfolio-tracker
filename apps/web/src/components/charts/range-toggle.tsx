@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
  * Snapshot-history ranges. `1d`/`7d` read the timestamped intraday table (see
@@ -31,20 +32,19 @@ export function RangeToggle({
   // spanning the full chart width, white pill w/ green text when active; default
   // (`pdOn`/`pdOff`) = compact 11px buttons, active = card bg + small shadow.
   return (
-    <div
-      className={cn("flex", theme === "inverse" ? "w-full gap-1.5" : "gap-0.5")}
-      role="group"
+    <ToggleGroup
+      value={value}
+      onValueChange={onChange}
+      disabled={disabled}
       aria-label={t("label")}
+      className={theme === "inverse" ? "w-full gap-1.5" : "gap-0.5"}
     >
       {ranges.map((r) => (
-        <button
+        <ToggleGroupItem
           key={r}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(r)}
-          aria-pressed={value === r}
+          value={r}
           className={cn(
-            "touch-target relative transition-colors disabled:opacity-50",
+            "touch-target relative",
             theme === "inverse"
               ? cn(
                   "flex-1 rounded-full py-1.5 text-center text-xs",
@@ -61,8 +61,8 @@ export function RangeToggle({
           )}
         >
           {t(r)}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

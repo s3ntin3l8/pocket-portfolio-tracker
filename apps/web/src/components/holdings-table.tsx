@@ -23,6 +23,7 @@ import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import type { ColDef } from "@/lib/table-sort";
+import { InfoTip } from "@/components/ui/tooltip";
 
 const HOLDINGS_COLS: ColDef<HoldingValuation>[] = [
   { key: "instrument", get: (h) => h.instrument?.symbol ?? "", type: "text" },
@@ -212,20 +213,18 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                   <TableCell className={TABLE_VALUE_STRONG}>
                     {h.marketValueDisplay !== null ? display(Number(h.marketValueDisplay)) : "—"}
                     {h.valuedAtCost && (
-                      <span
-                        title={t("valuedAtCostTooltip")}
-                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
-                      >
-                        {t("valuedAtCostBadge")}
-                      </span>
+                      <InfoTip label={t("valuedAtCostTooltip")} focusable>
+                        <span className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                          {t("valuedAtCostBadge")}
+                        </span>
+                      </InfoTip>
                     )}
                     {h.fxMissing && (
-                      <span
-                        title={t("fxMissingTooltip")}
-                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
-                      >
-                        {t("fxMissingBadge")}
-                      </span>
+                      <InfoTip label={t("fxMissingTooltip")} focusable>
+                        <span className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                          {t("fxMissingBadge")}
+                        </span>
+                      </InfoTip>
                     )}
                   </TableCell>
                   <TableCell className={cn(TABLE_VALUE_STRONG, pnlColor)}>
@@ -336,20 +335,18 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                 <div className="text-sm font-bold">
                   {h.marketValueDisplay !== null ? display(Number(h.marketValueDisplay)) : "—"}
                   {h.valuedAtCost && (
-                    <span
-                      title={t("valuedAtCostTooltip")}
-                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
-                    >
-                      {t("valuedAtCostBadge")}
-                    </span>
+                    <InfoTip label={t("valuedAtCostTooltip")} focusable>
+                      <span className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                        {t("valuedAtCostBadge")}
+                      </span>
+                    </InfoTip>
                   )}
                   {h.fxMissing && (
-                    <span
-                      title={t("fxMissingTooltip")}
-                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
-                    >
-                      {t("fxMissingBadge")}
-                    </span>
+                    <InfoTip label={t("fxMissingTooltip")} focusable>
+                      <span className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                        {t("fxMissingBadge")}
+                      </span>
+                    </InfoTip>
                   )}
                 </div>
                 <div className={cn("text-xs font-bold", pnlColor)}>

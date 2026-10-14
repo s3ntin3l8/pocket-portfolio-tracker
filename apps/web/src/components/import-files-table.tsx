@@ -15,6 +15,7 @@ import { useTableSort, type ColDef } from "@/lib/table-sort";
 import { Badge } from "@/components/ui/badge";
 import { PortfolioPicker } from "@/components/portfolio-picker";
 import type { ImportTargetPortfolio } from "@/components/import-flow/types";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export interface ImportFilesTableProps {
   /** One row per imported file, in upload order. */
@@ -109,12 +110,11 @@ export function ImportFilesTable({
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">
-                <input
-                  type="checkbox"
-                  className="size-4 align-middle accent-primary"
+                <Checkbox
+                  className="size-4"
                   aria-label={t("confirmPortfolio.selectAll")}
                   checked={allSelected}
-                  onChange={toggleAll}
+                  onCheckedChange={() => toggleAll()}
                 />
               </TableHead>
               <SortableTableHead
@@ -145,12 +145,11 @@ export function ImportFilesTable({
               return (
                 <TableRow key={g.importId} data-state={isChecked ? "selected" : undefined}>
                   <TableCell className="w-10">
-                    <input
-                      type="checkbox"
-                      className="size-4 align-middle accent-primary"
+                    <Checkbox
+                      className="size-4"
                       aria-label={t("confirmPortfolio.selectFile", { file: g.filename })}
                       checked={isChecked}
-                      onChange={() => toggle(g.importId)}
+                      onCheckedChange={() => toggle(g.importId)}
                     />
                   </TableCell>
                   <TableCell>

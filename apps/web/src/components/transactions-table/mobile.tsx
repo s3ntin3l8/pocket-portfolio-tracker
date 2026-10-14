@@ -7,6 +7,8 @@ import { onActivateKey } from "@/lib/a11y";
 import { TxRow, KIND_ICON } from "./types";
 import { TypeIconChip, SourceChips, txNetAmount, rowPerShareDisplay } from "./utils";
 import type { Anomaly } from "@portfolio/api-client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function MobileView({
   dayGroups,
@@ -77,12 +79,10 @@ export function MobileView({
                   )}
                 >
                   {selectionMode && (
-                    <input
-                      type="checkbox"
-                      readOnly
+                    <Checkbox
                       aria-label={tb("selectRow")}
                       checked={isSelected}
-                      className="size-4 shrink-0 accent-primary"
+                      className="size-4 shrink-0"
                     />
                   )}
                   <TypeIconChip type={tx.type} kind={tx.kind} className="size-10 rounded-md" />
@@ -93,16 +93,18 @@ export function MobileView({
                         {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
                       </span>
                       {anomaly && (
-                        <span
-                          title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                          aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                        <InfoTip
+                          label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                          focusable
                         >
-                          {anomaly.severity === "error" ? (
-                            <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                          ) : (
-                            <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                          )}
-                        </span>
+                          <span aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}>
+                            {anomaly.severity === "error" ? (
+                              <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                            ) : (
+                              <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                            )}
+                          </span>
+                        </InfoTip>
                       )}
                     </div>
                     <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-text-2">

@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function ChipGroup({
   label,
@@ -73,11 +74,10 @@ export function FilterBar(props: FilterBarProps) {
         />
       )}
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
-        <input
-          type="checkbox"
-          className="size-4 align-middle accent-primary"
+        <Checkbox
+          className="size-4"
           checked={props.needsReviewOnly}
-          onChange={(e) => props.onNeedsReviewChange(e.target.checked)}
+          onCheckedChange={(c) => props.onNeedsReviewChange(c === true)}
         />
         {t("review.filters.needsReview")}
       </label>

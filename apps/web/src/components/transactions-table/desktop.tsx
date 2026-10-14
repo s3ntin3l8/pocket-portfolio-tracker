@@ -25,6 +25,8 @@ import {
   rowPerShareDisplay,
 } from "./utils";
 import type { Anomaly } from "@portfolio/api-client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function DesktopTable({
   rows,
@@ -91,12 +93,11 @@ export function DesktopTable({
           <TableRow>
             <TableHead className="w-16">
               {selectionMode ? (
-                <input
-                  type="checkbox"
-                  className="size-4 align-middle accent-primary"
+                <Checkbox
+                  className="size-4"
                   aria-label={tb("selectAll")}
                   checked={allSelected}
-                  onChange={onToggleAll}
+                  onCheckedChange={() => onToggleAll()}
                 />
               ) : (
                 <Button
@@ -215,12 +216,11 @@ export function DesktopTable({
                 >
                   <TableCell className="w-16">
                     {selectionMode && (
-                      <input
-                        type="checkbox"
-                        className="size-4 align-middle accent-primary"
+                      <Checkbox
+                        className="size-4"
                         aria-label={tb("selectRow")}
                         checked={isSelected}
-                        onChange={() => onToggle(tx.id)}
+                        onCheckedChange={() => onToggle(tx.id)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     )}
@@ -249,16 +249,20 @@ export function DesktopTable({
                             )}
                           </span>
                           {anomaly && (
-                            <span
-                              title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                              aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                            <InfoTip
+                              label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                              focusable
                             >
-                              {anomaly.severity === "error" ? (
-                                <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                              ) : (
-                                <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                              )}
-                            </span>
+                              <span
+                                aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                              >
+                                {anomaly.severity === "error" ? (
+                                  <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                                ) : (
+                                  <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                                )}
+                              </span>
+                            </InfoTip>
                           )}
                           {status === "draft" && (
                             <Badge
@@ -269,13 +273,15 @@ export function DesktopTable({
                             </Badge>
                           )}
                           {status === "draft" && tx.needsReview && (
-                            <span
-                              className="inline-flex items-center"
-                              title={tm("status.needsReview")}
-                              aria-label={tm("status.needsReview")}
-                            >
-                              <AlertTriangle className="size-3.5 text-amber-500" />
-                            </span>
+                            <InfoTip label={tm("status.needsReview")} focusable>
+                              <span
+                                className="inline-flex items-center"
+
+                                aria-label={tm("status.needsReview")}
+                              >
+                                <AlertTriangle className="size-3.5 text-amber-500" />
+                              </span>
+                            </InfoTip>
                           )}
                           {status === "archived" && (
                             <Badge variant="outline">{tm("status.badgeArchived")}</Badge>

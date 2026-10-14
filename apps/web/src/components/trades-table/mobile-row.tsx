@@ -9,6 +9,7 @@ import { InstrumentLogo } from "@/components/instrument-logo";
 import { ScopeLink } from "@/components/scope-link";
 import { formatSignedMoney, formatPercent, cn } from "@/lib/utils";
 import { tradeKey, toneClass } from "./constants";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function MobileRow({
   tr,
@@ -75,13 +76,12 @@ export function MobileRow({
             </div>
           )}
           {tr.annualizedPct !== null && (
-            <div
-              className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}
-              title={t("annualizedTooltip")}
-            >
-              {formatPercent(tr.annualizedPct, locale)}
-              {t("annualizedAbbr")}
-            </div>
+            <InfoTip label={t("annualizedTooltip")} focusable>
+              <div className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}>
+                {formatPercent(tr.annualizedPct, locale)}
+                {t("annualizedAbbr")}
+              </div>
+            </InfoTip>
           )}
         </div>
       </div>

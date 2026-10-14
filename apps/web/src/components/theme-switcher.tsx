@@ -1,19 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useThemeMode } from "@/lib/use-theme-mode";
 
 const THEMES = ["light", "dark", "system"] as const;
+type ThemeChoice = (typeof THEMES)[number];
 
 export function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const { theme, setTheme, mounted } = useThemeMode();
   const t = useTranslations("Settings");
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setMounted(true), []);
 
   if (!mounted) {
     return (
@@ -31,23 +28,26 @@ export function ThemeSwitcher() {
   }
 
   return (
-    <div role="group" aria-label={t("appearance")} className="flex w-full gap-[7px]">
+    <ToggleGroup<ThemeChoice>
+      value={(theme as ThemeChoice) ?? "system"}
+      onValueChange={setTheme}
+      aria-label={t("appearance")}
+      className="w-full gap-[7px]"
+    >
       {THEMES.map((th) => (
-        <button
+        <ToggleGroupItem
           key={th}
-          type="button"
-          onClick={() => setTheme(th)}
-          aria-pressed={theme === th}
+          value={th}
           className={cn(
-            "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
+            "flex-1 rounded-sm py-[9px] text-center text-body-sm",
             theme === th
               ? "bg-pill font-bold text-white"
               : "bg-background font-semibold text-foreground hover:bg-secondary",
           )}
         >
           {t(`appearanceOptions.${th}`)}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

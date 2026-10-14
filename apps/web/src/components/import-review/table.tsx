@@ -20,6 +20,7 @@ import type { ImportReviewGroup, ImportTargetPortfolio } from "./types";
 import { TABLE_COL_COUNT } from "./types";
 import { DraftRow } from "./draft-row";
 import { IssueRow } from "./issue-row";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export interface ImportTableProps {
   drafts: ReviewDraft[];
@@ -86,12 +87,11 @@ export function ImportTable({
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">
-              <input
-                type="checkbox"
-                className="size-4 align-middle accent-primary"
+              <Checkbox
+                className="size-4"
                 aria-label={t("review.selectAll")}
                 checked={allVisibleSelected}
-                onChange={onToggleAll}
+                onCheckedChange={() => onToggleAll()}
               />
             </TableHead>
             <SortableTableHead
