@@ -2611,5 +2611,57 @@
     "details": "Details",
     "disconnectTitle": "Disconnect {broker}?",
     "disconnectBody": "Syncing stops. Transactions already imported stay in this portfolio."
+  },
+  "Assistant": {
+    "title": "Assistant",
+    "open": "Open the assistant",
+    "newChat": "New chat",
+    "conversation": "Conversation",
+    "steps": "What the assistant looked up",
+    "inputLabel": "Message to the assistant",
+    "placeholder": "Ask about your portfolio…",
+    "send": "Send",
+    "stop": "Stop",
+    "thinking": "Thinking…",
+    "disclosureCloud": "Answers use your portfolio figures, sent to {provider} to generate the reply. Account numbers and IBANs are never shared.",
+    "disclosureLocal": "Runs on your own server — your data stays on your infrastructure. Account numbers and IBANs are never shared.",
+    "disclaimer": "Explanations only — not financial, tax or legal advice. Check important figures in the app.",
+    "emptyHint": "Ask a question about your portfolio, or try one of these:",
+    "suggestions": {
+      "overview": "How is my portfolio doing?",
+      "gains": "What is driving my gains?",
+      "allocation": "Is my allocation close to my targets?"
+    },
+    "explainGain": "Ask the assistant to explain",
+    "explainGainPrompt": "Explain my gain figures for what I'm currently viewing: what each number means, which basis it uses, and anything unusual (holdings valued at cost, missing exchange rates).",
+    "tools": {
+      "list_portfolios": "Portfolios",
+      "get_net_worth": "Net worth",
+      "get_portfolio_summary": "Portfolio summary",
+      "get_holdings": "Holdings",
+      "search_transactions": "Transactions",
+      "get_performance": "Value history",
+      "get_income": "Income",
+      "get_contributions": "Contributions",
+      "get_tax_summary": "Tax summary",
+      "get_rebalancing": "Targets and drift",
+      "get_insights": "Insights",
+      "lookup_instrument": "Instrument lookup"
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "network": "Couldn't reach the assistant. Check your connection and try again.",
+      "provider_error": "The AI provider returned an error. Please try again in a moment.",
+      "provider_unreachable": "Couldn't reach the AI provider. Please try again in a moment.",
+      "provider_bad_response": "The AI provider sent an unreadable answer. Please try again.",
+      "provider_not_configured": "The assistant isn't configured correctly. Ask an admin to check the AI provider settings.",
+      "refused": "The assistant declined to answer that.",
+      "truncated": "The answer was cut off because it got too long. Try a narrower question.",
+      "too_many_tool_rounds": "That needed more lookups than allowed. Try a narrower question.",
+      "chat_failed": "Something went wrong while answering. Please try again.",
+      "assistant_rate_limited": "You've reached the hourly limit for assistant questions. Try again later.",
+      "chat_not_configured": "The assistant isn't set up on this server.",
+      "invalid_request": "That message couldn't be sent. Try a shorter one or start a new chat."
+    }
   }
 }
