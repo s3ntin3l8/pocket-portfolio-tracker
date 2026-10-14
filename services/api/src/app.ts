@@ -278,7 +278,9 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   // invalidate. Clearing the whole cache is cheap (a few Map entries) and only costs one
   // extra recompute per portfolio on the next read — never a staleness risk.
   app.addHook("onResponse", async (request, reply) => {
-    if (request.method !== "GET" && request.method !== "HEAD") {
+    // A POST that is itself read-only (`scope: "read"`, e.g. /mcp) never changes data.
+    const readOnlyRoute = request.routeOptions?.config?.scope === "read";
+    if (request.method !== "GET" && request.method !== "HEAD" && !readOnlyRoute) {
       clearValuationCache(request.log);
       clearDerivationCache();
     }

@@ -205,4 +205,14 @@ describe("POST /mcp", () => {
     const body = res.json();
     expect(body.error ?? body.result?.isError).toBeTruthy();
   });
+  it("refuses an id that tries to redirect the call to another endpoint", async () => {
+    const res = await rpc(ownerPat, "tools/call", {
+      name: "get_portfolio_summary",
+      arguments: { portfolioId: "x/../../me/tokens" },
+    });
+    const body = res.json();
+    // Rejected at input validation: no API call is made, no token metadata comes back.
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(JSON.stringify(body)).not.toMatch(/mcp-read|lastUsedAt/);
+  });
 });

@@ -205,8 +205,9 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         .set({ lastUsedAt: new Date() })
         .where(eq(apiTokens.id, row.id));
       const scope = row.scope === "write" ? "write" : "read";
-      // Method-based gate, plus a route-level opt-in (`config: { scope: "write" }`)
-      // for GETs that mutate state or spend provider quota.
+      // Method-based gate, plus two route-level opt-ins: `config: { scope: "write" }` makes
+      // a GET that mutates state or spends provider quota need a write PAT, and
+      // `config: { scope: "read" }` (below) is the inverse for a POST that only reads.
       const routeScope = request.routeOptions?.config?.scope;
       const routeNeedsWrite = routeScope === "write";
       // `scope: "read"` is the inverse opt-in: the route is read-only even though it is a

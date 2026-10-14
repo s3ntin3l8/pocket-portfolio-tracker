@@ -28,7 +28,7 @@ claude mcp add --transport http pocket https://<your-pocket-api>/mcp \
       "command": "npx",
       "args": [
         "-y",
-        "mcp-remote",
+        "mcp-remote@0.14.3",
         "https://<your-pocket-api>/mcp",
         "--header",
         "Authorization: Bearer <token>",
@@ -48,7 +48,10 @@ claude mcp add --transport http pocket https://<your-pocket-api>/mcp \
   text is scrubbed (`packages/ai-tools/src/redact.ts`).
 - **Failures are data, not exceptions:** a failing call returns `{ error, status }` (flagged `isError`), never the
   response body or a stack.
-- Each tool call is an in-process API request, so it counts against the per-credential rate limit and stamps the
+- Each tool call is an in-process API request, so it counts against the per-credential rate limit (1 for the
+  `/mcp` POST plus 1-2 for the tool's API calls; a 429 comes back to the model as a tool error) and stamps the
   token's `lastUsedAt`.
+- Tool ids are validated as GUIDs, so a tool argument can never steer a call to another endpoint.
+- `mcp-remote` is a third-party bridge fetched by `npx`; the snippet pins a version — review it before bumping.
 
 Not yet: OAuth for claude.ai connectors (#923), draft-only write tools (#924).

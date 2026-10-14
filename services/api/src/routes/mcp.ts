@@ -116,6 +116,14 @@ export async function mcpRoute(app: FastifyInstance) {
     "/mcp",
     { preHandler: app.authenticate, config: { scope: "read" } },
     async (request, reply) => {
+      // We write to the raw response ourselves (the transport owns it), so take it over
+      // before anything can be sent and carry over the headers Fastify plugins (helmet,
+      // cors) already set on the reply.
+      reply.hijack();
+      for (const [name, value] of Object.entries(reply.getHeaders())) {
+        if (value !== undefined) reply.raw.setHeader(name, value);
+      }
+      // The api-client builds the Authorization header from this; injectFetch forwards it.
       const token = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
       const client = createApiClient({
         baseUrl: "",
@@ -127,13 +135,13 @@ export async function mcpRoute(app: FastifyInstance) {
         sessionIdGenerator: undefined,
         enableJsonResponse: true,
       });
+      const closeFailed = (err: unknown) => request.log.warn({ err }, "mcp close failed");
       reply.raw.on("close", () => {
-        void transport.close();
-        void server.close();
+        transport.close().catch(closeFailed);
+        server.close().catch(closeFailed);
       });
       try {
         await server.connect(transport);
-        reply.hijack();
         await transport.handleRequest(request.raw, reply.raw, request.body);
       } catch (err) {
         request.log.error({ err }, "mcp request failed");

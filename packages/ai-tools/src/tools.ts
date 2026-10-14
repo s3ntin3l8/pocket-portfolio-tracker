@@ -12,12 +12,13 @@ import type { AiTool } from "./types.js";
 
 const costBasis = z.enum(["purchase_price", "total_paid"]).optional();
 const range = z.enum(["1d", "7d", "1m", "3m", "6m", "ytd", "1y", "5y", "all"]).default("1y");
-const portfolioId = z.string().min(1).describe("Portfolio id from list_portfolios");
+// Ids go into URL paths and query strings; a GUID check keeps `/`, `?` and `..` out of them.
+const id = () => z.guid();
+const portfolioId = id().describe("Portfolio id from list_portfolios");
 const optionalPortfolioId = portfolioId
   .optional()
   .describe("Portfolio id from list_portfolios; omit for all portfolios combined");
-const holderId = z
-  .string()
+const holderId = id()
   .optional()
   .describe("Account holder id; omit for everyone. Ignored when portfolioId is given.");
 
@@ -220,7 +221,7 @@ export function createTools(client: ApiClient): AiTool[] {
         .regex(/^\d{4}$/)
         .optional(),
       q: z.string().optional(),
-      instrumentId: z.string().optional(),
+      instrumentId: id().optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(50).default(25),
     }),

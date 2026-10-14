@@ -14,7 +14,7 @@ const CLAUDE_CODE = `claude mcp add --transport http pocket ${ENDPOINT} --header
 const CLAUDE_DESKTOP = JSON.stringify(
   {
     mcpServers: {
-      pocket: { command: "npx", args: ["-y", "mcp-remote", ENDPOINT, "--header", HEADER] },
+      pocket: { command: "npx", args: ["-y", "mcp-remote@0.14.3", ENDPOINT, "--header", HEADER] },
     },
   },
   null,

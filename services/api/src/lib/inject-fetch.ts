@@ -4,7 +4,9 @@ import type { FastifyInstance, InjectOptions } from "fastify";
  * A `fetch` that answers from the app itself (`app.inject`) instead of the network, so the
  * typed `@portfolio/api-client` can call this API in-process. Each call still runs the full
  * plugin chain — auth, per-credential rate limit, the read-only-token gate — exactly like an
- * external request carrying the same Authorization header.
+ * external request carrying the same Authorization header — including the per-credential
+ * rate limit, so an injected call is NOT free: a tool call costs 1 (the outer /mcp POST)
+ * plus 1-2 inner requests. A 429 on an inner call surfaces to the model as a tool error.
  */
 export function injectFetch(app: FastifyInstance): typeof fetch {
   return async (input, init) => {
