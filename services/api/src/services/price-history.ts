@@ -1,4 +1,4 @@
-import { and, desc, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, gte, inArray, lte, or } from "drizzle-orm";
 import { prices } from "@portfolio/db";
 import type { DB } from "../db/client.js";
 
@@ -20,7 +20,8 @@ function minusDays(date: string, days: number): string {
 /**
  * The latest stored close on or before each requested date, per instrument, looking back at
  * most `lookbackDays` (so a long price gap is a miss, not a stale number carried into a tax
- * figure). One `DISTINCT ON` query per date; misses are simply absent from the map.
+ * figure). One query for all dates (an OR of per-date windows, each at most `lookbackDays`+1
+ * rows per instrument), reduced per (instrument, date) in JS; misses are simply absent.
  */
 export async function getPricesOn(
   db: DB,
@@ -29,21 +30,31 @@ export async function getPricesOn(
   lookbackDays = 5,
 ): Promise<Map<string, PriceOn>> {
   const out = new Map<string, PriceOn>();
-  if (instrumentIds.length === 0) return out;
-  for (const date of new Set(dates)) {
-    const rows = await db
-      .selectDistinctOn([prices.instrumentId])
-      .from(prices)
-      .where(
-        and(
-          inArray(prices.instrumentId, instrumentIds),
-          lte(prices.date, date),
-          gte(prices.date, minusDays(date, lookbackDays)),
-        ),
-      )
-      .orderBy(prices.instrumentId, desc(prices.date));
-    for (const r of rows) {
-      out.set(priceKey(r.instrumentId, date), { close: r.close, currency: r.currency });
+  const wanted = [...new Set(dates)];
+  if (instrumentIds.length === 0 || wanted.length === 0) return out;
+  const windows = wanted.map((date) => ({ date, from: minusDays(date, lookbackDays) }));
+  const rows = await db
+    .select({
+      instrumentId: prices.instrumentId,
+      date: prices.date,
+      close: prices.close,
+      currency: prices.currency,
+    })
+    .from(prices)
+    .where(
+      and(
+        inArray(prices.instrumentId, instrumentIds),
+        or(...windows.map((w) => and(gte(prices.date, w.from), lte(prices.date, w.date)))),
+      ),
+    )
+    .orderBy(prices.instrumentId, desc(prices.date));
+  for (const r of rows) {
+    for (const w of windows) {
+      if (r.date > w.date || r.date < w.from) continue;
+      const key = priceKey(r.instrumentId, w.date);
+      // Relies on the (instrumentId, date) unique index (one row per day) and the
+      // `orderBy desc(date)` above: rows arrive newest-first, so the first hit is the latest close.
+      if (!out.has(key)) out.set(key, { close: r.close, currency: r.currency });
     }
   }
   return out;

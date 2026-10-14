@@ -340,6 +340,19 @@ export async function resolveCostBasisMode(
   return row?.costBasisMode === "total_paid" ? "total_paid" : undefined;
 }
 
+/**
+ * The user's global tax regime (`userPreferences.taxRegime`); anything but `"ID"` is `"DE"`
+ * (the default). Part of every cache key whose value depends on the regime.
+ */
+export async function resolveTaxRegime(app: FastifyInstance, userId: string): Promise<"DE" | "ID"> {
+  const [row] = await app.db
+    .select({ taxRegime: userPreferences.taxRegime })
+    .from(userPreferences)
+    .where(eq(userPreferences.userId, userId))
+    .limit(1);
+  return row?.taxRegime === "ID" ? "ID" : "DE";
+}
+
 export function methodFromQuery(q: { method?: string }): TradeMethod {
   return q.method === "fifo" ? "fifo" : "average";
 }

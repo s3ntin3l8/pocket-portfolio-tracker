@@ -220,7 +220,8 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
 - **Estimated Vorabpauschale is derived, never stored.** For DE-regime funds with no
   broker-booked `vorabpauschale` row for a completed year, `estimateVorabRows`
   (`packages/core/src/tax/vorab-estimate.ts`, loaded by `services/vorab-estimate.ts`) adds
-  `estimated: true` accrual rows to the tax trade log only; a broker row for the same
+  `estimated: true` accrual rows to every DE-regime trade log (Tax, Trades, Sparplan; boundary
+  prices batched once per request via `loadVorabPrices`); a broker row for the same
   (instrument, year) always wins, and a missing price/Basiszins means no row (never 0). The
   §18 Abs. 2 monthly reduction applies to the Vorabpauschale itself, after cap and
   distributions. See `docs/tax.md`.

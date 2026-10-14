@@ -14,7 +14,12 @@ import {
   getCachedFifoTradeLog,
   type InstrumentMeta,
 } from "../../services/valuation.js";
-import { loadEstimatedVorabRows } from "../../services/vorab-estimate.js";
+import {
+  collectVorabNeeds,
+  estimateVorabFromPrices,
+  loadEstimatedVorabRows,
+  loadVorabPrices,
+} from "../../services/vorab-estimate.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { toDecimalSafe } from "../../lib/decimal-safe.js";
 
@@ -341,109 +346,194 @@ export function registerTaxRoutes(app: FastifyInstance) {
         ? [syntheticUnallocatedHolder, ...holderRows]
         : [...holderRows];
 
-      const perHolderResults = await mapPool(effectiveHolders, 2, async (holder) => {
-        const isSynthetic = holder.id === "__unallocated__";
-        const pfs = isSynthetic
-          ? unallocatedPortfolios
-          : await app.db
-              .select({
-                id: portfolios.id,
-                cashCounted: portfolios.cashCounted,
-                taxAllowanceAnnual: portfolios.taxAllowanceAnnual,
-              })
-              .from(portfolios)
-              .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holder.id)));
+      // Phase 0: each holder's portfolios + FSA allocation (cheap queries), dropping holders
+      // the regime has nothing to say about.
+      const holderPlans = (
+        await mapPool(effectiveHolders, 2, async (holder) => {
+          const isSynthetic = holder.id === "__unallocated__";
+          const pfs = isSynthetic
+            ? unallocatedPortfolios
+            : await app.db
+                .select({
+                  id: portfolios.id,
+                  cashCounted: portfolios.cashCounted,
+                  taxAllowanceAnnual: portfolios.taxAllowanceAnnual,
+                })
+                .from(portfolios)
+                .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holder.id)));
 
-        if (pfs.length === 0) return null;
+          if (pfs.length === 0) return null;
 
-        const totalAllocated = pfs.reduce(
-          (sum, p) => sum.plus(toDecimalSafe(p.taxAllowanceAnnual)),
-          new Decimal(0),
-        );
-        // Under DE, holders without any FSA allocation are filtered — the German summary
-        // is meaningless without an allowance to allocate. Under ID, every holder surfaces
-        // so the ID payload is reachable regardless of FSA configuration.
-        if (regime === "DE" && totalAllocated.isZero()) return null;
-
-        const now = new Date();
-        const costBasisMode = await resolveCostBasisMode(app, id);
-        const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
-          const {
-            coreTxns,
-            prices,
-            metaById,
-            summary,
-            fxRates: pFxRates,
-            corporateActions: pCas,
-          } = await loadValuation(app, p.id, display, costBasisMode, p.cashCounted);
-          const estimatedVorab =
-            regime === "DE"
-              ? await loadEstimatedVorabRows(app.db, coreTxns, pCas, metaById, now, app.log)
-              : [];
-          const log = await buildTradeLog(
-            app,
-            estimatedVorab.length > 0 ? [...coreTxns, ...estimatedVorab] : coreTxns,
-            prices,
-            display,
-            "fifo",
-            costBasisMode,
-            metaById,
+          const totalAllocated = pfs.reduce(
+            (sum, p) => sum.plus(toDecimalSafe(p.taxAllowanceAnnual)),
+            new Decimal(0),
           );
-          // Skip restOfYearForecastGross under ID — the forecast is gross-income-only
-          // (used by the German branch's harvestSuggestion / FSP path) and the ID
-          // branch doesn't read `totalForecastGross`. Saves a per-portfolio query.
-          const pfForecast =
-            regime === "ID"
-              ? Promise.resolve({ toString: () => "0" } as { toString: () => string })
-              : restOfYearForecastGross(app, coreTxns, summary, display, year, now);
-          const forecast = await pfForecast;
-          return {
-            log,
-            metaById,
-            coreTxns,
-            forecast: Number(forecast.toString()),
-            rateByCcy: pFxRates as Record<string, string>,
-          };
-        });
-        const logs: TradeLog[] = perPortfolio.map((r) => r.log);
-        const meta = new Map<string, InstrumentMeta>();
-        let totalForecastGross = 0;
-        if (regime !== "ID") {
-          for (const { metaById, forecast } of perPortfolio) {
-            for (const [k, v] of metaById) meta.set(k, v);
-            totalForecastGross += forecast;
-          }
-        } else {
-          for (const { metaById } of perPortfolio) {
-            for (const [k, v] of metaById) meta.set(k, v);
-          }
-        }
-        const mergedLog = mergeTradeLogs(logs, display, "fifo");
+          // Under DE, holders without any FSA allocation are filtered — the German summary
+          // is meaningless without an allowance to allocate. Under ID, every holder surfaces
+          // so the ID payload is reachable regardless of FSA configuration.
+          if (regime === "DE" && totalAllocated.isZero()) return null;
+          return { holder, pfs, totalAllocated };
+        })
+      ).filter((r): r is NonNullable<typeof r> => r != null);
 
-        // Indonesian final-tax (flat, withheld-at-source): 0.1% of SALE PROCEEDS + 10% of
-        // dividend/coupon GROSS. No Sparerpauschbetrag / harvesting / realized-gain
-        // computation. Computed against the holder's MERGED trade log across all their
-        // portfolios, so the per-holder ID total includes proceeds from every depot.
-        // (W2: previously /networth/tax filtered out holders with no FSA allocation,
-        // which silently zeroed the ID payload for ID users — now it surfaces directly.)
-        if (regime === "ID") {
-          const allCoreTxns = perPortfolio.flatMap((p) => p.coreTxns);
-          // The per-portfolio loadValuation returned fxRates for each portfolio's display
-          // (its baseCurrency), not the networth-level `display`. Re-derive a display→
-          // native→display map that covers every distinct native currency across all the
-          // holder's portfolios. (mergeTradeLogs already folded the legs into display.)
-          const displayRates = new Map<string, number>();
-          for (const { rateByCcy } of perPortfolio) {
-            for (const [k, v] of Object.entries(rateByCcy ?? {})) displayRates.set(k, Number(v));
-          }
-          const idTax = computeIndonesianFinalTaxFromTradeLog({
-            tradeLog: mergedLog,
-            coreTxns: allCoreTxns,
-            year,
-            metaById: meta,
-            displayCurrency: display,
-            fxRates: displayRates,
+      const now = new Date();
+      const costBasisMode = await resolveCostBasisMode(app, id);
+
+      // Phase 1: valuations for every portfolio of every surfaced holder (bounded pool).
+      const allPfs = holderPlans.flatMap((h) => h.pfs);
+      const loaded = await mapPool(allPfs, PORTFOLIO_VALUATION_CONCURRENCY, (p) =>
+        loadValuation(app, p.id, display, costBasisMode, p.cashCounted),
+      );
+      const valuationById = new Map(allPfs.map((p, i) => [p.id, loaded[i]!]));
+
+      // Phase 2 needs every valuation from phase 1 (fund ids and first years come from the
+      // loaded transactions), so valuations must load before the batched price query.
+      // ONE boundary-price query for the union of fund ids and years (DE only).
+      const vorabPriceOn =
+        regime === "DE"
+          ? await loadVorabPrices(
+              app.db,
+              loaded.map((v) => collectVorabNeeds(v.coreTxns, v.metaById)),
+              now,
+            )
+          : null;
+
+      // Phase 3: per-holder trade logs (with the shared estimates) and tax figures.
+      const perHolderResults = await mapPool(
+        holderPlans,
+        2,
+        async ({ holder, pfs, totalAllocated }) => {
+          const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
+            const {
+              coreTxns,
+              prices,
+              metaById,
+              summary,
+              fxRates: pFxRates,
+              corporateActions: pCas,
+            } = valuationById.get(p.id)!;
+            const estimatedVorab = vorabPriceOn
+              ? estimateVorabFromPrices(coreTxns, pCas, metaById, vorabPriceOn, now, app.log)
+              : [];
+            const log = await buildTradeLog(
+              app,
+              estimatedVorab.length > 0 ? [...coreTxns, ...estimatedVorab] : coreTxns,
+              prices,
+              display,
+              "fifo",
+              costBasisMode,
+              metaById,
+            );
+            // Skip restOfYearForecastGross under ID — the forecast is gross-income-only
+            // (used by the German branch's harvestSuggestion / FSP path) and the ID
+            // branch doesn't read `totalForecastGross`. Saves a per-portfolio query.
+            const pfForecast =
+              regime === "ID"
+                ? Promise.resolve({ toString: () => "0" } as { toString: () => string })
+                : restOfYearForecastGross(app, coreTxns, summary, display, year, now);
+            const forecast = await pfForecast;
+            return {
+              log,
+              metaById,
+              coreTxns,
+              forecast: Number(forecast.toString()),
+              rateByCcy: pFxRates as Record<string, string>,
+            };
           });
+          const logs: TradeLog[] = perPortfolio.map((r) => r.log);
+          const meta = new Map<string, InstrumentMeta>();
+          let totalForecastGross = 0;
+          if (regime !== "ID") {
+            for (const { metaById, forecast } of perPortfolio) {
+              for (const [k, v] of metaById) meta.set(k, v);
+              totalForecastGross += forecast;
+            }
+          } else {
+            for (const { metaById } of perPortfolio) {
+              for (const [k, v] of metaById) meta.set(k, v);
+            }
+          }
+          const mergedLog = mergeTradeLogs(logs, display, "fifo");
+
+          // Indonesian final-tax (flat, withheld-at-source): 0.1% of SALE PROCEEDS + 10% of
+          // dividend/coupon GROSS. No Sparerpauschbetrag / harvesting / realized-gain
+          // computation. Computed against the holder's MERGED trade log across all their
+          // portfolios, so the per-holder ID total includes proceeds from every depot.
+          // (W2: previously /networth/tax filtered out holders with no FSA allocation,
+          // which silently zeroed the ID payload for ID users — now it surfaces directly.)
+          if (regime === "ID") {
+            const allCoreTxns = perPortfolio.flatMap((p) => p.coreTxns);
+            // The per-portfolio loadValuation returned fxRates for each portfolio's display
+            // (its baseCurrency), not the networth-level `display`. Re-derive a display→
+            // native→display map that covers every distinct native currency across all the
+            // holder's portfolios. (mergeTradeLogs already folded the legs into display.)
+            const displayRates = new Map<string, number>();
+            for (const { rateByCcy } of perPortfolio) {
+              for (const [k, v] of Object.entries(rateByCcy ?? {})) displayRates.set(k, Number(v));
+            }
+            const idTax = computeIndonesianFinalTaxFromTradeLog({
+              tradeLog: mergedLog,
+              coreTxns: allCoreTxns,
+              year,
+              metaById: meta,
+              displayCurrency: display,
+              fxRates: displayRates,
+            });
+            return {
+              holder: {
+                id: holder.id,
+                name: holder.name,
+                taxAllowanceAnnual: holder.taxAllowanceAnnual,
+                capitalGainsTaxRate: holder.capitalGainsTaxRate,
+                churchTax: holder.churchTax,
+                taxResidence: holder.taxResidence,
+              },
+              year,
+              regime: "ID" as const,
+              currency: display,
+              indonesianFinalTax: idTax,
+              harvestSuggestions: [],
+            };
+          }
+
+          const tfRates = buildTfRates(mergedLog.trades, meta);
+          const assetClasses = Object.fromEntries(
+            [...meta.entries()].map(([iid, m]) => [iid, m.assetClass]),
+          );
+          const taxRate = effectiveCapitalGainsTaxRate(holder);
+          const forecastIncomeRestOfYear =
+            totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
+          const lossCarryForward = await lossCarryForwardFor(app, holder.id, year);
+
+          const holderAllowanceCap = new Decimal(holder.taxAllowanceAnnual ?? 1000);
+          const remainingToDistribute = Decimal.max(
+            new Decimal(0),
+            holderAllowanceCap.minus(totalAllocated),
+          );
+          const overAllocated = totalAllocated.gt(holderAllowanceCap);
+
+          const allowanceAnnual = holderAllowanceCap.toFixed(2);
+
+          const usage = allowanceUsageYTD({
+            tradeLog: mergedLog,
+            tfRates,
+            allowanceAnnual,
+            taxRate,
+            year,
+            forecastIncomeRestOfYear,
+            assetClasses,
+            lossCarryForward,
+          });
+          const suggestions = harvestSuggestions({
+            tradeLog: mergedLog,
+            tfRates,
+            allowanceAnnual,
+            taxRate,
+            year,
+            assetClasses,
+            usage,
+          });
+
           return {
             holder: {
               id: holder.id,
@@ -454,77 +544,23 @@ export function registerTaxRoutes(app: FastifyInstance) {
               taxResidence: holder.taxResidence,
             },
             year,
-            regime: "ID" as const,
             currency: display,
-            indonesianFinalTax: idTax,
-            harvestSuggestions: [],
+            allowanceUsage: usage,
+            harvestSuggestions: suggestions.map((s) => ({
+              ...s,
+              instrument: meta.get(s.instrumentId) ?? null,
+            })),
+            tfRatesByInstrument: tfRates,
+            carryForwardApplied: true,
+            distribution: {
+              holderAllowanceCap: holderAllowanceCap.toFixed(2),
+              totalAllocated: totalAllocated.toFixed(2),
+              remainingToDistribute: remainingToDistribute.toFixed(2),
+              overAllocated,
+            },
           };
-        }
-
-        const tfRates = buildTfRates(mergedLog.trades, meta);
-        const assetClasses = Object.fromEntries(
-          [...meta.entries()].map(([iid, m]) => [iid, m.assetClass]),
-        );
-        const taxRate = effectiveCapitalGainsTaxRate(holder);
-        const forecastIncomeRestOfYear =
-          totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
-        const lossCarryForward = await lossCarryForwardFor(app, holder.id, year);
-
-        const holderAllowanceCap = new Decimal(holder.taxAllowanceAnnual ?? 1000);
-        const remainingToDistribute = Decimal.max(
-          new Decimal(0),
-          holderAllowanceCap.minus(totalAllocated),
-        );
-        const overAllocated = totalAllocated.gt(holderAllowanceCap);
-
-        const allowanceAnnual = holderAllowanceCap.toFixed(2);
-
-        const usage = allowanceUsageYTD({
-          tradeLog: mergedLog,
-          tfRates,
-          allowanceAnnual,
-          taxRate,
-          year,
-          forecastIncomeRestOfYear,
-          assetClasses,
-          lossCarryForward,
-        });
-        const suggestions = harvestSuggestions({
-          tradeLog: mergedLog,
-          tfRates,
-          allowanceAnnual,
-          taxRate,
-          year,
-          assetClasses,
-          usage,
-        });
-
-        return {
-          holder: {
-            id: holder.id,
-            name: holder.name,
-            taxAllowanceAnnual: holder.taxAllowanceAnnual,
-            capitalGainsTaxRate: holder.capitalGainsTaxRate,
-            churchTax: holder.churchTax,
-            taxResidence: holder.taxResidence,
-          },
-          year,
-          currency: display,
-          allowanceUsage: usage,
-          harvestSuggestions: suggestions.map((s) => ({
-            ...s,
-            instrument: meta.get(s.instrumentId) ?? null,
-          })),
-          tfRatesByInstrument: tfRates,
-          carryForwardApplied: true,
-          distribution: {
-            holderAllowanceCap: holderAllowanceCap.toFixed(2),
-            totalAllocated: totalAllocated.toFixed(2),
-            remainingToDistribute: remainingToDistribute.toFixed(2),
-            overAllocated,
-          },
-        };
-      });
+        },
+      );
       const result = perHolderResults.filter((r): r is NonNullable<typeof r> => r != null);
 
       request.timingName = "GET /networth/tax";
