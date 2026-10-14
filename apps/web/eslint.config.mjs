@@ -16,8 +16,8 @@ const colourMessage =
 
 // Arbitrary pixel/rem font sizes and radii bypass the named scale in `src/app/globals.css`
 // (@theme: text-micro/body-sm/body/heading/display/hero + xs/sm/base/lg, radius xs..xl).
-// Only literal px/rem values are matched, so `text-[clamp(...)]` and `text-[var(--x)]` pass.
-const SCALE_LITERAL = "\\b(?:text|rounded)-\\[[0-9.]+(?:px|rem)\\]";
+// Only literal px/rem/em values are matched, so `text-[clamp(...)]` and `text-[var(--x)]` pass.
+const SCALE_LITERAL = "\\b(?:text|rounded)-\\[[0-9.]+(?:px|rem|em)\\]";
 const scaleMessage =
   "No arbitrary text-[Npx]/rounded-[Npx] — use the named type/radius scale from globals.css @theme (text-micro/body-sm/body/heading/display/hero, text-xs..lg, rounded-xs..xl).";
 const scaleRules = [
@@ -75,9 +75,10 @@ const eslintConfig = [
     },
   },
   {
-    // The colour allowlist above must still obey the type/radius scale. Flat-config
-    // `no-restricted-syntax` entries replace (not merge), so this block carries only
-    // the scale rules for exactly the files the colour block skips.
+    // Scale-only block (each file here is exempt from the colour rule above for a concrete
+    // reason - meta theme-color, hash-derived hues - none of which excuse an off-scale size
+    // or radius). Flat-config `no-restricted-syntax` entries replace (not merge), so this
+    // block carries only the scale rules for exactly the files the colour block skips.
     files: colourAllowlist,
     rules: { "no-restricted-syntax": ["error", ...scaleRules] },
   },

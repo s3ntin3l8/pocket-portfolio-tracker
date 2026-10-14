@@ -36,7 +36,7 @@ const components: Components = {
   h3: ({ children }) => <p className="mb-1 mt-2 text-sm font-bold first:mt-0">{children}</p>,
   strong: ({ children }) => <strong className="font-bold">{children}</strong>,
   code: ({ children }) => (
-    <code className="rounded bg-background px-1 py-0.5 text-[0.85em]">{children}</code>
+    <code className="rounded bg-background px-1 py-0.5 text-micro">{children}</code>
   ),
   pre: ({ children }) => (
     <pre className="mb-2 overflow-x-auto rounded-lg bg-background p-3 text-xs last:mb-0">
