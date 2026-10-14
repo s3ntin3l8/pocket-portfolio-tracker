@@ -61,6 +61,9 @@ export const BUCKET_SUBTYPE_LABEL_KEY: Record<
  *  selectable via the bucket switcher, but still valid on an existing transaction being
  *  edited; see `SHARE_RECEIPT_TYPES`). */
 export function bucketForType(type: string): Bucket | null {
+  // Not a selectable Cash chip in `BUCKET_TYPES` (it's offered only when the portfolio has a
+  // loan), but it lives in the Cash bucket — so editing one shows that bucket active.
+  if (type === "loan_repayment") return "cash";
   for (const b of BUCKETS) {
     if ((BUCKET_TYPES[b] as readonly string[]).includes(type)) return b;
   }

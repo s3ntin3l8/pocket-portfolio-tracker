@@ -1738,6 +1738,13 @@
       "extrasMargin": "Add margin",
       "loanMargin": "Margin (sewa modal)",
       "extrasFeesTax": "Add fees / tax",
+      "loan": "Loan",
+      "loanNone": "Select a loan",
+      "loanRequired": "Choose the loan this repayment belongs to.",
+      "installment": "Installment",
+      "installmentNone": "None (whole loan)",
+      "installmentOption": "#{n} · due {date}",
+      "loanLinkLocked": "This installment was booked by the schedule, so its loan link can't be changed.",
       "customInstrumentToggle": "Can't find it? Add a custom instrument"
     },
     "reassign": "Reassign"

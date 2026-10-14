@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type {
   ApiClient,
   GoldSource,
+  LoanOption,
   Instrument,
   InstrumentSearchResult,
 } from "@portfolio/api-client";
@@ -37,6 +38,7 @@ export type AddTransactionClient = Pick<
   | "createTransaction"
   | "updateTransaction"
   | "getGoldSources"
+  | "listLoans"
 >;
 
 export interface AddTransactionInitial {
@@ -66,7 +68,13 @@ export interface AddTransactionInitial {
   kind?: string | null;
   source?: string | null;
   externalId?: string | null;
+  /** The cicilan loan / schedule installment a `loan_repayment` is linked to. */
+  loanId?: string | null;
+  installmentN?: number | null;
 }
+
+/** An installment/payoff booked by the schedule itself — its link to the loan is fixed. */
+const AUTO_BOOKED_LEG = /^loan:[^:]+:(inst:\d+|payoff)$/;
 
 export function useTransactionForm({
   client,
@@ -97,6 +105,12 @@ export function useTransactionForm({
     initial ? bucketForType(initial.type) : "trade",
   );
   const [kind, setKind] = useState(() => initial?.kind ?? "");
+  // Linking a manual loan repayment to a cicilan loan (and optionally one installment).
+  const [loans, setLoans] = useState<LoanOption[] | null>(null);
+  const [loanId, setLoanIdState] = useState(() => initial?.loanId ?? "");
+  const [installmentN, setInstallmentN] = useState<number | null>(
+    () => initial?.installmentN ?? null,
+  );
   const [currency, setCurrency] = useState(() => initial?.currency ?? "IDR");
   const [date, setDate] = useState(() => initial?.executedAt?.slice(0, 10) ?? "");
   const [quantity, setQuantity] = useState(() => initial?.quantity ?? "");
@@ -210,7 +224,46 @@ export function useTransactionForm({
   const feesLabelKey = isLoanRepayment ? "loanMargin" : "fees";
 
   const subTypeLabelKey = bucket ? BUCKET_SUBTYPE_LABEL_KEY[bucket] : "bucketSubtypeAction";
-  const subTypes = bucket ? BUCKET_TYPES[bucket] : [];
+  const openLoans = (loans ?? []).filter((l) => !l.closedAt);
+  // "Loan repayment" is a Cash chip only when there is a loan to link it to (or the row being
+  // edited already is one).
+  const subTypes: readonly string[] = !bucket
+    ? []
+    : bucket === "cash" && (openLoans.length > 0 || type === "loan_repayment")
+      ? [...BUCKET_TYPES.cash, "loan_repayment"]
+      : BUCKET_TYPES[bucket];
+  const isLoanRepaymentType = type === "loan_repayment";
+  const linkLocked = isEdit && AUTO_BOOKED_LEG.test(initial?.externalId ?? "");
+  // The loans list is needed as soon as the Cash bucket is open (it decides the chip).
+  const needLoans = bucket === "cash";
+  useEffect(() => {
+    if (!needLoans || loans !== null) return;
+    let live = true;
+    client
+      .listLoans(portfolioId)
+      .then((l) => live && setLoans(l))
+      .catch(() => live && setLoans([]));
+    return () => {
+      live = false;
+    };
+  }, [needLoans, loans, client, portfolioId]);
+  // A loan-linked row can only belong to one loan, which also fixes its currency.
+  const selectedLoan = (loans ?? []).find((l) => l.loanId === loanId) ?? null;
+  function setLoanId(id: string) {
+    setLoanIdState(id);
+    setInstallmentN(null);
+    const loan = (loans ?? []).find((l) => l.loanId === id);
+    if (loan) setCurrency(loan.currency);
+  }
+  function selectInstallment(n: number | null) {
+    setInstallmentN(n);
+    const row = selectedLoan?.installments.find((i) => i.n === n);
+    // Prefill what the schedule says is due, but never overwrite what the user typed.
+    if (row) {
+      if (!price) setPrice(row.principal);
+      if (!fees) setFees(row.margin);
+    }
+  }
 
   function setBucket(next: Bucket) {
     setBucketState(next);
@@ -341,6 +394,10 @@ export function useTransactionForm({
       setError(t("symbolRequired"));
       return;
     }
+    if (isLoanRepaymentType && !isEdit && !loanId) {
+      setError(t("loanRequired"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -376,6 +433,10 @@ export function useTransactionForm({
         source: (isEdit ? (initial?.source ?? "manual") : "manual") as
           "manual" | "screenshot" | "csv" | "pytr",
         externalId: isEdit ? (initial?.externalId ?? undefined) : undefined,
+        // Only a loan repayment carries a link (the API rejects one on any other type).
+        ...(isLoanRepaymentType
+          ? { loanId: loanId || null, installmentN: loanId ? installmentN : null }
+          : {}),
       };
       if (transactionId) {
         await client.updateTransaction(portfolioId, transactionId, payload);
@@ -401,6 +462,14 @@ export function useTransactionForm({
     setBucket,
     subTypeLabelKey,
     subTypes,
+    isLoanRepaymentType,
+    linkLocked,
+    loans: openLoans,
+    selectedLoan,
+    loanId,
+    setLoanId,
+    installmentN,
+    selectInstallment,
     kind,
     setKind,
     currency,

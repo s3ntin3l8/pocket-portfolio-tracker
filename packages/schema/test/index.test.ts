@@ -94,6 +94,43 @@ describe("transactionInputSchema", () => {
     expect(tx.executedAt).toBeInstanceOf(Date);
   });
 
+  it("only allows a loan link on a loan_repayment, and an installment only with a loan", () => {
+    const base = {
+      portfolioId: UUID,
+      price: "1000",
+      currency: "IDR",
+      executedAt: "2026-02-10T00:00:00.000Z",
+    };
+    const ok = transactionInputSchema.parse({
+      ...base,
+      type: "loan_repayment",
+      loanId: UUID,
+      installmentN: 2,
+    });
+    expect(ok).toMatchObject({ loanId: UUID, installmentN: 2 });
+    // null unlinks; omitted stays undefined (PATCH leaves a stored link alone).
+    expect(
+      transactionInputSchema.parse({ ...base, type: "loan_repayment", loanId: null }).loanId,
+    ).toBeNull();
+    expect(
+      transactionInputSchema.parse({ ...base, type: "loan_repayment" }).loanId,
+    ).toBeUndefined();
+    expect(() =>
+      transactionInputSchema.parse({ ...base, type: "deposit", loanId: UUID }),
+    ).toThrow();
+    expect(() =>
+      transactionInputSchema.parse({ ...base, type: "loan_repayment", installmentN: 2 }),
+    ).toThrow();
+    expect(() =>
+      transactionInputSchema.parse({
+        ...base,
+        type: "loan_repayment",
+        loanId: UUID,
+        installmentN: 0,
+      }),
+    ).toThrow();
+  });
+
   it("accepts kind and passes it through; omitting it leaves it undefined", () => {
     const withKind = transactionInputSchema.parse({
       portfolioId: UUID,

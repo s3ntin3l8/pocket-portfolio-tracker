@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { transactions, trResolvedEvents, dismissedAnomalies } from "@portfolio/db";
@@ -9,9 +9,24 @@ import { reassignTransactions } from "../../services/reassign.js";
 import { mergeTransactions, previewMerge, MergeBlockedError } from "../../services/merge.js";
 import { deleteReceiptsForTransactions } from "../../storage/receipts.js";
 import { ownedPortfolio } from "../helpers.js";
-import { onLoanLegsDeleted } from "../../services/loan-actions.js";
+import {
+  LoanActionError,
+  isAutoBookedLeg,
+  onLoanLegsDeleted,
+  validateLoanLink,
+} from "../../services/loan-actions.js";
 import type { PortfolioParams } from "./shared.js";
 import { bulkDeleteSchema } from "./shared.js";
+
+/** Run a loan-linking write; an invalid link is the caller's input, not a 500. */
+async function withLoanErrors<T>(reply: FastifyReply, fn: () => Promise<T>) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof LoanActionError) return reply.code(err.status).send({ error: err.code });
+    throw err;
+  }
+}
 
 export function registerCrudRoutes(app: FastifyInstance) {
   app.post<{ Params: PortfolioParams }>(
@@ -23,30 +38,45 @@ export function registerCrudRoutes(app: FastifyInstance) {
         ...(request.body as Record<string, unknown>),
         portfolioId,
       });
-      const [created] = await app.db
-        .insert(transactions)
-        .values({
-          portfolioId,
-          instrumentId: input.instrumentId ?? null,
-          type: input.type,
-          quantity: input.quantity,
-          price: input.price,
-          fees: input.fees,
-          tax: input.tax ?? null,
-          fxRate: input.fxRate ?? null,
-          perShare: input.perShare ?? null,
-          shares: input.shares ?? null,
-          nativeCurrency: input.nativeCurrency ?? null,
-          grossNative: input.grossNative ?? null,
-          description: input.description ?? null,
-          tags: input.tags ?? null,
-          currency: input.currency,
-          executedAt: input.executedAt,
-          source: input.source,
-          externalId: input.externalId,
-          kind: input.kind ?? null,
-        })
-        .returning();
+      const created = await withLoanErrors(reply, () =>
+        app.db.transaction(async (tx) => {
+          if (input.loanId) {
+            await validateLoanLink(tx, portfolioId, {
+              loanId: input.loanId,
+              installmentN: input.installmentN,
+              currency: input.currency,
+            });
+          }
+          const [row] = await tx
+            .insert(transactions)
+            .values({
+              portfolioId,
+              instrumentId: input.instrumentId ?? null,
+              type: input.type,
+              quantity: input.quantity,
+              price: input.price,
+              fees: input.fees,
+              tax: input.tax ?? null,
+              fxRate: input.fxRate ?? null,
+              perShare: input.perShare ?? null,
+              shares: input.shares ?? null,
+              nativeCurrency: input.nativeCurrency ?? null,
+              grossNative: input.grossNative ?? null,
+              description: input.description ?? null,
+              tags: input.tags ?? null,
+              currency: input.currency,
+              executedAt: input.executedAt,
+              source: input.source,
+              externalId: input.externalId,
+              kind: input.kind ?? null,
+              loanId: input.loanId ?? null,
+              installmentN: input.loanId ? (input.installmentN ?? null) : null,
+            })
+            .returning();
+          return row!;
+        }),
+      );
+      if (reply.sent) return reply;
       await enqueueRecompute(portfolioId, toDateKey(new Date(input.executedAt)));
       reply.code(201);
       return created;
@@ -126,38 +156,84 @@ export function registerCrudRoutes(app: FastifyInstance) {
         portfolioId,
       });
       const [previous] = await app.db
-        .select({ executedAt: transactions.executedAt })
+        .select({
+          executedAt: transactions.executedAt,
+          loanId: transactions.loanId,
+          installmentN: transactions.installmentN,
+          externalId: transactions.externalId,
+        })
         .from(transactions)
         .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
         .limit(1);
-      const [updated] = await app.db
-        .update(transactions)
-        .set({
-          instrumentId: input.instrumentId ?? null,
-          type: input.type,
-          quantity: input.quantity,
-          price: input.price,
-          fees: input.fees,
-          tax: input.tax ?? null,
-          fxRate: input.fxRate ?? null,
-          perShare: input.perShare ?? null,
-          shares: input.shares ?? null,
-          nativeCurrency: input.nativeCurrency ?? null,
-          grossNative: input.grossNative ?? null,
-          description: input.description ?? null,
-          tags: input.tags ?? null,
-          currency: input.currency,
-          executedAt: input.executedAt,
-          source: input.source,
-          externalId: input.externalId,
-          kind: input.kind ?? null,
-        })
-        .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
-        .returning();
+      if (!previous) {
+        return reply.code(404).send({ error: "transaction_not_found" });
+      }
+      // The link follows the row's type; an omitted loanId/installmentN leaves it as stored
+      // (a client that doesn't know about links must not wipe one), `null` unlinks.
+      const isRepayment = input.type === "loan_repayment";
+      const loanId = !isRepayment
+        ? null
+        : input.loanId === undefined
+          ? previous.loanId
+          : input.loanId;
+      const installmentN =
+        loanId === null
+          ? null
+          : input.installmentN !== undefined
+            ? input.installmentN
+            : loanId === previous.loanId
+              ? previous.installmentN
+              : null;
+      const linkChanged = loanId !== previous.loanId || installmentN !== previous.installmentN;
+      // An auto-booked installment/payoff is the schedule's own row; re-pointing it would
+      // desync it from its externalId and the schedule.
+      if (linkChanged && isAutoBookedLeg(previous.externalId)) {
+        return reply.code(409).send({ error: "loan_link_locked" });
+      }
+      const updated = await withLoanErrors(reply, () =>
+        app.db.transaction(async (tx) => {
+          if (linkChanged && loanId !== null) {
+            await validateLoanLink(tx, portfolioId, {
+              loanId,
+              installmentN,
+              currency: input.currency,
+              excludeTxId: txId,
+            });
+          }
+          const [row] = await tx
+            .update(transactions)
+            .set({
+              instrumentId: input.instrumentId ?? null,
+              type: input.type,
+              quantity: input.quantity,
+              price: input.price,
+              fees: input.fees,
+              tax: input.tax ?? null,
+              fxRate: input.fxRate ?? null,
+              perShare: input.perShare ?? null,
+              shares: input.shares ?? null,
+              nativeCurrency: input.nativeCurrency ?? null,
+              grossNative: input.grossNative ?? null,
+              description: input.description ?? null,
+              tags: input.tags ?? null,
+              currency: input.currency,
+              executedAt: input.executedAt,
+              source: input.source,
+              externalId: input.externalId,
+              kind: input.kind ?? null,
+              loanId,
+              installmentN,
+            })
+            .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
+            .returning();
+          return row;
+        }),
+      );
+      if (reply.sent) return reply;
       if (!updated) {
         return reply.code(404).send({ error: "transaction_not_found" });
       }
-      const fromDate = [previous?.executedAt, updated.executedAt]
+      const fromDate = [previous.executedAt, updated.executedAt]
         .filter((date): date is Date => date instanceof Date)
         .map(toDateKey)
         .sort()[0]!;

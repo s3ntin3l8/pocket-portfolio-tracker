@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { loans, transactions } from "@portfolio/db";
-import { loanBalances, toDateKey } from "@portfolio/core";
+import { loanBalances, summarizeGoldPlan, toDateKey } from "@portfolio/core";
 import type { DB } from "../db/client.js";
 import { toCoreTxns } from "./tx-core.js";
 import { bookDueInstallments, asScheduleRows } from "./loan-installments.js";
@@ -232,4 +232,129 @@ export async function reopenLoan(
   // `closedAt` is cleared and committed, so even if booking fails the next daily run books it.
   await bookDueInstallments(db, now, { loanId });
   await enqueueRecompute(portfolioId, closedAt);
+}
+
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+/** The externalId of an auto-booked installment (`bookDueInstallments`) — its link is fixed. */
+export const isAutoBookedLeg = (externalId: string | null | undefined) =>
+  externalId != null && /^loan:[^:]+:(inst:\d+|payoff)$/.test(externalId);
+
+/**
+ * Validate (and lock) the loan a manual `loan_repayment` is being linked to, inside the
+ * caller's db transaction. Takes the loan's row lock — the booking job, skip and payoff take
+ * the same one — so a link can't race the job into booking an installment twice. Paying a
+ * skipped installment clears its skip flag. `excludeTxId` is the row being edited, so
+ * re-saving an existing link isn't a conflict with itself.
+ */
+export async function validateLoanLink(
+  db: Exec,
+  portfolioId: string,
+  link: { loanId: string; installmentN?: number | null; currency: string; excludeTxId?: string },
+): Promise<void> {
+  const loan = await loadLoan(db, portfolioId, link.loanId, { lock: true });
+  if (loan.closedAt) throw new LoanActionError(409, "loan_closed");
+  if (link.currency !== loan.currency) throw new LoanActionError(400, "currency_mismatch");
+  const n = link.installmentN;
+  if (n == null) return;
+
+  const row = scheduleRow(loan, n);
+  const clashing = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.loanId, link.loanId),
+        eq(transactions.type, "loan_repayment"),
+        eq(transactions.installmentN, n),
+      ),
+    );
+  if (clashing.some((t) => t.id !== link.excludeTxId)) {
+    throw new LoanActionError(409, "installment_already_paid");
+  }
+  // Paying a skipped installment settles it, so it must not stay flagged as skipped.
+  await db
+    .update(loans)
+    .set({ schedule: withSkipped(loan.schedule, new Set([row.n]), false) })
+    .where(eq(loans.id, link.loanId));
+}
+
+export interface PortfolioLoanOption {
+  loanId: string;
+  provider: string | null;
+  contractNo: string | null;
+  currency: string;
+  closedAt: string | null;
+  installments: {
+    n: number;
+    dueDate: string;
+    principal: string;
+    margin: string;
+    status: "paid" | "skipped" | "overdue" | "upcoming" | "closed";
+  }[];
+}
+
+/** Picker feed for linking a manual repayment: each loan with its installments' status. */
+export async function listPortfolioLoans(
+  db: Exec,
+  portfolioId: string,
+  now: Date = new Date(),
+): Promise<PortfolioLoanOption[]> {
+  const loanRows = await db.select().from(loans).where(eq(loans.portfolioId, portfolioId));
+  if (loanRows.length === 0) return [];
+  const rows = await db
+    .select()
+    .from(transactions)
+    .where(
+      inArray(
+        transactions.loanId,
+        loanRows.map((l) => l.id),
+      ),
+    );
+  const legs = toCoreTxns(rows);
+  const today = isoDay(now);
+  return loanRows.map((l) => {
+    const plan = summarizeGoldPlan(
+      {
+        id: l.id,
+        instrumentId: l.instrumentId,
+        provider: l.provider,
+        contractNo: l.contractNo,
+        currency: l.currency,
+        purchasePrice: l.purchasePrice,
+        downPayment: l.downPayment,
+        principal: l.principal,
+        marginTotal: l.marginTotal,
+        tenorMonths: l.tenorMonths,
+        monthlyInstallment: l.monthlyInstallment,
+        startDate: l.startDate,
+        schedule: l.schedule,
+        closedAt: l.closedAt,
+      },
+      legs,
+      today,
+    );
+    return {
+      loanId: l.id,
+      provider: l.provider,
+      contractNo: l.contractNo,
+      currency: l.currency,
+      closedAt: l.closedAt,
+      installments: plan.schedule.map((r) => ({
+        n: r.n,
+        dueDate: r.dueDate,
+        principal: r.pokok,
+        margin: r.sewaModal,
+        status: r.paid
+          ? "paid"
+          : r.closed
+            ? "closed"
+            : r.skipped
+              ? "skipped"
+              : r.overdue
+                ? "overdue"
+                : "upcoming",
+      })),
+    };
+  });
 }
