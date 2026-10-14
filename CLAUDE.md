@@ -262,6 +262,10 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   fingerprint flags likely CSV-vs-PDF re-imports in the review screen, count-aware so
   genuine same-day repeats aren't suppressed). Raw screenshots are deleted after a
   confirmed parse (parsed JSON is kept).
+  AI-assisted entry (`propose_transactions` → `POST /imports/propose`) follows the same rule:
+  it only ever creates a draft import (parser `ai`, booked as `source="manual"` — never a
+  document, so it can be flagged a duplicate of another source but never enrich it). Write
+  tools are offered only to write-scoped credentials (`createTools(client, { write })`).
 - **Tests** live in each workspace's `test/`. The API uses an embedded **PGlite**
   Postgres (`pglite://` URLs) so tests need no external DB; `app.inject()` for routes.
 - Config is read from `app.config` (typed in `services/api/src/plugins/env.ts`), not

@@ -31,11 +31,13 @@ export function sourceTypeForDraft(d: ParsedTransaction, source: TxSource) {
         ? "pytr"
         : source === "ibkr"
           ? "ibkr"
-          : source === "screenshot"
-            ? "screenshot"
-            : source === "pdf"
-              ? "pdf"
-              : "csv"
+          : source === "manual"
+            ? "manual"
+            : source === "screenshot"
+              ? "screenshot"
+              : source === "pdf"
+                ? "pdf"
+                : "csv"
   ) as "pdf" | "pytr" | "ibkr" | "screenshot" | "csv" | "manual";
 }
 

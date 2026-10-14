@@ -9,5 +9,10 @@ export interface AiTool<S extends z.ZodType = z.ZodType> {
   title: string;
   description: string;
   inputSchema: S;
+  /**
+   * False for a tool that writes (only ever *draft* records the user confirms). Absent = read
+   * only. Write tools are offered only to write-scoped credentials.
+   */
+  readOnly?: boolean;
   handler: (input: z.infer<S>) => Promise<unknown>;
 }

@@ -44,7 +44,7 @@ const bodySchema = z
     message: "conversation must start and end with a user message",
   });
 
-function systemPrompt(scope: string | undefined): string {
+function systemPrompt(scope: string | undefined, canPropose: boolean): string {
   const viewing = !scope
     ? "unknown"
     : scope === "all"
@@ -59,6 +59,11 @@ function systemPrompt(scope: string | undefined): string {
     "- Use tools to get facts; answer only from tool results. If a tool returns { error }, say what could not be read instead of guessing.",
     "- Be concise. Reply in the language of the user's latest message. Quote amounts with their currency exactly as returned.",
     "- You explain; you do not give financial, tax or legal advice.",
+    ...(canPropose
+      ? [
+          "- If the user pastes a broker email, contract note or similar and wants it recorded, extract only what the text states and call propose_transactions. That creates a DRAFT for the user to review: never say it was added or booked, say it is waiting for their confirmation and link the review page. If a price, quantity or date is not in the text, ask instead of guessing.",
+        ]
+      : []),
     `- The user is currently viewing: ${viewing}. When that is a portfolio or holder, pass its id to tools rather than calling list_portfolios first.`,
     "",
     GLOSSARY,
@@ -196,6 +201,7 @@ export async function assistantRoute(app: FastifyInstance) {
 
       try {
         send("status", { provider: provider.name, local: provider.local });
+        const canWrite = request.user?.scope === "write";
         const client = createApiClient({
           baseUrl: "",
           fetch: injectFetch(app),
@@ -215,9 +221,10 @@ export async function assistantRoute(app: FastifyInstance) {
         let done: ChatEvent | null = null;
         await runChat({
           provider,
-          system: systemPrompt(body.data.scope),
+          system: systemPrompt(body.data.scope, canWrite),
           history,
-          tools: createTools(client),
+          // Draft-writing tools only for a write-scoped credential (never a read-only token).
+          tools: createTools(client, { write: canWrite }),
           signal: abort.signal,
           log: request.log,
           emit: (e: ChatEvent) => {

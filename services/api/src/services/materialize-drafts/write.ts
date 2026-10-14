@@ -112,6 +112,8 @@ export async function materializeDrafts(
     importId: string;
     status: TxStatus;
     isEu: boolean;
+    /** See `resolveDraftInstruments`: ISIN-bearing drafts take the EU path (AI-assisted entry). */
+    euWhenIsin?: boolean;
   },
 ): Promise<{
   written: TxRow[];
@@ -121,7 +123,7 @@ export async function materializeDrafts(
   collapsed: string[];
   matchedTransactionIds: string[];
 }> {
-  const { drafts, targetPortfolioId, source, importId, status, isEu } = args;
+  const { drafts, targetPortfolioId, source, importId, status, isEu, euWhenIsin } = args;
   if (drafts.length === 0)
     return {
       written: [],
@@ -132,7 +134,7 @@ export async function materializeDrafts(
       matchedTransactionIds: [],
     };
 
-  const resolved = await resolveDraftInstruments(ctx, drafts, { isEu });
+  const resolved = await resolveDraftInstruments(ctx, drafts, { isEu, euWhenIsin });
   const { enrichmentMatches, plainDuplicates } = await classifyDraftDuplicates(ctx, {
     resolved,
     targetPortfolioId,

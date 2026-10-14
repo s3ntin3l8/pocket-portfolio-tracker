@@ -58,6 +58,10 @@ export function withinDayTolerance(a: Date | string, b: Date | string): boolean 
  * preview endpoint and the upload-time annotator.
  */
 export function parserToTxSource(parser: string): string {
+  // AI-assisted entry (`propose_transactions`) is typed-in data the user confirms: it is a
+  // manual entry, not a file upload — it carries no document, so it can never "enrich" a
+  // committed row from another source (see classifyMatch).
+  if (parser === "ai") return "manual";
   if (parser === "pytr") return "pytr";
   if (parser === "ibkr") return "ibkr";
   if (parser === "dkb-pdf" || parser === "tr-pdf") return "pdf";

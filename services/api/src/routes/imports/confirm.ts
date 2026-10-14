@@ -131,15 +131,18 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
       const isIbkr = imp.parser === "ibkr";
       // pytr is its own source; DKB/TR PDFs get the new "pdf" source; IBKR gets "ibkr";
       // DKB-CSV and TR-CSV exports are CSV; everything else (LLM vision) is screenshot.
-      const source = isPytr
-        ? "pytr"
-        : isIbkr
-          ? "ibkr"
-          : isDkbPdf || isTrPdf
-            ? "pdf"
-            : imp.parser === "csv" || isDkb || isTrCsv
-              ? "csv"
-              : "screenshot";
+      const source =
+        imp.parser === "ai"
+          ? "manual" // AI-assisted entry: user-confirmed typed data, no document (see parserToTxSource)
+          : isPytr
+            ? "pytr"
+            : isIbkr
+              ? "ibkr"
+              : isDkbPdf || isTrPdf
+                ? "pdf"
+                : imp.parser === "csv" || isDkb || isTrCsv
+                  ? "csv"
+                  : "screenshot";
       // DKB, Trade Republic, and IBKR all carry ISINs in their exports — use the
       // OpenFIGI ISIN-resolution path for all of them.
       const isEu = isDkb || isPytr || isTrCsv || isDkbPdf || isTrPdf || isIbkr;
@@ -177,7 +180,11 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
 
       // Pass 1 — resolve each draft's instrument (best-effort, may hit the network). Done
       // OUTSIDE the transaction so a slow OpenFIGI/provider lookup never holds a DB tx open.
-      const resolved = await resolveDraftInstruments(app, drafts, { isEu });
+      // AI-assisted entry mixes instrument kinds: ISIN-bearing drafts take the EU/OpenFIGI path.
+      const resolved = await resolveDraftInstruments(app, drafts, {
+        isEu,
+        euWhenIsin: imp.parser === "ai",
+      });
 
       // Cross-source duplicate check (#196, hardened to a real backstop in #217, enrichment
       // classification added in #259): now that instruments are resolved, find drafts that

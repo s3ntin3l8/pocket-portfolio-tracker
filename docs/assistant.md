@@ -1,6 +1,7 @@
 # In-app assistant (chat)
 
-A chat that answers questions about **your own** portfolio. A model calls the same read-only tools the
+A chat that answers questions about **your own** portfolio. A model calls the same read-only tools (plus, for a
+write-scoped login, the draft-only `propose_transactions` — see [mcp.md](mcp.md#draft-only-write-tool)) the
 [MCP endpoint](mcp.md) serves (`packages/ai-tools`), in-process and with your own credentials, so per-user scoping,
 redaction (no account numbers/IBANs, no holder names, no memos) and the "model narrates, never computes" rules are
 identical. **Nothing is stored unless you opt in**: the conversation lives in the client, and only if you turn on
