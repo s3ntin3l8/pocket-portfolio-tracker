@@ -12,10 +12,13 @@ const KEYS = [
 ];
 let saved: Record<string, string | undefined>;
 beforeEach(() => {
+  // This file exercises the env-only (no DB) path, which keys off NODE_ENV=test.
+  vi.stubEnv("NODE_ENV", "test");
   saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
   for (const k of KEYS) delete process.env[k];
 });
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const k of KEYS) {
     if (saved[k] === undefined) delete process.env[k];
     else process.env[k] = saved[k];

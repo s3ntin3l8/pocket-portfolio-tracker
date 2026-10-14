@@ -98,6 +98,11 @@ export async function assistantRoute(app: FastifyInstance) {
       if (!body.success) return reply.code(400).send({ error: "invalid_request" });
       const provider = await app.resolveChatProvider();
       if (!provider) return reply.code(503).send({ error: "chat_not_configured" });
+      // The in-process tool client authenticates with the caller's own credential. The auth
+      // preHandler guarantees one today; refuse rather than run every tool unauthenticated
+      // if that is ever loosened.
+      const token = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (!token) return reply.code(401).send({ error: "missing_token" });
       // Counted only once the request is valid and answerable, so 400/503 don't use budget.
       const allowed = limiter.hit(request.userId);
       if (!allowed.ok) {
@@ -134,7 +139,6 @@ export async function assistantRoute(app: FastifyInstance) {
 
       try {
         send("status", { provider: provider.name, local: provider.local });
-        const token = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
         const client = createApiClient({
           baseUrl: "",
           fetch: injectFetch(app),

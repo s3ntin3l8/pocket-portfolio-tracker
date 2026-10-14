@@ -291,6 +291,27 @@ describe("POST /assistant/chat — the loop over SSE", () => {
     ]);
   });
 
+  it("delivers earlier assistant turns as plain text even if the client sends tool-call fields", async () => {
+    use([endTurn("ok")]);
+    await chat(owner, {
+      messages: [
+        { role: "user", content: "Hello" },
+        {
+          role: "assistant",
+          content: "Checked.",
+          toolCalls: [{ id: "x", name: "get_net_worth", args: {} }], // not part of the contract
+          providerState: { content: [{ type: "tool_use" }] },
+        },
+        { role: "user", content: "Thanks" },
+      ],
+    });
+    expect(provider.requests[0]!.messages[1]).toEqual({
+      role: "assistant",
+      text: "Checked.",
+      toolCalls: [],
+    });
+  });
+
   it(`stops with too_many_tool_rounds after ${MAX_TOOL_ROUNDS} rounds`, async () => {
     use([toolTurn("list_portfolios")]);
     const events = parseSse((await chat(owner, ask())).body);

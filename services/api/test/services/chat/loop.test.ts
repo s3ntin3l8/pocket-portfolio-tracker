@@ -325,4 +325,53 @@ describe("runChat", () => {
     expect(sent[0]!.content).toBe('{"error":"tool_failed"}');
     expect(JSON.stringify(sent)).not.toContain("secret stack");
   });
+
+  it("stops waiting for a slow tool once the client has gone, and asks the model nothing more", async () => {
+    const slow: AiTool = {
+      ...echo,
+      name: "slow",
+      handler: async () => {
+        await new Promise((r) => setTimeout(r, 1500)); // a derivation that can't be cancelled
+        return { done: true };
+      },
+    };
+    const ac = new AbortController();
+    const s = scripted([toolTurn(call("a", "slow", { n: 1 })), endTurn("never")]);
+    const started = Date.now();
+    const events: ChatEvent[] = [];
+    const running = runChat({
+      provider: s.provider,
+      system: "SYS",
+      history: [{ role: "user", content: "hi" }],
+      tools: [slow],
+      signal: ac.signal,
+      emit: (e) => events.push(e),
+    });
+    setTimeout(() => ac.abort(), 30); // the browser navigates away mid-tool
+    await running;
+    expect(Date.now() - started).toBeLessThan(1000); // did not wait for the 1.5 s handler
+    expect(s.calls()).toBe(1); // no further model call
+    expect(events.some((e) => e.type === "done")).toBe(false);
+  });
+
+  it("does not start calls that haven't begun once the client has gone", async () => {
+    let ran = 0;
+    const counting: AiTool = {
+      ...echo,
+      name: "count",
+      handler: async () => {
+        ran++;
+        return { ok: true };
+      },
+    };
+    const ac = new AbortController();
+    const s = scripted([
+      () => {
+        ac.abort(); // disconnect while the model is deciding on tools
+        return toolTurn(call("a", "count", { n: 1 }));
+      },
+    ]);
+    await run(s.provider, [counting], ac.signal);
+    expect(ran).toBe(0);
+  });
 });

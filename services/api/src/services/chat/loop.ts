@@ -84,7 +84,10 @@ export async function runChat(opts: RunChatOptions): Promise<void> {
     for (const p of prepared) {
       emit({ type: "tool_call", id: p.call.id, name: p.call.name, input: p.input });
     }
-    const outs = await Promise.all(prepared.map(execute));
+    const outs = await Promise.all(prepared.map((p) => execute(p, signal)));
+    // The client left while the tools ran: nothing is waiting for the answer, so stop here
+    // rather than feeding results to another model call.
+    if (signal?.aborted) return;
     messages.push({
       role: "tool",
       results: prepared.map((p, i) => finish(p, outs[i], budget, emit)),
@@ -113,11 +116,20 @@ function prepare(call: ChatToolCall, tools: AiTool[], index: number): Prepared {
   return { call, tool, input: parsed.data };
 }
 
-async function execute(p: Prepared): Promise<unknown> {
+/**
+ * Run one validated call. Once the client has gone we stop *waiting* for it (and don't start
+ * calls that haven't begun); an already-running handler can't be cancelled — it is an
+ * in-process API request — but its result is discarded, and the caps bound what it can cost.
+ */
+async function execute(p: Prepared, signal?: AbortSignal): Promise<unknown> {
   if (p.failure || !p.tool) return { error: p.failure ?? "unknown_tool" };
+  if (signal?.aborted) return { error: "aborted" };
+  const gone = new Promise<{ error: string }>((resolve) =>
+    signal?.addEventListener("abort", () => resolve({ error: "aborted" }), { once: true }),
+  );
   try {
     // The built-in handlers already turn API failures into `{ error, status }` and redact.
-    return await p.tool.handler(p.input);
+    return await Promise.race([p.tool.handler(p.input), gone]);
   } catch {
     return { error: "tool_failed" };
   }
