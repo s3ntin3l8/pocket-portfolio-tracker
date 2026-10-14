@@ -196,6 +196,9 @@ export function buildChatProvider(
  */
 export async function loadChatConfig(): Promise<ChatConfig> {
   if (process.env.NODE_ENV === "test") {
+    // Deliberately DB-free: tests of the env-only selection rely on it, and the pure
+    // resolveChatProviders / selectChatProvider tests build their own config. A test that
+    // needs the DB layer sets NODE_ENV to something else (see admin-chat-providers.test.ts).
     return { visionRows: [], chatRows: [], pinned: null, credentials: new Map() };
   }
   const db = getDb();
