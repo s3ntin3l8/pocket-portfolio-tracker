@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useApiClient } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
-import { bannerAnomalies, anomalyLabel, cn, type AnomalyTranslator } from "@/lib/utils";
+import { bannerAnomalies, reconciliationItem, cn, type AnomalyTranslator } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import { useLongPressSelect } from "@/lib/use-long-press-select";
 import { toast } from "sonner";
@@ -239,7 +239,13 @@ export function TransactionsTable({
     yearFilterProp != null ||
     draftFilter !== "all";
 
-  const portfolioAnomalies = useMemo(() => bannerAnomalies(anomalies), [anomalies]);
+  const reconciliationItems = useMemo(
+    () =>
+      bannerAnomalies(anomalies).map((a) =>
+        reconciliationItem(a, ta as AnomalyTranslator, locale, portfolioId),
+      ),
+    [anomalies, ta, locale, portfolioId],
+  );
 
   const monthFmt = useMemo(
     () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }),
@@ -481,23 +487,19 @@ export function TransactionsTable({
               />
             )}
             {showFilterBanners &&
-              portfolioAnomalies
-                .filter(
-                  (a) => !dismissedRecon.has(`${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`),
-                )
-                .map((a) => {
-                  const key = `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? ""}`;
-                  return (
-                    <ReconciliationBanner
-                      key={key}
-                      title={ta("reconciliationTitle")}
-                      detail={anomalyLabel(a, ta as AnomalyTranslator, locale)}
-                      tag={ta("portfolioTag")}
-                      dismissLabel={ta("dismiss")}
-                      onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(key))}
-                    />
-                  );
-                })}
+              reconciliationItems
+                .filter((item) => !dismissedRecon.has(item.key))
+                .map((item) => (
+                  <ReconciliationBanner
+                    key={item.key}
+                    title={item.title}
+                    detail={item.detail}
+                    tag={item.tag}
+                    dismissLabel={item.dismissLabel}
+                    action={item.action}
+                    onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(item.key))}
+                  />
+                ))}
           </div>
           <FilterBar
             typeFilter={typeFilter}

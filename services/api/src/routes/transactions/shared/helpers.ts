@@ -193,6 +193,27 @@ export async function corporateActionsFor(
   }));
 }
 
+/**
+ * A `position_gap` is detected from the broker feed, which only knows ISINs. Resolve each to
+ * the instrument so the banner can name it and link to its page — into `meta`, NOT
+ * `Anomaly.instrumentId`: that field marks an anomaly as belonging to one instrument's own
+ * transactions (the instrument page filters on it), and a portfolio-level gap isn't that.
+ * `instruments.isin` is unique, so a global lookup is exact. An unknown ISIN just stays as is.
+ */
+async function attachPositionGapInstruments(app: FastifyInstance, anomalies: Anomaly[]) {
+  const gaps = anomalies.filter((a) => a.code === "position_gap" && a.meta?.isin);
+  if (gaps.length === 0) return;
+  const found = await app.db
+    .select({ id: instruments.id, isin: instruments.isin, symbol: instruments.symbol })
+    .from(instruments)
+    .where(inArray(instruments.isin, [...new Set(gaps.map((a) => String(a.meta?.isin)))]));
+  const byIsin = new Map(found.map((i) => [i.isin, i]));
+  for (const a of gaps) {
+    const inst = byIsin.get(String(a.meta?.isin));
+    if (inst) a.meta = { ...a.meta, instrumentId: inst.id, symbol: inst.symbol };
+  }
+}
+
 export async function computePortfolioAnomalies(
   app: FastifyInstance,
   portfolio: { id: string; cashCounted: boolean; allowNegativeCash: boolean },
@@ -229,6 +250,13 @@ export async function computePortfolioAnomalies(
       allowNegativeCash: portfolio.allowNegativeCash,
       reconciliationGap: reconciliation ?? null,
     });
+    // Portfolio-level anomalies (broker reconciliation gaps) carry no transaction to point
+    // at; tag them with their portfolio so the aggregate view can tell them apart and link
+    // to the right place.
+    for (const a of anomalies) {
+      if (a.scope === "portfolio") a.meta = { ...a.meta, portfolioId: portfolio.id };
+    }
+    await attachPositionGapInstruments(app, anomalies);
     const dismissedSet = new Set(dismissed.map((d) => `${d.transactionId}:${d.code}`));
     const filtered = anomalies.filter(
       (a) => !(a.transactionId && dismissedSet.has(`${a.transactionId}:${a.code}`)),

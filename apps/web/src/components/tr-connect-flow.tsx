@@ -367,8 +367,9 @@ export function TrConnectFlow({
                       <span className="text-muted-foreground">
                         {t("reconcile.row", {
                           currency: c.currency,
-                          reported: c.reported,
-                          derived: c.derived,
+                          // 2 dp: the stored derived figure carries Decimal's full precision.
+                          reported: Number(c.reported).toFixed(2),
+                          derived: Number(c.derived).toFixed(2),
                         })}
                       </span>
                       <span className={off ? "text-destructive" : "text-muted-foreground"}>

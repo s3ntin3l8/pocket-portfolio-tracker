@@ -2184,12 +2184,15 @@
       "zero_price": "Harga nol: beli atau jual dicatat dengan harga Rp0",
       "reconciliation_gap": "Selisih rekonsiliasi kas vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
       "reconciliation_drift": "Selisih rekonsiliasi kas baru vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
-      "position_gap": "Selisih rekonsiliasi posisi vs. broker ({isin}: dilaporkan {reported}, dihitung {derived})"
+      "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})"
     },
     "noneTitle": "Tidak ada masalah data",
     "noneBody": "Semua transaksi konsisten.",
     "dismiss": "Tutup peringatan",
     "reconciliationTitle": "Kas tidak sesuai",
+    "reconciliationPositionTitle": "Posisi tidak sesuai",
+    "viewHolding": "Lihat kepemilikan",
+    "openConnection": "Buka koneksi",
     "portfolioTag": "Portofolio"
   },
   "PeriodSelector": {
