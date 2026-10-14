@@ -2651,6 +2651,7 @@
     },
     "errors": {
       "generic": "Terjadi kesalahan. Silakan coba lagi.",
+      "unauthorized": "Sesi Anda telah berakhir. Silakan masuk lagi.",
       "empty": "Asisten tidak memberikan jawaban. Silakan coba lagi.",
       "interrupted": "Koneksi terputus sebelum jawaban selesai.",
       "network": "Tidak dapat menghubungi asisten. Periksa koneksi Anda lalu coba lagi.",

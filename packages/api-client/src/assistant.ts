@@ -34,7 +34,8 @@ export type AssistantEvent =
   | { type: "error"; error: string; status?: number }
   | { type: "done"; rounds: number };
 
-/** A frame with no delimiter must not grow without bound (the server never sends one this big). */
+/** A frame with no delimiter must not grow without bound (the server never sends one this big).
+ *  Measured in UTF-16 code units (`string.length`), which is plenty for the threat model. */
 const MAX_FRAME_CHARS = 1_000_000;
 
 const EVENT_TYPES = new Set<AssistantEvent["type"]>([

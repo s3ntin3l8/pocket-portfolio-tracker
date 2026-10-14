@@ -87,6 +87,8 @@ export function errorKey(code: string): string {
 /** Map a failure before the stream started (HTTP status) or a network error to a key. */
 export function errorKeyFor(err: unknown): string {
   if (err instanceof ApiError) {
+    // The api client already routes a lost session to sign-in; this is the message while it does.
+    if (err.status === 401) return "unauthorized";
     if (err.status === 429) return "assistant_rate_limited";
     if (err.status === 503) return "chat_not_configured";
     if (err.status === 400) return "invalid_request";

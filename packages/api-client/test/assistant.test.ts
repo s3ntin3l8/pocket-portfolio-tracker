@@ -75,14 +75,14 @@ describe("parseAssistantStream", () => {
           enc.encode(
             frame("telemetry", { x: 1 }) +
               "event: message\ndata: {not json\n\n" +
-              "data: no event name\n\n" + // defaults to "message" but has no text field → still a message
+              "data: not json at all\n\n" + // no event name and not JSON → dropped, not fatal
               frame("done", { rounds: 1 }),
           ),
         ]),
       ),
     );
-    expect(events.at(-1)).toEqual({ type: "done", rounds: 1 });
-    expect(events.some((e) => (e.type as string) === "telemetry")).toBe(false);
+    // The unknown event and both unparseable frames are dropped; only `done` survives.
+    expect(events).toEqual([{ type: "done", rounds: 1 }]);
   });
 
   it("joins multi-line data fields", async () => {

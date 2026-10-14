@@ -93,7 +93,8 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
           }
         } finally {
           if (current()) {
-            const stopped = ac.signal.aborted;
+            // A Stop that lands after the answer already finished is not a stopped answer.
+            const stopped = ac.signal.aborted && !sawDone;
             abortRef.current = null;
             setStreaming(false);
             patchLast((t) => ({ ...t, pending: false, ...(stopped ? { stopped: true } : {}) }));

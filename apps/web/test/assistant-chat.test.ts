@@ -95,6 +95,7 @@ describe("error keys", () => {
   });
 
   it("maps pre-stream HTTP failures and network errors", () => {
+    expect(errorKeyFor(new ApiError(401, "{}"))).toBe("unauthorized");
     expect(errorKeyFor(new ApiError(429, "{}"))).toBe("assistant_rate_limited");
     expect(errorKeyFor(new ApiError(503, "{}"))).toBe("chat_not_configured");
     expect(errorKeyFor(new ApiError(400, "{}"))).toBe("invalid_request");

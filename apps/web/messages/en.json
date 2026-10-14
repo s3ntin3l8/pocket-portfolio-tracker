@@ -2651,6 +2651,7 @@
     },
     "errors": {
       "generic": "Something went wrong. Please try again.",
+      "unauthorized": "Your session has expired. Please sign in again.",
       "empty": "The assistant didn't return an answer. Please try again.",
       "interrupted": "The connection was interrupted before the answer finished.",
       "network": "Couldn't reach the assistant. Check your connection and try again.",
