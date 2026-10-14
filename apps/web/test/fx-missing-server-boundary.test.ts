@@ -25,10 +25,10 @@ describe("collectFxMissing server/client boundary", () => {
     expect(banner).not.toMatch(/export function collectFxMissing/);
   });
 
-  it("server pages import it from the lib module, not the banner", () => {
+  it("server pages/sections import it from the lib module, not the banner", () => {
     for (const page of [
       "src/app/[locale]/(app)/holdings/page.tsx",
-      "src/app/[locale]/(app)/reports/page.tsx",
+      "src/components/reports/reports-status.tsx",
       "src/app/[locale]/(app)/transactions/page.tsx",
     ]) {
       const src = read(page);
