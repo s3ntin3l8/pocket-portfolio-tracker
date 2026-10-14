@@ -63,6 +63,17 @@ describe("reconciliation anomaly labels", () => {
   });
 });
 
+describe("position gap without any identifier", () => {
+  it("never renders empty parentheses", () => {
+    const label = anomalyLabel(
+      { code: "position_gap", meta: { reported: "2", derived: "1" } },
+      ta,
+      "en",
+    );
+    expect(label).toContain("(—: reported 2, derived 1)");
+  });
+});
+
 describe("reconciliationItem", () => {
   it("titles a position gap as a position, links to the instrument, keys per portfolio", () => {
     const item = reconciliationItem(

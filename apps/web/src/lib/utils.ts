@@ -79,7 +79,7 @@ function reconciliationValues(
       if (n != null) values[key] = qty.format(n);
     }
     const isin = String(meta.isin ?? "");
-    values.instrument = meta.symbol ? `${String(meta.symbol)} · ${isin}` : isin;
+    values.instrument = meta.symbol ? `${String(meta.symbol)} · ${isin}` : isin || "—";
     return values;
   }
   const currency = String(meta.currency ?? "");
