@@ -125,7 +125,8 @@ export function AssistantDialog({
         e.preventDefault();
         submit();
       }}
-      className="flex items-end gap-2 border-t border-border bg-card px-4 py-3"
+      // The dialog's footer slot already provides the border and padding; the form just fills it.
+      className="flex w-full items-end gap-2"
     >
       <textarea
         value={draft}
@@ -165,9 +166,16 @@ export function AssistantDialog({
       <DialogContent size="md" mobileHeader={{ title: t("title") }} footer={composer}>
         <DialogHeader className="px-4 pt-4 md:px-6 md:pt-6">
           <div className="flex items-start justify-between gap-3">
-            <DialogTitle>{t("title")}</DialogTitle>
+            {/* The mobile header already shows the title; this stays as the one accessible name. */}
+            <DialogTitle className="sr-only md:not-sr-only">{t("title")}</DialogTitle>
             {chat.turns.length > 0 && (
-              <Button type="button" variant="ghost" size="sm" onClick={chat.reset}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={chat.reset}
+              >
                 <RotateCcw />
                 {t("newChat")}
               </Button>
