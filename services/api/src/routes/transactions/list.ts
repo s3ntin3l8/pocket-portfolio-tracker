@@ -62,6 +62,35 @@ function wantsArray(query: { page?: string }, all: boolean, ids: string[] | null
   return query.page === undefined && (all || ids !== null);
 }
 
+/** Drafts matching the non-status filters — the number behind the "Drafts only" chip. */
+async function countDrafts(app: FastifyInstance, conditions: SQL[]): Promise<number> {
+  const [r] = await app.db
+    .select({ count: count() })
+    .from(transactions)
+    .where(and(...conditions, eq(transactions.status, "draft")));
+  return Number(r?.count ?? 0);
+}
+
+/**
+ * `?all=1&fields=ids` — just `{ id, portfolioId, status }` for every matching row (capped
+ * at {@link ALL_ROWS_CAP}), skipping enrichment. Backs "select all N matching": the bulk
+ * endpoints take id lists, and enriching thousands of rows only to read their ids is waste.
+ */
+async function selectKeys(app: FastifyInstance, conditions: SQL[]) {
+  const fetched = await app.db
+    .select({
+      id: transactions.id,
+      portfolioId: transactions.portfolioId,
+      status: transactions.status,
+    })
+    .from(transactions)
+    .where(and(...conditions))
+    .orderBy(desc(transactions.executedAt))
+    .limit(ALL_ROWS_CAP + 1);
+  const truncated = fetched.length > ALL_ROWS_CAP;
+  return { rows: truncated ? fetched.slice(0, ALL_ROWS_CAP) : fetched, truncated };
+}
+
 export function registerListRoutes(app: FastifyInstance) {
   app.get<{
     Params: { portfolioId: string };
@@ -74,6 +103,8 @@ export function registerListRoutes(app: FastifyInstance) {
       q?: string;
       ids?: string;
       instrumentId?: string;
+      status?: string;
+      fields?: string;
       all?: string;
     };
   }>(
@@ -94,6 +125,7 @@ export function registerListRoutes(app: FastifyInstance) {
       const searchQuery = request.query.q;
       const idsFilter = parseIdsParam(request.query.ids);
       const instrumentIdFilter = request.query.instrumentId;
+      const draftsOnly = request.query.status === "draft";
       const paginate = !wantsArray(request.query, all, idsFilter);
 
       const conditions = [eq(transactions.portfolioId, request.params.portfolioId)];
@@ -120,6 +152,12 @@ export function registerListRoutes(app: FastifyInstance) {
   )`);
       }
 
+      // Rows/total honour the draft filter; the summary and `draftCount` do not (the chip
+      // count is "drafts matching the other filters", the summary is confirmed rows only).
+      const rowConditions = draftsOnly
+        ? [...conditions, eq(transactions.status, "draft")]
+        : conditions;
+
       if (paginate) {
         const ck = cacheKey(
           "transactions",
@@ -132,6 +170,7 @@ export function registerListRoutes(app: FastifyInstance) {
           searchQuery || "",
           instrumentIdFilter || "",
           idsFilter?.join(",") ?? "",
+          draftsOnly ? "draft" : "",
           request.portfolio.baseCurrency,
         );
         const cached = await withDerivationCache(transactionsCache, ck, async () => {
@@ -142,7 +181,7 @@ export function registerListRoutes(app: FastifyInstance) {
                 __total: sql<number>`count(*) over ()`,
               })
               .from(transactions)
-              .where(and(...conditions))
+              .where(and(...rowConditions))
               .orderBy(desc(transactions.executedAt))
               .limit(pageSize)
               .offset((page - 1) * pageSize),
@@ -166,7 +205,7 @@ export function registerListRoutes(app: FastifyInstance) {
             cnt = await app.db
               .select({ count: count() })
               .from(transactions)
-              .where(and(...conditions))
+              .where(and(...rowConditions))
               .then((r) => Number(r[0].count));
             _rows = [];
           }
@@ -187,19 +226,34 @@ export function registerListRoutes(app: FastifyInstance) {
         const yearConditions = [eq(transactions.portfolioId, request.params.portfolioId)];
         if (instrumentIdFilter)
           yearConditions.push(eq(transactions.instrumentId, instrumentIdFilter));
-        const years = await app.db
-          .select({ year: sql<number>`DISTINCT EXTRACT(YEAR FROM ${transactions.executedAt})` })
-          .from(transactions)
-          .where(and(...yearConditions))
-          .orderBy(sql`1 DESC`);
+        const [years, draftCount] = await Promise.all([
+          app.db
+            .select({ year: sql<number>`DISTINCT EXTRACT(YEAR FROM ${transactions.executedAt})` })
+            .from(transactions)
+            .where(and(...yearConditions))
+            .orderBy(sql`1 DESC`),
+          countDrafts(app, conditions),
+        ]);
         const yearList = years.map((r) => String(r.year));
-        return { rows: cached.rows, total: cached.total, summary: cached.summary, years: yearList };
+        return {
+          rows: cached.rows,
+          total: cached.total,
+          summary: cached.summary,
+          years: yearList,
+          draftCount,
+        };
+      }
+
+      if (request.query.fields === "ids") {
+        const keys = await selectKeys(app, rowConditions);
+        if (keys.truncated) reply.header("x-result-truncated", String(ALL_ROWS_CAP));
+        return keys.rows;
       }
 
       const fetched = await app.db
         .select()
         .from(transactions)
-        .where(and(...conditions))
+        .where(and(...rowConditions))
         .orderBy(desc(transactions.executedAt))
         .limit(ALL_ROWS_CAP + 1);
       const truncated = fetched.length > ALL_ROWS_CAP;
@@ -231,6 +285,8 @@ export function registerListRoutes(app: FastifyInstance) {
       q?: string;
       ids?: string;
       instrumentId?: string;
+      status?: string;
+      fields?: string;
       all?: string;
     };
   }>("/networth/transactions", { preHandler: app.authenticate }, async (request, reply) => {
@@ -246,6 +302,7 @@ export function registerListRoutes(app: FastifyInstance) {
     const searchQuery = request.query.q;
     const idsFilter = parseIdsParam(request.query.ids);
     const instrumentIdFilter = request.query.instrumentId;
+    const draftsOnly = request.query.status === "draft";
     const paginate = !wantsArray(request.query, all, idsFilter);
 
     const [pfs, [u]] = await Promise.all([
@@ -259,7 +316,7 @@ export function registerListRoutes(app: FastifyInstance) {
         .where(eq(users.id, id))
         .limit(1),
     ]);
-    if (pfs.length === 0) return paginate ? { rows: [], total: 0 } : [];
+    if (pfs.length === 0) return paginate ? { rows: [], total: 0, draftCount: 0 } : [];
 
     const displayCurrency = u?.displayCurrency ?? "IDR";
     const pfIds = pfs.map((p) => p.id);
@@ -289,6 +346,10 @@ export function registerListRoutes(app: FastifyInstance) {
         )`);
     }
 
+    const rowConditions = draftsOnly
+      ? [...conditions, eq(transactions.status, "draft")]
+      : conditions;
+
     if (paginate) {
       const ck = cacheKey(
         id,
@@ -300,6 +361,7 @@ export function registerListRoutes(app: FastifyInstance) {
         searchQuery ?? "",
         instrumentIdFilter ?? "",
         idsFilter?.join(",") ?? "",
+        draftsOnly ? "draft" : "",
         displayCurrency,
       );
       const cached = await withDerivationCache(networthTransactionsCache, ck, async () => {
@@ -310,7 +372,7 @@ export function registerListRoutes(app: FastifyInstance) {
               __total: sql<number>`count(*) over ()`,
             })
             .from(transactions)
-            .where(and(...conditions))
+            .where(and(...rowConditions))
             .orderBy(desc(transactions.executedAt))
             .limit(pageSize)
             .offset((page - 1) * pageSize),
@@ -326,7 +388,7 @@ export function registerListRoutes(app: FastifyInstance) {
           total = await app.db
             .select({ count: count() })
             .from(transactions)
-            .where(and(...conditions))
+            .where(and(...rowConditions))
             .then((r) => Number(r[0].count));
           rows = [];
         }
@@ -336,11 +398,14 @@ export function registerListRoutes(app: FastifyInstance) {
       const yearConditions = [inArray(transactions.portfolioId, pfIds)];
       if (instrumentIdFilter)
         yearConditions.push(eq(transactions.instrumentId, instrumentIdFilter));
-      const years = await app.db
-        .select({ year: sql<number>`DISTINCT EXTRACT(YEAR FROM ${transactions.executedAt})` })
-        .from(transactions)
-        .where(and(...yearConditions))
-        .orderBy(sql`1 DESC`);
+      const [years, draftCount] = await Promise.all([
+        app.db
+          .select({ year: sql<number>`DISTINCT EXTRACT(YEAR FROM ${transactions.executedAt})` })
+          .from(transactions)
+          .where(and(...yearConditions))
+          .orderBy(sql`1 DESC`),
+        countDrafts(app, conditions),
+      ]);
       const yearList = years.map((r) => String(r.year));
       request.timingMeta = {
         page,
@@ -353,13 +418,20 @@ export function registerListRoutes(app: FastifyInstance) {
         total: cached.total,
         summary: cached.summary,
         years: yearList,
+        draftCount,
       };
+    }
+
+    if (request.query.fields === "ids") {
+      const keys = await selectKeys(app, rowConditions);
+      if (keys.truncated) reply.header("x-result-truncated", String(ALL_ROWS_CAP));
+      return keys.rows;
     }
 
     const fetched = await app.db
       .select()
       .from(transactions)
-      .where(and(...conditions))
+      .where(and(...rowConditions))
       .orderBy(desc(transactions.executedAt))
       .limit(ALL_ROWS_CAP + 1);
     const truncated = fetched.length > ALL_ROWS_CAP;

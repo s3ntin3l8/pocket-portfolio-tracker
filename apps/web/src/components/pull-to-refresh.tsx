@@ -170,10 +170,12 @@ export function PullToRefresh({ children, scrollContainerRef }: PullToRefreshPro
         </div>
       )}
 
-      {/* Main content wrapper translated downward during pull */}
+      {/* Main content wrapper translated downward during pull. No transform at rest: even
+          `translateY(0)` makes this the containing block for `position: fixed` descendants
+          (the selection bar), pinning them to the content instead of the viewport. */}
       <div
         style={{
-          transform: `translateY(${pullDistance}px)`,
+          transform: pullDistance === 0 ? undefined : `translateY(${pullDistance}px)`,
           transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)",
         }}
       >

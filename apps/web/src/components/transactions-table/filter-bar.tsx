@@ -82,8 +82,7 @@ export function FilterBar({
     // doc comment: two `router.push()` calls in the same handler race against the same
     // stale `searchParams` snapshot and can resolve out of order (observed live as the
     // year filter silently reappearing after closing the sheet right after "Clear all").
-    onNavigateWithParam({ type: undefined, year: undefined });
-    onDraftFilterChange("all");
+    onNavigateWithParam({ type: undefined, year: undefined, status: undefined });
     if (showFlagged) onToggleFlagged();
   }
 

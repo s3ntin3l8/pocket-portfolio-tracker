@@ -22,6 +22,8 @@ import type { AddTransactionInitial } from "@/components/add-transaction-form";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
+import { cn } from "@/lib/utils";
+import { useAnyFullScreenOverlayOpen } from "@/components/full-screen-overlay";
 import {
   pickDefaultPortfolioId,
   effectiveScopeValue,
@@ -125,6 +127,7 @@ export function AddTransactionMenu({
   // bottom edge, off the top of the viewport, ever since #532 landed). `document` is
   // unavailable during SSR, so the portal only renders once mounted client-side.
   const [mounted, setMounted] = useState(false);
+  const overlayOpen = useAnyFullScreenOverlayOpen();
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
@@ -439,7 +442,12 @@ export function AddTransactionMenu({
         mounted &&
         createPortal(
           <Button
-            className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 size-14 rounded-[18px] shadow-lg md:hidden"
+            className={cn(
+              "fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 size-14 rounded-[18px] shadow-lg md:hidden",
+              // Selection mode (and any full-screen overlay) takes over the bottom edge, same
+              // as it does for BottomNav — the FAB would float over the selection bar.
+              overlayOpen && "hidden",
+            )}
             aria-label={tm("addTransaction")}
             onClick={() => onAddOpenChange(true)}
             onTouchStart={preloadAddMenuBodies}

@@ -4,6 +4,7 @@ import { ReassignDialog } from "@/components/reassign-dialog";
 import { MergeDialog } from "@/components/merge-dialog";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
 import type { TxRow } from "./types";
+import type { SelectionEntry } from "./bulk";
 
 export function ReassignMergeDialogs({
   reassignRows,
@@ -14,7 +15,7 @@ export function ReassignMergeDialogs({
   onCloseMerge,
   onMerged,
 }: {
-  reassignRows: TxRow[] | null;
+  reassignRows: SelectionEntry[] | null;
   onCloseReassign: () => void;
   portfolios: PickablePortfolio[];
   onConfirmReassign: (targetPortfolioId: string) => Promise<void>;

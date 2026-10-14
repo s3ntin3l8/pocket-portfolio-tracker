@@ -183,6 +183,7 @@ export function useTransactionPagination(
   portfolioId: string | undefined,
   showFlagged: boolean,
   instrumentId: string | undefined,
+  statusFilter?: "draft",
 ) {
   const [accumulatedRows, setAccumulatedRows] = useState<TxRow[]>(rows);
   const [currentPage, setCurrentPage] = useState(1);
@@ -214,6 +215,7 @@ export function useTransactionPagination(
           if (yearFilterProp) params.set("year", yearFilterProp);
           if (searchQuery) params.set("q", searchQuery);
           if (instrumentId) params.set("instrumentId", instrumentId);
+          if (statusFilter) params.set("status", statusFilter);
           const basePath = portfolioId
             ? `/api/backend/portfolios/${portfolioId}/transactions`
             : "/api/backend/networth/transactions";
@@ -238,6 +240,7 @@ export function useTransactionPagination(
       portfolioId,
       showFlagged,
       instrumentId,
+      statusFilter,
     ],
   );
 

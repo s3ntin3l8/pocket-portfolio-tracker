@@ -231,6 +231,8 @@ function paginated<R extends z.ZodType>(row: R) {
     // Absent for an empty networth scope (`{ rows: [], total: 0 }`).
     summary: transactionSummaryResponseSchema.optional(),
     years: z.array(z.string()).optional(),
+    /** Drafts matching the non-status filters (the "Drafts only" chip count). */
+    draftCount: z.number().optional(),
   });
 }
 

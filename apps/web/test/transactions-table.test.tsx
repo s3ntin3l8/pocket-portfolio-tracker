@@ -40,6 +40,13 @@ const mergeTransactions = vi.fn(async () => ({ survivorId: "m1" }));
 // its own fixture via `.mockImplementation`.
 const listTransactionsByIds = vi.fn(async (_portfolioId: string, _ids: string[]) => [] as TxRow[]);
 const listNetworthTransactionsByIds = vi.fn(async (_ids: string[]) => [] as TxRow[]);
+const listMatchingTransactionKeys = vi.fn(
+  async (_filters: Record<string, unknown>) =>
+    ({ rows: [], truncatedAt: null }) as {
+      rows: { id: string; portfolioId: string; status: string }[];
+      truncatedAt: number | null;
+    },
+);
 
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ refresh, push }),
@@ -60,6 +67,7 @@ const apiMock = {
   previewMergeTransactions,
   mergeTransactions,
   listTransactionsByIds,
+  listMatchingTransactionKeys,
   listNetworthTransactionsByIds,
   // Needed once the in-place EditTransactionSheet mounts its AddTransactionForm.
   getGoldSources: vi.fn(async () => []),
@@ -818,45 +826,79 @@ describe("TransactionsTable", () => {
       expect(screen.queryByRole("button", { name: md.discardDraft })).toBeNull();
     });
 
-    it("filters to drafts only via the draft filter", () => {
+    it("drafts filter writes ?status=draft to the URL (server-side filter)", () => {
+      push.mockClear();
       render(
         <NextIntlClientProvider locale="en" messages={messages}>
-          <TransactionsTable rows={[ROWS[0], { ...ROWS[1], status: "draft" }]} />
+          <TransactionsTable
+            rows={[ROWS[0], { ...ROWS[1], status: "draft" }]}
+            total={40}
+            draftCount={30}
+          />
+        </NextIntlClientProvider>,
+      );
+      // The chip count is the server's, not the 1 draft that happens to be loaded.
+      const draftSelect = screen.getByRole("combobox", {
+        name: messages.Transactions.filterDraftLabel,
+      });
+      expect(draftSelect).toHaveTextContent("Drafts only (30)");
+      fireEvent.change(draftSelect, { target: { value: "drafts" } });
+      expect(push).toHaveBeenCalledWith("/transactions?status=draft&page=1");
+    });
+
+    it("keeps the drafts chip (to leave the filter) when the server says zero drafts remain", () => {
+      push.mockClear();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={[]} total={0} draftCount={0} statusFilter="draft" />
         </NextIntlClientProvider>,
       );
       const draftSelect = screen.getByRole("combobox", {
         name: messages.Transactions.filterDraftLabel,
       });
-      fireEvent.change(draftSelect, { target: { value: "drafts" } });
-      const rows = screen.getAllByRole("row").slice(1);
-      expect(rows.length).toBe(1);
-      expect(rows[0]).toHaveTextContent("AAPL"); // t2 is the draft
+      expect(draftSelect).toHaveValue("drafts");
+      fireEvent.change(draftSelect, { target: { value: "all" } });
+      expect(push).toHaveBeenCalledWith("/transactions?page=1");
     });
 
-    it("auto-clears the draft filter when the last draft is confirmed", () => {
-      const draftRow = { ...ROWS[1], status: "draft" as const };
-      const { rerender } = render(
+    it("selects every server-side match (beyond the loaded rows) and bulk-acts on all of them", async () => {
+      bulkDeleteTransactions.mockClear();
+      listMatchingTransactionKeys.mockClear();
+      const keys = [
+        ...[ROWS[0], ROWS[1]].map((r) => ({
+          id: r.id,
+          portfolioId: r.portfolioId,
+          status: "draft",
+        })),
+        { id: "far-1", portfolioId: ROWS[0].portfolioId, status: "draft" },
+        { id: "far-2", portfolioId: ROWS[0].portfolioId, status: "draft" },
+      ];
+      listMatchingTransactionKeys.mockResolvedValueOnce({ rows: keys, truncatedAt: null });
+      render(
         <NextIntlClientProvider locale="en" messages={messages}>
-          <TransactionsTable rows={[ROWS[0], draftRow]} />
+          <TransactionsTable
+            rows={[ROWS[0], ROWS[1]].map((r) => ({ ...r, status: "draft" as const }))}
+            total={4}
+            statusFilter="draft"
+            draftCount={4}
+          />
         </NextIntlClientProvider>,
       );
-
-      // Filter to drafts only: just the one draft row is visible.
-      fireEvent.change(
-        screen.getByRole("combobox", { name: messages.Transactions.filterDraftLabel }),
-        { target: { value: "drafts" } },
-      );
-      expect(screen.getAllByRole("row").slice(1).length).toBe(1);
-
-      // Confirming the last draft → router.refresh re-feeds rows with no drafts.
-      rerender(
-        <NextIntlClientProvider locale="en" messages={messages}>
-          <TransactionsTable rows={[ROWS[0], ROWS[1]]} />
-        </NextIntlClientProvider>,
+      enterSelectionMode();
+      // Not offered until every loaded row is selected.
+      expect(screen.queryByRole("button", { name: /Select all 4 matching/ })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: tb.selectAllLoaded }));
+      fireEvent.click(screen.getByRole("button", { name: "Select all 4 matching" }));
+      await waitFor(() => expect(screen.getByText("4 selected")).toBeInTheDocument());
+      expect(listMatchingTransactionKeys).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "draft" }),
       );
 
-      // Filter auto-clears: all rows visible again instead of an empty "No results" list.
-      expect(screen.getAllByRole("row").slice(1).length).toBe(2);
+      fireEvent.click(screen.getByRole("button", { name: tb.delete }));
+      fireEvent.click(screen.getByRole("button", { name: tb.confirm }));
+      await waitFor(() => expect(bulkDeleteTransactions).toHaveBeenCalled());
+      const sent = bulkDeleteTransactions.mock.calls.flatMap((c: unknown[]) => c[1] as string[]);
+      expect(new Set(sent)).toEqual(new Set(keys.map((k) => k.id)));
     });
 
     it("batch-confirms only the selected draft rows", async () => {
@@ -2044,60 +2086,42 @@ describe("TransactionsTable", () => {
       vi.unstubAllGlobals();
     });
 
-    it("keeps Load more visible when drafts span multiple pages and not all are loaded", async () => {
-      // Page 1: 25 normal rows. Page 2: 15 drafts (total=40).
-      // Before loading page 2, accumulatedRows.length (25) < total (40) → Load More visible.
-      // After loading page 2, all drafts are accumulated → Load More hides.
-      const PAGE2_ONLY_DRAFTS: TxRow[] = Array.from({ length: 15 }, (_, i) => ({
-        id: `d25-${i}`,
-        portfolioId: "p1",
-        type: "buy" as const,
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        tax: null,
-        fxRate: null,
-        currency: "IDR",
-        executedAt: `2026-02-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`,
-        source: "csv" as const,
+    it("with ?status=draft, Load more pages through drafts only and sends status to the API", async () => {
+      // The server already narrowed rows/total to drafts: 40 drafts, 25 on page 1.
+      const draftRow = (i: number): TxRow => ({
+        ...PAGE1_ROWS[0],
+        id: `dr-${i}`,
         status: "draft" as const,
-        instrument: { symbol: `D25-${i}`, name: `Draft page2 ${i}` },
-      }));
-
+        instrument: { symbol: `DR${i}`, name: `Draft ${i}` },
+      });
+      const page1 = Array.from({ length: 25 }, (_, i) => draftRow(i));
+      const page2 = Array.from({ length: 15 }, (_, i) => draftRow(25 + i));
       const spy = vi.fn(async () => ({
-        json: async () => ({ rows: PAGE2_ONLY_DRAFTS, total: 40 }),
+        json: async () => ({ rows: page2, total: 40 }),
       })) as unknown as typeof fetch;
       vi.stubGlobal("fetch", spy);
 
       render(
         <NextIntlClientProvider locale="en" messages={messages}>
-          <TransactionsTable rows={PAGE1_ROWS} total={40} />
+          <TransactionsTable
+            rows={page1}
+            total={40}
+            draftCount={40}
+            statusFilter="draft"
+            portfolioId="p1"
+          />
         </NextIntlClientProvider>,
       );
+      expect(screen.getAllByRole("row").slice(1).length).toBe(25);
+      expect(screen.getByText(/Showing 25 of 40/)).toBeInTheDocument();
 
-      // Page 1 has 0 drafts — draft filter is hidden. Load more is visible because
-      // accumulatedRows.length (25) < total (40).
-      expect(screen.getByRole("button", { name: tb.loadMore })).toBeInTheDocument();
-
-      // Load page 2 (15 drafts).
       fireEvent.click(screen.getByRole("button", { name: tb.loadMore }));
       await waitFor(() => expect(spy).toHaveBeenCalled());
-
-      // accumulatedRows.length (40) === total (40) → all pages loaded.
-      // The draft filter now appears (15 drafts accumulated).
-      const draftSelect = screen.getByRole("combobox", {
-        name: messages.Transactions.filterDraftLabel,
-      });
-
-      // Switch to drafts filter — all 15 drafts are loaded and visible.
-      fireEvent.change(draftSelect, { target: { value: "drafts" } });
-
-      // All drafts fit in one page (15 < PAGE_SIZE=25) → Load more hides.
+      expect((spy as unknown as { mock: { calls: string[][] } }).mock.calls[0][0]).toContain(
+        "status=draft",
+      );
+      await waitFor(() => expect(screen.getAllByRole("row").slice(1).length).toBe(40));
       expect(screen.queryByRole("button", { name: tb.loadMore })).toBeNull();
-
-      // But all 15 drafts ARE visible in the table.
-      const rows = screen.getAllByRole("row").slice(1);
-      expect(rows.length).toBe(15);
 
       vi.unstubAllGlobals();
     });
