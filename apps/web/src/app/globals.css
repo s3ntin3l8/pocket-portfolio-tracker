@@ -424,3 +424,140 @@
     outline: none;
   }
 }
+
+/* ── Brand surfaces (onboarding) ─────────────────────────────────────────────────────
+   Onboarding is the one marketing-style screen: an always-dark-green brand panel with
+   gradients, glows and a wave illustration. Those need a few bespoke values that don't
+   belong in the app's semantic ramp, so they live here as a small NAMED set (and the
+   components consume them as utilities) instead of as literals scattered through the TSX.
+   Everything else on the screen uses the regular tokens (foreground, text-2, border, …).
+   Not for use outside components/onboarding. */
+:root {
+  --brand-mint: #38e1a4; /* accent on the dark brand panel: bullets, wave strokes, dots */
+  --brand-deep: #0b7d58; /* darker end of the primary-green card gradient */
+  --brand-grad: linear-gradient(150deg, #11211a 0%, #12271c 46%, #0e3123 100%);
+  --brand-grad-intro: linear-gradient(155deg, #0c1a13 0%, #0f2419 44%, #0b2e21 100%);
+  --onb-panel: #ffffff; /* form-side surface (dark: a hair darker than --background) */
+  --shadow-onb-menu: 0 16px 34px rgba(17, 33, 26, 0.14);
+}
+.dark {
+  --brand-grad: linear-gradient(150deg, #0c1a13 0%, #0f2419 46%, #0b2e21 100%);
+  --onb-panel: #121915;
+  --shadow-onb-menu: 0 16px 34px rgba(0, 0, 0, 0.5);
+}
+
+@theme inline {
+  --color-brand-mint: var(--brand-mint);
+  --color-brand-deep: var(--brand-deep);
+  --color-onb-panel: var(--onb-panel);
+
+  --shadow-onb-menu: var(--shadow-onb-menu);
+  /* Primary-green glows under CTAs / the done badge, derived from --primary. */
+  --shadow-cta: 0 8px 20px color-mix(in srgb, var(--primary) 28%, transparent);
+  --shadow-cta-lg: 0 12px 28px color-mix(in srgb, var(--primary) 40%, transparent);
+  --shadow-brand-card: 0 12px 30px color-mix(in srgb, var(--primary) 30%, transparent);
+  --shadow-done-badge: 0 14px 30px color-mix(in srgb, var(--primary) 34%, transparent);
+  /* Floating glass cards on the dark intro overlay. */
+  --shadow-float: 0 22px 48px rgb(0 0 0 / 0.4);
+}
+
+@theme {
+  /* Onboarding motion: step entrance, ambient glow drift, wave sway, floating card. */
+  --animate-step-in: onb-step-in 0.25s ease;
+  --animate-step-fade: onb-step-fade 0.4s ease both;
+  --animate-drift-glow: onb-drift 14s ease-in-out infinite;
+  --animate-drift-glow-rev: onb-drift 17s ease-in-out infinite reverse;
+  --animate-drift-glow-intro: onb-drift 13s ease-in-out infinite;
+  --animate-drift-glow-intro-rev: onb-drift 16s ease-in-out infinite reverse;
+  --animate-sway-brand: onb-step-in 0.25s ease, onb-sway 9s ease-in-out infinite;
+  --animate-sway-intro: onb-sway 15s ease-in-out infinite;
+  --animate-floaty: onb-floaty 5.5s ease-in-out infinite;
+}
+
+@keyframes onb-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes onb-step-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes onb-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(24px, -34px);
+  }
+}
+@keyframes onb-sway {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-14px, -26px) scale(1.035);
+  }
+}
+@keyframes onb-floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+/* Reduced motion: drop the ambient loops and entrance fades; layout/state is unchanged. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --animate-step-in: none;
+    --animate-step-fade: none;
+    --animate-drift-glow: none;
+    --animate-drift-glow-rev: none;
+    --animate-drift-glow-intro: none;
+    --animate-drift-glow-intro-rev: none;
+    --animate-sway-brand: none;
+    --animate-sway-intro: none;
+    --animate-floaty: none;
+  }
+}
+
+/* Brand gradients / glows as named utilities. Glows are drawn at full strength and dimmed
+   with the element's own `opacity-*`, so one gradient serves every intensity. */
+@utility bg-brand-panel {
+  background-image: var(--brand-grad);
+}
+@utility bg-brand-intro {
+  background-image: var(--brand-grad-intro);
+}
+@utility bg-brand-card {
+  background-image: linear-gradient(160deg, var(--primary), var(--brand-deep));
+}
+@utility bg-brand-card-glass {
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--primary) 92%, transparent),
+    color-mix(in srgb, var(--brand-deep) 92%, transparent)
+  );
+}
+@utility bg-glow-primary {
+  background-image: radial-gradient(circle, var(--primary), transparent 70%);
+}
+@utility bg-glow-mint {
+  background-image: radial-gradient(circle, var(--brand-mint), transparent 70%);
+}

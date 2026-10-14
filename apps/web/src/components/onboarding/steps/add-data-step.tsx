@@ -1,5 +1,4 @@
 import { Icon, ICONS } from "../icon";
-import type { OnboardingTheme } from "../theme";
 
 export type AddDataCardKey = "connect" | "import" | "manual" | "skip";
 
@@ -25,11 +24,9 @@ export interface AddDataCopy {
  *  flow — connect/import/manual/skip are genuinely distinct destinations here, unlike
  *  the design's stub which jumps every card straight to Done). */
 export function AddDataStep({
-  th,
   copy,
   onSelect,
 }: {
-  th: OnboardingTheme;
   copy: AddDataCopy;
   onSelect: (key: AddDataCardKey) => void;
 }) {
@@ -41,55 +38,20 @@ export function AddDataStep({
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="flex flex-col gap-2.5">
       {cards.map((c) => (
         <button
           key={c.key}
           type="button"
           onClick={() => onSelect(c.key)}
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 13,
-            textAlign: "left",
-            width: "100%",
-            border: `1px solid ${th.dividerLine}`,
-            borderRadius: 14,
-            padding: 16,
-            background: th.cardBg,
-            cursor: "pointer",
-            transition: "border-color .15s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#0E9F6E")}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = th.dividerLine)}
+          className="flex w-full cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary"
         >
-          <span
-            style={{
-              width: 36,
-              height: 36,
-              flexShrink: 0,
-              borderRadius: 10,
-              background: th.chipBg,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon d={CARD_ICONS[c.key]} size={17} stroke={th.kicker} />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-muted">
+            <Icon d={CARD_ICONS[c.key]} size={17} className="text-success" />
           </span>
           <span>
-            <div style={{ font: "700 14px 'Plus Jakarta Sans'", color: th.headColor }}>
-              {c.title}
-            </div>
-            <div
-              style={{
-                font: "500 12.5px/1.4 'Plus Jakarta Sans'",
-                color: th.subColor,
-                marginTop: 2,
-              }}
-            >
-              {c.desc}
-            </div>
+            <div className="text-sm font-bold text-foreground">{c.title}</div>
+            <div className="mt-0.5 text-xs/snug font-medium text-text-2">{c.desc}</div>
           </span>
         </button>
       ))}

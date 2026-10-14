@@ -8,6 +8,7 @@ import type { Portfolio } from "@portfolio/api-client";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { ImportTasksProvider } from "@/components/import-tasks-provider";
@@ -17,7 +18,7 @@ import {
   LazyNewEntryTabs as NewEntryTabs,
 } from "@/components/add-transaction-menu/lazy-bodies";
 import { Icon, ICONS } from "./icon";
-import { resolveTheme } from "./theme";
+import { BrandLogo } from "./brand-logo";
 import { BrandPanel } from "./brand-panel";
 import { MobileBackdrop } from "./mobile-backdrop";
 import { MobileIntro } from "./mobile-intro";
@@ -29,7 +30,6 @@ import { PortfolioStep } from "./steps/portfolio-step";
 import { AddDataStep, type AddDataCardKey } from "./steps/add-data-step";
 import { AddDataTrConnect } from "./steps/add-data-tr";
 import { DoneStep } from "./steps/done-step";
-import styles from "./onboarding.module.css";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -81,7 +81,6 @@ export function OnboardingFlow() {
   const [manualTab, setManualTab] = useState<NewEntryTab>("transaction");
   const [exiting, setExiting] = useState(false);
 
-  const th = resolveTheme(isDark, isDesktop);
   const isDone = step === 5;
   const showChrome = !isDone;
   // Verbatim `step > 0 && step < 5` from the design — this also covers the TR
@@ -291,40 +290,6 @@ export function OnboardingFlow() {
 
   const isMobileIntro = !isDesktop && !mIntroDone;
 
-  const rootStyle = {
-    height: "100dvh",
-    width: "100%",
-    display: "flex",
-    flexDirection: isDesktop ? ("row" as const) : ("column" as const),
-    background: th.pageBg,
-    position: "relative" as const,
-    overflow: "hidden" as const,
-  };
-
-  const contentWrap = isDesktop
-    ? {
-        flex: "1 1 56%",
-        minWidth: 0,
-        background: th.panelBg,
-        display: "flex",
-        flexDirection: "column" as const,
-        justifyContent: "center",
-        padding: "48px 6vw",
-        position: "relative" as const,
-        overflowY: "auto" as const,
-      }
-    : {
-        flex: 1,
-        minWidth: 0,
-        background: isDark ? th.brandGrad : th.pageBg,
-        display: "flex",
-        flexDirection: "column" as const,
-        justifyContent: "flex-start",
-        padding: "26px 20px 46px",
-        position: "relative" as const,
-        overflowY: "auto" as const,
-      };
-
   const targetPortfolios = createdPortfolio
     ? [
         {
@@ -338,20 +303,18 @@ export function OnboardingFlow() {
 
   return (
     <ImportTasksProvider>
-      <div className="pk" style={rootStyle}>
+      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white md:flex-row dark:bg-background">
         {isDesktop && (
           <ThemeTogglePill
-            th={th}
             isDark={isDark}
             label={themeToggleLabel}
             onToggle={toggleTheme}
-            style={{ position: "absolute", top: 22, right: 22, zIndex: 5 }}
+            className="absolute top-5.5 right-5.5 z-5"
           />
         )}
 
         {isDesktop && (
           <BrandPanel
-            th={th}
             step={step}
             stepTitle={stepTitle}
             brandHeadline={brandContent.h}
@@ -360,66 +323,30 @@ export function OnboardingFlow() {
           />
         )}
 
-        <div style={contentWrap}>
-          {!isDesktop && <MobileBackdrop isDark={isDark} />}
+        <div className="relative flex min-w-0 flex-1 flex-col justify-start overflow-y-auto bg-white px-5 pt-6 pb-11 max-md:dark:bg-brand-panel md:flex-[1_1_56%] md:justify-center md:bg-onb-panel md:px-[6vw] md:py-12">
+          {!isDesktop && <MobileBackdrop />}
 
-          <div style={{ width: "100%", maxWidth: 420, margin: "0 auto", position: "relative" }}>
+          <div className="relative mx-auto w-full max-w-105">
             {!isDesktop && (
-              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 22 }}>
-                <span
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 10,
-                    background: "#0E9F6E",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon d={ICONS.wallet} size={17} stroke="#fff" />
-                </span>
-                <span style={{ font: "800 16px 'Plus Jakarta Sans'", color: th.headColor }}>
-                  Pocket
-                </span>
+              <div className="mb-5.5 flex items-center">
+                <BrandLogo size="sm" className="text-foreground" />
                 <ThemeTogglePill
-                  th={th}
                   isDark={isDark}
                   label={themeToggleLabel}
                   onToggle={toggleTheme}
-                  style={{ marginLeft: "auto" }}
+                  className="ml-auto"
                 />
               </div>
             )}
 
             {showChrome ? (
               <>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 18,
-                    minHeight: 28,
-                  }}
-                >
+                <div className="mb-4.5 flex min-h-7 items-center justify-between">
                   {showBack ? (
                     <button
                       type="button"
                       onClick={handleBack}
-                      className="touch-target"
-                      style={{
-                        position: "relative",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 5,
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        font: "700 13px 'Plus Jakarta Sans'",
-                        color: th.labelColor,
-                      }}
+                      className="touch-target relative flex cursor-pointer items-center gap-[5px] text-body-sm font-bold text-text-mute"
                     >
                       <Icon d={ICONS.back} size={15} strokeWidth={2.2} />
                       {t("back")}
@@ -431,70 +358,37 @@ export function OnboardingFlow() {
                     type="button"
                     onClick={() => void handleSkipSetup()}
                     disabled={exiting}
-                    className="touch-target"
-                    style={{
-                      position: "relative",
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      font: "600 13px 'Plus Jakarta Sans'",
-                      color: th.dividerText,
-                    }}
+                    className="touch-target relative cursor-pointer text-body-sm font-semibold text-text-3"
                   >
                     {t("skipSetup")}
                   </button>
                 </div>
 
-                <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+                <div className="mb-6 flex gap-1.5">
                   {[0, 1, 2, 3, 4].map((i) => (
                     <span
                       key={i}
-                      style={{
-                        width: 22,
-                        height: 5,
-                        borderRadius: 999,
-                        background: i <= step ? th.dotOn : th.dotOff,
-                        transition: "background .2s",
-                      }}
+                      className={cn(
+                        "h-1.25 w-5.5 rounded-full transition-colors duration-200",
+                        i <= step ? "bg-primary" : "bg-input",
+                      )}
                     />
                   ))}
                 </div>
 
-                <div key={stepTitle} className={styles.stepAnim}>
-                  <div
-                    style={{
-                      font: "700 12px 'Plus Jakarta Sans'",
-                      letterSpacing: ".14em",
-                      textTransform: "uppercase",
-                      color: th.kicker,
-                    }}
-                  >
+                <div key={stepTitle} className="animate-step-in">
+                  <div className="text-xs font-bold tracking-[0.14em] text-success uppercase">
                     {stepKickerByIndex[step]}
                   </div>
-                  <h2
-                    style={{
-                      font: "800 26px 'Plus Jakarta Sans'",
-                      color: th.headColor,
-                      margin: "10px 0 6px",
-                      letterSpacing: "-.01em",
-                    }}
-                  >
+                  <h2 className="mt-2.5 mb-1.5 text-2xl font-extrabold tracking-tight text-foreground">
                     {stepTitle}
                   </h2>
-                  <p
-                    style={{
-                      font: "500 14px/1.55 'Plus Jakarta Sans'",
-                      color: th.subColor,
-                      margin: "0 0 26px",
-                    }}
-                  >
+                  <p className="mb-6.5 text-sm/relaxed font-medium text-text-2">
                     {stepSubByIndex[step]}
                   </p>
 
                   {step === 0 && (
                     <WelcomeStep
-                      th={th}
                       copy={{
                         previewLabel: t("welcome.previewLabel"),
                         previewValue: t("welcome.previewValue"),
@@ -529,7 +423,6 @@ export function OnboardingFlow() {
 
                   {step === 1 && (
                     <HolderStep
-                      th={th}
                       copy={{
                         nameLabel: t("holder.nameLabel"),
                         namePlaceholder: t("holder.namePlaceholder"),
@@ -554,7 +447,6 @@ export function OnboardingFlow() {
 
                   {step === 2 && (
                     <TaxStep
-                      th={th}
                       options={[
                         { code: "DE", name: t("tax.de.name"), desc: t("tax.de.desc") },
                         { code: "ID", name: t("tax.id.name"), desc: t("tax.id.desc") },
@@ -566,8 +458,6 @@ export function OnboardingFlow() {
 
                   {step === 3 && (
                     <PortfolioStep
-                      th={th}
-                      isDark={isDark}
                       copy={{
                         nameLabel: t("portfolio.nameLabel"),
                         namePlaceholder: t("portfolio.namePlaceholder"),
@@ -610,7 +500,6 @@ export function OnboardingFlow() {
 
                   {step === 4 && addDataView === "cards" && (
                     <AddDataStep
-                      th={th}
                       copy={{
                         connectTitle: t("addData.connectTitle"),
                         connectDesc: t("addData.connectDesc"),
@@ -627,7 +516,6 @@ export function OnboardingFlow() {
 
                   {step === 4 && addDataView === "tr" && createdPortfolio && (
                     <AddDataTrConnect
-                      th={th}
                       api={api}
                       portfolioId={createdPortfolio.id}
                       cashCounted={cashCounted}
@@ -642,23 +530,10 @@ export function OnboardingFlow() {
                       type="button"
                       onClick={handlePrimaryCta}
                       disabled={creating}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 7,
-                        font: "700 15px 'Plus Jakarta Sans'",
-                        color: "#fff",
-                        background: "#0E9F6E",
-                        border: "none",
-                        borderRadius: 13,
-                        padding: 15,
-                        cursor: creating ? "default" : "pointer",
-                        marginTop: 8,
-                        boxShadow: "0 8px 20px rgba(14,159,110,.28)",
-                        opacity: creating ? 0.7 : 1,
-                      }}
+                      className={cn(
+                        "mt-2 flex w-full items-center justify-center gap-[7px] rounded-lg bg-primary p-[15px] text-body font-bold text-white shadow-cta",
+                        creating ? "cursor-default opacity-70" : "cursor-pointer",
+                      )}
                     >
                       {creating ? <Spinner size="sm" /> : primaryCtaLabel}
                       {!creating && <Icon d={ICONS.arrowRight} size={16} strokeWidth={2.2} />}
@@ -668,7 +543,6 @@ export function OnboardingFlow() {
               </>
             ) : (
               <DoneStep
-                th={th}
                 copy={{
                   heading: t("done.heading"),
                   readySub: t("done.readySub"),
@@ -729,8 +603,8 @@ export function OnboardingFlow() {
           app-wide Add-transaction sheet uses), scoped to the portfolio just created. */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent size="lg" mobileHeader={{ title: t("addData.importSheetTitle") }}>
-          <div className="p-5 md:p-[26px]">
-            <DialogTitle className="hidden text-[19px] font-extrabold md:mb-3 md:block">
+          <div className="p-5 md:p-6">
+            <DialogTitle className="hidden text-xl font-extrabold md:mb-3 md:block">
               {t("addData.importSheetTitle")}
             </DialogTitle>
             {importOpen && createdPortfolio && (
@@ -759,8 +633,8 @@ export function OnboardingFlow() {
           mobileHeader={{ title: t("addData.manualSheetTitle") }}
           footer={true}
         >
-          <div className="p-5 md:p-[26px]">
-            <DialogTitle className="hidden text-[19px] font-extrabold md:mb-3 md:block">
+          <div className="p-5 md:p-6">
+            <DialogTitle className="hidden text-xl font-extrabold md:mb-3 md:block">
               {t("addData.manualSheetTitle")}
             </DialogTitle>
             {manualOpen && createdPortfolio && (

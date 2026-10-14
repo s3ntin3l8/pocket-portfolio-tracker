@@ -1,5 +1,5 @@
 import { Icon, ICONS } from "../icon";
-import { cardStyle, type OnboardingTheme } from "../theme";
+import { choiceCardClass } from "../choice-card";
 
 export interface TaxOptionCopy {
   code: "DE" | "ID";
@@ -9,18 +9,16 @@ export interface TaxOptionCopy {
 
 /** Step 2 — Tax regime: DE / ID selectable cards. */
 export function TaxStep({
-  th,
   options,
   taxRegime,
   onSelect,
 }: {
-  th: OnboardingTheme;
   options: TaxOptionCopy[];
   taxRegime: "DE" | "ID";
   onSelect: (regime: "DE" | "ID") => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
+    <div className="mb-6.5 flex flex-col gap-2.5">
       {options.map((o) => {
         const selected = o.code === taxRegime;
         return (
@@ -28,43 +26,20 @@ export function TaxStep({
             key={o.code}
             type="button"
             onClick={() => onSelect(o.code)}
-            style={cardStyle(th, selected)}
+            className={choiceCardClass(selected)}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span
-                  style={{
-                    font: "700 12px 'DM Mono',ui-monospace,monospace",
-                    color: th.kicker,
-                    background: th.chipBg,
-                    borderRadius: 7,
-                    padding: "4px 8px",
-                  }}
-                >
+            <div className="flex items-center justify-between gap-2.5">
+              <span className="flex items-center gap-2.5">
+                <span className="rounded-xs bg-muted px-2 py-1 font-mono text-xs font-bold text-success">
                   {o.code}
                 </span>
-                <span style={{ font: "700 14.5px 'Plus Jakarta Sans'", color: th.headColor }}>
-                  {o.name}
-                </span>
+                <span className="text-sm font-bold text-foreground">{o.name}</span>
               </span>
-              {selected && <Icon d={ICONS.check} size={18} stroke="#0E9F6E" strokeWidth={2.4} />}
+              {selected && (
+                <Icon d={ICONS.check} size={18} strokeWidth={2.4} className="text-primary" />
+              )}
             </div>
-            <p
-              style={{
-                font: "500 12.5px/1.5 'Plus Jakarta Sans'",
-                color: th.subColor,
-                margin: "8px 0 0",
-              }}
-            >
-              {o.desc}
-            </p>
+            <p className="mt-2 text-xs/normal font-medium text-text-2">{o.desc}</p>
           </button>
         );
       })}

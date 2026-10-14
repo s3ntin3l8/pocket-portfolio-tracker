@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { Icon, ICONS } from "./icon";
-import styles from "./onboarding.module.css";
+import { BrandLogo } from "./brand-logo";
+import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
@@ -75,74 +76,36 @@ export function MobileIntro({
   const curGlyph = SLIDE_GLYPHS[slide];
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 50,
-        background: "linear-gradient(155deg,#0c1a13 0%,#0f2419 44%,#0b2e21 100%)",
-        color: "#fff",
-        display: "flex",
-        flexDirection: "column",
-        padding: "56px 28px 34px",
-        fontFamily: "'Plus Jakarta Sans',sans-serif",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        className={styles.driftGlowIntro}
-        style={{
-          position: "absolute",
-          right: "-110px",
-          top: "-90px",
-          width: 320,
-          height: 320,
-          borderRadius: "50%",
-          background: "radial-gradient(circle,rgba(14,159,110,.34),transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        className={styles.driftGlowIntroReverse}
-        style={{
-          position: "absolute",
-          left: "-120px",
-          bottom: "-140px",
-          width: 340,
-          height: 340,
-          borderRadius: "50%",
-          background: "radial-gradient(circle,rgba(56,225,164,.12),transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-brand-intro px-7 pt-14 pb-8.5 text-white">
+      <div className="pointer-events-none absolute -top-22.5 -right-27.5 size-80 animate-drift-glow-intro rounded-full bg-glow-primary opacity-34" />
+      <div className="pointer-events-none absolute -bottom-35 -left-30 size-85 animate-drift-glow-intro-rev rounded-full bg-glow-mint opacity-12" />
       <svg
         width="100%"
         height="100%"
         viewBox="0 0 400 844"
         preserveAspectRatio="none"
-        className={styles.swayWaveIntro}
-        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+        className="pointer-events-none absolute inset-0 animate-sway-intro"
         aria-hidden
       >
         <path
           d="M0,430 C55,375 110,455 165,365 C220,275 275,375 330,295 C365,240 400,275 400,245 L400,844 L0,844 Z"
-          fill="#fff"
+          className="fill-white"
           fillOpacity=".06"
         />
         <path
           d="M0,520 C65,465 130,545 195,455 C260,365 315,445 370,365 C388,340 400,350 400,330 L400,844 L0,844 Z"
-          fill="#38E1A4"
+          className="fill-brand-mint"
           fillOpacity=".10"
         />
         <path
           d="M0,610 C65,560 130,630 195,550 C260,470 315,550 370,490 C388,465 400,480 400,450 L400,844 L0,844 Z"
-          fill="#0E9F6E"
+          className="fill-primary"
           fillOpacity=".18"
         />
         <path
           d="M0,610 C65,560 130,630 195,550 C260,470 315,550 370,490 C388,465 400,480 400,450"
           fill="none"
-          stroke="#38E1A4"
+          className="stroke-brand-mint"
           strokeWidth="2"
           strokeOpacity=".45"
         />
@@ -152,123 +115,38 @@ export function MobileIntro({
         type="button"
         onClick={() => onGoToSlide(slide - 1)}
         aria-label={tA("previous")}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 120,
-          bottom: 210,
-          width: "40%",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          zIndex: 2,
-        }}
+        className="absolute top-30 bottom-52.5 left-0 z-[2] w-[40%] cursor-pointer border-none bg-transparent"
       />
       <button
         type="button"
         onClick={() => onGoToSlide(slide + 1)}
         aria-label={tA("next")}
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 120,
-          bottom: 210,
-          width: "40%",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          zIndex: 2,
-        }}
+        className="absolute top-30 right-0 bottom-52.5 z-[2] w-[40%] cursor-pointer border-none bg-transparent"
       />
 
-      <div style={{ display: "flex", alignItems: "center", position: "relative", zIndex: 3 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-          <span
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 13,
-              background: "#0E9F6E",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon d={ICONS.wallet} size={22} stroke="#fff" />
-          </span>
-          <span style={{ font: "800 20px 'Plus Jakarta Sans'" }}>Pocket</span>
-        </div>
+      <div className="relative z-[3] flex items-center">
+        <BrandLogo />
         <button
           type="button"
           onClick={onEnter}
-          style={{
-            marginLeft: "auto",
-            background: "none",
-            border: "none",
-            padding: "6px 4px",
-            cursor: "pointer",
-            font: "600 13px 'Plus Jakarta Sans'",
-            color: "rgba(255,255,255,.6)",
-          }}
+          className="ml-auto cursor-pointer px-1 py-1.5 text-body-sm font-semibold text-white/60"
         >
           {copy.skip}
         </button>
       </div>
 
-      <div
-        key={`m-${slide}`}
-        className={styles.fadeStep}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-        }}
-      >
+      <div key={`m-${slide}`} className="relative z-1 flex flex-1 flex-col animate-step-fade">
         {cur.kind === "card" && (
-          <div style={{ marginTop: 38 }}>
-            <div
-              className={styles.floaty}
-              style={{
-                background: "linear-gradient(160deg,rgba(14,159,110,.92),rgba(11,125,88,.92))",
-                border: "1px solid rgba(255,255,255,.14)",
-                borderRadius: 20,
-                padding: "18px 20px",
-                boxShadow: "0 22px 48px rgba(0,0,0,.4)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: 10,
-                }}
-              >
+          <div className="mt-9.5">
+            <div className="animate-floaty rounded-xl border border-white/14 bg-brand-card-glass px-5 py-4.5 shadow-float">
+              <div className="flex items-start justify-between gap-2.5">
                 <div>
-                  <div
-                    style={{ font: "600 11px 'Plus Jakarta Sans'", color: "rgba(255,255,255,.78)" }}
-                  >
-                    {copy.netWorthLabel}
-                  </div>
-                  <div
-                    className="tabular-nums"
-                    style={{ font: "800 24px 'Plus Jakarta Sans'", color: "#fff", marginTop: 5 }}
-                  >
+                  <div className="text-micro font-semibold text-white/78">{copy.netWorthLabel}</div>
+                  <div className="mt-1.25 text-2xl font-extrabold text-white tabular-nums">
                     {copy.netWorthValue}
                   </div>
                 </div>
-                <span
-                  style={{
-                    font: "700 11px 'Plus Jakarta Sans'",
-                    color: "#fff",
-                    background: "rgba(255,255,255,.2)",
-                    borderRadius: 999,
-                    padding: "5px 9px",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <span className="rounded-full bg-white/20 px-2 py-1 text-micro font-bold whitespace-nowrap text-white">
                   {copy.netWorthPill}
                 </span>
               </div>
@@ -277,13 +155,13 @@ export function MobileIntro({
                 width="100%"
                 height={34}
                 preserveAspectRatio="none"
-                style={{ marginTop: 14, display: "block" }}
+                className="mt-3.5 block"
                 aria-hidden
               >
                 <polyline
                   points="0,20 10,16 20,18 30,10 40,13 50,6 60,9 70,2"
                   fill="none"
-                  stroke="#fff"
+                  className="stroke-white"
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -293,111 +171,46 @@ export function MobileIntro({
           </div>
         )}
         {cur.kind === "glyph" && (
-          <div style={{ marginTop: 44, display: "flex" }}>
-            <span
-              className={styles.floaty}
-              style={{
-                width: 78,
-                height: 78,
-                borderRadius: 22,
-                background: "linear-gradient(160deg,rgba(14,159,110,.9),rgba(11,125,88,.9))",
-                border: "1px solid rgba(255,255,255,.16)",
-                boxShadow: "0 20px 44px rgba(0,0,0,.4)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {curGlyph && <Icon d={curGlyph} size={38} stroke="#fff" strokeWidth={1.9} />}
+          <div className="mt-11 flex">
+            <span className="flex size-19.5 animate-floaty items-center justify-center rounded-xl border border-white/16 bg-brand-card-glass shadow-float">
+              {curGlyph && <Icon d={curGlyph} size={38} strokeWidth={1.9} className="text-white" />}
             </span>
           </div>
         )}
-        <div style={{ marginTop: "auto" }}>
-          <h1
-            style={{
-              font: "800 32px/1.15 'Plus Jakarta Sans'",
-              margin: 0,
-              letterSpacing: "-.02em",
-            }}
-          >
-            {cur.h}
-          </h1>
-          <p
-            style={{
-              font: "500 15px/1.6 'Plus Jakarta Sans'",
-              color: "rgba(255,255,255,.66)",
-              margin: "15px 0 0",
-            }}
-          >
-            {cur.s}
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+        <div className="mt-auto">
+          <h1 className="text-3xl/[1.15] font-extrabold tracking-tight">{cur.h}</h1>
+          <p className="mt-4 text-body text-white/66">{cur.s}</p>
+          <div className="mt-5 flex flex-col gap-2.5">
             {cur.bullets.map((text, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <span
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: "#38E1A4",
-                    marginTop: 8,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    font: "500 13px/1.5 'Plus Jakarta Sans'",
-                    color: "rgba(255,255,255,.74)",
-                  }}
-                >
-                  {text}
-                </span>
+              <div key={i} className="flex items-start gap-2.5">
+                <span className="mt-2 size-1.25 shrink-0 rounded-full bg-brand-mint" />
+                <span className="text-body-sm/normal text-white/74">{text}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div style={{ position: "relative", zIndex: 3, marginTop: 26 }}>
-        <div style={{ display: "flex", gap: 7, marginBottom: 20 }}>
+      <div className="relative z-[3] mt-6.5">
+        <div className="mb-5 flex gap-1.75">
           {slides.map((_, k) => (
             <button
               key={k}
               type="button"
               onClick={() => onGoToSlide(k)}
               aria-label={tA("goToSlide", { n: k + 1 })}
-              style={{
-                width: k === slide ? 22 : 7,
-                height: 7,
-                borderRadius: 999,
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                background: k === slide ? "#38E1A4" : "rgba(255,255,255,.24)",
-                transition: "width .25s, background .25s",
-              }}
+              className={cn(
+                "h-1.75 cursor-pointer rounded-full transition-[width,background-color] duration-250",
+                k === slide ? "w-5.5 bg-brand-mint" : "w-1.75 bg-white/24",
+              )}
             />
           ))}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+        <div className="flex flex-col gap-2.5">
           <button
             type="button"
             onClick={onEnter}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              font: "700 16px 'Plus Jakarta Sans'",
-              color: "#fff",
-              background: "#0E9F6E",
-              border: "none",
-              borderRadius: 14,
-              padding: 16,
-              cursor: "pointer",
-              boxShadow: "0 12px 28px rgba(14,159,110,.4)",
-            }}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 text-base font-bold text-white shadow-cta-lg"
           >
             {copy.getStarted}
             <Icon d={ICONS.arrowRight} size={17} strokeWidth={2.2} />
@@ -408,15 +221,7 @@ export function MobileIntro({
           <button
             type="button"
             onClick={onEnter}
-            style={{
-              width: "100%",
-              font: "700 14px 'Plus Jakarta Sans'",
-              color: "rgba(255,255,255,.82)",
-              background: "transparent",
-              border: "none",
-              padding: 6,
-              cursor: "pointer",
-            }}
+            className="w-full cursor-pointer p-1.5 text-sm font-bold text-white/82"
           >
             {copy.haveAccount}
           </button>

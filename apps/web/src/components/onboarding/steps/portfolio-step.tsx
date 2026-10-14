@@ -1,8 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Icon, ICONS } from "../icon";
-import { cardStyle, type OnboardingTheme } from "../theme";
-import styles from "../onboarding.module.css";
+import { choiceCardClass } from "../choice-card";
+import { FieldLabel, FieldError, GLASS_INPUT } from "./field";
 
 const BROKERAGE_LIST = [
   "Trade Republic",
@@ -32,8 +32,6 @@ export interface PortfolioCopy {
 }
 
 export function PortfolioStep({
-  th,
-  isDark,
   copy,
   portfolioName,
   portfolioNameError,
@@ -50,8 +48,6 @@ export function PortfolioStep({
   cashCounted,
   onCashCountedChange,
 }: {
-  th: OnboardingTheme;
-  isDark: boolean;
   copy: PortfolioCopy;
   portfolioName: string;
   portfolioNameError?: string;
@@ -77,46 +73,26 @@ export function PortfolioStep({
 
   return (
     <>
-      <div style={{ marginBottom: 18 }}>
-        <label
-          style={{
-            display: "block",
-            font: "600 12px 'Plus Jakarta Sans'",
-            color: th.labelColor,
-            margin: "0 2px 6px",
-          }}
-        >
-          {copy.nameLabel}
-        </label>
+      <div className="mb-4.5">
+        <FieldLabel>{copy.nameLabel}</FieldLabel>
         <Input
-          className={cn(
-            th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14",
-            portfolioNameError && styles.inputError,
-          )}
+          className={cn(GLASS_INPUT, portfolioNameError && "border-destructive!")}
           aria-label={copy.nameLabel}
           placeholder={copy.namePlaceholder}
           value={portfolioName}
           onChange={(e) => onPortfolioNameChange(e.target.value)}
         />
-        {portfolioNameError && <p className={styles.errorText}>{portfolioNameError}</p>}
+        {portfolioNameError && <FieldError>{portfolioNameError}</FieldError>}
       </div>
 
-      <div style={{ marginBottom: 18, position: "relative" }}>
-        <label
-          style={{
-            display: "block",
-            font: "600 12px 'Plus Jakarta Sans'",
-            color: th.labelColor,
-            margin: "0 2px 6px",
-          }}
-        >
+      <div className="relative mb-4.5">
+        <FieldLabel>
           {copy.brokerageLabel}{" "}
-          <span style={{ fontWeight: 500, color: th.dividerText }}>{copy.brokerageOptional}</span>
-        </label>
-        <div style={{ position: "relative" }}>
+          <span className="font-medium text-text-3">{copy.brokerageOptional}</span>
+        </FieldLabel>
+        <div className="relative">
           <Input
-            className={cn(th.glassInput && "bg-white/5 backdrop-blur-[3px] border-white/14")}
-            style={{ paddingRight: 40 }}
+            className={cn(GLASS_INPUT, "pr-10")}
             aria-label={copy.brokerageLabel}
             placeholder={copy.brokeragePlaceholder}
             value={brokerageValue}
@@ -129,21 +105,7 @@ export function PortfolioStep({
             aria-label={copy.brokerageLabel}
             aria-expanded={brokerageOpen}
             onClick={onBrokerageToggle}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              position: "absolute",
-              top: 0,
-              right: 0,
-              height: "100%",
-              width: 40,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: th.dividerText,
-            }}
+            className="absolute top-0 right-0 flex h-full w-10 cursor-pointer items-center justify-center text-text-3"
           >
             <svg
               width={16}
@@ -154,10 +116,7 @@ export function PortfolioStep({
               strokeWidth={2.2}
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{
-                transform: brokerageOpen ? "rotate(180deg)" : "none",
-                transition: "transform .15s",
-              }}
+              className={cn("transition-transform duration-150", brokerageOpen && "rotate-180")}
               aria-hidden
             >
               <path d={ICONS.chevronDown} />
@@ -165,22 +124,7 @@ export function PortfolioStep({
           </button>
         </div>
         {brokerageOpen && (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: "calc(100% + 6px)",
-              zIndex: 10,
-              background: th.panelBg,
-              border: `1px solid ${th.dividerLine}`,
-              borderRadius: 12,
-              padding: 6,
-              boxShadow: isDark ? "0 16px 34px rgba(0,0,0,.5)" : "0 16px 34px rgba(17,33,26,.14)",
-              maxHeight: 224,
-              overflowY: "auto",
-            }}
-          >
+          <div className="absolute inset-x-0 top-[calc(100%+6px)] z-10 max-h-56 overflow-y-auto rounded-md border border-border bg-onb-panel p-1.5 shadow-onb-menu">
             {matches.map((name) => (
               <button
                 key={name}
@@ -189,57 +133,21 @@ export function PortfolioStep({
                   e.preventDefault();
                   onSelectBrokerage(name);
                 }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  width: "100%",
-                  textAlign: "left",
-                  background: "transparent",
-                  border: "none",
-                  padding: "9px 10px",
-                  borderRadius: 9,
-                  cursor: "pointer",
-                  transition: "background .12s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = th.chipBg)}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-muted"
               >
-                <span
-                  style={{
-                    width: 26,
-                    height: 26,
-                    flexShrink: 0,
-                    borderRadius: 7,
-                    background: th.chipBg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon d={ICONS.building} size={14} stroke={th.kicker} />
+                <span className="flex size-6.5 shrink-0 items-center justify-center rounded-xs bg-muted">
+                  <Icon d={ICONS.building} size={14} className="text-success" />
                 </span>
-                <span style={{ font: "600 13.5px 'Plus Jakarta Sans'", color: th.headColor }}>
-                  {name}
-                </span>
+                <span className="text-body-sm font-semibold text-foreground">{name}</span>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      <div style={{ marginBottom: 22 }}>
-        <label
-          style={{
-            display: "block",
-            font: "600 12px 'Plus Jakarta Sans'",
-            color: th.labelColor,
-            margin: "0 2px 8px",
-          }}
-        >
-          {copy.currencyLabel}
-        </label>
-        <div style={{ display: "flex", gap: 7 }}>
+      <div className="mb-5.5">
+        <FieldLabel className="mb-2">{copy.currencyLabel}</FieldLabel>
+        <div className="flex gap-1.75">
           {CURRENCY_OPTIONS.map((code) => {
             const selected = code === currency;
             return (
@@ -247,16 +155,10 @@ export function PortfolioStep({
                 key={code}
                 type="button"
                 onClick={() => onCurrencyChange(code)}
-                style={{
-                  border: "none",
-                  borderRadius: 9,
-                  padding: "9px 14px",
-                  font: "700 12.5px 'Plus Jakarta Sans'",
-                  cursor: "pointer",
-                  transition: "background .15s",
-                  background: selected ? "#0E9F6E" : th.chipBg,
-                  color: selected ? "#fff" : th.chipText,
-                }}
+                className={cn(
+                  "cursor-pointer rounded-sm px-3.5 py-2 text-xs font-bold transition-colors",
+                  selected ? "bg-primary text-white" : "bg-muted text-text-mute dark:text-text-2",
+                )}
               >
                 {code}
               </button>
@@ -265,18 +167,9 @@ export function PortfolioStep({
         </div>
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <label
-          style={{
-            display: "block",
-            font: "600 12px 'Plus Jakarta Sans'",
-            color: th.labelColor,
-            margin: "0 2px 8px",
-          }}
-        >
-          {copy.cashLabel}
-        </label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="mb-2">
+        <FieldLabel className="mb-2">{copy.cashLabel}</FieldLabel>
+        <div className="flex flex-col gap-2.5">
           {cashOptions.map((o) => {
             const selected = o.key === cashCounted;
             return (
@@ -284,45 +177,20 @@ export function PortfolioStep({
                 key={String(o.key)}
                 type="button"
                 onClick={() => onCashCountedChange(o.key)}
-                style={cardStyle(th, selected)}
+                className={choiceCardClass(selected)}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                  }}
-                >
-                  <span style={{ font: "700 14px 'Plus Jakarta Sans'", color: th.headColor }}>
-                    {o.title}
-                  </span>
+                <div className="flex items-center justify-between gap-2.5">
+                  <span className="text-sm font-bold text-foreground">{o.title}</span>
                   {selected && (
-                    <Icon d={ICONS.check} size={17} stroke="#0E9F6E" strokeWidth={2.4} />
+                    <Icon d={ICONS.check} size={17} strokeWidth={2.4} className="text-primary" />
                   )}
                 </div>
-                <p
-                  style={{
-                    font: "500 12.5px/1.5 'Plus Jakarta Sans'",
-                    color: th.subColor,
-                    margin: "6px 0 0",
-                  }}
-                >
-                  {o.desc}
-                </p>
+                <p className="mt-1.5 text-xs/normal font-medium text-text-2">{o.desc}</p>
               </button>
             );
           })}
         </div>
-        <p
-          style={{
-            font: "500 11.5px 'Plus Jakarta Sans'",
-            color: th.dividerText,
-            margin: "10px 2px 0",
-          }}
-        >
-          {copy.cashHelper}
-        </p>
+        <p className="mx-0.5 mt-2.5 text-micro font-medium text-text-3">{copy.cashHelper}</p>
       </div>
     </>
   );
