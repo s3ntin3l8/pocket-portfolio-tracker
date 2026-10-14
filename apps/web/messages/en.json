@@ -1745,6 +1745,14 @@
       "installmentNone": "None (whole loan)",
       "installmentOption": "#{n} · due {date}",
       "loanLinkLocked": "This installment was booked by the schedule, so its loan link can't be changed.",
+      "loanErrors": {
+        "installment_already_paid": "This installment already has a repayment. Pick another installment or leave it empty.",
+        "loan_closed": "This loan is closed, so it can't take new repayments.",
+        "currency_mismatch": "The repayment's currency must match the loan's currency.",
+        "installment_not_found": "That installment isn't in the loan's schedule.",
+        "loan_not_found": "That loan no longer exists.",
+        "loan_link_locked": "This installment was booked by the schedule, so its loan link can't be changed."
+      },
       "customInstrumentToggle": "Can't find it? Add a custom instrument"
     },
     "reassign": "Reassign"

@@ -5,7 +5,7 @@ import {
   AddTransactionForm,
   type AddTransactionClient,
 } from "../src/components/add-transaction-form";
-import type { Instrument, SourceSummary } from "@portfolio/api-client";
+import { ApiError, type Instrument, type SourceSummary } from "@portfolio/api-client";
 import messages from "../messages/en.json";
 
 const getSourceDocumentUrl = vi.fn(async () => ({
@@ -925,6 +925,36 @@ describe("AddTransactionForm", () => {
           installmentN: 2,
         }),
       );
+    });
+
+    it.each([
+      [409, "installment_already_paid", m.loanErrors.installment_already_paid],
+      [409, "loan_closed", m.loanErrors.loan_closed],
+      [400, "currency_mismatch", m.loanErrors.currency_mismatch],
+      [404, "installment_not_found", m.loanErrors.installment_not_found],
+      [404, "loan_not_found", m.loanErrors.loan_not_found],
+      [500, "boom", m.error],
+    ])("maps a %i %s rejection to its message", async (status, code, text) => {
+      const client = makeClient({
+        listLoans: vi.fn(async () => [LOAN]),
+        createTransaction: vi.fn(async () => {
+          throw new ApiError(status, JSON.stringify({ error: code }));
+        }),
+      });
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <AddTransactionForm client={client} portfolioId="p1" />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(await screen.findByRole("button", { name: messages.TxType.loan_repayment }));
+      fireEvent.change(screen.getByLabelText(m.amount), { target: { value: "1000" } });
+      fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+        target: { value: "2026-02-10" },
+      });
+      fireEvent.change(screen.getByLabelText(m.loan), { target: { value: LOAN.loanId } });
+      fireEvent.click(screen.getByRole("button", { name: m.submit }));
+      expect(await screen.findByText(text)).toBeInTheDocument();
     });
 
     it("requires a loan to create a repayment", async () => {
