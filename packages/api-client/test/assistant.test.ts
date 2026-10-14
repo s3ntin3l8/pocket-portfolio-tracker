@@ -224,3 +224,14 @@ describe("delta events", () => {
     ]);
   });
 });
+
+describe("conversation events", () => {
+  it("are parsed as a known event type", async () => {
+    const events = [];
+    for await (const e of parseAssistantStream(
+      bodyOf([enc.encode('event: conversation\ndata: {"id":"c1","saved":false}\n\n')]),
+    ))
+      events.push(e);
+    expect(events).toEqual([{ type: "conversation", id: "c1", saved: false }]);
+  });
+});

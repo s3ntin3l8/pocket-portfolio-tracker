@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, CircleAlert, RotateCcw, Send, Square } from "lucide-react";
-import type { AssistantStatus } from "@portfolio/api-client";
+import { Check, CircleAlert, History, RotateCcw, Send, Square, Trash2 } from "lucide-react";
+import type { AssistantConversationSummary, AssistantStatus } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +23,14 @@ export interface AssistantChatApi {
   send: (text: string) => boolean;
   stop: () => void;
   reset: () => void;
+  /** The stored conversation is full: new messages are not being saved. */
+  conversationFull?: boolean;
+  /** Stored conversations; null when the client can't list them. */
+  history?: {
+    list: () => Promise<AssistantConversationSummary[]>;
+    open: (id: string) => Promise<boolean>;
+    remove: (id: string) => Promise<boolean>;
+  } | null;
 }
 
 const SUGGESTIONS = ["overview", "gains", "allocation"] as const;
@@ -91,6 +99,90 @@ function Turn({ turn }: { turn: ChatTurn }) {
   );
 }
 
+/** Saved conversations (opted-in users): reopen one, or delete it. */
+function HistoryPanel({
+  history,
+  onOpened,
+}: {
+  history: NonNullable<AssistantChatApi["history"]>;
+  onOpened: () => void;
+}) {
+  const t = useTranslations("Assistant");
+  const [items, setItems] = useState<AssistantConversationSummary[] | null>(null);
+  const [error, setError] = useState<"load" | "open" | "delete" | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    history
+      .list()
+      .then((list) => alive && setItems(list))
+      .catch(() => alive && setError("load"));
+    return () => {
+      alive = false;
+    };
+  }, [history]);
+
+  if (error === "load") return <p className="text-sm text-destructive">{t("historyLoadError")}</p>;
+  if (!items) {
+    return (
+      <p className="flex items-center gap-2 text-sm text-text-2">
+        <Spinner className="size-3.5" />
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {(error === "open" || error === "delete") && (
+        <p role="alert" className="text-xs font-semibold text-destructive">
+          {error === "open" ? t("historyOpenError") : t("historyDeleteError")}
+        </p>
+      )}
+      {items.length === 0 ? (
+        <p className="text-sm text-text-2">{t("historyEmpty")}</p>
+      ) : (
+        <ul className="divide-y divide-line overflow-hidden rounded-xl bg-muted">
+          {items.map((c) => (
+            <li key={c.id} className="flex items-center gap-1 pr-1">
+              <button
+                type="button"
+                aria-label={t("historyOpen", { title: c.title })}
+                className="min-w-0 flex-1 px-3 py-2.5 text-left hover:bg-accent/50"
+                onClick={async () => {
+                  setError(null);
+                  if (await history.open(c.id)) onOpened();
+                  else setError("open");
+                }}
+              >
+                <span className="block truncate text-sm font-semibold">{c.title}</span>
+                <span className="block text-micro text-text-2">
+                  {new Date(c.updatedAt).toLocaleDateString()}
+                </span>
+              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={t("historyDelete", { title: c.title })}
+                onClick={async () => {
+                  setError(null);
+                  if (await history.remove(c.id)) {
+                    setItems((list) => list?.filter((x) => x.id !== c.id) ?? null);
+                  } else {
+                    setError("delete");
+                  }
+                }}
+              >
+                <Trash2 />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-micro text-text-2">{t("historyNote")}</p>
+    </div>
+  );
+}
+
 /** The chat panel. Presentational: state lives in the host so a conversation survives closing. */
 export function AssistantDialog({
   open,
@@ -105,6 +197,8 @@ export function AssistantDialog({
 }) {
   const t = useTranslations("Assistant");
   const [draft, setDraft] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const canShowHistory = Boolean(status?.saveHistory && chat.history);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -185,18 +279,34 @@ export function AssistantDialog({
           <div className="flex items-start justify-between gap-3">
             {/* The mobile header already shows the title; this stays as the one accessible name. */}
             <DialogTitle className="sr-only md:not-sr-only">{t("title")}</DialogTitle>
-            {chat.turns.length > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="ml-auto"
-                onClick={chat.reset}
-              >
-                <RotateCcw />
-                {t("newChat")}
-              </Button>
-            )}
+            <div className="ml-auto flex items-center gap-1">
+              {canShowHistory && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={showHistory}
+                  onClick={() => setShowHistory((v) => !v)}
+                >
+                  <History />
+                  {showHistory ? t("historyBack") : t("history")}
+                </Button>
+              )}
+              {chat.turns.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowHistory(false);
+                    chat.reset();
+                  }}
+                >
+                  <RotateCcw />
+                  {t("newChat")}
+                </Button>
+              )}
+            </div>
           </div>
           <DialogDescription>{disclosure}</DialogDescription>
         </DialogHeader>
@@ -206,7 +316,9 @@ export function AssistantDialog({
           aria-label={t("conversation")}
           className="space-y-3 px-4 py-4 md:px-6"
         >
-          {chat.turns.length === 0 ? (
+          {showHistory && chat.history ? (
+            <HistoryPanel history={chat.history} onOpened={() => setShowHistory(false)} />
+          ) : chat.turns.length === 0 ? (
             <div className="space-y-3">
               <p className="text-sm text-text-2">{t("emptyHint")}</p>
               <div className="flex flex-wrap gap-2">
@@ -228,6 +340,11 @@ export function AssistantDialog({
           )}
           <div ref={endRef} />
         </div>
+        {chat.conversationFull && !showHistory && (
+          <p role="status" className="px-4 pb-2 text-xs text-text-2 md:px-6">
+            {t("historyFull")}
+          </p>
+        )}
         <p className="px-4 pb-3 text-micro text-text-2 md:px-6">{t("disclaimer")}</p>
       </DialogContent>
     </Dialog>

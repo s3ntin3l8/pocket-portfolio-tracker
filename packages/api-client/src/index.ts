@@ -1161,6 +1161,8 @@ export interface UserPreferences {
   riskFreeRate: number | null;
   /** User's target retirement age. Null = no retirement forecast target. */
   retirementAge: number | null;
+  /** Opt-in: keep assistant conversations server-side (off by default). */
+  assistantSaveHistory: boolean;
 }
 
 /** A personal access token's metadata (never the secret). */
@@ -2265,12 +2267,16 @@ export {
   parseAssistantStream,
   type AssistantChatMessage,
   type AssistantChatRequest,
+  type AssistantConversation,
+  type AssistantConversationSummary,
   type AssistantEvent,
   type AssistantStatus,
 } from "./assistant.js";
 import {
   parseAssistantStream,
   type AssistantChatRequest,
+  type AssistantConversation,
+  type AssistantConversationSummary,
   type AssistantEvent,
   type AssistantStatus,
 } from "./assistant.js";
@@ -2614,6 +2620,7 @@ export function createApiClient(config: ApiClientConfig) {
         benchmarkSymbols: { symbol: string; displayName?: string }[];
         riskFreeRate: number | null;
         retirementAge: number | null;
+        assistantSaveHistory: boolean;
       }>,
     ) => request<UserPreferences>("PUT", "/me/preferences", prefs),
     getIncome: (holderId?: string) =>
@@ -3352,6 +3359,15 @@ export function createApiClient(config: ApiClientConfig) {
 
     // --- In-app assistant (docs/assistant.md) ---
     getAssistantStatus: () => request<AssistantStatus>("GET", "/assistant/status"),
+    /** Stored conversations (empty unless the user opted in to keeping history). */
+    listAssistantConversations: () =>
+      request<{ conversations: AssistantConversationSummary[] }>("GET", "/assistant/conversations"),
+    getAssistantConversation: (id: string) =>
+      request<AssistantConversation>("GET", `/assistant/conversations/${encodeURIComponent(id)}`),
+    deleteAssistantConversation: (id: string) =>
+      request<void>("DELETE", `/assistant/conversations/${encodeURIComponent(id)}`),
+    deleteAllAssistantConversations: () =>
+      request<{ deleted: number }>("DELETE", "/assistant/conversations"),
     /**
      * Stream one chat turn as typed events. No client-side timeout (a turn can run several
      * model calls); the caller stops it with `signal`, which aborts the request and — through

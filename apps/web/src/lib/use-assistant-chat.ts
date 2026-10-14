@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiClient } from "@portfolio/api-client";
 import {
   applyEvent,
@@ -11,14 +11,21 @@ import {
   type ChatTurn,
 } from "@/lib/assistant-chat";
 
-type ChatClient = Pick<ApiClient, "streamAssistantChat">;
+type ChatClient = Pick<ApiClient, "streamAssistantChat"> &
+  Partial<
+    Pick<
+      ApiClient,
+      "listAssistantConversations" | "getAssistantConversation" | "deleteAssistantConversation"
+    >
+  >;
 
 let nextId = 0;
 const newId = () => `t${++nextId}`;
 
 /**
- * Chat state for the assistant panel. The conversation lives only in memory (nothing is stored
- * server-side); `send` streams one answer, `stop` cancels it — the abort travels through the
+ * Chat state for the assistant panel. The conversation lives in memory; only users who opted in
+ * to history also have it stored server-side (the stream then reports its `conversation` id, which
+ * later sends carry so the turn is appended to it). `send` streams one answer, `stop` cancels it — the abort travels through the
  * proxy to the API, which stops the model call. Turns are kept in a ref so a send always sees
  * the latest history regardless of render timing.
  */
@@ -27,6 +34,16 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
   const abortRef = useRef<AbortController | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const conversationRef = useRef<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  /** The stored conversation is full: new messages are no longer being saved. */
+  const [conversationFull, setConversationFull] = useState(false);
+
+  const setConversation = useCallback((id: string | null, full = false) => {
+    conversationRef.current = id;
+    setConversationId(id);
+    setConversationFull(full);
+  }, []);
 
   const commit = useCallback((next: ChatTurn[]) => {
     turnsRef.current = next;
@@ -68,11 +85,16 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
         let sawDone = false;
         try {
           for await (const event of client.streamAssistantChat(
-            { messages: request, scope: getScope() },
+            {
+              messages: request,
+              scope: getScope(),
+              ...(conversationRef.current ? { conversationId: conversationRef.current } : {}),
+            },
             { signal: ac.signal },
           )) {
             if (!current()) break;
             if (event.type === "done") sawDone = true;
+            if (event.type === "conversation") setConversation(event.id, !event.saved);
             patchLast((t) => applyEvent(t, event));
           }
           // A stream that ends without `done` or an error was cut off; one that ends with
@@ -108,7 +130,7 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
       })();
       return true;
     },
-    [client, commit, getScope, patchLast],
+    [client, commit, getScope, patchLast, setConversation],
   );
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
@@ -117,8 +139,50 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
+    setConversation(null);
     commit([]);
-  }, [commit]);
+  }, [commit, setConversation]);
+
+  /** Stored conversations (only meaningful for users who opted in). */
+  // Stable across renders: the panel refetches its list whenever this changes.
+  const history = useMemo(
+    () =>
+      client.listAssistantConversations
+        ? {
+            list: async () => (await client.listAssistantConversations!()).conversations,
+            open: async (id: string): Promise<boolean> => {
+              try {
+                const conv = await client.getAssistantConversation!(id);
+                abortRef.current?.abort();
+                abortRef.current = null;
+                setStreaming(false);
+                commit(
+                  conv.messages.map((m) => ({
+                    id: newId(),
+                    role: m.role,
+                    content: m.content,
+                    steps: [],
+                  })),
+                );
+                setConversation(conv.id);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+            remove: async (id: string): Promise<boolean> => {
+              try {
+                await client.deleteAssistantConversation!(id);
+                if (conversationRef.current === id) setConversation(null);
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          }
+        : null,
+    [client, commit, setConversation],
+  );
 
   // Leaving the app shell cancels any in-flight answer. React StrictMode (dev) unmounts and
   // remounts immediately, which must not kill a request started on mount (e.g. a seeded
@@ -134,5 +198,5 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     };
   }, []);
 
-  return { turns, streaming, send, stop, reset };
+  return { turns, streaming, send, stop, reset, conversationId, conversationFull, history };
 }

@@ -7,6 +7,24 @@ export interface AssistantStatus {
   label: string | null;
   /** True when data never leaves the user's own infrastructure. */
   local: boolean;
+  /** The user opted in to keeping conversations (and this credential may write them). */
+  saveHistory?: boolean;
+}
+
+export interface AssistantConversationSummary {
+  id: string;
+  title: string;
+  scope: string | null;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface AssistantConversation {
+  id: string;
+  title: string;
+  scope: string | null;
+  updatedAt: string;
+  messages: AssistantChatMessage[];
 }
 
 export interface AssistantChatMessage {
@@ -19,6 +37,8 @@ export interface AssistantChatRequest {
   messages: AssistantChatMessage[];
   /** `all`, `p:<portfolio id>` or `h:<holder id>` — what the user is currently viewing. */
   scope?: string;
+  /** Append the turn to this stored conversation (history on); omit to start a new one. */
+  conversationId?: string;
 }
 
 /**
@@ -34,6 +54,7 @@ export type AssistantEvent =
   | { type: "tool_result"; id: string; name: string; ok: boolean }
   | { type: "delta"; text: string }
   | { type: "message"; text: string }
+  | { type: "conversation"; id: string; saved: boolean }
   | { type: "error"; error: string; status?: number }
   | { type: "done"; rounds: number };
 
@@ -47,6 +68,7 @@ const EVENT_TYPES = new Set<AssistantEvent["type"]>([
   "tool_result",
   "delta",
   "message",
+  "conversation",
   "error",
   "done",
 ]);

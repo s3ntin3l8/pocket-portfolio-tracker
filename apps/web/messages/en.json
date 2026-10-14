@@ -1383,7 +1383,14 @@
     "dataSourceOn": "On",
     "dataSourceOff": "Off",
     "installAppIosTitle": "Install on iOS",
-    "installAppIosHint": "Tap Share, then \"Add to Home Screen\"."
+    "installAppIosHint": "Tap Share, then \"Add to Home Screen\".",
+    "assistantLabel": "Assistant",
+    "assistantHistoryLabel": "Keep assistant conversations",
+    "assistantHistoryHint": "Off by default. When on, your questions and the assistant's answers (text only — never tool data) are stored so you can reopen them on any device. Kept for 90 days, up to 50 conversations; you can delete them anytime.",
+    "assistantHistoryError": "Couldn't update this setting. Please try again.",
+    "assistantHistoryOffTitle": "Stop saving conversations?",
+    "assistantHistoryOffBody": "All your saved assistant conversations will be deleted from the server. This can't be undone.",
+    "assistantHistoryOffConfirm": "Turn off and delete"
   },
   "Holdings": {
     "title": "Holdings",
@@ -2707,6 +2714,16 @@
       "assistant_rate_limited": "You've reached the hourly limit for assistant questions. Try again later.",
       "chat_not_configured": "The assistant isn't set up on this server.",
       "invalid_request": "That message couldn't be sent. Try a shorter one or start a new chat."
-    }
+    },
+    "history": "History",
+    "historyBack": "Back to chat",
+    "historyEmpty": "No saved conversations yet.",
+    "historyLoadError": "Couldn't load your saved conversations.",
+    "historyOpenError": "Couldn't open that conversation.",
+    "historyDeleteError": "Couldn't delete that conversation.",
+    "historyNote": "Saved conversations keep only the text of your questions and the answers, for 90 days.",
+    "historyOpen": "Open: {title}",
+    "historyDelete": "Delete: {title}",
+    "historyFull": "This conversation is full, so new messages aren't being saved. Start a new chat to keep going."
   }
 }

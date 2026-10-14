@@ -1,3 +1,4 @@
+import { deleteAllConversations } from "../services/assistant-history.js";
 import type { FastifyInstance } from "fastify";
 import { asc, eq } from "drizzle-orm";
 import { userBenchmarkSymbols, userPreferences } from "@portfolio/db";
@@ -58,6 +59,7 @@ export async function preferencesRoute(app: FastifyInstance) {
           : [{ symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 }],
       riskFreeRate: prefs?.riskFreeRate ? Number(prefs.riskFreeRate) : null,
       retirementAge: prefs?.retirementAge ?? null,
+      assistantSaveHistory: prefs?.assistantSaveHistory ?? false,
     };
   });
 
@@ -97,6 +99,7 @@ export async function preferencesRoute(app: FastifyInstance) {
         taxRegime: body.taxRegime ?? "DE",
         riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null,
         retirementAge: body.retirementAge ?? null,
+        assistantSaveHistory: body.assistantSaveHistory ?? false,
         createdAt: now,
         updatedAt: now,
       })
@@ -111,10 +114,18 @@ export async function preferencesRoute(app: FastifyInstance) {
             ? { riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null }
             : {}),
           ...(body.retirementAge !== undefined ? { retirementAge: body.retirementAge } : {}),
+          ...(body.assistantSaveHistory !== undefined
+            ? { assistantSaveHistory: body.assistantSaveHistory }
+            : {}),
           updatedAt: now,
         },
       })
       .returning();
+
+    // Turning history off is also a delete request: nothing stays behind "just in case".
+    if (body.assistantSaveHistory === false) {
+      await deleteAllConversations(app.db, id);
+    }
 
     if (body.benchmarkSymbols) {
       const unique = dedupeAndLabel(body.benchmarkSymbols);
@@ -154,6 +165,7 @@ export async function preferencesRoute(app: FastifyInstance) {
       benchmarkSymbols: finalSymbols,
       riskFreeRate: updated?.riskFreeRate ? Number(updated.riskFreeRate) : null,
       retirementAge: updated?.retirementAge ?? null,
+      assistantSaveHistory: updated?.assistantSaveHistory ?? false,
     };
   });
 }

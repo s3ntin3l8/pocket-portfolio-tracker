@@ -32,6 +32,7 @@ export * from "./schema/instruments.js";
 export * from "./schema/screenshot-imports.js";
 export * from "./schema/connections.js";
 export * from "./schema/admin.js";
+export * from "./schema/assistant.js";
 export * from "./schema/documents.js";
 export * from "./schema/transactions.js";
 export * from "./schema/transaction-sources.js";
