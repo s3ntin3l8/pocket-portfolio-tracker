@@ -20,6 +20,7 @@ import { meRoute } from "./routes/me.js";
 import { portfoliosRoute } from "./routes/portfolios.js";
 import { accountHoldersRoute } from "./routes/account-holders.js";
 import { transactionsRoute } from "./routes/transactions.js";
+import { loansRoute } from "./routes/loans.js";
 import { instrumentsRoute } from "./routes/instruments.js";
 import { quotesRoute } from "./routes/quotes.js";
 import { internalMarketDataRoute } from "./routes/internal-market-data.js";
@@ -337,6 +338,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(portfoliosRoute);
   await app.register(accountHoldersRoute);
   await app.register(transactionsRoute);
+  await app.register(loansRoute);
   await app.register(instrumentsRoute);
   await app.register(quotesRoute);
   await app.register(internalMarketDataRoute);

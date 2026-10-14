@@ -12,6 +12,8 @@ import {
   TABLE_VALUE,
 } from "@/components/ui/table";
 import { formatMoney, formatQuantity } from "@/lib/utils";
+import { GoldInstallmentMenu } from "./gold-installment-menu";
+import { GoldPlanActions } from "./gold-plan-actions";
 
 function formatDate(date: string, locale: string): string {
   // Date-only keys are calendar dates, not instants: pin to UTC so they never shift a day.
@@ -55,11 +57,13 @@ export function GoldPlanCard({
   const pct = Math.min(100, Math.round((plan.paidCount / total) * 100));
   const overdue = plan.nextDue?.overdue === true;
 
-  const status = plan.completed
-    ? { label: t("statusCompleted"), variant: "success" as const }
-    : overdue
-      ? { label: t("statusOverdue"), variant: "destructive" as const }
-      : { label: t("statusOnTrack"), variant: "default" as const };
+  const status = plan.closedAt
+    ? { label: t("statusPaidOff"), variant: "success" as const }
+    : plan.completed
+      ? { label: t("statusCompleted"), variant: "success" as const }
+      : overdue
+        ? { label: t("statusOverdue"), variant: "destructive" as const }
+        : { label: t("statusOnTrack"), variant: "default" as const };
 
   const valueText =
     plan.fxMissing || plan.value === null
@@ -136,6 +140,19 @@ export function GoldPlanCard({
           </p>
         )}
 
+        {plan.schedule.some((r) => r.skipped) && (
+          <p className="text-xs text-text-2">{t("skippedNote")}</p>
+        )}
+
+        <GoldPlanActions
+          portfolioId={plan.portfolioId}
+          loanId={plan.loanId}
+          currency={plan.currency}
+          outstanding={plan.outstandingPrincipal}
+          closedAt={plan.closedAt}
+          completed={plan.completed}
+        />
+
         {plan.schedule.length > 0 && (
           <details className="group">
             <summary className="cursor-pointer text-sm font-semibold text-primary">
@@ -151,6 +168,9 @@ export function GoldPlanCard({
                     <TableHead className="text-right">{t("colMargin")}</TableHead>
                     <TableHead className="text-right">{t("colTotal")}</TableHead>
                     <TableHead>{t("colStatus")}</TableHead>
+                    <TableHead className="w-10">
+                      <span className="sr-only">{t("colActions")}</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -164,9 +184,31 @@ export function GoldPlanCard({
                       <TableCell className={TABLE_VALUE}>{money(r.sewaModal)}</TableCell>
                       <TableCell className={TABLE_VALUE}>{money(r.angsuran)}</TableCell>
                       <TableCell>
-                        <Badge variant={r.paid ? "success" : r.overdue ? "destructive" : "outline"}>
-                          {r.paid ? t("rowPaid") : r.overdue ? t("rowOverdue") : t("rowUpcoming")}
+                        <Badge
+                          variant={
+                            r.paid || r.closed ? "success" : r.overdue ? "destructive" : "outline"
+                          }
+                        >
+                          {r.paid
+                            ? t("rowPaid")
+                            : r.closed
+                              ? t("rowClosed")
+                              : r.skipped
+                                ? t("rowSkipped")
+                                : r.overdue
+                                  ? t("rowOverdue")
+                                  : t("rowUpcoming")}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!r.paid && !r.closed && (
+                          <GoldInstallmentMenu
+                            portfolioId={plan.portfolioId}
+                            loanId={plan.loanId}
+                            n={r.n}
+                            skipped={r.skipped}
+                          />
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

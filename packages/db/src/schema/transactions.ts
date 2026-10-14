@@ -4,6 +4,7 @@ import {
   uuid,
   text,
   numeric,
+  smallint,
   jsonb,
   timestamp,
   index,
@@ -53,6 +54,12 @@ export const transactions = pgTable(
     loanId: uuid("loan_id").references(() => loans.id, {
       onDelete: "set null",
     }),
+    /**
+     * Which `loans.schedule` installment this `loan_repayment` settles — the explicit
+     * repayment → installment mapping (a count of repayments could not tell an extra or
+     * partial payment from a scheduled one). Null for everything else, incl. an early payoff.
+     */
+    installmentN: smallint("installment_n"),
     externalId: text("external_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -61,6 +68,7 @@ export const transactions = pgTable(
     index("transactions_portfolio_executed_at_idx").on(t.portfolioId, desc(t.executedAt)),
     index("transactions_instrument_id_idx").on(t.instrumentId),
     index("transactions_import_id_status_idx").on(t.importId, t.status),
+    index("transactions_loan_installment_idx").on(t.loanId, t.installmentN),
     index("transactions_description_trgm_idx").using("gin", t.description.op("gin_trgm_ops")),
     uniqueIndex("transactions_dedup_idx")
       .on(t.portfolioId, t.source, t.externalId)

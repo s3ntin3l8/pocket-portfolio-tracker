@@ -97,6 +97,7 @@ export async function writeGoldContracts(
           source,
           importId,
           loanId: loan.id,
+          installmentN: leg.installmentN ?? null,
           externalId,
         })
         .onConflictDoNothing()

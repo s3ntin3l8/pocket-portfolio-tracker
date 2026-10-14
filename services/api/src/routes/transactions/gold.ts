@@ -143,6 +143,7 @@ async function buildGoldReport(
         monthlyInstallment: l.monthlyInstallment,
         startDate: l.startDate,
         schedule: l.schedule,
+        closedAt: l.closedAt,
       },
       txnsByPortfolio.get(l.portfolioId) ?? [],
       today,
