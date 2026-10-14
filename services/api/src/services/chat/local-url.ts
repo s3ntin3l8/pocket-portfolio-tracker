@@ -27,9 +27,8 @@ export function isLocalUrl(raw: string): boolean {
     );
   }
   if (kind === 6) {
-    return (
-      host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")
-    );
+    // ::1, unique-local fc00::/7, link-local fe80::/10 (fe80–febf).
+    return host === "::1" || /^f[cd]/.test(host) || /^fe[89ab]/.test(host);
   }
   return !host.includes(".") || host.endsWith(".local") || host.endsWith(".internal");
 }

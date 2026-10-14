@@ -15,6 +15,11 @@ describe("createWindowLimiter", () => {
     expect(l.hit("u")).toEqual({ ok: true }); // the first hit has aged out
   });
 
+  it("a max of 0 refuses everything and waits the whole window", () => {
+    const l = createWindowLimiter({ max: 0, windowMs: 5000, now: () => 0 });
+    expect(l.hit("u")).toEqual({ ok: false, retryAfterSec: 5 });
+  });
+
   it("counts keys independently", () => {
     const l = createWindowLimiter({ max: 1, windowMs: 1000, now: () => 0 });
     expect(l.hit("a").ok).toBe(true);

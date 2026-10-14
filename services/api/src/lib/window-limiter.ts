@@ -15,9 +15,11 @@ export function createWindowLimiter(opts: { max: number; windowMs: number; now?:
       const recent = (hits.get(key) ?? []).filter((ts) => ts > cutoff);
       if (recent.length >= opts.max) {
         hits.set(key, recent);
+        // `?? t`: with max 0 there is no hit to age out, so the wait is the whole window.
+        const oldest = recent[0] ?? t;
         return {
           ok: false,
-          retryAfterSec: Math.max(1, Math.ceil((recent[0]! + opts.windowMs - t) / 1000)),
+          retryAfterSec: Math.max(1, Math.ceil((oldest + opts.windowMs - t) / 1000)),
         };
       }
       recent.push(t);

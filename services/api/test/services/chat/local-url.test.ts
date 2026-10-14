@@ -12,6 +12,9 @@ describe("isLocalUrl", () => {
     "http://169.254.1.1",
     "http://[::1]:11434",
     "http://[fd12::1]",
+    "http://[fe80::1]",
+    "http://[fe81::1]", // fe80::/10 spans fe80–febf
+    "http://[febf::1]",
     "http://ollama:11434", // Docker service name
     "http://host.docker.internal:11434",
     "http://nas.local:11434",
@@ -23,6 +26,7 @@ describe("isLocalUrl", () => {
     "http://8.8.8.8:11434",
     "http://172.32.0.1", // just outside 172.16/12
     "http://[2001:db8::1]",
+    "http://[fec0::1]", // deprecated site-local, outside fe80::/10
     "not a url",
     "",
   ])("treats %s as not local", (url) => expect(isLocalUrl(url)).toBe(false));

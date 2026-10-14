@@ -144,6 +144,9 @@ export async function assistantRoute(app: FastifyInstance) {
           fetch: injectFetch(app),
           getToken: () => token,
         });
+        // History is rebuilt from role + text only. Any `toolCalls` / `providerState` a client
+        // sends was already stripped by the body schema; keep it that way — a passthrough would
+        // let a client forge tool calls or inject provider content blocks.
         const history: ChatMessage[] = body.data.messages.map((m) =>
           m.role === "user"
             ? { role: "user", content: m.content }
@@ -162,7 +165,11 @@ export async function assistantRoute(app: FastifyInstance) {
           },
         });
       } catch (err) {
-        request.log.error({ err }, "assistant chat failed");
+        // Name only: a provider stack/message can echo prompt material, which logs must not hold.
+        request.log.error(
+          { err: err instanceof Error ? err.name : "unknown" },
+          "assistant chat failed",
+        );
         send("error", { error: "chat_failed" });
       } finally {
         clearInterval(keepalive);
