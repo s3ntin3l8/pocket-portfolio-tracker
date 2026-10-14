@@ -279,6 +279,8 @@ export function TransactionsTable({
         status: statusFilter,
       });
       setMatchingKeys(keys);
+      // Replaces (not extends) the selection: this is only offered once every loaded row is
+      // selected (`matchingOffered`), so the matching set is a superset of what was selected.
       setSelected(new Set(keys.map((k) => k.id)));
       if (truncatedAt) toast.info(tBatch("selectionCapped", { max: truncatedAt }));
     } catch {
