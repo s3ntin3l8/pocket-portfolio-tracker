@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, ViewTransition } from "react";
 import { cn } from "@/lib/utils";
 import { MonogramBadge } from "@/components/monogram-badge";
 
@@ -58,12 +58,19 @@ export function InstrumentLogo({
   market,
   assetClass,
   className,
+  transitionName,
 }: {
   label: string;
   symbol?: string | null;
   market?: string | null;
   assetClass?: string | null;
   className?: string;
+  /**
+   * `<ViewTransition name>` for a shared-element morph (holdings row -> instrument header).
+   * Names must be unique on the page, so a caller that mounts several variants at once
+   * (the holdings table and card list) passes it to the visible one only.
+   */
+  transitionName?: string;
 }) {
   const [errored, setErrored] = useState(false);
   // Call sites like the "selected instrument" chip in add-transaction-form.tsx render this
@@ -101,11 +108,22 @@ export function InstrumentLogo({
     [markFailed],
   );
 
+  const withTransition = (node: React.ReactElement) =>
+    transitionName ? (
+      <ViewTransition name={transitionName} share="vt-logo" default="none">
+        {node}
+      </ViewTransition>
+    ) : (
+      node
+    );
+
   if (!src || errored || failedLogoUrls.has(src)) {
-    return <MonogramBadge label={label} assetClass={assetClass} className={className} />;
+    return withTransition(
+      <MonogramBadge label={label} assetClass={assetClass} className={className} />,
+    );
   }
 
-  return (
+  return withTransition(
     <span
       className={cn(
         "inline-flex size-[38px] shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted",
@@ -121,6 +139,6 @@ export function InstrumentLogo({
         className="block size-full object-contain p-1"
         onError={markFailed}
       />
-    </span>
+    </span>,
   );
 }
