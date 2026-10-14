@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getChatProvider } from "../../../src/services/chat/registry.js";
 
 const KEYS = [
@@ -49,13 +49,57 @@ describe("getChatProvider (env-only selection under test)", () => {
     expect(p).toMatchObject({ name: "ollama", local: true });
   });
 
-  it("honours the CHAT_PROVIDER pin and falls through when the pinned one is unconfigured", async () => {
+  it("honours the CHAT_PROVIDER pin", async () => {
     process.env.ANTHROPIC_API_KEY = "k";
     process.env.OPENROUTER_API_KEY = "k";
     process.env.OPENROUTER_CHAT_MODEL = "m";
     process.env.CHAT_PROVIDER = "openrouter";
     expect((await getChatProvider())?.name).toBe("openrouter");
-    process.env.CHAT_PROVIDER = "ollama"; // not configured
-    expect((await getChatProvider())?.name).toBe("claude");
+  });
+
+  it("never falls through from a pinned provider to another one (a 'keep it local' pin stays local)", async () => {
+    process.env.ANTHROPIC_API_KEY = "k"; // a cloud key exists, e.g. for vision
+    process.env.CHAT_PROVIDER = "ollama"; // pinned, but its model is not set
+    process.env.OLLAMA_BASE_URL = "http://localhost:11434";
+    expect(await getChatProvider()).toBeNull();
+    process.env.OLLAMA_CHAT_MODEL = "qwen3";
+    expect((await getChatProvider())?.name).toBe("ollama");
+  });
+
+  it("only reports Ollama as local when its URL is on the user's own network", async () => {
+    process.env.OLLAMA_CHAT_MODEL = "qwen3";
+    for (const [url, local] of [
+      ["http://localhost:11434", true],
+      ["http://192.168.1.20:11434", true],
+      ["http://ollama:11434", true],
+      ["https://ollama.example.com", false],
+      ["http://8.8.8.8:11434", false],
+    ] as const) {
+      process.env.OLLAMA_BASE_URL = url;
+      expect((await getChatProvider())?.local, url).toBe(local);
+    }
+  });
+
+  it("asks OpenRouter not to retain prompts unless the operator opts out", async () => {
+    process.env.OPENROUTER_API_KEY = "k";
+    process.env.OPENROUTER_CHAT_MODEL = "some/model";
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: "x" }, finish_reason: "stop" }] }),
+      );
+    });
+    try {
+      const req = { system: "s", messages: [], tools: [], maxTokens: 1 };
+      await (await getChatProvider())!.complete(req);
+      process.env.OPENROUTER_ALLOW_DATA_COLLECTION = "true";
+      await (await getChatProvider())!.complete(req);
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.OPENROUTER_ALLOW_DATA_COLLECTION;
+    }
+    expect(bodies[0]!.provider).toEqual({ data_collection: "deny" });
+    expect(bodies[1]!.provider).toBeUndefined();
   });
 });

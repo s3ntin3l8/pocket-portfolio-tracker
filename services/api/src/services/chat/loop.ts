@@ -7,6 +7,10 @@ import type { Logger } from "../parsers/types.js";
 export const MAX_TOOL_ROUNDS = 8;
 export const MAX_TOKENS = 8000;
 export const MAX_TOOL_RESULT_CHARS = 24_000;
+/** Parallel tool calls run per model turn; extra calls get an error result (every call needs one). */
+export const MAX_TOOL_CALLS_PER_ROUND = 8;
+/** Total tool-result characters fed back to the model across one request. */
+export const MAX_TOTAL_TOOL_RESULT_CHARS = 120_000;
 
 /** What the route streams to the client (one SSE event each). Per turn, not per token. */
 export type ChatEvent =
@@ -33,6 +37,7 @@ export interface RunChatOptions {
 export async function runChat(opts: RunChatOptions): Promise<void> {
   const { provider, system, tools, emit, signal, log } = opts;
   const messages: ChatMessage[] = [...opts.history];
+  const budget = { remaining: MAX_TOTAL_TOOL_RESULT_CHARS };
   const specs = tools.map((t) => ({
     name: t.name,
     description: t.description,
@@ -71,42 +76,79 @@ export async function runChat(opts: RunChatOptions): Promise<void> {
       toolCalls: result.toolCalls,
       providerState: result.providerState,
     });
-    const results = await Promise.all(result.toolCalls.map((c) => runTool(c, tools, emit)));
-    messages.push({ role: "tool", results });
-  }
-}
-
-async function runTool(
-  call: ChatToolCall,
-  tools: AiTool[],
-  emit: (e: ChatEvent) => void,
-): Promise<ChatToolResult> {
-  const tool = tools.find((t) => t.name === call.name);
-  let out: unknown;
-  if (!tool) {
-    emit({ type: "tool_call", id: call.id, name: call.name, input: null });
-    out = { error: "unknown_tool" };
-  } else {
-    const parsed = tool.inputSchema.safeParse(call.args ?? {});
-    emit({
-      type: "tool_call",
-      id: call.id,
-      name: call.name,
-      input: parsed.success ? parsed.data : null,
+    // Validate first, announce every call in order, run the handlers in parallel (each isolated
+    // so one throw can't strand the others), then cap and report the results in call order:
+    // the client can pair tool_call/tool_result by position as well as by id, and the
+    // per-request result budget is applied deterministically.
+    const prepared = result.toolCalls.map((c, i) => prepare(c, tools, i));
+    for (const p of prepared) {
+      emit({ type: "tool_call", id: p.call.id, name: p.call.name, input: p.input });
+    }
+    const outs = await Promise.all(prepared.map(execute));
+    messages.push({
+      role: "tool",
+      results: prepared.map((p, i) => finish(p, outs[i], budget, emit)),
     });
-    // The handler already converts API failures into `{ error, status }` and redacts.
-    out = parsed.success ? await tool.handler(parsed.data) : { error: "invalid_arguments" };
   }
-  const ok = !isToolError(out);
-  emit({ type: "tool_result", id: call.id, name: call.name, ok });
-  return { callId: call.id, name: call.name, content: capResult(out), isError: !ok };
 }
 
-function capResult(out: unknown): string {
+interface Prepared {
+  call: ChatToolCall;
+  tool?: AiTool;
+  /** The validated input, or null when the call will not run. */
+  input: unknown;
+  /** Why the call will not run, as the error code the model is told. */
+  failure?: string;
+}
+
+function prepare(call: ChatToolCall, tools: AiTool[], index: number): Prepared {
+  // Every tool call must be answered, so rejected calls still get a (failed) result.
+  if (index >= MAX_TOOL_CALLS_PER_ROUND)
+    return { call, input: null, failure: "too_many_tool_calls" };
+  const tool = tools.find((t) => t.name === call.name);
+  if (!tool) return { call, input: null, failure: "unknown_tool" };
+  // `null` means the model's arguments were not valid JSON: never run with defaults.
+  const parsed = call.args === null ? null : tool.inputSchema.safeParse(call.args ?? {});
+  if (!parsed?.success) return { call, input: null, failure: "invalid_arguments" };
+  return { call, tool, input: parsed.data };
+}
+
+async function execute(p: Prepared): Promise<unknown> {
+  if (p.failure || !p.tool) return { error: p.failure ?? "unknown_tool" };
+  try {
+    // The built-in handlers already turn API failures into `{ error, status }` and redact.
+    return await p.tool.handler(p.input);
+  } catch {
+    return { error: "tool_failed" };
+  }
+}
+
+function finish(
+  p: Prepared,
+  rawOut: unknown,
+  budget: { remaining: number },
+  emit: (e: ChatEvent) => void,
+): ChatToolResult {
+  // Once the budget is spent the model only gets the (tiny) error, never a truncated payload.
+  const exhausted = budget.remaining <= 0;
+  const out = exhausted ? { error: "result_budget_exceeded" } : rawOut;
+  const ok = !isToolError(out);
+  const content = exhausted
+    ? JSON.stringify(out)
+    : capResult(out, Math.min(MAX_TOOL_RESULT_CHARS, budget.remaining));
+  budget.remaining -= content.length;
+  emit({ type: "tool_result", id: p.call.id, name: p.call.name, ok });
+  return { callId: p.call.id, name: p.call.name, content, isError: !ok };
+}
+
+/** Over-long results are wrapped, not cut mid-JSON, so the model always receives parseable JSON. */
+function capResult(out: unknown, limit: number): string {
   const json = JSON.stringify(out);
-  if (json.length <= MAX_TOOL_RESULT_CHARS) return json;
-  return (
-    json.slice(0, MAX_TOOL_RESULT_CHARS) +
-    `\n[truncated: the result exceeded ${MAX_TOOL_RESULT_CHARS} characters; narrow the query]`
-  );
+  if (json.length <= limit) return json;
+  const keep = Math.max(0, limit - 200);
+  return JSON.stringify({
+    truncated: true,
+    note: `The result exceeded ${limit} characters; narrow the query. Partial JSON follows.`,
+    partial: json.slice(0, keep),
+  });
 }

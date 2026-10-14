@@ -66,7 +66,11 @@ export interface ChatProvider {
  */
 export class ChatProviderError extends Error {
   constructor(
-    public readonly code: "provider_error" | "provider_unreachable" | "provider_bad_response",
+    public readonly code:
+      | "provider_error"
+      | "provider_unreachable"
+      | "provider_bad_response"
+      | "provider_not_configured",
     public readonly status?: number,
   ) {
     super(status ? `${code} (${status})` : code);

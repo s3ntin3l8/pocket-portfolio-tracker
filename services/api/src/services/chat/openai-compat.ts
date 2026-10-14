@@ -17,6 +17,8 @@ export interface OpenAICompatOptions {
   baseUrl: string;
   model: string;
   apiKey?: string;
+  /** Extra top-level request fields (e.g. OpenRouter routing preferences). */
+  extraBody?: Record<string, unknown>;
   fetch?: typeof fetch;
 }
 
@@ -31,6 +33,7 @@ export class OpenAICompatChatProvider implements ChatProvider {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly apiKey: string | undefined;
+  private readonly extraBody: Record<string, unknown>;
   private readonly doFetch: typeof fetch;
 
   constructor(opts: OpenAICompatOptions) {
@@ -40,6 +43,7 @@ export class OpenAICompatChatProvider implements ChatProvider {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
     this.model = opts.model;
     this.apiKey = opts.apiKey;
+    this.extraBody = opts.extraBody ?? {};
     this.doFetch = opts.fetch ?? globalThis.fetch;
   }
 
@@ -62,16 +66,21 @@ export class OpenAICompatChatProvider implements ChatProvider {
           model: this.model,
           max_tokens: req.maxTokens,
           messages: [{ role: "system", content: req.system }, ...req.messages.flatMap(toOpenAI)],
-          tools: req.tools.map((t) => ({
-            type: "function",
-            function: {
-              name: t.name,
-              description: t.description,
-              // Strict OpenAI-compatible servers reject the draft marker zod emits.
-              parameters: stripSchemaMarker(t.inputSchema),
-            },
-          })),
-          tool_choice: "auto",
+          ...(req.tools.length > 0
+            ? {
+                tools: req.tools.map((t) => ({
+                  type: "function",
+                  function: {
+                    name: t.name,
+                    description: t.description,
+                    // Strict OpenAI-compatible servers reject the draft marker zod emits.
+                    parameters: stripSchemaMarker(t.inputSchema),
+                  },
+                })),
+                tool_choice: "auto",
+              }
+            : {}),
+          ...this.extraBody,
         }),
       });
     } catch (err) {
@@ -156,7 +165,8 @@ function toOpenAI(m: ChatMessage): Record<string, unknown>[] {
             tool_calls: m.toolCalls.map((c) => ({
               id: c.id,
               type: "function",
-              function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) },
+              // `null` = the model sent invalid JSON; servers require an object here.
+              function: { name: c.name, arguments: c.args == null ? "{}" : JSON.stringify(c.args) },
             })),
           }
         : {}),

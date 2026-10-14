@@ -2,6 +2,7 @@
  * In-app assistant: auth, validation, the SSE event sequence over a scripted model, per-user
  * isolation through the in-process tools, redaction, caps, and provider selection from the DB.
  */
+import type { AddressInfo } from "node:net";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { visionProviderSettings } from "@portfolio/db";
@@ -221,6 +222,8 @@ describe("POST /assistant/chat — the loop over SSE", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toMatch(/^text\/event-stream/);
     expect(res.headers["x-accel-buffering"]).toBe("no");
+    // Headers set by Fastify plugins before the hijack (helmet) survive on the raw SSE response.
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
     expect(res.headers["cache-control"]).toMatch(/no-cache/);
 
     const events = parseSse(res.body);
@@ -320,6 +323,43 @@ describe("POST /assistant/chat — the loop over SSE", () => {
       payload: { name: "nope", baseCurrency: "eur" },
     });
     expect(blocked.statusCode).toBe(403);
+  });
+});
+
+describe("client disconnect", () => {
+  it("aborts the in-flight model call and ends the stream when the browser goes away", async () => {
+    let started = false;
+    let aborted = false;
+    current = {
+      name: "slow",
+      label: "Slow",
+      local: true,
+      isConfigured: () => true,
+      complete: (req) =>
+        new Promise((_resolve, reject) => {
+          started = true;
+          req.signal!.addEventListener("abort", () => {
+            aborted = true;
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        }),
+    };
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const { port } = app.server.address() as AddressInfo;
+    const ac = new AbortController();
+    const response = fetch(`http://127.0.0.1:${port}/assistant/chat`, {
+      method: "POST",
+      headers: { ...auth(owner), "content-type": "application/json" },
+      body: JSON.stringify(ask()),
+      signal: ac.signal,
+    }).catch(() => null);
+
+    await vi.waitFor(() => expect(started).toBe(true));
+    expect(aborted).toBe(false);
+    ac.abort(); // the browser navigates away / cancels
+    await vi.waitFor(() => expect(aborted).toBe(true));
+    await response;
+    use([endTurn("hi")]);
   });
 });
 

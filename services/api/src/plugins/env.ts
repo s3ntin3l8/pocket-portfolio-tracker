@@ -74,6 +74,12 @@ const schema = {
       type: "string",
       default: "1 minute",
     },
+    // In-app assistant cost cap: chat turns per user per hour (each turn can run several
+    // model calls). Per user, not per credential — a refreshed login token must not reset it.
+    ASSISTANT_RATE_LIMIT_MAX: {
+      type: "number",
+      default: 30,
+    },
     TRUSTED_PROXY_CIDRS: {
       type: "string",
       default: "",
@@ -259,6 +265,7 @@ declare module "fastify" {
       CORS_ORIGIN: string;
       RATE_LIMIT_MAX: number;
       RATE_LIMIT_WINDOW: string;
+      ASSISTANT_RATE_LIMIT_MAX: number;
       TRUSTED_PROXY_CIDRS: string;
       MARKET_DATA_TTL_MS: number;
       PYTR_PYTHON_BIN: string;

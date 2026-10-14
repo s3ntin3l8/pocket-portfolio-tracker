@@ -215,7 +215,40 @@ describe("AnthropicChatProvider", () => {
     expect(p.isConfigured()).toBe(false);
     await expect(
       p.complete({ system: "s", messages: [], tools: [], maxTokens: 1 }),
-    ).rejects.toMatchObject({ code: "provider_error", status: 401 });
+    ).rejects.toMatchObject({ code: "provider_not_configured" });
+  });
+});
+
+describe("AnthropicChatProvider — edge cases", () => {
+  it("returns several tool calls from one turn and omits an empty tools list", async () => {
+    const f = fakeFetch(() =>
+      json({
+        content: [
+          { type: "tool_use", id: "a", name: "get_holdings", input: {} },
+          { type: "tool_use", id: "b", name: "get_income", input: { year: 2025 } },
+        ],
+        stop_reason: "tool_use",
+      }),
+    );
+    const out = await new AnthropicChatProvider("k", { fetch: f.impl }).complete({
+      system: "s",
+      messages: [],
+      tools: [],
+      maxTokens: 1,
+    });
+    expect(out.toolCalls.map((c) => c.id)).toEqual(["a", "b"]);
+    expect(f.calls[0]!.body.tools).toBeUndefined();
+  });
+
+  it("copes with an empty content array", async () => {
+    const f = fakeFetch(() => json({ content: [], stop_reason: "end_turn" }));
+    const out = await new AnthropicChatProvider("k", { fetch: f.impl }).complete({
+      system: "s",
+      messages: [],
+      tools: [],
+      maxTokens: 1,
+    });
+    expect(out).toMatchObject({ text: "", toolCalls: [], stop: "end" });
   });
 });
 
@@ -369,5 +402,42 @@ describe("OpenAICompatChatProvider", () => {
     expect(make(fetch, { model: "" }).isConfigured()).toBe(false);
     expect(make(fetch, { baseUrl: "" }).isConfigured()).toBe(false);
     expect(make(fetch).isConfigured()).toBe(true);
+  });
+
+  it("omits tools/tool_choice when there are none and merges extra body fields", async () => {
+    const f = fakeFetch(() =>
+      json({ choices: [{ message: { content: "x" }, finish_reason: "stop" }] }),
+    );
+    await make(f.impl, { extraBody: { provider: { data_collection: "deny" } } }).complete({
+      system: "s",
+      messages: [],
+      tools: [],
+      maxTokens: 1,
+    });
+    const body = f.calls[0]!.body;
+    expect(body.tools).toBeUndefined();
+    expect(body.tool_choice).toBeUndefined();
+    expect(body.provider).toEqual({ data_collection: "deny" });
+  });
+
+  it("replays a tool call with unparseable arguments as an empty object, not the string null", async () => {
+    const f = fakeFetch(() =>
+      json({ choices: [{ message: { content: "x" }, finish_reason: "stop" }] }),
+    );
+    await make(f.impl).complete({
+      system: "s",
+      tools: [],
+      maxTokens: 1,
+      messages: [
+        { role: "user", content: "q" },
+        { role: "assistant", text: "", toolCalls: [{ id: "c1", name: "get_income", args: null }] },
+        {
+          role: "tool",
+          results: [{ callId: "c1", name: "get_income", content: "{}", isError: true }],
+        },
+      ],
+    });
+    const assistant = f.calls[0]!.body.messages[2];
+    expect(assistant.tool_calls[0].function.arguments).toBe("{}");
   });
 });

@@ -51,7 +51,7 @@ export class AnthropicChatProvider implements ChatProvider {
   }
 
   async complete(req: ChatRequest, log?: Logger): Promise<ChatResult> {
-    if (!this.isConfigured()) throw new ChatProviderError("provider_error", 401);
+    if (!this.isConfigured()) throw new ChatProviderError("provider_not_configured");
     const t0 = Date.now();
     // Server-side refusal fallback is a first-party-API feature: only request it there.
     const fallbacks = this.baseUrl === DEFAULT_BASE_URL;
@@ -71,11 +71,15 @@ export class AnthropicChatProvider implements ChatProvider {
           model: this.model,
           max_tokens: req.maxTokens,
           system: req.system,
-          tools: req.tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            input_schema: t.inputSchema,
-          })),
+          ...(req.tools.length > 0
+            ? {
+                tools: req.tools.map((t) => ({
+                  name: t.name,
+                  description: t.description,
+                  input_schema: t.inputSchema,
+                })),
+              }
+            : {}),
           messages: req.messages.map(toAnthropicMessage),
           ...(this.effort ? { output_config: { effort: this.effort } } : {}),
           ...(fallbacks ? { fallbacks: "default" } : {}),

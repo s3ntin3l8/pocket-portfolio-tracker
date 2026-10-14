@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createTools, GLOSSARY } from "@portfolio/ai-tools";
 import { createApiClient } from "@portfolio/api-client";
 import { injectFetch } from "../lib/inject-fetch.js";
+import { createWindowLimiter } from "../lib/window-limiter.js";
 import { runChat, type ChatEvent } from "../services/chat/loop.js";
 import type { ChatMessage } from "../services/chat/types.js";
 
@@ -64,9 +65,17 @@ function systemPrompt(scope: string | undefined): string {
  * codes; upstream bodies never reach the client.
  *
  * `scope: "read"` — like /mcp it is a POST that only reads, so a read-scoped token may use it
- * and the write-invalidation hook must not flush the caches for it.
+ * and the write-invalidation hook must not flush the caches for it. The cost cap is per user
+ * (`ASSISTANT_RATE_LIMIT_MAX` turns per hour), enforced here after authentication.
  */
 export async function assistantRoute(app: FastifyInstance) {
+  // Keyed by user id (known only after authentication), so a refreshed access token or a
+  // freshly minted PAT shares the same budget.
+  const limiter = createWindowLimiter({
+    max: app.config.ASSISTANT_RATE_LIMIT_MAX,
+    windowMs: 60 * 60 * 1000,
+  });
+
   app.get("/assistant/status", { preHandler: app.authenticate }, async () => {
     const provider = await app.resolveChatProvider();
     return {
@@ -82,20 +91,21 @@ export async function assistantRoute(app: FastifyInstance) {
     "/assistant/chat",
     {
       preHandler: app.authenticate,
-      config: {
-        scope: "read",
-        // The per-credential cost cap: each turn can run several model calls.
-        rateLimit: {
-          max: Number(process.env.ASSISTANT_RATE_LIMIT_MAX ?? 30) || 30,
-          timeWindow: "1 hour",
-        },
-      },
+      config: { scope: "read" },
     },
     async (request, reply) => {
       const body = bodySchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "invalid_request" });
       const provider = await app.resolveChatProvider();
       if (!provider) return reply.code(503).send({ error: "chat_not_configured" });
+      // Counted only once the request is valid and answerable, so 400/503 don't use budget.
+      const allowed = limiter.hit(request.userId);
+      if (!allowed.ok) {
+        return reply
+          .code(429)
+          .header("retry-after", String(allowed.retryAfterSec))
+          .send({ error: "assistant_rate_limited" });
+      }
 
       // From here on we own the raw response: take it over before anything is written and
       // carry over headers Fastify plugins (helmet, cors) already set.
