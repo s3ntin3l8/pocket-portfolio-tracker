@@ -3,6 +3,7 @@ import { getDb } from "../../db/client.js";
 import type { ResolvedSecret } from "../market-data.js";
 import { resolveVisionCredentials, resolveVisionProviderConfig } from "../screenshot-parser.js";
 import { AnthropicChatProvider } from "./anthropic.js";
+import { GeminiChatProvider } from "./gemini.js";
 import { isLocalUrl } from "./local-url.js";
 import { OpenAICompatChatProvider } from "./openai-compat.js";
 import type { ChatProvider } from "./types.js";
@@ -30,6 +31,16 @@ export const CHAT_PROVIDER_REGISTRY: ChatProviderDescriptor[] = [
       new AnthropicChatProvider(s?.apiKey ?? env("ANTHROPIC_API_KEY") ?? "", {
         model: env("ANTHROPIC_CHAT_MODEL"),
         effort: env("ANTHROPIC_CHAT_EFFORT"),
+      }),
+  },
+  {
+    id: "gemini",
+    // Gemini outranks OpenRouter and Ollama in the vision priority, and most deployments with
+    // a Gemini vision key never meant to send chat there: chat is opt-in via a chat model.
+    configured: (s) => Boolean((s?.apiKey ?? env("GEMINI_API_KEY")) && env("GEMINI_CHAT_MODEL")),
+    create: (s) =>
+      new GeminiChatProvider(s?.apiKey ?? env("GEMINI_API_KEY") ?? "", {
+        model: env("GEMINI_CHAT_MODEL") ?? "",
       }),
   },
   {

@@ -65,13 +65,14 @@ The chat provider is picked per request:
 Credentials are the same vendor credentials the vision parsers use (encrypted DB credential, else env). Only the
 models are chat-specific:
 
-| Provider     | Needs                                   | Notes                                                                                                                                                                                                                                                     |
-| ------------ | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `claude`     | `ANTHROPIC_API_KEY`                     | default model `claude-opus-5-5` (`ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_CHAT_EFFORT`); on the first-party API the request opts into server-side refusal fallback                                                                                              |
-| `openrouter` | key + `OPENROUTER_CHAT_MODEL`           | OpenAI-compatible `/chat/completions` with tools. Requests carry `provider.data_collection: "deny"` (only endpoints that do not retain or train on prompts); set `OPENROUTER_ALLOW_DATA_COLLECTION=true` to relax, e.g. for a model with no such endpoint |
-| `ollama`     | `OLLAMA_BASE_URL` + `OLLAMA_CHAT_MODEL` | tool-calling quality depends on the model. `local` is derived from the URL (loopback, private ranges, `.local`/`.internal`, single-label/Docker names), so a remote URL is reported as not local                                                          |
+| Provider     | Needs                                   | Notes                                                                                                                                                                                                                                                                                                                |
+| ------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `claude`     | `ANTHROPIC_API_KEY`                     | default model `claude-opus-5-5` (`ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_CHAT_EFFORT`); on the first-party API the request opts into server-side refusal fallback                                                                                                                                                         |
+| `openrouter` | key + `OPENROUTER_CHAT_MODEL`           | OpenAI-compatible `/chat/completions` with tools. Requests carry `provider.data_collection: "deny"` (only endpoints that do not retain or train on prompts); set `OPENROUTER_ALLOW_DATA_COLLECTION=true` to relax, e.g. for a model with no such endpoint                                                            |
+| `ollama`     | `OLLAMA_BASE_URL` + `OLLAMA_CHAT_MODEL` | tool-calling quality depends on the model. `local` is derived from the URL (loopback, private ranges, `.local`/`.internal`, single-label/Docker names), so a remote URL is reported as not local                                                                                                                     |
+| `gemini`     | key + `GEMINI_CHAT_MODEL`               | Gemini `generateContent` with function calling, streamed. Opt-in via the model variable: Gemini outranks OpenRouter and Ollama in the default priority, so a Gemini vision key alone never starts sending chat to Google. The model's parts (including thought signatures) are replayed verbatim between tool rounds |
 
-Gemini has no chat adapter yet. Provider adapters use plain `fetch` (no SDK), like the vision parsers.
+Provider adapters use plain `fetch` (no SDK), like the vision parsers.
 
 ## Privacy
 
