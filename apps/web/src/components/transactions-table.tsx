@@ -18,7 +18,7 @@ import {
   TradeFilterBanner,
   ReconciliationBanner,
 } from "@/components/transactions/activity-banners";
-import { apiErrorCode, type Anomaly } from "@portfolio/api-client";
+import type { Anomaly } from "@portfolio/api-client";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
 
 import type { TxRow } from "./transactions-table/types";
@@ -26,11 +26,8 @@ import { TX_COLS } from "./transactions-table/utils";
 import { AnomalyBanner } from "./transactions-table/banners";
 import { FilterBar } from "./transactions-table/filter-bar";
 import { SelectionBar } from "./transactions-table/selection-bar";
-import {
-  groupIdsByPortfolio,
-  runBulkByPortfolio,
-  type SelectionEntry,
-} from "./transactions-table/bulk";
+import type { SelectionEntry } from "./transactions-table/bulk";
+import { useBatchActions } from "./transactions-table/batch-actions";
 import { ReassignMergeDialogs } from "./transactions-table/reassign-merge";
 import { DesktopTable } from "./transactions-table/desktop";
 import { MobileView } from "./transactions-table/mobile";
@@ -100,7 +97,6 @@ export function TransactionsTable({
   actions?: React.ReactNode;
 }) {
   const ta = useTranslations("Anomalies");
-  const tTx = useTranslations("Transactions");
   const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
@@ -113,8 +109,6 @@ export function TransactionsTable({
   const flaggedCount = anomalyByTxId.size;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [showFlagged, setShowFlagged] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
@@ -137,15 +131,12 @@ export function TransactionsTable({
       statusFilter,
     );
 
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const [reassignRows, setReassignRows] = useState<SelectionEntry[] | null>(null);
   // "Select all N matching": id/portfolio/status of rows beyond the loaded pages, so the
   // bulk actions can still group the selection per portfolio.
   const [matchingKeys, setMatchingKeys] = useState<SelectionEntry[] | null>(null);
   const [matchingLoading, setMatchingLoading] = useState(false);
   const [mergeRows, setMergeRows] = useState<[TxRow, TxRow] | null>(null);
 
-  const tr = useTranslations("Transactions.reassign");
   const tBatch = useTranslations("Transactions.batch");
 
   const clearSelection = () => {
@@ -317,62 +308,23 @@ export function TransactionsTable({
     else setDetailTx(tx);
   };
 
-  async function onBatchDelete() {
-    setBusy(true);
-    try {
-      await runBulkByPortfolio(groupIdsByPortfolio(selectedEntries), (portfolioId, ids) =>
-        api.bulkDeleteTransactions(portfolioId, ids),
-      );
-      clearSelection();
-      router.refresh();
-    } finally {
-      setBusy(false);
-      setConfirming(false);
-    }
-  }
-
   const selectedDraftIds = useMemo(
     () => selectedEntries.filter((e) => e.status === "draft").map((e) => e.id),
     [selectedEntries],
   );
 
-  async function onBatchResolve(action: "confirm" | "discard") {
-    setBusy(true);
-    try {
-      await runBulkByPortfolio(
-        groupIdsByPortfolio(selectedEntries.filter((e) => e.status === "draft")),
-        (portfolioId, ids) => api.resolveDraftTransactions(portfolioId, ids, action),
-      );
-      clearSelection();
-      router.refresh();
-    } catch (err) {
-      if (!handleResolveError(err)) throw err;
-      router.refresh(); // other portfolios' batches may have gone through
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Confirm refuses an inbound depot transfer that still has no cost basis (price 0) —
-  // audit B4. Surface it as a translated toast instead of an unhandled rejection; the
-  // user fixes it by editing the draft's price. Returns false for any other error.
-  function handleResolveError(err: unknown): boolean {
-    if (apiErrorCode(err) !== "transfer_cost_basis_required") return false;
-    toast.error(tTx("draftTransferCostBasisRequired"));
-    return true;
-  }
-
-  async function onResolveOne(tx: TxRow, action: "confirm" | "discard") {
-    setResolvingId(tx.id);
-    try {
-      await api.resolveDraftTransactions(tx.portfolioId, [tx.id], action);
-      router.refresh();
-    } catch (err) {
-      if (!handleResolveError(err)) throw err;
-    } finally {
-      setResolvingId(null);
-    }
-  }
+  const {
+    busy,
+    confirming,
+    setConfirming,
+    resolvingId,
+    reassignRows,
+    setReassignRows,
+    onBatchDelete,
+    onBatchResolve,
+    onResolveOne,
+    doReassign,
+  } = useBatchActions({ selectedEntries, clearSelection });
 
   const canReassign = portfolios.length > 1;
   const selectedRows = useMemo(
@@ -383,25 +335,6 @@ export function TransactionsTable({
     selected.size === 2 &&
     selectedRows.length === 2 &&
     selectedRows[0].portfolioId === selectedRows[1].portfolioId;
-
-  async function doReassign(targetPortfolioId: string) {
-    const queued = (reassignRows ?? []).filter((r) => r.portfolioId !== targetPortfolioId);
-    let moved = 0;
-    let skipped = 0;
-    const results = await runBulkByPortfolio(groupIdsByPortfolio(queued), (pid, ids) =>
-      api.reassignTransactions(pid, ids, targetPortfolioId),
-    );
-    for (const r of results) {
-      moved += r.moved;
-      skipped += r.skippedConflicts + r.skippedLoans;
-    }
-    if (moved === 0) toast.info(tr("none"));
-    else if (skipped > 0) toast.success(tr("successWithSkips", { moved, skipped }));
-    else toast.success(tr("success", { count: moved }));
-    setReassignRows(null);
-    clearSelection();
-    router.refresh();
-  }
 
   const colSpan = showPortfolio ? 10 : 9;
 
