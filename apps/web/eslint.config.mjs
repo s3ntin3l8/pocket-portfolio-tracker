@@ -42,13 +42,10 @@ const eslintConfig = [
     //    browser chrome outside the CSS cascade, so it cannot use var().
     //  - lib/brokerages.ts: hash-derived hsl() hues for unknown brokerages — computed per name
     //    at runtime, so there is no token to point at.
-    //  - components/onboarding/**: pre-auth intro screens with their own palette, pending a
-    //    port onto the tokens (tracked as track 7 of the UI modernization plan).
     ignores: [
       "src/components/theme-color-sync.tsx",
       "src/lib/brokerages.ts",
       "src/app/[[]locale]/layout.tsx",
-      "src/components/onboarding/**",
     ],
     rules: {
       "no-restricted-syntax": [
