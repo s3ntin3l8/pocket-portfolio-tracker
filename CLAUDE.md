@@ -28,6 +28,8 @@ cash** with live IDX prices and a real-time gold ticker.
   `@portfolio/db`; the API applies them at startup.
 - **`apps/web`** — **Next.js (App Router) PWA**, Tailwind + shadcn/ui, **next-intl**
   (EN/ID). Talks to the API over HTTP (base URL is config-driven → Vercel-migratable).
+  Includes an in-app assistant panel (`components/assistant/`, streams `POST /assistant/chat`; model
+  output is untrusted — Markdown never renders images or raw HTML; see `docs/assistant.md`).
 - **`packages/*`** — `schema` (zod + types), `core` (holdings, cost basis, XIRR/TWR,
   contributions, tax DE/ID, trade-log, allocation/rebalancing, forecasting, corp-actions,
   FX — the domain logic derived from transactions, the source of truth), `db` (Drizzle
