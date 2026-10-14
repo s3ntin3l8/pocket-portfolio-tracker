@@ -1,6 +1,6 @@
 /**
  * Exercises the `scope: "read"` exception in the global onResponse write-invalidation hook
- * (services/api/src/app.ts): a read-only POST (i.e. /mcp) must not flush the valuation and
+ * (services/api/src/app.ts): a read-only POST (i.e. /mcp and /assistant/chat) must not flush the valuation and
  * derivation caches the way every other non-GET does — otherwise each MCP call would discard them.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
@@ -26,7 +26,16 @@ beforeAll(async () => {
   process.env.AUTHENTIK_ISSUER = ISSUER;
   process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
   process.env.RATE_LIMIT_MAX = "10000";
-  app = await buildApp({ authKey: kp.publicKey });
+  app = await buildApp({
+    authKey: kp.publicKey,
+    chatProvider: {
+      name: "fake",
+      label: "Fake",
+      local: true,
+      isConfigured: () => true,
+      complete: async () => ({ text: "hi", toolCalls: [], stop: "end" }),
+    },
+  });
   jwt = await new SignJWT({ email: "mcp-cache@example.com" })
     .setProtectedHeader({ alg: "ES256" })
     .setSubject("mcp-cache")
@@ -67,6 +76,27 @@ describe("cache invalidation hook", () => {
     expect(write.statusCode).toBe(201);
     // onResponse runs after the reply is flushed; wait for the write's flush rather than
     // guessing a delay. Exactly one flush means the earlier /mcp POST did not add one.
+    await vi.waitFor(() => expect(clearValuation).toHaveBeenCalled());
+    expect(clearValuation).toHaveBeenCalledTimes(1);
+  });
+  it("does not fire for a streamed POST /assistant/chat turn either", async () => {
+    clearValuation.mockClear();
+    const res = await app.inject({
+      method: "POST",
+      url: "/assistant/chat",
+      headers: headers(),
+      payload: { messages: [{ role: "user", content: "hello" }] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("event: done");
+
+    const write = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: headers(),
+      payload: { name: "cache-probe-2", baseCurrency: "eur" },
+    });
+    expect(write.statusCode).toBe(201);
     await vi.waitFor(() => expect(clearValuation).toHaveBeenCalled());
     expect(clearValuation).toHaveBeenCalledTimes(1);
   });

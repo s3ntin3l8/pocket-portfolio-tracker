@@ -55,4 +55,6 @@ claude mcp add --transport http pocket https://<your-pocket-api>/mcp \
 - Tool ids are validated as GUIDs, so a tool argument can never steer a call to another endpoint.
 - `mcp-remote` is a third-party bridge fetched by `npx`; the snippet pins a version — review it before bumping.
 
+The in-app chat uses the same tools: see [`assistant.md`](assistant.md).
+
 Not yet: OAuth for claude.ai connectors (#923), draft-only write tools (#924).

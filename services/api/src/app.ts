@@ -33,6 +33,9 @@ import { ibkrRoute } from "./routes/ibkr.js";
 import { adminRoute } from "./routes/admin.js";
 import { searchRoute } from "./routes/search.js";
 import { mcpRoute } from "./routes/mcp.js";
+import { assistantRoute } from "./routes/assistant.js";
+import { getChatProvider } from "./services/chat/registry.js";
+import type { ChatProvider } from "./services/chat/types.js";
 import { storageRoute } from "./routes/storage.js";
 import { targetsRoute } from "./routes/targets.js";
 import { preferencesRoute } from "./routes/preferences.js";
@@ -51,6 +54,8 @@ import { clearDerivationCache } from "./lib/derivation-cache.js";
 export type BuildAppOptions = AuthPluginOptions & {
   // Injectable so tests can supply a mock parser instead of hitting Anthropic.
   screenshotParser?: ScreenshotParser;
+  /** Test seam for the assistant: an instance, or `null` for "not configured". Omitted = resolve from settings/env. */
+  chatProvider?: ChatProvider | null;
   // Injectable so tests drive the pytr boundary without spawning Python.
   pytr?: PytrRunner;
   // Injectable so tests can mock the IBKR Flex client without real HTTP.
@@ -307,6 +312,10 @@ export async function buildApp(opts: BuildAppOptions = {}) {
 
   const screenshotParser = opts.screenshotParser ?? (await getScreenshotParser());
   app.decorate("screenshotParser", screenshotParser);
+  app.decorate(
+    "resolveChatProvider",
+    opts.chatProvider !== undefined ? async () => opts.chatProvider ?? null : getChatProvider,
+  );
   // Log the selected vision provider once at startup (only for the real singleton, not
   // test-injected mocks — those are controlled by the test and shouldn't pollute logs).
   if (!opts.screenshotParser) {
@@ -351,6 +360,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(adminRoute);
   await app.register(searchRoute);
   await app.register(mcpRoute);
+  await app.register(assistantRoute);
   await app.register(targetsRoute);
   await app.register(preferencesRoute);
   // Public file-serving for the folder storage provider (no auth — token in query string).
@@ -362,6 +372,8 @@ export async function buildApp(opts: BuildAppOptions = {}) {
 declare module "fastify" {
   interface FastifyInstance {
     screenshotParser: ScreenshotParser;
+    /** Resolves the assistant's chat provider per request; `null` when none is configured. */
+    resolveChatProvider: () => Promise<ChatProvider | null>;
     pytr: PytrRunner;
     ibkrFlex: IbkrFlexClient;
     storage: StorageProvider;
