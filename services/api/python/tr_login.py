@@ -89,8 +89,16 @@ def main() -> int:
         )
         return EXIT_AUTHENTICATOR_REQUIRED
 
+    # pytr exposes the login process id only as `_process_id`. Fail fast if it is missing
+    # (e.g. renamed upstream): the runner ignores a stdout line without a processId and
+    # would otherwise wait out its whole pairing timeout.
+    process_id = getattr(tr, "_process_id", None)
+    if not process_id:
+        print("pytr did not report a login process id", file=sys.stderr)
+        return EXIT_FAILED
+
     # Tell the runner the push has been sent; it flips the connection to 'awaiting_approval'.
-    print(json.dumps({"processId": tr._process_id, "status": "awaiting_approval"}), flush=True)
+    print(json.dumps({"processId": process_id, "status": "awaiting_approval"}), flush=True)
 
     try:
         tr.complete_weblogin()

@@ -15,14 +15,16 @@ import pytest
 import tr_login
 
 
-def install_fake_pytr(monkeypatch, *, initiate=None, complete=None, needs_authenticator=False):
+def install_fake_pytr(
+    monkeypatch, *, initiate=None, complete=None, needs_authenticator=False, process_id="proc-123"
+):
     """Register a fake `pytr.api.TradeRepublicApi`; returns the list of constructed instances."""
     instances = []
 
     class FakeApi:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
-            self._process_id = "proc-123"
+            self._process_id = process_id
             self.weblogin_needs_authenticator = needs_authenticator
             instances.append(self)
 
@@ -115,3 +117,11 @@ def test_not_approved_exits_3(monkeypatch, pair_env, exc):
 def test_other_completion_error_exits_1(monkeypatch, pair_env):
     install_fake_pytr(monkeypatch, complete=RuntimeError("network"))
     assert pair_env() == 1
+
+
+def test_missing_process_id_exits_1_without_stdout(monkeypatch, capsys, pair_env):
+    install_fake_pytr(monkeypatch, process_id=None)
+    assert pair_env() == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "process id" in captured.err
