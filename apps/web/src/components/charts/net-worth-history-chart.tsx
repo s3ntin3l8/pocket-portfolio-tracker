@@ -135,6 +135,7 @@ export function NetWorthHistoryChart({
     } catch {
       // keep last good series on failed refetch
     } finally {
+      // Keep coupled with `setData(next)` above (same batch): the hero emit effect depends on `loading`.
       if (seq === requestSeq.current) setLoading(false);
     }
   }

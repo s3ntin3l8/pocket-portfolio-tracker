@@ -144,7 +144,7 @@ export function HeroGlanceCard({
         // the new ones tick in (same pattern as the headline). The headline is not keyed on
         // range, so it stays put.
         <ViewTransition
-          key={`${range}|${snapshot.isIntraday}|${closeDelta}|${benchmarkPct}`}
+          key={`${range}|${snapshot.isIntraday}|${closeDelta.toFixed(4)}|${benchmarkPct?.toFixed(4) ?? "none"}`}
           enter="vt-tick"
           exit="vt-tick-out"
           default="none"
