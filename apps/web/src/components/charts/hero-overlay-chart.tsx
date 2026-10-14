@@ -53,7 +53,7 @@ export function HeroOverlayChart({
           <Line
             type="monotone"
             dataKey="benchmark"
-            stroke="#FFD24A"
+            stroke="var(--hero-gold)"
             strokeWidth={1.8}
             strokeDasharray="5 3"
             dot={false}
@@ -63,13 +63,16 @@ export function HeroOverlayChart({
           <Line
             type="monotone"
             dataKey="portfolio"
-            stroke="#ffffff"
+            stroke="var(--primary-foreground)"
             strokeWidth={2.2}
             dot={false}
             isAnimationActive={false}
           />
           <Tooltip
-            cursor={{ stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }}
+            cursor={{
+              stroke: "color-mix(in srgb, var(--primary-foreground) 55%, transparent)",
+              strokeDasharray: "4 4",
+            }}
             content={<HeroTooltip isIntraday={isIntraday} currency={currency} locale={locale} />}
           />
         </ComposedChart>
@@ -116,7 +119,7 @@ function HeroTooltip({
       value: isIntraday
         ? formatMoney(p.portfolio, currency, locale)
         : formatPercent(p.portfolio / 100, locale),
-      dot: "#ffffff",
+      dot: "var(--primary-foreground)",
     },
   ];
   if (p.benchmark !== null) {
@@ -125,7 +128,7 @@ function HeroTooltip({
       value: isIntraday
         ? formatMoney(p.benchmark, currency, locale)
         : formatPercent(p.benchmark / 100, locale),
-      dot: "#FFD24A",
+      dot: "var(--hero-gold)",
     });
   }
 

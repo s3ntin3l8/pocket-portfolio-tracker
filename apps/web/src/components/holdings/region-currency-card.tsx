@@ -19,7 +19,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
   const locale = useLocale();
   return (
     <div className="min-w-0">
-      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
         {title}
       </p>
       {rows.length > 0 ? (

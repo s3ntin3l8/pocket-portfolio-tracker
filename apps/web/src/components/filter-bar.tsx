@@ -61,7 +61,7 @@ export function YearFilterDropdown({
           className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           {value ?? allLabel}
-          <ChevronDown className="size-3.5 shrink-0 text-text-3" />
+          <ChevronDown className="size-3.5 shrink-0 text-text-2" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[9rem]">

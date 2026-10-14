@@ -66,7 +66,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
     return (
       <Card className="rounded-2xl bg-card p-4 shadow-card">
         <p className="text-xs font-semibold text-text-2">{t("title")}</p>
-        <p className="mt-2 text-xs text-text-3">{t("insufficientData")}</p>
+        <p className="mt-2 text-xs text-text-2">{t("insufficientData")}</p>
       </Card>
     );
   }
@@ -81,7 +81,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-text-2">{t("title")}</p>
-          <p className="mt-0.5 truncate text-micro text-text-3">{subtitle}</p>
+          <p className="mt-0.5 truncate text-micro text-text-2">{subtitle}</p>
         </div>
       </div>
 
@@ -91,12 +91,12 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
             <XAxis
               dataKey="year"
-              tick={{ fontSize: 10, fill: "var(--color-text-3)" }}
+              tick={{ fontSize: 10, fill: "var(--color-text-2)" }}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "var(--color-text-3)" }}
+              tick={{ fontSize: 10, fill: "var(--color-text-2)" }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => `${v.toFixed(0)}%`}
@@ -201,21 +201,21 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                 <TableCell className="px-2 py-1.5 first:pl-2 last:pr-2 text-left text-xs font-medium text-text-2">
                   {r.year}
                   {r.isCurrentYear && (
-                    <span className="ml-1 text-micro text-text-3">· {t("ytdLabel")}</span>
+                    <span className="ml-1 text-micro text-text-2">· {t("ytdLabel")}</span>
                   )}
                 </TableCell>
                 <TableCell className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs">
                   {r.portfolioTwr !== null ? (
                     <PercentCell value={Number(r.portfolioTwr)} locale={locale} />
                   ) : (
-                    <span className="text-text-3">{t("noData")}</span>
+                    <span className="text-text-2">{t("noData")}</span>
                   )}
                 </TableCell>
                 <TableCell className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs">
                   {r.portfolioXirr !== null ? (
                     <PercentCell value={Number(r.portfolioXirr)} locale={locale} />
                   ) : (
-                    <span className="text-text-3">{t("noData")}</span>
+                    <span className="text-text-2">{t("noData")}</span>
                   )}
                 </TableCell>
                 {r.benchmarks.map((b) => (
@@ -226,7 +226,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                     {b.twr !== null ? (
                       <PercentCell value={Number(b.twr)} locale={locale} />
                     ) : (
-                      <span className="text-text-3">{t("noData")}</span>
+                      <span className="text-text-2">{t("noData")}</span>
                     )}
                   </TableCell>
                 ))}
@@ -238,7 +238,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                     {b.activeReturn !== null ? (
                       <PercentCell value={Number(b.activeReturn)} locale={locale} />
                     ) : (
-                      <span className="text-text-3">{t("noData")}</span>
+                      <span className="text-text-2">{t("noData")}</span>
                     )}
                   </TableCell>
                 ))}

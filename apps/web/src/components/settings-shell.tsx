@@ -15,7 +15,7 @@ export interface ShellNavItem {
   title: string;
   /** Shown under the title in the mobile landing row; omitted on the desktop rail. */
   subtitle?: string;
-  color: string;
+  fg: string;
   bg: string;
   /** Small uppercase pill next to the title (e.g. "ADMIN"). */
   badge?: string;
@@ -95,7 +95,7 @@ export function SettingsShell({
         >
           <span
             className="flex size-[30px] shrink-0 items-center justify-center rounded-sm [&>svg]:size-4"
-            style={{ background: item.bg, color: item.color }}
+            style={{ background: item.bg, color: item.fg }}
           >
             {item.icon}
           </span>
@@ -142,7 +142,7 @@ export function SettingsShell({
                     >
                       <span
                         className="flex size-9 shrink-0 items-center justify-center rounded-xl [&>svg]:size-[18px]"
-                        style={{ background: item.bg, color: item.color }}
+                        style={{ background: item.bg, color: item.fg }}
                       >
                         {item.icon}
                       </span>

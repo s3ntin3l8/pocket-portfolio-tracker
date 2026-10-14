@@ -72,7 +72,7 @@ export function PricingFields({
 
   return (
     <div className="border-t border-line pt-[18px]">
-      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-3">
+      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-2">
         {t("amount")}
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -175,7 +175,7 @@ export function DetailsFields({
 }: DetailsFieldsProps) {
   return (
     <div className="border-t border-line pt-[18px]">
-      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-3">
+      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-2">
         {t("details")}
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -205,7 +205,7 @@ export function DetailsFields({
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("notesPlaceholder")}
               rows={2}
-              className="flex w-full resize-y rounded-md border border-border bg-card px-3.5 py-[13px] text-base font-medium transition-colors placeholder:text-text-3 focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+              className="flex w-full resize-y rounded-md border border-border bg-card px-3.5 py-[13px] text-base font-medium transition-colors placeholder:text-text-2 focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
             />
           </Field>
         </div>

@@ -115,7 +115,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
             onChange={(v) => setFolder((p) => ({ ...p, path: v, pathSource: "db" }))}
           />
           {!initial.encryptionEnabled && (
-            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+            <div className="flex items-center gap-1.5 text-xs text-warning">
               <AlertCircle className="size-3 shrink-0" />
               {t("storageEncryptionRequired")}
             </div>

@@ -56,10 +56,7 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
                   {h.birthYear != null ? ` · ${h.birthYear}` : ""}
                 </p>
               </div>
-              <ChevronRight
-                aria-hidden
-                className="size-[18px] shrink-0 text-[color:var(--chevron,#C3CBC6)]"
-              />
+              <ChevronRight aria-hidden className="size-[18px] shrink-0 text-muted-foreground/50" />
             </Link>
           ))}
         </div>

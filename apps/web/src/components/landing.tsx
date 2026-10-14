@@ -135,11 +135,11 @@ export function Landing({
         {/* ambient glow */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[radial-gradient(circle,rgba(14,159,110,0.32),transparent_70%)]"
+          className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--primary)_32%,transparent),transparent_70%)]"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -bottom-24 -left-24 size-72 rounded-full bg-[radial-gradient(circle,rgba(56,225,164,0.10),transparent_70%)]"
+          className="pointer-events-none absolute -bottom-24 -left-24 size-72 rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--mint)_10%,transparent),transparent_70%)]"
         />
 
         <div className="relative flex items-center gap-2.5">
@@ -162,7 +162,7 @@ export function Landing({
             <div className="text-sm text-white/60">{t("glanceLabel")}</div>
             <div className="mt-1 flex items-center gap-3">
               <span className="font-mono text-3xl font-extrabold tabular-nums">{demoAmount}</span>
-              <span className="rounded-full bg-[rgba(56,225,164,0.18)] px-2 py-0.5 text-sm font-semibold text-[#5FEAB6]">
+              <span className="rounded-full bg-mint/20 px-2 py-0.5 text-sm font-semibold text-mint-soft">
                 ▲ {demoGain}
               </span>
             </div>
@@ -175,7 +175,7 @@ export function Landing({
             >
               <path
                 d="M0 44 L40 40 L80 42 L120 30 L160 34 L200 22 L240 26 L280 14 L320 10"
-                stroke="#38E1A4"
+                stroke="var(--mint)"
                 strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"

@@ -46,12 +46,12 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
         </div>
       </div>
 
-      <div className="px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
+      <div className="px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
         {t("statsTablesLabel")}
       </div>
       {db.tables.length > 0 ? (
         <div className="overflow-hidden rounded-2xl bg-card shadow-card">
-          <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-micro font-bold uppercase tracking-[.03em] text-text-3 md:flex">
+          <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-micro font-bold uppercase tracking-[.03em] text-text-2 md:flex">
             <span className="flex-1">{t("statsColumnTable")}</span>
             <span className="w-[100px] text-right">{t("statsRowsEstimate")}</span>
             <span className="w-[74px] text-right">{t("statsColumnSize")}</span>
@@ -80,7 +80,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
 
       {!objectStorage.configured ? (
         <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background p-3.5">
-          <Info className="mt-px size-[17px] shrink-0 text-text-3" strokeWidth={1.9} />
+          <Info className="mt-px size-[17px] shrink-0 text-text-2" strokeWidth={1.9} />
           <p className="text-xs leading-relaxed text-text-2">
             <span className="font-bold text-foreground">{t("statsObjectStorageNotUsedTitle")}</span>{" "}
             — {t("statsObjectStorageNotUsedBody")}

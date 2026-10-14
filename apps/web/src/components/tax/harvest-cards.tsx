@@ -1,6 +1,7 @@
 import { CircleCheck } from "lucide-react";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { Link } from "@/i18n/navigation";
+import { tint } from "@/lib/tint";
 import type { HarvestSuggestion } from "@portfolio/api-client";
 import type { HarvestSummary } from "@portfolio/core";
 import type { TaxTranslator } from "./tax-cards";
@@ -108,15 +109,15 @@ export function HarvestRow({
       <div className="shrink-0 text-right">
         {/* Our German model harvests unrealized GAINS within the allowance → shown green. */}
         <p className="tabular text-body-sm font-bold text-success">{money(s.unrealizedGross)}</p>
-        <p className="text-micro font-semibold text-text-3">{t("harvest.unrealized")}</p>
+        <p className="text-micro font-semibold text-text-2">{t("harvest.unrealized")}</p>
       </div>
       {/* Stays on /tax (unlike the retired `/transactions/new` full page) — the shell's
           `AddTransactionMenu` picks up `?harvestInstrument=` reactively and opens the Add
           sheet on a prefilled Sell draft, matching the app's one everyday add flow. */}
       <Link
         href={`/tax?harvestInstrument=${s.instrumentId}`}
-        className="shrink-0 rounded-sm px-[13px] py-2 text-xs font-bold text-[#7C5CFC] transition-transform active:scale-95"
-        style={{ backgroundColor: "rgba(124,92,252,.13)" }}
+        className="shrink-0 rounded-sm px-[13px] py-2 text-xs font-bold text-violet transition-transform active:scale-95"
+        style={{ backgroundColor: tint("violet").bg }}
       >
         {t("harvest.button")}
       </Link>

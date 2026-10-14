@@ -137,20 +137,20 @@ export function EditBenchmarkDialog({
                 <button
                   type="button"
                   onClick={() => removeAt(i)}
-                  className="touch-target relative rounded-full p-0.5 text-text-3 transition-colors hover:text-foreground"
+                  className="touch-target relative rounded-full p-0.5 text-text-2 transition-colors hover:text-foreground"
                   aria-label={t("remove")}
                 >
                   <X className="size-3" />
                 </button>
               </span>
             ))}
-            {list.length === 0 && <p className="px-0.5 text-xs text-text-3">{t("noBenchmarks")}</p>}
+            {list.length === 0 && <p className="px-0.5 text-xs text-text-2">{t("noBenchmarks")}</p>}
           </div>
 
           {list.length < MAX && (
             <>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-3" />
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-2" />
                 <Input
                   value={query}
                   onChange={(e) => {
@@ -164,14 +164,14 @@ export function EditBenchmarkDialog({
                 {loading && (
                   <Spinner
                     size="sm"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-3"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-2"
                   />
                 )}
               </div>
 
               {query.trim() === "" && results.length === 0 && (
                 <div>
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-2">
                     <Sparkles className="size-3.5" />
                     {t("suggested")}
                   </p>
@@ -186,7 +186,7 @@ export function EditBenchmarkDialog({
                           disabled={picked}
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                             picked
-                              ? "bg-secondary text-text-3 opacity-50"
+                              ? "bg-secondary text-text-2 opacity-50"
                               : "bg-secondary text-secondary-foreground hover:bg-accent"
                           }`}
                         >
@@ -215,10 +215,10 @@ export function EditBenchmarkDialog({
                       >
                         <span className="min-w-0 flex-1 truncate">
                           <span className="font-medium">{r.symbol}</span>
-                          {r.name && <span className="ml-1.5 text-text-3">{r.name}</span>}
+                          {r.name && <span className="ml-1.5 text-text-2">{r.name}</span>}
                         </span>
                         {r.currency && (
-                          <span className="shrink-0 text-xs text-text-3">{r.currency}</span>
+                          <span className="shrink-0 text-xs text-text-2">{r.currency}</span>
                         )}
                       </button>
                     );

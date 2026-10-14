@@ -67,7 +67,7 @@ export function TransactionSourcesSection({
 
   return (
     <div>
-      <p className="mb-2 ml-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
+      <p className="mb-2 ml-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
         {t("sourcesSection.title")}
       </p>
       <div className="divide-y divide-line overflow-hidden rounded-xl border border-border bg-card">
@@ -98,7 +98,7 @@ export function TransactionSourcesSection({
                   {src.filename ? ` · ${src.filename}` : ""}
                 </p>
                 {showTaxBreakdown && tcEntries.length > 0 && (
-                  <p className="mt-0.5 text-micro font-semibold text-[#0E9F6E]">
+                  <p className="mt-0.5 text-micro font-semibold text-primary">
                     {tcEntries.map(([k, v]) => `${TAX_COMPONENT_LABELS[k] ?? k}: ${v}`).join(" · ")}
                   </p>
                 )}

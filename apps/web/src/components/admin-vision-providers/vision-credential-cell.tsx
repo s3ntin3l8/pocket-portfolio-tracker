@@ -42,7 +42,7 @@ export function VisionKeySubline({
     return (
       <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
         {provider.keySource === "env" && <span className="font-mono">{t("keyFromEnv")}</span>}
-        <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+        <span className="inline-flex items-center gap-1 text-warning">
           <ShieldOff className="size-3 shrink-0" />
           {t("encryptionDisabled")}
         </span>

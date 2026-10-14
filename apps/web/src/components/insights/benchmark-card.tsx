@@ -27,11 +27,11 @@ export function BenchmarkCard({
       <Card className="rounded-2xl bg-card p-4 shadow-card">
         <div className="flex flex-col items-center gap-3 py-4 text-center">
           <div className="flex size-10 items-center justify-center rounded-full bg-secondary">
-            <TrendingUp className="size-5 text-text-3" />
+            <TrendingUp className="size-5 text-text-2" />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">{t("setBenchmark")}</p>
-            <p className="mt-0.5 text-xs text-text-3">{t("setBenchmarkHint")}</p>
+            <p className="mt-0.5 text-xs text-text-2">{t("setBenchmarkHint")}</p>
           </div>
           <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
             {t("setBenchmark")}
@@ -58,7 +58,7 @@ export function BenchmarkCard({
         className="touch-target absolute right-3 top-3 flex size-7 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
         aria-label={t("editBenchmark")}
       >
-        <Pencil className="size-3.5 text-text-3" />
+        <Pencil className="size-3.5 text-text-2" />
       </button>
       <p className="text-xs font-semibold text-text-2">
         {t("vs", { symbol: benchmarkLabel(benchmark.symbol) })}

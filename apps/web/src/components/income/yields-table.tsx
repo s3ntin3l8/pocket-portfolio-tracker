@@ -140,7 +140,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
               href={`/instruments/${y.instrumentId}`}
               data-testid="yield-card"
               aria-label={t("openInstrument", { symbol: y.symbol ?? "—" })}
-              className="block px-4 py-3 transition-colors hover:bg-[var(--row-hover)]"
+              className="block px-4 py-3 transition-colors hover:bg-row-hover"
             >
               <div className="flex items-baseline justify-between gap-2">
                 <div className="min-w-0">
@@ -160,14 +160,14 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
                   <span className="text-text-mute">{t("yieldCardTrailing")} </span>
                   {formatMoney(Number(y.trailingIncome), y.currency, locale)}
                 </span>
-                <span className="mx-1.5 text-text-3">·</span>
+                <span className="mx-1.5 text-text-2">·</span>
                 <span>
                   <span className="text-text-mute">{t("yieldCardValue")} </span>
                   {formatMoney(Number(y.marketValue), y.currency, locale)}
                 </span>
                 {y.yieldOnCost !== null ? (
                   <>
-                    <span className="mx-1.5 text-text-3">·</span>
+                    <span className="mx-1.5 text-text-2">·</span>
                     <span>
                       <span className="text-text-mute">{t("yieldCardYieldOnCost")} </span>
                       <span className="font-semibold text-text-2">

@@ -101,8 +101,8 @@ export function HeroGlanceCard({
 
   return (
     <div
-      className="rounded-xl px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-2xl"
-      style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
+      className="rounded-xl px-6 pb-[18px] pt-[22px] text-white shadow-hero sm:rounded-2xl"
+      style={{ background: "linear-gradient(160deg,var(--primary),var(--primary-deep))" }}
     >
       <p className="text-body-sm font-semibold text-white/78">{t("label")}</p>
       {/* Keyed by the formatted value: a scope switch (a router transition) swaps the key,
@@ -169,7 +169,7 @@ export function HeroGlanceCard({
           <span>
             <span
               className="mr-1 inline-block h-[2px] w-3 align-middle"
-              style={{ background: "#ffffff" }}
+              style={{ background: "var(--primary-foreground)" }}
             />
             {t("legendPortfolio")}
           </span>
@@ -179,7 +179,7 @@ export function HeroGlanceCard({
                 className="mr-1 inline-block h-[2px] w-3 align-middle"
                 style={{
                   backgroundImage:
-                    "repeating-linear-gradient(90deg, #FFD24A 0 5px, transparent 5px 8px)",
+                    "repeating-linear-gradient(90deg, var(--hero-gold) 0 5px, transparent 5px 8px)",
                 }}
               />
               {t("legendBenchmark", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}

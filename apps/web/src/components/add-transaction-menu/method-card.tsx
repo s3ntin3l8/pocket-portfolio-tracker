@@ -2,13 +2,14 @@
 
 import { forwardRef } from "react";
 import type { LucideIcon } from "lucide-react";
+import { tint } from "@/lib/tint";
 
 export const TONES = {
-  green: { bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  violet: { bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  gold: { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" },
-  blue: { bg: "rgba(59,130,246,.16)", fg: "#3B82F6" },
-  orange: { bg: "rgba(249,115,22,.16)", fg: "#F97316" },
+  green: { ...tint("primary") },
+  violet: { ...tint("violet") },
+  gold: { ...tint("gold") },
+  blue: { ...tint("info") },
+  orange: { ...tint("orange") },
 } as const;
 
 export const MethodCard = forwardRef<
@@ -27,7 +28,7 @@ export const MethodCard = forwardRef<
       ref={ref}
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3.5 rounded-xl border border-border bg-card p-4 text-left shadow-[0_1px_2px_rgba(15,27,20,.04)] transition-transform active:scale-[.97]"
+      className="flex w-full items-center gap-3.5 rounded-xl border border-border bg-card p-4 text-left shadow-hairline transition-transform active:scale-[.97]"
     >
       <span
         className="flex size-[46px] shrink-0 items-center justify-center rounded-lg"
@@ -42,7 +43,7 @@ export const MethodCard = forwardRef<
         </span>
       </span>
       {tag && (
-        <span className="shrink-0 rounded-xs bg-[rgba(16,163,114,.14)] px-2 py-1 text-micro font-bold text-[#0E9F6E]">
+        <span className="shrink-0 rounded-xs bg-primary/15 px-2 py-1 text-micro font-bold text-primary">
           {tag}
         </span>
       )}

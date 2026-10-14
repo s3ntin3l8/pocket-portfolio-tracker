@@ -5,9 +5,9 @@ import { toast } from "sonner";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePwaInstall } from "@/lib/use-pwa-install";
+import { tint } from "@/lib/tint";
 
-const ICON_BG = "rgba(59,130,246,.16)";
-const ICON_COLOR = "#3B82F6";
+const { bg: ICON_BG, fg: ICON_COLOR } = tint("info");
 
 /**
  * The "Install app" settings-menu row — a direct action, not a link to a sub-page.

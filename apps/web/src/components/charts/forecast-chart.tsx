@@ -42,12 +42,15 @@ export function ForecastChart({
         <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="forecast-value-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity={0.42} />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--primary-foreground)" stopOpacity={0.42} />
+              <stop offset="100%" stopColor="var(--primary-foreground)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <Tooltip
-            cursor={{ stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }}
+            cursor={{
+              stroke: "color-mix(in srgb, var(--primary-foreground) 55%, transparent)",
+              strokeDasharray: "4 4",
+            }}
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               return (
@@ -66,16 +69,21 @@ export function ForecastChart({
             isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="value"
-            stroke="#ffffff"
+            stroke="var(--primary-foreground)"
             strokeWidth={2.4}
             fill="url(#forecast-value-fill)"
-            activeDot={{ r: 5, fill: "#fff", stroke: "#0B7D58", strokeWidth: 2.5 }}
+            activeDot={{
+              r: 5,
+              fill: "var(--primary-foreground)",
+              stroke: "var(--primary-deep)",
+              strokeWidth: 2.5,
+            }}
           />
           <Line
             isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="contributed"
-            stroke="rgba(255,255,255,.65)"
+            stroke="color-mix(in srgb, var(--primary-foreground) 65%, transparent)"
             strokeWidth={1.6}
             strokeDasharray="4 4"
             dot={false}

@@ -271,7 +271,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
 
           {classSlices.length > 0 && (
             <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
                 {t("byClassTitle")}
               </p>
               <AllocationDonut
@@ -284,7 +284,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
 
           {s.byCurrency.length > 1 && (
             <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
                 {t("currencyTitle")}
               </p>
               <div className="grid grid-cols-1 gap-x-5 gap-y-2.5 @sm:grid-cols-2 @sm:gap-x-7 @lg:grid-cols-3">

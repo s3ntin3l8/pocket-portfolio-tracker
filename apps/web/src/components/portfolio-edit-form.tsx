@@ -131,12 +131,12 @@ export function PortfolioEditForm({
                   type="button"
                   onClick={handleDelete}
                   disabled={f.busy}
-                  className="h-auto w-full rounded-sm bg-[#E5484D] px-4 py-2.5 text-body-sm font-bold text-white hover:bg-[#E5484D]/90 sm:w-auto"
+                  className="h-auto w-full rounded-sm bg-destructive px-4 py-2.5 text-body-sm font-bold text-white hover:bg-destructive/90 sm:w-auto"
                 >
                   {f.busy && <Spinner size="sm" />}
                   {t("confirmDelete")}
                 </Button>
-                <p className="text-micro font-medium text-text-3">
+                <p className="text-micro font-medium text-text-2">
                   {t("deleteWarning", { count: portfolio?.transactionCount ?? 0 })}{" "}
                   {t("deleteRelatedNote")}
                 </p>
@@ -146,7 +146,7 @@ export function PortfolioEditForm({
                 type="button"
                 onClick={() => f.setConfirmDelete(true)}
                 disabled={f.busy}
-                className="text-sm font-bold text-[#E5484D] sm:mr-auto"
+                className="text-sm font-bold text-destructive sm:mr-auto"
               >
                 {t("delete")}
               </button>

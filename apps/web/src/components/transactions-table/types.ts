@@ -1,3 +1,4 @@
+import { tintStyle } from "@/lib/tint";
 import {
   ScanLine,
   FileSpreadsheet,
@@ -71,16 +72,16 @@ export const TYPE_TONE_CLASSES = {
   success: "bg-success/15 text-success",
   destructive: "bg-destructive/15 text-destructive",
   warning: "bg-warning/15 text-warning",
-  violet: "bg-[#7C5CFC]/15 text-[#7C5CFC]",
-  teal: "bg-[#0D9488]/15 text-[#0D9488]",
+  violet: "bg-violet/15 text-violet",
+  teal: "bg-chart-3/15 text-chart-3",
 } as const;
 
 export const SRC_TONES: Record<string, React.CSSProperties> = {
-  csv: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
-  pdf: { background: "rgba(229,72,77,.13)", color: "#E5484D" },
-  screenshot: { background: "rgba(124,92,252,.16)", color: "#7C5CFC" },
-  pytr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
-  ibkr: { background: "rgba(13,148,136,.16)", color: "#0D9488" },
+  csv: tintStyle("teal"),
+  pdf: tintStyle("destructive"),
+  screenshot: tintStyle("violet"),
+  pytr: tintStyle("teal"),
+  ibkr: tintStyle("teal"),
   manual: { background: "var(--border)", color: "var(--text-mute)" },
 };
 

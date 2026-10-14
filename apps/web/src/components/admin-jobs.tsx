@@ -24,7 +24,7 @@ function formatRelative(iso: string | null): string {
  *  `Badge` (which showed the raw lowercase status in the old table layout). */
 function StatusBadge({ status }: { status: AdminJob["lastStatus"] }) {
   const t = useTranslations("Admin");
-  if (!status) return <span className="text-xs text-text-3">—</span>;
+  if (!status) return <span className="text-xs text-text-2">—</span>;
   const failed = status === "failed";
   return (
     <span
@@ -229,7 +229,7 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
               <code className="rounded-xs bg-background px-2 py-1 font-mono text-micro text-text-2">
                 {job.cron ?? "on-demand"}
               </code>
-              <span className="text-xs text-text-3">·</span>
+              <span className="text-xs text-text-2">·</span>
               <span aria-live="polite">
                 {isPending ? (
                   <span className="text-xs font-bold text-primary">
@@ -240,11 +240,9 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
                         : t("jobQueued")}
                   </span>
                 ) : timedOut ? (
-                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                    {t("jobPollTimedOut")}
-                  </span>
+                  <span className="text-xs font-medium text-warning">{t("jobPollTimedOut")}</span>
                 ) : (
-                  <span className="text-xs text-text-3">{formatRelative(job.lastRunAt)}</span>
+                  <span className="text-xs text-text-2">{formatRelative(job.lastRunAt)}</span>
                 )}
               </span>
               <span className="flex-1" />

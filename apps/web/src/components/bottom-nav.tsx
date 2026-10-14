@@ -62,7 +62,7 @@ export function BottomNav({
                 <span
                   className={cn(
                     "absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-micro font-extrabold text-white ring-2 ring-card",
-                    anomalyError ? "bg-destructive" : "bg-[var(--gold-fg)]",
+                    anomalyError ? "bg-destructive" : "bg-gold-fg",
                   )}
                 >
                   <span aria-hidden>{badge > 99 ? "99+" : badge}</span>

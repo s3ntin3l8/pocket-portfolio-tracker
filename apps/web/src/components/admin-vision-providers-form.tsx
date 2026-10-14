@@ -162,7 +162,7 @@ export function AdminVisionProvidersForm({
                           {...handleProps.attrs}
                           {...handleProps.listeners}
                           aria-label={t("dragHandle")}
-                          className="touch-target relative hidden shrink-0 cursor-grab items-center justify-center text-text-3 hover:text-text-2 active:cursor-grabbing md:flex"
+                          className="touch-target relative hidden shrink-0 cursor-grab items-center justify-center text-text-2 hover:text-text-2 active:cursor-grabbing md:flex"
                         >
                           <GripVertical className="size-4" />
                         </button>
@@ -172,7 +172,7 @@ export function AdminVisionProvidersForm({
                             {...handleProps.attrs}
                             {...handleProps.listeners}
                             aria-label={t("dragHandle")}
-                            className="touch-target relative flex size-8 shrink-0 cursor-grab items-center justify-center text-text-3 active:cursor-grabbing md:hidden"
+                            className="touch-target relative flex size-8 shrink-0 cursor-grab items-center justify-center text-text-2 active:cursor-grabbing md:hidden"
                           >
                             <GripVertical className="size-5" />
                           </button>

@@ -13,6 +13,7 @@ import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
 import { Link } from "@/i18n/navigation";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
 import { requireAdmin } from "@/lib/server-api";
+import { tint } from "@/lib/tint";
 
 /**
  * Shared master-detail layout for every `/admin/*` route — the same `SettingsShell`
@@ -46,8 +47,7 @@ export default async function AdminLayout({
       icon: <LineChart />,
       title: t("providers"),
       subtitle: t("providersHint"),
-      color: "#0E9F6E",
-      bg: "rgba(16,163,114,.14)",
+      ...tint("primary"),
     },
     {
       key: "vision",
@@ -55,8 +55,7 @@ export default async function AdminLayout({
       icon: <Eye />,
       title: t("visionProviders"),
       subtitle: t("visionProvidersHint"),
-      color: "#7C5CFC",
-      bg: "rgba(124,92,252,.16)",
+      ...tint("violet"),
     },
     {
       key: "imports",
@@ -64,8 +63,7 @@ export default async function AdminLayout({
       icon: <ArrowDownUp />,
       title: t("importStrategy"),
       subtitle: t("importStrategyHint"),
-      color: "#0D9488",
-      bg: "rgba(13,148,136,.16)",
+      ...tint("teal"),
     },
     {
       key: "storage",
@@ -73,8 +71,7 @@ export default async function AdminLayout({
       icon: <HardDrive />,
       title: t("storage"),
       subtitle: t("storageHint"),
-      color: "#2A6FDB",
-      bg: "rgba(42,111,219,.14)",
+      ...tint("info"),
     },
     {
       key: "database",
@@ -82,8 +79,7 @@ export default async function AdminLayout({
       icon: <Database />,
       title: t("stats"),
       subtitle: t("statsHint"),
-      color: "var(--gold-fg)",
-      bg: "rgba(224,165,58,.16)",
+      ...tint("gold"),
     },
     {
       key: "users",
@@ -91,8 +87,7 @@ export default async function AdminLayout({
       icon: <Users />,
       title: t("users"),
       subtitle: t("usersHint"),
-      color: "#F59E0B",
-      bg: "rgba(245,158,11,.15)",
+      ...tint("warning"),
     },
     {
       key: "jobs",
@@ -100,8 +95,7 @@ export default async function AdminLayout({
       icon: <Clock />,
       title: t("jobs"),
       subtitle: t("jobsHint"),
-      color: "#E5484D",
-      bg: "rgba(229,72,77,.12)",
+      ...tint("destructive"),
     },
   ];
 

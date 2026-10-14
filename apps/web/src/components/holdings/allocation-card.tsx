@@ -31,7 +31,7 @@ export function AllocationCard({
   const tHoldings = useTranslations("Holdings");
   return (
     <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
         {title}
       </p>
       <AllocationDonut

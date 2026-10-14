@@ -9,6 +9,7 @@ import { AppVersion } from "@/components/app-version";
 import { Link } from "@/i18n/navigation";
 import { loadMe, loadPortfoliosList, loadAccountHolders } from "@/lib/server-api";
 import { APP_VERSION } from "@/lib/version";
+import { tint } from "@/lib/tint";
 
 /**
  * Shared master-detail layout for every `/settings/*` route: a persistent desktop rail
@@ -43,8 +44,7 @@ export default async function SettingsLayout({
       icon: <UserRound />,
       title: t("navAccount"),
       subtitle: t("navAccountSub"),
-      color: "#0E9F6E",
-      bg: "rgba(16,163,114,.14)",
+      ...tint("primary"),
     },
     {
       key: "investing",
@@ -52,8 +52,7 @@ export default async function SettingsLayout({
       icon: <TrendingUp />,
       title: t("navInvesting"),
       subtitle: t("navInvestingSub"),
-      color: "#0D9488",
-      bg: "rgba(13,148,136,.16)",
+      ...tint("teal"),
     },
     {
       key: "portfolios",
@@ -64,8 +63,7 @@ export default async function SettingsLayout({
         portfolios: portfoliosResult.portfolios.length,
         holders: holders.length,
       }),
-      color: "#7C5CFC",
-      bg: "rgba(124,92,252,.16)",
+      ...tint("violet"),
     },
     {
       key: "data",
@@ -73,8 +71,7 @@ export default async function SettingsLayout({
       icon: <KeyRound />,
       title: t("navData"),
       subtitle: t("navDataSub"),
-      color: "var(--gold-fg)",
-      bg: "rgba(224,165,58,.16)",
+      ...tint("gold"),
     },
   ];
 
@@ -90,8 +87,7 @@ export default async function SettingsLayout({
       icon: <ShieldCheck />,
       title: t("adminLink"),
       subtitle: t("adminDesc"),
-      color: "#2A6FDB",
-      bg: "rgba(42,111,219,.14)",
+      ...tint("info"),
       badge: t("adminBadge"),
       hideFromRail: true,
     });

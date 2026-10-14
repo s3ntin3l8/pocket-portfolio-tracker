@@ -101,7 +101,7 @@ export function AccountSection({
             </p>
           )}
           {showFsaHelper && fsaOverAllocated && (
-            <div className="flex items-start gap-1.5 text-xs text-yellow-700 dark:text-yellow-300">
+            <div className="flex items-start gap-1.5 text-xs text-warn-strong">
               <TriangleAlert className="size-3.5 mt-0.5 shrink-0" />
               <span>{t("taxAllowanceOverAllocated", { cap: holderAllowanceCap.toFixed(0) })}</span>
             </div>

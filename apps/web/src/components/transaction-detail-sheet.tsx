@@ -146,7 +146,7 @@ export function TransactionDetailSheet({
   const accountName = account?.name ?? tx.portfolioName ?? null;
 
   const iconBtn =
-    "flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-colors hover:bg-secondary";
+    "flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline transition-colors hover:bg-secondary";
 
   const title = tx.instrument?.symbol ? `${tt(tx.type)} · ${tx.instrument.symbol}` : tt(tx.type);
   // v2 design: the header subtitle is "{date} · {portfolio}", not just the date.
@@ -297,12 +297,12 @@ export function TransactionDetailSheet({
         )}
 
         {anomaly && (
-          <div className="mt-5 rounded-lg border border-amber-400/40 bg-amber-50/40 p-3 text-sm dark:bg-amber-950/10">
+          <div className="mt-5 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
             <div className="flex items-start gap-2">
               {anomaly.severity === "error" ? (
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
               ) : (
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
               )}
               <p className="text-muted-foreground">
                 {anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
@@ -386,7 +386,7 @@ export function TransactionDetailSheet({
               </Button>
             )}
             <Button
-              className="flex-1 border-none bg-[rgba(229,72,77,.12)] text-[#E5484D] hover:bg-[rgba(229,72,77,.2)]"
+              className="flex-1 border-none bg-destructive/15 text-destructive hover:bg-destructive/20"
               aria-label={td("label")}
               onClick={() => setConfirmingDelete(true)}
             >

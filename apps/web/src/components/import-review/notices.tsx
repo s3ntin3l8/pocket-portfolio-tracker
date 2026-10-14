@@ -7,7 +7,7 @@ export function EnrichmentNotice({ count }: { count: number }) {
   const t = useTranslations("Import");
   if (count === 0) return null;
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
+    <div className="rounded-lg border border-info/40 bg-info/10 px-3 py-2 text-sm text-info">
       {t("review.enrichmentNotice", { count })}
     </div>
   );
@@ -35,13 +35,11 @@ export function IssuesBanner({
   return (
     <div className="space-y-2">
       {attention.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+        <div className="flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warn-strong">
           <span className="font-medium">
             {t("review.issues.attention", { count: attention.length })}
           </span>
-          <span className="text-amber-700/70 dark:text-amber-400/70">
-            — {t("review.issues.attentionHint")}
-          </span>
+          <span className="text-warn-strong/70">— {t("review.issues.attentionHint")}</span>
         </div>
       )}
       {ignorable.length > 0 && (

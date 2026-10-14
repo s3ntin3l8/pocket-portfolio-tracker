@@ -141,7 +141,7 @@ export function InstrumentField({
             />
             {results.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-micro font-semibold text-text-3">{t("savedResults")}</p>
+                <p className="text-micro font-semibold text-text-2">{t("savedResults")}</p>
                 <ul className="divide-y divide-line rounded-md border border-border bg-card">
                   {results.map((i) => (
                     <li key={i.id}>
@@ -170,7 +170,7 @@ export function InstrumentField({
 
             {discovered.length > 0 && (
               <div className="space-y-1.5">
-                <p className="flex items-center gap-1 text-micro font-semibold text-text-3">
+                <p className="flex items-center gap-1 text-micro font-semibold text-text-2">
                   <Sparkles className="size-3" />
                   {t("discoveredResults")}
                 </p>
@@ -193,7 +193,7 @@ export function InstrumentField({
                           <span className="font-bold">{i.symbol}</span>
                           <span className="ml-2 text-text-2">{i.name}</span>
                         </span>
-                        <span className="shrink-0 text-xs text-text-3">{i.currency}</span>
+                        <span className="shrink-0 text-xs text-text-2">{i.currency}</span>
                       </button>
                     </li>
                   ))}
@@ -256,7 +256,7 @@ export function InstrumentField({
                         placeholder={t("goldLabelPlaceholder")}
                       />
                     </Field>
-                    <p className="col-span-2 text-xs text-text-3">{t("goldNote")}</p>
+                    <p className="col-span-2 text-xs text-text-2">{t("goldNote")}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
@@ -337,7 +337,7 @@ export function InstrumentField({
                             onChange={(e) => setMaturityDate(e.target.value)}
                           />
                         </Field>
-                        <p className="col-span-2 text-xs text-text-3">{t("bondNote")}</p>
+                        <p className="col-span-2 text-xs text-text-2">{t("bondNote")}</p>
                       </>
                     )}
                   </div>

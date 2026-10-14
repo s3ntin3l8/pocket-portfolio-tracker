@@ -156,7 +156,7 @@ export function DraftReviewClient({
       {importedCount !== null && (
         <div
           role="status"
-          className="flex items-center gap-2 rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400"
+          className="flex items-center gap-2 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success"
         >
           <CheckCircle2 className="size-4 shrink-0" />
           {t("importedBanner", { count: importedCount })}

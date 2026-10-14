@@ -61,7 +61,7 @@ export function AdminUserActions({
           <button
             type="button"
             aria-label={t("usersActions")}
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-text-3 hover:bg-background hover:text-text-2"
+            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-text-2 hover:bg-background hover:text-text-2"
           >
             <MoreVertical className="size-4" />
           </button>

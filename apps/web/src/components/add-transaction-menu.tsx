@@ -486,7 +486,7 @@ export function AddTransactionMenu({
           onInteractOutside={(e) => {
             if (!dismissible) e.preventDefault();
           }}
-          className="flex flex-row gap-0 overflow-hidden bg-background p-0 md:w-[calc(100%-4rem)] md:rounded-xl md:border-0 md:shadow-[0_30px_80px_rgba(0,0,0,.4)] md:max-h-[calc(100dvh-64px)]"
+          className="flex flex-row gap-0 overflow-hidden bg-background p-0 md:w-[calc(100%-4rem)] md:rounded-xl md:border-0 md:shadow-modal md:max-h-[calc(100dvh-64px)]"
         >
           <NavRail
             className="max-md:hidden"
@@ -515,7 +515,7 @@ export function AddTransactionMenu({
                   type="button"
                   onClick={() => setStep("choose")}
                   aria-label={tm("back")}
-                  className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                  className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline md:hidden"
                 >
                   <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
                 </button>
@@ -529,7 +529,7 @@ export function AddTransactionMenu({
                   mid-import — the pre-merge mobile Sheet's built-in close button worked
                   the same way. */}
               <DialogClose
-                className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline md:hidden"
                 aria-label={tA("close")}
               >
                 <X className="size-[18px]" strokeWidth={2.2} />

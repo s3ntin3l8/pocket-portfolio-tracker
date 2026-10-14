@@ -2,11 +2,12 @@
 
 import type { DriftRow } from "@portfolio/api-client";
 import type { useTranslations } from "next-intl";
+import { tintStyle } from "@/lib/tint";
 
-const DRIFT_BADGE_STYLE: Record<DriftRow["status"], { color: string; backgroundColor: string }> = {
-  on_target: { color: "#0E9F6E", backgroundColor: "rgba(16,163,114,.14)" },
-  over: { color: "#E5484D", backgroundColor: "rgba(229,72,77,.13)" },
-  under: { color: "var(--gold-fg)", backgroundColor: "rgba(224,165,58,.16)" },
+const DRIFT_BADGE_STYLE: Record<DriftRow["status"], { color: string; background: string }> = {
+  on_target: tintStyle("primary"),
+  over: tintStyle("destructive"),
+  under: tintStyle("gold"),
 };
 
 export function DriftBadge({

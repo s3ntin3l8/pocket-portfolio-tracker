@@ -38,7 +38,7 @@ export function ReportHeader({
         aria-label={tA("back")}
         // Visual size stays the reference's 36px card button; `before:` pads the tap
         // target out to ~44px (the touch-target minimum) without affecting layout.
-        className="relative flex size-9 shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-transform before:absolute before:-inset-1 active:scale-95 md:hidden"
+        className="relative flex size-9 shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline transition-transform before:absolute before:-inset-1 active:scale-95 md:hidden"
       >
         <ChevronLeft className="size-[19px]" strokeWidth={2.2} />
       </ScopeLink>
