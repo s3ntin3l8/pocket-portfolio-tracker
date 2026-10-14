@@ -19,6 +19,10 @@ balance all agree on it. A repayment with no installment number (an early payoff
 sum recorded against the loan) still reduces the balance but never marks an installment paid
 and never stops a scheduled one from being booked.
 
+A repayment recorded by hand today can't be linked to a loan (tracked in #955), so it carries
+no installment number: it reduces the net-worth liabilities, but it neither marks an
+installment paid nor stops the next scheduled one from being booked.
+
 ## Departing from the schedule
 
 All of this is on the Gold report's plan card.

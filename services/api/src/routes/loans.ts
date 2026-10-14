@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { decimalString } from "@portfolio/schema";
 import {
   LoanActionError,
   payoffLoan,
@@ -13,7 +12,11 @@ type LoanParams = { portfolioId: string; loanId: string };
 
 const payoffBodySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD"),
-  fees: decimalString.optional(),
+  // Non-negative: a negative fee would be subtracted from the loan's financing cost.
+  fees: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "must be a non-negative decimal string")
+    .optional(),
 });
 
 const installmentParam = z.coerce.number().int().positive();

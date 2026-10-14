@@ -249,6 +249,31 @@ describe("loan routes (skip / payoff)", () => {
     expect((await loanRow(id)).closedAt).toBeNull();
   });
 
+  it("rejects negative payoff fees", async () => {
+    const id = await mkLoan();
+    const res = await app.inject({
+      method: "POST",
+      url: url(id, "payoff"),
+      headers: auth(owner),
+      payload: { date: toDateKey(new Date()), fees: "-50" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect((await loanRow(id)).closedAt).toBeNull();
+  });
+
+  it("concurrent skips of different installments both land (no lost update)", async () => {
+    const id = await mkLoan();
+    const skip = (n: number) =>
+      app.inject({
+        method: "POST",
+        url: url(id, `installments/${n}/skip`),
+        headers: auth(owner),
+      });
+    const results = await Promise.all([skip(2), skip(3)]);
+    expect(results.map((r) => r.statusCode)).toEqual([204, 204]);
+    expect(skippedNs(await loanRow(id))).toEqual([2, 3]);
+  });
+
   it("refuses a payoff when nothing is outstanding", async () => {
     const id = await mkLoan();
     await bookDueInstallments(app.db, new Date("2026-06-01T00:00:00Z"), { loanId: id });

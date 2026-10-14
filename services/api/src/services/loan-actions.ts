@@ -33,12 +33,23 @@ function withSkipped(schedule: unknown, ns: Set<number>, skipped: boolean): unkn
   });
 }
 
-/** Load a loan, scoped to its portfolio (the caller already checked portfolio ownership). */
-export async function loadLoan(db: Exec, portfolioId: string, loanId: string): Promise<LoanRow> {
-  const [loan] = await db
+/**
+ * Load a loan, scoped to its portfolio (the caller already checked portfolio ownership).
+ * `lock` takes a row lock (`FOR UPDATE`) for the rest of the surrounding transaction: every
+ * schedule edit rewrites the whole jsonb from what it read, so two concurrent edits of the
+ * same loan must serialize or one silently loses the other's change.
+ */
+export async function loadLoan(
+  db: Exec,
+  portfolioId: string,
+  loanId: string,
+  opts: { lock?: boolean } = {},
+): Promise<LoanRow> {
+  const query = db
     .select()
     .from(loans)
     .where(and(eq(loans.id, loanId), eq(loans.portfolioId, portfolioId)));
+  const [loan] = await (opts.lock ? query.for("update") : query);
   if (!loan) throw new LoanActionError(404, "loan_not_found");
   return loan;
 }
@@ -71,7 +82,7 @@ export async function onLoanLegsDeleted(
     }
   }
   for (const [loanId, ns] of skipByLoan) {
-    const [loan] = await db.select().from(loans).where(eq(loans.id, loanId));
+    const [loan] = await db.select().from(loans).where(eq(loans.id, loanId)).for("update");
     if (!loan) continue;
     await db
       .update(loans)
@@ -99,10 +110,10 @@ export async function skipInstallment(
   loanId: string,
   n: number,
 ): Promise<void> {
-  const loan = await loadLoan(db, portfolioId, loanId);
-  const row = scheduleRow(loan, n);
-  if (loan.closedAt) throw new LoanActionError(409, "loan_closed");
-  await db.transaction(async (tx) => {
+  const dueDate = await db.transaction(async (tx) => {
+    const loan = await loadLoan(tx, portfolioId, loanId, { lock: true });
+    const row = scheduleRow(loan, n);
+    if (loan.closedAt) throw new LoanActionError(409, "loan_closed");
     await tx
       .update(loans)
       .set({ schedule: withSkipped(loan.schedule, new Set([n]), true) })
@@ -116,8 +127,9 @@ export async function skipInstallment(
           eq(transactions.installmentN, n),
         ),
       );
+    return row.dueDate;
   });
-  await enqueueRecompute(portfolioId, row.dueDate);
+  await enqueueRecompute(portfolioId, dueDate);
 }
 
 /** Undo a skip: the installment is booked again right away if it is already due. */
@@ -128,14 +140,18 @@ export async function unskipInstallment(
   n: number,
   now: Date = new Date(),
 ): Promise<void> {
-  const loan = await loadLoan(db, portfolioId, loanId);
-  const row = scheduleRow(loan, n);
-  await db
-    .update(loans)
-    .set({ schedule: withSkipped(loan.schedule, new Set([n]), false) })
-    .where(eq(loans.id, loanId));
+  const dueDate = await db.transaction(async (tx) => {
+    const loan = await loadLoan(tx, portfolioId, loanId, { lock: true });
+    const row = scheduleRow(loan, n);
+    await tx
+      .update(loans)
+      .set({ schedule: withSkipped(loan.schedule, new Set([n]), false) })
+      .where(eq(loans.id, loanId));
+    return row.dueDate;
+  });
+  // The flag is committed, so even if booking fails the next daily run books it.
   await bookDueInstallments(db, now, { loanId });
-  await enqueueRecompute(portfolioId, row.dueDate);
+  await enqueueRecompute(portfolioId, dueDate);
 }
 
 /**
