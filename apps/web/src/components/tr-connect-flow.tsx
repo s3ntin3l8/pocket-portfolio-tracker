@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, RefreshCw, Plug, Smartphone, Unplug } from "lucide-react";
+import { AlertCircle, KeyRound, RefreshCw, Plug, Smartphone, Unplug } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { apiErrorCode } from "@portfolio/api-client";
@@ -31,11 +31,13 @@ const APPROVAL_WINDOW_MS = 210_000;
 const STATUS_POLL_INTERVAL_MS = 2500;
 const STATUS_POLL_INITIAL_DELAY_MS = 1500;
 
-type Phase = "form" | "awaiting" | "connected";
+type Phase = "form" | "code" | "awaiting" | "connected";
 
-function phaseFor(status: TrConnection["status"]): Phase {
+// An authenticator-app account first asks for the code; a push account goes straight to
+// waiting for the approval in the TR app.
+function phaseFor(status: TrConnection["status"], method?: TrConnection["pairingMethod"]): Phase {
   if (status === "connected") return "connected";
-  if (status === "awaiting_2fa") return "awaiting";
+  if (status === "awaiting_2fa") return method === "authenticator" ? "code" : "awaiting";
   return "form";
 }
 
@@ -62,7 +64,9 @@ export function TrConnectFlow({
   onChanged?: () => void;
 }) {
   const t = useTranslations("TradeRepublic");
-  const [phase, setPhase] = useState<Phase>(phaseFor(initial.status));
+  const [phase, setPhase] = useState<Phase>(phaseFor(initial.status, initial.pairingMethod));
+  const [authenticator, setAuthenticator] = useState(initial.pairingMethod === "authenticator");
+  const [code, setCode] = useState("");
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -97,16 +101,44 @@ export function TrConnectFlow({
     e.preventDefault();
     if (busy || !phone || !pin || !portfolioId) return;
     void run(async () => {
-      await client.connectTr({
+      const res = await client.connectTr({
         phone,
         pin,
         portfolioId,
         ...(showAdvanced && wafToken ? { wafToken } : {}),
       });
       setPin("");
+      windowStartRef.current = Date.now();
       // Re-arm the awaiting effect so this fresh pairing fires its own verify.
       verifyFiredRef.current = false;
-      setPhase("awaiting");
+      if (res.method === "authenticator") {
+        // The code has to be typed first; submitCode fires the verify with it.
+        setAuthenticator(true);
+        setCode("");
+        setPhase("code");
+      } else {
+        setAuthenticator(false);
+        setPhase("awaiting");
+      }
+    });
+  };
+
+  // Authenticator-app pairing: send the code, then wait for the login to be confirmed in the
+  // TR app. A refused code (code_invalid) brings the user back here to try again; any other
+  // failure is left to the status poll, which owns the outcome.
+  const submitCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(code)) return;
+    setError(null);
+    verifyFiredRef.current = true;
+    setPhase("awaiting");
+    void client.verifyTr({ code }).catch((err: unknown) => {
+      const apiCode = apiErrorCode(err);
+      if (apiCode === "code_invalid" || apiCode === "code_required") {
+        setError(messageForError(err));
+        setCode("");
+        setPhase("code");
+      }
     });
   };
 
@@ -122,9 +154,12 @@ export function TrConnectFlow({
   const verifyFiredRef = useRef(false);
   const windowStartRef = useRef(0);
   useEffect(() => {
-    if (phase !== "awaiting" || verifyFiredRef.current) return;
+    if (phase !== "awaiting" && phase !== "code") return;
+    // connect() starts the approval window; a pairing resumed on mount starts it here.
+    if (!windowStartRef.current) windowStartRef.current = Date.now();
+    // Authenticator pairings fire their verify from submitCode, with the code.
+    if (phase !== "awaiting" || verifyFiredRef.current || authenticator) return;
     verifyFiredRef.current = true;
-    windowStartRef.current = Date.now();
     // Fire-and-forget: this kicks off server-side completion; the poll observes it.
     void client.verifyTr().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,7 +180,11 @@ export function TrConnectFlow({
           onChanged?.();
           return;
         }
-        if (conn.status !== "awaiting_2fa") {
+        if (
+          conn.status !== "awaiting_2fa" ||
+          // The server forgot the pairing (restart / timeout) while we still wait for a code.
+          (phase === "code" && conn.pairingMethod === null)
+        ) {
           // error / expired / disconnected — the pairing did not complete.
           setError(t("approvalError"));
           setPhase("form");
@@ -160,7 +199,7 @@ export function TrConnectFlow({
         setPhase("form");
       }
     },
-    phase === "awaiting" ? STATUS_POLL_INTERVAL_MS : null,
+    phase === "awaiting" || phase === "code" ? STATUS_POLL_INTERVAL_MS : null,
     { initialDelayMs: STATUS_POLL_INITIAL_DELAY_MS },
   );
 
@@ -251,6 +290,37 @@ export function TrConnectFlow({
             <Button type="submit" disabled={busy || !phone || !pin || !portfolioId}>
               {busy ? <Spinner size="sm" /> : <Plug className="size-4" />}
               {t("connect")}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {phase === "code" && (
+        <form onSubmit={submitCode} className="space-y-4">
+          <div className="flex items-start gap-3 rounded-md border bg-muted/40 px-3 py-3">
+            <KeyRound className="size-5 shrink-0 text-muted-foreground" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{t("codeTitle")}</p>
+              <p className="text-sm text-muted-foreground">{t("codeHint")}</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tr-code">{t("codeLabel")}</Label>
+            <Input
+              id="tr-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={disconnect} disabled={busy}>
+              {t("cancel")}
+            </Button>
+            <Button type="submit" disabled={code.length !== 6}>
+              {t("submitCode")}
             </Button>
           </div>
         </form>

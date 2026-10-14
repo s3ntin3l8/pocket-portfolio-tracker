@@ -6,6 +6,7 @@ the constructor arguments, the stdout contract and the exit-code mapping.
 Run: `python -m pytest services/api/python`.
 """
 
+import io
 import json
 import sys
 import types
@@ -25,6 +26,7 @@ def install_fake_pytr(
         def __init__(self, **kwargs):
             self.kwargs = kwargs
             self._process_id = process_id
+            self.codes = []
             self.weblogin_needs_authenticator = needs_authenticator
             instances.append(self)
 
@@ -32,13 +34,19 @@ def install_fake_pytr(
             if initiate:
                 raise initiate
 
-        def complete_weblogin(self):
-            if complete:
-                raise complete
+        def complete_weblogin(self, verify_code=None):
+            self.codes.append(verify_code)
+            outcome = complete.pop(0) if isinstance(complete, list) else complete
+            if outcome:
+                raise outcome
 
     pkg = types.ModuleType("pytr")
     api = types.ModuleType("pytr.api")
     api.TradeRepublicApi = FakeApi
+    api.LOGIN_ERRORS = {
+        "VALIDATION_CODE_INVALID": "That authenticator code is not correct.",
+        "VALIDATION_CODE_ALREADY_USED": "That authenticator code was already used.",
+    }
     pkg.api = api
     monkeypatch.setitem(sys.modules, "pytr", pkg)
     monkeypatch.setitem(sys.modules, "pytr.api", api)
@@ -100,12 +108,67 @@ def test_initiate_failure_exits_1_without_stdout(monkeypatch, capsys, pair_env):
     assert "boom" in captured.err
 
 
-def test_authenticator_required_exits_4_without_stdout(monkeypatch, capsys, pair_env):
+BAD_CODE = ValueError("That authenticator code is not correct.")
+
+
+def feed_stdin(monkeypatch, text):
+    monkeypatch.setattr(sys, "stdin", io.StringIO(text))
+
+
+def stdout_lines(capsys):
+    return [json.loads(line) for line in capsys.readouterr().out.strip().splitlines()]
+
+
+def test_authenticator_account_announces_awaiting_code_and_submits_the_code(
+    monkeypatch, capsys, pair_env
+):
+    instances = install_fake_pytr(monkeypatch, needs_authenticator=True)
+    feed_stdin(monkeypatch, "123456\n")
+    assert pair_env() == 0
+    assert stdout_lines(capsys) == [{"processId": "proc-123", "status": "awaiting_code"}]
+    assert instances[0].codes == ["123456"]
+
+
+def test_wrong_code_reports_code_invalid_then_accepts_the_next(monkeypatch, capsys, pair_env):
+    instances = install_fake_pytr(monkeypatch, needs_authenticator=True, complete=[BAD_CODE, None])
+    feed_stdin(monkeypatch, "111111\n222222\n")
+    assert pair_env() == 0
+    assert stdout_lines(capsys)[1:] == [{"status": "code_invalid"}]
+    assert instances[0].codes == ["111111", "222222"]
+
+
+def test_already_used_code_is_retryable(monkeypatch, capsys, pair_env):
+    used = ValueError("That authenticator code was already used.")
+    install_fake_pytr(monkeypatch, needs_authenticator=True, complete=[used, None])
+    feed_stdin(monkeypatch, "111111\n222222\n")
+    assert pair_env() == 0
+    assert {"status": "code_invalid"} in stdout_lines(capsys)
+
+
+def test_three_wrong_codes_exit_3(monkeypatch, capsys, pair_env):
+    install_fake_pytr(monkeypatch, needs_authenticator=True, complete=[BAD_CODE] * 3)
+    feed_stdin(monkeypatch, "1\n2\n3\n4\n")
+    assert pair_env() == 3
+    assert stdout_lines(capsys).count({"status": "code_invalid"}) == 3
+
+
+def test_stdin_closing_before_a_code_exits_1(monkeypatch, capsys, pair_env):
     install_fake_pytr(monkeypatch, needs_authenticator=True)
-    assert pair_env() == 4
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert "authenticator" in captured.err
+    feed_stdin(monkeypatch, "")
+    assert pair_env() == 1
+    assert "stdin closed" in capsys.readouterr().err
+
+
+def test_authenticator_non_code_failure_exits_3(monkeypatch, pair_env):
+    install_fake_pytr(monkeypatch, needs_authenticator=True, complete=ValueError("login rejected"))
+    feed_stdin(monkeypatch, "123456\n")
+    assert pair_env() == 3
+
+
+def test_authenticator_timeout_exits_3(monkeypatch, pair_env):
+    install_fake_pytr(monkeypatch, needs_authenticator=True, complete=TimeoutError("expired"))
+    feed_stdin(monkeypatch, "123456\n")
+    assert pair_env() == 3
 
 
 @pytest.mark.parametrize("exc", [ValueError("rejected"), TimeoutError("expired")])

@@ -10,7 +10,7 @@ export async function trRoute(app: FastifyInstance) {
   // Current connection state (no secrets).
   app.get("/tr/connection", { preHandler: app.authenticate }, async (request) => {
     const id = request.userId;
-    return serialize(await getConnection(app, id));
+    return serialize(await getConnection(app, id), app.pytr.pairingMethod(id));
   });
 
   registerPairingRoutes(app);

@@ -8,7 +8,7 @@ import messages from "../messages/en.json";
 
 function makeClient(over: Partial<TrConnectClient> = {}): TrConnectClient {
   return {
-    connectTr: vi.fn(async () => ({ status: "awaiting_2fa" as const })),
+    connectTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
     verifyTr: vi.fn(async () => ({ status: "connected" as const })),
     syncTr: vi.fn(async () => ({ status: "connected" as const, drafts: 3 })),
     disconnectTr: vi.fn(async () => undefined),
@@ -130,6 +130,85 @@ describe("TrConnectFlow", () => {
 
     expect(await screen.findByRole("alert", {}, { timeout: 4000 })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Connect/ })).toBeTruthy();
+  });
+
+  describe("authenticator-app (TOTP) pairing", () => {
+    // The poll keeps reporting a live authenticator pairing until verify completes it.
+    const AWAITING_CODE: TrConnection = {
+      ...DISCONNECTED,
+      status: "awaiting_2fa",
+      portfolioId: "p1",
+      pairingMethod: "authenticator",
+    };
+    const totpClient = (over: Partial<TrConnectClient> = {}) =>
+      makeClient({
+        connectTr: vi.fn(async () => ({
+          status: "awaiting_2fa" as const,
+          method: "authenticator" as const,
+        })),
+        getTrConnection: vi.fn(async () => AWAITING_CODE),
+        ...over,
+      });
+    const connect = async () => {
+      fireEvent.change(screen.getByLabelText("Phone number"), { target: { value: "+49150" } });
+      fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "1234" } });
+      fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+      return screen.findByLabelText("Authenticator code");
+    };
+
+    it("asks for the code instead of verifying right away, then sends it", async () => {
+      const client = totpClient();
+      renderFlow(client);
+      const input = await connect();
+      expect(client.verifyTr).not.toHaveBeenCalled();
+
+      fireEvent.change(input, { target: { value: "123456" } });
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(client.verifyTr).toHaveBeenCalledWith({ code: "123456" }));
+      expect(await screen.findByText("Waiting for approval…")).toBeTruthy();
+    });
+
+    it("keeps Continue disabled until the code has six digits", async () => {
+      renderFlow(totpClient());
+      const input = await connect();
+      fireEvent.change(input, { target: { value: "12ab34" } });
+      expect((input as HTMLInputElement).value).toBe("1234");
+      expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+    });
+
+    it("returns to the code field with a message when the code is refused", async () => {
+      const client = totpClient({
+        verifyTr: vi.fn(async () => {
+          throw new ApiError(400, JSON.stringify({ error: "code_invalid" }));
+        }),
+      });
+      renderFlow(client);
+      const input = await connect();
+      fireEvent.change(input, { target: { value: "000000" } });
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByRole("alert")).toBeTruthy();
+      expect(screen.getByText(/wasn't accepted/)).toBeTruthy();
+      expect(((await screen.findByLabelText("Authenticator code")) as HTMLInputElement).value).toBe(
+        "",
+      );
+    });
+
+    it("opens straight on the code field when an authenticator pairing is already pending", () => {
+      renderFlow(totpClient(), AWAITING_CODE);
+      expect(screen.getByLabelText("Authenticator code")).toBeTruthy();
+    });
+
+    it("falls back to the form when the server forgot the pairing", async () => {
+      const client = totpClient({
+        getTrConnection: vi.fn(async () => ({ ...AWAITING_CODE, pairingMethod: null })),
+      });
+      renderFlow(client, AWAITING_CODE);
+      expect(await screen.findByRole("alert", {}, { timeout: 4000 })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Connect/ })).toBeTruthy();
+    });
   });
 
   it("passes a pasted waf token from the advanced field", async () => {

@@ -25,12 +25,20 @@ export class PytrApprovalError extends Error {
   }
 }
 
-// Thrown when the account signs in with an authenticator app (TOTP) code, which pairing cannot
-// collect yet (exit code 4).
-export class PytrAuthenticatorRequiredError extends Error {
-  constructor(message = "authenticator-app login is not supported") {
+// Thrown when an authenticator-app (TOTP) pairing is verified without a code.
+export class PytrCodeRequiredError extends Error {
+  constructor(message = "an authenticator code is required") {
     super(message);
-    this.name = "PytrAuthenticatorRequiredError";
+    this.name = "PytrCodeRequiredError";
+  }
+}
+
+// Thrown when Trade Republic refused the authenticator code (wrong or already used). The
+// pairing stays alive so the user can submit another code.
+export class PytrCodeInvalidError extends Error {
+  constructor(message = "the authenticator code was not accepted") {
+    super(message);
+    this.name = "PytrCodeInvalidError";
   }
 }
 

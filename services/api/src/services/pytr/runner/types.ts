@@ -30,7 +30,10 @@ export interface TrExportSummary {
   positions?: { isin: string; qty: number | string }[] | null;
 }
 
+export type PairingMethod = "push" | "authenticator";
+
 export interface PendingPairing {
+  method: PairingMethod;
   child: ChildProcess;
   cookiesFile: string;
   tmpDir: string;

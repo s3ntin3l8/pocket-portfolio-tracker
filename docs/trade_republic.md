@@ -43,18 +43,25 @@ approve promptly or the attempt expires and you start over.
 
 `tr_login.py` is a thin adapter over pytr's native v2 login (`use_v2_login`): pytr owns the
 request headers, the approval poll and the cookie save. Exit codes: `0` approved, `3` not
-approved / expired, `4` the account signs in with an **authenticator app (TOTP)**, which
-pairing cannot collect yet (the Connect flow answers 422 `tr_authenticator_unsupported`),
-`1` anything else.
+approved / expired / out of code attempts, `1` anything else.
+
+**Authenticator-app (TOTP) accounts** add a code step. `tr_login.py` prints
+`{"processId", "status": "awaiting_code"}` instead of `awaiting_approval`, and the Connect
+flow shows a 6-digit field. The code goes to `POST /tr/connection/verify` as `{ "code" }`
+and is passed to the login process on stdin. Trade Republic then still asks you to confirm
+the login in the app. A refused code (wrong or already used) answers 400 `code_invalid` and
+the pairing stays alive for another code; after 3 refused codes the login ends (exit `3`)
+and you start over. `GET /tr/connection` reports `pairingMethod` (`push` | `authenticator`)
+while a pairing is pending.
+
+If Trade Republic starts rejecting pytr's built-in web-client values, override them without
+a code change via `PYTR_TR_APP_VERSION`, `PYTR_TR_PLATFORM` and `PYTR_TR_USER_AGENT` (passed
+through to the pytr subprocess; empty means pytr's default).
 
 If pairing fails with exit `3` and stderr says `Unexpected login process status`, Trade Republic
 answered the approval poll with a status pytr doesn't treat as pending or confirmed. The previous
 vendored login tolerated a response with no terminal state if it set a session cookie; pytr's
 does not.
-
-If Trade Republic starts rejecting pytr's built-in web-client values, override them without
-a code change via `PYTR_TR_APP_VERSION`, `PYTR_TR_PLATFORM` and `PYTR_TR_USER_AGENT` (passed
-through to the pytr subprocess; empty means pytr's default).
 
 ## How sync works
 
