@@ -169,6 +169,21 @@ describe("GeminiChatProvider.complete", () => {
     expect(blocked.stop).toBe("refusal");
   });
 
+  it("treats a malformed tool call as a failed turn, not a clean end", async () => {
+    for (const reason of [
+      "MALFORMED_FUNCTION_CALL",
+      "MISSING_TOOL_PARAMS",
+      "UNEXPECTED_TOOL_CALL",
+    ]) {
+      await expect(
+        make(() => jsonRes(cand([{ text: "x" }], reason))).p.complete(REQ),
+      ).rejects.toMatchObject({ code: "provider_bad_response" });
+    }
+    await expect(
+      make(() => sseRes([cand([], "MALFORMED_FUNCTION_CALL")])).p.stream(REQ, () => {}),
+    ).rejects.toMatchObject({ code: "provider_bad_response" });
+  });
+
   it("maps failures to codes without leaking upstream detail", async () => {
     await expect(
       make(() => jsonRes({ error: { message: "secret" } }, 429)).p.complete(REQ),
@@ -322,6 +337,15 @@ describe("toGeminiSchema", () => {
         d: { type: "integer", nullable: true },
         e: {},
       },
+    });
+    // A real multi-branch anyOf/oneOf is passed through (nullable when a null branch is present).
+    expect(
+      toGeminiSchema({
+        anyOf: [{ type: "string" }, { type: "number" }, { type: "null" }],
+      }),
+    ).toEqual({ anyOf: [{ type: "string" }, { type: "number" }], nullable: true });
+    expect(toGeminiSchema({ oneOf: [{ type: "string" }, { type: "integer" }] })).toEqual({
+      anyOf: [{ type: "string" }, { type: "integer" }],
     });
     expect(toGeminiSchema(null)).toEqual({});
     expect(toGeminiSchema({ type: "object", required: [] })).toEqual({ type: "object" });

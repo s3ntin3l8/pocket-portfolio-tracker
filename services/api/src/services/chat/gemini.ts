@@ -118,7 +118,7 @@ export class GeminiChatProvider implements ChatProvider {
     const data = (await res.json().catch(() => null)) as GeminiResponse | null;
     if (!data) throw new ChatProviderError("provider_bad_response");
     const turn = readTurn([data]);
-    if (!turn) throw new ChatProviderError("provider_bad_response");
+    if (!turn || isBrokenTurn(turn)) throw new ChatProviderError("provider_bad_response");
     this.logTurn(log, turn, data.usageMetadata, t0);
     return toResult(turn);
   }
@@ -162,7 +162,7 @@ export class GeminiChatProvider implements ChatProvider {
       }
       const turn = readTurn(chunks);
       // No finish reason means the connection was cut: never treat that as a complete turn.
-      if (!turn || (!turn.finishReason && !turn.blocked)) {
+      if (!turn || isBrokenTurn(turn) || (!turn.finishReason && !turn.blocked)) {
         throw new ChatProviderError("provider_bad_response");
       }
       this.logTurn(log, turn, usage, t0);
@@ -227,6 +227,17 @@ function readTurn(chunks: GeminiResponse[]): Turn | null {
 
 const isPlainText = (p: Part) =>
   typeof p.text === "string" && !p.thought && p.thoughtSignature === undefined;
+
+/**
+ * The model tried to call a tool but produced something unusable. That is a failed turn, not
+ * a clean end (and not a refusal): nothing in it can be shown or run.
+ */
+const BROKEN_FINISH = new Set([
+  "MALFORMED_FUNCTION_CALL",
+  "MISSING_TOOL_PARAMS",
+  "UNEXPECTED_TOOL_CALL",
+]);
+const isBrokenTurn = (turn: Turn) => BROKEN_FINISH.has(turn.finishReason ?? "");
 
 function toResult(turn: Turn): ChatResult {
   const text = turn.parts
@@ -329,8 +340,10 @@ export function toGeminiSchema(schema: unknown): Record<string, unknown> {
     const real = branches.filter((b) => (b as { type?: unknown })?.type !== "null");
     if (real.length === 1) {
       Object.assign(out, toGeminiSchema(real[0]));
-      if (real.length !== branches.length) out.nullable = true;
+    } else if (real.length > 1) {
+      out.anyOf = real.map(toGeminiSchema); // Gemini supports anyOf natively
     }
+    if (real.length !== branches.length) out.nullable = true;
   }
   for (const [k, v] of Object.entries(s)) {
     if (!SCHEMA_KEYS.has(k)) continue;
