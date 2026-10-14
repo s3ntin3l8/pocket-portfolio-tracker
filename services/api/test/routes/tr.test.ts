@@ -14,6 +14,7 @@ import { buildApp } from "../../src/app.js";
 import { getDb, closeDb } from "../../src/db/client.js";
 import {
   PytrApprovalError,
+  PytrAuthenticatorRequiredError,
   PytrError,
   PytrUnavailableError,
 } from "../../src/services/pytr/runner.js";
@@ -279,6 +280,21 @@ describe("Trade Republic connection (encryption enabled)", () => {
     });
     expect(res.statusCode).toBe(502);
     expect(res.json()).toEqual({ error: "tr_pairing_failed" });
+    fake.startResult = { processId: "pid-1" };
+  });
+
+  it("422s when the account needs an authenticator-app code", async () => {
+    const t = await token("tr-totp");
+    const portfolioId = await portfolioFor(app, t);
+    fake.startResult = new PytrAuthenticatorRequiredError();
+    const res = await app.inject({
+      method: "POST",
+      url: "/tr/connection",
+      headers: auth(t),
+      payload: { phone: "+49150", pin: "1234", portfolioId },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({ error: "tr_authenticator_unsupported" });
     fake.startResult = { processId: "pid-1" };
   });
 

@@ -38,8 +38,18 @@ Verify the interpreter can import pytr:
 Trade Republic killed the v1 SMS login; pytr uses the **v2 push-approval** flow.
 On **Connect**, enter your TR phone number and PIN — Trade Republic sends a push to your
 **TR mobile app**. There is no SMS code: foreground the app and **approve the login
-there**. The pairing window is bounded (`PYTR_APPROVAL_TIMEOUT_S`, default 180s on the
-Python side); approve promptly or the attempt expires and you start over.
+there**. The pairing window is bounded by Trade Republic's own login-process expiry;
+approve promptly or the attempt expires and you start over.
+
+`tr_login.py` is a thin adapter over pytr's native v2 login (`use_v2_login`): pytr owns the
+request headers, the approval poll and the cookie save. Exit codes: `0` approved, `3` not
+approved / expired, `4` the account signs in with an **authenticator app (TOTP)**, which
+pairing cannot collect yet (the Connect flow answers 422 `tr_authenticator_unsupported`),
+`1` anything else.
+
+If Trade Republic starts rejecting pytr's built-in web-client values, override them without
+a code change via `PYTR_TR_APP_VERSION`, `PYTR_TR_PLATFORM` and `PYTR_TR_USER_AGENT` (passed
+through to the pytr subprocess; empty means pytr's default).
 
 ## How sync works
 

@@ -117,6 +117,11 @@ services:
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
       # Trade Republic sync — the venv is baked into the image (see root Dockerfile).
       PYTR_PYTHON_BIN: /opt/pytr-venv/bin/python
+      # Optional overrides for when Trade Republic rejects pytr's built-in web-client values
+      # (empty = pytr's default); see docs/trade_republic.md.
+      PYTR_TR_APP_VERSION: ${PYTR_TR_APP_VERSION:-}
+      PYTR_TR_PLATFORM: ${PYTR_TR_PLATFORM:-}
+      PYTR_TR_USER_AGENT: ${PYTR_TR_USER_AGENT:-}
       # Opt-in rotating file logs inside the container; unset by default (journald/
       # CloudWatch already capture container stdout in most setups) — see LOG_DIR in
       # .env.example / services/api/src/app.ts's resolveLogDestination().

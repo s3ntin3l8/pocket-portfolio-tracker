@@ -2,7 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { trConnections } from "@portfolio/db";
-import { PytrApprovalError, PytrUnavailableError } from "../../services/pytr/runner.js";
+import {
+  PytrApprovalError,
+  PytrAuthenticatorRequiredError,
+  PytrUnavailableError,
+} from "../../services/pytr/runner.js";
 import { sanitizeConnectionError } from "../../lib/sanitize-error.js";
 import { getConnection, lookupPortfolio } from "./_shared.js";
 
@@ -45,6 +49,9 @@ export function registerPairingRoutes(app: FastifyInstance) {
     } catch (err) {
       if (err instanceof PytrUnavailableError) {
         return reply.code(503).send({ error: "pytr_not_available" });
+      }
+      if (err instanceof PytrAuthenticatorRequiredError) {
+        return reply.code(422).send({ error: "tr_authenticator_unsupported" });
       }
       request.log.error({ err }, "tr pairing failed to start");
       return reply.code(502).send({ error: "tr_pairing_failed" });

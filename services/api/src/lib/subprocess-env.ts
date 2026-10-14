@@ -24,6 +24,10 @@ const ALLOWED_EXACT = new Set([
   "no_proxy",
   "all_proxy",
   "PLAYWRIGHT_BROWSERS_PATH",
+  // pytr protocol overrides (app version / platform / user agent); not secrets.
+  "PYTR_TR_APP_VERSION",
+  "PYTR_TR_PLATFORM",
+  "PYTR_TR_USER_AGENT",
   "XDG_CACHE_HOME",
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
