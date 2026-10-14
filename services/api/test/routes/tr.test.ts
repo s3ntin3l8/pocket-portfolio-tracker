@@ -356,6 +356,24 @@ describe("Trade Republic connection (encryption enabled)", () => {
       expect(conn.json().status).toBe("awaiting_2fa");
     });
 
+    it("treats a null body like no code (push pairings still verify)", async () => {
+      const t = await token("tr-null-body");
+      const portfolioId = await portfolioFor(app, t);
+      await app.inject({
+        method: "POST",
+        url: "/tr/connection",
+        headers: { ...auth(t), "content-type": "application/json" },
+        payload: { phone: "+49150", pin: "1234", portfolioId },
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/verify",
+        headers: { ...auth(t), "content-type": "application/json" },
+        payload: "null",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
     it.each(["12a456", "12345", "1234567", "123456\n"])(
       "rejects the malformed code %j before it can reach the login process",
       async (code) => {

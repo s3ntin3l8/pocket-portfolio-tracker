@@ -20,7 +20,7 @@ const connectBodySchema = z.object({
 
 // Authenticator-app (TOTP) pairings send the 6-digit code here. The strict pattern also keeps
 // anything but digits (newlines included) out of the login process's stdin.
-const verifyBodySchema = z.object({ code: z.string().regex(/^\d{6}$/) }).optional();
+const verifyBodySchema = z.object({ code: z.string().regex(/^\d{6}$/) }).nullish();
 
 export function registerPairingRoutes(app: FastifyInstance) {
   app.post("/tr/connection", { preHandler: app.authenticate }, async (request, reply) => {

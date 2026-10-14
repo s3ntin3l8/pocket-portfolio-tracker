@@ -149,7 +149,7 @@ export class PytrRunner {
     // Only the first line (processId + method) is read above; a later awaiting_code is ignored.
     // Trade Republic refused an authenticator code: fail this verify only. The login process
     // stays alive and waits for the next code on stdin.
-    if (parsed.status === "code_invalid" && entry.onApproval) {
+    if (parsed.status === "code_invalid" && entry.method === "authenticator" && entry.onApproval) {
       const { reject } = entry.onApproval;
       entry.onApproval = null;
       reject(new PytrCodeInvalidError());
