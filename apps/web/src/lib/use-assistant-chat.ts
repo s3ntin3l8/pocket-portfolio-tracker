@@ -5,6 +5,7 @@ import type { ApiClient } from "@portfolio/api-client";
 import {
   applyEvent,
   errorKeyFor,
+  settleTurn,
   MAX_MESSAGE_CHARS,
   toRequestMessages,
   type ChatTurn,
@@ -97,7 +98,11 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
             const stopped = ac.signal.aborted && !sawDone;
             abortRef.current = null;
             setStreaming(false);
-            patchLast((t) => ({ ...t, pending: false, ...(stopped ? { stopped: true } : {}) }));
+            patchLast((t) => ({
+              ...settleTurn(t),
+              pending: false,
+              ...(stopped ? { stopped: true } : {}),
+            }));
           }
         }
       })();

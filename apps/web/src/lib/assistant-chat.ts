@@ -16,6 +16,8 @@ export interface ChatTurn {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Text of the model turn still being generated (a preview; `message` replaces it). */
+  streaming?: string;
   /** Tool calls the assistant made while answering (assistant turns only). */
   steps: ToolStep[];
   /** An i18n key under `Assistant.errors` when this turn ended in a failure. */
@@ -43,9 +45,15 @@ export function toRequestMessages(turns: ChatTurn[]): AssistantChatMessage[] {
 /** Fold one stream event into the assistant turn it belongs to. */
 export function applyEvent(turn: ChatTurn, event: AssistantEvent): ChatTurn {
   switch (event.type) {
+    case "delta":
+      return { ...turn, streaming: (turn.streaming ?? "") + event.text };
     case "message":
       // A turn with tool calls can produce several model messages; keep them as paragraphs.
-      return { ...turn, content: turn.content ? `${turn.content}\n\n${event.text}` : event.text };
+      return {
+        ...turn,
+        streaming: undefined,
+        content: turn.content ? `${turn.content}\n\n${event.text}` : event.text,
+      };
     case "tool_call":
       return {
         ...turn,
@@ -63,6 +71,21 @@ export function applyEvent(turn: ChatTurn, event: AssistantEvent): ChatTurn {
     default:
       return turn; // status / done carry nothing to show
   }
+}
+
+/** The text to show for a turn: finished messages plus the one still streaming in. */
+export function displayText(turn: ChatTurn): string {
+  if (!turn.streaming) return turn.content;
+  return turn.content ? `${turn.content}\n\n${turn.streaming}` : turn.streaming;
+}
+
+/**
+ * End of a stream: a partial turn the user stopped (or that was cut off) keeps the text that
+ * had arrived, so it shows the same afterwards and is part of the history sent next.
+ */
+export function settleTurn(turn: ChatTurn): ChatTurn {
+  if (!turn.streaming) return turn;
+  return { ...turn, content: displayText(turn), streaming: undefined };
 }
 
 const KNOWN_ERRORS = new Set([

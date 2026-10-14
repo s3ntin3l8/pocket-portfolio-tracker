@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@portfolio/api-client";
 import {
   applyEvent,
+  displayText,
+  settleTurn,
   currentScope,
   errorKey,
   errorKeyFor,
@@ -120,5 +122,30 @@ describe("currentScope", () => {
 
   it("ignores an invalid URL scope rather than sending it", () => {
     expect(currentScope("?scope=p:../../me", "all")).toBe("all");
+  });
+});
+
+describe("streaming deltas", () => {
+  const base: ChatTurn = { id: "a", role: "assistant", content: "", steps: [], pending: true };
+
+  it("accumulates deltas into a preview that the turn's message replaces", () => {
+    let t = applyEvent(base, { type: "delta", text: "Hel" });
+    t = applyEvent(t, { type: "delta", text: "lo" });
+    expect(t.content).toBe("");
+    expect(displayText(t)).toBe("Hello");
+    t = applyEvent(t, { type: "message", text: "Hello!" });
+    expect(t.streaming).toBeUndefined();
+    expect(displayText(t)).toBe("Hello!");
+  });
+
+  it("shows earlier messages and the one streaming in as paragraphs", () => {
+    const t = applyEvent({ ...base, content: "First." }, { type: "delta", text: "Second" });
+    expect(displayText(t)).toBe("First.\n\nSecond");
+  });
+
+  it("keeps the partial text of a stopped turn so it counts as history", () => {
+    const settled = settleTurn(applyEvent(base, { type: "delta", text: "half an ans" }));
+    expect(settled).toMatchObject({ content: "half an ans", streaming: undefined });
+    expect(settleTurn(settled)).toBe(settled);
   });
 });

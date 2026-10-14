@@ -12,8 +12,12 @@ export const MAX_TOOL_CALLS_PER_ROUND = 8;
 /** Total tool-result characters fed back to the model across one request. */
 export const MAX_TOTAL_TOOL_RESULT_CHARS = 120_000;
 
-/** What the route streams to the client (one SSE event each). Per turn, not per token. */
+/**
+ * What the route streams to the client (one SSE event each). `delta` carries text fragments as
+ * they arrive; `message` is the complete text of the turn and marks the turn as finished.
+ */
 export type ChatEvent =
+  | { type: "delta"; text: string }
   | { type: "tool_call"; id: string; name: string; input: unknown }
   | { type: "tool_result"; id: string; name: string; ok: boolean }
   | { type: "message"; text: string }
@@ -49,10 +53,10 @@ export async function runChat(opts: RunChatOptions): Promise<void> {
 
     let result;
     try {
-      result = await provider.complete(
-        { system, messages, tools: specs, maxTokens: MAX_TOKENS, signal },
-        log,
-      );
+      const req = { system, messages, tools: specs, maxTokens: MAX_TOKENS, signal };
+      result = provider.stream
+        ? await provider.stream(req, (text) => emit({ type: "delta", text }), log)
+        : await provider.complete(req, log);
     } catch (err) {
       if (signal?.aborted) return;
       if (err instanceof ChatProviderError) {

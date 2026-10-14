@@ -58,6 +58,11 @@ export interface ChatProvider {
   readonly local: boolean;
   isConfigured(): boolean;
   complete(req: ChatRequest, log?: Logger): Promise<ChatResult>;
+  /**
+   * Same turn as `complete`, but text is reported through `onDelta` as it arrives. Resolves with
+   * the complete result once the turn ends. Optional: the loop falls back to `complete`.
+   */
+  stream?(req: ChatRequest, onDelta: (text: string) => void, log?: Logger): Promise<ChatResult>;
 }
 
 /**
@@ -80,6 +85,9 @@ export class ChatProviderError extends Error {
 
 /** Per-call upstream timeout (a tool loop makes several calls; each gets its own budget). */
 export const PROVIDER_TIMEOUT_MS = 120_000;
+
+/** A stream that goes quiet this long between chunks is dead (the overall timeout still applies). */
+export const STREAM_IDLE_TIMEOUT_MS = 60_000;
 
 /** Combine the caller's abort signal with the per-call timeout. */
 export function withTimeout(signal: AbortSignal | undefined, ms = PROVIDER_TIMEOUT_MS) {

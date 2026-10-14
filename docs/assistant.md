@@ -22,9 +22,15 @@ looking at so it can pass that id to tools instead of listing portfolios first. 
 | `status`      | `{ provider, local }`                                       |
 | `tool_call`   | `{ id, name, input }`                                       |
 | `tool_result` | `{ id, name, ok }`                                          |
-| `message`     | `{ text }` — one per model turn (**not** per token)         |
+| `delta`       | `{ text }` — a text fragment of the turn being generated    |
+| `message`     | `{ text }` — the turn's complete text; ends the turn        |
 | `error`       | `{ error, status? }` — a short code, never an upstream body |
 | `done`        | `{ rounds }`                                                |
+
+`delta` events are a live preview: the following `message` carries the same turn's full text and replaces them. A
+turn cut off by `max_tokens` or a refusal still sends its `message` and then an `error`; its tool calls never run (a
+call whose arguments are truncated is refused as `invalid_arguments`). A provider stream that goes quiet for 60 s is
+treated as failed (`provider_unreachable`).
 
 Within a turn, all `tool_call` events come first (in call order), then the `tool_result` events in the same order;
 pair them by `id`. A tool that throws gets a failed `tool_result` (`tool_failed`), never a missing one.
