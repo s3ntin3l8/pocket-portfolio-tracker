@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { apiErrorCode } from "@portfolio/api-client";
 import type { ApiClient, TrConnection } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { ConnectedCompactRow } from "@/components/broker/connected-compact-row";
+import { ReconcileSummary } from "@/components/broker/reconcile-summary";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useInterval } from "@/lib/use-interval";
@@ -47,6 +50,7 @@ export function TrConnectFlow({
   cashCounted,
   initial,
   onChanged,
+  compact = false,
 }: {
   client: TrConnectClient;
   /**
@@ -62,8 +66,12 @@ export function TrConnectFlow({
   cashCounted: boolean;
   initial: TrConnection;
   onChanged?: () => void;
+  /** Collapse the connected state to a single row (last sync, Sync, ⋯ menu). Every other
+   *  status keeps the full flow. */
+  compact?: boolean;
 }) {
   const t = useTranslations("TradeRepublic");
+  const tB = useTranslations("BrokerConnection");
   const [phase, setPhase] = useState<Phase>(phaseFor(initial.status, initial.pairingMethod));
   const [authenticator, setAuthenticator] = useState(initial.pairingMethod === "authenticator");
   const [code, setCode] = useState("");
@@ -74,6 +82,7 @@ export function TrConnectFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingReimport, setConfirmingReimport] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
   const expired = initial.status === "expired";
 
@@ -221,6 +230,7 @@ export function TrConnectFlow({
   const disconnect = () =>
     void run(async () => {
       await client.disconnectTr();
+      setConfirmingDisconnect(false);
       setPhase("form");
       onChanged?.();
     });
@@ -350,37 +360,70 @@ export function TrConnectFlow({
         </div>
       )}
 
-      {phase === "connected" && (
+      {phase === "connected" && compact && initial.status === "connected" && (
+        <>
+          <ConnectedCompactRow
+            lastSyncAt={initial.lastSyncAt}
+            syncLabel={t("syncNow")}
+            onSync={doSync}
+            busy={busy}
+            menuItems={[
+              {
+                key: "reprocess",
+                label: reprocessDone ? t("reprocess.done") : t("reprocess.action"),
+                onSelect: reprocess,
+              },
+              {
+                key: "reimport",
+                label: t("reimport.action"),
+                onSelect: () => setConfirmingReimport(true),
+              },
+              {
+                key: "disconnect",
+                label: t("disconnect"),
+                destructive: true,
+                onSelect: () => setConfirmingDisconnect(true),
+              },
+            ]}
+            details={
+              <>
+                <p className="text-xs text-muted-foreground">{t("connectedHint")}</p>
+                <ReconcileSummary recon={initial.lastReconciliation} namespace="TradeRepublic" />
+                <div className="space-y-1 rounded-md border px-3 py-3">
+                  <p className="text-sm font-medium">{t("scope.title")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {cashCounted ? t("scope.cashInside") : t("scope.cashOutside")}
+                  </p>
+                </div>
+              </>
+            }
+          />
+          <ConfirmActionDialog
+            open={confirmingDisconnect}
+            onOpenChange={setConfirmingDisconnect}
+            title={tB("disconnectTitle", { broker: "Trade Republic" })}
+            description={tB("disconnectBody")}
+            confirmLabel={t("disconnect")}
+            busy={busy}
+            onConfirm={disconnect}
+          />
+          <ConfirmActionDialog
+            open={confirmingReimport}
+            onOpenChange={setConfirmingReimport}
+            title={t("reimport.action")}
+            description={t("reimport.warning")}
+            confirmLabel={t("reimport.confirm")}
+            busy={busy}
+            onConfirm={reimport}
+          />
+        </>
+      )}
+
+      {phase === "connected" && !(compact && initial.status === "connected") && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">{t("connectedHint")}</p>
 
-          {(() => {
-            const recon = initial.lastReconciliation;
-            if (!recon) return null;
-            return (
-              <div className="space-y-1 rounded-md border px-3 py-2 text-sm">
-                <p className="font-medium">{t("reconcile.title")}</p>
-                {recon.cash.map((c) => {
-                  const off = Number(c.diff) !== 0;
-                  return (
-                    <div key={c.currency} className="flex justify-between gap-2">
-                      <span className="text-muted-foreground">
-                        {t("reconcile.row", {
-                          currency: c.currency,
-                          // 2 dp: the stored derived figure carries Decimal's full precision.
-                          reported: Number(c.reported).toFixed(2),
-                          derived: Number(c.derived).toFixed(2),
-                        })}
-                      </span>
-                      <span className={off ? "text-destructive" : "text-muted-foreground"}>
-                        {off ? t("reconcile.off", { diff: c.diff }) : t("reconcile.match")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+          <ReconcileSummary recon={initial.lastReconciliation} namespace="TradeRepublic" />
 
           <div className="space-y-1 rounded-md border px-3 py-3">
             <p className="text-sm font-medium">{t("scope.title")}</p>

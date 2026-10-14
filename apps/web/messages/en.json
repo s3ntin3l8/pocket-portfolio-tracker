@@ -2551,5 +2551,12 @@
     "rowPaid": "Paid",
     "rowOverdue": "Overdue",
     "rowUpcoming": "Upcoming"
+  },
+  "BrokerConnection": {
+    "lastSync": "Last sync",
+    "never": "Never",
+    "details": "Details",
+    "disconnectTitle": "Disconnect {broker}?",
+    "disconnectBody": "Syncing stops. Transactions already imported stay in this portfolio."
   }
 }
