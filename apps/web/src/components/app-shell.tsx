@@ -236,7 +236,7 @@ export function AppShell({
                   <div className="min-w-0">{switcher}</div>
                   <div className="ml-auto flex items-center gap-1">
                     <ThemeToggle className="hidden md:inline-flex" />
-                    <GlobalSearch holderId={selectedHolderId} />
+                    <GlobalSearch holderId={selectedHolderId} isAdmin={isAdmin} />
                     {/* Global add-entry affordance: reachable from every screen, owns the
                     share-target / shortcut auto-open. Suspense is required because
                     AddTransactionMenu reads useSearchParams and this shell renders on

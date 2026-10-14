@@ -26,7 +26,7 @@ import {
 
 /** Params that belong to the previous scope's view and must not survive a scope change:
  *  the Holdings drill-in override and list pagination. */
-const SCOPE_RESET_PARAMS = ["portfolio", "page"];
+export const SCOPE_RESET_PARAMS = ["portfolio", "page"];
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
