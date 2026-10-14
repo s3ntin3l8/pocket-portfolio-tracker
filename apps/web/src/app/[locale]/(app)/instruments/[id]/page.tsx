@@ -1,47 +1,33 @@
+import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-  ArrowLeft,
-  LineChart,
-  Receipt,
-  Wallet,
-  Pencil,
-  AlertCircle,
-  AlertTriangle,
-} from "lucide-react";
-import { ScopeLink } from "@/components/scope-link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineChart } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
-import { StatCard } from "@/components/stat-card";
-import { InstrumentLogo } from "@/components/instrument-logo";
-import { InstrumentPriceCard } from "@/components/instrument-price-card";
 import { InstrumentFundamentalsCard } from "@/components/instrument-fundamentals-card";
-import { InstrumentIncomeCard } from "@/components/instrument-income-card";
 import { InstrumentManualPriceCard } from "@/components/instrument-manual-price-card";
-import { CorporateActionsManager } from "@/components/corporate-actions-manager";
-import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
-import { TransactionsTable, type TxRow } from "@/components/transactions-table";
-import { InstrumentLotsTable } from "@/components/instrument-lots-table";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageHeaderSetter } from "@/components/page-header";
 import {
-  loadInstrumentResult,
-  loadInstrumentScope,
-  loadAnomalies,
-  loadIncomeStats,
-  loadPreferences,
-  loadMe,
-  loadTransactionsPaginated,
-  loadNetworthTransactionsPaginated,
-  getSelectedPortfolioId,
-} from "@/lib/server-api";
-import { formatMoney, formatPercent, rowAnomalyCounts } from "@/lib/utils";
-import { lastPriceInfo } from "@/lib/instrument-price";
+  instrumentOnce,
+  meOnce,
+  startInstrumentLoads,
+  type InstrumentTxFilters,
+} from "@/components/instrument/instrument-data";
+import { InstrumentBackButton, InstrumentHeader } from "@/components/instrument/instrument-header";
+import {
+  InstrumentPriceSection,
+  InstrumentLotsSection,
+  InstrumentIncomeSection,
+  InstrumentTransactionsSection,
+  InstrumentCorporateActionsSection,
+  InstrumentPositionSection,
+} from "@/components/instrument/instrument-sections";
+import {
+  InstrumentCardSkeleton,
+  InstrumentTransactionsSkeleton,
+} from "@/components/instrument/instrument-skeletons";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
-const PAGE_SIZE = 25;
 
 export default async function InstrumentPage({
   params,
@@ -61,74 +47,22 @@ export default async function InstrumentPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Instrument");
-  const tA11y = await getTranslations("A11y");
-  const ta = await getTranslations("Anomalies");
-  const tc = await getTranslations("AssetClass");
 
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp?.page ?? "1"));
-  const typeFilter = sp?.type ?? undefined;
-  const yearFilter = sp?.year ?? undefined;
-  const searchQuery = sp?.q ?? undefined;
-  const statusFilter = sp?.status === "draft" ? "draft" : undefined;
+  const filters: InstrumentTxFilters = {
+    page: Math.max(1, Number(sp?.page ?? "1")),
+    type: sp?.type ?? undefined,
+    year: sp?.year ?? undefined,
+    q: sp?.q ?? undefined,
+    status: sp?.status === "draft" ? "draft" : undefined,
+  };
 
-  // Cost basis is a single global preference — thread it into loadInstrumentScope,
-  // which previously silently defaulted to purchase_price regardless of the user's
-  // choice on Holdings (a real correctness gap: instrument P&L could disagree with
-  // holdings P&L on cost basis).
-  // loadPreferences() used to be awaited before anything else — a full serial round trip
-  // blocking the whole page. The loaders that don't need costBasis are kicked off
-  // immediately instead; only loadInstrumentScope waits on it.
-  const prefsPromise = loadPreferences();
-  const instrumentPromise = loadInstrumentResult(id);
-  const anomaliesPromise = loadAnomalies();
-  const incomeStatsPromise = loadIncomeStats();
-  const mePromise = loadMe();
-  const selectedIdPromise = getSelectedPortfolioId();
-
-  const prefs = await prefsPromise;
-  const costBasis = prefs?.costBasisMode ?? "purchase_price";
-
-  // Same aggregate-vs-single-portfolio branch Activity uses for its own paginated fetch —
-  // scoped down to this instrument via `instrumentId` so filter chips/year/search/"Load more"
-  // all operate server-side on this instrument's own transactions, not the whole scope (#585).
-  const selectedId = await selectedIdPromise;
-  const aggregate = selectedId === null;
-  const txPromise = aggregate
-    ? loadNetworthTransactionsPaginated(
-        page,
-        PAGE_SIZE,
-        typeFilter,
-        yearFilter,
-        searchQuery,
-        id,
-        statusFilter,
-      )
-    : loadTransactionsPaginated(
-        selectedId!,
-        page,
-        PAGE_SIZE,
-        undefined,
-        typeFilter,
-        yearFilter,
-        searchQuery,
-        id,
-        statusFilter,
-      );
-
-  const [instrumentResult, scope, allAnomalies, incomeStatsResult, txResult] = await Promise.all([
-    instrumentPromise,
-    loadInstrumentScope(id, costBasis),
-    anomaliesPromise,
-    incomeStatsPromise,
-    txPromise,
-  ]);
-
-  const txRows: TxRow[] = txResult.status === "ok" ? txResult.rows : [];
-  const txTotal = txResult.status === "ok" ? txResult.total : 0;
-  const txYears = txResult.status === "ok" ? (txResult.years ?? []) : [];
-  const txDraftCount = txResult.status === "ok" ? txResult.draftCount : undefined;
-  const hasActiveTxFilter = Boolean(typeFilter || yearFilter || searchQuery || statusFilter);
+  // Blocking path: only what decides WHICH page this is (not found / error / instrument).
+  // Every loader the streamed sections need is started NOW (not awaited) so they overlap
+  // with this gate instead of waterfalling after it; each section then awaits its own
+  // request-`cache()`d loader (see components/instrument/instrument-data.ts).
+  startInstrumentLoads(id, filters);
+  const [instrumentResult, me] = await Promise.all([instrumentOnce(id), meOnce()]);
 
   if (TIMING) {
     // eslint-disable-next-line react-hooks/purity
@@ -142,46 +76,12 @@ export default async function InstrumentPage({
     );
   }
 
-  const me = await mePromise;
-  const isAdmin = Boolean(me?.isAdmin);
-
-  // Filter anomalies to those affecting this specific instrument. Portfolio-scoped
-  // anomalies (reconciliation_gap, position_gap) are NOT instrument-specific — they used to
-  // be included unconditionally here (`|| a.scope === "portfolio"`), which leaked an
-  // unrelated portfolio-wide cash/position warning onto every single instrument's page.
-  // They already have their own dedicated banner on Holdings/Transactions; this page only
-  // needs anomalies that actually attach to one of this instrument's own transactions.
-  const instrumentAnomalies = (allAnomalies ?? []).filter((a) => a.instrumentId === id);
-  // Same dedup-by-transaction, worst-severity-wins count used everywhere else (Holdings,
-  // Transactions) — see apps/web/src/lib/utils.ts `rowAnomalyCounts`.
-  const { errors: instrumentAnomalyErrors, warnings: instrumentAnomalyWarnings } =
-    rowAnomalyCounts(instrumentAnomalies);
-
-  // This instrument's slice of the existing income analytics — reused as-is (same
-  // lifetime `byInstrument` total and trailing `yields` the Income screen's YieldsTable
-  // already renders), not a new aggregation.
-  const incomeStats = incomeStatsResult.status === "ok" ? incomeStatsResult.data : null;
-  const instrumentIncome = incomeStats?.byInstrument.find((i) => i.instrumentId === id) ?? null;
-  const instrumentYield = incomeStats?.yields.find((y) => y.instrumentId === id) ?? null;
-
-  const back = (
-    <Button
-      variant="outline"
-      size="icon"
-      asChild
-      aria-label={tA11y("backToHoldings")}
-      className="rounded-xl bg-card shadow-card"
-    >
-      <ScopeLink href="/holdings">
-        <ArrowLeft className="size-4" />
-      </ScopeLink>
-    </Button>
-  );
-
   if (instrumentResult.status === "not_found") {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">{back}</div>
+        <div className="flex items-center gap-3">
+          <InstrumentBackButton />
+        </div>
         <EmptyState icon={LineChart} title={t("notFound")} description={t("notFoundBody")} />
       </div>
     );
@@ -191,13 +91,16 @@ export default async function InstrumentPage({
   if (instrumentResult.status !== "ok") {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">{back}</div>
+        <div className="flex items-center gap-3">
+          <InstrumentBackButton />
+        </div>
         <DataState status={instrumentResult.status} retryAfter={retryAfterOf(instrumentResult)} />
       </div>
     );
   }
 
-  const { instrument, history, corporateActions } = instrumentResult.data;
+  const { instrument } = instrumentResult.data;
+  const isAdmin = Boolean(me?.isAdmin);
 
   // Prefer the provider-enriched presentation name (`Apple Inc.`) over the raw
   // broker/import `name` (which can be a description or just the ticker). Some providers
@@ -208,70 +111,10 @@ export default async function InstrumentPage({
       ? instrument.displayName
       : instrument.name;
 
-  // Your position in this instrument (null / zero-quantity = not held in the active scope).
-  const holding = scope.holding;
-  const hasPosition = holding !== null && Number(holding.quantity) !== 0;
-  const pnlDisplay =
-    holding?.unrealizedPnLDisplay != null ? Number(holding.unrealizedPnLDisplay) : null;
-  const costBasisDisplay = holding ? Number(holding.costBasisDisplay) : 0;
-  const pnlPct =
-    pnlDisplay !== null && costBasisDisplay !== 0 ? pnlDisplay / costBasisDisplay : undefined;
-  const qtyFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 8 });
-  const lots = holding?.lots ?? [];
-  const lotCurrency = holding?.currency ?? instrument.currency;
-
-  // This position's market value ÷ the total market value of every holding in the active
-  // scope — reuses `loadInstrumentScope`'s already-fetched holdings list (no new fetch).
-  const marketValueDisplay =
-    holding?.marketValueDisplay != null ? Number(holding.marketValueDisplay) : null;
-  const portfolioWeight =
-    marketValueDisplay !== null && scope.totalMarketValueDisplay
-      ? marketValueDisplay / scope.totalMarketValueDisplay
-      : null;
-
-  // The price hero's "Last price · today's change" headline — derived once from the initial
-  // (1Y) candle window loaded above, independent of `HoldingValuation.dayChange` so it works
-  // the same whether or not the instrument is currently held.
-  const lastPrice = lastPriceInfo(history, instrument.currency);
-
   return (
     <div className="space-y-6">
       <PageHeaderSetter title={heroName} backHref="/holdings" />
-      <div className="flex items-start gap-3">
-        {back}
-        {/* Instrument hero: logo chip + name as the primary heading, symbol + asset class +
-            market + currency on the secondary line. Desktop topbar renders the name via
-            PageHeaderSetter above, so this row stays mobile-first without duplicating it. */}
-        <InstrumentLogo
-          label={instrument.symbol}
-          symbol={instrument.symbol}
-          market={instrument.market}
-          assetClass={instrument.assetClass}
-          className="size-11 shrink-0 rounded-md text-sm"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <PageTitle className="truncate">{heroName}</PageTitle>
-            {isAdmin && (
-              <InstrumentEditDialog instrument={instrument}>
-                <Button variant="ghost" size="icon" aria-label={t("edit")}>
-                  <Pencil className="size-4" />
-                </Button>
-              </InstrumentEditDialog>
-            )}
-          </div>
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground/80">{instrument.symbol}</span>
-            <Badge variant="outline" className="font-normal">
-              {tc(instrument.assetClass)}
-            </Badge>
-            <span aria-hidden>·</span>
-            <span>{instrument.market}</span>
-            <span aria-hidden>·</span>
-            <span>{instrument.currency}</span>
-          </p>
-        </div>
-      </div>
+      <InstrumentHeader instrument={instrument} heroName={heroName} isAdmin={isAdmin} />
 
       <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[minmax(0,1fr)_300px] @xl:items-start">
         {/* ── Main column: price chart + fundamentals + lots + transactions ──
@@ -280,19 +123,9 @@ export default async function InstrumentPage({
             a horizontal scrollbar on the page — which is what the old layout was doing
             once the fundamentals card or the DesktopTable had more columns than fit. */}
         <div className="space-y-6 min-w-0">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("priceHistory")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <InstrumentPriceCard
-                instrumentId={id}
-                initialHistory={history}
-                currency={instrument.currency}
-                lastPrice={lastPrice}
-              />
-            </CardContent>
-          </Card>
+          <Suspense fallback={<InstrumentCardSkeleton height="h-64" />}>
+            <InstrumentPriceSection id={id} />
+          </Suspense>
 
           {/* Fundamentals: PE, market cap, dividend yield, analyst recs, revenue-vs-earnings —
               client-fetched (self-heals a per-instrument DB cache), so a slow/unreachable
@@ -304,176 +137,31 @@ export default async function InstrumentPage({
           )}
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
-            {lots.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("openLots")}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-0">
-                  <InstrumentLotsTable lots={lots} currency={lotCurrency} />
-                </CardContent>
-              </Card>
-            )}
-            <InstrumentIncomeCard
-              title={t("incomeCardTitle")}
-              dividendsReceived={
-                instrumentIncome
-                  ? formatMoney(
-                      Number(instrumentIncome.total),
-                      incomeStats?.displayCurrency ?? scope.displayCurrency,
-                      locale,
-                    )
-                  : null
-              }
-              receivedCaption={t("incomeReceivedCaption")}
-              emptyMessage={t("incomeEmpty")}
-              yieldOnCost={
-                instrumentYield?.yieldOnCost != null
-                  ? formatPercent(Number(instrumentYield.yieldOnCost), locale)
-                  : null
-              }
-              yieldTitle={t("yieldOnCostLabel")}
-              yieldCaption={t("yieldOnCostCaption")}
-              bondInfo={
-                instrument.assetClass === "bond" &&
-                instrument.couponRate != null &&
-                instrument.maturityDate != null
-                  ? {
-                      label: t("bondTermsLabel"),
-                      couponRate: formatPercent(Number(instrument.couponRate), locale),
-                      maturityDate: new Date(
-                        `${instrument.maturityDate}T00:00:00`,
-                      ).toLocaleDateString(locale, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      }),
-                    }
-                  : null
-              }
-            />
+            <Suspense fallback={<InstrumentCardSkeleton />}>
+              <InstrumentLotsSection id={id} />
+            </Suspense>
+            <Suspense fallback={<InstrumentCardSkeleton />}>
+              <InstrumentIncomeSection id={id} locale={locale} />
+            </Suspense>
             {instrument.assetClass === "bond" && (
               <InstrumentManualPriceCard instrument={instrument} />
             )}
           </div>
 
-          {/* Flat heading + TransactionsTable, matching Activity's own layout exactly (#585) —
-              no outer Card here: DesktopTable already renders its own card-styled box, so
-              wrapping it in a second Card doubled the boxing and flushed the filter chips/search
-              bar against the outer card's edge instead of reading as a toolbar above the table. */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">{t("transactions")}</h2>
-              {(instrumentAnomalyErrors > 0 || instrumentAnomalyWarnings > 0) && (
-                <span
-                  className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                    instrumentAnomalyErrors > 0
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-warning/10 text-warn-strong"
-                  }`}
-                >
-                  {instrumentAnomalyErrors > 0 ? (
-                    <AlertCircle className="size-3" />
-                  ) : (
-                    <AlertTriangle className="size-3" />
-                  )}
-                  {instrumentAnomalyErrors > 0
-                    ? ta("bannerError", { count: instrumentAnomalyErrors })
-                    : ta("bannerWarning", { count: instrumentAnomalyWarnings })}
-                </span>
-              )}
-            </div>
-            {txTotal > 0 || hasActiveTxFilter ? (
-              <TransactionsTable
-                rows={txRows}
-                showPortfolio={aggregate}
-                anomalies={instrumentAnomalies}
-                showFilterBanners={false}
-                scopeCurrency={scope.displayCurrency}
-                years={txYears}
-                typeFilter={typeFilter}
-                yearFilter={yearFilter}
-                searchQuery={searchQuery}
-                portfolioId={selectedId ?? undefined}
-                total={txTotal}
-                instrumentId={id}
-                statusFilter={statusFilter}
-                draftCount={txDraftCount}
-              />
-            ) : (
-              <EmptyState
-                icon={Receipt}
-                title={t("noTransactions")}
-                description={t("noTransactionsBody")}
-              />
-            )}
-          </div>
+          <Suspense fallback={<InstrumentTransactionsSkeleton />}>
+            <InstrumentTransactionsSection id={id} filters={filters} />
+          </Suspense>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("corporateActions")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CorporateActionsManager items={corporateActions} isAdmin={isAdmin} />
-            </CardContent>
-          </Card>
+          <Suspense fallback={<InstrumentCardSkeleton />}>
+            <InstrumentCorporateActionsSection id={id} />
+          </Suspense>
         </div>
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
         <div className="space-y-6 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto @xl:order-last">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("position")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasPosition && holding ? (
-                <div className="grid grid-cols-1 gap-2.5 sm:gap-4">
-                  <StatCard
-                    label={t("marketValueLabel")}
-                    value={
-                      marketValueDisplay !== null
-                        ? formatMoney(marketValueDisplay, scope.displayCurrency, locale)
-                        : "—"
-                    }
-                  />
-                  <StatCard
-                    label={t("quantityLabel")}
-                    value={qtyFmt.format(Number(holding.quantity))}
-                  />
-                  <StatCard
-                    label={t("avgCostLabel")}
-                    value={formatMoney(
-                      Number(holding.avgCost),
-                      holding.currency ?? instrument.currency,
-                      locale,
-                    )}
-                  />
-                  <StatCard
-                    label={t("unrealizedPnl")}
-                    value={
-                      pnlDisplay !== null
-                        ? formatMoney(pnlDisplay, scope.displayCurrency, locale)
-                        : "—"
-                    }
-                    delta={pnlPct !== undefined ? formatPercent(pnlPct, locale) : undefined}
-                    deltaTone={pnlDisplay === null ? "neutral" : pnlDisplay >= 0 ? "up" : "down"}
-                  />
-                  <StatCard
-                    label={t("portfolioWeightLabel")}
-                    value={
-                      portfolioWeight !== null ? `${(portfolioWeight * 100).toFixed(1)}%` : "—"
-                    }
-                  />
-                </div>
-              ) : (
-                <EmptyState
-                  icon={Wallet}
-                  title={t("noPosition")}
-                  description={t("noPositionBody")}
-                />
-              )}
-            </CardContent>
-          </Card>
+          <Suspense fallback={<InstrumentCardSkeleton />}>
+            <InstrumentPositionSection id={id} locale={locale} />
+          </Suspense>
         </div>
       </div>
     </div>
