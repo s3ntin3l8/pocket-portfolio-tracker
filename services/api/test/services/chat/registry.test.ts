@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHAT_PROVIDER_REGISTRY, getChatProvider } from "../../../src/services/chat/registry.js";
+import {
+  CHAT_PROVIDER_REGISTRY,
+  buildChatProvider,
+  effectivePin,
+  getChatProvider,
+  resolveChatProviders,
+  selectChatProvider,
+  type ChatConfig,
+} from "../../../src/services/chat/registry.js";
 
 const KEYS = [
   "ANTHROPIC_API_KEY",
@@ -10,6 +18,7 @@ const KEYS = [
   "OPENROUTER_CHAT_MODEL",
   "OLLAMA_BASE_URL",
   "OLLAMA_CHAT_MODEL",
+  "ANTHROPIC_CHAT_EFFORT",
   "CHAT_PROVIDER",
 ];
 let saved: Record<string, string | undefined>;
@@ -129,9 +138,129 @@ describe("Gemini chat opt-in", () => {
 
   it("accepts a key stored in the admin credentials, still gated on the model", () => {
     const d = CHAT_PROVIDER_REGISTRY.find((c) => c.id === "gemini")!;
-    expect(d.configured({ apiKey: "from-db" } as never)).toBe(false); // pragma: allowlist secret
-    process.env.GEMINI_CHAT_MODEL = "m";
-    expect(d.configured({ apiKey: "from-db" } as never)).toBe(true); // pragma: allowlist secret
-    expect(d.create({ apiKey: "from-db" } as never).isConfigured()).toBe(true); // pragma: allowlist secret
+    const secret = { apiKey: "from-db" }; // pragma: allowlist secret
+    expect(d.configured(secret, undefined)).toBe(false);
+    expect(d.configured(secret, "m")).toBe(true);
+    expect(d.create(secret, "m").isConfigured()).toBe(true);
+  });
+});
+
+describe("resolveChatProviders / selectChatProvider (admin layer)", () => {
+  const cfg = (over: Partial<ChatConfig> = {}): ChatConfig => ({
+    visionRows: [],
+    chatRows: [],
+    pinned: null,
+    credentials: new Map([
+      ["claude", { apiKey: "a" }], // pragma: allowlist secret
+      ["gemini", { apiKey: "g" }], // pragma: allowlist secret
+      ["ollama", { url: "http://localhost:11434" }],
+    ]),
+    ...over,
+  });
+  const ids = (c: ChatConfig) => resolveChatProviders(c).map((s) => s.id);
+
+  it("inherits the vision enable/priority until the admin overrides them for chat", () => {
+    expect(ids(cfg())).toEqual(["claude", "gemini", "openrouter", "ollama"]);
+    const vision = cfg({
+      visionRows: [
+        { provider: "ollama", enabled: true, priority: 0 },
+        { provider: "claude", enabled: false, priority: 1 },
+      ],
+    });
+    expect(ids(vision)[0]).toBe("ollama");
+    expect(resolveChatProviders(vision).find((s) => s.id === "claude")).toMatchObject({
+      enabled: false,
+      enabledSource: "vision",
+      prioritySource: "vision",
+    });
+    const chat = cfg({
+      visionRows: vision.visionRows,
+      chatRows: [
+        { provider: "claude", enabled: true, priority: 0, model: null },
+        { provider: "ollama", enabled: null, priority: 9, model: null },
+      ],
+    });
+    expect(ids(chat)[0]).toBe("claude");
+    expect(resolveChatProviders(chat).find((s) => s.id === "claude")).toMatchObject({
+      enabled: true,
+      enabledSource: "chat",
+      prioritySource: "chat",
+    });
+    expect(resolveChatProviders(chat).find((s) => s.id === "ollama")).toMatchObject({
+      priority: 9,
+      enabled: true,
+      enabledSource: "vision",
+    });
+  });
+
+  it("resolves the model: admin, then env, then the adapter default, and uses it to gate", () => {
+    const base = resolveChatProviders(cfg());
+    expect(base.find((s) => s.id === "claude")).toMatchObject({
+      model: "claude-opus-5-5",
+      modelSource: "default",
+    });
+    expect(base.find((s) => s.id === "gemini")).toMatchObject({ configured: false, model: null });
+
+    process.env.GEMINI_CHAT_MODEL = "from-env";
+    const withEnv = resolveChatProviders(cfg()).find((s) => s.id === "gemini");
+    expect(withEnv).toMatchObject({ configured: true, model: "from-env", modelSource: "env" });
+
+    const withDb = resolveChatProviders(
+      cfg({
+        chatRows: [{ provider: "gemini", enabled: null, priority: null, model: " db-model " }],
+      }),
+    ).find((s) => s.id === "gemini");
+    expect(withDb).toMatchObject({ configured: true, model: "db-model", modelSource: "db" });
+    // A model chosen in the admin satisfies the "model required" gate on its own.
+    delete process.env.GEMINI_CHAT_MODEL;
+    expect(
+      resolveChatProviders(
+        cfg({ chatRows: [{ provider: "gemini", enabled: null, priority: null, model: "m" }] }),
+      ).find((s) => s.id === "gemini")?.configured,
+    ).toBe(true);
+  });
+
+  it("picks the first enabled, configured provider by priority", () => {
+    const states = resolveChatProviders(
+      cfg({ chatRows: [{ provider: "claude", enabled: false, priority: null, model: null }] }),
+    );
+    // claude is off, gemini has no model, openrouter has no key -> ollama needs a model too.
+    expect(selectChatProvider(states, null)).toBeNull();
+    process.env.OLLAMA_CHAT_MODEL = "qwen";
+    expect(selectChatProvider(resolveChatProviders(cfg()), null)?.id).toBe("claude");
+    expect(
+      selectChatProvider(
+        resolveChatProviders(
+          cfg({ chatRows: [{ provider: "claude", enabled: false, priority: null, model: null }] }),
+        ),
+        null,
+      )?.id,
+    ).toBe("ollama");
+  });
+
+  it("never falls through from a pin, and a pin ignores the enabled flag", () => {
+    process.env.OLLAMA_CHAT_MODEL = "qwen";
+    const off = resolveChatProviders(
+      cfg({ chatRows: [{ provider: "ollama", enabled: false, priority: null, model: null }] }),
+    );
+    expect(selectChatProvider(off, "ollama")?.id).toBe("ollama");
+    expect(selectChatProvider(off, "openrouter")).toBeNull(); // pinned but unusable
+    expect(selectChatProvider(off, "nonsense")).toBeNull();
+  });
+
+  it("takes the pin from the admin setting before the env var", () => {
+    expect(effectivePin({ pinned: null })).toEqual({ value: null, source: null });
+    process.env.CHAT_PROVIDER = "Ollama";
+    expect(effectivePin({ pinned: null })).toEqual({ value: "ollama", source: "env" });
+    expect(effectivePin({ pinned: "claude" })).toEqual({ value: "claude", source: "db" });
+  });
+
+  it("builds the provider with the resolved model", () => {
+    const [s] = resolveChatProviders(
+      cfg({ chatRows: [{ provider: "claude", enabled: null, priority: null, model: "claude-x" }] }),
+    ).filter((x) => x.id === "claude");
+    const p = buildChatProvider(s!, cfg().credentials);
+    expect(p.name).toBe("claude");
+    expect(p.isConfigured()).toBe(true);
   });
 });

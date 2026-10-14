@@ -47,6 +47,25 @@ export const visionProviderSettings = pgTable("vision_provider_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+/**
+ * Chat-specific overrides per provider (credentials stay shared with vision). A null column
+ * means "inherit": enabled/priority from `vision_provider_settings`, model from the env var.
+ */
+export const chatProviderSettings = pgTable("chat_provider_settings", {
+  provider: text("provider").primaryKey(),
+  enabled: boolean("enabled"),
+  priority: integer("priority"),
+  model: text("model"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/** Singleton (id = 1): the chat provider the admin pinned, if any (beats `CHAT_PROVIDER`). */
+export const chatSettings = pgTable("chat_settings", {
+  id: integer("id").primaryKey().default(1),
+  pinnedProvider: text("pinned_provider"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
 export const adminAuditLog = pgTable("admin_audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   actorSub: text("actor_sub").notNull(),

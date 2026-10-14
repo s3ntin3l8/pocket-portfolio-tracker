@@ -1,6 +1,7 @@
 import type {
   AdminProvider,
   AdminVisionProvider,
+  AdminChatProvidersResponse,
   AdminStats,
   AdminUser,
   AdminJobsResponse,
@@ -84,6 +85,18 @@ export async function loadAdminVisionProviders(): Promise<
   try {
     const { providers, encryptionEnabled } = await api.getAdminVisionProviders();
     return { status: "ok", providers, encryptionEnabled };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+export async function loadAdminChatProviders(): Promise<
+  ({ status: "ok" } & AdminChatProvidersResponse) | { status: "unavailable" }
+> {
+  const api = await getServerApi();
+  if (!api) return { status: "unavailable" };
+  try {
+    return { status: "ok", ...(await api.getAdminChatProviders()) };
   } catch {
     return { status: "unavailable" };
   }

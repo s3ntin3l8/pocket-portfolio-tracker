@@ -58,12 +58,16 @@ A read-scoped token may chat: the route is declared `config: { scope: "read" }` 
 
 The chat provider is picked per request:
 
-1. `CHAT_PROVIDER` pin (a lower-case provider id): **that provider or nothing**. If the pinned provider is not configured for chat, chat is unavailable (`503`) — it never falls through to another provider, so a "keep it local" pin cannot silently start sending data to a cloud provider;
-2. otherwise the first provider that is **enabled** and ranked highest in the admin's provider priority (the same
-   enable/priority settings as the vision parsers) **and** configured for chat.
+1. a **pin**: the admin's pin (Admin → Assistant providers), else the `CHAT_PROVIDER` env var. The pinned provider is used **or nothing** — if it is not usable, chat is unavailable (`503`); it never falls through to another provider, so a "keep it local" pin cannot silently start sending data to a cloud provider. A pin ignores the per-provider enabled switch;
+2. otherwise the first provider that is **enabled** and ranked highest by priority **and** configured for chat.
 
-Credentials are the same vendor credentials the vision parsers use (encrypted DB credential, else env). Only the
-models are chat-specific:
+Enabled and priority follow the vision parsers' settings until the admin saves chat-specific ones (Admin → Assistant
+providers); "Reset to defaults" drops every chat override again. The **model** is the admin's setting, else the
+provider's env var, else the adapter default — a model chosen in the admin also satisfies the "model required" gate
+for Gemini, OpenRouter and Ollama. The same page shows which provider answers chat right now.
+
+Credentials are the same vendor credentials the vision parsers use (encrypted DB credential, else env; set them on
+the vision providers page). Only the models are chat-specific:
 
 | Provider     | Needs                                   | Notes                                                                                                                                                                                                                                                                                                                |
 | ------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
