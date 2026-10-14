@@ -6,6 +6,58 @@ import { TrConnectFlow, type TrConnectClient } from "@/components/tr-connect-flo
 import { IbkrConnectFlow, type IbkrConnectClient } from "@/components/ibkr-connect-flow";
 import type { Portfolio, TrConnection, IbkrConnection } from "@portfolio/api-client";
 
+type ConnectionStatus = "connected" | "awaiting_2fa" | "expired" | "error" | "disconnected";
+
+const PILL_TONE: Record<"ok" | "pending" | "bad" | "idle", string> = {
+  ok: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  bad: "bg-destructive/15 text-destructive",
+  idle: "bg-muted text-muted-foreground",
+};
+
+/**
+ * The broker connection is its own thing, not a field of the portfolio form — so it's a
+ * card (with its state at a glance) that sits ABOVE the form, not a section trailing the
+ * Save button as if it were part of what Save saves.
+ */
+function ConnectionCard({
+  title,
+  status,
+  children,
+}: {
+  title: string;
+  /** Omitted while loading / unavailable (no connection object to read a state from). */
+  status?: ConnectionStatus;
+  children: React.ReactNode;
+}) {
+  const t = useTranslations("PortfolioForm");
+  const pill =
+    status === undefined
+      ? null
+      : status === "connected"
+        ? { tone: "ok" as const, label: t("connectionConnected") }
+        : status === "awaiting_2fa"
+          ? { tone: "pending" as const, label: t("connectionAwaiting") }
+          : status === "expired" || status === "error"
+            ? { tone: "bad" as const, label: t("connectionAttention") }
+            : { tone: "idle" as const, label: t("connectionNotConnected") };
+  return (
+    <section className="rounded-2xl border border-line bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium">{title}</h3>
+        {pill && (
+          <span
+            className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold ${PILL_TONE[pill.tone]}`}
+          >
+            {pill.label}
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function TrConnectionSection({
   trConnection,
   effectivePortfolio,
@@ -30,8 +82,10 @@ export function TrConnectionSection({
   const te = useTranslations("Empty");
 
   return (
-    <div className="border-t border-line px-6 pb-6 pt-4">
-      <p className="mb-3 text-sm font-medium">{t("trSectionTitle")}</p>
+    <ConnectionCard
+      title={t("trSectionTitle")}
+      status={trConnection ? trConnection.status : undefined}
+    >
       {trConnection === null ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner size="sm" />
@@ -61,7 +115,7 @@ export function TrConnectionSection({
           />
         </>
       )}
-    </div>
+    </ConnectionCard>
   );
 }
 
@@ -83,8 +137,10 @@ export function IbkrConnectionSection({
   const te = useTranslations("Empty");
 
   return (
-    <div className="border-t border-line px-6 pb-6 pt-4">
-      <p className="mb-3 text-sm font-medium">{tibkr("sectionTitle")}</p>
+    <ConnectionCard
+      title={tibkr("sectionTitle")}
+      status={ibkrConnection ? ibkrConnection.status : undefined}
+    >
       {ibkrConnection === null ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner size="sm" />
@@ -103,6 +159,6 @@ export function IbkrConnectionSection({
           }}
         />
       )}
-    </div>
+    </ConnectionCard>
   );
 }
