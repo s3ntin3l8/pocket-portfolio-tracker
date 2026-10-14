@@ -83,6 +83,23 @@ describe("GeminiChatProvider.complete", () => {
     ]);
   });
 
+  it("sends no parameters for a tool without arguments (Gemini rejects empty object schemas)", async () => {
+    const f = make(() => jsonRes(cand([{ text: "x" }])));
+    await f.p.complete({
+      ...REQ,
+      tools: [
+        {
+          name: "list_portfolios",
+          description: "List",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        },
+      ],
+    });
+    expect(f.calls[0]!.body.tools[0].functionDeclarations).toEqual([
+      { name: "list_portfolios", description: "List" },
+    ]);
+  });
+
   it("maps function calls, keeps thought signatures for replay, and ids calls it did not id", async () => {
     const parts = [
       { functionCall: { name: "get_networth", args: { scope: "all" } }, thoughtSignature: "sig1" },

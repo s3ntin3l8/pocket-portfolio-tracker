@@ -81,11 +81,17 @@ export class GeminiChatProvider implements ChatProvider {
               ? {
                   tools: [
                     {
-                      functionDeclarations: req.tools.map((t) => ({
-                        name: t.name,
-                        description: t.description,
-                        parameters: toGeminiSchema(t.inputSchema),
-                      })),
+                      functionDeclarations: req.tools.map((t) => {
+                        const parameters = toGeminiSchema(t.inputSchema);
+                        const props = parameters.properties as Record<string, unknown> | undefined;
+                        return {
+                          name: t.name,
+                          description: t.description,
+                          // A tool without arguments takes no `parameters` at all: Gemini
+                          // rejects an OBJECT schema with empty properties.
+                          ...(props && Object.keys(props).length > 0 ? { parameters } : {}),
+                        };
+                      }),
                     },
                   ],
                 }
