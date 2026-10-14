@@ -1,6 +1,12 @@
 // Barrel re‑export: sub‑modules live in runner/{types,core,factory}.ts.
 // Existing `from "./runner.js"` imports keep working.
-export { PytrApprovalError, PytrAuthError, PytrError, PytrUnavailableError } from "./errors.js";
+export {
+  PytrApprovalError,
+  PytrAuthError,
+  PytrAuthenticatorRequiredError,
+  PytrError,
+  PytrUnavailableError,
+} from "./errors.js";
 export type { SpawnFn } from "./process.js";
 export type {
   DocDownloadResult,

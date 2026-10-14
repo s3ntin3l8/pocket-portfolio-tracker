@@ -6,7 +6,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyBaseLogger } from "fastify";
 import { runProcess, readLines, safeRm, type SpawnFn } from "../process.js";
-import { PytrApprovalError, PytrAuthError, PytrError, PytrUnavailableError } from "../errors.js";
+import {
+  PytrApprovalError,
+  PytrAuthError,
+  PytrAuthenticatorRequiredError,
+  PytrError,
+  PytrUnavailableError,
+} from "../errors.js";
 import type {
   DocDownloadResult,
   DownloadDocumentsResult,
@@ -151,7 +157,12 @@ export class PytrRunner {
             "pytr pairing exited nonzero",
           );
           const msg = entry.stderr.trim() || `pytr login exited with code ${code}`;
-          const err = code === 3 ? new PytrApprovalError(msg) : new PytrError(msg);
+          const err =
+            code === 3
+              ? new PytrApprovalError(msg)
+              : code === 4
+                ? new PytrAuthenticatorRequiredError(msg)
+                : new PytrError(msg);
           entry.onInit?.reject(err);
           entry.onInit = null;
           if (entry.onApproval) {

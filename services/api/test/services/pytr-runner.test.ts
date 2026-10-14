@@ -8,6 +8,7 @@ import {
   PytrUnavailableError,
   PytrAuthError,
   PytrApprovalError,
+  PytrAuthenticatorRequiredError,
   PytrError,
   type SpawnFn,
 } from "../../src/services/pytr/runner.js";
@@ -175,6 +176,16 @@ describe("PytrRunner pairing", () => {
     child.stderr.emit("data", Buffer.from("login not approved: login expired"));
     child.emit("exit", 3);
     await expect(approvalP).rejects.toThrow(PytrApprovalError);
+  });
+
+  it("rejects startPairing with PytrAuthenticatorRequiredError on exit 4 (TOTP account)", async () => {
+    const { spawn, nextChild } = makeSpawn();
+    const runner = makeRunner(spawn);
+    const startP = runner.startPairing("u1", { phone: "+49", pin: "1" });
+    const child = await nextChild();
+    child.stderr.emit("data", Buffer.from("this account uses an authenticator app"));
+    child.emit("exit", 4);
+    await expect(startP).rejects.toThrow(PytrAuthenticatorRequiredError);
   });
 
   it("times out a pairing that is never approved", async () => {

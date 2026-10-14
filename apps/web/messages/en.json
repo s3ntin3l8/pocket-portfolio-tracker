@@ -1795,6 +1795,7 @@
     "errors": {
       "pytr_not_available": "Trade Republic sync isn't set up on the server.",
       "encryption_required": "The server can't store credentials securely yet (encryption key missing).",
+      "tr_authenticator_unsupported": "This Trade Republic account signs in with an authenticator app, which isn't supported yet.",
       "tr_pairing_failed": "Couldn't start the Trade Republic login. Please try again.",
       "portfolio_not_found": "That portfolio could no longer be found.",
       "not_connected": "Not connected. Reconnect and try again.",

@@ -34,6 +34,18 @@ describe("buildSubprocessEnv (A10)", () => {
     expect(env).not.toHaveProperty("STORAGE_SECRET_KEY");
   });
 
+  it("passes the pytr protocol overrides through", () => {
+    const env = buildSubprocessEnv(
+      {},
+      { ...base, PYTR_TR_APP_VERSION: "9.9.9", PYTR_TR_PLATFORM: "web", PYTR_TR_USER_AGENT: "ua" },
+    );
+    expect(env).toMatchObject({
+      PYTR_TR_APP_VERSION: "9.9.9",
+      PYTR_TR_PLATFORM: "web",
+      PYTR_TR_USER_AGENT: "ua",
+    });
+  });
+
   it("lets extraEnv override and never reads the real process.env secrets", () => {
     process.env.DB_ENCRYPTION_KEY = "leak-me"; // pragma: allowlist secret
     try {

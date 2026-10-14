@@ -10,8 +10,7 @@
 # validation. Pin the exact SHA (never a moving branch) for reproducible builds. Installing
 # from git requires a `git` binary at build time (see Dockerfile / Makefile).
 #
-# Our v2 push-approval login lives in tr_login.py as a TradeRepublicApi subclass (mirrors
-# pytr #355, now merged upstream as `use_v2_login`; migrating is a tracked follow-up).
+# tr_login.py is a thin adapter over pytr's native v2 push-approval login (`use_v2_login`).
 #
 # We rely on pytr's no-browser AWS-WAF solver (PYTR_WAF_STRATEGY=awswaf). playwright is an
 # optional pytr extra and is deliberately NOT installed (no `pytr[playwright]`, no Chromium).
