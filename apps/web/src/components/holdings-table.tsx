@@ -18,6 +18,8 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { MonogramBadge } from "@/components/monogram-badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
+import { instrumentLogoTransitionName } from "@/lib/instrument-logo-transition";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { HoldingSparkline } from "@/components/holding-sparkline";
 import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
@@ -65,6 +67,9 @@ export interface HoldingsTableProps {
 export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   const t = useTranslations("Holdings");
   const locale = useLocale();
+  // Both layouts are mounted (CSS-hidden); a transition name must be unique, so only the
+  // visible one gets it. Server/first render is false -> the card list owns the name.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { sortKey, sortDir, toggle, sort } = useTableSort<HoldingValuation>(HOLDINGS_COLS);
 
   const sorted = sort(rows);
@@ -187,6 +192,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                         symbol={h.instrument?.symbol}
                         market={h.instrument?.market}
                         assetClass={h.instrument?.assetClass}
+                        transitionName={
+                          isDesktop ? instrumentLogoTransitionName(h.instrumentId) : undefined
+                        }
                       />
                       <div>
                         <ScopeLink
@@ -319,6 +327,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                 symbol={h.instrument?.symbol}
                 market={h.instrument?.market}
                 assetClass={h.instrument?.assetClass}
+                transitionName={
+                  !isDesktop ? instrumentLogoTransitionName(h.instrumentId) : undefined
+                }
                 className="size-[42px] rounded-md"
               />
               <div className="min-w-0 flex-1">

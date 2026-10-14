@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { InstrumentLogoPlaceholder } from "@/components/instrument/instrument-logo-placeholder";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
@@ -6,7 +7,7 @@ export default function Loading() {
     <div className="space-y-6">
       <div className="flex items-start gap-3">
         <Skeleton className="size-9 shrink-0 rounded-xl" />
-        <Skeleton className="size-11 shrink-0 rounded-md" />
+        <InstrumentLogoPlaceholder />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <Skeleton className="h-7 w-48" />

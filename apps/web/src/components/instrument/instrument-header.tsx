@@ -5,6 +5,7 @@ import { ScopeLink } from "@/components/scope-link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
+import { instrumentLogoTransitionName } from "@/lib/instrument-logo-transition";
 import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 import { PageTitle } from "@/components/page-header";
 
@@ -50,6 +51,7 @@ export async function InstrumentHeader({
         symbol={instrument.symbol}
         market={instrument.market}
         assetClass={instrument.assetClass}
+        transitionName={instrumentLogoTransitionName(instrument.id)}
         className="size-11 shrink-0 rounded-md text-sm"
       />
       <div className="min-w-0 flex-1">
