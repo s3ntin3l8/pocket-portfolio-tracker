@@ -7,17 +7,6 @@ import { Button } from "@/components/ui/button";
 
 export type DataStateStatus = "empty" | "unauthorized" | "rate_limited" | "unavailable";
 
-/**
- * One place that turns a loader status into the right message instead of a single
- * "Can't reach the API" card: "empty" (the caller's own copy — nothing to show yet),
- * "unauthorized" (session expired), "rate_limited" (with a live countdown from
- * `retryAfter`) and "unavailable" (API unreachable). Every failure state carries an inline
- * Retry that re-runs the server loaders via `router.refresh()`. Never reports a transient
- * failure as "not found".
- *
- * Renders on the server or the client (the interactive bit is `DataStateRetry`), so a
- * server page can pass its `LucideIcon` straight through.
- */
 type EmptyCopy = { title: string; description: string; action?: React.ReactNode };
 
 export type DataStateProps = { retryAfter?: number | null } & (
@@ -37,6 +26,17 @@ export type DataStateProps = { retryAfter?: number | null } & (
     }
 );
 
+/**
+ * One place that turns a loader status into the right message instead of a single
+ * "Can't reach the API" card: "empty" (the caller's own copy — nothing to show yet),
+ * "unauthorized" (session expired), "rate_limited" (with a live countdown from
+ * `retryAfter`) and "unavailable" (API unreachable). Every failure state carries an inline
+ * Retry that re-runs the server loaders via `router.refresh()`. Never reports a transient
+ * failure as "not found".
+ *
+ * Renders on the server or the client (the interactive bit is `DataStateRetry`), so a
+ * server page can pass its `LucideIcon` straight through.
+ */
 export function DataState(props: DataStateProps) {
   const { status, retryAfter } = props;
   const t = useTranslations("DataState");
