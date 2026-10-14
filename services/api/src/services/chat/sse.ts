@@ -8,7 +8,11 @@ export interface SseFrame {
  * line; `data:` lines of one frame are joined with `\n`; comment lines (`:`) are ignored.
  * Both `\n` and `\r\n` line endings are accepted.
  */
-export async function* readSseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<SseFrame> {
+export async function* readSseFrames(
+  body: ReadableStream<Uint8Array>,
+  /** Called for every chunk read, including ones that only carry comments (keepalives). */
+  onChunk?: () => void,
+): AsyncGenerator<SseFrame> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
@@ -16,7 +20,9 @@ export async function* readSseFrames(body: ReadableStream<Uint8Array>): AsyncGen
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      onChunk?.();
+      // Normalise after appending so a CRLF split across two chunks still collapses.
+      buf = (buf + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
       let idx: number;
       while ((idx = buf.indexOf("\n\n")) !== -1) {
         const frame = parseFrame(buf.slice(0, idx));

@@ -50,6 +50,20 @@ describe("readSseFrames", () => {
   });
 });
 
+describe("readSseFrames edge cases", () => {
+  it("collapses a CRLF split across chunks and reports every chunk, even comment-only ones", async () => {
+    let chunks = 0;
+    const out = [];
+    for await (const f of readSseFrames(
+      sseBody(["data: a\r", "\n\r", "\n", ": keepalive\n\n"]),
+      () => chunks++,
+    ))
+      out.push(f);
+    expect(out).toEqual([{ event: "message", data: "a" }]);
+    expect(chunks).toBe(4);
+  });
+});
+
 describe("idleGuard", () => {
   it("aborts when no chunk arrives in time and stays quiet once stopped", async () => {
     const g = idleGuard(undefined, 20);
@@ -306,6 +320,33 @@ describe("OpenAICompatChatProvider.stream", () => {
     ]).stream(REQ, () => {});
     expect(out.stop).toBe("max_tokens");
     expect(out.toolCalls[0]!.args).toBeNull();
+  });
+
+  it("keeps parallel calls apart when a backend sends them all with index 0", async () => {
+    const out = await make([
+      chunk({ tool_calls: [{ index: 0, id: "a", function: { name: "x", arguments: "{}" } }] }),
+      chunk(
+        { tool_calls: [{ index: 0, id: "b", function: { name: "y", arguments: '{"n":1}' } }] },
+        "tool_calls",
+      ),
+    ]).stream(REQ, () => {});
+    expect(out.toolCalls).toEqual([
+      { id: "a", name: "x", args: {} },
+      { id: "b", name: "y", args: { n: 1 } },
+    ]);
+  });
+
+  it("rejects a stream that ends without a finish_reason, so a cut-off turn is never complete", async () => {
+    await expect(
+      make([
+        chunk({ tool_calls: [{ index: 0, id: "a", function: { name: "x", arguments: "{}" } }] }),
+      ]).stream(REQ, () => {}),
+    ).rejects.toMatchObject({ code: "provider_bad_response" });
+    await expect(make([chunk({ content: "partial" })]).stream(REQ, () => {})).rejects.toMatchObject(
+      {
+        code: "provider_bad_response",
+      },
+    );
   });
 
   it("maps content_filter to refusal, and errors/empty streams/HTTP failures to codes", async () => {

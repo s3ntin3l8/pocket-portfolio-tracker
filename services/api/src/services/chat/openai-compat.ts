@@ -161,8 +161,7 @@ export class OpenAICompatChatProvider implements ChatProvider {
       // Tool-call fragments arrive keyed by index: id/name once, arguments in pieces.
       const calls = new Map<number, { id?: string; name: string; args: string }>();
       try {
-        for await (const frame of readSseFrames(res.body)) {
-          guard.touch();
+        for await (const frame of readSseFrames(res.body, guard.touch)) {
           if (frame.data.trim() === "[DONE]") break;
           let chunk: StreamChunk;
           try {
@@ -184,7 +183,12 @@ export class OpenAICompatChatProvider implements ChatProvider {
             onDelta(delta.content);
           }
           for (const tc of delta?.tool_calls ?? []) {
-            const i = tc.index ?? 0;
+            // Some backends send every parallel call with index 0 (or none) but a distinct id:
+            // a new id means a new call, never a continuation of the previous one.
+            let i = tc.index ?? 0;
+            if (tc.id && calls.get(i)?.id && calls.get(i)!.id !== tc.id) {
+              i = Math.max(...calls.keys()) + 1;
+            }
             const cur = calls.get(i) ?? { name: "", args: "" };
             if (tc.id) cur.id = tc.id;
             if (tc.function?.name) cur.name += tc.function.name;
@@ -199,7 +203,9 @@ export class OpenAICompatChatProvider implements ChatProvider {
         log?.error({ provider: this.name }, "chat stream failed");
         throw new ChatProviderError("provider_unreachable");
       }
-      if (!sawChoice) throw new ChatProviderError("provider_bad_response");
+      // No finish_reason means the connection was cut: a partial turn must not look complete
+      // (and its tool calls must never run).
+      if (!sawChoice || !finish) throw new ChatProviderError("provider_bad_response");
 
       // Arguments are parsed only now that the stream is over, so a cut-off call is `null`
       // (refused by the loop) rather than run with half its input.

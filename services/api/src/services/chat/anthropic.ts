@@ -159,8 +159,7 @@ export class AnthropicChatProvider implements ChatProvider {
       let usage: Record<string, unknown> | undefined;
       let model: string | undefined;
       try {
-        for await (const frame of readSseFrames(res.body)) {
-          guard.touch();
+        for await (const frame of readSseFrames(res.body, guard.touch)) {
           const ev = safeJson(frame.data) as StreamEvent | null;
           if (!ev) continue;
           switch (ev.type) {
