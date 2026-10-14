@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Check, FolderInput, GitMerge, Trash2 } from "lucide-react";
+import { Check, FolderInput, GitMerge, ListChecks, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { SelectionBarShell } from "@/components/ui/selection-bar-shell";
@@ -15,6 +15,11 @@ export function SelectionBar({
   busy,
   confirming,
   onClearSelection,
+  allSelected,
+  onToggleAll,
+  matchingTotal,
+  matchingLoading,
+  onSelectMatching,
   onBatchConfirmDrafts,
   onBatchDiscardDrafts,
   onReassign,
@@ -31,6 +36,13 @@ export function SelectionBar({
   busy: boolean;
   confirming: boolean;
   onClearSelection: () => void;
+  /** Every loaded (visible) row is selected. */
+  allSelected: boolean;
+  onToggleAll: () => void;
+  /** Server-side match count to offer "Select all N matching" for; null = don't offer. */
+  matchingTotal: number | null;
+  matchingLoading: boolean;
+  onSelectMatching: () => void;
   onBatchConfirmDrafts: () => void;
   onBatchDiscardDrafts: () => void;
   onReassign: () => void;
@@ -43,7 +55,7 @@ export function SelectionBar({
 
   if (!selectionMode) return null;
 
-  const actions =
+  const batchActions =
     selectedCount > 0 ? (
       confirming ? (
         <span className="flex items-center gap-2">
@@ -89,6 +101,32 @@ export function SelectionBar({
         </span>
       )
     ) : null;
+
+  // Select-all lives in the bar so it works on mobile, where there's no header checkbox.
+  const actions = (
+    <>
+      {!confirming && (
+        <span className="flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={onToggleAll} disabled={busy}>
+            <ListChecks className="size-3.5" />
+            {allSelected ? tb("clearAll") : tb("selectAllLoaded")}
+          </Button>
+          {matchingTotal !== null && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onSelectMatching}
+              disabled={busy || matchingLoading}
+            >
+              {matchingLoading && <Spinner size="xs" />}
+              {tb("selectAllMatching", { count: matchingTotal })}
+            </Button>
+          )}
+        </span>
+      )}
+      {batchActions}
+    </>
+  );
 
   return (
     <SelectionBarShell

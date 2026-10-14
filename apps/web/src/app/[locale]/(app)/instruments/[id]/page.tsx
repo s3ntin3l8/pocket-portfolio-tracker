@@ -48,7 +48,13 @@ export default async function InstrumentPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
-  searchParams?: Promise<{ page?: string; type?: string; year?: string; q?: string }>;
+  searchParams?: Promise<{
+    page?: string;
+    type?: string;
+    year?: string;
+    q?: string;
+    status?: string;
+  }>;
 }) {
   // eslint-disable-next-line react-hooks/purity
   const t0 = TIMING ? performance.now() : 0;
@@ -64,6 +70,7 @@ export default async function InstrumentPage({
   const typeFilter = sp?.type ?? undefined;
   const yearFilter = sp?.year ?? undefined;
   const searchQuery = sp?.q ?? undefined;
+  const statusFilter = sp?.status === "draft" ? "draft" : undefined;
 
   // Cost basis is a single global preference — thread it into loadInstrumentScope,
   // which previously silently defaulted to purchase_price regardless of the user's
@@ -88,7 +95,15 @@ export default async function InstrumentPage({
   const selectedId = await selectedIdPromise;
   const aggregate = selectedId === null;
   const txPromise = aggregate
-    ? loadNetworthTransactionsPaginated(page, PAGE_SIZE, typeFilter, yearFilter, searchQuery, id)
+    ? loadNetworthTransactionsPaginated(
+        page,
+        PAGE_SIZE,
+        typeFilter,
+        yearFilter,
+        searchQuery,
+        id,
+        statusFilter,
+      )
     : loadTransactionsPaginated(
         selectedId!,
         page,
@@ -98,6 +113,7 @@ export default async function InstrumentPage({
         yearFilter,
         searchQuery,
         id,
+        statusFilter,
       );
 
   const [instrumentResult, scope, allAnomalies, incomeStatsResult, txResult] = await Promise.all([
@@ -111,7 +127,8 @@ export default async function InstrumentPage({
   const txRows: TxRow[] = txResult.status === "ok" ? txResult.rows : [];
   const txTotal = txResult.status === "ok" ? txResult.total : 0;
   const txYears = txResult.status === "ok" ? (txResult.years ?? []) : [];
-  const hasActiveTxFilter = Boolean(typeFilter || yearFilter || searchQuery);
+  const txDraftCount = txResult.status === "ok" ? txResult.draftCount : undefined;
+  const hasActiveTxFilter = Boolean(typeFilter || yearFilter || searchQuery || statusFilter);
 
   if (TIMING) {
     // eslint-disable-next-line react-hooks/purity
@@ -384,6 +401,8 @@ export default async function InstrumentPage({
                 portfolioId={selectedId ?? undefined}
                 total={txTotal}
                 instrumentId={id}
+                statusFilter={statusFilter}
+                draftCount={txDraftCount}
               />
             ) : (
               <EmptyState

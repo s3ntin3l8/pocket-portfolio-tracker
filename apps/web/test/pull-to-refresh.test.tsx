@@ -140,4 +140,16 @@ describe("PullToRefresh", () => {
     fireEvent.touchEnd(container);
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
+
+  it("leaves no transform on the content wrapper at rest (it would trap position:fixed children)", () => {
+    const scrollContainerRef = createRef<HTMLDivElement>();
+    const { getByText } = render(
+      <div ref={scrollContainerRef}>
+        <PullToRefresh scrollContainerRef={scrollContainerRef}>
+          <div>content to refresh</div>
+        </PullToRefresh>
+      </div>,
+    );
+    expect(getByText("content to refresh").parentElement?.style.transform).toBe("");
+  });
 });

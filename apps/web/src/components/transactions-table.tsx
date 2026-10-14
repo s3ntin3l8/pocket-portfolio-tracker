@@ -26,6 +26,11 @@ import { TX_COLS } from "./transactions-table/utils";
 import { AnomalyBanner } from "./transactions-table/banners";
 import { FilterBar } from "./transactions-table/filter-bar";
 import { SelectionBar } from "./transactions-table/selection-bar";
+import {
+  groupIdsByPortfolio,
+  runBulkByPortfolio,
+  type SelectionEntry,
+} from "./transactions-table/bulk";
 import { ReassignMergeDialogs } from "./transactions-table/reassign-merge";
 import { DesktopTable } from "./transactions-table/desktop";
 import { MobileView } from "./transactions-table/mobile";
@@ -64,6 +69,8 @@ export function TransactionsTable({
   portfolioId,
   total,
   instrumentId,
+  statusFilter,
+  draftCount: serverDraftCount,
   actions,
 }: {
   rows: TxRow[];
@@ -84,6 +91,10 @@ export function TransactionsTable({
   portfolioId?: string;
   total?: number;
   instrumentId?: string;
+  /** `?status=draft` — the server already narrowed `rows`/`total` to drafts. */
+  statusFilter?: "draft";
+  /** Drafts matching the other filters (server-side), for the "Drafts only" chip. */
+  draftCount?: number;
   /** Export CSV / export documents buttons — rendered in the filter toolbar, right of
    *  the search input. Optional: the `instruments/[id]` embed doesn't pass one. */
   actions?: React.ReactNode;
@@ -104,7 +115,6 @@ export function TransactionsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [draftFilter, setDraftFilter] = useState<"all" | "drafts">("all");
   const [showFlagged, setShowFlagged] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
@@ -124,16 +134,23 @@ export function TransactionsTable({
       portfolioId,
       showFlagged,
       instrumentId,
+      statusFilter,
     );
 
   const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const [reassignRows, setReassignRows] = useState<TxRow[] | null>(null);
+  const [reassignRows, setReassignRows] = useState<SelectionEntry[] | null>(null);
+  // "Select all N matching": id/portfolio/status of rows beyond the loaded pages, so the
+  // bulk actions can still group the selection per portfolio.
+  const [matchingKeys, setMatchingKeys] = useState<SelectionEntry[] | null>(null);
+  const [matchingLoading, setMatchingLoading] = useState(false);
   const [mergeRows, setMergeRows] = useState<[TxRow, TxRow] | null>(null);
 
   const tr = useTranslations("Transactions.reassign");
+  const tBatch = useTranslations("Transactions.batch");
 
   const clearSelection = () => {
     setSelected(new Set());
+    setMatchingKeys(null);
     setSelectionMode(false);
   };
 
@@ -154,17 +171,17 @@ export function TransactionsTable({
     [showFlagged, flaggedRows, accumulatedRows],
   );
 
-  const draftCount = useMemo(
+  // The server's count (drafts matching the other filters) when the page supplies it; the
+  // instrument page doesn't, so it falls back to counting the loaded rows.
+  const loadedDraftCount = useMemo(
     () => viewSourceRows.filter((r) => r.status === "draft").length,
     [viewSourceRows],
   );
+  const draftCount = serverDraftCount ?? loadedDraftCount;
+  const draftFilter: "all" | "drafts" = statusFilter === "draft" ? "drafts" : "all";
 
   if (showFlagged && flaggedCount === 0) {
     setShowFlagged(false);
-  }
-
-  if (draftFilter === "drafts" && draftCount === 0) {
-    setDraftFilter("all");
   }
 
   if (detailTx) {
@@ -229,7 +246,7 @@ export function TransactionsTable({
     [locale],
   );
 
-  const allSelected = visibleRows.length > 0 && selected.size === visibleRows.length;
+  const allSelected = visibleRows.length > 0 && visibleRows.every((r) => selected.has(r.id));
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -240,8 +257,51 @@ export function TransactionsTable({
   }
 
   function toggleAll() {
+    setMatchingKeys(null);
     setSelected(allSelected ? new Set() : new Set(visibleRows.map((r) => r.id)));
   }
+
+  // Server rows beyond what's loaded — only offered once every loaded row is selected, and
+  // not in the flagged view (its rows come from a by-id fetch, not the paginated list).
+  const matchingActive = matchingKeys !== null;
+  const matchingOffered =
+    allSelected && !showFlagged && !matchingActive && (total ?? 0) > visibleRows.length;
+
+  async function selectAllMatching() {
+    setMatchingLoading(true);
+    try {
+      const { rows: keys, truncatedAt } = await api.listMatchingTransactionKeys({
+        portfolioId,
+        type: typeFilter,
+        year: yearFilterProp,
+        q: searchQuery,
+        instrumentId,
+        status: statusFilter,
+      });
+      setMatchingKeys(keys);
+      setSelected(new Set(keys.map((k) => k.id)));
+      if (truncatedAt) toast.info(tBatch("selectionCapped", { max: truncatedAt }));
+    } catch {
+      toast.error(tBatch("selectMatchingFailed"));
+    } finally {
+      setMatchingLoading(false);
+    }
+  }
+
+  // id → portfolio/status for everything that can be selected (loaded rows win over the
+  // matching snapshot, they're fresher).
+  const selectionIndex = useMemo(() => {
+    const m = new Map<string, SelectionEntry>();
+    for (const k of matchingKeys ?? []) m.set(k.id, k);
+    for (const r of viewSourceRows)
+      m.set(r.id, { id: r.id, portfolioId: r.portfolioId, status: r.status });
+    return m;
+  }, [matchingKeys, viewSourceRows]);
+
+  const selectedEntries = useMemo(
+    () => [...selected].flatMap((id) => selectionIndex.get(id) ?? []),
+    [selected, selectionIndex],
+  );
 
   const onRowActivate = (tx: TxRow) => {
     if (consumeLongPress()) return;
@@ -252,17 +312,8 @@ export function TransactionsTable({
   async function onBatchDelete() {
     setBusy(true);
     try {
-      const byPortfolio = new Map<string, string[]>();
-      for (const r of viewSourceRows) {
-        if (!selected.has(r.id)) continue;
-        const ids = byPortfolio.get(r.portfolioId) ?? [];
-        ids.push(r.id);
-        byPortfolio.set(r.portfolioId, ids);
-      }
-      await Promise.all(
-        [...byPortfolio.entries()].map(([portfolioId, ids]) =>
-          api.bulkDeleteTransactions(portfolioId, ids),
-        ),
+      await runBulkByPortfolio(groupIdsByPortfolio(selectedEntries), (portfolioId, ids) =>
+        api.bulkDeleteTransactions(portfolioId, ids),
       );
       clearSelection();
       router.refresh();
@@ -273,24 +324,16 @@ export function TransactionsTable({
   }
 
   const selectedDraftIds = useMemo(
-    () => viewSourceRows.filter((r) => selected.has(r.id) && r.status === "draft").map((r) => r.id),
-    [viewSourceRows, selected],
+    () => selectedEntries.filter((e) => e.status === "draft").map((e) => e.id),
+    [selectedEntries],
   );
 
   async function onBatchResolve(action: "confirm" | "discard") {
     setBusy(true);
     try {
-      const byPortfolio = new Map<string, string[]>();
-      for (const r of viewSourceRows) {
-        if (!selected.has(r.id) || r.status !== "draft") continue;
-        const ids = byPortfolio.get(r.portfolioId) ?? [];
-        ids.push(r.id);
-        byPortfolio.set(r.portfolioId, ids);
-      }
-      await Promise.all(
-        [...byPortfolio.entries()].map(([portfolioId, ids]) =>
-          api.resolveDraftTransactions(portfolioId, ids, action),
-        ),
+      await runBulkByPortfolio(
+        groupIdsByPortfolio(selectedEntries.filter((e) => e.status === "draft")),
+        (portfolioId, ids) => api.resolveDraftTransactions(portfolioId, ids, action),
       );
       clearSelection();
       router.refresh();
@@ -329,23 +372,16 @@ export function TransactionsTable({
     [viewSourceRows, selected],
   );
   const canMerge =
-    selectedRows.length === 2 && selectedRows[0].portfolioId === selectedRows[1].portfolioId;
+    selected.size === 2 &&
+    selectedRows.length === 2 &&
+    selectedRows[0].portfolioId === selectedRows[1].portfolioId;
 
   async function doReassign(targetPortfolioId: string) {
-    const queued = reassignRows ?? [];
-    const byPortfolio = new Map<string, string[]>();
-    for (const r of queued) {
-      if (r.portfolioId === targetPortfolioId) continue;
-      const ids = byPortfolio.get(r.portfolioId) ?? [];
-      ids.push(r.id);
-      byPortfolio.set(r.portfolioId, ids);
-    }
+    const queued = (reassignRows ?? []).filter((r) => r.portfolioId !== targetPortfolioId);
     let moved = 0;
     let skipped = 0;
-    const results = await Promise.all(
-      [...byPortfolio.entries()].map(([pid, ids]) =>
-        api.reassignTransactions(pid, ids, targetPortfolioId),
-      ),
+    const results = await runBulkByPortfolio(groupIdsByPortfolio(queued), (pid, ids) =>
+      api.reassignTransactions(pid, ids, targetPortfolioId),
     );
     for (const r of results) {
       moved += r.moved;
@@ -471,7 +507,9 @@ export function TransactionsTable({
             onNavigateWithParam={navigateWithParam}
             draftCount={draftCount}
             draftFilter={draftFilter}
-            onDraftFilterChange={(v) => setDraftFilter(v)}
+            onDraftFilterChange={(v) =>
+              navigateWithParam("status", v === "drafts" ? "draft" : undefined)
+            }
             searchQuery={searchQuery}
             onSearchChange={(v) => {
               const params = new URLSearchParams(searchParams.toString());
@@ -495,9 +533,14 @@ export function TransactionsTable({
             busy={busy}
             confirming={confirming}
             onClearSelection={clearSelection}
+            allSelected={allSelected}
+            onToggleAll={toggleAll}
+            matchingTotal={matchingOffered ? (total ?? 0) : null}
+            matchingLoading={matchingLoading}
+            onSelectMatching={selectAllMatching}
             onBatchConfirmDrafts={() => onBatchResolve("confirm")}
             onBatchDiscardDrafts={() => onBatchResolve("discard")}
-            onReassign={() => setReassignRows(viewSourceRows.filter((r) => selected.has(r.id)))}
+            onReassign={() => setReassignRows(selectedEntries)}
             onMerge={() => setMergeRows([selectedRows[0], selectedRows[1]])}
             onRequestDelete={() => setConfirming(true)}
             onConfirmDelete={onBatchDelete}

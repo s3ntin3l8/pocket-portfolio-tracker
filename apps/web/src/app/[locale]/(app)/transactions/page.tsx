@@ -33,7 +33,13 @@ export default async function TransactionsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams?: Promise<{ page?: string; type?: string; year?: string; q?: string }>;
+  searchParams?: Promise<{
+    page?: string;
+    type?: string;
+    year?: string;
+    q?: string;
+    status?: string;
+  }>;
 }) {
   // eslint-disable-next-line react-hooks/purity
   const t0 = TIMING ? performance.now() : 0;
@@ -51,6 +57,7 @@ export default async function TransactionsPage({
   const typeFilter = (sp?.type as string) ?? undefined;
   const yearFilter = (sp?.year as string) ?? undefined;
   const searchQuery = (sp?.q as string) ?? undefined;
+  const statusFilter = sp?.status === "draft" ? "draft" : undefined;
 
   // Fire ALL API calls immediately — no serial dependency on portfolios.
   const importsPromise = loadImports();
@@ -67,6 +74,7 @@ export default async function TransactionsPage({
     fxMissingCurrencies?: string[];
   } | null = null;
   let txYears: string[] = [];
+  let draftCount: number | undefined;
   let singlePortfolio: { id: string; name: string; documentRetention: boolean } | null = null;
   let anomalies: Anomaly[] | null = null;
   let scopeCurrency = "IDR";
@@ -76,7 +84,15 @@ export default async function TransactionsPage({
 
   if (aggregate) {
     const [result, anomalyResult] = await Promise.all([
-      loadNetworthTransactionsPaginated(page, PAGE_SIZE, typeFilter, yearFilter, searchQuery),
+      loadNetworthTransactionsPaginated(
+        page,
+        PAGE_SIZE,
+        typeFilter,
+        yearFilter,
+        searchQuery,
+        undefined,
+        statusFilter,
+      ),
       loadNetworthAnomalies(),
     ]);
     status = result.status;
@@ -86,6 +102,7 @@ export default async function TransactionsPage({
     if (result.status === "ok") {
       txSummary = result.summary ?? null;
       txYears = result.years ?? [];
+      draftCount = result.draftCount;
     }
     scopeCurrency = me?.displayCurrency ?? "IDR";
     anomalies = anomalyResult;
@@ -99,6 +116,8 @@ export default async function TransactionsPage({
         typeFilter,
         yearFilter,
         searchQuery,
+        undefined,
+        statusFilter,
       ),
       loadAnomalies(),
     ]);
@@ -109,6 +128,7 @@ export default async function TransactionsPage({
       total = txResult.total;
       txSummary = txResult.summary ?? null;
       txYears = txResult.years ?? [];
+      draftCount = txResult.draftCount;
     }
     anomalies = anomalyResult;
   }
@@ -289,6 +309,8 @@ export default async function TransactionsPage({
         searchQuery={searchQuery}
         portfolioId={singlePortfolio?.id ?? undefined}
         total={total}
+        statusFilter={statusFilter}
+        draftCount={draftCount}
         actions={actions}
       />
       {importsSection}

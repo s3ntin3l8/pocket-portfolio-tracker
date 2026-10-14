@@ -54,6 +54,7 @@ export async function loadNetworthTransactionsPaginated(
   year?: string,
   q?: string,
   instrumentId?: string,
+  status?: "draft",
 ): Promise<
   | {
       status: "ok";
@@ -61,6 +62,7 @@ export async function loadNetworthTransactionsPaginated(
       total: number;
       summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
       years?: string[];
+      draftCount?: number;
     }
   | (DataFailure & { rows: []; total: 0 })
 > {
@@ -74,6 +76,7 @@ export async function loadNetworthTransactionsPaginated(
       year,
       q,
       instrumentId,
+      status,
     );
     return {
       status: "ok",
@@ -81,6 +84,7 @@ export async function loadNetworthTransactionsPaginated(
       total: data.total,
       summary: data.summary,
       years: data.years,
+      draftCount: data.draftCount,
     };
   } catch (err) {
     return { ...classifyFailure(err), rows: [], total: 0 };
@@ -96,6 +100,7 @@ export async function loadTransactionsPaginated(
   year?: string,
   q?: string,
   instrumentId?: string,
+  status?: "draft",
 ): Promise<
   | {
       status: "ok";
@@ -103,6 +108,7 @@ export async function loadTransactionsPaginated(
       total: number;
       summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
       years?: string[];
+      draftCount?: number;
     }
   | (DataFailure & { rows: []; total: 0 })
 > {
@@ -118,6 +124,8 @@ export async function loadTransactionsPaginated(
       year,
       q,
       instrumentId,
+      undefined,
+      status,
     );
     return {
       status: "ok",
@@ -125,6 +133,7 @@ export async function loadTransactionsPaginated(
       total: data.total,
       summary: data.summary,
       years: data.years,
+      draftCount: data.draftCount,
     };
   } catch (err) {
     return { ...classifyFailure(err), rows: [], total: 0 };

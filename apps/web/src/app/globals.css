@@ -159,7 +159,11 @@
   /* Route-transition content blend + skeleton shimmer sweep. Registered here so Tailwind
      generates `animate-fade-in` / `animate-shimmer` utilities (Tailwind v4 CSS config —
      no tailwind.config.js). */
-  --animate-fade-in: fade-in 0.35s ease-out both;
+  /* `backwards`, not `both`: `both` keeps the final keyframe's transform/filter applied
+     forever, which makes this wrapper the containing block for every `position: fixed`
+     descendant (selection bar, sticky action bars) — they'd pin to the content's bottom
+     instead of the viewport's. The end state equals no styling, so nothing is lost. */
+  --animate-fade-in: fade-in 0.35s ease-out backwards;
   --animate-shimmer: shimmer 1.6s linear infinite;
 }
 

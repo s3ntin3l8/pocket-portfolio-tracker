@@ -4,6 +4,10 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { useSheetFooterChrome } from "@/components/ui/sheet";
+import {
+  FullScreenOverlayProvider,
+  useFullScreenOverlayRegistration,
+} from "@/components/full-screen-overlay";
 
 const search = { value: "" };
 
@@ -202,6 +206,37 @@ describe("AddTransactionMenu", () => {
   it("keeps the import sheet closed without a share/import param", () => {
     renderMenu();
     expect(screen.queryByRole("dialog", { name: messages.Import.title })).not.toBeInTheDocument();
+  });
+
+  it("hides the mobile FAB while a full-screen overlay (e.g. selection mode) is open", async () => {
+    function Overlay() {
+      useFullScreenOverlayRegistration(true);
+      return null;
+    }
+    const fab = () =>
+      screen
+        .getAllByRole("button", { name: messages.Manage.addTransaction })
+        .find((b) => b.className.includes("rounded-[18px]"));
+
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <FullScreenOverlayProvider>
+          <AddTransactionMenu autoOpenFromParams />
+        </FullScreenOverlayProvider>
+      </NextIntlClientProvider>,
+    );
+    await waitFor(() => expect(fab()).toBeDefined());
+    expect(fab()!.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <FullScreenOverlayProvider>
+          <AddTransactionMenu autoOpenFromParams />
+          <Overlay />
+        </FullScreenOverlayProvider>
+      </NextIntlClientProvider>,
+    );
+    await waitFor(() => expect(fab()!.className).toMatch(/(^|\s)hidden(\s|$)/));
   });
 
   it("auto-opens the import sheet on ?import=1 and clears the flag", async () => {

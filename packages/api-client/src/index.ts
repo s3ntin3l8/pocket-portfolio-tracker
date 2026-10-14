@@ -2675,9 +2675,11 @@ export function createApiClient(config: ApiClientConfig) {
       q?: string,
       instrumentId?: string,
       opts?: RequestOptions,
+      status?: "draft",
     ) => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (convertTo) params.set("convertTo", convertTo);
+      if (status) params.set("status", status);
       if (type) params.set("type", type);
       if (year) params.set("year", year);
       if (q) params.set("q", q);
@@ -2693,6 +2695,7 @@ export function createApiClient(config: ApiClientConfig) {
           fxMissingCurrencies?: string[];
         };
         years?: string[];
+        draftCount?: number;
       }>("GET", `/portfolios/${portfolioId}/transactions?${params}`, undefined, opts).then((d) =>
         validated(paginatedTransactionsResponseSchema, "/portfolios/:id/transactions", d),
       );
@@ -2706,8 +2709,10 @@ export function createApiClient(config: ApiClientConfig) {
       year?: string,
       q?: string,
       instrumentId?: string,
+      status?: "draft",
     ) => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      if (status) params.set("status", status);
       if (type) params.set("type", type);
       if (year) params.set("year", year);
       if (q) params.set("q", q);
@@ -2723,9 +2728,35 @@ export function createApiClient(config: ApiClientConfig) {
           fxMissingCurrencies?: string[];
         };
         years?: string[];
+        draftCount?: number;
       }>("GET", `/networth/transactions?${params}`).then((d) =>
         validated(paginatedNetworthTransactionsResponseSchema, "/networth/transactions", d),
       );
+    },
+    /** Id/portfolio/status of every transaction matching the list filters (no pagination,
+     *  no enrichment; capped server-side, `truncatedAt` set when it was). Backs "select all
+     *  N matching" — the bulk endpoints take id lists. `portfolioId` omitted → all portfolios. */
+    listMatchingTransactionKeys: async (filters: {
+      portfolioId?: string;
+      type?: string;
+      year?: string;
+      q?: string;
+      instrumentId?: string;
+      status?: "draft";
+    }) => {
+      const params = new URLSearchParams({ all: "1", fields: "ids" });
+      for (const k of ["type", "year", "q", "instrumentId", "status"] as const) {
+        const v = filters[k];
+        if (v) params.set(k, v);
+      }
+      const path = filters.portfolioId
+        ? `/portfolios/${filters.portfolioId}/transactions`
+        : "/networth/transactions";
+      const { data, headers } = await requestWithHeaders<
+        { id: string; portfolioId: string; status: string }[]
+      >("GET", `${path}?${params}`);
+      const cap = Number(headers?.get("x-result-truncated"));
+      return { rows: data, truncatedAt: Number.isFinite(cap) && cap > 0 ? cap : null };
     },
     /** Fetch exactly the given transaction ids, enriched the same way as a normal page —
      *  regardless of pagination/type/year/search scope. Used by "Show flagged only" (#562)
