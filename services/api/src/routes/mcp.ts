@@ -123,7 +123,9 @@ export async function mcpRoute(app: FastifyInstance) {
       for (const [name, value] of Object.entries(reply.getHeaders())) {
         if (value !== undefined) reply.raw.setHeader(name, value);
       }
-      // The api-client builds the Authorization header from this; injectFetch forwards it.
+      // The api-client has no other way to set Authorization: it only sends one when `getToken`
+      // returns a token (injectFetch just forwards the headers it is given). Drop this and every
+      // inner call is unauthenticated.
       const token = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
       const client = createApiClient({
         baseUrl: "",

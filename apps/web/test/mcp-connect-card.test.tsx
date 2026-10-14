@@ -5,7 +5,7 @@ import messages from "../messages/en.json";
 import { McpConnectCard } from "@/components/mcp-connect-card";
 
 const copy = vi.hoisted(() => vi.fn(async () => true));
-vi.mock("@/components/api-tokens-manager", () => ({ copyToClipboard: copy }));
+vi.mock("@/lib/copy", () => ({ copyToClipboard: copy }));
 
 function renderCard() {
   return render(
@@ -22,6 +22,17 @@ describe("McpConnectCard", () => {
     expect(screen.getByText(/mcp-remote/)).toBeInTheDocument();
     expect(screen.getAllByText(/<your-pocket-api-url>\/mcp/).length).toBeGreaterThan(0);
     expect(screen.getByText(/never shared/)).toBeInTheDocument();
+  });
+
+  it("renders a valid Claude Desktop config with the pinned bridge", () => {
+    const { container } = renderCard();
+    const json = [...container.querySelectorAll("code")]
+      .map((c) => c.textContent ?? "")
+      .find((t) => t.trim().startsWith("{"));
+    const cfg = JSON.parse(json!);
+    expect(cfg.mcpServers.pocket.command).toBe("npx");
+    expect(cfg.mcpServers.pocket.args[1]).toMatch(/^mcp-remote@\d+\.\d+\.\d+$/);
+    expect(cfg.mcpServers.pocket.args).toContain("<your-pocket-api-url>/mcp");
   });
 
   it("copies a snippet and confirms", async () => {

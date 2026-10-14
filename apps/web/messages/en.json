@@ -1298,7 +1298,7 @@
     "tokensNever": "Never",
     "tokensNoExpiry": "Never",
     "mcpTitle": "Connect an AI assistant",
-    "mcpHint": "Let Claude (or any MCP client) read your portfolio — read-only. Create a read-only access token above, then add Pocket as an MCP server. Account numbers and IBANs are never shared.",
+    "mcpHint": "Let Claude (or any MCP client) read your portfolio — read-only. Create a read-only access token above, then add Pocket as an MCP server. Account numbers and IBANs are never shared. Each tool call counts 1–2 requests against that token’s rate limit.",
     "mcpClaudeCode": "Claude Code",
     "mcpClaudeDesktop": "Claude Desktop (claude_desktop_config.json)",
     "mcpPlaceholders": "Replace <your-pocket-api-url> with the public address of your Pocket API and <token> with the token you created.",

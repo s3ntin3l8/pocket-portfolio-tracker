@@ -1,6 +1,7 @@
 /**
- * A read-only POST (`scope: "read"`, i.e. /mcp) must not flush the valuation/derivation
- * caches the way every other non-GET does — otherwise each MCP call would discard them.
+ * Exercises the `scope: "read"` exception in the global onResponse write-invalidation hook
+ * (services/api/src/app.ts): a read-only POST (i.e. /mcp) must not flush the valuation and
+ * derivation caches the way every other non-GET does — otherwise each MCP call would discard them.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";

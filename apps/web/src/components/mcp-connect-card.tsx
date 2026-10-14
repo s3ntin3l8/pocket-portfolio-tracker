@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
-import { copyToClipboard } from "@/components/api-tokens-manager";
+import { copyToClipboard } from "@/lib/copy";
 
 const URL_PLACEHOLDER = "<your-pocket-api-url>";
 const TOKEN_PLACEHOLDER = "<token>";

@@ -8,6 +8,7 @@ assistant (Claude Code, Claude Desktop, any MCP client) can read and explain you
   Settings → Data & connections. A read-scoped token may call `/mcp` even though it is a `POST`
   (`config: { scope: "read" }` on the route — see `plugins/auth.ts`); everything a tool does goes back through
   the API in-process and is gated like any other request.
+- **Transport security:** the token is a bearer credential — always use an `https://` API address. (TLS normally terminates at the reverse proxy, so the API itself does not enforce it.)
 - **Tools:** the 12 tools in `packages/ai-tools` (portfolios, net worth, summary, holdings, transaction search,
   value history, income, contributions, tax, targets/drift, insights, instrument lookup), plus the
   `pocket://glossary` resource and three prompts (`monthly_review`, `tax_year_check`, `rebalancing_plan`).
