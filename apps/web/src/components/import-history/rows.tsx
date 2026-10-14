@@ -208,12 +208,12 @@ export function DesktopRow({
       <TableCell className="max-w-[220px]">
         <span className="flex min-w-0 items-center gap-2.5">
           <span
-            className="flex size-7 shrink-0 items-center justify-center rounded-[9px]"
+            className="flex size-7 shrink-0 items-center justify-center rounded-sm"
             style={{ background: style.bg, color: style.fg }}
           >
             <Icon className="size-3.5" strokeWidth={2} />
           </span>
-          <span className="min-w-0 truncate text-[13px] font-bold" title={label}>
+          <span className="min-w-0 truncate text-body-sm font-bold" title={label}>
             {label}
           </span>
         </span>
@@ -301,21 +301,21 @@ export function MobileRow({
         />
       )}
       <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-[12px]"
+        className="flex size-10 shrink-0 items-center justify-center rounded-md"
         style={{ background: style.bg, color: style.fg }}
       >
         <Icon className="size-5" strokeWidth={1.9} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-bold" title={label}>
+        <p className="truncate text-body-sm font-bold" title={label}>
           {label}
         </p>
-        <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-text-2">
+        <div className="flex min-w-0 items-center gap-1.5 text-micro font-medium text-text-2">
           <span className="truncate">
             {sourceLabel} · {shortDf.format(new Date(imp.createdAt))} ·{" "}
             {t("items", { count: imp.count })}
           </span>
-          <Badge variant={STATUS_VARIANT[imp.status]} className="shrink-0 px-1.5 py-0 text-[9px]">
+          <Badge variant={STATUS_VARIANT[imp.status]} className="shrink-0 px-1.5 py-0 text-micro">
             {t(statusLabelKey(imp))}
           </Badge>
         </div>

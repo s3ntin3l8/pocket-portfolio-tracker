@@ -66,10 +66,10 @@ export function AdminUserActions({
             <MoreVertical className="size-4" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[186px] rounded-[13px] p-0">
+        <DropdownMenuContent align="end" className="min-w-[186px] rounded-md p-0">
           <DropdownMenuItem
             onSelect={selectItem(setRevokeOpen)}
-            className="gap-2.5 rounded-none px-3.5 py-3 text-[13px] font-semibold"
+            className="gap-2.5 rounded-none px-3.5 py-3 text-body-sm font-semibold"
           >
             <History className="size-[15px]" />
             {t("revokeTokens")}
@@ -77,7 +77,7 @@ export function AdminUserActions({
           {onboardingCompleted && (
             <DropdownMenuItem
               onSelect={selectItem(setResetOpen)}
-              className="gap-2.5 rounded-none border-t border-line px-3.5 py-3 text-[13px] font-semibold"
+              className="gap-2.5 rounded-none border-t border-line px-3.5 py-3 text-body-sm font-semibold"
             >
               <RotateCw className="size-[15px]" />
               {t("resetOnboarding")}
@@ -85,7 +85,7 @@ export function AdminUserActions({
           )}
           <DropdownMenuItem
             onSelect={selectItem(setDeleteOpen)}
-            className="gap-2.5 rounded-none border-t border-line px-3.5 py-3 text-[13px] font-semibold text-destructive focus:text-destructive"
+            className="gap-2.5 rounded-none border-t border-line px-3.5 py-3 text-body-sm font-semibold text-destructive focus:text-destructive"
           >
             <Trash2 className="size-[15px]" />
             {t("deleteUser")}

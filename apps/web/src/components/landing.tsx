@@ -143,7 +143,7 @@ export function Landing({
         />
 
         <div className="relative flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-[11px] bg-primary">
+          <span className="flex size-9 items-center justify-center rounded-sm bg-primary">
             <Wallet className="size-[18px]" strokeWidth={2} />
           </span>
           <span className="text-lg font-extrabold tracking-tight">Pocket</span>
@@ -158,7 +158,7 @@ export function Landing({
           </div>
 
           {/* portfolio glance card */}
-          <div className="max-w-md rounded-[22px] border border-white/15 bg-white/[0.07] p-6 backdrop-blur">
+          <div className="max-w-md rounded-xl border border-white/15 bg-white/[0.07] p-6 backdrop-blur">
             <div className="text-sm text-white/60">{t("glanceLabel")}</div>
             <div className="mt-1 flex items-center gap-3">
               <span className="font-mono text-3xl font-extrabold tabular-nums">{demoAmount}</span>
@@ -193,7 +193,7 @@ export function Landing({
       <section className="flex flex-1 items-center justify-center bg-background p-6 md:p-12">
         <div className="w-full max-w-sm space-y-6">
           <div className="space-y-2">
-            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary">
+            <div className="text-micro font-extrabold uppercase tracking-[0.14em] text-primary">
               {needsSetup ? t("setupKicker") : t("kicker")}
             </div>
             <h2 className="text-3xl font-extrabold tracking-tight">

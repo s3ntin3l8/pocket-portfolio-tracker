@@ -17,7 +17,7 @@ export function PocketLogo({
   return (
     <span
       className={cn(
-        "flex size-8 items-center justify-center rounded-[11px] bg-primary text-primary-foreground",
+        "flex size-8 items-center justify-center rounded-sm bg-primary text-primary-foreground",
         className,
       )}
     >
@@ -37,7 +37,7 @@ export function Brand({
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <PocketLogo variant={variant} />
-      <span className="text-[17px] font-extrabold tracking-tight">Pocket</span>
+      <span className="text-lg font-extrabold tracking-tight">Pocket</span>
     </div>
   );
 }

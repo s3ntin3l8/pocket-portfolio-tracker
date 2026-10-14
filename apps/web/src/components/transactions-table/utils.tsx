@@ -48,7 +48,7 @@ export function TypeIconChip({
   return (
     <span
       className={cn(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]",
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-sm",
         TYPE_TONE_CLASSES[entry.tone],
         className,
       )}

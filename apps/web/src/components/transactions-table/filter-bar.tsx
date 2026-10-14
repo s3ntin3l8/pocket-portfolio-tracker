@@ -153,19 +153,19 @@ export function FilterBar({
           <SlidersHorizontal className="size-3.5" />
           {t("filterLabel")}
           {activeFilterCount > 0 && (
-            <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-white/20 text-[9px] font-bold">
+            <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-white/20 text-micro font-bold">
               {activeFilterCount}
             </span>
           )}
         </button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-[20px] px-5">
+      <SheetContent side="bottom" className="rounded-t-xl px-5">
         <SheetHeader className="pb-3 pt-1">
           <SheetTitle className="text-left text-base">{t("filterLabel")}</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-4">
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+            <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
               {t("filterType")}
             </p>
             <div className="flex flex-wrap gap-2">{typeChips}</div>
@@ -173,7 +173,7 @@ export function FilterBar({
 
           {yearOptions.length > 1 && (
             <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
                 {t("filterYear")}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -199,7 +199,7 @@ export function FilterBar({
 
           {(draftCount > 0 || draftFilter !== "all") && (
             <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
                 {t("filterDraftLabel")}
               </p>
               <div className="flex gap-2">
@@ -227,7 +227,7 @@ export function FilterBar({
             type="button"
             onClick={clearAllFilters}
             disabled={sheetFilterCount === 0}
-            className="w-full rounded-[13px] border border-border bg-card py-2.5 text-sm font-semibold text-foreground disabled:opacity-40"
+            className="w-full rounded-md border border-border bg-card py-2.5 text-sm font-semibold text-foreground disabled:opacity-40"
           >
             {t("filterClearAll")}
           </button>

@@ -50,7 +50,7 @@ export function PortfolioFormBody({
       <Button
         type="button"
         onClick={() => onDone?.()}
-        className="h-auto max-md:w-full max-md:rounded-[15px] max-md:py-[15px] md:rounded-[13px] md:px-[26px] md:py-[13px] text-[14px] font-bold"
+        className="h-auto max-md:w-full max-md:rounded-lg max-md:py-[15px] md:rounded-md md:px-[26px] md:py-[13px] text-sm font-bold"
       >
         {t("done")}
       </Button>
@@ -59,7 +59,7 @@ export function PortfolioFormBody({
         type="submit"
         form={formId}
         disabled={f.busy || !f.name.trim()}
-        className="h-auto max-md:w-full max-md:rounded-[15px] max-md:py-[15px] md:rounded-[13px] md:px-[26px] md:py-[13px] text-[14px] font-bold"
+        className="h-auto max-md:w-full max-md:rounded-lg max-md:py-[15px] md:rounded-md md:px-[26px] md:py-[13px] text-sm font-bold"
       >
         {f.busy && <Spinner size="sm" />}
         {f.busy

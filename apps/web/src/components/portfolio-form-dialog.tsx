@@ -39,7 +39,7 @@ export function PortfolioFormDialog({
       <Button
         type="button"
         onClick={() => f.setOpen(false)}
-        className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
+        className="h-auto w-full rounded-lg py-[15px] text-body font-bold"
       >
         {t("done")}
       </Button>
@@ -48,7 +48,7 @@ export function PortfolioFormDialog({
         type="submit"
         form={formId}
         disabled={f.busy || !f.name.trim()}
-        className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
+        className="h-auto w-full rounded-lg py-[15px] text-body font-bold"
       >
         {f.busy && <Spinner size="sm" />}
         {f.busy
@@ -177,12 +177,12 @@ export function PortfolioFormDialog({
                       type="button"
                       onClick={f.onDelete}
                       disabled={f.busy}
-                      className="h-auto w-full rounded-[15px] bg-[#E5484D] py-[15px] text-[15px] font-bold text-white hover:bg-[#E5484D]/90"
+                      className="h-auto w-full rounded-lg bg-[#E5484D] py-[15px] text-body font-bold text-white hover:bg-[#E5484D]/90"
                     >
                       {f.busy && <Spinner size="sm" />}
                       {t("confirmDelete")}
                     </Button>
-                    <p className="mt-1.5 text-center text-[11px] font-medium text-text-3">
+                    <p className="mt-1.5 text-center text-micro font-medium text-text-3">
                       {t("deleteWarning", { count: portfolio?.transactionCount ?? 0 })}{" "}
                       {t("deleteRelatedNote")}
                     </p>

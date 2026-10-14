@@ -23,7 +23,7 @@ function formatDate(date: string, locale: string): string {
 function Fact({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold text-text-2">{label}</dt>
+      <dt className="text-micro font-semibold text-text-2">{label}</dt>
       <dd className={`tabular mt-0.5 truncate text-sm font-bold ${muted ? "text-text-2" : ""}`}>
         {value}
       </dd>

@@ -125,12 +125,12 @@ export function RebalancingCard({
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-bold">{t("title")}</h2>
+        <h2 className="text-base font-semibold">{t("title")}</h2>
         <div className="flex items-center gap-2">
           {hasTargets && (
             <span
               className={cn(
-                "rounded-lg px-[9px] py-1 text-[11px] font-bold",
+                "rounded-lg px-[9px] py-1 text-micro font-bold",
                 editing ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warning",
               )}
             >

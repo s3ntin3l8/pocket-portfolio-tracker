@@ -10,14 +10,14 @@ import { useTranslations } from "next-intl";
 export function IncomeBarChartLegend() {
   const t = useTranslations("Income");
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+    <div className="ml-auto flex shrink-0 items-center gap-3.5 text-micro font-semibold text-text-2">
       <span className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-primary" />
+        <span className="size-2.5 rounded-xs bg-primary" />
         {t("tooltipReceived")}
       </span>
       <span className="flex items-center gap-1.5">
         <span
-          className="size-2.5 rounded-[3px] bg-primary/25"
+          className="size-2.5 rounded-xs bg-primary/25"
           style={{
             backgroundImage:
               "repeating-linear-gradient(45deg, var(--color-primary) 0 1.5px, transparent 1.5px 4px)",
@@ -26,7 +26,7 @@ export function IncomeBarChartLegend() {
         {t("tooltipProjected")}
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] border border-dashed border-primary bg-primary/10" />
+        <span className="size-2.5 rounded-xs border border-dashed border-primary bg-primary/10" />
         {t("tooltipForecast")}
       </span>
     </div>

@@ -56,7 +56,7 @@ export function BrokerageIcon({
 
   return (
     <span
-      className={cn(box, "text-[0.7rem] font-semibold text-white")}
+      className={cn(box, "text-micro font-semibold text-white")}
       style={{ backgroundColor: tintFor(name) }}
       role="img"
       aria-label={name}

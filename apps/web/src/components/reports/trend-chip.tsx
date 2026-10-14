@@ -26,7 +26,7 @@ export function TrendChip({
         tone === "neutral" && "bg-muted text-muted-foreground",
       )}
     >
-      {arrow && tone !== "neutral" && <span className="shrink-0 text-[9px]">{arrowGlyph}</span>}
+      {arrow && tone !== "neutral" && <span className="shrink-0 text-micro">{arrowGlyph}</span>}
       <span className="min-w-0 truncate">{label}</span>
     </span>
   );

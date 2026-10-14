@@ -80,10 +80,10 @@ export function AuthErrorRecovery({
   if (phase === "retrying") {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-        <span className="flex size-16 items-center justify-center rounded-[20px] bg-primary/10 text-primary">
+        <span className="flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Spinner size="xl" />
         </span>
-        <h1 className="text-balance text-2xl font-extrabold tracking-tight">{t("retrying")}</h1>
+        <h1 className="text-balance text-2xl font-bold tracking-tight">{t("retrying")}</h1>
       </div>
     );
   }

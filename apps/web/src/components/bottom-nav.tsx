@@ -61,7 +61,7 @@ export function BottomNav({
               {badge != null && (
                 <span
                   className={cn(
-                    "absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold text-white ring-2 ring-card",
+                    "absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-micro font-extrabold text-white ring-2 ring-card",
                     anomalyError ? "bg-destructive" : "bg-[var(--gold-fg)]",
                   )}
                 >
@@ -70,7 +70,7 @@ export function BottomNav({
                 </span>
               )}
             </span>
-            <span className={cn("text-[10px]", active ? "font-bold" : "font-semibold")}>
+            <span className={cn("text-micro", active ? "font-bold" : "font-semibold")}>
               {t(key)}
             </span>
           </ScopeLink>

@@ -53,7 +53,7 @@ export function RangeToggle({
                     : "bg-transparent font-semibold text-white/85 hover:bg-white/10",
                 )
               : cn(
-                  "rounded-lg px-[11px] py-1.5 text-[11px]",
+                  "rounded-lg px-[11px] py-1.5 text-micro",
                   value === r
                     ? "bg-card font-bold text-foreground shadow-[0_1px_3px_rgba(15,27,20,.14)]"
                     : "font-semibold text-text-2 hover:text-foreground",

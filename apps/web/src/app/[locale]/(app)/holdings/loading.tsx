@@ -30,7 +30,7 @@ export default function Loading() {
             </div>
             <div className="flex items-center gap-2 md:ml-auto">
               <Skeleton className="h-8 w-full md:w-56" />
-              <Skeleton className="size-11 shrink-0 rounded-[13px] md:size-8" />
+              <Skeleton className="size-11 shrink-0 rounded-md md:size-8" />
             </div>
           </div>
           <Card>

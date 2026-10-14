@@ -200,7 +200,7 @@ export function DesktopTable({
                   <tr role="presentation">
                     <td
                       colSpan={colSpan}
-                      className="bg-card-2 px-[22px] py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3"
+                      className="bg-card-2 px-[22px] py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3"
                     >
                       {monthFmt.format(new Date(tx.executedAt))}
                     </td>
@@ -295,15 +295,15 @@ export function DesktopTable({
                       {tx.portfolioName ?? "—"}
                     </TableCell>
                   )}
-                  <TableCell className="tabular text-right text-[13px] font-semibold text-text-2">
+                  <TableCell className="tabular text-right text-body-sm font-semibold text-text-2">
                     {Number(tx.quantity) || rowQuantityDisplay(tx) || "—"}
                   </TableCell>
-                  <TableCell className="tabular text-right text-[13px] font-semibold">
+                  <TableCell className="tabular text-right text-body-sm font-semibold">
                     {Number(tx.quantity) > 0
                       ? m(Number(tx.price), tx.currency)
                       : (rowPerShareDisplay(tx, m) ?? "—")}
                   </TableCell>
-                  <TableCell className="tabular hidden text-right text-[13px] font-semibold text-text-2 lg:table-cell">
+                  <TableCell className="tabular hidden text-right text-body-sm font-semibold text-text-2 lg:table-cell">
                     {tx.tax != null && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -311,7 +311,7 @@ export function DesktopTable({
                       <SourceChips
                         tx={tx}
                         t={t}
-                        chipClassName="inline-flex items-center whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[9px] font-bold uppercase"
+                        chipClassName="inline-flex items-center whitespace-nowrap rounded-xs px-2 py-[3px] text-micro font-bold uppercase"
                       />
                     </div>
                   </TableCell>

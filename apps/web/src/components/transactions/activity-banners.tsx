@@ -37,14 +37,14 @@ function StatBlock({
           "border-t border-line pt-2.5 sm:pt-4 @xl:border-l @xl:border-t-0 @xl:pl-2.5 @xl:sm:pl-4 @xl:pl-6 @xl:pt-0",
       )}
     >
-      <p className="truncate text-[11px] font-semibold text-text-2 sm:text-xs">{label}</p>
-      <p className="tabular mt-1 truncate text-sm font-extrabold sm:text-xl @xl:text-[26px]">
+      <p className="truncate text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
+      <p className="tabular mt-1 truncate text-sm font-extrabold sm:text-xl @xl:text-display">
         {value}
       </p>
       {sub && (
         <p
           className={cn(
-            "tabular mt-0.5 truncate text-[11px] font-bold sm:text-xs",
+            "tabular mt-0.5 truncate text-micro font-bold sm:text-xs",
             TONE_CLASS[tone],
           )}
         >
@@ -59,7 +59,7 @@ function StatBlock({
 function Breakdown({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="col-span-full border-t border-line pt-4 @xl:col-span-2 @xl:border-l @xl:border-t-0 @xl:pl-6 @xl:pt-0">
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+      <p className="mb-2.5 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
         {label}
       </p>
       <div className="flex flex-col gap-2.5">{children}</div>
@@ -201,7 +201,7 @@ export function ReconciliationBanner({
           </Link>
         )}
       </div>
-      <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+      <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-1 text-micro font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
         {tag}
       </span>
       {onDismiss && (

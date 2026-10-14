@@ -106,7 +106,7 @@ export default async function SettingsLayout({
         {initials}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-[15px] font-extrabold">{me.name || me.email}</p>
+        <p className="truncate text-body font-extrabold">{me.name || me.email}</p>
         <p className="truncate text-xs text-muted-foreground">{me.email}</p>
       </div>
     </div>
@@ -119,7 +119,7 @@ export default async function SettingsLayout({
       indexHref="/settings"
       railTop={
         identityCard && (
-          <div className="rounded-[18px] border border-border bg-card p-3.5 shadow-card">
+          <div className="rounded-xl border border-border bg-card p-3.5 shadow-card">
             {identityCard}
           </div>
         )

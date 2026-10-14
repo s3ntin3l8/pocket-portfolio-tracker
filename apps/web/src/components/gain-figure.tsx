@@ -68,12 +68,10 @@ export function GainFigure({
     <div className={className}>
       <div className="flex items-baseline gap-2">
         {amount != null && (
-          <p className={cn("tabular text-[18px] font-extrabold", colour, amountClassName)}>
-            {amount}
-          </p>
+          <p className={cn("tabular text-lg font-extrabold", colour, amountClassName)}>{amount}</p>
         )}
         {pct != null && (
-          <p className={cn("tabular text-[13px] font-bold", colour, pctClassName)}>{pct}</p>
+          <p className={cn("tabular text-body-sm font-bold", colour, pctClassName)}>{pct}</p>
         )}
       </div>
       <BasisLabel>{label}</BasisLabel>

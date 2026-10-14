@@ -253,7 +253,7 @@ function TaxHolderOverviewDe({
           <Card className="overflow-hidden rounded-2xl">
             <div className="flex items-start justify-between gap-3 px-[22px] pb-1 pt-[18px]">
               <div className="min-w-0">
-                <h2 className="flex items-center gap-2 text-[15px] font-bold">
+                <h2 className="flex items-center gap-2 text-base font-semibold">
                   <TrendingUp className="size-4" />
                   {t("harvest.title")}
                 </h2>
@@ -262,7 +262,7 @@ function TaxHolderOverviewDe({
                 </p>
               </div>
               <span
-                className="shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#7C5CFC]"
+                className="shrink-0 rounded-lg px-2.5 py-1 text-micro font-bold tracking-wide text-[#7C5CFC]"
                 style={{ backgroundColor: "rgba(124,92,252,.16)" }}
               >
                 {entry.currency}
@@ -285,7 +285,7 @@ function TaxHolderOverviewDe({
 
             {harvestSuggestions.length > 0 ? (
               <>
-                <p className="px-[22px] pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <p className="px-[22px] pb-1 pt-2 text-micro font-bold uppercase tracking-wide text-text-3">
                   {t("harvest.positionsEyebrow")}
                 </p>
                 <div>

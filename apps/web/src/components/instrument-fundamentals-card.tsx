@@ -204,7 +204,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
           <div className="flex flex-wrap gap-2.5">
             {data.earningsDate && (
               <div className="flex items-center gap-2.5 rounded-xl bg-muted/50 px-3.5 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-amber-500/15 text-amber-600 dark:text-amber-400">
                   <CalendarClock className="size-4.5" />
                 </span>
                 <div>
@@ -221,7 +221,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
             )}
             {data.exDividendDate && (
               <div className="flex items-center gap-2.5 rounded-xl bg-muted/50 px-3.5 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-amber-500/15 text-amber-600 dark:text-amber-400">
                   <CalendarClock className="size-4.5" />
                 </span>
                 <div>
@@ -311,7 +311,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
 
         {intraday.length > 0 && (
           <div>
-            <p className="mb-2 text-[11px] text-muted-foreground">
+            <p className="mb-2 text-micro text-muted-foreground">
               {t("asOfLabel", {
                 date: new Date(data.asOf).toLocaleDateString(locale, {
                   year: "numeric",

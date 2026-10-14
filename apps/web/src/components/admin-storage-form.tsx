@@ -94,7 +94,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
             const next = PROVIDER_OPTIONS.find((o) => o.value === e.target.value)?.value;
             if (next) setActiveProvider(next);
           }}
-          className="w-full appearance-none rounded-[12px] border border-border bg-background px-3.5 py-3 text-sm font-semibold outline-none"
+          className="w-full appearance-none rounded-md border border-border bg-background px-3.5 py-3 text-sm font-semibold outline-none"
         >
           {PROVIDER_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -202,7 +202,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
               type="button"
               onClick={handleTestConnection}
               disabled={testState === "testing"}
-              className="flex items-center gap-1.5 rounded-[12px] border border-border bg-background px-4 py-2.5 text-[13px] font-bold disabled:cursor-default disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-md border border-border bg-background px-4 py-2.5 text-body-sm font-bold disabled:cursor-default disabled:opacity-60"
             >
               {testState === "testing" && <Spinner size="sm" />}
               {testState === "testing" ? t("storageTesting") : t("storageTestConnection")}
@@ -232,7 +232,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
           onClick={handleSave}
           disabled={busy}
           className={cn(
-            "flex items-center gap-1.5 rounded-[12px] bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground",
+            "flex items-center gap-1.5 rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground",
             busy && "cursor-default opacity-70",
           )}
         >

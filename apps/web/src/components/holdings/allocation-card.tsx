@@ -30,8 +30,8 @@ export function AllocationCard({
 }) {
   const tHoldings = useTranslations("Holdings");
   return (
-    <div className="@container rounded-[18px] bg-card px-6 py-5 shadow-card">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+    <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
+      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
         {title}
       </p>
       <AllocationDonut

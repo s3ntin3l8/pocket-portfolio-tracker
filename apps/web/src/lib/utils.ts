@@ -1,6 +1,19 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
 import type { Anomaly } from "@portfolio/api-client";
+
+/**
+ * Named type/radius steps from `globals.css` `@theme` — twMerge must know them, otherwise
+ * `text-micro` is parsed as a colour and silently de-duplicates against `text-text-2` etc.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: ["micro", "body-sm", "body", "heading", "display", "hero"],
+      radius: ["xs"],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

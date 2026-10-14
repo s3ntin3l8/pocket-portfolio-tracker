@@ -73,7 +73,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-text-2">{t("title")}</p>
-          <p className="mt-0.5 truncate text-[11px] text-text-3">{subtitle}</p>
+          <p className="mt-0.5 truncate text-micro text-text-3">{subtitle}</p>
         </div>
       </div>
 
@@ -140,15 +140,15 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-text-2">
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-micro font-semibold text-text-2">
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-[3px]" style={{ background: CHART_PALETTE[0] }} />
+          <span className="size-2.5 rounded-xs" style={{ background: CHART_PALETTE[0] }} />
           Portfolio
         </span>
         {benchmarkColumnKeys.map((sym, i) => (
           <span key={sym} className="flex items-center gap-1.5">
             <span
-              className="size-2.5 rounded-[3px]"
+              className="size-2.5 rounded-xs"
               style={{ background: CHART_PALETTE[(i + 1) % CHART_PALETTE.length] }}
             />
             {benchmarkLabels[sym]}
@@ -159,7 +159,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border text-[11px] uppercase tracking-wide text-text-3">
+            <tr className="border-b border-border text-micro uppercase tracking-wide text-text-3">
               <th className="px-2 py-1.5 text-left font-semibold">{t("headerYear")}</th>
               <th className="px-2 py-1.5 text-right font-semibold">{t("headerPortfolioTwr")}</th>
               <th className="px-2 py-1.5 text-right font-semibold">{t("headerPortfolioXirr")}</th>
@@ -181,7 +181,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                 <td className="px-2 py-1.5 text-left text-xs font-medium text-text-2">
                   {r.year}
                   {r.isCurrentYear && (
-                    <span className="ml-1 text-[10px] text-text-3">· {t("ytdLabel")}</span>
+                    <span className="ml-1 text-micro text-text-3">· {t("ytdLabel")}</span>
                   )}
                 </td>
                 <td className="tabular px-2 py-1.5 text-right text-xs">

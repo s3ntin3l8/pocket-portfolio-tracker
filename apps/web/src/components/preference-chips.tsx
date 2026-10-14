@@ -67,7 +67,7 @@ export function PreferenceChips({
             disabled={pending !== null}
             aria-pressed={current === o.value}
             className={cn(
-              "touch-target relative flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors disabled:opacity-60",
+              "touch-target relative flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors disabled:opacity-60",
               current === o.value
                 ? "bg-pill font-bold text-white"
                 : "bg-background font-semibold text-foreground",
@@ -82,7 +82,7 @@ export function PreferenceChips({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-[12px] border border-border bg-card p-[3px] shadow-card",
+        "inline-flex items-center gap-1 rounded-md border border-border bg-card p-[3px] shadow-card",
         className,
       )}
     >
@@ -94,7 +94,7 @@ export function PreferenceChips({
           disabled={pending !== null}
           aria-pressed={current === o.value}
           className={cn(
-            "touch-target relative rounded-[9px] px-3.5 py-1.5 text-xs font-bold transition-colors disabled:opacity-60",
+            "touch-target relative rounded-sm px-3.5 py-1.5 text-xs font-bold transition-colors disabled:opacity-60",
             current === o.value
               ? "bg-foreground text-background"
               : "text-muted-foreground hover:text-foreground",

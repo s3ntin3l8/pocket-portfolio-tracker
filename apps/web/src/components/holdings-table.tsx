@@ -214,7 +214,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                     {h.valuedAtCost && (
                       <span
                         title={t("valuedAtCostTooltip")}
-                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase text-text-mute"
+                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
                       >
                         {t("valuedAtCostBadge")}
                       </span>
@@ -222,7 +222,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                     {h.fxMissing && (
                       <span
                         title={t("fxMissingTooltip")}
-                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase text-text-mute"
+                        className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
                       >
                         {t("fxMissingBadge")}
                       </span>
@@ -273,10 +273,10 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={4}>{t("total")}</TableCell>
               <TableCell className="tabular text-right">{money(totals.value)}</TableCell>
-              <TableCell className={cn("tabular text-right text-[13px]", totalPnlColor)}>
+              <TableCell className={cn("tabular text-right text-body-sm", totalPnlColor)}>
                 {formatSignedMoney(totals.pnl, currency, locale)}
                 {totalPct !== null && (
-                  <div className="text-[11px] font-bold">
+                  <div className="text-micro font-bold">
                     {formatPercent(totalPct / 100, locale)}
                   </div>
                 )}
@@ -285,12 +285,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
           </TableFooter>
         </Table>
         {valuedAtCostCount > 0 && (
-          <p className="mt-2 text-[11px] font-medium text-text-mute">
+          <p className="mt-2 text-micro font-medium text-text-mute">
             {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
           </p>
         )}
         {fxMissingCount > 0 && (
-          <p className="mt-2 text-[11px] font-medium text-text-mute">
+          <p className="mt-2 text-micro font-medium text-text-mute">
             {t("fxMissingFooterNote", { count: fxMissingCount })}
           </p>
         )}
@@ -320,12 +320,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                 symbol={h.instrument?.symbol}
                 market={h.instrument?.market}
                 assetClass={h.instrument?.assetClass}
-                className="size-[42px] rounded-[13px]"
+                className="size-[42px] rounded-md"
               />
               <div className="min-w-0 flex-1">
                 <ScopeLink
                   href={`/instruments/${h.instrumentId}`}
-                  className="block truncate text-[15px] font-bold hover:underline"
+                  className="block truncate text-body font-bold hover:underline"
                 >
                   {h.instrument?.symbol ?? "—"}
                 </ScopeLink>
@@ -338,7 +338,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                   {h.valuedAtCost && (
                     <span
                       title={t("valuedAtCostTooltip")}
-                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[8px] font-bold uppercase text-text-mute"
+                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
                     >
                       {t("valuedAtCostBadge")}
                     </span>
@@ -346,7 +346,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                   {h.fxMissing && (
                     <span
                       title={t("fxMissingTooltip")}
-                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-[8px] font-bold uppercase text-text-mute"
+                      className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute"
                     >
                       {t("fxMissingBadge")}
                     </span>
@@ -368,9 +368,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               (sorted.length > 0 || ci > 0) && "border-t border-border",
             )}
           >
-            <MonogramBadge label={ccy} assetClass="cash" className="size-[42px] rounded-[13px]" />
+            <MonogramBadge label={ccy} assetClass="cash" className="size-[42px] rounded-md" />
             <div className="min-w-0 flex-1">
-              <span className="text-[15px] font-bold">{t("cash")}</span>
+              <span className="text-body font-bold">{t("cash")}</span>
               <div className="truncate text-xs font-medium text-text-2">{ccy}</div>
             </div>
             <div className="shrink-0 text-right tabular text-sm font-bold">
@@ -390,12 +390,12 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
           </div>
         </div>
         {valuedAtCostCount > 0 && (
-          <p className="px-4 py-2 text-[11px] font-medium text-text-mute">
+          <p className="px-4 py-2 text-micro font-medium text-text-mute">
             {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
           </p>
         )}
         {fxMissingCount > 0 && (
-          <p className="px-4 py-2 text-[11px] font-medium text-text-mute">
+          <p className="px-4 py-2 text-micro font-medium text-text-mute">
             {t("fxMissingFooterNote", { count: fxMissingCount })}
           </p>
         )}

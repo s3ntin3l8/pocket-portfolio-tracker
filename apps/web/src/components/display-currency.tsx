@@ -48,7 +48,7 @@ export function DisplayCurrency({ current }: { current: string }) {
             disabled={pending !== null}
             aria-pressed={value === c}
             className={cn(
-              "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors disabled:opacity-60",
+              "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors disabled:opacity-60",
               value === c
                 ? "bg-pill font-bold text-white"
                 : "bg-background font-semibold text-foreground",

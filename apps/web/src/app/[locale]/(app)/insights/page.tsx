@@ -124,7 +124,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         style={{ background: "linear-gradient(135deg,#11211a,#1d3a2c)" }}
       >
         <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
-        <p className="tabular mt-1 text-[36px] font-extrabold leading-none sm:text-[40px]">
+        <p className="tabular mt-1 text-hero font-extrabold leading-none sm:text-hero">
           {summary.xirr !== null ? formatPercent(summary.xirr, locale) : "—"}
         </p>
         <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">
@@ -147,7 +147,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("concentration.label")}</p>
-                <p className="tabular mt-1 text-[22px] font-extrabold leading-none">
+                <p className="tabular mt-1 text-heading font-extrabold leading-none">
                   {allocation.concentration.top1Pct.toFixed(0)}%
                 </p>
                 {topClass && (
@@ -168,7 +168,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
 
               <div className="rounded-2xl bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("diversification.label")}</p>
-                <p className="mt-1 text-[22px] font-extrabold leading-none">
+                <p className="mt-1 text-heading font-extrabold leading-none">
                   {t("diversification.value", { count: assetClassSlices.length })}
                 </p>
                 <p className="mt-1 text-xs font-medium text-text-2">

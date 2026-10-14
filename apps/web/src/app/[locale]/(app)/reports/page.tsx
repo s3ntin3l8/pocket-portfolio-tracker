@@ -297,8 +297,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
               pct={formatPercent(s.simpleGainPct, locale)}
               tone={toneOf(currentValue - netContributed)}
               basis="contributed"
-              amountClassName="text-[14px]"
-              pctClassName="text-[12px]"
+              amountClassName="text-sm"
+              pctClassName="text-xs"
             />
           ) : undefined
         }
@@ -442,8 +442,8 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
               pct={formatPercent(unrealized / measuredCost, locale)}
               tone={toneOf(unrealized)}
               basis="cost"
-              amountClassName="text-[14px]"
-              pctClassName="text-[12px]"
+              amountClassName="text-sm"
+              pctClassName="text-xs"
             />
           ) : undefined
         }

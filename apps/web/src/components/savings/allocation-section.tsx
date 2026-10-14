@@ -56,7 +56,7 @@ export function AllocationSection({
 
   return (
     <div className="mt-4 border-t border-line pt-4">
-      <p className="mb-[9px] text-[11px] font-semibold uppercase tracking-wide text-text-3">
+      <p className="mb-[9px] text-micro font-semibold uppercase tracking-wide text-text-3">
         {t("allocTitle")}
       </p>
 
@@ -64,7 +64,7 @@ export function AllocationSection({
         {drift.map((d) => (
           <span
             key={d.key}
-            className="h-full rounded-[3px]"
+            className="h-full rounded-xs"
             style={{ width: `${d.actualPct.toFixed(1)}%`, backgroundColor: colorByKey.get(d.key) }}
           />
         ))}
@@ -72,9 +72,9 @@ export function AllocationSection({
 
       <div className="mb-3 flex flex-col gap-1.5">
         {drift.map((d) => (
-          <div key={d.key} className="flex items-center gap-2 text-[11px] font-semibold">
+          <div key={d.key} className="flex items-center gap-2 text-micro font-semibold">
             <span
-              className="size-2 shrink-0 rounded-[2px]"
+              className="size-2 shrink-0 rounded-xs"
               style={{ backgroundColor: colorByKey.get(d.key) }}
             />
             <span className="min-w-0 flex-1 truncate text-text-2">{nameOf(d.key)}</span>
@@ -114,7 +114,7 @@ export function AllocationSection({
 
       {contributionSplit && contributionSplit.length > 0 && (
         <div className="mt-3.5">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-3">
+          <p className="mb-2 text-micro font-semibold uppercase tracking-wide text-text-3">
             {t("recommendedTopUp", { total: monthlyTotalLabel })}
           </p>
           <div className="flex flex-col gap-1.5">

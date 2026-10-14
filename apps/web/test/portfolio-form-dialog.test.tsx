@@ -654,7 +654,7 @@ describe("PortfolioFormDialog", () => {
       expect(content.className).toContain("md:max-w-[600px]");
       // Full-screen-on-mobile geometry (the default) — was a Sheet at every width.
       expect(content.className).toContain("inset-0");
-      expect(content.className).toContain("md:rounded-[22px]");
+      expect(content.className).toContain("md:rounded-xl");
     });
 
     it("shows the mobile back-chevron header with the create/edit title", () => {

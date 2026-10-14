@@ -59,7 +59,7 @@ export function AdvancedFields({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex items-center gap-1.5 text-[13px] font-semibold text-text-2"
+        className="flex items-center gap-1.5 text-body-sm font-semibold text-text-2"
       >
         <ChevronDown
           className={cn("size-3.5 transition-transform", open && "rotate-180")}
