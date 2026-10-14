@@ -15,14 +15,15 @@ cash** with live IDX prices and a real-time gold ticker.
   `s3ntin3l8/node-backend-template`. **Auth:** Authentik OIDC — `plugins/auth.ts`
   verifies Bearer JWTs (remote JWKS in prod, an injectable key in tests via
   `buildApp({ authKey })`), or a long-lived personal access token (`pt_`-prefixed,
-  hashed at rest, `/me/tokens`, mutating methods blocked for read-scoped tokens);
+  hashed at rest, `/me/tokens`, mutating methods blocked for read-scoped tokens, unless a route opts in with
+  `config: { scope: "read" }` — a POST that is itself read-only, i.e. `/mcp`);
   upserts the user by `sub`, and exposes the `app.authenticate` preHandler — every
   route scopes queries to `request.user`. **Routes** (`src/routes/*.ts`, one file per
   domain): `me` (profile + PATs), `account-holders`, `portfolios`, `transactions`
   (also holdings/trades/tax/income/allocation/forecasts/contributions — the largest
   route file), `corporate-actions`, `mergers`, `imports` (+`imports/parse`,
   `imports/confirm`), `documents`, `instruments`, `quotes`, `search`, `storage`,
-  `targets`, `tr`, `ibkr`, `preferences`, `admin`. Schema + migrations come from
+  `targets`, `tr`, `ibkr`, `preferences`, `mcp` (read-only MCP endpoint, see `docs/mcp.md`), `admin`. Schema + migrations come from
   `@portfolio/db`; the API applies them at startup.
 - **`apps/web`** — **Next.js (App Router) PWA**, Tailwind + shadcn/ui, **next-intl**
   (EN/ID). Talks to the API over HTTP (base URL is config-driven → Vercel-migratable).

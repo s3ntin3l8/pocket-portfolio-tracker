@@ -31,6 +31,7 @@ import { trRoute } from "./routes/tr.js";
 import { ibkrRoute } from "./routes/ibkr.js";
 import { adminRoute } from "./routes/admin.js";
 import { searchRoute } from "./routes/search.js";
+import { mcpRoute } from "./routes/mcp.js";
 import { storageRoute } from "./routes/storage.js";
 import { targetsRoute } from "./routes/targets.js";
 import { preferencesRoute } from "./routes/preferences.js";
@@ -345,6 +346,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(ibkrRoute);
   await app.register(adminRoute);
   await app.register(searchRoute);
+  await app.register(mcpRoute);
   await app.register(targetsRoute);
   await app.register(preferencesRoute);
   // Public file-serving for the folder storage provider (no auth — token in query string).

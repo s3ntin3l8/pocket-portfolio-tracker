@@ -36,7 +36,7 @@ export type ApiTokensClient = Pick<
  * over plain HTTP on a LAN IP, where `navigator.clipboard` is undefined — so fall back
  * to a hidden-textarea + `execCommand("copy")`, which still works there.
  */
-async function copyToClipboard(text: string): Promise<boolean> {
+export async function copyToClipboard(text: string): Promise<boolean> {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);

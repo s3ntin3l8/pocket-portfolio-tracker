@@ -75,11 +75,21 @@ function compactHeadline(s: PortfolioSummary | NetWorth) {
  * A failed call becomes data the model can act on ("tax_allowance_not_configured"), never the
  * raw error: that carries the response body and a stack, which must not reach the provider.
  */
-function toolError(err: unknown) {
+export function toolError(err: unknown) {
   if (err instanceof ApiError) {
     return { error: apiErrorCode(err) ?? "request_failed", status: err.status };
   }
   return { error: "tool_failed" };
+}
+
+/** True for the `{ error, status? }` shape `toolError` produces (transports flag it as an error). */
+export function isToolError(out: unknown): boolean {
+  if (!out || typeof out !== "object") return false;
+  const keys = Object.keys(out);
+  return (
+    typeof (out as { error?: unknown }).error === "string" &&
+    keys.every((k) => k === "error" || k === "status")
+  );
 }
 
 /**

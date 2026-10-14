@@ -39,6 +39,11 @@ COPY --from=build /app/packages/schema/dist ./packages/schema/dist
 COPY --from=build /app/packages/schema/package.json ./packages/schema/package.json
 COPY --from=build /app/packages/market-data/dist ./packages/market-data/dist
 COPY --from=build /app/packages/market-data/package.json ./packages/market-data/package.json
+# /mcp serves the AI tools in-process through the typed API client.
+COPY --from=build /app/packages/ai-tools/dist ./packages/ai-tools/dist
+COPY --from=build /app/packages/ai-tools/package.json ./packages/ai-tools/package.json
+COPY --from=build /app/packages/api-client/dist ./packages/api-client/dist
+COPY --from=build /app/packages/api-client/package.json ./packages/api-client/package.json
 
 # --- Trade Republic sync (pytr) runs as a Python subprocess ---
 # Install pytr into an isolated venv (sidesteps PEP-668 on slim). DELIBERATELY do NOT
