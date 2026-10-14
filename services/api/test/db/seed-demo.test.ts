@@ -27,10 +27,16 @@ describe("seedDemo — admin bootstrap", () => {
     await seedDemo();
 
     const [row] = await getDb()
-      .select({ isAdmin: users.isAdmin, authSub: users.authSub })
+      .select({
+        isAdmin: users.isAdmin,
+        authSub: users.authSub,
+        onboardingCompletedAt: users.onboardingCompletedAt,
+      })
       .from(users)
       .where(eq(users.email, "seed-demo-admin-test@example.com"));
     expect(row.isAdmin).toBe(true);
     expect(row.authSub).toBe("local|seed-demo-admin-test@example.com");
+    // The demo user owns a full dataset, so it must not be gated into onboarding.
+    expect(row.onboardingCompletedAt).not.toBeNull();
   }, 30_000);
 });

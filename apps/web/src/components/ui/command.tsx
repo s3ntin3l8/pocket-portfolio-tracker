@@ -7,6 +7,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
+import { useRestoreFocus } from "@/lib/use-restore-focus";
 
 const Command = React.forwardRef<
   React.ComponentRef<typeof CommandPrimitive>,
@@ -32,12 +33,15 @@ function CommandDialog({
   const tA = useTranslations("A11y");
   // Android hardware/gesture back closes the palette instead of navigating the route.
   useBackToClose(open, onOpenChange);
+  // No <Trigger> here: hand focus back to whatever had it when the palette opened.
+  const restoreFocus = useRestoreFocus(open);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} {...props}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
+          onCloseAutoFocus={restoreFocus}
           className="fixed left-1/2 top-[20%] z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
         >
           <DialogPrimitive.Title className="sr-only">{tA("search")}</DialogPrimitive.Title>

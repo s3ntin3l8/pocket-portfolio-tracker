@@ -43,6 +43,23 @@ The templates enforce checking all guidelines (lint, typecheck, test,
 format-check, migrations) before submission. Fill them in rather than
 skipping them.
 
+## Web e2e (Playwright, local only)
+
+`apps/web/e2e/` holds real-browser specs (currently the command bar: palette, `g` chords,
+`n`/`?`, focus restore, `?entry=` deep links, Android back). They are **not** part of
+`npm test` or CI yet. One-time: `npx playwright install chromium`. Then, from the repo root:
+
+```bash
+npm run e2e --workspace @portfolio/web
+```
+
+Playwright's `webServer` boots a `make dev`-equivalent stack on its own ports (API `3101`,
+web `3105`; override with `E2E_API_PORT` / `E2E_WEB_PORT`): the API on a throwaway PGlite
+database (`.pglite-e2e/`, wiped and re-seeded with the demo dataset on every run) and
+`next dev`, with the `DEV_AUTH_TOKEN` bypass. No `.env` is needed, and it does not touch
+your normal dev database. The first run compiles routes in `next dev`, so allow a few
+minutes. Failure traces land in `apps/web/test-results/`.
+
 ## Branching
 
 Branch off the **latest remote** default branch, not your local one —

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { X, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
+import { useRestoreFocus } from "@/lib/use-restore-focus";
 import { useFullScreenOverlayRegistration } from "@/components/full-screen-overlay";
 import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
 
@@ -16,8 +17,15 @@ function Dialog({
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   // Android hardware/gesture back closes the dialog instead of navigating the route.
   useBackToClose(open, onOpenChange);
-  return <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} {...props} />;
+  // Trigger-less dialogs (shortcut / state-driven) otherwise lose focus to <body> on close.
+  const restoreFocus = useRestoreFocus(open);
+  return (
+    <RestoreFocusContext.Provider value={restoreFocus}>
+      <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} {...props} />
+    </RestoreFocusContext.Provider>
+  );
 }
+const RestoreFocusContext = React.createContext<((event: Event) => void) | undefined>(undefined);
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogClose = DialogPrimitive.Close;
 
@@ -116,6 +124,7 @@ function DialogContent({
   footer?: React.ReactNode | true;
 }) {
   const tA = useTranslations("A11y");
+  const restoreFocus = React.useContext(RestoreFocusContext);
   // `!= null` also catches `null` (not just `undefined`) — a caller passing
   // `condition && <content/>` (a common React idiom) gets `null`, not `false`, when
   // `condition` is falsy, and that must not render an empty footer bar.
@@ -162,6 +171,10 @@ function DialogContent({
           className,
         )}
         {...props}
+        onCloseAutoFocus={(event) => {
+          props.onCloseAutoFocus?.(event);
+          if (!event.defaultPrevented) restoreFocus?.(event);
+        }}
       >
         {fullScreenOnMobile && <FullScreenOverlayMarker />}
         {fullScreenOnMobile && mobileHeader && (
