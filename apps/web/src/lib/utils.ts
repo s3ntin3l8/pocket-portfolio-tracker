@@ -52,6 +52,50 @@ export function formatMoneyCompact(
 
 /** A loosely-typed next-intl translator scoped to the `Anomalies` namespace. The dynamic
  *  `codes.<code>` key can't be statically verified, so callers pass `ta` cast to this shape. */
+const RECONCILIATION_CODES = new Set([
+  "reconciliation_gap",
+  "reconciliation_drift",
+  "position_gap",
+]);
+
+/**
+ * Display values for the broker-reconciliation messages. The API hands these over as raw
+ * decimal strings (a derived cash figure can carry a dozen digits), so cash amounts render
+ * as money in their currency and position quantities as plain numbers (up to 6 dp, trailing
+ * zeros trimmed). A position gap names the instrument when the API resolved it, else the ISIN.
+ */
+function reconciliationValues(
+  code: string,
+  meta: Record<string, unknown>,
+  locale: string,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(meta)) values[key] = String(value);
+  const num = (v: unknown) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
+  if (code === "position_gap") {
+    const qty = new Intl.NumberFormat(locale, { maximumFractionDigits: 6 });
+    for (const key of ["reported", "derived", "diff"]) {
+      const n = num(meta[key]);
+      if (n != null) values[key] = qty.format(n);
+    }
+    const isin = String(meta.isin ?? "");
+    values.instrument = meta.symbol ? `${String(meta.symbol)} · ${isin}` : isin || "—";
+    return values;
+  }
+  const currency = String(meta.currency ?? "");
+  for (const key of ["reported", "derived", "diff", "driftSincePrev"]) {
+    const n = num(meta[key]);
+    if (n == null) continue;
+    try {
+      values[key] = formatMoney(n, currency, locale);
+    } catch {
+      // Intl throws on an empty/invalid currency code: keep the raw string rather than
+      // breaking the label (and with it every banner on the surface).
+    }
+  }
+  return values;
+}
+
 export type AnomalyTranslator = (key: string, values?: Record<string, string>) => string;
 
 /**
@@ -72,6 +116,9 @@ export function anomalyLabel(
       currency,
       balance: formatMoney(Number(anomaly.meta.balance), currency, locale),
     });
+  }
+  if (anomaly.meta && RECONCILIATION_CODES.has(anomaly.code)) {
+    return ta(`codes.${anomaly.code}`, reconciliationValues(anomaly.code, anomaly.meta, locale));
   }
   if (anomaly.meta) {
     const values: Record<string, string> = {};
@@ -212,4 +259,48 @@ export function formatRatio(value: number, locale = "en") {
     minimumFractionDigits: 1,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+export interface ReconciliationItem {
+  key: string;
+  title: string;
+  detail: string;
+  tag: string;
+  dismissLabel: string;
+  /** Where to go to look at / fix the gap — omitted when the target isn't known. */
+  action?: { href: string; label: string };
+}
+
+/**
+ * One standalone broker-reconciliation banner (cash or position gap), fully resolved so it
+ * can be rendered from a server or client component. A position gap says so (not "Cash
+ * doesn't reconcile") and links to the instrument when the API resolved it; a cash gap links
+ * to the portfolio's settings, where the broker connection lives. `fallbackPortfolioId`
+ * covers single-portfolio callers for anomalies without a `portfolioId` in their meta.
+ */
+export function reconciliationItem(
+  a: { code: string; meta?: Record<string, unknown> | null },
+  ta: AnomalyTranslator,
+  locale: string,
+  fallbackPortfolioId?: string,
+): ReconciliationItem {
+  const meta = a.meta ?? {};
+  const isPosition = a.code === "position_gap";
+  const portfolioId = typeof meta.portfolioId === "string" ? meta.portfolioId : fallbackPortfolioId;
+  // Same code+subject can occur once per portfolio in the aggregate view.
+  const key = [a.code, meta.currency ?? meta.isin ?? "", portfolioId ?? ""].join(":");
+  let action: ReconciliationItem["action"];
+  if (isPosition && typeof meta.instrumentId === "string") {
+    action = { href: `/instruments/${meta.instrumentId}`, label: ta("viewHolding") };
+  } else if (!isPosition && portfolioId) {
+    action = { href: `/settings/portfolios/${portfolioId}`, label: ta("openConnection") };
+  }
+  return {
+    key,
+    title: ta(isPosition ? "reconciliationPositionTitle" : "reconciliationTitle"),
+    detail: anomalyLabel(a, ta, locale),
+    tag: ta("portfolioTag"),
+    dismissLabel: ta("dismiss"),
+    action,
+  };
 }

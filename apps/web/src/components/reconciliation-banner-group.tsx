@@ -10,6 +10,7 @@ export interface BannerItem {
   tag: string;
   /** `Anomalies.dismiss` — pre-resolved server-side, same reason as the other fields. */
   dismissLabel: string;
+  action?: { href: string; label: string };
 }
 
 export function ReconciliationBannerGroup({ items }: { items: BannerItem[] }) {
@@ -28,6 +29,7 @@ export function ReconciliationBannerGroup({ items }: { items: BannerItem[] }) {
             detail={item.detail}
             tag={item.tag}
             dismissLabel={item.dismissLabel}
+            action={item.action}
             onDismiss={() => setDismissed((prev) => new Set(prev).add(item.key))}
           />
         ))}

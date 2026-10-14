@@ -1,4 +1,5 @@
 import { AlertTriangle, X } from "lucide-react";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { BasisLabel } from "@/components/basis-label";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
@@ -170,10 +171,13 @@ export function ReconciliationBanner({
   tag,
   dismissLabel,
   onDismiss,
+  action,
 }: {
   title: string;
   detail: string;
   tag: string;
+  /** A link to where the gap can be looked at / fixed (the holding, the connection). */
+  action?: { href: string; label: string };
   /** Accessible name for the dismiss button — this component takes pre-resolved
    *  strings (no `useTranslations` here, so it stays usable from a server component),
    *  so callers must pass their own `Anomalies.dismiss` translation. */
@@ -188,6 +192,14 @@ export function ReconciliationBanner({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold">{title}</p>
         <p className="text-xs text-muted-foreground">{detail}</p>
+        {action && (
+          <Link
+            href={action.href}
+            className="mt-1.5 inline-block text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+          >
+            {action.label}
+          </Link>
+        )}
       </div>
       <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
         {tag}

@@ -35,7 +35,7 @@ import {
   formatSignedMoney,
   rowAnomalyCounts,
   bannerAnomalies,
-  anomalyLabel,
+  reconciliationItem,
   type AnomalyTranslator,
 } from "@/lib/utils";
 import { PageTitle } from "@/components/page-header";
@@ -342,13 +342,9 @@ export default async function HoldingsPage({
         <div className="space-y-5">
           {anomalyBanner}
           <ReconciliationBannerGroup
-            items={standaloneAnomalies.map((a, i) => ({
-              key: `${a.code}:${a.meta?.currency ?? a.meta?.isin ?? i}`,
-              title: ta("reconciliationTitle"),
-              detail: anomalyLabel(a, ta as AnomalyTranslator, locale),
-              tag: ta("portfolioTag"),
-              dismissLabel: ta("dismiss"),
-            }))}
+            items={standaloneAnomalies.map((a) =>
+              reconciliationItem(a, ta as AnomalyTranslator, locale, portfolioParam ?? undefined),
+            )}
           />
 
           <PositionsPanel

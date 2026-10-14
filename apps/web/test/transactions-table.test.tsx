@@ -1491,10 +1491,14 @@ describe("TransactionsTable", () => {
       );
       // All 3 render as distinct ReconciliationBanners (interpolated meta makes each unique),
       // not just the first one found — previously .find() only ever surfaced one.
-      expect(screen.getAllByText("Cash doesn't reconcile").length).toBe(3);
+      // A position gap says so — it's not titled "Cash doesn't reconcile".
+      expect(screen.getAllByText("Cash doesn't reconcile").length).toBe(1);
+      expect(screen.getAllByText("Position doesn't reconcile").length).toBe(2);
       expect(screen.getByText(/XF000BTC0017/)).toBeInTheDocument();
       expect(screen.getByText(/XF000ETH0019/)).toBeInTheDocument();
-      expect(screen.getByText(/EUR: reported 3552.4/)).toBeInTheDocument();
+      // Money / quantities are formatted, not the API's raw decimal strings.
+      expect(screen.getByText(/EUR: reported €3,552.40, derived €3,579.92/)).toBeInTheDocument();
+      expect(screen.getByText(/reported 0.026504, derived 0.000262/)).toBeInTheDocument();
       // None of these 3 are row-flaggable (no transactionId) → the headline "N found" count
       // excludes them entirely instead of promising rows "Show flagged only" can't produce —
       // they're already visible above as their own banners. No headline banner, no toggle.
@@ -1533,7 +1537,8 @@ describe("TransactionsTable", () => {
       // show. The 3 portfolio-scoped anomalies render as their own ReconciliationBanners
       // instead of inflating this count to a number nothing on the page can match.
       expect(screen.getByText("1 error and 1 warning found in your data")).toBeInTheDocument();
-      expect(screen.getAllByText("Cash doesn't reconcile").length).toBe(3);
+      expect(screen.getAllByText("Cash doesn't reconcile").length).toBe(1);
+      expect(screen.getAllByText("Position doesn't reconcile").length).toBe(2);
       fireEvent.click(screen.getByRole("button", { name: messages.Anomalies.showFlagged }));
       await waitFor(() => expect(screen.getAllByRole("row").slice(1).length).toBe(2));
     });
@@ -1883,7 +1888,9 @@ describe("TransactionsTable", () => {
       // `codes.reconciliation_gap` was rendered with no values, throwing next-intl's
       // FORMATTING_ERROR).
       expect(
-        screen.getByText("Cash reconciliation gap vs. broker (EUR: reported 100, derived 98)"),
+        screen.getByText(
+          "Cash reconciliation gap vs. broker (EUR: reported €100.00, derived €98.00)",
+        ),
       ).toBeInTheDocument();
       // No transaction-scoped anomaly → no "Show flagged" toggle, yet the recon banner shows.
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();

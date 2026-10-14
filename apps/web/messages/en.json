@@ -2184,12 +2184,15 @@
       "zero_price": "Zero price: buy or sell recorded at €0",
       "reconciliation_gap": "Cash reconciliation gap vs. broker ({currency}: reported {reported}, derived {derived})",
       "reconciliation_drift": "New cash reconciliation drift vs. broker ({currency}: reported {reported}, derived {derived})",
-      "position_gap": "Position reconciliation gap vs. broker ({isin}: reported {reported}, derived {derived})"
+      "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})"
     },
     "noneTitle": "No data issues found",
     "noneBody": "All transactions are consistent.",
     "dismiss": "Dismiss warning",
     "reconciliationTitle": "Cash doesn't reconcile",
+    "reconciliationPositionTitle": "Position doesn't reconcile",
+    "viewHolding": "View holding",
+    "openConnection": "Open connection",
     "portfolioTag": "Portfolio"
   },
   "PeriodSelector": {
