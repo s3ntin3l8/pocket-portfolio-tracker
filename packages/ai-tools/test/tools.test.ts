@@ -10,6 +10,9 @@ import {
 import { downsample } from "../src/compact.js";
 
 // Fixtures deliberately carry every sensitive key so the walker proves none survive.
+const P1 = "11111111-1111-1111-1111-111111111111";
+const H1 = "22222222-2222-2222-2222-222222222222";
+const I1 = "33333333-3333-3333-3333-333333333333";
 const leaky = { accountNumber: "DE00-SECRET", iban: "DE89370400440532013000", userId: "u1" };
 const holding = (over: Record<string, unknown> = {}) => ({
   instrumentId: "i1",
@@ -104,7 +107,7 @@ const client = {
     rows: [
       {
         id: "t1",
-        portfolioId: "p1",
+        portfolioId: P1,
         instrumentId: "i1",
         type: "buy",
         quantity: "1",
@@ -165,14 +168,14 @@ const byName = (n: string) => tools.find((t) => t.name === n)!;
 const inputs: Record<string, unknown> = {
   list_portfolios: {},
   get_net_worth: {},
-  get_portfolio_summary: { portfolioId: "p1" },
+  get_portfolio_summary: { portfolioId: P1 },
   get_holdings: {},
-  search_transactions: { portfolioId: "p1" },
-  get_performance: { portfolioId: "p1" },
-  get_income: { portfolioId: "p1" },
+  search_transactions: { portfolioId: P1 },
+  get_performance: { portfolioId: P1 },
+  get_income: { portfolioId: P1 },
   get_contributions: {},
   get_tax_summary: { year: 2025 },
-  "get_tax_summary#portfolio": { portfolioId: "p1", year: 2025 },
+  "get_tax_summary#portfolio": { portfolioId: P1, year: 2025 },
   get_rebalancing: { dimension: "asset_class" },
   get_insights: {},
   lookup_instrument: { q: "abc" },
@@ -235,11 +238,11 @@ describe("ai-tools", () => {
     const t = byName("search_transactions");
     await t.handler(
       t.inputSchema.parse({
-        portfolioId: "p1",
+        portfolioId: P1,
         type: "buy",
         year: "2025",
         q: "x",
-        instrumentId: "i1",
+        instrumentId: I1,
         page: 2,
         pageSize: 10,
       }),
@@ -249,21 +252,21 @@ describe("ai-tools", () => {
         type: "buy",
         year: "2025",
         q: "x",
-        instrumentId: "i1",
+        instrumentId: I1,
         page: 2,
         pageSize: 10,
       }),
     );
-    await byName("get_tax_summary").handler({ year: 2025, holderId: "h1" });
+    await byName("get_tax_summary").handler({ year: 2025, holderId: H1 });
     expect(calls).toEqual([
-      'listTransactionsPaginated("p1",2,10,undefined,"buy","2025","x","i1")',
-      'listNetworthTransactionsPaginated(2,10,"buy","2025","x","i1")',
-      'getNetworthTax(2025,"h1")',
+      `listTransactionsPaginated("${P1}",2,10,undefined,"buy","2025","x","${I1}")`,
+      `listNetworthTransactionsPaginated(2,10,"buy","2025","x","${I1}")`,
+      `getNetworthTax(2025,"${H1}")`,
     ]);
   });
 
   it("portfolio summary merges XIRR from the performance endpoint", async () => {
-    const out = (await byName("get_portfolio_summary").handler({ portfolioId: "p1" })) as Record<
+    const out = (await byName("get_portfolio_summary").handler({ portfolioId: P1 })) as Record<
       string,
       unknown
     >;
@@ -274,8 +277,8 @@ describe("ai-tools", () => {
   it("holdings can be scoped to a holder", async () => {
     calls.length = 0;
     const t = byName("get_holdings");
-    await t.handler(t.inputSchema.parse({ holderId: "h1" }));
-    expect(calls).toEqual(['getNetWorth(undefined,"h1")']);
+    await t.handler(t.inputSchema.parse({ holderId: H1 }));
+    expect(calls).toEqual([`getNetWorth(undefined,"${H1}")`]);
   });
 
   it("net worth forwards gain, fx exclusions and at-cost counts; drops the holdings array", async () => {
@@ -311,7 +314,7 @@ describe("ai-tools", () => {
 
   it("scopes by portfolioId when given, else uses the net-worth endpoints", async () => {
     calls.length = 0;
-    await byName("get_income").handler({ portfolioId: "p1" });
+    await byName("get_income").handler({ portfolioId: P1 });
     await byName("get_income").handler({});
     expect(calls.some((c) => c.startsWith("getPortfolioIncome"))).toBe(true);
     expect(calls.some((c) => c.startsWith("getIncome"))).toBe(true);
@@ -319,7 +322,7 @@ describe("ai-tools", () => {
 
   it("caps series at 60 points and keeps the endpoints", async () => {
     const t = byName("get_performance");
-    const out = (await t.handler(t.inputSchema.parse({ portfolioId: "p1" }))) as {
+    const out = (await t.handler(t.inputSchema.parse({ portfolioId: P1 }))) as {
       points: { date: string }[];
       totalPoints: number;
     };
@@ -337,6 +340,21 @@ describe("ai-tools", () => {
     };
     expect(out.targets).toHaveLength(1);
     expect(out.drift).toHaveLength(1);
+  });
+
+  it("rejects ids that could escape their URL slot (path/query injection)", () => {
+    for (const [name, key] of [
+      ["get_portfolio_summary", "portfolioId"],
+      ["get_holdings", "holderId"],
+      ["search_transactions", "instrumentId"],
+    ] as const) {
+      const schema = byName(name).inputSchema;
+      const base = name === "get_portfolio_summary" ? {} : {};
+      for (const bad of ["x/../me/tokens", `${P1}/../../me`, `${P1}?a=b`, "../admin", "p1"]) {
+        expect(schema.safeParse({ ...base, [key]: bad }).success).toBe(false);
+      }
+      expect(schema.safeParse({ [key]: P1 }).success).toBe(true);
+    }
   });
 
   it("rejects bad input (pageSize cap, year format)", () => {
@@ -367,7 +385,7 @@ describe("failures", () => {
       },
     } as unknown as ApiClient);
     const tax = failing.find((t) => t.name === "get_tax_summary")!;
-    const out = await tax.handler({ portfolioId: "p1" });
+    const out = await tax.handler({ portfolioId: P1 });
     expect(out).toEqual({ error: "tax_allowance_not_configured", status: 422 });
     const list = await failing.find((t) => t.name === "list_portfolios")!.handler({});
     expect(list).toEqual({ error: "tool_failed" });

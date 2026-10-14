@@ -205,10 +205,16 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         .set({ lastUsedAt: new Date() })
         .where(eq(apiTokens.id, row.id));
       const scope = row.scope === "write" ? "write" : "read";
-      // Method-based gate, plus a route-level opt-in (`config: { scope: "write" }`)
-      // for GETs that mutate state or spend provider quota.
-      const routeNeedsWrite = request.routeOptions?.config?.scope === "write";
-      if (scope === "read" && (MUTATING_METHODS.has(request.method) || routeNeedsWrite)) {
+      // Method-based gate, plus two route-level opt-ins: `config: { scope: "write" }` makes
+      // a GET that mutates state or spends provider quota need a write PAT, and
+      // `config: { scope: "read" }` (below) is the inverse for a POST that only reads.
+      const routeScope = request.routeOptions?.config?.scope;
+      const routeNeedsWrite = routeScope === "write";
+      // `scope: "read"` is the inverse opt-in: the route is read-only even though it is a
+      // POST (the MCP transport), so a read PAT may call it. Whatever it does internally
+      // goes back through the API and is gated there.
+      const methodMutates = MUTATING_METHODS.has(request.method) && routeScope !== "read";
+      if (scope === "read" && (methodMutates || routeNeedsWrite)) {
         return reply.code(403).send({ error: "read_only_token" });
       }
       request.user = {
@@ -404,8 +410,10 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
 
 declare module "fastify" {
   interface FastifyContextConfig {
-    /** `"write"`: even a GET on this route needs a write-scoped credential (PATs). */
-    scope?: "write";
+    /** `"write"`: even a GET on this route needs a write-scoped credential (PATs).
+     *  `"read"`: a read-scoped PAT may use this route despite a mutating method (a
+     *  POST that is itself read-only, e.g. the MCP transport). */
+    scope?: "write" | "read";
   }
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;

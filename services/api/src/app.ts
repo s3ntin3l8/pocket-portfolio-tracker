@@ -31,6 +31,7 @@ import { trRoute } from "./routes/tr.js";
 import { ibkrRoute } from "./routes/ibkr.js";
 import { adminRoute } from "./routes/admin.js";
 import { searchRoute } from "./routes/search.js";
+import { mcpRoute } from "./routes/mcp.js";
 import { storageRoute } from "./routes/storage.js";
 import { targetsRoute } from "./routes/targets.js";
 import { preferencesRoute } from "./routes/preferences.js";
@@ -277,7 +278,9 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   // invalidate. Clearing the whole cache is cheap (a few Map entries) and only costs one
   // extra recompute per portfolio on the next read — never a staleness risk.
   app.addHook("onResponse", async (request, reply) => {
-    if (request.method !== "GET" && request.method !== "HEAD") {
+    // A POST that is itself read-only (`scope: "read"`, e.g. /mcp) never changes data.
+    const readOnlyRoute = request.routeOptions?.config?.scope === "read";
+    if (request.method !== "GET" && request.method !== "HEAD" && !readOnlyRoute) {
       clearValuationCache(request.log);
       clearDerivationCache();
     }
@@ -345,6 +348,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(ibkrRoute);
   await app.register(adminRoute);
   await app.register(searchRoute);
+  await app.register(mcpRoute);
   await app.register(targetsRoute);
   await app.register(preferencesRoute);
   // Public file-serving for the folder storage provider (no auth — token in query string).

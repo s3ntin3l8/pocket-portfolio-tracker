@@ -3,6 +3,7 @@ import type { ApiToken, IbkrConnection, TrConnection } from "@portfolio/api-clie
 import { FileInput } from "lucide-react";
 import { ApiTokens } from "@/components/api-tokens";
 import { BrokerageIcon } from "@/components/brokerage-icon";
+import { McpConnectCard } from "@/components/mcp-connect-card";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,6 +64,17 @@ export async function DataConnectionsSection({
         <div className="overflow-hidden rounded-2xl bg-card shadow-card">
           <div className="p-4">
             <ApiTokens initialTokens={apiTokens} />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
+          {t("mcpTitle")}
+        </p>
+        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="p-4">
+            <McpConnectCard />
           </div>
         </div>
       </div>
