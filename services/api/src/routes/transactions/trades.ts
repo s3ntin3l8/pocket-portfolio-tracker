@@ -5,10 +5,17 @@ import { type InstrumentMeta } from "../../services/valuation.js";
 import { type TradeLog, mergeTradeLogs } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import { mapPool } from "../../lib/promise-pool.js";
+import {
+  collectVorabNeeds,
+  estimateVorabFromPrices,
+  loadEstimatedVorabRows,
+  loadVorabPrices,
+} from "../../services/vorab-estimate.js";
 import { cacheKey } from "../helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   resolveCostBasisMode,
+  resolveTaxRegime,
   methodFromQuery,
   buildTradeLog,
   attachInstruments,
@@ -27,20 +34,31 @@ export function registerTradesRoutes(app: FastifyInstance) {
       const portfolio = request.portfolio;
       const method = methodFromQuery(request.query);
       const costBasisMode = await resolveCostBasisMode(app, request.userId, request.query);
+      // Estimated Vorabpauschale rows are DE-only, so the regime is part of the cache key.
+      const regime = await resolveTaxRegime(app, request.userId);
       const cached = await withDerivationCache(
         tradesCache,
-        cacheKey(portfolioId, method, costBasisMode),
+        cacheKey(portfolioId, method, costBasisMode, regime),
         async () => {
-          const { coreTxns, prices, metaById } = await loadValuation(
+          const {
+            coreTxns,
+            prices,
+            metaById,
+            corporateActions: cas,
+          } = await loadValuation(
             app,
             portfolioId,
             portfolio.baseCurrency,
             costBasisMode,
             portfolio.cashCounted,
           );
+          const estimated =
+            regime === "DE"
+              ? await loadEstimatedVorabRows(app.db, coreTxns, cas, metaById, new Date(), app.log)
+              : [];
           const log = await buildTradeLog(
             app,
-            coreTxns,
+            estimated.length > 0 ? [...coreTxns, ...estimated] : coreTxns,
             prices,
             portfolio.baseCurrency,
             method,
@@ -68,6 +86,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
       const { holderId } = request.query;
       const method = methodFromQuery(request.query);
       const costBasisMode = await resolveCostBasisMode(app, request.userId, request.query);
+      const regime = await resolveTaxRegime(app, id);
 
       if (holderId != null) {
         const [holder] = await app.db
@@ -89,7 +108,7 @@ export function registerTradesRoutes(app: FastifyInstance) {
 
       const result = await withDerivationCache(
         networthTradesCache,
-        cacheKey(id, method, costBasisMode, holderId ?? ""),
+        cacheKey(id, method, costBasisMode, holderId ?? "", regime),
         async () => {
           const [u] = await app.db
             .select({ displayCurrency: users.displayCurrency })
@@ -98,17 +117,28 @@ export function registerTradesRoutes(app: FastifyInstance) {
             .limit(1);
           const display = u?.displayCurrency ?? "IDR";
 
-          const perPortfolio = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, async (p) => {
-            const { coreTxns, prices, metaById } = await loadValuation(
-              app,
-              p.id,
-              display,
-              costBasisMode,
-              p.cashCounted,
-            );
+          // Phase 1: valuations; phase 2: one shared boundary-price query (DE only);
+          // phase 3: per-portfolio trade logs with the estimates.
+          const loaded = await mapPool(pfs, PORTFOLIO_VALUATION_CONCURRENCY, (p) =>
+            loadValuation(app, p.id, display, costBasisMode, p.cashCounted),
+          );
+          const now = new Date();
+          const vorabPriceOn =
+            regime === "DE"
+              ? await loadVorabPrices(
+                  app.db,
+                  loaded.map((v) => collectVorabNeeds(v.coreTxns, v.metaById)),
+                  now,
+                )
+              : null;
+          const perPortfolio = await mapPool(loaded, PORTFOLIO_VALUATION_CONCURRENCY, async (v) => {
+            const { coreTxns, prices, metaById, corporateActions: cas } = v;
+            const estimated = vorabPriceOn
+              ? estimateVorabFromPrices(coreTxns, cas, metaById, vorabPriceOn, now, app.log)
+              : [];
             const log = await buildTradeLog(
               app,
-              coreTxns,
+              estimated.length > 0 ? [...coreTxns, ...estimated] : coreTxns,
               prices,
               display,
               method,

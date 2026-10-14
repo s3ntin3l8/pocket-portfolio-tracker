@@ -22,6 +22,7 @@ import {
   type TradeAction,
   partitionConvertible,
 } from "@portfolio/core";
+import { loadEstimatedVorabRows } from "../../services/vorab-estimate.js";
 import { cacheKey } from "../helpers.js";
 import { buildTfRates } from "./tax-helpers.js";
 import type { PortfolioParams } from "./shared.js";
@@ -52,7 +53,7 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       const includeSales = request.query.includeSales === "true";
       const portfolio = request.portfolio;
       const costBasisMode = await resolveCostBasisMode(app, id);
-      const { coreTxns, summary, prices, metaById } = await loadValuation(
+      const { coreTxns, summary, prices, metaById, corporateActions } = await loadValuation(
         app,
         portfolioId,
         portfolio.baseCurrency,
@@ -197,9 +198,19 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       }
 
       // Compute harvest suggestions using FIFO trade log.
+      // DE regime is certain here (ID returned above): feed the derived Vorabpauschale
+      // estimates in so the harvest cap sees the same credit as the Tax page.
+      const estimatedVorab = await loadEstimatedVorabRows(
+        app.db,
+        coreTxns,
+        corporateActions,
+        metaById,
+        new Date(),
+        app.log,
+      );
       const tradeLog = await buildTradeLog(
         app,
-        coreTxns,
+        estimatedVorab.length > 0 ? [...coreTxns, ...estimatedVorab] : coreTxns,
         prices,
         portfolio.baseCurrency,
         "fifo",

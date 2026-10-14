@@ -172,10 +172,13 @@ A year with no entry returns `null` and logs a warning — values are never gues
 
 ### Estimated Vorabpauschale (when the broker books none)
 
-For German-regime fund holdings (`etf`, `mutual_fund`) the tax route derives the missing
+For German-regime fund holdings (`etf`, `mutual_fund`) the API derives the missing
 accrual itself — `estimateVorabRows` (`packages/core/src/tax/vorab-estimate.ts`), loaded
 from `prices` by `services/vorab-estimate.ts` and fed into the same trade log as the
-broker rows. The rows are **derived, never stored**, carry `estimated: true`, and surface as
+broker rows. Every DE-regime consumer of the trade log gets it, so a sell's Vorabpauschale
+credit is the same everywhere: the Tax routes (`/portfolios/:id/tax`, `/networth/tax`), the
+Trades routes (`/portfolios/:id/trades`, `/networth/trades`) and the Sparplan harvest cap
+(`/portfolios/:id/sparplan?includeSales=true`). Under the ID regime none of them add rows. The rows are **derived, never stored**, carry `estimated: true`, and surface as
 `vorabByYear[].estimated` / `AllowanceUsage.vorabpauschaleEstimated` (the Tax page labels
 the accrued figure "Estimated from year-start and year-end prices"). Rules (§18 InvStG,
 verified against the statute text):
@@ -202,9 +205,17 @@ verified against the statute text):
   estimated. A split/bonus in the year is handled by bringing both quantities and prices to
   current share terms.
 
-Staleness: the estimate sits inside the FIFO trade-log cache, so it is as fresh as the
-valuation that feeds it (60 s TTL, cleared on any write); a background price backfill shows
-up at the next TTL expiry.
+Price lookups are batched: `getPricesOn` runs one query for all boundary dates, and the
+multi-portfolio routes (`/networth/tax`, `/networth/trades`) load every portfolio's valuation
+first, then make ONE `loadVorabPrices` call over the union of fund ids and years, shared by
+all portfolios (`estimateVorabFromPrices` per portfolio).
+
+Staleness: `/portfolios/:id/tax` computes the estimate lazily inside the FIFO trade-log cache;
+`/portfolios/:id/trades` and `/networth/trades` inside their derivation caches, keyed by tax
+regime so a regime switch never serves a stale log. `/networth/tax` and Sparplan are not
+cached at that level (the valuations they read are). All are as fresh as the valuation that
+feeds them (60 s TTL, cleared on any write); a background price backfill shows up at the next
+TTL expiry.
 
 ### Harvest suggestions
 
