@@ -355,6 +355,7 @@ export function GlobalSearch({
         ].filter((s) => matches(s.label, trimmedQuery))
       : [];
 
+  // Includes shownRecentInstruments and showAssistant: they feed the empty-state computation below.
   const commandCount =
     recentPages.length +
     shownRecentInstruments.length +

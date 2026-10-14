@@ -145,6 +145,13 @@ test.describe("command bar", () => {
     await page.keyboard.press("n");
     const sheet = page.getByRole("dialog");
     await expect(sheet).toBeVisible();
+    // `n` opens the Radix Dialog primitive (ui/dialog.tsx), not a vaul Sheet/Drawer, at
+    // every viewport width; the vaul `Sheet` is used by other flows.
+    await expect(sheet).not.toHaveAttribute("data-vaul-drawer", /.*/);
+    // Focus really moved into the dialog while open, so the marker is not trivially still
+    // focused when it closes.
+    await expect(page.locator("#e2e-focus-marker")).not.toBeFocused();
+    await expect(sheet.locator(":focus")).toHaveCount(1);
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
     await expect(page.locator("#e2e-focus-marker")).toBeFocused();
@@ -298,9 +305,15 @@ test.describe("single-key shortcut toggle (Settings -> Account)", () => {
     await toggle.click();
     await expect(toggle).not.toBeChecked();
 
+    // Cannot use gotoReady's `?` probe here (shortcuts are off); Cmd/Ctrl-K is the
+    // always-on shortcut, so use it to prove hydration instead.
     await page.goto(HOLDINGS);
-    await expect(page.getByRole("button", { name: "Search" }).first()).toBeVisible();
-    await page.waitForTimeout(1500); // let hydration attach the listener
+    await expect(async () => {
+      await page.keyboard.press(`${mod}+k`);
+      await expect(palette(page)).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await page.keyboard.press("Escape");
+    await expect(palette(page)).toBeHidden();
     await page.keyboard.press("g");
     await page.keyboard.press("a");
     await expect(page).toHaveURL(/\/en\/holdings/);
@@ -315,7 +328,13 @@ test.describe("single-key shortcut toggle (Settings -> Account)", () => {
 
     // Re-enable: shortcuts are back.
     await page.goto("/en/settings");
-    await page.getByRole("switch", { name: "Keyboard shortcuts" }).click();
+    const again = page.getByRole("switch", { name: "Keyboard shortcuts" });
+    await expect(again).not.toBeChecked();
+    await again.click();
+    await expect(again).toBeChecked();
     await gotoReady(page, HOLDINGS);
+    await page.keyboard.press("g");
+    await page.keyboard.press("a");
+    await expect(page).toHaveURL(/\/en\/transactions/);
   });
 });
