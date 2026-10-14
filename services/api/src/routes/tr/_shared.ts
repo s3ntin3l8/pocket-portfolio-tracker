@@ -4,7 +4,10 @@ import { accountHolders, portfolios, trConnections } from "@portfolio/db";
 
 type TrConnection = typeof trConnections.$inferSelect;
 
-export function serialize(conn: TrConnection | null) {
+export function serialize(
+  conn: TrConnection | null,
+  pairingMethod: "push" | "authenticator" | null = null,
+) {
   return {
     status: conn?.status ?? "disconnected",
     portfolioId: conn?.portfolioId ?? null,
@@ -12,6 +15,8 @@ export function serialize(conn: TrConnection | null) {
     lastError: conn?.lastError ?? null,
     lastReconciliation: conn?.lastReconciliation ?? null,
     syncing: conn?.syncing ?? false,
+    // How the in-flight pairing signs in; null when none is pending.
+    pairingMethod,
   };
 }
 

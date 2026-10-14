@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import crypto from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { generateKeyPair, SignJWT } from "jose";
@@ -14,7 +14,8 @@ import { buildApp } from "../../src/app.js";
 import { getDb, closeDb } from "../../src/db/client.js";
 import {
   PytrApprovalError,
-  PytrAuthenticatorRequiredError,
+  PytrCodeInvalidError,
+  PytrCodeRequiredError,
   PytrError,
   PytrUnavailableError,
 } from "../../src/services/pytr/runner.js";
@@ -24,7 +25,11 @@ import type { PytrRunner } from "../../src/services/pytr/runner.js";
 // methods; behaviour is tweakable per test.
 class FakePytr {
   pending = new Set<string>();
-  startResult: { processId: string } | Error = { processId: "pid-1" };
+  startResult: { processId: string; method: "push" | "authenticator" } | Error = {
+    processId: "pid-1",
+    method: "push",
+  };
+  lastCode: string | undefined;
   approvalResult: string | Error = "MOZILLA_COOKIE_JAR";
   async startPairing(userId: string) {
     if (this.startResult instanceof Error) throw this.startResult;
@@ -34,7 +39,12 @@ class FakePytr {
   hasPendingPairing(userId: string) {
     return this.pending.has(userId);
   }
-  async awaitApproval(userId: string) {
+  pairingMethod(userId: string) {
+    if (!this.pending.has(userId)) return null;
+    return this.startResult instanceof Error ? null : this.startResult.method;
+  }
+  async awaitApproval(userId: string, code?: string) {
+    this.lastCode = code;
     if (this.approvalResult instanceof Error) throw this.approvalResult;
     this.pending.delete(userId);
     return this.approvalResult;
@@ -154,7 +164,7 @@ describe("Trade Republic connection (encryption enabled)", () => {
       payload: { phone: "+4915112345678", pin: "1234", portfolioId },
     });
     expect(start.statusCode).toBe(202);
-    expect(start.json()).toEqual({ status: "awaiting_2fa" });
+    expect(start.json()).toEqual({ status: "awaiting_2fa", method: "push" });
 
     const pending = await app.inject({
       method: "GET",
@@ -280,22 +290,100 @@ describe("Trade Republic connection (encryption enabled)", () => {
     });
     expect(res.statusCode).toBe(502);
     expect(res.json()).toEqual({ error: "tr_pairing_failed" });
-    fake.startResult = { processId: "pid-1" };
+    fake.startResult = { processId: "pid-1", method: "push" };
   });
 
-  it("422s when the account needs an authenticator-app code", async () => {
-    const t = await token("tr-totp");
-    const portfolioId = await portfolioFor(app, t);
-    fake.startResult = new PytrAuthenticatorRequiredError();
-    const res = await app.inject({
-      method: "POST",
-      url: "/tr/connection",
-      headers: auth(t),
-      payload: { phone: "+49150", pin: "1234", portfolioId },
+  describe("authenticator-app (TOTP) pairing", () => {
+    async function connectTotp(name: string) {
+      const t = await token(name);
+      const portfolioId = await portfolioFor(app, t);
+      fake.startResult = { processId: "pid-1", method: "authenticator" };
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection",
+        headers: auth(t),
+        payload: { phone: "+49150", pin: "1234", portfolioId },
+      });
+      return { t, res };
+    }
+    const verify = (t: string, payload?: unknown) =>
+      app.inject({
+        method: "POST",
+        url: "/tr/connection/verify",
+        headers: auth(t),
+        ...(payload === undefined ? {} : { payload: payload as object }),
+      });
+
+    afterEach(() => {
+      fake.startResult = { processId: "pid-1", method: "push" };
+      fake.approvalResult = "MOZILLA_COOKIE_JAR";
+      fake.lastCode = undefined;
     });
-    expect(res.statusCode).toBe(422);
-    expect(res.json()).toEqual({ error: "tr_authenticator_unsupported" });
-    fake.startResult = { processId: "pid-1" };
+
+    it("reports the method on connect and exposes it on GET /tr/connection", async () => {
+      const { t, res } = await connectTotp("tr-totp-method");
+      expect(res.statusCode).toBe(202);
+      expect(res.json()).toEqual({ status: "awaiting_2fa", method: "authenticator" });
+      const conn = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(conn.json()).toMatchObject({ status: "awaiting_2fa", pairingMethod: "authenticator" });
+    });
+
+    it("passes the code to the runner and connects", async () => {
+      const { t } = await connectTotp("tr-totp-ok");
+      const res = await verify(t, { code: "123456" });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ status: "connected" });
+      expect(fake.lastCode).toBe("123456");
+    });
+
+    it("400s code_required without a code and keeps awaiting_2fa", async () => {
+      const { t } = await connectTotp("tr-totp-nocode");
+      fake.approvalResult = new PytrCodeRequiredError();
+      const res = await verify(t);
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: "code_required" });
+      const conn = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(conn.json().status).toBe("awaiting_2fa");
+    });
+
+    it("400s code_invalid for a refused code and keeps awaiting_2fa for a retry", async () => {
+      const { t } = await connectTotp("tr-totp-bad");
+      fake.approvalResult = new PytrCodeInvalidError();
+      const res = await verify(t, { code: "000000" });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: "code_invalid" });
+      const conn = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(conn.json().status).toBe("awaiting_2fa");
+    });
+
+    it("treats a null body like no code (push pairings still verify)", async () => {
+      const t = await token("tr-null-body");
+      const portfolioId = await portfolioFor(app, t);
+      await app.inject({
+        method: "POST",
+        url: "/tr/connection",
+        headers: { ...auth(t), "content-type": "application/json" },
+        payload: { phone: "+49150", pin: "1234", portfolioId },
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/verify",
+        headers: { ...auth(t), "content-type": "application/json" },
+        payload: "null",
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it.each(["12a456", "12345", "1234567", "123456\n"])(
+      "rejects the malformed code %j before it can reach the login process",
+      async (code) => {
+        const { t } = await connectTotp(`tr-totp-fmt-${code.length}-${code.charCodeAt(2)}`);
+        const res = await verify(t, { code });
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toEqual({ error: "code_invalid" });
+        expect(fake.lastCode).toBeUndefined();
+      },
+    );
   });
 
   it("502s when approval fails for a non-decline reason", async () => {
@@ -330,7 +418,7 @@ describe("Trade Republic connection (encryption enabled)", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: "pytr_not_available" });
-    fake.startResult = { processId: "pid-1" };
+    fake.startResult = { processId: "pid-1", method: "push" };
   });
 
   it("re-import wipes pytr transactions, the resolved ledger, and open drafts", async () => {

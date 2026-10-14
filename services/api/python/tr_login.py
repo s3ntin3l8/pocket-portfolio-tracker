@@ -18,9 +18,13 @@ Contract (the Node runner in services/api/src/services/pytr/runner/core.ts depen
     2. print ONE JSON line to stdout: {"processId": "...", "status": "awaiting_approval"}
     3. poll the login process until the user approves the push in the TR mobile app
     4. on approval pytr saves the cookie session to --cookies-file
-  exit:  0 approved; 3 rejected/expired/not approved; 4 the account needs an authenticator-app
-         (TOTP) code, which pairing cannot collect yet (nothing is printed to stdout);
-         1 any other failure (a human-readable reason is written to stderr)
+  authenticator-app (TOTP) accounts:
+    2. print {"processId": "...", "status": "awaiting_code"} instead
+    3. read one 6-digit code per line from stdin and submit it; a wrong or already-used code
+       prints {"status": "code_invalid"} and the next line is read (MAX_CODE_ATTEMPTS tries).
+       After a valid code pytr still waits for the login to be confirmed in the TR app.
+  exit:  0 approved; 3 rejected/expired/not approved or out of code attempts; 1 any other
+         failure, including stdin closing before a code arrived (reason on stderr)
 
 TR's private protocol (app version, platform, user agent) can change. pytr reads
 PYTR_TR_APP_VERSION / PYTR_TR_PLATFORM / PYTR_TR_USER_AGENT, so a stale value can be fixed
@@ -35,7 +39,7 @@ import sys
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_NOT_APPROVED = 3
-EXIT_AUTHENTICATOR_REQUIRED = 4
+MAX_CODE_ATTEMPTS = 3
 
 
 def main() -> int:
@@ -82,13 +86,6 @@ def main() -> int:
         print(f"initiate_weblogin failed: {exc}", file=sys.stderr)
         return EXIT_FAILED
 
-    if tr.weblogin_needs_authenticator:
-        print(
-            "this account uses an authenticator app (TOTP) login, which is not supported yet",
-            file=sys.stderr,
-        )
-        return EXIT_AUTHENTICATOR_REQUIRED
-
     # pytr exposes the login process id only as `_process_id`. Fail fast if it is missing
     # (e.g. renamed upstream): the runner ignores a stdout line without a processId and
     # would otherwise wait out its whole pairing timeout.
@@ -97,11 +94,18 @@ def main() -> int:
         print("pytr did not report a login process id", file=sys.stderr)
         return EXIT_FAILED
 
+    if tr.weblogin_needs_authenticator:
+        print(json.dumps({"processId": process_id, "status": "awaiting_code"}), flush=True)
+        return _complete_with_code(tr)
+
     # Tell the runner the push has been sent; it flips the connection to 'awaiting_approval'.
     print(json.dumps({"processId": process_id, "status": "awaiting_approval"}), flush=True)
+    return _finish(tr.complete_weblogin)
 
+
+def _finish(complete) -> int:
     try:
-        tr.complete_weblogin()
+        complete()
     except (ValueError, TimeoutError) as exc:
         # pytr raises ValueError for a rejected/gone/unexpected login process and
         # TimeoutError when it expires unapproved.
@@ -110,8 +114,44 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"complete_weblogin failed: {exc}", file=sys.stderr)
         return EXIT_FAILED
-
     return EXIT_OK
+
+
+def _retryable_code_errors() -> set:
+    """The messages pytr raises for a code Trade Republic refused (before any polling)."""
+    errors = getattr(sys.modules.get("pytr.api"), "LOGIN_ERRORS", None) or {}
+    return {
+        errors[key]
+        for key in ("VALIDATION_CODE_INVALID", "VALIDATION_CODE_ALREADY_USED")
+        if key in errors
+    }
+
+
+def _complete_with_code(tr) -> int:
+    """Authenticator-app login: read codes from stdin until one is accepted."""
+    retryable = _retryable_code_errors()
+    for _ in range(MAX_CODE_ATTEMPTS):
+        line = sys.stdin.readline()
+        if not line:
+            print("stdin closed before an authenticator code arrived", file=sys.stderr)
+            return EXIT_FAILED
+        code = line.strip()
+        try:
+            tr.complete_weblogin(verify_code=code)
+            return EXIT_OK
+        except ValueError as exc:
+            if str(exc) not in retryable:
+                print(f"login not approved: {exc}", file=sys.stderr)
+                return EXIT_NOT_APPROVED
+            print(json.dumps({"status": "code_invalid"}), flush=True)
+        except TimeoutError as exc:
+            print(f"login not approved: {exc}", file=sys.stderr)
+            return EXIT_NOT_APPROVED
+        except Exception as exc:  # noqa: BLE001
+            print(f"complete_weblogin failed: {exc}", file=sys.stderr)
+            return EXIT_FAILED
+    print("too many invalid authenticator codes", file=sys.stderr)
+    return EXIT_NOT_APPROVED
 
 
 if __name__ == "__main__":

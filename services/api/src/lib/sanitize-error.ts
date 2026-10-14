@@ -1,6 +1,8 @@
 import {
   PytrApprovalError,
   PytrAuthError,
+  PytrCodeInvalidError,
+  PytrCodeRequiredError,
   PytrError,
   PytrUnavailableError,
 } from "../services/pytr/errors.js";
@@ -30,6 +32,9 @@ export function oneLine(raw: string): string {
 export function sanitizeConnectionError(err: unknown, fallback = "sync failed"): string {
   if (err instanceof PytrAuthError) return "Trade Republic session expired";
   if (err instanceof PytrApprovalError) return "Trade Republic login was not approved";
+  if (err instanceof PytrCodeInvalidError)
+    return "Trade Republic authenticator code was not accepted";
+  if (err instanceof PytrCodeRequiredError) return "Trade Republic authenticator code is required";
   if (err instanceof PytrUnavailableError) return "pytr is not available";
   if (err instanceof PytrError) {
     // PytrError carries raw subprocess stderr. Both branches return a FIXED literal, never

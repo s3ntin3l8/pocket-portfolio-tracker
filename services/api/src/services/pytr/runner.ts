@@ -3,7 +3,8 @@
 export {
   PytrApprovalError,
   PytrAuthError,
-  PytrAuthenticatorRequiredError,
+  PytrCodeInvalidError,
+  PytrCodeRequiredError,
   PytrError,
   PytrUnavailableError,
 } from "./errors.js";

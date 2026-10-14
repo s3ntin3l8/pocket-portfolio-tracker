@@ -8,7 +8,8 @@ import {
   PytrUnavailableError,
   PytrAuthError,
   PytrApprovalError,
-  PytrAuthenticatorRequiredError,
+  PytrCodeInvalidError,
+  PytrCodeRequiredError,
   PytrError,
   type SpawnFn,
 } from "../../src/services/pytr/runner.js";
@@ -94,7 +95,7 @@ describe("PytrRunner pairing", () => {
 
     // The init line carries the processId (push sent) — no SMS countdown in the v2 flow.
     child.emitLine('{"processId":"pid-1","status":"awaiting_approval"}\n');
-    expect(await startP).toEqual({ processId: "pid-1" });
+    expect(await startP).toEqual({ processId: "pid-1", method: "push" });
     expect(runner.hasPendingPairing("u1")).toBe(true);
 
     const approvalP = runner.awaitApproval("u1");
@@ -178,14 +179,83 @@ describe("PytrRunner pairing", () => {
     await expect(approvalP).rejects.toThrow(PytrApprovalError);
   });
 
-  it("rejects startPairing with PytrAuthenticatorRequiredError on exit 4 (TOTP account)", async () => {
-    const { spawn, nextChild } = makeSpawn();
-    const runner = makeRunner(spawn);
-    const startP = runner.startPairing("u1", { phone: "+49", pin: "1" });
-    const child = await nextChild();
-    child.stderr.emit("data", Buffer.from("this account uses an authenticator app"));
-    child.emit("exit", 4);
-    await expect(startP).rejects.toThrow(PytrAuthenticatorRequiredError);
+  describe("authenticator-app (TOTP) pairing", () => {
+    async function startTotp(runner: PytrRunner, nextChild: () => Promise<FakeChild>) {
+      const startP = runner.startPairing("u1", { phone: "+49", pin: "1" });
+      const child = await nextChild();
+      child.emitLine('{"processId":"p","status":"awaiting_code"}\n');
+      return { child, started: await startP };
+    }
+
+    it("resolves with the authenticator method on awaiting_code, push otherwise", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      const { started } = await startTotp(runner, nextChild);
+      expect(started).toEqual({ processId: "p", method: "authenticator" });
+      expect(runner.pairingMethod("u1")).toBe("authenticator");
+      expect(runner.pairingMethod("nobody")).toBeNull();
+
+      const second = runner.startPairing("u2", { phone: "+49", pin: "1" });
+      (await nextChild()).emitLine('{"processId":"q","status":"awaiting_approval"}\n');
+      expect(await second).toEqual({ processId: "q", method: "push" });
+    });
+
+    it("rejects a verify without a code and keeps the pairing pending", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      await startTotp(runner, nextChild);
+      await expect(runner.awaitApproval("u1")).rejects.toThrow(PytrCodeRequiredError);
+      expect(runner.hasPendingPairing("u1")).toBe(true);
+    });
+
+    it("writes the code to stdin and resolves with the session on a clean exit", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      const { child } = await startTotp(runner, nextChild);
+      const approval = runner.awaitApproval("u1", "123456");
+      expect(child.stdin.write).toHaveBeenCalledWith("123456\n", expect.any(Function));
+      await writeFile(child.cookiesFile()!, "COOKIES");
+      child.emit("exit", 0);
+      await expect(approval).resolves.toBe("COOKIES");
+    });
+
+    it("rejects the verify when the code cannot be written to the login process", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      const { child } = await startTotp(runner, nextChild);
+      child.stdin.write.mockImplementation((_d: string, cb: (e?: Error) => void) =>
+        cb(new Error("EPIPE")),
+      );
+      await expect(runner.awaitApproval("u1", "123456")).rejects.toThrow(PytrError);
+      expect(runner.hasPendingPairing("u1")).toBe(true);
+    });
+
+    it("code_invalid rejects only that verify; the next code goes to the same login", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      const { child } = await startTotp(runner, nextChild);
+      const first = runner.awaitApproval("u1", "111111");
+      child.emitLine('{"status":"code_invalid"}\n');
+      await expect(first).rejects.toThrow(PytrCodeInvalidError);
+      expect(runner.hasPendingPairing("u1")).toBe(true);
+      expect(child.kill).not.toHaveBeenCalled();
+
+      const second = runner.awaitApproval("u1", "222222");
+      expect(child.stdin.write).toHaveBeenLastCalledWith("222222\n", expect.any(Function));
+      await writeFile(child.cookiesFile()!, "COOKIES");
+      child.emit("exit", 0);
+      await expect(second).resolves.toBe("COOKIES");
+    });
+
+    it("rejects with PytrApprovalError when the attempts run out (exit 3)", async () => {
+      const { spawn, nextChild } = makeSpawn();
+      const runner = makeRunner(spawn);
+      const { child } = await startTotp(runner, nextChild);
+      const approval = runner.awaitApproval("u1", "111111");
+      child.stderr.emit("data", Buffer.from("too many invalid authenticator codes"));
+      child.emit("exit", 3);
+      await expect(approval).rejects.toThrow(PytrApprovalError);
+    });
   });
 
   it("times out a pairing that is never approved", async () => {

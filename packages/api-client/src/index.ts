@@ -2027,6 +2027,8 @@ export interface TrConnection {
   lastReconciliation: CashReconciliation | null;
   /** True while a background sync job is running. Poll GET /tr/connection to observe. */
   syncing: boolean;
+  /** How the in-flight pairing signs in (`authenticator` = needs a code); null when none. */
+  pairingMethod?: "push" | "authenticator" | null;
 }
 
 export interface TrConnectInput {
@@ -3235,10 +3237,16 @@ export function createApiClient(config: ApiClientConfig) {
     // --- Trade Republic ---
     getTrConnection: () => request<TrConnection>("GET", "/tr/connection"),
     connectTr: (input: TrConnectInput) =>
-      request<{ status: TrStatus }>("POST", "/tr/connection", input),
-    // No code in the v2 push-approval flow: this long-polls until the user approves the
-    // login in the TR mobile app (or it is declined / the window expires).
-    verifyTr: () => request<{ status: TrStatus }>("POST", "/tr/connection/verify"),
+      request<{ status: TrStatus; method: "push" | "authenticator" }>(
+        "POST",
+        "/tr/connection",
+        input,
+      ),
+    // Push accounts send no code: this long-polls until the user approves the login in the TR
+    // mobile app (or it is declined / the window expires). Authenticator-app accounts pass
+    // the 6-digit `code`; a refused code fails with `code_invalid` and can be retried.
+    verifyTr: (input?: { code: string }) =>
+      request<{ status: TrStatus }>("POST", "/tr/connection/verify", input),
     syncTr: () => request<{ queued: boolean } | TrSyncResult>("POST", "/tr/connection/sync"),
     reimportTr: () => request<{ removed: number }>("POST", "/tr/connection/reimport"),
     reprocessTrDocuments: () =>

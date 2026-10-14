@@ -9,13 +9,15 @@ import { runProcess, readLines, safeRm, type SpawnFn } from "../process.js";
 import {
   PytrApprovalError,
   PytrAuthError,
-  PytrAuthenticatorRequiredError,
+  PytrCodeInvalidError,
+  PytrCodeRequiredError,
   PytrError,
   PytrUnavailableError,
 } from "../errors.js";
 import type {
   DocDownloadResult,
   DownloadDocumentsResult,
+  PairingMethod,
   PendingPairing,
   PytrRunnerOptions,
   RawTrEvent,
@@ -51,7 +53,7 @@ export class PytrRunner {
   async startPairing(
     userId: string,
     input: { phone: string; pin: string; wafToken?: string },
-  ): Promise<{ processId: string }> {
+  ): Promise<{ processId: string; method: PairingMethod }> {
     if (!this.opts.enabled) throw new PytrUnavailableError();
     this.cancelPairing(userId);
 
@@ -93,14 +95,15 @@ export class PytrRunner {
       "pytr pairing spawned",
     );
 
-    return new Promise<{ processId: string }>((resolve, reject) => {
+    return new Promise<{ processId: string; method: PairingMethod }>((resolve, reject) => {
       const entry: PendingPairing = {
+        method: "push",
         child,
         cookiesFile,
         tmpDir,
         stderr: "",
         onInit: {
-          resolve: (processId) => resolve({ processId }),
+          resolve: (processId) => resolve({ processId, method: entry.method }),
           reject,
         },
         onApproval: null,
@@ -115,6 +118,10 @@ export class PytrRunner {
       child.stderr?.on("data", (d: Buffer) => {
         entry.stderr += d.toString();
       });
+      // A write to a login process that already exited surfaces here (EPIPE); without a
+      // listener it would be an unhandled 'error' event. The awaitApproval write callback
+      // rejects the caller, and onPairExit reports the exit itself.
+      child.stdin?.on?.("error", (err) => this.log?.warn({ userId, err }, "pytr stdin error"));
       child.on("error", (err) => this.failPairing(userId, err));
       child.on("exit", (code) => this.onPairExit(userId, code));
     });
@@ -122,17 +129,30 @@ export class PytrRunner {
 
   private onPairLine(userId: string, line: string): void {
     const entry = this.pending.get(userId);
-    if (!entry?.onInit) return;
+    if (!entry) return;
     let parsed: { processId?: unknown; status?: unknown };
     try {
       parsed = JSON.parse(line);
     } catch {
       return;
     }
-    if (typeof parsed.processId === "string" && parsed.processId) {
-      const { resolve } = entry.onInit;
-      entry.onInit = null;
-      resolve(parsed.processId);
+    if (entry.onInit) {
+      if (typeof parsed.processId === "string" && parsed.processId) {
+        const { resolve } = entry.onInit;
+        entry.onInit = null;
+        // Set the method BEFORE resolving: the resolve callback reads entry.method.
+        entry.method = parsed.status === "awaiting_code" ? "authenticator" : "push";
+        resolve(parsed.processId);
+      }
+      return;
+    }
+    // Only the first line (processId + method) is read above; a later awaiting_code is ignored.
+    // Trade Republic refused an authenticator code: fail this verify only. The login process
+    // stays alive and waits for the next code on stdin.
+    if (parsed.status === "code_invalid" && entry.method === "authenticator" && entry.onApproval) {
+      const { reject } = entry.onApproval;
+      entry.onApproval = null;
+      reject(new PytrCodeInvalidError());
     }
   }
 
@@ -157,12 +177,7 @@ export class PytrRunner {
             "pytr pairing exited nonzero",
           );
           const msg = entry.stderr.trim() || `pytr login exited with code ${code}`;
-          const err =
-            code === 3
-              ? new PytrApprovalError(msg)
-              : code === 4
-                ? new PytrAuthenticatorRequiredError(msg)
-                : new PytrError(msg);
+          const err = code === 3 ? new PytrApprovalError(msg) : new PytrError(msg);
           entry.onInit?.reject(err);
           entry.onInit = null;
           if (entry.onApproval) {
@@ -210,7 +225,17 @@ export class PytrRunner {
     return this.pending.has(userId);
   }
 
-  awaitApproval(userId: string): Promise<string> {
+  /** How the pending pairing signs in, or null when none is in progress. */
+  pairingMethod(userId: string): PairingMethod | null {
+    return this.pending.get(userId)?.method ?? null;
+  }
+
+  /**
+   * Wait for the pairing to complete. For an authenticator-app pairing `code` is the 6-digit
+   * code to submit first; a refused code rejects with PytrCodeInvalidError and leaves the
+   * pairing pending so the caller can try again.
+   */
+  awaitApproval(userId: string, code?: string): Promise<string> {
     const entry = this.pending.get(userId);
     if (!entry) {
       return Promise.reject(new PytrError("no pairing in progress"));
@@ -221,6 +246,18 @@ export class PytrRunner {
       return "sessionData" in settled
         ? Promise.resolve(settled.sessionData)
         : Promise.reject(settled.error);
+    }
+    if (entry.method === "authenticator") {
+      if (!code) return Promise.reject(new PytrCodeRequiredError());
+      return new Promise<string>((resolve, reject) => {
+        entry.onApproval = { resolve, reject };
+        entry.child.stdin?.write(`${code}\n`, (err) => {
+          if (!err) return;
+          // The login process is gone or its stdin closed: fail this verify now.
+          entry.onApproval = null;
+          reject(new PytrError("could not send the authenticator code"));
+        });
+      });
     }
     return new Promise<string>((resolve, reject) => {
       entry.onApproval = { resolve, reject };
