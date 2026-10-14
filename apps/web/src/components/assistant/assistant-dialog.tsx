@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { AssistantMarkdown } from "@/components/assistant/assistant-markdown";
-import { MAX_MESSAGE_CHARS, type ChatTurn, type ToolStep } from "@/lib/assistant-chat";
+import { MAX_MESSAGE_CHARS, displayText, type ChatTurn, type ToolStep } from "@/lib/assistant-chat";
 import { cn } from "@/lib/utils";
 
 export interface AssistantChatApi {
@@ -60,8 +60,9 @@ function Turn({ turn }: { turn: ChatTurn }) {
       </div>
     );
   }
-  const waiting = turn.pending && !turn.content && turn.steps.length === 0;
-  const stoppedEmpty = turn.stopped && !turn.content && !turn.error;
+  const text = displayText(turn);
+  const waiting = turn.pending && !text && turn.steps.length === 0;
+  const stoppedEmpty = turn.stopped && !text && !turn.error;
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] min-w-0 space-y-2 rounded-xl bg-muted px-3 py-2 text-sm">
@@ -79,7 +80,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
           </p>
         )}
         {stoppedEmpty && <p className="text-xs text-text-2">{t("stopped")}</p>}
-        {turn.content && <AssistantMarkdown text={turn.content} />}
+        {text && <AssistantMarkdown text={text} />}
         {turn.error && (
           <p role="alert" className="text-xs font-semibold text-destructive">
             {t(`errors.${turn.error}`)}

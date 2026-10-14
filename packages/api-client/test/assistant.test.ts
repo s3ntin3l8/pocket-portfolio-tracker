@@ -206,3 +206,21 @@ describe("createApiClient assistant methods", () => {
     expect(err).toMatchObject({ status, body });
   });
 });
+
+describe("delta events", () => {
+  it("are parsed as a known event type", async () => {
+    const events = [];
+    for await (const e of parseAssistantStream(
+      bodyOf([
+        enc.encode(
+          'event: delta\ndata: {"text":"Hel"}\n\nevent: message\ndata: {"text":"Hello"}\n\n',
+        ),
+      ]),
+    ))
+      events.push(e);
+    expect(events).toEqual([
+      { type: "delta", text: "Hel" },
+      { type: "message", text: "Hello" },
+    ]);
+  });
+});
