@@ -14,6 +14,22 @@ const COLOUR_LITERAL =
 const colourMessage =
   "No colour literals (hex / rgb[a] / hsl[a]) — use a theme token from globals.css (e.g. bg-primary/15, var(--violet), tint() from @/lib/tint). See eslint.config.mjs for the allowlist.";
 
+// Arbitrary pixel/rem font sizes and radii bypass the named scale in `src/app/globals.css`
+// (@theme: text-micro/body-sm/body/heading/display/hero + xs/sm/base/lg, radius xs..xl).
+// Only literal px/rem/em values are matched, so `text-[clamp(...)]` and `text-[var(--x)]` pass.
+const SCALE_LITERAL = "\\b(?:text|rounded)-\\[[0-9.]+(?:px|rem|em)\\]";
+const scaleMessage =
+  "No arbitrary text-[Npx]/rounded-[Npx] — use the named type/radius scale from globals.css @theme (text-micro/body-sm/body/heading/display/hero, text-xs..lg, rounded-xs..xl).";
+const scaleRules = [
+  { selector: `Literal[value=/${SCALE_LITERAL}/]`, message: scaleMessage },
+  { selector: `TemplateElement[value.raw=/${SCALE_LITERAL}/]`, message: scaleMessage },
+];
+const colourAllowlist = [
+  "src/components/theme-color-sync.tsx",
+  "src/lib/brokerages.ts",
+  "src/app/[[]locale]/layout.tsx",
+];
+
 const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
@@ -42,11 +58,7 @@ const eslintConfig = [
     //    browser chrome outside the CSS cascade, so it cannot use var().
     //  - lib/brokerages.ts: hash-derived hsl() hues for unknown brokerages — computed per name
     //    at runtime, so there is no token to point at.
-    ignores: [
-      "src/components/theme-color-sync.tsx",
-      "src/lib/brokerages.ts",
-      "src/app/[[]locale]/layout.tsx",
-    ],
+    ignores: colourAllowlist,
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -58,8 +70,17 @@ const eslintConfig = [
           selector: `TemplateElement[value.raw=/${COLOUR_LITERAL}/]`,
           message: colourMessage,
         },
+        ...scaleRules,
       ],
     },
+  },
+  {
+    // Scale-only block (each file here is exempt from the colour rule above for a concrete
+    // reason - meta theme-color, hash-derived hues - none of which excuse an off-scale size
+    // or radius). Flat-config `no-restricted-syntax` entries replace (not merge), so this
+    // block carries only the scale rules for exactly the files the colour block skips.
+    files: colourAllowlist,
+    rules: { "no-restricted-syntax": ["error", ...scaleRules] },
   },
   {
     // public/ holds static assets + serwist's generated service worker (public/sw.js);
