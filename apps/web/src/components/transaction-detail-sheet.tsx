@@ -89,6 +89,9 @@ export function TransactionDetailSheet({
   const router = useRouter();
   const [clientRate, setClientRate] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // The "⋯" tooltip is suppressed while its dropdown is open so the two popups never stack.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuTipOpen, setMenuTipOpen] = useState(false);
 
   const { dismissing, deleting, statusBusy, dismissAnomaly, onDelete, downloadReceipt, setStatus } =
     useTransactionActions(api, router, tx);
@@ -170,8 +173,8 @@ export function TransactionDetailSheet({
   );
 
   const overflowMenu = hasOverflow && (
-    <DropdownMenu modal={false}>
-      <Tooltip>
+    <DropdownMenu modal={false} onOpenChange={setMenuOpen}>
+      <Tooltip open={menuTipOpen && !menuOpen} onOpenChange={setMenuTipOpen}>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
             <button type="button" className={iconBtn} aria-label={tm("actions")}>

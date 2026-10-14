@@ -128,6 +128,7 @@ export function RowActions({
         ) : (
           <>
             {imp.document && (
+              // Hover label is the filename on purpose; the accessible name stays "download receipt".
               <InfoTip label={imp.document.originalFilename ?? t("downloadReceipt")}>
                 <Button
                   size="icon"
