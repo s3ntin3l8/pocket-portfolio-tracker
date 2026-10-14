@@ -69,64 +69,70 @@ export async function bookDueInstallments(
   // Earliest day booked per portfolio → one recompute from there covers the whole batch.
   const earliestByPortfolio = new Map<string, string>();
 
-  for (const loan of loanRows) {
-    // Paid off early: the payoff repayment settled everything still owed.
-    if (loan.closedAt) continue;
-    const due = asScheduleRows(loan.schedule)
-      .filter(
-        (r) => !r.skipped && new Date(`${r.dueDate}T00:00:00.000Z`).getTime() <= now.getTime(),
-      )
-      .sort((a, b) => a.n - b.n);
-    if (due.length === 0) continue;
+  for (const candidate of loanRows) {
+    // One transaction per loan, under the same row lock the skip / payoff actions take, so a
+    // payoff (or schedule edit) racing this job can't compute its balance from a stale view
+    // and then have an installment booked underneath it.
+    await db.transaction(async (tx) => {
+      const [loan] = await tx.select().from(loans).where(eq(loans.id, candidate.id)).for("update");
+      // Gone, or paid off early: the payoff repayment settled everything still owed.
+      if (!loan || loan.closedAt) return;
+      const due = asScheduleRows(loan.schedule)
+        .filter(
+          (r) => !r.skipped && new Date(`${r.dueDate}T00:00:00.000Z`).getTime() <= now.getTime(),
+        )
+        .sort((a, b) => a.n - b.n);
+      if (due.length === 0) return;
 
-    // Only the financing legs matter (which installments are covered, the drawdown for its
-    // source), so the lookup stays one row per booked installment however long the loan ran.
-    const existing = await db
-      .select({
-        type: transactions.type,
-        source: transactions.source,
-        installmentN: transactions.installmentN,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.loanId, loan.id),
-          inArray(transactions.type, ["loan_repayment", "loan_drawdown"]),
+      // Only the financing legs matter (which installments are covered, the drawdown for its
+      // source), so the lookup stays one row per booked installment however long the loan ran.
+      const existing = await tx
+        .select({
+          type: transactions.type,
+          source: transactions.source,
+          installmentN: transactions.installmentN,
+        })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.loanId, loan.id),
+            inArray(transactions.type, ["loan_repayment", "loan_drawdown"]),
+          ),
+        );
+      const covered = new Set(
+        existing.flatMap((t) =>
+          t.type === "loan_repayment" && t.installmentN != null ? [t.installmentN] : [],
         ),
       );
-    const covered = new Set(
-      existing.flatMap((t) =>
-        t.type === "loan_repayment" && t.installmentN != null ? [t.installmentN] : [],
-      ),
-    );
-    // Inherit the contract's own source (screenshot/pdf/…) so the rows group with its legs.
-    const source = existing.find((t) => t.type === "loan_drawdown")?.source ?? "manual";
+      // Inherit the contract's own source (screenshot/pdf/…) so the rows group with its legs.
+      const source = existing.find((t) => t.type === "loan_drawdown")?.source ?? "manual";
 
-    for (const row of due.filter((r) => !covered.has(r.n))) {
-      const [written] = await db
-        .insert(transactions)
-        .values({
-          portfolioId: loan.portfolioId,
-          instrumentId: null,
-          type: "loan_repayment",
-          quantity: "0",
-          price: new Decimal(row.pokok).toString(),
-          fees: new Decimal(row.sewaModal).toString(),
-          currency: loan.currency,
-          executedAt: new Date(`${row.dueDate}T00:00:00.000Z`),
-          source,
-          importId: loan.importId,
-          loanId: loan.id,
-          installmentN: row.n,
-          externalId: `loan:${loan.id}:inst:${row.n}`,
-        })
-        .onConflictDoNothing()
-        .returning({ id: transactions.id });
-      if (!written) continue;
-      booked++;
-      const prev = earliestByPortfolio.get(loan.portfolioId);
-      if (!prev || row.dueDate < prev) earliestByPortfolio.set(loan.portfolioId, row.dueDate);
-    }
+      for (const row of due.filter((r) => !covered.has(r.n))) {
+        const [written] = await tx
+          .insert(transactions)
+          .values({
+            portfolioId: loan.portfolioId,
+            instrumentId: null,
+            type: "loan_repayment",
+            quantity: "0",
+            price: new Decimal(row.pokok).toString(),
+            fees: new Decimal(row.sewaModal).toString(),
+            currency: loan.currency,
+            executedAt: new Date(`${row.dueDate}T00:00:00.000Z`),
+            source,
+            importId: loan.importId,
+            loanId: loan.id,
+            installmentN: row.n,
+            externalId: `loan:${loan.id}:inst:${row.n}`,
+          })
+          .onConflictDoNothing()
+          .returning({ id: transactions.id });
+        if (!written) continue;
+        booked++;
+        const prev = earliestByPortfolio.get(loan.portfolioId);
+        if (!prev || row.dueDate < prev) earliestByPortfolio.set(loan.portfolioId, row.dueDate);
+      }
+    });
   }
 
   for (const [portfolioId, fromDate] of earliestByPortfolio) {

@@ -274,6 +274,39 @@ describe("loan routes (skip / payoff)", () => {
     expect(skippedNs(await loanRow(id))).toEqual([2, 3]);
   });
 
+  it("two concurrent payoffs: one wins, the other is refused (never a 500)", async () => {
+    const id = await mkLoan();
+    const pay = () =>
+      app.inject({
+        method: "POST",
+        url: url(id, "payoff"),
+        headers: auth(owner),
+        payload: { date: toDateKey(new Date()) },
+      });
+    const results = await Promise.all([pay(), pay()]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    const payoffs = (await repayments(id)).filter((t) => t.externalId === `loan:${id}:payoff`);
+    expect(payoffs).toHaveLength(1);
+  });
+
+  it("a payoff racing the booking job never repays more than is owed", async () => {
+    const id = await mkLoan(); // 3000 drawn, 1000 repaid; installments 2 and 3 are due
+    const [payoff, booked] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: url(id, "payoff"),
+        headers: auth(owner),
+        payload: { date: toDateKey(new Date()) },
+      }),
+      bookDueInstallments(app.db, new Date(), { loanId: id }),
+    ]);
+    // Either the job ran first (payoff finds nothing owed) or the payoff did (job books nothing).
+    expect([200, 409]).toContain(payoff.statusCode);
+    if (payoff.statusCode === 200) expect(booked.booked).toBe(0);
+    const paid = (await repayments(id)).reduce((sum, t) => sum + Number(t.price), 0);
+    expect(paid).toBe(3000);
+  });
+
   it("refuses a payoff when nothing is outstanding", async () => {
     const id = await mkLoan();
     await bookDueInstallments(app.db, new Date("2026-06-01T00:00:00Z"), { loanId: id });

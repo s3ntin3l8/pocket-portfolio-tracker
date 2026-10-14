@@ -165,26 +165,30 @@ export async function payoffLoan(
   input: { date: string; fees?: string },
   now: Date = new Date(),
 ): Promise<{ principal: string }> {
-  const loan = await loadLoan(db, portfolioId, loanId);
-  if (loan.closedAt) throw new LoanActionError(409, "loan_closed");
-  if (input.date > toDateKey(now)) throw new LoanActionError(400, "payoff_in_future");
+  // The whole decision — closed? how much is still owed? — runs under the loan's row lock
+  // (the booking job takes the same one), so two payoffs, or a payoff racing the job, can't
+  // both pass the checks or pay a balance an installment is about to change.
+  const principal = await db.transaction(async (tx) => {
+    const loan = await loadLoan(tx, portfolioId, loanId, { lock: true });
+    if (loan.closedAt) throw new LoanActionError(409, "loan_closed");
+    if (input.date > toDateKey(now)) throw new LoanActionError(400, "payoff_in_future");
 
-  const rows = await db.select().from(transactions).where(eq(transactions.loanId, loanId));
-  const legs = toCoreTxns(rows);
-  const lastRepayment = legs
-    .filter((t) => t.type === "loan_repayment")
-    .map((t) => toDateKey(t.executedAt))
-    .sort()
-    .pop();
-  // A payoff dated before a booked repayment would leave that repayment "after" the loan closed.
-  if (lastRepayment && input.date < lastRepayment) {
-    throw new LoanActionError(400, "payoff_before_last_repayment");
-  }
-  const outstanding = new Decimal(loanBalances(legs)[loanId] ?? "0");
-  if (outstanding.lte(0)) throw new LoanActionError(409, "nothing_outstanding");
+    const rows = await tx.select().from(transactions).where(eq(transactions.loanId, loanId));
+    const legs = toCoreTxns(rows);
+    const lastRepayment = legs
+      .filter((t) => t.type === "loan_repayment")
+      .map((t) => toDateKey(t.executedAt))
+      .sort()
+      .pop();
+    // A payoff dated before a booked repayment would leave that repayment "after" the loan
+    // closed.
+    if (lastRepayment && input.date < lastRepayment) {
+      throw new LoanActionError(400, "payoff_before_last_repayment");
+    }
+    const outstanding = new Decimal(loanBalances(legs)[loanId] ?? "0");
+    if (outstanding.lte(0)) throw new LoanActionError(409, "nothing_outstanding");
 
-  const source = rows.find((r) => r.type === "loan_drawdown")?.source ?? "manual";
-  await db.transaction(async (tx) => {
+    const source = rows.find((r) => r.type === "loan_drawdown")?.source ?? "manual";
     await tx.insert(transactions).values({
       portfolioId,
       instrumentId: null,
@@ -201,9 +205,10 @@ export async function payoffLoan(
       externalId: payoffExternalId(loanId),
     });
     await tx.update(loans).set({ closedAt: input.date }).where(eq(loans.id, loanId));
+    return outstanding.toString();
   });
   await enqueueRecompute(portfolioId, input.date);
-  return { principal: outstanding.toString() };
+  return { principal };
 }
 
 /** Undo an early payoff: remove the payoff repayment and resume booking the schedule. */
@@ -213,17 +218,18 @@ export async function reopenLoan(
   loanId: string,
   now: Date = new Date(),
 ): Promise<void> {
-  const loan = await loadLoan(db, portfolioId, loanId);
-  if (!loan.closedAt) throw new LoanActionError(409, "loan_not_closed");
-  await db.transaction(async (tx) => {
+  const closedAt = await db.transaction(async (tx) => {
+    const loan = await loadLoan(tx, portfolioId, loanId, { lock: true });
+    if (!loan.closedAt) throw new LoanActionError(409, "loan_not_closed");
     await tx
       .delete(transactions)
       .where(
         and(eq(transactions.loanId, loanId), eq(transactions.externalId, payoffExternalId(loanId))),
       );
     await tx.update(loans).set({ closedAt: null }).where(eq(loans.id, loanId));
+    return loan.closedAt;
   });
   // `closedAt` is cleared and committed, so even if booking fails the next daily run books it.
   await bookDueInstallments(db, now, { loanId });
-  await enqueueRecompute(portfolioId, loan.closedAt);
+  await enqueueRecompute(portfolioId, closedAt);
 }
