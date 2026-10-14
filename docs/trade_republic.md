@@ -47,6 +47,11 @@ approved / expired, `4` the account signs in with an **authenticator app (TOTP)*
 pairing cannot collect yet (the Connect flow answers 422 `tr_authenticator_unsupported`),
 `1` anything else.
 
+If pairing fails with exit `3` and stderr says `Unexpected login process status`, Trade Republic
+answered the approval poll with a status pytr doesn't treat as pending or confirmed. The previous
+vendored login tolerated a response with no terminal state if it set a session cookie; pytr's
+does not.
+
 If Trade Republic starts rejecting pytr's built-in web-client values, override them without
 a code change via `PYTR_TR_APP_VERSION`, `PYTR_TR_PLATFORM` and `PYTR_TR_USER_AGENT` (passed
 through to the pytr subprocess; empty means pytr's default).
