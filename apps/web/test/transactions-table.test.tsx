@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor, act, within } from "@testing-librar
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
+// 98 tests, several rendering large tables / paginated drafts: ~5s each under CPU load,
+// which trips vitest's default 5s timeout on busy hosts and CI shards. Per-file only.
+vi.setConfig({ testTimeout: 20_000 });
+
 const refresh = vi.fn();
 const push = vi.fn();
 // Mutable per-test "current route" — defaults to Activity's own path. Tests that need to
