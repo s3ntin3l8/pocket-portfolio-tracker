@@ -25,9 +25,16 @@ function controllable() {
     wake?.();
     wake = null;
   };
-  async function* iterator(): AsyncGenerator<AssistantEvent> {
+  // Like a real fetch body: aborting the request makes the read reject.
+  async function* iterator(signal?: AbortSignal): AsyncGenerator<AssistantEvent> {
+    const aborted = new Promise<never>((_resolve, reject) => {
+      const fail = () => reject(new DOMException("aborted", "AbortError"));
+      if (signal?.aborted) fail();
+      else signal?.addEventListener("abort", fail, { once: true });
+    });
+    aborted.catch(() => undefined); // handled via the race below
     for (;;) {
-      await next();
+      await Promise.race([next(), aborted]);
       const item = queue.shift()!;
       if (item === "end") return;
       if (item instanceof Error) throw item;
@@ -57,7 +64,7 @@ const client = {
     (body: (typeof calls)[number]["body"], opts?: { signal?: AbortSignal }) => {
       calls.push({ body, signal: opts?.signal });
       const s = streams.shift() ?? controllable();
-      return s.iterator();
+      return s.iterator(opts?.signal);
     },
   ),
 };
@@ -222,6 +229,102 @@ describe("the chat panel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /New chat/ }));
     expect(screen.queryByText("Doing fine.")).toBeNull();
+  });
+});
+
+describe("answer outcomes", () => {
+  it("says so when the user stops before anything arrived (no empty bubble)", async () => {
+    streams.push(controllable());
+    render(<Shell />);
+    await openPanel();
+    type("hi");
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    expect(await screen.findByText("Stopped.")).toBeInTheDocument();
+  });
+
+  it("reports a stream that was cut off without done or an error", async () => {
+    const s = controllable();
+    streams.push(s);
+    render(<Shell />);
+    await openPanel();
+    type("hi");
+    s.push({ type: "message", text: "Half an ans" });
+    s.push("end"); // closed with no `done`
+    expect(await screen.findByRole("alert")).toHaveTextContent(/connection was interrupted/);
+    expect(screen.getByText("Half an ans")).toBeInTheDocument(); // the partial text is kept
+  });
+
+  it("reports a finished stream that produced no answer", async () => {
+    const s = controllable();
+    streams.push(s);
+    render(<Shell />);
+    await openPanel();
+    type("hi");
+    s.push({ type: "done", rounds: 1 });
+    s.push("end");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/didn't return an answer/);
+  });
+
+  it("queues an Explain question that arrives while an answer is streaming, instead of dropping it", async () => {
+    const running = controllable();
+    const explain = controllable();
+    streams.push(running, explain);
+    const gain: GainSummary = {
+      displayCurrency: "EUR",
+      boundary: "outside",
+      value: "1",
+      costOfOpen: "1",
+      netContributed: "1",
+      unrealized: "0",
+      realized: "0",
+      income: "0",
+    };
+    render(
+      <Shell>
+        <GainExplainer gain={gain} />
+      </Shell>,
+    );
+    await openPanel();
+    type("long running question");
+    await waitFor(() => expect(calls).toHaveLength(1));
+
+    // Close the panel, then ask the assistant to explain from the gain explainer.
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "How is this gain calculated?" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Ask the assistant to explain/ }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toHaveLength(1); // still waiting for the running answer
+
+    running.push({ type: "message", text: "first answer" });
+    running.push({ type: "done", rounds: 1 });
+    running.push("end");
+    await waitFor(() => expect(calls).toHaveLength(2)); // now it is sent
+    expect(calls[1]!.body.messages.at(-1)!.content).toMatch(/Explain my gain figures/);
+    explain.push("end");
+  });
+});
+
+describe("keyboard focus", () => {
+  it("puts the cursor in the composer on desktop widths", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes("min-width: 768px"),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+      onchange: null,
+    })) as typeof window.matchMedia;
+    try {
+      render(<Shell />);
+      await openPanel();
+      await waitFor(() => expect(screen.getByLabelText("Message to the assistant")).toHaveFocus());
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 

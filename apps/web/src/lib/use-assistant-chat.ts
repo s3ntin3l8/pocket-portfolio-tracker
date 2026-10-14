@@ -41,10 +41,11 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     [commit],
   );
 
+  /** Starts an answer; returns false (and does nothing) when one is already streaming. */
   const send = useCallback(
-    async (raw: string) => {
+    (raw: string): boolean => {
       const text = raw.trim().slice(0, MAX_MESSAGE_CHARS);
-      if (!text || abortRef.current) return;
+      if (!text || abortRef.current) return false;
 
       const history = [
         ...turnsRef.current,
@@ -62,23 +63,44 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
       // `abortRef.current !== ac` means this send was superseded (New chat, then a new
       // question): its late events must not touch the new conversation or its controller.
       const current = () => abortRef.current === ac;
-      try {
-        for await (const event of client.streamAssistantChat(
-          { messages: request, scope: getScope() },
-          { signal: ac.signal },
-        )) {
-          if (!current()) break;
-          patchLast((t) => applyEvent(t, event));
+      void (async () => {
+        let sawDone = false;
+        try {
+          for await (const event of client.streamAssistantChat(
+            { messages: request, scope: getScope() },
+            { signal: ac.signal },
+          )) {
+            if (!current()) break;
+            if (event.type === "done") sawDone = true;
+            patchLast((t) => applyEvent(t, event));
+          }
+          // A stream that ends without `done` or an error was cut off; one that ends with
+          // nothing to show would otherwise leave an empty bubble.
+          if (current() && !ac.signal.aborted) {
+            patchLast((t) =>
+              t.error
+                ? t
+                : !sawDone
+                  ? { ...t, error: "interrupted" }
+                  : t.content
+                    ? t
+                    : { ...t, error: "empty" },
+            );
+          }
+        } catch (err) {
+          if (!ac.signal.aborted && current()) {
+            patchLast((t) => ({ ...t, error: errorKeyFor(err) }));
+          }
+        } finally {
+          if (current()) {
+            const stopped = ac.signal.aborted;
+            abortRef.current = null;
+            setStreaming(false);
+            patchLast((t) => ({ ...t, pending: false, ...(stopped ? { stopped: true } : {}) }));
+          }
         }
-      } catch (err) {
-        if (!ac.signal.aborted && current()) patchLast((t) => ({ ...t, error: errorKeyFor(err) }));
-      } finally {
-        if (current()) {
-          abortRef.current = null;
-          setStreaming(false);
-          patchLast((t) => ({ ...t, pending: false }));
-        }
-      }
+      })();
+      return true;
     },
     [client, commit, getScope, patchLast],
   );

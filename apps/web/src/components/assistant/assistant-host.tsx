@@ -39,13 +39,14 @@ export default function AssistantHost({
   );
   const chat = useAssistantChat(client, getScope);
 
+  // A seeded question waits for a running answer to finish rather than being dropped; it is
+  // marked handled only once a send was actually accepted (so StrictMode can't double-send).
   const handledSeed = useRef(0);
-  const { send } = chat;
+  const { send, streaming } = chat;
   useEffect(() => {
-    if (!seed || seed.id === handledSeed.current) return;
-    handledSeed.current = seed.id;
-    send(seed.text);
-  }, [seed, send]);
+    if (!seed || seed.id === handledSeed.current || streaming) return;
+    if (send(seed.text)) handledSeed.current = seed.id;
+  }, [seed, send, streaming]);
 
   return <AssistantDialog open={open} onOpenChange={onOpenChange} chat={chat} status={status} />;
 }

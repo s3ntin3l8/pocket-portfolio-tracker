@@ -51,4 +51,42 @@ describe("AssistantMarkdown (model output is untrusted)", () => {
     expect(container.querySelectorAll("table th")).toHaveLength(2);
     expect(container.querySelectorAll("li")).toHaveLength(2);
   });
+  it("rejects entity-encoded protocol-relative, backslash and whitespace-led link targets", () => {
+    const { container } = render(
+      <AssistantMarkdown
+        text={[
+          "[a](/&#47;evil.example)",
+          "[b](/&sol;evil.example)",
+          "[c](&#47;/evil.example)",
+          "[d](<\t//evil.example>)",
+          "[e](<  //evil.example>)",
+          "[f](/\\evil.example)",
+        ].join("\n\n")}
+      />,
+    );
+    for (const a of container.querySelectorAll("a")) {
+      expect(a.getAttribute("href")).not.toMatch(/^\/\//); // never protocol-relative
+      expect(a.getAttribute("href")).not.toMatch(/^\s/);
+    }
+  });
+
+  it("drops reference-style images and never fetches through reference links", () => {
+    const { container } = render(
+      <AssistantMarkdown
+        text={"![alt][ref]\n\n[click][ref]\n\n[ref]: https://evil.example/leak.png"}
+      />,
+    );
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.innerHTML).not.toContain("<img");
+  });
+
+  it("autolinks stay click-only and hardened", () => {
+    const { container } = render(
+      <AssistantMarkdown text={"see https://example.com/x and <https://example.org>"} />,
+    );
+    for (const a of container.querySelectorAll("a")) {
+      expect(a.getAttribute("rel")).toContain("noopener");
+      expect(a.getAttribute("referrerpolicy")).toBe("no-referrer");
+    }
+  });
 });

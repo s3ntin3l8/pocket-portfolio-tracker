@@ -2623,6 +2623,7 @@
     "send": "Kirim",
     "stop": "Berhenti",
     "thinking": "Sedang berpikir…",
+    "stopped": "Dihentikan.",
     "disclosureCloud": "Jawaban memakai angka portofolio Anda, yang dikirim ke {provider} untuk menyusun balasan. Nomor rekening dan IBAN tidak pernah dibagikan.",
     "disclosureLocal": "Berjalan di server Anda sendiri — data tetap di infrastruktur Anda. Nomor rekening dan IBAN tidak pernah dibagikan.",
     "disclaimer": "Hanya penjelasan — bukan nasihat keuangan, pajak, atau hukum. Periksa angka penting di aplikasi.",
@@ -2650,6 +2651,8 @@
     },
     "errors": {
       "generic": "Terjadi kesalahan. Silakan coba lagi.",
+      "empty": "Asisten tidak memberikan jawaban. Silakan coba lagi.",
+      "interrupted": "Koneksi terputus sebelum jawaban selesai.",
       "network": "Tidak dapat menghubungi asisten. Periksa koneksi Anda lalu coba lagi.",
       "provider_error": "Penyedia AI mengembalikan kesalahan. Silakan coba lagi sebentar lagi.",
       "provider_unreachable": "Tidak dapat menghubungi penyedia AI. Silakan coba lagi sebentar lagi.",

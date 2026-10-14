@@ -22,6 +22,8 @@ export interface ChatTurn {
   error?: string;
   /** True while the answer is still streaming in. */
   pending?: boolean;
+  /** True when the user stopped the answer (it keeps whatever had arrived). */
+  stopped?: boolean;
 }
 
 /**

@@ -112,6 +112,25 @@ describe("parseAssistantStream", () => {
   });
 });
 
+describe("parseAssistantStream hardening", () => {
+  it("lets the SSE event name win over a `type` key smuggled into the payload", async () => {
+    const events = await collect(
+      parseAssistantStream(
+        bodyOf([enc.encode('event: message\ndata: {"type":"error","text":"hi"}\n\n')]),
+      ),
+    );
+    expect(events).toEqual([{ type: "message", text: "hi" }]);
+  });
+
+  it("refuses a frame that never ends instead of buffering it forever", async () => {
+    const chunk = enc.encode("data: " + "x".repeat(200_000));
+    const body = bodyOf(Array.from({ length: 8 }, () => chunk)); // 1.6M chars, no blank line
+    await expect(collect(parseAssistantStream(body))).rejects.toThrow(
+      "assistant_stream_frame_too_large",
+    );
+  });
+});
+
 describe("createApiClient assistant methods", () => {
   it("getAssistantStatus reads /assistant/status", async () => {
     const status = { available: true, provider: "ollama", label: "Ollama (local)", local: true };

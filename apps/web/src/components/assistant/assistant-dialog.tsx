@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 export interface AssistantChatApi {
   turns: ChatTurn[];
   streaming: boolean;
-  send: (text: string) => void;
+  send: (text: string) => boolean;
   stop: () => void;
   reset: () => void;
 }
@@ -61,6 +61,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
     );
   }
   const waiting = turn.pending && !turn.content && turn.steps.length === 0;
+  const stoppedEmpty = turn.stopped && !turn.content && !turn.error;
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] min-w-0 space-y-2 rounded-xl bg-muted px-3 py-2 text-sm">
@@ -77,6 +78,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
             {t("thinking")}
           </p>
         )}
+        {stoppedEmpty && <p className="text-xs text-text-2">{t("stopped")}</p>}
         {turn.content && <AssistantMarkdown text={turn.content} />}
         {turn.error && (
           <p role="alert" className="text-xs font-semibold text-destructive">
@@ -103,6 +105,7 @@ export function AssistantDialog({
   const t = useTranslations("Assistant");
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Keep the newest content in view as the answer streams in.
   useEffect(() => {
@@ -129,6 +132,7 @@ export function AssistantDialog({
       className="flex w-full items-end gap-2"
     >
       <textarea
+        ref={inputRef}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
@@ -163,7 +167,19 @@ export function AssistantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md" mobileHeader={{ title: t("title") }} footer={composer}>
+      <DialogContent
+        size="md"
+        mobileHeader={{ title: t("title") }}
+        footer={composer}
+        onOpenAutoFocus={(e) => {
+          // Desktop: start typing right away. On touch layouts leave focus alone — focusing
+          // the field would raise the keyboard over the suggestions.
+          if (window.matchMedia?.("(min-width: 768px)").matches) {
+            e.preventDefault();
+            inputRef.current?.focus();
+          }
+        }}
+      >
         <DialogHeader className="px-4 pt-4 md:px-6 md:pt-6">
           <div className="flex items-start justify-between gap-3">
             {/* The mobile header already shows the title; this stays as the one accessible name. */}

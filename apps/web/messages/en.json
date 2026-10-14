@@ -2623,6 +2623,7 @@
     "send": "Send",
     "stop": "Stop",
     "thinking": "Thinking…",
+    "stopped": "Stopped.",
     "disclosureCloud": "Answers use your portfolio figures, sent to {provider} to generate the reply. Account numbers and IBANs are never shared.",
     "disclosureLocal": "Runs on your own server — your data stays on your infrastructure. Account numbers and IBANs are never shared.",
     "disclaimer": "Explanations only — not financial, tax or legal advice. Check important figures in the app.",
@@ -2650,6 +2651,8 @@
     },
     "errors": {
       "generic": "Something went wrong. Please try again.",
+      "empty": "The assistant didn't return an answer. Please try again.",
+      "interrupted": "The connection was interrupted before the answer finished.",
       "network": "Couldn't reach the assistant. Check your connection and try again.",
       "provider_error": "The AI provider returned an error. Please try again in a moment.",
       "provider_unreachable": "Couldn't reach the AI provider. Please try again in a moment.",

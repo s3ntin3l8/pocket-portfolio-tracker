@@ -34,6 +34,9 @@ export type AssistantEvent =
   | { type: "error"; error: string; status?: number }
   | { type: "done"; rounds: number };
 
+/** A frame with no delimiter must not grow without bound (the server never sends one this big). */
+const MAX_FRAME_CHARS = 1_000_000;
+
 const EVENT_TYPES = new Set<AssistantEvent["type"]>([
   "status",
   "tool_call",
@@ -58,7 +61,8 @@ function parseFrame(frame: string): AssistantEvent | null {
   if (data.length === 0 || !EVENT_TYPES.has(event as AssistantEvent["type"])) return null;
   try {
     const payload = JSON.parse(data.join("\n")) as Record<string, unknown>;
-    return { type: event, ...payload } as AssistantEvent;
+    // `type` last: the SSE event name decides, whatever the payload carries.
+    return { ...payload, type: event } as AssistantEvent;
   } catch {
     return null; // a malformed frame must not kill the stream
   }
@@ -82,6 +86,7 @@ export async function* parseAssistantStream(
       buffer += decoder.decode(value, { stream: !done });
       const frames = buffer.split(/\r?\n\r?\n/);
       buffer = frames.pop() ?? "";
+      if (buffer.length > MAX_FRAME_CHARS) throw new Error("assistant_stream_frame_too_large");
       for (const frame of frames) {
         const event = parseFrame(frame);
         if (event) yield event;
