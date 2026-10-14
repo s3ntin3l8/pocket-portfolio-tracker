@@ -2,20 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, Check, SlidersHorizontal } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { SlidersHorizontal } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { CHIP_BASE, CHIP_ACTIVE, CHIP_INACTIVE } from "@/components/ui/table";
 import {
   TableToolbar,
   TOOLBAR_FILTERS_DESKTOP_ONLY,
   ToolbarSearch,
 } from "@/components/table-toolbar";
+import { FilterChip, YearFilterDropdown } from "@/components/filter-bar";
 import { cn } from "@/lib/utils";
 
 export function FilterBar({
@@ -96,18 +90,13 @@ export function FilterBar({
           ["income", tBanner("chipIncome")],
         ] as const
       ).map(([key, label]) => (
-        <button
+        <FilterChip
           key={key}
-          type="button"
+          active={key === "all" ? !typeFilter : typeFilter === key}
           onClick={() => onNavigateWithParam("type", key === "all" ? undefined : key)}
-          aria-pressed={key === "all" ? !typeFilter : typeFilter === key}
-          className={cn(
-            CHIP_BASE,
-            (key === "all" ? !typeFilter : typeFilter === key) ? CHIP_ACTIVE : CHIP_INACTIVE,
-          )}
         >
           {label}
-        </button>
+        </FilterChip>
       ))}
       {flaggedCount > 0 && (
         <button
@@ -178,20 +167,13 @@ export function FilterBar({
               </p>
               <div className="flex flex-wrap gap-2">
                 {["all", ...yearOptions].map((y) => (
-                  <button
+                  <FilterChip
                     key={y}
-                    type="button"
+                    active={y === "all" ? !yearFilterProp : yearFilterProp === y}
                     onClick={() => onNavigateWithParam("year", y === "all" ? undefined : y)}
-                    aria-pressed={y === "all" ? !yearFilterProp : yearFilterProp === y}
-                    className={cn(
-                      CHIP_BASE,
-                      (y === "all" ? !yearFilterProp : yearFilterProp === y)
-                        ? CHIP_ACTIVE
-                        : CHIP_INACTIVE,
-                    )}
                   >
                     {y === "all" ? t("allYears") : y}
-                  </button>
+                  </FilterChip>
                 ))}
               </div>
             </div>
@@ -204,15 +186,13 @@ export function FilterBar({
               </p>
               <div className="flex gap-2">
                 {(["all", "drafts"] as const).map((v) => (
-                  <button
+                  <FilterChip
                     key={v}
-                    type="button"
+                    active={draftFilter === v}
                     onClick={() => onDraftFilterChange(v)}
-                    aria-pressed={draftFilter === v}
-                    className={cn(CHIP_BASE, draftFilter === v ? CHIP_ACTIVE : CHIP_INACTIVE)}
                   >
                     {v === "all" ? t("draftShowAll") : t("draftOnly", { count: draftCount })}
-                  </button>
+                  </FilterChip>
                 ))}
               </div>
             </div>
@@ -242,32 +222,13 @@ export function FilterBar({
         <div className={TOOLBAR_FILTERS_DESKTOP_ONLY}>
           {typeChips}
           {yearOptions.length > 1 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={t("filterYear")}
-                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {yearFilterProp ?? t("allYears")}
-                  <ChevronDown className="size-3.5 shrink-0 text-text-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[9rem]">
-                {["all", ...yearOptions].map((y) => (
-                  <DropdownMenuItem
-                    key={y}
-                    onSelect={() => onNavigateWithParam("year", y === "all" ? undefined : y)}
-                    className="justify-between gap-3"
-                  >
-                    {y === "all" ? t("allYears") : y}
-                    {(y === "all" ? !yearFilterProp : yearFilterProp === y) && (
-                      <Check className="size-4 text-primary" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <YearFilterDropdown
+              value={yearFilterProp}
+              options={yearOptions}
+              onChange={(y) => onNavigateWithParam("year", y ?? undefined)}
+              label={t("filterYear")}
+              allLabel={t("allYears")}
+            />
           )}
           {(draftCount > 0 || draftFilter !== "all") && (
             <select
