@@ -1745,6 +1745,14 @@
       "installmentNone": "Tidak ada (seluruh pinjaman)",
       "installmentOption": "#{n} · jatuh tempo {date}",
       "loanLinkLocked": "Cicilan ini dibukukan otomatis oleh jadwal, sehingga tautan pinjamannya tidak dapat diubah.",
+      "loanErrors": {
+        "installment_already_paid": "Cicilan ini sudah memiliki pembayaran. Pilih cicilan lain atau kosongkan.",
+        "loan_closed": "Pinjaman ini sudah ditutup, sehingga tidak dapat menerima pembayaran baru.",
+        "currency_mismatch": "Mata uang pembayaran harus sama dengan mata uang pinjaman.",
+        "installment_not_found": "Cicilan tersebut tidak ada dalam jadwal pinjaman.",
+        "loan_not_found": "Pinjaman tersebut sudah tidak ada.",
+        "loan_link_locked": "Cicilan ini dibukukan otomatis oleh jadwal, sehingga tautan pinjamannya tidak dapat diubah."
+      },
       "customInstrumentToggle": "Tidak ditemukan? Tambahkan instrumen kustom"
     },
     "reassign": "Pindahkan"

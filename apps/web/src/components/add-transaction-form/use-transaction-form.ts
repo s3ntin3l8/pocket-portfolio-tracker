@@ -9,6 +9,7 @@ import type {
   Instrument,
   InstrumentSearchResult,
 } from "@portfolio/api-client";
+import { apiErrorCode } from "@portfolio/api-client";
 import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
 import {
   INCOME_TYPES,
@@ -444,8 +445,10 @@ export function useTransactionForm({
         await client.createTransaction(portfolioId, payload);
       }
       onSuccess?.();
-    } catch {
-      setError(t("error"));
+    } catch (err) {
+      // The API's loan-link rejections (a race with the installment job) get their own message.
+      const code = apiErrorCode(err);
+      setError(code && t.has(`loanErrors.${code}`) ? t(`loanErrors.${code}`) : t("error"));
     } finally {
       setBusy(false);
     }
