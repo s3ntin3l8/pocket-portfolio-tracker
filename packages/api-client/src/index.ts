@@ -1466,7 +1466,12 @@ export interface GoldPlanScheduleRow {
   pokok: string;
   sewaModal: string;
   angsuran: string;
+  /** A booked repayment settles this installment. */
   paid: boolean;
+  /** Skipped by the user: not booked; its principal stays owed. */
+  skipped: boolean;
+  /** The loan was paid off early and this installment wasn't paid on its own. */
+  closed: boolean;
   overdue: boolean;
 }
 
@@ -1488,6 +1493,8 @@ export interface GoldPlan {
   startDate: string;
   paidCount: number;
   remainingCount: number;
+  /** `YYYY-MM-DD` the loan was paid off early, or null. */
+  closedAt: string | null;
   paidPrincipal: string;
   paidMargin: string;
   outstandingPrincipal: string;
@@ -2612,6 +2619,20 @@ export function createApiClient(config: ApiClientConfig) {
     updatePortfolio: (portfolioId: string, input: Partial<PortfolioInput>) =>
       request<Portfolio>("PATCH", `/portfolios/${portfolioId}`, input),
     deletePortfolio: (portfolioId: string) => request<void>("DELETE", `/portfolios/${portfolioId}`),
+
+    // Financed-gold (cicilan) loans: depart from the repayment schedule.
+    skipInstallment: (portfolioId: string, loanId: string, n: number) =>
+      request<void>("POST", `/portfolios/${portfolioId}/loans/${loanId}/installments/${n}/skip`),
+    unskipInstallment: (portfolioId: string, loanId: string, n: number) =>
+      request<void>("DELETE", `/portfolios/${portfolioId}/loans/${loanId}/installments/${n}/skip`),
+    payoffLoan: (portfolioId: string, loanId: string, input: { date: string; fees?: string }) =>
+      request<{ principal: string }>(
+        "POST",
+        `/portfolios/${portfolioId}/loans/${loanId}/payoff`,
+        input,
+      ),
+    reopenLoan: (portfolioId: string, loanId: string) =>
+      request<void>("DELETE", `/portfolios/${portfolioId}/loans/${loanId}/payoff`),
 
     listAccountHolders: () => request<AccountHolder[]>("GET", "/account-holders"),
     createAccountHolder: (input: AccountHolderInput) =>

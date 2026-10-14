@@ -15,6 +15,8 @@ export interface ContractLeg {
   fees: string;
   currency: string;
   executedAt: Date;
+  /** The schedule installment a `repayment` leg settles. */
+  installmentN?: number;
 }
 
 /** Identity for the financed gold instrument (Galeri 24 buyback-valued, in grams). */
@@ -122,6 +124,7 @@ export function buildContractLegs(c: ParsedGoldContract, now: Date): ContractLeg
       fees: new Decimal(row.sewaModal).toString(),
       currency,
       executedAt: row.dueDate,
+      installmentN: row.n,
     });
   }
 

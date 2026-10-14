@@ -9,6 +9,8 @@ export const loanScheduleRowSchema = z.object({
   sewaModal: decimalString,
   angsuran: decimalString,
   sisaPokok: decimalString,
+  /** The user skipped this installment: the booking job must not (re-)book it. */
+  skipped: z.boolean().optional(),
 });
 export type LoanScheduleRow = z.infer<typeof loanScheduleRowSchema>;
 

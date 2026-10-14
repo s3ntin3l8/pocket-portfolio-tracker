@@ -115,6 +115,7 @@ describe("bookDueInstallments", () => {
         source: "pdf",
         importId,
         loanId,
+        installmentN: 1,
         externalId: `import:${importId}:loan:0:2`,
       },
     ]);
@@ -210,6 +211,7 @@ describe("bookDueInstallments", () => {
       executedAt: new Date("2026-01-13T00:00:00.000Z"),
       source: "manual",
       loanId: l.id,
+      installmentN: 1,
       externalId: "manual-late-1",
     });
 
@@ -220,6 +222,81 @@ describe("bookDueInstallments", () => {
     const rows = await db.select().from(transactions).where(eq(transactions.loanId, l.id));
     expect(rows.filter((t) => t.type === "loan_repayment")).toHaveLength(3);
     expect(rows.map((t) => t.externalId)).not.toContain(`loan:${l.id}:inst:1`);
+  });
+
+  const mkLoan = async (contractNo: string, extra: Partial<typeof loans.$inferInsert> = {}) => {
+    const [l] = await db
+      .insert(loans)
+      .values({
+        portfolioId,
+        instrumentId,
+        contractNo,
+        provider: "GALERI24",
+        purchasePrice: "3000",
+        principal: "3000",
+        tenorMonths: 3,
+        startDate: "2026-01-01",
+        schedule: [1, 2, 3].map((n) => ({
+          n,
+          dueDate: `2026-0${n}-10`,
+          pokok: "1000",
+          sewaModal: "0",
+          angsuran: "1000",
+          sisaPokok: String(3000 - n * 1000),
+        })),
+        currency: "IDR",
+        ...extra,
+      })
+      .returning();
+    return l;
+  };
+  const repaymentsOf = async (id: string) =>
+    (await db.select().from(transactions).where(eq(transactions.loanId, id)))
+      .filter((t) => t.type === "loan_repayment")
+      .sort((a, b) => (a.installmentN ?? 99) - (b.installmentN ?? 99));
+
+  it("an extra repayment that names no installment does not suppress a scheduled one", async () => {
+    const l = await mkLoan("EXTRA");
+    // A lump sum recorded against the loan, not tied to any installment.
+    await db.insert(transactions).values({
+      portfolioId,
+      instrumentId: null,
+      type: "loan_repayment",
+      quantity: "0",
+      price: "500",
+      fees: "0",
+      currency: "IDR",
+      executedAt: new Date("2026-01-05T00:00:00.000Z"),
+      source: "manual",
+      loanId: l.id,
+      externalId: "manual-extra",
+    });
+    const res = await bookDueInstallments(db, new Date("2026-03-20T00:00:00.000Z"), {
+      loanId: l.id,
+    });
+    expect(res.booked).toBe(3); // all three scheduled installments, unaffected by the extra
+    expect((await repaymentsOf(l.id)).map((t) => t.installmentN)).toEqual([1, 2, 3, null]);
+  });
+
+  it("never books a skipped installment, and keeps booking the others", async () => {
+    const l = await mkLoan("SKIP");
+    const schedule = (l.schedule as { n: number }[]).map((r) =>
+      r.n === 2 ? { ...r, skipped: true } : r,
+    );
+    await db.update(loans).set({ schedule }).where(eq(loans.id, l.id));
+    const now = new Date("2026-03-20T00:00:00.000Z");
+    expect((await bookDueInstallments(db, now, { loanId: l.id })).booked).toBe(2);
+    expect((await repaymentsOf(l.id)).map((t) => t.installmentN)).toEqual([1, 3]);
+    expect((await bookDueInstallments(db, now, { loanId: l.id })).booked).toBe(0);
+  });
+
+  it("books nothing for a loan that was paid off early", async () => {
+    const l = await mkLoan("CLOSED", { closedAt: "2026-01-20" });
+    const res = await bookDueInstallments(db, new Date("2026-06-01T00:00:00.000Z"), {
+      loanId: l.id,
+    });
+    expect(res.booked).toBe(0);
+    expect(await repaymentsOf(l.id)).toEqual([]);
   });
 
   it("skips loans without a schedule and honours the loanId filter", async () => {

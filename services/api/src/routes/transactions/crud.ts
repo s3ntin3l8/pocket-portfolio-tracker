@@ -9,6 +9,7 @@ import { reassignTransactions } from "../../services/reassign.js";
 import { mergeTransactions, previewMerge, MergeBlockedError } from "../../services/merge.js";
 import { deleteReceiptsForTransactions } from "../../storage/receipts.js";
 import { ownedPortfolio } from "../helpers.js";
+import { onLoanLegsDeleted } from "../../services/loan-actions.js";
 import type { PortfolioParams } from "./shared.js";
 import { bulkDeleteSchema } from "./shared.js";
 
@@ -57,10 +58,16 @@ export function registerCrudRoutes(app: FastifyInstance) {
     { preHandler: [app.authenticate, app.requirePortfolio] },
     async (request, reply) => {
       const { portfolioId, txId } = request.params;
-      const [deleted] = await app.db
-        .delete(transactions)
-        .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
-        .returning();
+      // Deleting an auto-booked installment (or a payoff) is a deliberate departure from the
+      // schedule: flag it in the same db transaction so the booking job doesn't undo it.
+      const deleted = await app.db.transaction(async (tx) => {
+        const [row] = await tx
+          .delete(transactions)
+          .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
+          .returning();
+        if (row) await onLoanLegsDeleted(tx, [row]);
+        return row;
+      });
       if (!deleted) {
         return reply.code(404).send({ error: "transaction_not_found" });
       }
@@ -80,14 +87,22 @@ export function registerCrudRoutes(app: FastifyInstance) {
     async (request) => {
       const { portfolioId } = request.params;
       const { ids } = bulkDeleteSchema.parse(request.body);
-      const deleted = await app.db
-        .delete(transactions)
-        .where(and(eq(transactions.portfolioId, portfolioId), inArray(transactions.id, ids)))
-        .returning({
-          id: transactions.id,
-          importId: transactions.importId,
-          executedAt: transactions.executedAt,
-        });
+      const deleted = await app.db.transaction(async (tx) => {
+        const rows = await tx
+          .delete(transactions)
+          .where(and(eq(transactions.portfolioId, portfolioId), inArray(transactions.id, ids)))
+          .returning({
+            id: transactions.id,
+            importId: transactions.importId,
+            executedAt: transactions.executedAt,
+            type: transactions.type,
+            loanId: transactions.loanId,
+            installmentN: transactions.installmentN,
+            externalId: transactions.externalId,
+          });
+        await onLoanLegsDeleted(tx, rows);
+        return rows;
+      });
       if (deleted.length > 0) {
         await deleteReceiptsForTransactions(
           app,

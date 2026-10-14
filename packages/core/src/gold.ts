@@ -19,6 +19,8 @@ export interface GoldPlanLoan {
   startDate: string;
   /** `loans.schedule` jsonb — validated row by row, anything malformed is ignored. */
   schedule: unknown;
+  /** `YYYY-MM-DD` of an early payoff (the remaining principal settled in one repayment). */
+  closedAt?: string | null;
 }
 
 export interface GoldPlanScheduleRow {
@@ -29,9 +31,13 @@ export interface GoldPlanScheduleRow {
   sewaModal: string;
   /** Installment total (principal + margin). */
   angsuran: string;
-  /** Covered by a booked repayment: the earliest N installments are paid, N = repayments booked. */
+  /** A booked repayment settles this installment (matched by `installmentN`). */
   paid: boolean;
-  /** Unpaid and past its due date. */
+  /** Deliberately skipped: not booked, and its principal stays owed until settled. */
+  skipped: boolean;
+  /** The loan was paid off early and this installment was never paid on its own. */
+  closed: boolean;
+  /** Unpaid, not skipped, loan still open, and past its due date. */
   overdue: boolean;
 }
 
@@ -52,6 +58,8 @@ export interface GoldPlanSummary {
   startDate: string;
   paidCount: number;
   remainingCount: number;
+  /** `YYYY-MM-DD` the loan was paid off early, or null while it runs to schedule. */
+  closedAt: string | null;
   paidPrincipal: string;
   paidMargin: string;
   /** Σ drawdown − Σ repayment principal (the same derivation as `loanBalances`). */
@@ -63,12 +71,19 @@ export interface GoldPlanSummary {
   completed: boolean;
 }
 
-function readSchedule(schedule: unknown): Omit<GoldPlanScheduleRow, "paid" | "overdue">[] {
+type ScheduleBase = Omit<GoldPlanScheduleRow, "paid" | "skipped" | "closed" | "overdue"> & {
+  /** The row carries the user's `skipped` flag in `loans.schedule`. */
+  flaggedSkipped: boolean;
+};
+
+function readSchedule(schedule: unknown): ScheduleBase[] {
   if (!Array.isArray(schedule)) return [];
-  const rows: Omit<GoldPlanScheduleRow, "paid" | "overdue">[] = [];
+  const rows: ScheduleBase[] = [];
   for (const r of schedule) {
     if (typeof r !== "object" || r === null) continue;
-    const { n, dueDate, pokok, sewaModal, angsuran } = r as Record<string, unknown>;
+    // `loans.schedule` is untyped jsonb; the row shape (incl. the `skipped` flag) is defined by
+    // `loanScheduleRowSchema` in @portfolio/schema — keep the two in step.
+    const { n, dueDate, pokok, sewaModal, angsuran, skipped } = r as Record<string, unknown>;
     if (
       typeof n === "number" &&
       typeof dueDate === "string" &&
@@ -81,6 +96,7 @@ function readSchedule(schedule: unknown): Omit<GoldPlanScheduleRow, "paid" | "ov
         pokok,
         sewaModal,
         angsuran: typeof angsuran === "string" ? angsuran : D(pokok).add(sewaModal).toString(),
+        flaggedSkipped: skipped === true,
       });
     }
   }
@@ -89,10 +105,12 @@ function readSchedule(schedule: unknown): Omit<GoldPlanScheduleRow, "paid" | "ov
 
 /**
  * Progress of one cicilan contract, derived from its schedule and the booked loan legs —
- * never stored. The loan's booked `loan_repayment`s are counted and that many of the earliest
- * installments are shown as paid — the same rule `bookDueInstallments` uses, so a payment the
- * user recorded on a different day than its due date still counts, and the report agrees with
- * the liability that net worth subtracts. `today` is a `YYYY-MM-DD` date key.
+ * never stored. An installment is paid when a booked `loan_repayment` names it
+ * (`installmentN`) — an explicit mapping, so an extra or partial manual repayment doesn't
+ * shift which installments count as paid. A schedule row the user skipped stays unpaid (its
+ * principal remains in the liability net worth subtracts); once the loan was paid off early
+ * (`closedAt`), every installment not paid on its own is `closed`. `today` is a `YYYY-MM-DD`
+ * date key.
  */
 export function summarizeGoldPlan(
   loan: GoldPlanLoan,
@@ -101,14 +119,28 @@ export function summarizeGoldPlan(
 ): GoldPlanSummary {
   const mine = txns.filter((t) => t.loanId === loan.id);
   const repayments = mine.filter((t) => t.type === "loan_repayment");
+  const paidNs = new Set(
+    repayments.map((t) => t.installmentN).filter((n): n is number => n != null),
+  );
+  const closedAt = loan.closedAt ?? null;
 
-  const schedule: GoldPlanScheduleRow[] = readSchedule(loan.schedule).map((r, i) => {
-    const paid = i < repayments.length;
-    return { ...r, paid, overdue: !paid && r.dueDate < today };
+  const schedule: GoldPlanScheduleRow[] = readSchedule(loan.schedule).map((r) => {
+    const { flaggedSkipped, ...row } = r;
+    const paid = paidNs.has(r.n);
+    const closed = !paid && closedAt !== null;
+    const skipped = !paid && !closed && flaggedSkipped;
+    return {
+      ...row,
+      paid,
+      skipped,
+      closed,
+      overdue: !paid && !closed && !skipped && r.dueDate < today,
+    };
   });
 
   const paidCount = schedule.length > 0 ? schedule.filter((r) => r.paid).length : repayments.length;
-  const next = schedule.find((r) => !r.paid) ?? null;
+  // A skipped installment is not "next due" — it waits for the user to un-skip or pay it off.
+  const next = schedule.find((r) => !r.paid && !r.closed && !r.skipped) ?? null;
   const grams = mine.filter((t) => t.type === "buy").reduce((sum, t) => sum.add(t.quantity), D(0));
 
   return {
@@ -126,7 +158,8 @@ export function summarizeGoldPlan(
     monthlyInstallment: loan.monthlyInstallment,
     startDate: loan.startDate,
     paidCount,
-    remainingCount: Math.max(0, loan.tenorMonths - paidCount),
+    remainingCount: closedAt !== null ? 0 : Math.max(0, loan.tenorMonths - paidCount),
+    closedAt,
     paidPrincipal: repayments.reduce((s, t) => s.add(t.price), D(0)).toString(),
     paidMargin: repayments.reduce((s, t) => s.add(t.fees), D(0)).toString(),
     outstandingPrincipal: loanBalances(mine)[loan.id] ?? "0",
@@ -134,6 +167,10 @@ export function summarizeGoldPlan(
       ? { n: next.n, dueDate: next.dueDate, amount: next.angsuran, overdue: next.overdue }
       : null,
     schedule,
-    completed: schedule.length > 0 ? next === null : paidCount >= loan.tenorMonths,
+    // Skipped installments keep the plan open: their principal is still owed.
+    completed:
+      schedule.length > 0
+        ? schedule.every((r) => r.paid || r.closed)
+        : paidCount >= loan.tenorMonths,
   };
 }

@@ -102,6 +102,8 @@ describe("buildContractLegs", () => {
     const legs = buildContractLegs(CONTRACT, new Date("2025-05-20")); // 3 installments due
     const repayments = legs.filter((l) => l.role === "repayment");
     expect(repayments).toHaveLength(3);
+    // Each leg names the schedule installment it settles (the explicit repayment mapping).
+    expect(repayments.map((l) => l.installmentN)).toEqual([1, 2, 3]);
     expect(repayments[0]).toMatchObject({
       type: "loan_repayment",
       price: "5683880", // Pokok in price

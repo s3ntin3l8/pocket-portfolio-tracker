@@ -170,6 +170,7 @@ describe("gold report", () => {
         fees: "100",
         executedAt: new Date("2026-01-13T00:00:00Z"),
         loanId,
+        installmentN: 1,
         externalId: "g3",
       },
       {

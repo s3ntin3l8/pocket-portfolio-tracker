@@ -1,8 +1,25 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { ApiError } from "@portfolio/api-client";
 import type { GoldHoldingRow, GoldPlan } from "@portfolio/api-client";
 import messages from "../messages/en.json";
+
+const { refresh, toastSuccess, toastError, api } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+  api: {
+    skipInstallment: vi.fn(async () => undefined),
+    unskipInstallment: vi.fn(async () => undefined),
+    payoffLoan: vi.fn(async () => ({ principal: "3750000" })),
+    reopenLoan: vi.fn(async () => undefined),
+  },
+}));
+vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("@/lib/api", () => ({ useApiClient: () => api }));
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
+
 import { GoldPlanCard } from "../src/components/reports/gold/gold-plan-card";
 import { GoldHoldingsTable } from "../src/components/reports/gold/gold-holdings-table";
 
@@ -30,6 +47,7 @@ const PLAN: GoldPlan = {
   startDate: "2026-01-13",
   paidCount: 1,
   remainingCount: 3,
+  closedAt: null,
   paidPrincipal: "1250000",
   paidMargin: "125000",
   outstandingPrincipal: "3750000",
@@ -45,9 +63,22 @@ const PLAN: GoldPlan = {
     sewaModal: "125000",
     angsuran: "1375000",
     paid: n === 1,
+    skipped: false,
+    closed: false,
     overdue: false,
   })),
 };
+
+beforeEach(() => {
+  refresh.mockClear();
+  toastSuccess.mockClear();
+  toastError.mockClear();
+  for (const fn of Object.values(api)) fn.mockClear();
+});
+
+// Radix opens its dropdown on keyboard events, not a synthetic click.
+const openMenuIn = (row: HTMLElement) =>
+  fireEvent.keyDown(within(row).getByRole("button", { name: "More options" }), { key: "Enter" });
 
 describe("GoldPlanCard", () => {
   it("shows progress, what is owed and the next installment", () => {
@@ -174,5 +205,112 @@ describe("GoldHoldingsTable", () => {
     expect(within(noFxRow).getAllByRole("cell").at(-1)).toHaveTextContent("—");
     expect(within(noFxRow).getAllByRole("cell").at(-2)).toHaveTextContent("—");
     expect(screen.queryByText(/\+0/)).not.toBeInTheDocument();
+  });
+
+  it("shows a skipped installment, its note, and no menu on a paid row", () => {
+    const plan: GoldPlan = {
+      ...PLAN,
+      schedule: PLAN.schedule.map((r) => (r.n === 2 ? { ...r, skipped: true } : r)),
+    };
+    wrap(<GoldPlanCard plan={plan} title="LM" displayCurrency="IDR" locale="en" />);
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(within(rows[1]).getByText("Skipped")).toBeInTheDocument();
+    expect(screen.getByText(messages.GoldReport.skippedNote)).toBeInTheDocument();
+    expect(within(rows[0]).queryByRole("button", { name: "More options" })).toBeNull();
+  });
+
+  it("skips an unpaid installment from the row menu", async () => {
+    wrap(<GoldPlanCard plan={PLAN} title="LM" displayCurrency="IDR" locale="en" />);
+    openMenuIn(screen.getAllByRole("row")[2]!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Skip installment" }));
+    await waitFor(() => expect(api.skipInstallment).toHaveBeenCalledWith("p1", "l1", 2));
+    expect(toastSuccess).toHaveBeenCalledWith(messages.GoldReport.skipped);
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("restores a skipped installment", async () => {
+    const plan: GoldPlan = {
+      ...PLAN,
+      schedule: PLAN.schedule.map((r) => (r.n === 2 ? { ...r, skipped: true } : r)),
+    };
+    wrap(<GoldPlanCard plan={plan} title="LM" displayCurrency="IDR" locale="en" />);
+    openMenuIn(screen.getAllByRole("row")[2]!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Restore installment" }));
+    await waitFor(() => expect(api.unskipInstallment).toHaveBeenCalledWith("p1", "l1", 2));
+    expect(toastSuccess).toHaveBeenCalledWith(messages.GoldReport.unskipped);
+  });
+
+  it("translates an API error code instead of a generic failure", async () => {
+    api.skipInstallment.mockRejectedValueOnce(
+      new ApiError(409, JSON.stringify({ error: "loan_closed" })),
+    );
+    wrap(<GoldPlanCard plan={PLAN} title="LM" displayCurrency="IDR" locale="en" />);
+    openMenuIn(screen.getAllByRole("row")[2]!);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Skip installment" }));
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(messages.GoldReport.errors.loan_closed),
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("pays the plan off early with the chosen date and fees", async () => {
+    wrap(<GoldPlanCard plan={PLAN} title="LM" displayCurrency="IDR" locale="en" />);
+    fireEvent.click(screen.getByRole("button", { name: "Pay off early" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/3,750,000/)).toBeInTheDocument(); // remaining principal
+    fireEvent.change(within(dialog).getByLabelText("Payoff date"), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Fees or penalty (optional)"), {
+      target: { value: "50000,5" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay off" }));
+    await waitFor(() =>
+      expect(api.payoffLoan).toHaveBeenCalledWith("p1", "l1", {
+        date: "2026-03-01",
+        fees: "50000.5",
+      }),
+    );
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("omits fees when none were entered", async () => {
+    wrap(<GoldPlanCard plan={PLAN} title="LM" displayCurrency="IDR" locale="en" />);
+    fireEvent.click(screen.getByRole("button", { name: "Pay off early" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Payoff date"), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay off" }));
+    await waitFor(() =>
+      expect(api.payoffLoan).toHaveBeenCalledWith("p1", "l1", { date: "2026-03-01" }),
+    );
+  });
+
+  it("offers no payoff on a completed plan", () => {
+    const done: GoldPlan = { ...PLAN, completed: true, outstandingPrincipal: "0", nextDue: null };
+    wrap(<GoldPlanCard plan={done} title="LM" displayCurrency="IDR" locale="en" />);
+    expect(screen.queryByRole("button", { name: "Pay off early" })).toBeNull();
+  });
+
+  it("shows a paid-off plan with its date, closed rows, and an undo", async () => {
+    const closed: GoldPlan = {
+      ...PLAN,
+      closedAt: "2026-03-01",
+      completed: true,
+      outstandingPrincipal: "0",
+      nextDue: null,
+      schedule: PLAN.schedule.map((r) => (r.paid ? r : { ...r, closed: true })),
+    };
+    wrap(<GoldPlanCard plan={closed} title="LM" displayCurrency="IDR" locale="en" />);
+    // The plan status badge plus the three installments the payoff closed.
+    expect(screen.getAllByText("Paid off")).toHaveLength(4);
+    expect(screen.getByText(/Paid off on/)).toBeInTheDocument();
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(within(rows[1]).getByText("Paid off")).toBeInTheDocument();
+    expect(within(rows[1]).queryByRole("button", { name: "More options" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Undo payoff" }));
+    await waitFor(() => expect(api.reopenLoan).toHaveBeenCalledWith("p1", "l1"));
+    expect(refresh).toHaveBeenCalled();
   });
 });

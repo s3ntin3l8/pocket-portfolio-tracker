@@ -40,6 +40,8 @@ export const loans = pgTable(
     monthlyInstallment: numeric("monthly_installment").notNull().default("0"),
     startDate: date("start_date").notNull(),
     schedule: jsonb("schedule"),
+    /** Early-payoff date: set once the remaining principal was settled in one repayment. */
+    closedAt: date("closed_at"),
     costBasisMode: text("cost_basis_mode").notNull().default("purchase_price"),
     currency: text("currency").notNull().default("IDR"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
