@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getChatProvider } from "../../../src/services/chat/registry.js";
+import { CHAT_PROVIDER_REGISTRY, getChatProvider } from "../../../src/services/chat/registry.js";
 
 const KEYS = [
   "ANTHROPIC_API_KEY",
   "ANTHROPIC_CHAT_MODEL",
+  "GEMINI_API_KEY",
+  "GEMINI_CHAT_MODEL",
   "OPENROUTER_API_KEY",
   "OPENROUTER_CHAT_MODEL",
   "OLLAMA_BASE_URL",
@@ -104,5 +106,32 @@ describe("getChatProvider (env-only selection under test)", () => {
     }
     expect(bodies[0]!.provider).toEqual({ data_collection: "deny" });
     expect(bodies[1]!.provider).toBeUndefined();
+  });
+});
+
+describe("Gemini chat opt-in", () => {
+  it("is not selected by a Gemini key alone, even though it outranks OpenRouter in vision priority", async () => {
+    process.env.GEMINI_API_KEY = "g-key";
+    expect(await getChatProvider()).toBeNull();
+    process.env.OPENROUTER_API_KEY = "or-key";
+    process.env.OPENROUTER_CHAT_MODEL = "some/model";
+    expect((await getChatProvider())?.name).toBe("openrouter");
+  });
+
+  it("is selected once a chat model is set, and honours the pin", async () => {
+    process.env.GEMINI_API_KEY = "g-key";
+    process.env.GEMINI_CHAT_MODEL = "gemini-2.5-pro";
+    const p = await getChatProvider();
+    expect(p).toMatchObject({ name: "gemini", local: false });
+    process.env.CHAT_PROVIDER = "gemini";
+    expect((await getChatProvider())?.name).toBe("gemini");
+  });
+
+  it("accepts a key stored in the admin credentials, still gated on the model", () => {
+    const d = CHAT_PROVIDER_REGISTRY.find((c) => c.id === "gemini")!;
+    expect(d.configured({ apiKey: "from-db" } as never)).toBe(false);
+    process.env.GEMINI_CHAT_MODEL = "m";
+    expect(d.configured({ apiKey: "from-db" } as never)).toBe(true);
+    expect(d.create({ apiKey: "from-db" } as never).isConfigured()).toBe(true);
   });
 });
