@@ -5,7 +5,7 @@ import type { AdminStats as AdminStatsData } from "@portfolio/api-client";
 
 /**
  * `/admin/database`. Design (`Admin Settings.dc.html`, "DATABASE / STATS" section): two
- * `rounded-[16px]` stat tiles (Database size / Rows est.), an uppercase "TABLES" eyebrow
+ * `rounded-lg` stat tiles (Database size / Rows est.), an uppercase "TABLES" eyebrow
  * over a `rounded-2xl` table-list card, and — the design's one deviation from real
  * data — a static "Object storage not used" callout. This app's storage backend is
  * real and configurable (see PR B2's `admin-storage-form.tsx`), so that callout only
@@ -32,15 +32,15 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <div className="flex-1 rounded-[16px] bg-card p-[14px_15px] shadow-card">
+        <div className="flex-1 rounded-lg bg-card p-[14px_15px] shadow-card">
           <div className="text-xs font-medium text-text-2">{t("statsDatabaseSize")}</div>
-          <div className="mt-0.5 text-[22px] font-extrabold tabular-nums">
+          <div className="mt-0.5 text-heading font-extrabold tabular-nums">
             {db.sizeBytes !== null ? formatBytes(db.sizeBytes) : t("statsSizeUnavailable")}
           </div>
         </div>
-        <div className="flex-1 rounded-[16px] bg-card p-[14px_15px] shadow-card">
+        <div className="flex-1 rounded-lg bg-card p-[14px_15px] shadow-card">
           <div className="text-xs font-medium text-text-2">{t("statsRowsEstimate")}</div>
-          <div className="mt-0.5 text-[22px] font-extrabold tabular-nums">
+          <div className="mt-0.5 text-heading font-extrabold tabular-nums">
             {formatRows(rowsTotal)}
           </div>
         </div>
@@ -51,7 +51,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
       </div>
       {db.tables.length > 0 ? (
         <div className="overflow-hidden rounded-2xl bg-card shadow-card">
-          <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-[11px] font-bold uppercase tracking-[.03em] text-text-3 md:flex">
+          <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-micro font-bold uppercase tracking-[.03em] text-text-3 md:flex">
             <span className="flex-1">{t("statsColumnTable")}</span>
             <span className="w-[100px] text-right">{t("statsRowsEstimate")}</span>
             <span className="w-[74px] text-right">{t("statsColumnSize")}</span>
@@ -62,7 +62,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
               className="flex items-center gap-3 px-[15px] py-[11px] max-md:justify-between"
               style={i > 0 ? { borderTop: "1px solid var(--line)" } : undefined}
             >
-              <span className="font-mono text-[13px] font-semibold md:flex-1">{table.name}</span>
+              <span className="font-mono text-body-sm font-semibold md:flex-1">{table.name}</span>
               <span className="tabular-nums text-xs text-text-2 md:w-[100px] md:text-right">
                 {formatRows(table.rows)}
               </span>
@@ -79,7 +79,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
       )}
 
       {!objectStorage.configured ? (
-        <div className="flex items-start gap-2.5 rounded-[14px] border border-border bg-background p-3.5">
+        <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background p-3.5">
           <Info className="mt-px size-[17px] shrink-0 text-text-3" strokeWidth={1.9} />
           <p className="text-xs leading-relaxed text-text-2">
             <span className="font-bold text-foreground">{t("statsObjectStorageNotUsedTitle")}</span>{" "}
@@ -87,7 +87,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
           </p>
         </div>
       ) : (
-        <div className="rounded-[14px] border border-border bg-background p-3.5">
+        <div className="rounded-lg border border-border bg-background p-3.5">
           <div className="text-xs font-bold text-foreground">{t("statsObjectStorage")}</div>
           {"error" in objectStorage && objectStorage.error ? (
             <p className="mt-1 text-xs text-destructive">{objectStorage.error}</p>

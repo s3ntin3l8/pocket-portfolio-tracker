@@ -67,10 +67,10 @@ export function TransactionSourcesSection({
 
   return (
     <div>
-      <p className="mb-2 ml-0.5 text-[12px] font-bold uppercase tracking-[.04em] text-text-3">
+      <p className="mb-2 ml-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-3">
         {t("sourcesSection.title")}
       </p>
-      <div className="divide-y divide-line overflow-hidden rounded-[18px] border border-border bg-card">
+      <div className="divide-y divide-line overflow-hidden rounded-xl border border-border bg-card">
         {sources.map((src) => {
           const style = SRC_STYLE[src.sourceType] ?? DEFAULT_SRC;
           const Icon = style.icon;
@@ -86,19 +86,19 @@ export function TransactionSourcesSection({
           return (
             <div key={src.id} className="flex items-center gap-3 px-[15px] py-[13px]">
               <span
-                className="flex size-[42px] shrink-0 items-center justify-center rounded-[11px]"
+                className="flex size-[42px] shrink-0 items-center justify-center rounded-sm"
                 style={{ background: style.bg, color: style.fg }}
               >
                 <Icon className="size-5" strokeWidth={1.9} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-foreground">{label}</p>
-                <p className="truncate text-[12px] font-medium text-text-2">
+                <p className="text-body-sm font-bold text-foreground">{label}</p>
+                <p className="truncate text-xs font-medium text-text-2">
                   {t("sourcesSection.importedAt", { date: df.format(new Date(src.createdAt)) })}
                   {src.filename ? ` · ${src.filename}` : ""}
                 </p>
                 {showTaxBreakdown && tcEntries.length > 0 && (
-                  <p className="mt-0.5 text-[11px] font-semibold text-[#0E9F6E]">
+                  <p className="mt-0.5 text-micro font-semibold text-[#0E9F6E]">
                     {tcEntries.map(([k, v]) => `${TAX_COMPONENT_LABELS[k] ?? k}: ${v}`).join(" · ")}
                   </p>
                 )}
@@ -110,7 +110,7 @@ export function TransactionSourcesSection({
                   title={t("sourcesSection.download")}
                   disabled={downloading === src.id}
                   onClick={() => void downloadSource(src.id)}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-[11px] border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
                 >
                   {downloading === src.id ? (
                     <Spinner size="sm" />

@@ -45,7 +45,7 @@ export function TimelineColumnHeader() {
   return (
     <div
       className={cn(
-        "hidden gap-3.5 border-b border-line px-0.5 py-2.5 text-[10px] font-bold uppercase tracking-wide text-text-3 sm:grid",
+        "hidden gap-3.5 border-b border-line px-0.5 py-2.5 text-micro font-bold uppercase tracking-wide text-text-3 sm:grid",
         TIMELINE_GRID,
       )}
     >
@@ -76,7 +76,7 @@ function TimelineBadge({
       : { bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" };
   return (
     <span
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] text-[10px] font-extrabold"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-sm text-micro font-extrabold"
       style={
         forecast
           ? { backgroundColor: "transparent", color: tone.fg, border: `1.5px dashed ${tone.fg}` }
@@ -154,14 +154,12 @@ function InstrumentGroupRow({
         )}
         <TimelineBadge label={label} type={group.dominantType} forecast={allForecast} />
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span className="truncate text-[13px] font-bold">{label}</span>
+          <span className="truncate text-body-sm font-bold">{label}</span>
           {group.displayName && (
-            <span className="truncate text-[11px] font-medium text-text-2">
-              {group.displayName}
-            </span>
+            <span className="truncate text-micro font-medium text-text-2">{group.displayName}</span>
           )}
           {allForecast && (
-            <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+            <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-3">
               {t("est")}
             </span>
           )}
@@ -191,7 +189,7 @@ function InstrumentGroupRow({
           const perShare =
             e.perShare != null ? formatMoney(Number(e.perShare), e.currency, locale) : "—";
           const estTag = forecast && (
-            <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+            <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-3">
               {t("est")}
             </span>
           );
@@ -199,7 +197,7 @@ function InstrumentGroupRow({
           return (
             <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
               {showBand && (
-                <div className="bg-card-2 px-0.5 py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3">
+                <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3">
                   {monthFmt!.format(new Date(e.date))}
                   <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
                 </div>
@@ -236,14 +234,14 @@ function InstrumentGroupRow({
                     {dateLabel}
                   </span>
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="truncate text-[13px] font-bold">{label}</span>
+                    <span className="truncate text-body-sm font-bold">{label}</span>
                     {estTag}
                   </div>
                   <span className="truncate text-xs font-medium text-text-2">{typeLabel}</span>
-                  <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                  <span className="tabular text-right text-body-sm font-semibold text-text-mute">
                     {shares}
                   </span>
-                  <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                  <span className="tabular text-right text-body-sm font-semibold text-text-mute">
                     {perShare}
                   </span>
                   <span
@@ -259,10 +257,10 @@ function InstrumentGroupRow({
                 <div className="flex items-center gap-3 pl-10 pr-0.5 py-[11px] sm:hidden">
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="truncate text-[13px] font-bold">{label}</span>
+                      <span className="truncate text-body-sm font-bold">{label}</span>
                       {estTag}
                     </div>
-                    <span className="truncate text-[11px] font-medium text-text-2">
+                    <span className="truncate text-micro font-medium text-text-2">
                       {typeLabel} {" · "} {dateLabel}
                     </span>
                   </div>
@@ -433,7 +431,7 @@ export function IncomeEventsTable({
                 .join(" · ") || undefined;
 
             const estTag = forecast && (
-              <span className="shrink-0 rounded-[5px] bg-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-text-3">
+              <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-3">
                 {t("est")}
               </span>
             );
@@ -441,7 +439,7 @@ export function IncomeEventsTable({
             return (
               <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
                 {showBand && (
-                  <div className="bg-card-2 px-0.5 py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3">
+                  <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3">
                     {monthFmt!.format(new Date(e.date))}
                     <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
                   </div>
@@ -480,14 +478,14 @@ export function IncomeEventsTable({
                     </span>
                     <div className="flex min-w-0 items-center gap-2.5">
                       <TimelineBadge label={label} type={e.type} forecast={forecast} />
-                      <span className="truncate text-[13px] font-bold">{label}</span>
+                      <span className="truncate text-body-sm font-bold">{label}</span>
                       {estTag}
                     </div>
                     <span className="truncate text-xs font-medium text-text-2">{typeLabel}</span>
-                    <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                    <span className="tabular text-right text-body-sm font-semibold text-text-mute">
                       {shares}
                     </span>
-                    <span className="tabular text-right text-[13px] font-semibold text-text-mute">
+                    <span className="tabular text-right text-body-sm font-semibold text-text-mute">
                       {perShare}
                     </span>
                     <span
@@ -505,10 +503,10 @@ export function IncomeEventsTable({
                     <TimelineBadge label={label} type={e.type} forecast={forecast} />
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate text-[13px] font-bold">{label}</span>
+                        <span className="truncate text-body-sm font-bold">{label}</span>
                         {estTag}
                       </div>
-                      <span className="truncate text-[11px] font-medium text-text-2">
+                      <span className="truncate text-micro font-medium text-text-2">
                         {typeLabel} {" · "} {dateLabel}
                       </span>
                     </div>

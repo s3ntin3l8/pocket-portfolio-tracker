@@ -30,14 +30,14 @@ export function StatCard({
   return (
     <Card className={className}>
       <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
-        <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{label}</p>
-        <p className="tabular mt-1 truncate min-w-0 text-[15px] font-extrabold sm:text-xl lg:text-[26px]">
+        <p className="text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
+        <p className="tabular mt-1 truncate min-w-0 text-body font-extrabold sm:text-xl lg:text-display">
           {value}
         </p>
         {delta && (
           <p
             className={cn(
-              "tabular mt-0.5 text-[11px] font-bold sm:text-xs",
+              "tabular mt-0.5 text-micro font-bold sm:text-xs",
               deltaTone === "up" && "text-success",
               deltaTone === "down" && "text-destructive",
               deltaTone === "neutral" && "text-muted-foreground",
@@ -47,7 +47,7 @@ export function StatCard({
           </p>
         )}
         {basis && <BasisLabel>{basis}</BasisLabel>}
-        {caption && <p className="mt-1 text-[11px] text-muted-foreground sm:text-xs">{caption}</p>}
+        {caption && <p className="mt-1 text-micro text-muted-foreground sm:text-xs">{caption}</p>}
       </CardContent>
     </Card>
   );

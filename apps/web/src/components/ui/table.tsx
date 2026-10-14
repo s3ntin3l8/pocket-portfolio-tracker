@@ -61,7 +61,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-11 px-3 text-left align-middle text-[11px] font-bold uppercase tracking-[0.04em] text-text-3 first:pl-[22px] last:pr-[22px] [&:has([role=checkbox])]:pr-0",
+        "h-11 px-3 text-left align-middle text-micro font-bold uppercase tracking-[0.04em] text-text-3 first:pl-[22px] last:pr-[22px] [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -83,9 +83,9 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 // `cn()` (e.g. `cn(TABLE_VALUE, "text-text-mute")` for a de-emphasized secondary number).
 export const TABLE_LABEL = "text-sm font-bold";
 export const TABLE_SUBLABEL = "text-xs font-medium text-text-2";
-export const TABLE_VALUE = "tabular whitespace-nowrap text-right text-[13px] font-medium";
-export const TABLE_VALUE_STRONG = "tabular whitespace-nowrap text-right text-[13px] font-bold";
-export const TABLE_SUBVALUE = "text-[11px] font-semibold";
+export const TABLE_VALUE = "tabular whitespace-nowrap text-right text-body-sm font-medium";
+export const TABLE_VALUE_STRONG = "tabular whitespace-nowrap text-right text-body-sm font-bold";
+export const TABLE_SUBVALUE = "text-micro font-semibold";
 
 // Shared filter-chip pill spec, used by the toolbar filter rows above a table (Activity,
 // Trades, Income, Holdings' asset-class tabs). Compose with `cn()`:

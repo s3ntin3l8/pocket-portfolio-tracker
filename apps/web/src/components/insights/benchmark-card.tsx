@@ -65,7 +65,7 @@ export function BenchmarkCard({
       </p>
       <p
         className={cn(
-          "tabular mt-1 text-[22px] font-extrabold leading-none",
+          "tabular mt-1 text-heading font-extrabold leading-none",
           activeReturn >= 0 ? "text-success" : "text-destructive",
         )}
       >

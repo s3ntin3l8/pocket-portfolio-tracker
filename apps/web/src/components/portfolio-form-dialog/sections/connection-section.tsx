@@ -47,7 +47,7 @@ function ConnectionCard({
         <h3 className="text-sm font-medium">{title}</h3>
         {pill && (
           <span
-            className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold ${PILL_TONE[pill.tone]}`}
+            className={`shrink-0 rounded-md px-2 py-0.5 text-micro font-bold ${PILL_TONE[pill.tone]}`}
           >
             {pill.label}
           </span>

@@ -203,7 +203,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                   <TableCell colSpan={4}>{t("totalRealized")}</TableCell>
                   <TableCell
                     className={cn(
-                      "tabular text-right text-[13px]",
+                      "tabular text-right text-body-sm",
                       closedTotal > 0 ? "text-success" : closedTotal < 0 ? "text-destructive" : "",
                     )}
                   >

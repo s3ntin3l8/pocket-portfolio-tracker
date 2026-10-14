@@ -251,7 +251,7 @@ export default async function InstrumentPage({
           symbol={instrument.symbol}
           market={instrument.market}
           assetClass={instrument.assetClass}
-          className="size-11 shrink-0 rounded-[13px] text-sm"
+          className="size-11 shrink-0 rounded-md text-sm"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

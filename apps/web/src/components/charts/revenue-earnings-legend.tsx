@@ -7,13 +7,13 @@ import { useTranslations } from "next-intl";
 export function RevenueEarningsChartLegend() {
   const t = useTranslations("Instrument");
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+    <div className="ml-auto flex shrink-0 items-center gap-3.5 text-micro font-semibold text-text-2">
       <span className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-[var(--color-chart-1)]" />
+        <span className="size-2.5 rounded-xs bg-[var(--color-chart-1)]" />
         {t("revenueLabel")}
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-[var(--color-chart-2)]" />
+        <span className="size-2.5 rounded-xs bg-[var(--color-chart-2)]" />
         {t("earningsLabel")}
       </span>
     </div>

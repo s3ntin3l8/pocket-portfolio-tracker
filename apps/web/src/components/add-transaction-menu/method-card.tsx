@@ -27,22 +27,22 @@ export const MethodCard = forwardRef<
       ref={ref}
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3.5 rounded-[18px] border border-border bg-card p-4 text-left shadow-[0_1px_2px_rgba(15,27,20,.04)] transition-transform active:scale-[.97]"
+      className="flex w-full items-center gap-3.5 rounded-xl border border-border bg-card p-4 text-left shadow-[0_1px_2px_rgba(15,27,20,.04)] transition-transform active:scale-[.97]"
     >
       <span
-        className="flex size-[46px] shrink-0 items-center justify-center rounded-[14px]"
+        className="flex size-[46px] shrink-0 items-center justify-center rounded-lg"
         style={{ background: TONES[tone].bg, color: TONES[tone].fg }}
       >
         <Icon className="size-[23px]" strokeWidth={1.9} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold">{title}</span>
+        <span className="block text-body font-bold">{title}</span>
         <span className="mt-[3px] block text-xs font-medium leading-[1.4] text-text-2">
           {description}
         </span>
       </span>
       {tag && (
-        <span className="shrink-0 rounded-[7px] bg-[rgba(16,163,114,.14)] px-2 py-1 text-[9px] font-bold text-[#0E9F6E]">
+        <span className="shrink-0 rounded-xs bg-[rgba(16,163,114,.14)] px-2 py-1 text-micro font-bold text-[#0E9F6E]">
           {tag}
         </span>
       )}

@@ -149,7 +149,7 @@ export function AppShell({
                     href={href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-[11px] rounded-[12px] px-3 py-2.5 text-sm transition-colors",
+                      "flex items-center gap-[11px] rounded-md px-3 py-2.5 text-sm transition-colors",
                       active
                         ? "bg-[rgba(16,163,114,.14)] font-bold text-primary"
                         : "font-semibold text-text-mute hover:bg-secondary hover:text-foreground",
@@ -161,7 +161,7 @@ export function AppShell({
                     {badge != null && (
                       <span
                         className={cn(
-                          "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold text-white",
+                          "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-micro font-extrabold text-white",
                           anomalyError ? "bg-destructive" : "bg-[var(--gold-fg)]",
                         )}
                       >
@@ -175,8 +175,8 @@ export function AppShell({
             </nav>
             <div className="mt-auto flex flex-col gap-3 pt-4">
               {netWorthSummary && (
-                <div className="rounded-[14px] bg-background p-3.5">
-                  <p className="text-[11px] font-semibold text-text-2">{t("netWorth")}</p>
+                <div className="rounded-lg bg-background p-3.5">
+                  <p className="text-micro font-semibold text-text-2">{t("netWorth")}</p>
                   <p className="tabular mt-0.5 text-lg font-extrabold">
                     {netWorthSummary.valueFormatted}
                   </p>
@@ -196,7 +196,7 @@ export function AppShell({
               <SignOutButton />
               <AppVersion
                 ariaLabel={t("version", { version: APP_VERSION })}
-                className="block self-center text-[11px] text-text-3"
+                className="block self-center text-micro text-text-3"
               />
             </div>
           </aside>

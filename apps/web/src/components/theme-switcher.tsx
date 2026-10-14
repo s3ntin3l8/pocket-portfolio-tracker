@@ -21,7 +21,7 @@ export function ThemeSwitcher() {
         {THEMES.map((th) => (
           <div
             key={th}
-            className="flex-1 rounded-[11px] py-[9px] text-center text-[13px] bg-background font-semibold text-text-3 select-none"
+            className="flex-1 rounded-sm py-[9px] text-center text-body-sm bg-background font-semibold text-text-3 select-none"
           >
             {t(`appearanceOptions.${th}`)}
           </div>
@@ -39,7 +39,7 @@ export function ThemeSwitcher() {
           onClick={() => setTheme(th)}
           aria-pressed={theme === th}
           className={cn(
-            "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors",
+            "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
             theme === th
               ? "bg-pill font-bold text-white"
               : "bg-background font-semibold text-foreground hover:bg-secondary",

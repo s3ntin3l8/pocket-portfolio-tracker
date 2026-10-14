@@ -55,7 +55,7 @@ export function SecretCell({
         <SourceBadge source={secretSource} />
       </div>
       <div className="mt-1.5 flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate rounded-[12px] border border-border bg-background px-3 py-2 font-mono text-sm text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-muted-foreground">
           {hasSecret ? secretHint : t("storageSecretNone")}
         </span>
         {hasSecret ? (
@@ -63,7 +63,7 @@ export function SecretCell({
             type="button"
             onClick={() => setEditing((v) => !v)}
             aria-label={t("editCredential")}
-            className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-background text-text-2 hover:text-foreground"
+            className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-background text-text-2 hover:text-foreground"
           >
             <Pencil className="size-[15px]" />
           </button>
@@ -71,7 +71,7 @@ export function SecretCell({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="shrink-0 whitespace-nowrap rounded-[9px] bg-primary/10 px-2.5 py-2 text-[11px] font-bold text-primary"
+            className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-2 text-micro font-bold text-primary"
           >
             {t("credentialSet")}
           </button>

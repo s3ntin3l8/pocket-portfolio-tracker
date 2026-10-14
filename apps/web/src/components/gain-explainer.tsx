@@ -44,7 +44,7 @@ export function GainExplainer({ gain }: { gain: GainSummary }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex min-h-6 items-center gap-1 text-[11px] font-semibold text-text-2 underline-offset-2 hover:text-foreground hover:underline"
+          className="inline-flex min-h-6 items-center gap-1 text-micro font-semibold text-text-2 underline-offset-2 hover:text-foreground hover:underline"
         >
           <Info className="size-3.5" aria-hidden />
           {t("explainerTrigger")}

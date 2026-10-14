@@ -39,7 +39,7 @@ describe("DialogContent", () => {
     const el = screen.getByTestId("content");
     expect(el.className).toContain("inset-0");
     expect(el.className).toContain("rounded-none");
-    expect(el.className).toContain("md:rounded-[22px]");
+    expect(el.className).toContain("md:rounded-xl");
     expect(el.className).toContain("md:max-w-[480px]");
   });
 

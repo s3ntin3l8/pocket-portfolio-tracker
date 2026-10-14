@@ -270,8 +270,8 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           )}
 
           {classSlices.length > 0 && (
-            <div className="@container rounded-[18px] bg-card px-6 py-5 shadow-card">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+            <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
+              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
                 {t("byClassTitle")}
               </p>
               <AllocationDonut
@@ -283,23 +283,23 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           )}
 
           {s.byCurrency.length > 1 && (
-            <div className="@container rounded-[18px] bg-card px-6 py-5 shadow-card">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.04em] text-text-3">
+            <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
+              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
                 {t("currencyTitle")}
               </p>
               <div className="grid grid-cols-1 gap-x-5 gap-y-2.5 @sm:grid-cols-2 @sm:gap-x-7 @lg:grid-cols-3">
                 {s.byCurrency.map((c, i) => (
                   <div key={c.currency} className="flex items-center gap-[9px]">
                     <span
-                      className="size-[9px] shrink-0 rounded-[2px]"
+                      className="size-[9px] shrink-0 rounded-xs"
                       style={{
                         background: `var(--color-chart-${(i % 5) + 1})`,
                       }}
                     />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                    <span className="min-w-0 flex-1 truncate text-body-sm font-semibold">
                       {c.currency}
                     </span>
-                    <span className="tabular shrink-0 text-[13px] font-bold text-text-2">
+                    <span className="tabular shrink-0 text-body-sm font-bold text-text-2">
                       {Number(s.lifetimeTotal) > 0
                         ? `${((Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100).toFixed(1)}%`
                         : "—"}

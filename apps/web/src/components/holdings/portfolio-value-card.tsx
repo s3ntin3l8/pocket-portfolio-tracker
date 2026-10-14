@@ -39,16 +39,16 @@ export function PortfolioValueCard({
   todayTone?: Tone;
 }) {
   return (
-    <div className="rounded-[18px] bg-card px-6 py-5 shadow-card">
+    <div className="rounded-xl bg-card px-6 py-5 shadow-card">
       <div className="flex flex-col gap-3">
         {/* Total value */}
         <div>
-          <p className="text-[11px] font-semibold text-text-3">{totalLabel}</p>
-          <p className="tabular mt-0.5 text-[22px] font-extrabold">{totalValueFormatted}</p>
+          <p className="text-micro font-semibold text-text-3">{totalLabel}</p>
+          <p className="tabular mt-0.5 text-heading font-extrabold">{totalValueFormatted}</p>
         </div>
         {/* All-time P&L */}
         <div className="border-t border-line pt-3">
-          <p className="text-[11px] font-semibold text-text-3">{allTimeLabel}</p>
+          <p className="text-micro font-semibold text-text-3">{allTimeLabel}</p>
           <GainFigure
             amount={allTimeAmount}
             pct={allTimePct}
@@ -60,13 +60,13 @@ export function PortfolioValueCard({
         </div>
         {/* Today's change */}
         <div className="border-t border-line pt-3">
-          <p className="text-[11px] font-semibold text-text-3">{todayLabel}</p>
+          <p className="text-micro font-semibold text-text-3">{todayLabel}</p>
           <div className="mt-0.5 flex items-baseline gap-2">
-            <p className={cn("tabular text-[18px] font-extrabold", toneClass(todayTone))}>
+            <p className={cn("tabular text-lg font-extrabold", toneClass(todayTone))}>
               {todayAmount}
             </p>
             {todayPct != null && (
-              <p className={cn("tabular text-[13px] font-bold", toneClass(todayTone))}>
+              <p className={cn("tabular text-body-sm font-bold", toneClass(todayTone))}>
                 {todayPct}
               </p>
             )}

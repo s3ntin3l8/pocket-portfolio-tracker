@@ -131,12 +131,12 @@ export function PortfolioEditForm({
                   type="button"
                   onClick={handleDelete}
                   disabled={f.busy}
-                  className="h-auto w-full rounded-[11px] bg-[#E5484D] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#E5484D]/90 sm:w-auto"
+                  className="h-auto w-full rounded-sm bg-[#E5484D] px-4 py-2.5 text-body-sm font-bold text-white hover:bg-[#E5484D]/90 sm:w-auto"
                 >
                   {f.busy && <Spinner size="sm" />}
                   {t("confirmDelete")}
                 </Button>
-                <p className="text-[11px] font-medium text-text-3">
+                <p className="text-micro font-medium text-text-3">
                   {t("deleteWarning", { count: portfolio?.transactionCount ?? 0 })}{" "}
                   {t("deleteRelatedNote")}
                 </p>
@@ -156,7 +156,7 @@ export function PortfolioEditForm({
             <Button
               type="button"
               onClick={() => router.push("/settings/portfolios")}
-              className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold sm:w-auto sm:rounded-[11px] sm:px-[22px] sm:py-[11px]"
+              className="h-auto w-full rounded-lg py-[15px] text-body font-bold sm:w-auto sm:rounded-sm sm:px-[22px] sm:py-[11px]"
             >
               {t("done")}
             </Button>
@@ -164,7 +164,7 @@ export function PortfolioEditForm({
             <Button
               type="submit"
               disabled={f.busy || !f.name.trim()}
-              className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold sm:w-auto sm:rounded-[11px] sm:px-[22px] sm:py-[11px]"
+              className="h-auto w-full rounded-lg py-[15px] text-body font-bold sm:w-auto sm:rounded-sm sm:px-[22px] sm:py-[11px]"
             >
               {f.busy && <Spinner size="sm" />}
               {f.busy

@@ -149,7 +149,7 @@ function DialogContent({
                 // Mobile: full screen, no card chrome — a page, not a modal.
                 "inset-0 h-full max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 shadow-none",
                 // Desktop: centered card at the size tier's width.
-                "md:inset-auto md:left-1/2 md:top-1/2 md:h-auto md:w-[calc(100%-2rem)] md:max-h-[88vh] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-[22px] md:border md:shadow-lg",
+                "md:inset-auto md:left-1/2 md:top-1/2 md:h-auto md:w-[calc(100%-2rem)] md:max-h-[88vh] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:border md:shadow-lg",
                 !structured && "p-6",
                 SIZE_CLASS[size],
               )
@@ -177,7 +177,7 @@ function DialogContent({
                 caller's own DialogTitle already renders. This is the visible mobile
                 heading only; a caller using mobileHeader still owns the one accessible
                 DialogTitle (a visually-hidden one is fine if it has no other use for it). */}
-            <h1 className="min-w-0 truncate text-lg font-extrabold tracking-tight">
+            <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">
               {mobileHeader.title}
             </h1>
           </div>

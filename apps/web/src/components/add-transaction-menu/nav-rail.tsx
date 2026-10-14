@@ -61,7 +61,7 @@ export function NavRail({
         className,
       )}
     >
-      <div className="px-2.5 pb-3.5 pt-0.5 text-[17px] font-extrabold text-foreground">
+      <div className="px-2.5 pb-3.5 pt-0.5 text-lg font-extrabold text-foreground">
         {labels.heading}
       </div>
       {top.map((item) => (
@@ -91,7 +91,7 @@ function NavButton({
       onClick={() => onSelect(item.key)}
       aria-current={active ? "step" : undefined}
       className={cn(
-        "flex w-full items-center gap-[11px] rounded-[11px] px-3 py-2.5 text-left text-[13px]",
+        "flex w-full items-center gap-[11px] rounded-sm px-3 py-2.5 text-left text-body-sm",
         active
           ? "bg-card font-bold text-foreground shadow-[0_1px_2px_rgba(15,27,20,.06)]"
           : "font-semibold text-text-2 hover:bg-card/60",

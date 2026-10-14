@@ -118,11 +118,11 @@ export function PortfolioSwitcher({
     const only = portfolios[0];
     return (
       <div
-        className="inline-flex max-w-full items-center gap-[9px] rounded-[10px] bg-background py-[7px] pl-2 pr-3.5 text-sm font-semibold text-foreground"
+        className="inline-flex max-w-full items-center gap-[9px] rounded-sm bg-background py-[7px] pl-2 pr-3.5 text-sm font-semibold text-foreground"
         aria-label={t("label")}
         title={portfolioLabel(only)}
       >
-        <BrokerageIcon brokerage={only.brokerage} className="size-6 rounded-[7px]" />
+        <BrokerageIcon brokerage={only.brokerage} className="size-6 rounded-xs" />
         <span className="truncate">{portfolioLabel(only)}</span>
       </div>
     );
@@ -133,7 +133,7 @@ export function PortfolioSwitcher({
   const triggerIcon = selectedHolder ? (
     <Users className="size-4 shrink-0 text-muted-foreground" />
   ) : selectedPortfolio ? (
-    <BrokerageIcon brokerage={selectedPortfolio.brokerage} className="size-6 rounded-[7px]" />
+    <BrokerageIcon brokerage={selectedPortfolio.brokerage} className="size-6 rounded-xs" />
   ) : (
     <Layers className="size-4 shrink-0 text-muted-foreground" />
   );
@@ -147,7 +147,7 @@ export function PortfolioSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t("label")}
-        className="inline-flex max-w-full items-center gap-[9px] rounded-[10px] bg-background py-[7px] pl-2 pr-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex max-w-full items-center gap-[9px] rounded-sm bg-background py-[7px] pl-2 pr-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {triggerIcon}
         <span className="truncate">{triggerLabel}</span>

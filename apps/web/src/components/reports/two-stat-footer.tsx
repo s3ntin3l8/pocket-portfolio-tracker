@@ -18,11 +18,11 @@ export function TwoStatFooter({
       <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-2">
         {metrics.map((m, i) => (
           <div key={i} className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[.03em] text-text-3 [overflow-wrap:normal] [word-break:break-word]">
+            <p className="text-micro font-semibold uppercase tracking-[.03em] text-text-3 [overflow-wrap:normal] [word-break:break-word]">
               {m.label}
             </p>
             <p
-              className="tabular mt-[3px] whitespace-nowrap text-[15px] font-bold"
+              className="tabular mt-[3px] whitespace-nowrap text-body font-bold"
               style={m.color ? { color: m.color } : undefined}
             >
               {m.value}
@@ -31,7 +31,7 @@ export function TwoStatFooter({
         ))}
       </div>
       <span
-        className="flex shrink-0 items-center gap-0.5 text-[13px] font-bold"
+        className="flex shrink-0 items-center gap-0.5 text-body-sm font-bold"
         style={{ color: accentColor }}
       >
         {openLabel}

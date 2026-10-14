@@ -49,12 +49,12 @@ export function InstrumentIncomeCard({
             </div>
             {yieldOnCost !== null && (
               <div className="mt-3.5 flex items-center gap-2.5 rounded-xl bg-muted/50 px-3.5 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-amber-500/15 text-amber-600 dark:text-amber-400">
                   <Coins className="size-4.5" />
                 </span>
                 <div className="flex-1">
                   <p className="text-sm font-semibold">{yieldTitle}</p>
-                  <p className="text-[11px] text-muted-foreground">{yieldCaption}</p>
+                  <p className="text-micro text-muted-foreground">{yieldCaption}</p>
                 </div>
                 <span className="tabular text-sm font-bold text-success">{yieldOnCost}</span>
               </div>
@@ -64,7 +64,7 @@ export function InstrumentIncomeCard({
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
         )}
         {bondInfo && (
-          <p className="mt-3 text-[11px] text-muted-foreground">
+          <p className="mt-3 text-micro text-muted-foreground">
             {bondInfo.label}: {bondInfo.couponRate} · {bondInfo.maturityDate}
           </p>
         )}

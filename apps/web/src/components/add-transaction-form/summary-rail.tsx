@@ -37,8 +37,8 @@ export function SummaryRail({
 
   return (
     <aside className="sticky top-0 flex flex-col gap-3 self-start">
-      <div className="flex flex-col gap-3.5 rounded-[18px] border border-border bg-card-2 p-4">
-        <div className="text-[11px] font-bold uppercase tracking-[.06em] text-text-3">
+      <div className="flex flex-col gap-3.5 rounded-xl border border-border bg-card-2 p-4">
+        <div className="text-micro font-bold uppercase tracking-[.06em] text-text-3">
           {t("summary")}
         </div>
 
@@ -46,13 +46,13 @@ export function SummaryRail({
           <div className="flex items-center gap-2.5">
             <BrokerageIcon
               brokerage={portfolio.brokerage}
-              className="size-[34px] shrink-0 rounded-[10px]"
+              className="size-[34px] shrink-0 rounded-sm"
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-bold text-foreground">
+              <span className="block truncate text-body-sm font-bold text-foreground">
                 {portfolio.name}
               </span>
-              <span className="block truncate text-[11px] font-medium text-text-2">
+              <span className="block truncate text-micro font-medium text-text-2">
                 {[portfolio.brokerage, portfolio.accountHolder].filter(Boolean).join(" · ")}
               </span>
             </span>
@@ -67,7 +67,7 @@ export function SummaryRail({
         {showBreakdown && (
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-2">{t("subtotal")}</span>
-            <span className="text-[13px] font-semibold text-foreground">
+            <span className="text-body-sm font-semibold text-foreground">
               {formatMoney(total.subtotal, currency)}
             </span>
           </div>
@@ -75,7 +75,7 @@ export function SummaryRail({
         {showBreakdown && total.fees !== 0 && (
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-2">{t("fees")}</span>
-            <span className="text-[13px] font-semibold text-foreground">
+            <span className="text-body-sm font-semibold text-foreground">
               {sign + formatMoney(total.fees, currency)}
             </span>
           </div>
@@ -83,17 +83,17 @@ export function SummaryRail({
         {showBreakdown && total.tax !== 0 && (
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-2">{t("tax")}</span>
-            <span className="text-[13px] font-semibold text-foreground">
+            <span className="text-body-sm font-semibold text-foreground">
               {sign + formatMoney(total.tax, currency)}
             </span>
           </div>
         )}
 
         <div className="flex items-center justify-between border-t border-border pt-3">
-          <span className="text-[13px] font-semibold text-text-2">
+          <span className="text-body-sm font-semibold text-text-2">
             {t(total ? totalLabelKey(total.kind) : "totalEstimated")}
           </span>
-          <span className="text-[18px] font-extrabold text-foreground">
+          <span className="text-lg font-extrabold text-foreground">
             {total ? formatMoney(total.total, currency) : "—"}
           </span>
         </div>

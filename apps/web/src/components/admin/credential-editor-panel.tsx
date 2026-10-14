@@ -60,7 +60,7 @@ export function CredentialEditorPanel({
 
   return (
     <div className="border-t border-line bg-card px-3.5 pb-3.5 pt-2.5">
-      <div className="rounded-[13px] border border-border bg-card-2 p-3.5">
+      <div className="rounded-md border border-border bg-card-2 p-3.5">
         <label htmlFor={inputId} className="mb-1.5 block px-0.5 text-xs font-semibold text-text-2">
           {t("credentialEditorLabel", { label })}
         </label>
@@ -91,14 +91,14 @@ export function CredentialEditorPanel({
             type="button"
             onClick={() => void save()}
             disabled={busy || !trimmed}
-            className="rounded-[10px] bg-primary px-4 py-2 text-[13px] font-bold text-primary-foreground disabled:cursor-default disabled:opacity-50"
+            className="rounded-sm bg-primary px-4 py-2 text-body-sm font-bold text-primary-foreground disabled:cursor-default disabled:opacity-50"
           >
             {busy && !clearState.busy ? <Spinner size="sm" /> : t("credentialSave")}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[10px] px-3 py-2 text-[13px] font-bold text-text-2"
+            className="rounded-sm px-3 py-2 text-body-sm font-bold text-text-2"
           >
             {t("credentialCancel")}
           </button>
@@ -108,7 +108,7 @@ export function CredentialEditorPanel({
               type="button"
               onClick={() => void clear()}
               disabled={busy}
-              className="rounded-[10px] bg-destructive/10 px-3.5 py-2 text-[13px] font-bold text-destructive disabled:cursor-default disabled:opacity-50"
+              className="rounded-sm bg-destructive/10 px-3.5 py-2 text-body-sm font-bold text-destructive disabled:cursor-default disabled:opacity-50"
             >
               {clearState.busy ? <Spinner size="sm" /> : t("credentialClear")}
             </button>
@@ -124,7 +124,7 @@ export function CredentialEditorPanel({
             (services/api/src/routes/admin/vision-providers.ts gates the whole route on
             `encryption.isEnabled`, not just the key case), so don't claim it's encrypted. */}
         {!isUrl && (
-          <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-text-3">
+          <p className="mt-2.5 flex items-center gap-1.5 text-micro text-text-3">
             <Lock className="size-[13px] shrink-0 text-primary" strokeWidth={2} />
             {t("credentialStoredEncrypted")}
           </p>

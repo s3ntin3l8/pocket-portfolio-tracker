@@ -72,7 +72,7 @@ export function PricingFields({
 
   return (
     <div className="border-t border-line pt-[18px]">
-      <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[.06em] text-text-3">
+      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-3">
         {t("amount")}
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -134,11 +134,11 @@ export function PricingFields({
       {/* Live estimated-total line — suppressed on desktop, where the Summary rail
           (`summary-rail.tsx`) shows the same figure alongside the rest of the form. */}
       {total && !isDesktop && (
-        <div className="mt-3 flex items-center justify-between rounded-[14px] border border-border bg-card-2 px-4 py-3.5">
-          <span className="text-[13px] font-semibold text-text-2">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-card-2 px-4 py-3.5">
+          <span className="text-body-sm font-semibold text-text-2">
             {t(totalLabelKey(total.kind))}
           </span>
-          <span className="text-[18px] font-extrabold text-foreground">
+          <span className="text-lg font-extrabold text-foreground">
             {formatMoney(total.total, currency)}
           </span>
         </div>
@@ -175,7 +175,7 @@ export function DetailsFields({
 }: DetailsFieldsProps) {
   return (
     <div className="border-t border-line pt-[18px]">
-      <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[.06em] text-text-3">
+      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-3">
         {t("details")}
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -205,7 +205,7 @@ export function DetailsFields({
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("notesPlaceholder")}
               rows={2}
-              className="flex w-full resize-y rounded-[13px] border border-border bg-card px-3.5 py-[13px] text-base font-medium transition-colors placeholder:text-text-3 focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+              className="flex w-full resize-y rounded-md border border-border bg-card px-3.5 py-[13px] text-base font-medium transition-colors placeholder:text-text-3 focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
             />
           </Field>
         </div>

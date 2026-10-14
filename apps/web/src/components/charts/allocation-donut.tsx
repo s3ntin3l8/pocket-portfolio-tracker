@@ -176,8 +176,8 @@ export function AllocationDonut({
         </ResponsiveContainer>
         {formattedTotal && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2">
-            <span className="text-center text-[10px] font-semibold text-text-3">{label}</span>
-            <span className="tabular mt-0.5 text-center text-[15px] font-extrabold">
+            <span className="text-center text-micro font-semibold text-text-3">{label}</span>
+            <span className="tabular mt-0.5 text-center text-body font-extrabold">
               {formattedTotal}
             </span>
           </div>
@@ -192,12 +192,12 @@ export function AllocationDonut({
               className={`flex min-w-0 flex-1 items-center gap-2 ${onSliceClick ? "cursor-pointer hover:underline" : "cursor-default"}`}
             >
               <span
-                className="size-2.5 shrink-0 rounded-[3px]"
+                className="size-2.5 shrink-0 rounded-xs"
                 style={{ background: colorOf(d.key, i) }}
               />
               <span className="truncate text-xs font-semibold">{d.label}</span>
             </button>
-            <span className="tabular shrink-0 text-right text-[11px] font-semibold text-text-2">
+            <span className="tabular shrink-0 text-right text-micro font-semibold text-text-2">
               {compact(d.value)}
             </span>
             {showPercent && (
@@ -208,10 +208,10 @@ export function AllocationDonut({
           </li>
         ))}
         {hasAtCost && atCostLegend && (
-          <li className="flex items-center gap-2 text-[11px] font-medium text-text-2">
+          <li className="flex items-center gap-2 text-micro font-medium text-text-2">
             <span
               aria-hidden
-              className="size-2.5 shrink-0 rounded-[3px] border border-text-3"
+              className="size-2.5 shrink-0 rounded-xs border border-text-3"
               style={{
                 backgroundImage:
                   "repeating-linear-gradient(45deg, var(--color-text-3) 0 2px, transparent 2px 4px)",

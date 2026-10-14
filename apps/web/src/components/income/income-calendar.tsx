@@ -94,7 +94,7 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
   return (
     <div className="rounded-2xl bg-card p-[22px] shadow-card">
       <div className="mb-3">
-        <h2 className="text-base font-bold">{t("calendarTitle")}</h2>
+        <h2 className="text-base font-semibold">{t("calendarTitle")}</h2>
         <p className="mt-0.5 text-xs font-medium text-text-2">{t("calendarSubtitle")}</p>
       </div>
 
@@ -118,7 +118,7 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
       </div>
 
       {/* ── Footer: year range + truncation hint ── */}
-      <div className="mt-2.5 text-[10px] font-semibold text-text-2">
+      <div className="mt-2.5 text-micro font-semibold text-text-2">
         <span className="tabular">{yearRange}</span>
         {droppedCount > 0 && (
           <span className="ml-2 text-text-mute">

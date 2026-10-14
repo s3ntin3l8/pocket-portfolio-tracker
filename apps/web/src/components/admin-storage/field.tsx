@@ -40,10 +40,7 @@ export function Field({
         value={value ?? ""}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          "rounded-[12px] border-border bg-background text-sm",
-          monospace && "font-mono",
-        )}
+        className={cn("rounded-md border-border bg-background text-sm", monospace && "font-mono")}
       />
     </div>
   );

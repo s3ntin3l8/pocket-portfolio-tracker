@@ -21,7 +21,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
         {/* Best run */}
         <div>
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[11px] text-text-2">{t("bestRun")}</span>
+            <span className="text-micro text-text-2">{t("bestRun")}</span>
             {bestLen !== null ? (
               <span className="tabular text-sm font-bold text-success">
                 {tU("streakMonths", { count: bestLen })}
@@ -31,7 +31,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
             )}
           </div>
           {streaks.bestStreak && (
-            <p className="mt-0.5 text-[11px] text-text-3">
+            <p className="mt-0.5 text-micro text-text-3">
               {bestRet !== null && (
                 <span className="font-semibold text-success">{formatPercent(bestRet, locale)}</span>
               )}
@@ -41,7 +41,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
             </p>
           )}
           {streaks.bestMonth && (
-            <p className="mt-0.5 text-[11px] text-text-2">
+            <p className="mt-0.5 text-micro text-text-2">
               {t("bestMonth")}:{" "}
               <span className="font-semibold text-success">
                 {formatPercent(Number(streaks.bestMonth.returnPct), locale)}
@@ -56,7 +56,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
         {/* Worst run */}
         <div>
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[11px] text-text-2">{t("worstRun")}</span>
+            <span className="text-micro text-text-2">{t("worstRun")}</span>
             {worstLen !== null ? (
               <span className="tabular text-sm font-bold text-destructive">
                 {tU("streakMonths", { count: worstLen })}
@@ -66,7 +66,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
             )}
           </div>
           {streaks.worstStreak && (
-            <p className="mt-0.5 text-[11px] text-text-3">
+            <p className="mt-0.5 text-micro text-text-3">
               {worstRet !== null && (
                 <span className="font-semibold text-destructive">
                   {formatPercent(worstRet, locale)}
@@ -78,7 +78,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
             </p>
           )}
           {streaks.worstMonth && (
-            <p className="mt-0.5 text-[11px] text-text-2">
+            <p className="mt-0.5 text-micro text-text-2">
               {t("worstMonth")}:{" "}
               <span className="font-semibold text-destructive">
                 {formatPercent(Number(streaks.worstMonth.returnPct), locale)}
@@ -89,7 +89,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
         </div>
       </div>
 
-      <p className="mt-3 text-[11px] text-text-2">
+      <p className="mt-3 text-micro text-text-2">
         {t("positiveMonths", {
           pct: Math.round(winRate * 100),
           pos: streaks.positiveMonths,

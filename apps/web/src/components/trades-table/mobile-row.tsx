@@ -35,7 +35,7 @@ export function MobileRow({
           symbol={tr.instrument?.symbol}
           market={tr.instrument?.market}
           assetClass={tr.instrument?.assetClass}
-          className="mt-0.5 size-[42px] rounded-[13px]"
+          className="mt-0.5 size-[42px] rounded-md"
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2">

@@ -38,7 +38,7 @@ export function CashOnHandCard({ cash, locale }: { cash: Record<string, string>;
       <CardContent className="space-y-4 pt-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold">{t("cashOnHandTitle")}</h2>
+            <h2 className="text-base font-semibold">{t("cashOnHandTitle")}</h2>
             <p className="text-xs text-muted-foreground">{t("cashOnHandSubtitle")}</p>
           </div>
           <p className="tabular shrink-0 text-lg font-extrabold">{totalLabel}</p>
