@@ -59,7 +59,7 @@ function StatBlock({
 function Breakdown({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="col-span-full border-t border-line pt-4 @xl:col-span-2 @xl:border-l @xl:border-t-0 @xl:pl-6 @xl:pt-0">
-      <p className="mb-2.5 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+      <p className="mb-2.5 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
         {label}
       </p>
       <div className="flex flex-col gap-2.5">{children}</div>
@@ -185,8 +185,8 @@ export function ReconciliationBanner({
   onDismiss?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-amber-400/40 bg-card px-4 py-3.5 shadow-[0_1px_2px_rgba(15,27,20,.04)]">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+    <div className="flex items-center gap-3 rounded-2xl border border-warning/40 bg-card px-4 py-3.5 shadow-hairline">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
         <AlertTriangle className="size-4.5" />
       </span>
       <div className="min-w-0 flex-1">
@@ -195,13 +195,13 @@ export function ReconciliationBanner({
         {action && (
           <Link
             href={action.href}
-            className="mt-1.5 inline-block text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+            className="mt-1.5 inline-block text-xs font-semibold text-warn-strong underline-offset-2 hover:underline"
           >
             {action.label}
           </Link>
         )}
       </div>
-      <span className="shrink-0 rounded-md bg-amber-500/15 px-2 py-1 text-micro font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+      <span className="shrink-0 rounded-md bg-warning/15 px-2 py-1 text-micro font-bold uppercase tracking-wide text-warn-strong">
         {tag}
       </span>
       {onDismiss && (

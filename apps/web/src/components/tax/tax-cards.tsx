@@ -30,8 +30,8 @@ export function EstimatedTaxHero({
       style={{
         background:
           tone === "green"
-            ? "linear-gradient(135deg,#0E9F6E,#0B7D58)"
-            : "linear-gradient(135deg,#7C5CFC,#5B3FD6)",
+            ? "linear-gradient(135deg,var(--primary),var(--primary-deep))"
+            : "linear-gradient(135deg,var(--violet),var(--violet-deep))",
       }}
     >
       <p className="truncate text-xs font-semibold text-white/80">{label}</p>
@@ -82,13 +82,16 @@ export function AllowanceSummaryBoxes({
         <div className="mt-2 h-[7px] overflow-hidden rounded-xs bg-line">
           <div
             className="h-full rounded-xs transition-all"
-            style={{ width: `${Math.min(100, Math.max(0, usedPct))}%`, backgroundColor: "#7C5CFC" }}
+            style={{
+              width: `${Math.min(100, Math.max(0, usedPct))}%`,
+              backgroundColor: "var(--violet)",
+            }}
           />
         </div>
-        <p className="mt-1.5 text-micro font-medium text-text-3">
+        <p className="mt-1.5 text-micro font-medium text-text-2">
           {t("allowanceBoxes.leftDesc", { used: money(usedYtd), annual: money(allowanceAnnual) })}
         </p>
-        <p className="mt-1 text-micro font-medium text-text-3">
+        <p className="mt-1 text-micro font-medium text-text-2">
           {t("allowance.taxSaving")}: {money(taxSavingAvailable)}
         </p>
       </div>
@@ -97,7 +100,7 @@ export function AllowanceSummaryBoxes({
           {t("allowanceBoxes.taxableGains")}
         </span>
         <p className="tabular mt-1.5 text-xl font-extrabold">{money(taxable)}</p>
-        <p className="mt-1 text-micro font-medium text-text-3">
+        <p className="mt-1 text-micro font-medium text-text-2">
           {t("allowanceBoxes.taxableGainsDesc", { tax: money(estimatedTax) })}
         </p>
       </div>
@@ -146,7 +149,7 @@ export function DistributionCard({
           />
         </div>
         {d.overAllocated && (
-          <div className="flex items-start gap-2 rounded-md border border-yellow-400 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-600 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
+          <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warn-strong">
             <TriangleAlert className="size-4 mt-0.5 shrink-0" />
             <span>{t("distribution.overAllocated")}</span>
           </div>
@@ -202,19 +205,19 @@ function PotCard({
   return (
     <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
       <span className="text-micro font-semibold text-text-2">{title}</span>
-      <p className="mt-0.5 text-micro text-text-3">{desc}</p>
+      <p className="mt-0.5 text-micro text-text-2">{desc}</p>
       <div className="mt-2 space-y-1">
         <div className="flex justify-between text-micro">
-          <span className="text-text-3">{t("coverage.pots.net")}</span>
+          <span className="text-text-2">{t("coverage.pots.net")}</span>
           <span className="tabular font-bold">{money(netGainLoss)}</span>
         </div>
         <div className="flex justify-between text-micro">
-          <span className="text-text-3">{t("coverage.pots.used")}</span>
+          <span className="text-text-2">{t("coverage.pots.used")}</span>
           <span className="tabular font-bold">{money(used)}</span>
         </div>
         {Number(carryForward) > 0 && (
           <div className="flex justify-between text-micro">
-            <span className="text-text-3">{t("coverage.pots.carryForward")}</span>
+            <span className="text-text-2">{t("coverage.pots.carryForward")}</span>
             <span className="tabular font-bold">{money(carryForward)}</span>
           </div>
         )}
@@ -272,11 +275,11 @@ export function CoverageCard({
                 className="h-full rounded-xs transition-all"
                 style={{
                   width: `${Math.min(100, Math.max(0, usedPct))}%`,
-                  backgroundColor: "#7C5CFC",
+                  backgroundColor: "var(--violet)",
                 }}
               />
             </div>
-            <p className="mt-1.5 text-micro font-medium text-text-3">
+            <p className="mt-1.5 text-micro font-medium text-text-2">
               {isTaxable ? t("coverage.fsa.exceeded") : t("coverage.fsa.allUsed")}
             </p>
           </div>
@@ -309,7 +312,7 @@ export function CoverageCard({
         </div>
 
         {hasCf ? (
-          <p className="text-micro font-medium text-text-3">{t("coverage.pots.editorHint")}</p>
+          <p className="text-micro font-medium text-text-2">{t("coverage.pots.editorHint")}</p>
         ) : null}
 
         <Separator />

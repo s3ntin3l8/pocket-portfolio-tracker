@@ -105,9 +105,7 @@ export function IdDividendsTable({
                     {fmt(r.gross)}
                   </TableCell>
                   <TableCell className="tabular text-right font-semibold">{fmt(r.tax)}</TableCell>
-                  <TableCell className="tabular text-right text-emerald-600 dark:text-emerald-400">
-                    {fmt(r.net)}
-                  </TableCell>
+                  <TableCell className="tabular text-right text-success">{fmt(r.net)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -120,7 +118,7 @@ export function IdDividendsTable({
                 <TableCell className="tabular text-right font-semibold">
                   {fmt(totalDividendTax)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                <TableCell className="tabular text-right font-semibold text-success">
                   {fmt(totalDividendNet)}
                 </TableCell>
               </TableRow>

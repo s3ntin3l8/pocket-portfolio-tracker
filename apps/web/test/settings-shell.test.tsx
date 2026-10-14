@@ -31,6 +31,7 @@ vi.mock("@/components/scope-link", () => ({
 
 import { SettingsShell, type ShellNavItem } from "../src/components/settings-shell";
 import { SectionHeader } from "../src/components/section-header";
+import { tint } from "../src/lib/tint";
 
 const NAV_ITEMS: ShellNavItem[] = [
   {
@@ -39,8 +40,7 @@ const NAV_ITEMS: ShellNavItem[] = [
     icon: <UserRound />,
     title: "Account",
     subtitle: "Currency, language & appearance",
-    color: "#0E9F6E",
-    bg: "rgba(16,163,114,.14)",
+    ...tint("primary"),
   },
   {
     key: "portfolios",
@@ -48,8 +48,7 @@ const NAV_ITEMS: ShellNavItem[] = [
     icon: <Briefcase />,
     title: "Portfolios & holders",
     subtitle: "2 portfolios · 1 holder",
-    color: "#7C5CFC",
-    bg: "rgba(124,92,252,.16)",
+    ...tint("violet"),
   },
 ];
 

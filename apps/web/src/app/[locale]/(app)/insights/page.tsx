@@ -121,7 +121,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
 
       <div
         className="rounded-2xl p-6 text-white"
-        style={{ background: "linear-gradient(135deg,#11211a,#1d3a2c)" }}
+        style={{ background: "linear-gradient(135deg,var(--hero-ink),var(--hero-ink-2))" }}
       >
         <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
         <p className="tabular mt-1 text-hero font-extrabold leading-none sm:text-hero">

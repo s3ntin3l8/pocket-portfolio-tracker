@@ -20,14 +20,15 @@ import {
   formatQuantity,
   formatSignedMoney,
 } from "@/lib/utils";
+import { tint } from "@/lib/tint";
 
 const ICONS = {
-  income: { icon: Coins, bg: "rgba(14,159,110,.12)", fg: "#0E9F6E" },
-  trades: { icon: ScrollText, bg: "rgba(224,165,58,.14)", fg: "var(--gold-fg)" },
-  savings: { icon: PiggyBank, bg: "rgba(124,92,252,.12)", fg: "#7C5CFC" },
-  tax: { icon: Receipt, bg: "rgba(13,148,136,.12)", fg: "var(--color-chart-3)" },
-  gold: { icon: Gem, bg: "rgba(224,165,58,.14)", fg: "var(--gold-fg)" },
-  documents: { icon: FileText, bg: "rgba(59,130,246,.12)", fg: "#3B82F6" },
+  income: { icon: Coins, ...tint("primary") },
+  trades: { icon: ScrollText, ...tint("gold") },
+  savings: { icon: PiggyBank, ...tint("violet") },
+  tax: { icon: Receipt, ...tint("teal") },
+  gold: { icon: Gem, ...tint("gold") },
+  documents: { icon: FileText, ...tint("info") },
 } as const;
 
 /*
@@ -356,13 +357,13 @@ export async function TaxCard({ locale }: CardProps) {
             ? [
                 {
                   pct: usedPct,
-                  color: "#7C5CFC",
+                  color: "var(--violet)",
                   label: t("tax.tooltipUsed"),
                   amount: m(usedYtd),
                 },
                 {
                   pct: Math.max(0, 100 - usedPct),
-                  color: "#7C5CFC",
+                  color: "var(--violet)",
                   striped: true,
                   label: t("tax.tooltipAllowance"),
                   amount: m(allowanceAnnual),

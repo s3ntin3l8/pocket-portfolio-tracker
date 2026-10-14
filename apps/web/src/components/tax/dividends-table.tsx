@@ -113,7 +113,7 @@ export function DividendsTable({
                   <TableCell className="tabular text-right font-semibold">
                     {fmt(r.tax, r.currency)}
                   </TableCell>
-                  <TableCell className="tabular text-right text-emerald-600 dark:text-emerald-400">
+                  <TableCell className="tabular text-right text-success">
                     {fmt(r.net, r.currency)}
                   </TableCell>
                 </TableRow>
@@ -128,7 +128,7 @@ export function DividendsTable({
                 <TableCell className="tabular text-right font-semibold">
                   {joinTotals("tax")}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                <TableCell className="tabular text-right font-semibold text-success">
                   {joinTotals("net")}
                 </TableCell>
               </TableRow>

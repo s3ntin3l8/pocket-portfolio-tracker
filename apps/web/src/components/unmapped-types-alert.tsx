@@ -14,7 +14,7 @@ export async function UnmappedTypesAlert({ types }: { types: UnmappedEventType[]
   return (
     <div
       role="alert"
-      className="rounded-lg border border-amber-400/40 bg-amber-50 p-4 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+      className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-warn-strong"
     >
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 size-5 shrink-0" />

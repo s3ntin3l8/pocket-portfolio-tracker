@@ -32,7 +32,7 @@ export function AnomalyBanner({
         "flex items-center gap-3 rounded-lg border px-4 py-3 text-sm",
         anomalyErrorsCount > 0
           ? "border-destructive/40 bg-destructive/5 text-destructive"
-          : "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+          : "border-warning/40 bg-warning/10 text-warn-strong",
       )}
     >
       {anomalyErrorsCount > 0 ? (

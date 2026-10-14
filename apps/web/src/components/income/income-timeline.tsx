@@ -20,6 +20,7 @@ import {
   TimelineColumnHeader,
   type IncomeEventRow,
 } from "@/components/income/income-events-table";
+import { tint } from "@/lib/tint";
 
 /** Sum a year's events per currency (income can span currencies). */
 function totalsByCurrency(events: IncomeEventRow[]): Record<string, number> {
@@ -243,7 +244,10 @@ export function IncomeTimeline({
           <span className="flex items-center gap-1.5">
             <span
               className="size-2.5 rounded-xs"
-              style={{ backgroundColor: "rgba(16,163,114,.12)", border: "1.5px dashed #0E9F6E" }}
+              style={{
+                backgroundColor: tint("primary", 12).bg,
+                border: "1.5px dashed var(--primary)",
+              }}
             />
             {t("legendForecast")}
           </span>
@@ -282,7 +286,7 @@ export function IncomeTimeline({
                       className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card pl-3 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
                       {yearFilter === "all" ? t("allYears") : yearFilter}
-                      <ChevronDown className="size-3.5 shrink-0 text-text-3" />
+                      <ChevronDown className="size-3.5 shrink-0 text-text-2" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[9rem]">
@@ -305,7 +309,7 @@ export function IncomeTimeline({
               {/* Group-by is a display mode, not a filter — a distinct, smaller pill
                   pair kept last so the search still lands at the far right. */}
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className="whitespace-nowrap text-micro font-semibold text-text-3">
+                <span className="whitespace-nowrap text-micro font-semibold text-text-2">
                   {t("groupByLabel")}
                 </span>
                 {(
@@ -368,15 +372,15 @@ export function IncomeTimeline({
                 >
                   <div className="flex items-baseline gap-2.5 min-w-0">
                     {loadingYear === g.year && !lazyRows ? (
-                      <Spinner size="sm" className="shrink-0 text-text-3" />
+                      <Spinner size="sm" className="shrink-0 text-text-2" />
                     ) : isOpen ? (
-                      <ChevronDown className="size-4 shrink-0 text-text-3" />
+                      <ChevronDown className="size-4 shrink-0 text-text-2" />
                     ) : (
-                      <ChevronRight className="size-4 shrink-0 text-text-3" />
+                      <ChevronRight className="size-4 shrink-0 text-text-2" />
                     )}
                     <span className="text-body font-extrabold">{g.year}</span>
                     {g.subtitle && (
-                      <span className="truncate text-micro font-semibold text-text-3">
+                      <span className="truncate text-micro font-semibold text-text-2">
                         {g.subtitle}
                       </span>
                     )}
@@ -393,7 +397,7 @@ export function IncomeTimeline({
                     {g.assumptions && <p className="pt-2 text-xs text-text-2">{g.assumptions}</p>}
                     {loadingYear === g.year && !lazyRows ? (
                       <div className="flex justify-center py-6">
-                        <Spinner size="md" className="text-text-3" />
+                        <Spinner size="md" className="text-text-2" />
                       </div>
                     ) : displayRows ? (
                       <IncomeEventsTable
@@ -412,7 +416,7 @@ export function IncomeTimeline({
             <button
               type="button"
               onClick={() => loadYear(nextOlder)}
-              className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold text-text-3 hover:text-foreground"
+              className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold text-text-2 hover:text-foreground"
             >
               {loadingYear === nextOlder ? (
                 <Spinner size="sm" />

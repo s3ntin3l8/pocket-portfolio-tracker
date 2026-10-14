@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { IncomeEvent, UpcomingPayment } from "@portfolio/api-client";
 import { monogram } from "@/lib/brokerages";
 import { cn } from "@/lib/utils";
+import { tint } from "@/lib/tint";
 
 /** Unified row type: historical events + upcoming payments merged into one table. */
 export type IncomeEventRow = IncomeEvent & {
@@ -39,7 +40,7 @@ export function TimelineColumnHeader() {
   return (
     <div
       className={cn(
-        "hidden gap-3.5 border-b border-line px-0.5 py-2.5 text-micro font-bold uppercase tracking-wide text-text-3 sm:grid",
+        "hidden gap-3.5 border-b border-line px-0.5 py-2.5 text-micro font-bold uppercase tracking-wide text-text-2 sm:grid",
         TIMELINE_GRID,
       )}
     >
@@ -65,9 +66,7 @@ export function TimelineBadge({
   forecast: boolean;
 }) {
   const tone =
-    type === "coupon" || type === "interest"
-      ? { bg: "rgba(13,148,136,.16)", fg: "#0D9488" }
-      : { bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" };
+    type === "coupon" || type === "interest" ? { ...tint("teal") } : { ...tint("primary") };
   return (
     <span
       className="inline-flex size-9 shrink-0 items-center justify-center rounded-sm text-micro font-extrabold"

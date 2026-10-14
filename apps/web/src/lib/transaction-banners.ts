@@ -18,7 +18,13 @@ export interface FlowMixRow {
   color: string;
 }
 
-export const BANNER_PALETTE = ["#0E9F6E", "#0D9488", "#7C5CFC", "#E0A53A", "#64748B"];
+export const BANNER_PALETTE = [
+  "var(--primary)",
+  "var(--chart-3)",
+  "var(--violet)",
+  "var(--chart-2)",
+  "var(--chart-5)",
+];
 
 /** Sum is display-only (a banner footer, not a ledger figure) so it reuses the same plain-
  *  number `txAmountDisplay`/`txNetAmountDisplay` helpers the table's own Amount/Net Amount

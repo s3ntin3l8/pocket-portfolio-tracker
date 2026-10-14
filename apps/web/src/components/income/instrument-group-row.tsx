@@ -70,9 +70,9 @@ export function InstrumentGroupRow({
         className="flex w-full items-center gap-3.5 border-b border-line px-0.5 py-[11px] text-left hover:bg-muted/40"
       >
         {expanded ? (
-          <ChevronDown className="size-4 shrink-0 text-text-3" />
+          <ChevronDown className="size-4 shrink-0 text-text-2" />
         ) : (
-          <ChevronRight className="size-4 shrink-0 text-text-3" />
+          <ChevronRight className="size-4 shrink-0 text-text-2" />
         )}
         <TimelineBadge label={label} type={group.dominantType} forecast={allForecast} />
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -81,7 +81,7 @@ export function InstrumentGroupRow({
             <span className="truncate text-micro font-medium text-text-2">{group.displayName}</span>
           )}
           {allForecast && (
-            <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-3">
+            <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-2">
               {t("est")}
             </span>
           )}
@@ -111,7 +111,7 @@ export function InstrumentGroupRow({
           const perShare =
             e.perShare != null ? formatMoney(Number(e.perShare), e.currency, locale) : "—";
           const estTag = forecast && (
-            <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-3">
+            <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-2">
               {t("est")}
             </span>
           );
@@ -119,7 +119,7 @@ export function InstrumentGroupRow({
           return (
             <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
               {showBand && (
-                <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3">
+                <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-2">
                   {monthFmt!.format(new Date(e.date))}
                   <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
                 </div>

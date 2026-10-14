@@ -18,7 +18,7 @@ export function TwoStatFooter({
       <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-2">
         {metrics.map((m, i) => (
           <div key={i} className="min-w-0">
-            <p className="text-micro font-semibold uppercase tracking-[.03em] text-text-3 [overflow-wrap:normal] [word-break:break-word]">
+            <p className="text-micro font-semibold uppercase tracking-[.03em] text-text-2 [overflow-wrap:normal] [word-break:break-word]">
               {m.label}
             </p>
             <p

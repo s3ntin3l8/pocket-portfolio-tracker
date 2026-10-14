@@ -176,7 +176,7 @@ export function IncomeEventsTable({
                 .join(" · ") || undefined;
 
             const estTag = forecast && (
-              <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-3">
+              <span className="shrink-0 rounded-xs bg-line px-1.5 py-0.5 text-micro font-bold uppercase tracking-wide text-text-2">
                 {t("est")}
               </span>
             );
@@ -184,7 +184,7 @@ export function IncomeEventsTable({
             return (
               <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
                 {showBand && (
-                  <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3">
+                  <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-2">
                     {monthFmt!.format(new Date(e.date))}
                     <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
                   </div>

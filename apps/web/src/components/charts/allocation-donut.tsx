@@ -184,7 +184,7 @@ export function AllocationDonut({
         </ResponsiveContainer>
         {formattedTotal && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2">
-            <span className="text-center text-micro font-semibold text-text-3">{label}</span>
+            <span className="text-center text-micro font-semibold text-text-2">{label}</span>
             <span className="tabular mt-0.5 text-center text-body font-extrabold">
               {formattedTotal}
             </span>
@@ -219,10 +219,10 @@ export function AllocationDonut({
           <li className="flex items-center gap-2 text-micro font-medium text-text-2">
             <span
               aria-hidden
-              className="size-2.5 shrink-0 rounded-xs border border-text-3"
+              className="size-2.5 shrink-0 rounded-xs border border-text-2"
               style={{
                 backgroundImage:
-                  "repeating-linear-gradient(45deg, var(--color-text-3) 0 2px, transparent 2px 4px)",
+                  "repeating-linear-gradient(45deg, var(--color-text-2) 0 2px, transparent 2px 4px)",
               }}
             />
             {atCostLegend}

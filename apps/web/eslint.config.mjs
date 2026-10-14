@@ -3,6 +3,17 @@ import nextTypescript from "eslint-config-next/typescript";
 
 // eslint-config-next 16 ships native ESLint flat config arrays under these subpaths,
 // so we spread them directly instead of bridging legacy configs via FlatCompat.
+// Colour literals bypass the theme tokens in `src/app/globals.css` (and the light/dark
+// switch). Use a token instead: Tailwind classes (`bg-primary/15`, `text-gold-fg`,
+// `border-warning/40`), `var(--token)` / `color-mix(in srgb, var(--token) N%, transparent)`
+// in style props and chart attributes, or `tint()` from `@/lib/tint` for badge pairs.
+// Matches hex colours (#abc, #aabbcc, #aabbccdd) and rgb()/rgba()/hsl()/hsla() inside any
+// string or template literal; comments are not matched.
+const COLOUR_LITERAL =
+  "(#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z_-])|\\b(?:rgb|hsl)a?\\()";
+const colourMessage =
+  "No colour literals (hex / rgb[a] / hsl[a]) — use a theme token from globals.css (e.g. bg-primary/15, var(--violet), tint() from @/lib/tint). See eslint.config.mjs for the allowlist.";
+
 const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
@@ -21,6 +32,35 @@ const eslintConfig = [
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    // Allowlist (each needs a concrete colour string, not a CSS variable):
+    //  - theme-color-sync.tsx / [locale]/layout.tsx: <meta name="theme-color"> is read by the
+    //    browser chrome outside the CSS cascade, so it cannot use var().
+    //  - lib/brokerages.ts: hash-derived hsl() hues for unknown brokerages — computed per name
+    //    at runtime, so there is no token to point at.
+    //  - components/onboarding/**: pre-auth intro screens with their own palette, pending a
+    //    port onto the tokens (tracked as track 7 of the UI modernization plan).
+    ignores: [
+      "src/components/theme-color-sync.tsx",
+      "src/lib/brokerages.ts",
+      "src/app/[[]locale]/layout.tsx",
+      "src/components/onboarding/**",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: `Literal[value=/${COLOUR_LITERAL}/]`,
+          message: colourMessage,
+        },
+        {
+          selector: `TemplateElement[value.raw=/${COLOUR_LITERAL}/]`,
+          message: colourMessage,
+        },
       ],
     },
   },

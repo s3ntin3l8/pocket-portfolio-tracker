@@ -25,9 +25,6 @@ export function PortfolioCardLink({ portfolioId, name }: { portfolioId: string; 
  *  {@link PortfolioCardLink} above. */
 export function PortfolioCardChevron() {
   return (
-    <ChevronRight
-      aria-hidden
-      className="mt-0.5 size-[18px] shrink-0 text-[color:var(--chevron,#C3CBC6)]"
-    />
+    <ChevronRight aria-hidden className="mt-0.5 size-[18px] shrink-0 text-muted-foreground/50" />
   );
 }

@@ -43,12 +43,12 @@ export function PortfolioValueCard({
       <div className="flex flex-col gap-3">
         {/* Total value */}
         <div>
-          <p className="text-micro font-semibold text-text-3">{totalLabel}</p>
+          <p className="text-micro font-semibold text-text-2">{totalLabel}</p>
           <p className="tabular mt-0.5 text-heading font-extrabold">{totalValueFormatted}</p>
         </div>
         {/* All-time P&L */}
         <div className="border-t border-line pt-3">
-          <p className="text-micro font-semibold text-text-3">{allTimeLabel}</p>
+          <p className="text-micro font-semibold text-text-2">{allTimeLabel}</p>
           <GainFigure
             amount={allTimeAmount}
             pct={allTimePct}
@@ -60,7 +60,7 @@ export function PortfolioValueCard({
         </div>
         {/* Today's change */}
         <div className="border-t border-line pt-3">
-          <p className="text-micro font-semibold text-text-3">{todayLabel}</p>
+          <p className="text-micro font-semibold text-text-2">{todayLabel}</p>
           <div className="mt-0.5 flex items-baseline gap-2">
             <p className={cn("tabular text-lg font-extrabold", toneClass(todayTone))}>
               {todayAmount}

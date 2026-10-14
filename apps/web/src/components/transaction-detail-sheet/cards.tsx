@@ -9,7 +9,7 @@ import { SOURCE_PILL, DEFAULT_PILL, DRAFT_PILL, INCOME_BREAKDOWN_TYPES } from ".
 
 export function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 ml-0.5 mt-5 text-xs font-bold uppercase tracking-[.04em] text-text-3 first:mt-0">
+    <p className="mb-2 ml-0.5 mt-5 text-xs font-bold uppercase tracking-[.04em] text-text-2 first:mt-0">
       {children}
     </p>
   );

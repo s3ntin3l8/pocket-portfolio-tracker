@@ -9,8 +9,8 @@ import type { Portfolio, TrConnection, IbkrConnection } from "@portfolio/api-cli
 type ConnectionStatus = "connected" | "awaiting_2fa" | "expired" | "error" | "disconnected";
 
 const PILL_TONE: Record<"ok" | "pending" | "bad" | "idle", string> = {
-  ok: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  ok: "bg-success/15 text-success",
+  pending: "bg-warning/15 text-warn-strong",
   bad: "bg-destructive/15 text-destructive",
   idle: "bg-muted text-muted-foreground",
 };
@@ -101,7 +101,7 @@ export function TrConnectionSection({
           {boundElsewhere && (
             <div
               role="note"
-              className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+              className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warn-strong"
             >
               {ttr("boundElsewhere")}
             </div>

@@ -70,7 +70,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
         className={cn(
           // text-base (16px) on mobile avoids iOS/Android zoom-on-focus; text-sm from sm: up.
           "flex w-full items-center justify-between gap-2 rounded-md border border-border bg-card px-3.5 py-[13px] text-base font-medium transition-colors focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm",
-          !formatted && "text-text-3",
+          !formatted && "text-text-2",
           className,
         )}
       >

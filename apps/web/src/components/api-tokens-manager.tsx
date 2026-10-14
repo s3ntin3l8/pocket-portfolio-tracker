@@ -141,7 +141,7 @@ export function ApiTokensManager({
                 className={cn(
                   "shrink-0 rounded-sm px-2 py-1 text-micro font-bold",
                   tok.scope === "write"
-                    ? "bg-[rgba(224,165,58,.16)] text-[var(--gold-fg)]"
+                    ? "bg-gold-fg/15 text-gold-fg"
                     : "bg-success/15 text-success",
                 )}
               >

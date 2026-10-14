@@ -62,12 +62,12 @@ export function PlanRow({
       <div className="shrink-0 text-right">
         <p className="tabular text-body-sm font-bold">{amount}</p>
         {driftRow ? (
-          <p className="tabular mt-0.5 text-micro font-semibold text-text-3">
+          <p className="tabular mt-0.5 text-micro font-semibold text-text-2">
             {t("nowPct", { pct: driftRow.actualPct.toFixed(0) })}
           </p>
         ) : (
           plan.status === "stopped" && (
-            <p className="mt-0.5 text-micro font-semibold text-text-3">{t("statusStopped")}</p>
+            <p className="mt-0.5 text-micro font-semibold text-text-2">{t("statusStopped")}</p>
           )
         )}
       </div>

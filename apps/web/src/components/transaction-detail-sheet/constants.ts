@@ -10,27 +10,28 @@ import {
   Scale,
   Split,
 } from "lucide-react";
+import { tint } from "@/lib/tint";
 
 export const TYPE_BADGE: Record<string, { icon: LucideIcon; bg: string; fg: string }> = {
-  buy: { icon: ArrowRight, bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  savings_plan: { icon: ArrowRight, bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  sell: { icon: ArrowLeft, bg: "rgba(229,72,77,.15)", fg: "#E5484D" },
-  dividend: { icon: Coins, bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" },
-  coupon: { icon: Coins, bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" },
-  interest: { icon: ArrowDownLeft, bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  deposit: { icon: ArrowDownLeft, bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  bonus_cash: { icon: ArrowDownLeft, bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  loan_drawdown: { icon: ArrowDownLeft, bg: "rgba(16,163,114,.14)", fg: "#0E9F6E" },
-  withdrawal: { icon: ArrowUpRight, bg: "rgba(229,72,77,.15)", fg: "#E5484D" },
-  fee: { icon: ArrowUpRight, bg: "rgba(229,72,77,.15)", fg: "#E5484D" },
-  tax: { icon: ArrowUpRight, bg: "rgba(229,72,77,.15)", fg: "#E5484D" },
-  loan_repayment: { icon: ArrowUpRight, bg: "rgba(229,72,77,.15)", fg: "#E5484D" },
-  split: { icon: Split, bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  bonus: { icon: Split, bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  rights: { icon: Split, bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  transfer_in: { icon: ArrowLeftRight, bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
-  transfer_out: { icon: ArrowLeftRight, bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
-  adjustment: { icon: Scale, bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
+  buy: { icon: ArrowRight, ...tint("primary") },
+  savings_plan: { icon: ArrowRight, ...tint("primary") },
+  sell: { icon: ArrowLeft, ...tint("destructive") },
+  dividend: { icon: Coins, ...tint("gold") },
+  coupon: { icon: Coins, ...tint("gold") },
+  interest: { icon: ArrowDownLeft, ...tint("primary") },
+  deposit: { icon: ArrowDownLeft, ...tint("primary") },
+  bonus_cash: { icon: ArrowDownLeft, ...tint("primary") },
+  loan_drawdown: { icon: ArrowDownLeft, ...tint("primary") },
+  withdrawal: { icon: ArrowUpRight, ...tint("destructive") },
+  fee: { icon: ArrowUpRight, ...tint("destructive") },
+  tax: { icon: ArrowUpRight, ...tint("destructive") },
+  loan_repayment: { icon: ArrowUpRight, ...tint("destructive") },
+  split: { icon: Split, ...tint("violet") },
+  bonus: { icon: Split, ...tint("violet") },
+  rights: { icon: Split, ...tint("violet") },
+  transfer_in: { icon: ArrowLeftRight, ...tint("teal") },
+  transfer_out: { icon: ArrowLeftRight, ...tint("teal") },
+  adjustment: { icon: Scale, ...tint("teal") },
 };
 
 export const DEFAULT_BADGE = { icon: Receipt, bg: "var(--border)", fg: "var(--text-mute)" };
@@ -42,14 +43,14 @@ export const DEFAULT_BADGE = { icon: Receipt, bg: "var(--border)", fg: "var(--te
 export const INCOME_BREAKDOWN_TYPES = ["dividend", "coupon"] as const;
 
 export const SOURCE_PILL: Record<string, { bg: string; fg: string }> = {
-  screenshot: { bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  csv: { bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
-  pytr: { bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
-  pdf: { bg: "rgba(229,72,77,.13)", fg: "#E5484D" },
+  screenshot: { ...tint("violet") },
+  csv: { ...tint("teal") },
+  pytr: { ...tint("teal") },
+  pdf: { ...tint("destructive") },
 };
 
 export const DEFAULT_PILL = { bg: "var(--border)", fg: "var(--text-mute)" };
 
 /** Hero "Draft" pill — shown alongside (not instead of) the source pill for a draft
  *  transaction. Gold, matching the app's other draft/pending accents. */
-export const DRAFT_PILL = { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" };
+export const DRAFT_PILL = { ...tint("gold") };

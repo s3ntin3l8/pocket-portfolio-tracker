@@ -34,10 +34,10 @@ export function RecentImportsSection({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-0.5 text-xs font-bold uppercase tracking-[0.04em] text-text-3 transition-colors hover:text-foreground"
+        className="flex items-center gap-1.5 px-0.5 text-xs font-bold uppercase tracking-[0.04em] text-text-2 transition-colors hover:text-foreground"
       >
         {t("title")}
-        <span className="font-semibold normal-case tracking-normal text-text-3">
+        <span className="font-semibold normal-case tracking-normal text-text-2">
           ({visibleCount})
         </span>
         <ChevronDown className={cn("size-[13px] transition-transform", open && "rotate-180")} />

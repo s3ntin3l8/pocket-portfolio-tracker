@@ -38,7 +38,7 @@ export function SummaryRail({
   return (
     <aside className="sticky top-0 flex flex-col gap-3 self-start">
       <div className="flex flex-col gap-3.5 rounded-xl border border-border bg-card-2 p-4">
-        <div className="text-micro font-bold uppercase tracking-[.06em] text-text-3">
+        <div className="text-micro font-bold uppercase tracking-[.06em] text-text-2">
           {t("summary")}
         </div>
 

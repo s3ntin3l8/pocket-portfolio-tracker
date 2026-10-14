@@ -36,7 +36,7 @@ export function RetirementAgeForm({ age }: { age: number | null }) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label htmlFor={ageId} className="text-xs font-medium text-text-3">
+        <label htmlFor={ageId} className="text-xs font-medium text-text-2">
           {t("retirementAge")}
         </label>
         <Input

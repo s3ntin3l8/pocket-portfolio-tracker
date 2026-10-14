@@ -22,7 +22,7 @@ function num(v: string, min: number, max: number): number {
  *
  * Styled as the reference's green-gradient "hero" (same recipe as Holdings'
  * `HeroGlanceCard`: `linear-gradient(160deg,#0E9F6E,#0B7D58)`, `rounded-xl`,
- * `shadow-[0_12px_30px_rgba(14,159,110,.30)]`) — white-on-green controls, chart and
+ * `shadow-hero`) — white-on-green controls, chart and
  * a contributed/growth split footer.
  */
 export function ForecastPanel({
@@ -115,8 +115,8 @@ export function ForecastPanel({
 
   return (
     <div
-      className="rounded-2xl p-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.28)]"
-      style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
+      className="rounded-2xl p-[22px] text-white shadow-hero"
+      style={{ background: "linear-gradient(160deg,var(--primary),var(--primary-deep))" }}
     >
       <p className="text-base font-bold">{t("forecastTitle")}</p>
       <p className="mt-px text-xs font-medium text-white/80">{t("forecastSubtitle")}</p>
@@ -135,7 +135,7 @@ export function ForecastPanel({
             inputMode="numeric"
             value={monthly}
             onChange={(e) => setMonthly(num(e.target.value, 0, 1_000_000))}
-            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-body-sm font-extrabold text-[#0B3A2A] focus:outline-none"
+            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-body-sm font-extrabold text-primary-ink focus:outline-none"
           />
         </div>
 

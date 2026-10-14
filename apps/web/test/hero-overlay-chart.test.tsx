@@ -72,9 +72,9 @@ describe("HeroOverlayChart", () => {
     ]);
     const portfolioLine = screen.getByTestId("line-portfolio");
     const benchmarkLine = screen.getByTestId("line-benchmark");
-    expect(portfolioLine).toHaveAttribute("data-stroke", "#ffffff");
+    expect(portfolioLine).toHaveAttribute("data-stroke", "var(--primary-foreground)");
     expect(portfolioLine).toHaveAttribute("data-dash", "");
-    expect(benchmarkLine).toHaveAttribute("data-stroke", "#FFD24A");
+    expect(benchmarkLine).toHaveAttribute("data-stroke", "var(--hero-gold)");
     expect(benchmarkLine).toHaveAttribute("data-dash", "5 3");
   });
 

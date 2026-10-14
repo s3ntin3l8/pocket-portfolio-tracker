@@ -50,7 +50,7 @@ export function TradeActionsSection({
         <div className="space-y-1">
           {buys.map((a) => (
             <div key={a.key} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex items-center gap-1 text-green-600 dark:text-green-400 shrink-0">
+              <span className="flex items-center gap-1 text-success shrink-0">
                 <TrendingUp className="h-3 w-3" />
                 {t("buy")}
               </span>

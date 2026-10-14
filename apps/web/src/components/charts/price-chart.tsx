@@ -39,7 +39,7 @@ export function PriceChart({
   const locale = useLocale();
   const points = data.map((d) => ({ date: d.date, close: Number(d.close) }));
   const gradientId = theme === "inverse" ? "price-fill-inverse" : "price-fill";
-  const lineColor = theme === "inverse" ? "#ffffff" : "var(--color-primary)";
+  const lineColor = theme === "inverse" ? "var(--primary-foreground)" : "var(--color-primary)";
 
   const formatValue = (v: number) =>
     unit === "percent" ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : formatMoney(v, currency, locale);
@@ -107,7 +107,10 @@ export function PriceChart({
           <Tooltip
             cursor={
               theme === "inverse"
-                ? { stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }
+                ? {
+                    stroke: "color-mix(in srgb, var(--primary-foreground) 55%, transparent)",
+                    strokeDasharray: "4 4",
+                  }
                 : { stroke: "var(--color-border)", strokeDasharray: "4 4" }
             }
             content={({ active, payload, label }) => {
@@ -130,7 +133,12 @@ export function PriceChart({
             fill={`url(#${gradientId})`}
             activeDot={
               theme === "inverse"
-                ? { r: 5, fill: "#fff", stroke: "#0B7D58", strokeWidth: 2.5 }
+                ? {
+                    r: 5,
+                    fill: "var(--primary-foreground)",
+                    stroke: "var(--primary-deep)",
+                    strokeWidth: 2.5,
+                  }
                 : { r: 4 }
             }
           />

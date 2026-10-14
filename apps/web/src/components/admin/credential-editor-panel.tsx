@@ -79,7 +79,7 @@ export function CredentialEditorPanel({
             <button
               type="button"
               onClick={() => setShowValue((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-3 hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-2 hover:text-foreground"
               aria-label={showValue ? t("credentialHide") : t("credentialShow")}
             >
               {showValue ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
@@ -124,7 +124,7 @@ export function CredentialEditorPanel({
             (services/api/src/routes/admin/vision-providers.ts gates the whole route on
             `encryption.isEnabled`, not just the key case), so don't claim it's encrypted. */}
         {!isUrl && (
-          <p className="mt-2.5 flex items-center gap-1.5 text-micro text-text-3">
+          <p className="mt-2.5 flex items-center gap-1.5 text-micro text-text-2">
             <Lock className="size-[13px] shrink-0 text-primary" strokeWidth={2} />
             {t("credentialStoredEncrypted")}
           </p>

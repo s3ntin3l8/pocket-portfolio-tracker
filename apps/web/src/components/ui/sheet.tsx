@@ -160,7 +160,7 @@ export function useSheetFooterChrome() {
 function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Drawer.Overlay>) {
   return (
     <Drawer.Overlay
-      className={cn("fixed inset-0 z-50 bg-[rgba(17,33,26,.45)] backdrop-blur-[2px]", className)}
+      className={cn("fixed inset-0 z-50 bg-scrim backdrop-blur-[2px]", className)}
       {...props}
     />
   );
@@ -240,7 +240,7 @@ function SheetContent({
           // div below for why the handle, content, and footer are split into three flex
           // regions instead of one scrolling Drawer.Content.
           side === "bottom" &&
-            "bottom-0 left-0 right-0 mx-auto max-h-[90dvh] w-full max-w-[520px] rounded-t-xl shadow-[0_-12px_44px_rgba(0,0,0,.22)]",
+            "bottom-0 left-0 right-0 mx-auto max-h-[90dvh] w-full max-w-[520px] rounded-t-xl shadow-sheet-up",
           side === "full" &&
             "bottom-0 left-0 right-0 mx-auto h-[100dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-none bg-card shadow-xl",
           className,
@@ -299,7 +299,7 @@ function SheetContent({
             className={cn(
               "absolute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none",
               side === "bottom"
-                ? "right-5 top-7 flex size-11 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)]"
+                ? "right-5 top-7 flex size-11 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline"
                 : "right-4 top-4 rounded-md opacity-70 transition-opacity hover:opacity-100",
             )}
           >

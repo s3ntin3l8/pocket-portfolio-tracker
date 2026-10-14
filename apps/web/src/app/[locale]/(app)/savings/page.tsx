@@ -109,7 +109,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
                     {t("chartValue")}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="h-0 w-3.5 border-t-2 border-dashed border-text-3" />
+                    <span className="h-0 w-3.5 border-t-2 border-dashed border-text-2" />
                     {t("chartContributions")}
                   </span>
                 </div>

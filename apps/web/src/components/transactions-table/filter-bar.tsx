@@ -106,8 +106,8 @@ export function FilterBar({
           className={cn(
             "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
             showFlagged
-              ? "border-[var(--gold-fg)] bg-[var(--gold-fg)] text-white"
-              : "border-[rgba(224,165,58,.34)] bg-[rgba(224,165,58,.12)] text-[var(--gold-fg)]",
+              ? "border-gold-fg bg-gold-fg text-white"
+              : "border-gold-fg/35 bg-gold-fg/15 text-gold-fg",
           )}
         >
           {tBanner("chipIssues", { count: flaggedCount })}
@@ -154,7 +154,7 @@ export function FilterBar({
         </SheetHeader>
         <div className="flex flex-col gap-4">
           <div>
-            <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+            <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
               {t("filterType")}
             </p>
             <div className="flex flex-wrap gap-2">{typeChips}</div>
@@ -162,7 +162,7 @@ export function FilterBar({
 
           {yearOptions.length > 1 && (
             <div>
-              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
                 {t("filterYear")}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -181,7 +181,7 @@ export function FilterBar({
 
           {(draftCount > 0 || draftFilter !== "all") && (
             <div>
-              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-3">
+              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
                 {t("filterDraftLabel")}
               </p>
               <div className="flex gap-2">

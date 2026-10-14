@@ -6,6 +6,8 @@
 // To add a logo: add/extend an entry here with `icon`, then run
 // `node scripts/fetch-brokerage-icons.ts` to vendor the SVG(s) into `public/brokerages/`.
 
+import { tint } from "./tint";
+
 export interface BrokerageDef {
   /** Slug — also the SVG filename base under `public/brokerages/<key>[.-light|-dark].svg`. */
   key: string;
@@ -127,19 +129,19 @@ export function assetClassTone(assetClass: string | null | undefined): {
 } {
   switch (assetClass) {
     case "equity":
-      return { bg: "rgba(14,159,110,.14)", fg: "var(--chart-1)" };
+      return tint("primary");
     case "etf":
-      return { bg: "rgba(124,92,252,.16)", fg: "var(--chart-4)" };
+      return tint("violet");
     case "mutual_fund":
-      return { bg: "rgba(13,148,136,.16)", fg: "var(--chart-3)" };
+      return tint("teal");
     case "gold":
-      return { bg: "rgba(224,165,58,.16)", fg: "var(--gold-fg)" };
+      return tint("gold");
     case "bond":
-      return { bg: "rgba(59,130,246,.16)", fg: "#3B82F6" };
+      return tint("info");
     case "crypto":
-      return { bg: "rgba(249,115,22,.16)", fg: "#F97316" };
+      return tint("orange");
     case "cash":
-      return { bg: "rgba(100,116,139,.16)", fg: "var(--chart-5)" };
+      return tint("slate");
     default:
       return { bg: "var(--muted)", fg: "var(--muted-foreground)" };
   }

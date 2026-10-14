@@ -49,13 +49,13 @@ export function RangeToggle({
               ? cn(
                   "flex-1 rounded-full py-1.5 text-center text-xs",
                   value === r
-                    ? "bg-white font-bold text-[#0B7D58]"
+                    ? "bg-white font-bold text-primary-deep"
                     : "bg-transparent font-semibold text-white/85 hover:bg-white/10",
                 )
               : cn(
                   "rounded-lg px-[11px] py-1.5 text-micro",
                   value === r
-                    ? "bg-card font-bold text-foreground shadow-[0_1px_3px_rgba(15,27,20,.14)]"
+                    ? "bg-card font-bold text-foreground shadow-hairline"
                     : "font-semibold text-text-2 hover:text-foreground",
                 ),
           )}

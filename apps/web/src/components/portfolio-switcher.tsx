@@ -151,7 +151,7 @@ export function PortfolioSwitcher({
       >
         {triggerIcon}
         <span className="truncate">{triggerLabel}</span>
-        <ChevronDown className="size-3.5 shrink-0 text-text-3" />
+        <ChevronDown className="size-3.5 shrink-0 text-text-2" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-w-[16rem]">
         {/* Section 1: All portfolios */}

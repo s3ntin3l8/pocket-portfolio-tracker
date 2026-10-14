@@ -28,7 +28,7 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
             className={cn("font-semibold", currDdpct < 0 ? "text-destructive" : "text-success")}
           >
             {formatPercent(currDdpct, locale)}
-            {isUnderwater && <span className="text-text-3"> · {t("stillUnderwater")}</span>}
+            {isUnderwater && <span className="text-text-2"> · {t("stillUnderwater")}</span>}
           </span>
         </span>
       </div>
@@ -40,7 +40,7 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
           </span>
         )}
         {drawdown.recoveryDays !== undefined && (
-          <span className="text-text-3">
+          <span className="text-text-2">
             {" · "}
             {t("recoveredIn", { days: drawdown.recoveryDays })}
           </span>

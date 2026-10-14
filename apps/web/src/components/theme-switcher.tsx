@@ -22,7 +22,7 @@ export function ThemeSwitcher() {
         {THEMES.map((th) => (
           <div
             key={th}
-            className="flex-1 rounded-sm py-[9px] text-center text-body-sm bg-background font-semibold text-text-3 select-none"
+            className="flex-1 rounded-sm py-[9px] text-center text-body-sm bg-background font-semibold text-text-2 select-none"
           >
             {t(`appearanceOptions.${th}`)}
           </div>

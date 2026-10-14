@@ -3,8 +3,16 @@
 import type { DriftRow, SparplanContributionSplit } from "@portfolio/api-client";
 import type { useTranslations } from "next-intl";
 import { formatFixed, formatMoney, formatPercentPoints } from "@/lib/utils";
+import { tint } from "@/lib/tint";
 
-export const SEG_COLORS = ["#7C5CFC", "#0D9488", "var(--gold-fg)", "#0E9F6E", "#3B82F6", "#F97316"];
+export const SEG_COLORS = [
+  "var(--violet)",
+  "var(--chart-3)",
+  "var(--gold-fg)",
+  "var(--primary)",
+  "var(--info)",
+  "var(--orange)",
+];
 
 export function AllocationSection({
   drift,
@@ -56,7 +64,7 @@ export function AllocationSection({
 
   return (
     <div className="mt-4 border-t border-line pt-4">
-      <p className="mb-[9px] text-micro font-semibold uppercase tracking-wide text-text-3">
+      <p className="mb-[9px] text-micro font-semibold uppercase tracking-wide text-text-2">
         {t("allocTitle")}
       </p>
 
@@ -78,7 +86,7 @@ export function AllocationSection({
               style={{ backgroundColor: colorByKey.get(d.key) }}
             />
             <span className="min-w-0 flex-1 truncate text-text-2">{nameOf(d.key)}</span>
-            <span className="tabular text-text-3">
+            <span className="tabular text-text-2">
               {t("allocTarget", { pct: formatPercentPoints(d.targetPct, locale, 0) })}
             </span>
             <span className="tabular w-[62px] text-right">
@@ -90,7 +98,7 @@ export function AllocationSection({
 
       <div
         className="flex items-start gap-2.5 rounded-xl px-[13px] py-[11px]"
-        style={{ backgroundColor: "rgba(224,165,58,.14)" }}
+        style={{ backgroundColor: tint("gold").bg }}
       >
         <svg
           width="17"
@@ -114,7 +122,7 @@ export function AllocationSection({
 
       {contributionSplit && contributionSplit.length > 0 && (
         <div className="mt-3.5">
-          <p className="mb-2 text-micro font-semibold uppercase tracking-wide text-text-3">
+          <p className="mb-2 text-micro font-semibold uppercase tracking-wide text-text-2">
             {t("recommendedTopUp", { total: monthlyTotalLabel })}
           </p>
           <div className="flex flex-col gap-1.5">
@@ -122,7 +130,7 @@ export function AllocationSection({
               <div key={s.key} className="flex items-center gap-2 text-xs font-semibold">
                 <span className="min-w-0 flex-1 truncate text-text-2">{nameOf(s.key)}</span>
                 <span className="tabular">{formatMoney(Number(s.amount), currency, locale)}</span>
-                <span className="tabular w-[42px] text-right text-text-3">
+                <span className="tabular w-[42px] text-right text-text-2">
                   {formatPercentPoints(s.sharePct, locale, 0)}
                 </span>
               </div>

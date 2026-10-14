@@ -70,7 +70,7 @@ export function BenchmarkSettingsForm({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label htmlFor={symbolId} className="text-xs font-medium text-text-3">
+        <label htmlFor={symbolId} className="text-xs font-medium text-text-2">
           {t("benchmarkSymbolLabel")}
         </label>
         <p className="px-0.5 text-xs text-muted-foreground">{t("benchmarkSymbolHint")}</p>
@@ -84,7 +84,7 @@ export function BenchmarkSettingsForm({
               <button
                 type="button"
                 onClick={() => removeAt(i)}
-                className="rounded-full p-0.5 text-text-3 transition-colors hover:text-foreground"
+                className="rounded-full p-0.5 text-text-2 transition-colors hover:text-foreground"
                 aria-label={t("removeBenchmark")}
               >
                 <X className="size-3" />
@@ -121,7 +121,7 @@ export function BenchmarkSettingsForm({
         )}
       </div>
       <div className="space-y-2">
-        <label htmlFor={rateId} className="text-xs font-medium text-text-3">
+        <label htmlFor={rateId} className="text-xs font-medium text-text-2">
           {t("riskFreeRateLabel")}
         </label>
         <Input

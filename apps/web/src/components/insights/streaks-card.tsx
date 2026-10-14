@@ -27,11 +27,11 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
                 {tU("streakMonths", { count: bestLen })}
               </span>
             ) : (
-              <span className="text-sm text-text-3">—</span>
+              <span className="text-sm text-text-2">—</span>
             )}
           </div>
           {streaks.bestStreak && (
-            <p className="mt-0.5 text-micro text-text-3">
+            <p className="mt-0.5 text-micro text-text-2">
               {bestRet !== null && (
                 <span className="font-semibold text-success">{formatPercent(bestRet, locale)}</span>
               )}
@@ -46,7 +46,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
               <span className="font-semibold text-success">
                 {formatPercent(Number(streaks.bestMonth.returnPct), locale)}
               </span>{" "}
-              <span className="text-text-3">({streaks.bestMonth.date})</span>
+              <span className="text-text-2">({streaks.bestMonth.date})</span>
             </p>
           )}
         </div>
@@ -62,11 +62,11 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
                 {tU("streakMonths", { count: worstLen })}
               </span>
             ) : (
-              <span className="text-sm text-text-3">—</span>
+              <span className="text-sm text-text-2">—</span>
             )}
           </div>
           {streaks.worstStreak && (
-            <p className="mt-0.5 text-micro text-text-3">
+            <p className="mt-0.5 text-micro text-text-2">
               {worstRet !== null && (
                 <span className="font-semibold text-destructive">
                   {formatPercent(worstRet, locale)}
@@ -83,7 +83,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
               <span className="font-semibold text-destructive">
                 {formatPercent(Number(streaks.worstMonth.returnPct), locale)}
               </span>{" "}
-              <span className="text-text-3">({streaks.worstMonth.date})</span>
+              <span className="text-text-2">({streaks.worstMonth.date})</span>
             </p>
           )}
         </div>

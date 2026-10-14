@@ -17,11 +17,11 @@ function paymentLabel(payment: Pick<UpcomingPayment, "displayName" | "name" | "s
 }
 
 const STATUS_DOTS: Record<UpcomingPayment["status"], string> = {
-  scheduled: "#0D9488",
-  announced: "#3B82F6",
-  projected: "#F59E0B",
-  grown: "#8B5CF6",
-  paid: "#22C55E",
+  scheduled: "var(--chart-3)",
+  announced: "var(--info)",
+  projected: "var(--warning)",
+  grown: "var(--violet)",
+  paid: "var(--success)",
 };
 
 export type MonthBucket = {

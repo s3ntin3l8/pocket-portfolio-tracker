@@ -30,7 +30,7 @@ export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
         <div key={u.id} className={i > 0 ? "border-t border-line px-4 py-3.5" : "px-4 py-3.5"}>
           <div className="flex items-baseline gap-2.5">
             <span className="min-w-0 flex-1 truncate text-sm font-bold">{u.email}</span>
-            <span className="shrink-0 text-micro font-medium tabular-nums text-text-3">
+            <span className="shrink-0 text-micro font-medium tabular-nums text-text-2">
               {new Date(u.createdAt).toLocaleDateString(locale)}
             </span>
             <AdminUserActions

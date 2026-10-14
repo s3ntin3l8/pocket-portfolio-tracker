@@ -96,7 +96,7 @@ export function SparplanTargetEditor({
 
       {loading ? (
         <div className="flex justify-center py-4">
-          <Spinner size="sm" className="text-text-3" />
+          <Spinner size="sm" className="text-text-2" />
         </div>
       ) : (
         <>
@@ -120,7 +120,7 @@ export function SparplanTargetEditor({
                     onChange={(e) => setValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
                     className="tabular h-[30px] w-[60px] rounded-lg border border-border bg-card px-2 text-right text-body-sm font-bold text-foreground focus:outline-none"
                   />
-                  <span className="text-xs font-semibold text-text-3">%</span>
+                  <span className="text-xs font-semibold text-text-2">%</span>
                 </span>
               </div>
             ))}
@@ -129,7 +129,7 @@ export function SparplanTargetEditor({
           <p
             className={cn(
               "mt-2.5 text-right text-micro font-bold",
-              sumOk ? "text-text-3" : "text-[#E5484D]",
+              sumOk ? "text-text-2" : "text-destructive",
             )}
           >
             {t("targetTotal", { pct: total.toFixed(1) })}

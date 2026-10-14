@@ -25,6 +25,7 @@ import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 import type { TaxSummaryHolderWithCarryForward } from "@/lib/server-api/_shared";
 import { harvestSummary } from "@portfolio/core";
 import { TaxHolderDetailDE, TaxHolderSectionId } from "./tax-detail-section";
+import { tint } from "@/lib/tint";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -262,8 +263,8 @@ function TaxHolderOverviewDe({
                 </p>
               </div>
               <span
-                className="shrink-0 rounded-lg px-2.5 py-1 text-micro font-bold tracking-wide text-[#7C5CFC]"
-                style={{ backgroundColor: "rgba(124,92,252,.16)" }}
+                className="shrink-0 rounded-lg px-2.5 py-1 text-micro font-bold tracking-wide text-violet"
+                style={{ backgroundColor: tint("violet", 16).bg }}
               >
                 {entry.currency}
               </span>
@@ -285,7 +286,7 @@ function TaxHolderOverviewDe({
 
             {harvestSuggestions.length > 0 ? (
               <>
-                <p className="px-[22px] pb-1 pt-2 text-micro font-bold uppercase tracking-wide text-text-3">
+                <p className="px-[22px] pb-1 pt-2 text-micro font-bold uppercase tracking-wide text-text-2">
                   {t("harvest.positionsEyebrow")}
                 </p>
                 <div>

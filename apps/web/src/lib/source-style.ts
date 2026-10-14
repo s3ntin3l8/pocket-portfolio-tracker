@@ -1,5 +1,6 @@
 import { FileSpreadsheet, FileText, PencilLine, ScanText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { tint } from "./tint";
 
 /**
  * Per-source-type icon + tint, transcribed from `Pocket Prototype.dc.html` (the `SRCTYPE`
@@ -8,11 +9,11 @@ import type { LucideIcon } from "lucide-react";
  * the same palette instead of two copies drifting apart.
  */
 export const SRC_STYLE: Record<string, { icon: LucideIcon; bg: string; fg: string }> = {
-  csv: { icon: FileSpreadsheet, bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
-  pdf: { icon: FileText, bg: "rgba(229,72,77,.13)", fg: "#E5484D" },
-  screenshot: { icon: ScanText, bg: "rgba(124,92,252,.16)", fg: "#7C5CFC" },
-  pytr: { icon: FileText, bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
-  ibkr: { icon: FileText, bg: "rgba(13,148,136,.16)", fg: "#0D9488" },
+  csv: { icon: FileSpreadsheet, ...tint("teal") },
+  pdf: { icon: FileText, ...tint("destructive") },
+  screenshot: { icon: ScanText, ...tint("violet") },
+  pytr: { icon: FileText, ...tint("teal") },
+  ibkr: { icon: FileText, ...tint("teal") },
   manual: { icon: PencilLine, bg: "var(--border)", fg: "var(--text-mute)" },
 };
 

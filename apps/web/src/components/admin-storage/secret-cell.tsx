@@ -40,7 +40,7 @@ export function SecretCell({
         <label className="block px-0.5 text-xs font-semibold text-text-2">
           {t("storageSecretKey")}
         </label>
-        <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+        <div className="flex items-center gap-1.5 text-xs text-warning">
           <AlertCircle className="size-3 shrink-0" />
           {t("storageEncryptionRequired")}
         </div>

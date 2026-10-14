@@ -201,7 +201,7 @@ export function DesktopTable({
                   <tr role="presentation">
                     <td
                       colSpan={colSpan}
-                      className="bg-card-2 px-[22px] py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3"
+                      className="bg-card-2 px-[22px] py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-2"
                     >
                       {monthFmt.format(new Date(tx.executedAt))}
                     </td>
@@ -210,7 +210,7 @@ export function DesktopTable({
                 <TableRow
                   data-state={isSelected ? "selected" : undefined}
                   className={`select-none ${status === "archived" ? "opacity-50" : ""} ${
-                    status === "draft" ? "bg-amber-50/40 dark:bg-amber-950/10" : ""
+                    status === "draft" ? "bg-warning/5" : ""
                   }`}
                   {...longPressHandlers(tx.id)}
                 >
@@ -259,16 +259,13 @@ export function DesktopTable({
                                 {anomaly.severity === "error" ? (
                                   <AlertCircle className="size-3.5 shrink-0 text-destructive" />
                                 ) : (
-                                  <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                                  <AlertTriangle className="size-3.5 shrink-0 text-warning" />
                                 )}
                               </span>
                             </InfoTip>
                           )}
                           {status === "draft" && (
-                            <Badge
-                              variant="outline"
-                              className="border-amber-400/50 text-amber-600 dark:text-amber-400"
-                            >
+                            <Badge variant="outline" className="border-warning/50 text-warning">
                               {tm("status.badgeDraft")}
                             </Badge>
                           )}
@@ -279,7 +276,7 @@ export function DesktopTable({
 
                                 aria-label={tm("status.needsReview")}
                               >
-                                <AlertTriangle className="size-3.5 text-amber-500" />
+                                <AlertTriangle className="size-3.5 text-warning" />
                               </span>
                             </InfoTip>
                           )}

@@ -45,7 +45,7 @@ export function MobileView({
     <div className="space-y-4 lg:hidden">
       {dayGroups.map((group) => (
         <div key={group.day}>
-          <div className="mb-2 ml-1 text-xs font-bold uppercase tracking-[0.04em] text-text-3">
+          <div className="mb-2 ml-1 text-xs font-bold uppercase tracking-[0.04em] text-text-2">
             {group.label}
           </div>
           <div className="overflow-hidden rounded-2xl bg-card shadow-card">
@@ -74,7 +74,7 @@ export function MobileView({
                     "flex cursor-pointer select-none items-center gap-3 px-[15px] py-[14px]",
                     i > 0 && "border-t border-line",
                     status === "archived" && "opacity-50",
-                    status === "draft" && "bg-amber-50/40 dark:bg-amber-950/10",
+                    status === "draft" && "bg-warning/5",
                     isSelected && "bg-primary/10",
                   )}
                 >
@@ -102,7 +102,7 @@ export function MobileView({
                             {anomaly.severity === "error" ? (
                               <AlertCircle className="size-3.5 shrink-0 text-destructive" />
                             ) : (
-                              <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                              <AlertTriangle className="size-3.5 shrink-0 text-warning" />
                             )}
                           </span>
                         </InfoTip>
