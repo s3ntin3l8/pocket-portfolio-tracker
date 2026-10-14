@@ -223,6 +223,7 @@ export async function reopenLoan(
       );
     await tx.update(loans).set({ closedAt: null }).where(eq(loans.id, loanId));
   });
+  // `closedAt` is cleared and committed, so even if booking fails the next daily run books it.
   await bookDueInstallments(db, now, { loanId });
   await enqueueRecompute(portfolioId, loan.closedAt);
 }
