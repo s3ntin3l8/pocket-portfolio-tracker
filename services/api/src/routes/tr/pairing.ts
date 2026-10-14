@@ -96,7 +96,11 @@ export function registerPairingRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: "no_pairing_in_progress" });
     }
 
-    const { code } = verifyBodySchema.parse(request.body) ?? {};
+    // A malformed code is just a refused code: answer in the same contract as the others
+    // instead of the global validation error.
+    const parsed = verifyBodySchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "code_invalid" });
+    const { code } = parsed.data ?? {};
     request.log.info({ userId: id }, "tr approval awaiting");
     let sessionData: string;
     try {

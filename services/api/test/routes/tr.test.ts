@@ -380,6 +380,7 @@ describe("Trade Republic connection (encryption enabled)", () => {
         const { t } = await connectTotp(`tr-totp-fmt-${code.length}-${code.charCodeAt(2)}`);
         const res = await verify(t, { code });
         expect(res.statusCode).toBe(400);
+        expect(res.json()).toEqual({ error: "code_invalid" });
         expect(fake.lastCode).toBeUndefined();
       },
     );
