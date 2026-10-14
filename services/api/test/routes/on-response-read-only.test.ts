@@ -57,8 +57,6 @@ describe("cache invalidation hook", () => {
       payload: { jsonrpc: "2.0", id: 1, method: "tools/list" },
     });
     expect(res.statusCode).toBe(200);
-    await new Promise((r) => setTimeout(r, 25));
-    expect(clearValuation).not.toHaveBeenCalled();
 
     const write = await app.inject({
       method: "POST",
@@ -67,7 +65,9 @@ describe("cache invalidation hook", () => {
       payload: { name: "cache-probe", baseCurrency: "eur" },
     });
     expect(write.statusCode).toBe(201);
-    await new Promise((r) => setTimeout(r, 25));
-    expect(clearValuation).toHaveBeenCalled();
+    // onResponse runs after the reply is flushed; wait for the write's flush rather than
+    // guessing a delay. Exactly one flush means the earlier /mcp POST did not add one.
+    await vi.waitFor(() => expect(clearValuation).toHaveBeenCalled());
+    expect(clearValuation).toHaveBeenCalledTimes(1);
   });
 });
