@@ -92,11 +92,8 @@ describe("RouteTransition", () => {
 describe("view-transition CSS", () => {
   it("disables every view-transition animation under prefers-reduced-motion", async () => {
     const { readFileSync } = await import("node:fs");
-    const { fileURLToPath } = await import("node:url");
-    const css = readFileSync(
-      fileURLToPath(new URL("../src/app/globals.css", import.meta.url)),
-      "utf8",
-    );
+    const { resolve } = await import("node:path");
+    const css = readFileSync(resolve(import.meta.dirname, "../src/app/globals.css"), "utf8");
     const block = css.match(
       /@media \(prefers-reduced-motion: reduce\) \{\s*::view-transition-old\(\*\)[\s\S]*?\n\}/,
     );
