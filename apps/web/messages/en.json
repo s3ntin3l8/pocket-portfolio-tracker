@@ -1735,6 +1735,8 @@
       "bucketSubtypeCategory": "Category",
       "details": "Details",
       "extrasFees": "Add fees",
+      "extrasMargin": "Add margin",
+      "loanMargin": "Margin (sewa modal)",
       "extrasFeesTax": "Add fees / tax",
       "customInstrumentToggle": "Can't find it? Add a custom instrument"
     },

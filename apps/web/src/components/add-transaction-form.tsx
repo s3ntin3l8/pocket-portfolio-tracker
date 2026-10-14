@@ -156,6 +156,7 @@ export function AddTransactionForm({
         showExtrasFields={form.showExtrasFields}
         showExtrasBtn={form.showExtrasBtn}
         extrasLabelKey={form.extrasLabelKey}
+        feesLabelKey={form.feesLabelKey}
         onOpenExtras={() => form.setExtrasOpen(true)}
         showFees={form.showFees}
         showTax={form.showTax}

@@ -185,7 +185,9 @@ export function useTransactionForm({
 
   const hasInstrument = !isCash;
   const showQuantity = isTrade || isShareReceipt || isTransfer;
-  const showFees = isTrade;
+  // A loan repayment carries its financing margin (sewa modal) in `fees`.
+  const isLoanRepayment = type === "loan_repayment";
+  const showFees = isTrade || isLoanRepayment;
   // Add: only a sale or an income event ever withholds tax — a buy never does (v2 design,
   // Add Transaction v2.dc.html: `showTax = type === "sell" || isIncome`). Edit differs —
   // its mock (Edit Transaction v2.dc.html) uses `showTax = isAcq || isIncome`, i.e. a buy
@@ -197,10 +199,15 @@ export function useTransactionForm({
   // Income tax sits inline in the Amount group; an acquisition's fees/tax sit behind the
   // "Add fees / tax" collapsible (only relevant — i.e. rendered at all — for a trade).
   const showInlineTax = isIncome;
-  const relevantExtras = isTrade;
+  const relevantExtras = isTrade || isLoanRepayment;
   const showExtrasFields = relevantExtras && extrasOpen;
   const showExtrasBtn = relevantExtras && !extrasOpen;
-  const extrasLabelKey = showTax ? "extrasFeesTax" : "extrasFees";
+  const extrasLabelKey = isLoanRepayment
+    ? "extrasMargin"
+    : showTax
+      ? "extrasFeesTax"
+      : "extrasFees";
+  const feesLabelKey = isLoanRepayment ? "loanMargin" : "fees";
 
   const subTypeLabelKey = bucket ? BUCKET_SUBTYPE_LABEL_KEY[bucket] : "bucketSubtypeAction";
   const subTypes = bucket ? BUCKET_TYPES[bucket] : [];
@@ -466,6 +473,7 @@ export function useTransactionForm({
     showExtrasFields,
     showExtrasBtn,
     extrasLabelKey,
+    feesLabelKey,
     extrasOpen,
     setExtrasOpen,
     customOpen,
