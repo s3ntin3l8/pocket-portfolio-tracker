@@ -63,6 +63,17 @@ describe("reconciliation anomaly labels", () => {
   });
 });
 
+describe("cash gap with a malformed currency", () => {
+  it("falls back to the raw values instead of throwing", () => {
+    const label = anomalyLabel(
+      { code: "reconciliation_gap", meta: { currency: "", reported: "1.5", derived: "2" } },
+      ta,
+      "en",
+    );
+    expect(label).toContain("reported 1.5, derived 2");
+  });
+});
+
 describe("position gap without any identifier", () => {
   it("never renders empty parentheses", () => {
     const label = anomalyLabel(

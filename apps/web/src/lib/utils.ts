@@ -85,7 +85,13 @@ function reconciliationValues(
   const currency = String(meta.currency ?? "");
   for (const key of ["reported", "derived", "diff", "driftSincePrev"]) {
     const n = num(meta[key]);
-    if (n != null) values[key] = formatMoney(n, currency, locale);
+    if (n == null) continue;
+    try {
+      values[key] = formatMoney(n, currency, locale);
+    } catch {
+      // Intl throws on an empty/invalid currency code: keep the raw string rather than
+      // breaking the label (and with it every banner on the surface).
+    }
   }
   return values;
 }
