@@ -15,6 +15,7 @@ import { PortfolioPicker, type PickablePortfolio } from "@/components/portfolio-
 import { cn } from "@/lib/utils";
 import { useFocusScroll } from "@/lib/use-focus-scroll";
 import { useSheetFooter, useSheetFooterChrome } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
 
 /** The slice of the API client this form needs (injectable for tests). */
 export type RecordCorpActionClient = Pick<
@@ -488,10 +489,9 @@ export function RecordCorporateActionForm({
               />
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={taxable}
-                onChange={(e) => setTaxable(e.target.checked)}
+                onCheckedChange={(c) => setTaxable(c === true)}
                 className="size-4"
               />
               {t("mergerTaxable")}

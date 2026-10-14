@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useTheme } from "next-themes";
+import { Suspense, useMemo, useState } from "react";
+import { useThemeMode } from "@/lib/use-theme-mode";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import type { Portfolio } from "@portfolio/api-client";
@@ -49,14 +49,8 @@ export function OnboardingFlow() {
   const t = useTranslations("Onboarding");
   const api = useApiClient();
   const router = useRouter();
-  const { resolvedTheme, setTheme } = useTheme();
-
-  // Mount guard mirrors `theme-toggle.tsx` — avoids an SSR/client theme mismatch;
-  // defaults dark (matches the design's own default theme).
-  const [mounted, setMounted] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setMounted(true), []);
-  const isDark = mounted ? resolvedTheme === "dark" : true;
+  // Shared with the app-wide theme controls; defaults dark (matches the design's own default).
+  const { isDark, toggle: toggleTheme } = useThemeMode();
 
   // Desktop/mobile layout switch at the app-wide `md` breakpoint (768px) — the same one
   // every overlay uses. `useMediaQuery` reports `false` for the server render and
@@ -350,7 +344,7 @@ export function OnboardingFlow() {
             th={th}
             isDark={isDark}
             label={themeToggleLabel}
-            onToggle={() => setTheme(isDark ? "light" : "dark")}
+            onToggle={toggleTheme}
             style={{ position: "absolute", top: 22, right: 22, zIndex: 5 }}
           />
         )}
@@ -392,7 +386,7 @@ export function OnboardingFlow() {
                   th={th}
                   isDark={isDark}
                   label={themeToggleLabel}
-                  onToggle={() => setTheme(isDark ? "light" : "dark")}
+                  onToggle={toggleTheme}
                   style={{ marginLeft: "auto" }}
                 />
               </div>

@@ -69,7 +69,7 @@ describe("NetWorthHistoryChart", () => {
 
   it("refetches the series when the range changes", async () => {
     renderChart();
-    fireEvent.click(screen.getByRole("button", { name: "3M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "3M" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("3m"));
   });
 
@@ -79,7 +79,7 @@ describe("NetWorthHistoryChart", () => {
         <NetWorthHistoryChart initial={initial} currency="IDR" holderId="h1" />
       </NextIntlClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "3M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "3M" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("3m", { holderId: "h1" }));
   });
 
@@ -89,14 +89,14 @@ describe("NetWorthHistoryChart", () => {
       () => new Promise<HistoryPoint[]>((res) => (resolveSlow = res)),
     );
     renderChart();
-    fireEvent.click(screen.getByRole("button", { name: "3M" })); // slow
+    fireEvent.click(screen.getByRole("radio", { name: "3M" })); // slow
     getNetWorthHistory.mockImplementationOnce(async () => [
       { date: "2026-01-01", netWorth: "1" },
       { date: "2026-02-01", netWorth: "2" },
       { date: "2026-03-01", netWorth: "3" },
       { date: "2026-04-01", netWorth: "4" },
     ]);
-    fireEvent.click(screen.getByRole("button", { name: "1M" })); // fast, newer
+    fireEvent.click(screen.getByRole("radio", { name: "1M" })); // fast, newer
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByTestId("chart")).toBeInTheDocument());
     await act(async () => {
@@ -114,7 +114,7 @@ describe("NetWorthHistoryChart", () => {
         <NetWorthHistoryChart initial={initial} currency="IDR" selectedId="p2" />
       </NextIntlClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "3M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "3M" }));
     await waitFor(() => expect(getPortfolioHistory).toHaveBeenCalledWith("p2", "3m"));
     expect(getNetWorthHistory).not.toHaveBeenCalled();
   });
@@ -126,7 +126,7 @@ describe("NetWorthHistoryChart", () => {
     ];
     getNetWorthHistory.mockResolvedValueOnce(intradayPoints);
     renderChart();
-    fireEvent.click(screen.getByRole("button", { name: "1D" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1D" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
     expect(await screen.findByTestId("chart")).toBeInTheDocument();
   });
@@ -134,7 +134,7 @@ describe("NetWorthHistoryChart", () => {
   it("shows a collecting-data note instead of a blank/broken chart when no intraday points exist yet", async () => {
     getNetWorthHistory.mockResolvedValueOnce([]);
     renderChart();
-    fireEvent.click(screen.getByRole("button", { name: "1D" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1D" }));
     await waitFor(() => expect(screen.getByText(/Collecting intraday data/i)).toBeInTheDocument());
     expect(screen.queryByTestId("chart")).not.toBeInTheDocument();
   });
@@ -145,7 +145,7 @@ describe("NetWorthHistoryChart", () => {
       { at: "2026-06-01T02:15:00.000Z", netWorth: "110", marketValue: "110" },
     ] as IntradayPoint[]);
     renderChart();
-    fireEvent.click(screen.getByRole("button", { name: "1D" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1D" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
     const perfButton = screen.getByRole("button", { name: "Performance" });
     expect(perfButton).toBeDisabled();
@@ -177,15 +177,15 @@ describe("NetWorthHistoryChart", () => {
       expect(screen.queryByRole("button", { name: "Value" })).not.toBeInTheDocument();
 
       // Only the 5 hero chips render (no 3M/YTD).
-      expect(screen.getByRole("button", { name: "1D" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "7D" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "1M" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "1Y" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "3M" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "YTD" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "1D" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "7D" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "1M" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "1Y" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "All" })).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "3M" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "YTD" })).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "1D" }));
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
       await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
 
       expect(await screen.findByTestId("hero-overlay-chart")).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe("NetWorthHistoryChart", () => {
           <NetWorthHistoryChart initial={initial} currency="IDR" variant="hero" />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: "1D" }));
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
       await waitFor(() =>
         expect(screen.getByText(/Collecting intraday data/i)).toBeInTheDocument(),
       );
@@ -303,7 +303,7 @@ describe("NetWorthHistoryChart", () => {
           />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: "1D" }));
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
       await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
       await waitFor(() => {
         const lastCall = onSeriesChange.mock.calls.at(-1);
@@ -333,7 +333,7 @@ describe("NetWorthHistoryChart hero range as URL state", () => {
     const replaceSpy = vi.spyOn(window.history, "replaceState");
     const lengthBefore = window.history.length;
     renderHero();
-    fireEvent.click(screen.getByRole("button", { name: "1M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1M" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1m"));
     expect(window.location.search).toBe("?scope=p%3Ap1&range=1m");
     expect(replaceSpy).toHaveBeenCalled();
@@ -346,19 +346,19 @@ describe("NetWorthHistoryChart hero range as URL state", () => {
   it("removes the param again when the default range is picked", async () => {
     renderHero({ initialRange: "1m" });
     window.history.replaceState(null, "", "/holdings?range=1m");
-    fireEvent.click(screen.getByRole("button", { name: "1Y" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1Y" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1y"));
     expect(window.location.search).toBe("");
   });
 
   it("opens on the server-resolved initialRange chip", () => {
     renderHero({ initialRange: "all" });
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("hides the 1D/7D chips when intraday data is absent", () => {
     renderHero({ hasIntraday: false });
-    expect(screen.queryByRole("button", { name: "1D" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "7D" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "1D" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "7D" })).not.toBeInTheDocument();
   });
 });

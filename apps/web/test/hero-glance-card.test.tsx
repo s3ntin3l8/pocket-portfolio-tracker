@@ -188,7 +188,7 @@ describe("HeroGlanceCard", () => {
         <HeroGlanceCard netWorth="1050000" currency="IDR" initialHistory={[]} initialRange="7d" />
       </NextIntlClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "1D" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1D" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
     await waitFor(() => expect(screen.getByText(/past 1D/)).toBeInTheDocument());
     // Pill 1 shows the absolute currency delta (50,000 IDR) — NOT a percent.
@@ -229,9 +229,9 @@ describe("HeroGlanceCard", () => {
         />
       </NextIntlClientProvider>,
     );
-    expect(screen.queryByRole("button", { name: "1D" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "7D" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1M" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "1D" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "7D" })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1M" })).toBeInTheDocument();
 
     rerender(
       <NextIntlClientProvider locale="en" messages={messages}>
@@ -243,8 +243,8 @@ describe("HeroGlanceCard", () => {
         />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByRole("button", { name: "1D" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "7D" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1D" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "7D" })).toBeInTheDocument();
   });
 
   it("keeps the 1D/7D chips when the intraday check itself failed", () => {
@@ -259,6 +259,6 @@ describe("HeroGlanceCard", () => {
         />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByRole("button", { name: "1D" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1D" })).toBeInTheDocument();
   });
 });

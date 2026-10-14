@@ -4,6 +4,7 @@ import { AreaChart, Area, Line, Tooltip, ResponsiveContainer } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
 import type { ForecastPoint } from "@portfolio/core";
 import { formatMoney } from "@/lib/utils";
+import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
@@ -46,18 +47,19 @@ export function ForecastChart({
             </linearGradient>
           </defs>
           <Tooltip
-            formatter={(v, key) => [
-              money(Number(v)),
-              key === "contributed" ? t("projectedContributed") : t("projectedValue"),
-            ]}
-            labelFormatter={(m) => t("years", { count: Math.round(Number(m) / 12) })}
             cursor={{ stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }}
-            contentStyle={{
-              background: "#0f1b14",
-              border: "none",
-              borderRadius: 10,
-              color: "#fff",
-              fontSize: 12,
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              return (
+                <ChartTooltipPanel
+                  title={t("years", { count: Math.round(Number(label) / 12) })}
+                  rows={payload.map((p) => ({
+                    label:
+                      p.dataKey === "contributed" ? t("projectedContributed") : t("projectedValue"),
+                    value: money(Number(p.value)),
+                  }))}
+                />
+              );
             }}
           />
           <Area

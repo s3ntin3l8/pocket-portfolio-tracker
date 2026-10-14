@@ -4,6 +4,14 @@ import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
 import { cn, formatPercent } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
@@ -156,70 +164,88 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
         ))}
       </div>
 
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-micro uppercase tracking-wide text-text-3">
-              <th className="px-2 py-1.5 text-left font-semibold">{t("headerYear")}</th>
-              <th className="px-2 py-1.5 text-right font-semibold">{t("headerPortfolioTwr")}</th>
-              <th className="px-2 py-1.5 text-right font-semibold">{t("headerPortfolioXirr")}</th>
+      <div className="mt-3">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="text-left h-auto px-2 py-1.5 first:pl-2 last:pr-2">
+                {t("headerYear")}
+              </TableHead>
+              <TableHead className="text-right h-auto px-2 py-1.5 first:pl-2 last:pr-2">
+                {t("headerPortfolioTwr")}
+              </TableHead>
+              <TableHead className="text-right h-auto px-2 py-1.5 first:pl-2 last:pr-2">
+                {t("headerPortfolioXirr")}
+              </TableHead>
               {symbols.map((s) => (
-                <th key={s.symbol} className="px-2 py-1.5 text-right font-semibold">
+                <TableHead
+                  key={s.symbol}
+                  className="text-right h-auto px-2 py-1.5 first:pl-2 last:pr-2"
+                >
                   {s.displayName || benchmarkLabel(s.symbol)}
-                </th>
+                </TableHead>
               ))}
               {symbols.map((s) => (
-                <th key={`act-${s.symbol}`} className="px-2 py-1.5 text-right font-semibold">
+                <TableHead
+                  key={`act-${s.symbol}`}
+                  className="h-auto px-2 py-1.5 text-right first:pl-2 last:pr-2"
+                >
                   {t("headerActiveReturn", { symbol: s.displayName || benchmarkLabel(s.symbol) })}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((r) => (
-              <tr key={r.year} className="border-b border-border/50 last:border-0">
-                <td className="px-2 py-1.5 text-left text-xs font-medium text-text-2">
+              <TableRow key={r.year} className="border-border/50 last:border-0">
+                <TableCell className="px-2 py-1.5 first:pl-2 last:pr-2 text-left text-xs font-medium text-text-2">
                   {r.year}
                   {r.isCurrentYear && (
                     <span className="ml-1 text-micro text-text-3">· {t("ytdLabel")}</span>
                   )}
-                </td>
-                <td className="tabular px-2 py-1.5 text-right text-xs">
+                </TableCell>
+                <TableCell className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs">
                   {r.portfolioTwr !== null ? (
                     <PercentCell value={Number(r.portfolioTwr)} locale={locale} />
                   ) : (
                     <span className="text-text-3">{t("noData")}</span>
                   )}
-                </td>
-                <td className="tabular px-2 py-1.5 text-right text-xs">
+                </TableCell>
+                <TableCell className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs">
                   {r.portfolioXirr !== null ? (
                     <PercentCell value={Number(r.portfolioXirr)} locale={locale} />
                   ) : (
                     <span className="text-text-3">{t("noData")}</span>
                   )}
-                </td>
+                </TableCell>
                 {r.benchmarks.map((b) => (
-                  <td key={b.symbol} className="tabular px-2 py-1.5 text-right text-xs">
+                  <TableCell
+                    key={b.symbol}
+                    className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs"
+                  >
                     {b.twr !== null ? (
                       <PercentCell value={Number(b.twr)} locale={locale} />
                     ) : (
                       <span className="text-text-3">{t("noData")}</span>
                     )}
-                  </td>
+                  </TableCell>
                 ))}
                 {r.benchmarks.map((b) => (
-                  <td key={`act-${b.symbol}`} className="tabular px-2 py-1.5 text-right text-xs">
+                  <TableCell
+                    key={`act-${b.symbol}`}
+                    className="tabular px-2 py-1.5 text-right text-xs first:pl-2 last:pr-2"
+                  >
                     {b.activeReturn !== null ? (
                       <PercentCell value={Number(b.activeReturn)} locale={locale} />
                     ) : (
                       <span className="text-text-3">{t("noData")}</span>
                     )}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </Card>
   );

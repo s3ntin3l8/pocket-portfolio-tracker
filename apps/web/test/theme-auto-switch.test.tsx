@@ -141,33 +141,33 @@ describe("ThemeSwitcher", () => {
   it("renders light, dark, and system options", () => {
     wrap(<ThemeSwitcher />);
 
-    expect(screen.getByRole("button", { name: "Light" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Dark" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "System" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Light" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Dark" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "System" })).toBeInTheDocument();
   });
 
-  it("renders with a role='group' container and correct aria-label", () => {
+  it("renders with a role='radiogroup' container and correct aria-label", () => {
     wrap(<ThemeSwitcher />);
 
-    const group = screen.getByRole("group", { name: "Appearance" });
+    const group = screen.getByRole("radiogroup", { name: "Appearance" });
     expect(group).toBeInTheDocument();
   });
 
-  it("marks current theme as selected using aria-pressed", () => {
+  it("marks current theme as selected using aria-checked", () => {
     wrap(<ThemeSwitcher />);
 
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "false");
   });
 
   it("calls setTheme with correct value when button is clicked", () => {
     wrap(<ThemeSwitcher />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Light" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(setTheme).toHaveBeenCalledWith("light");
 
-    fireEvent.click(screen.getByRole("button", { name: "System" }));
+    fireEvent.click(screen.getByRole("radio", { name: "System" }));
     expect(setTheme).toHaveBeenCalledWith("system");
   });
 });

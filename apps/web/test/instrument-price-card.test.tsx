@@ -40,12 +40,12 @@ describe("InstrumentRangeToggle", () => {
         <InstrumentRangeToggle value="1y" onChange={() => {}} />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByRole("button", { name: "1M" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "6M" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1Y" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1M" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "6M" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1Y" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "All" })).toBeInTheDocument();
     // No 1D/7D/3M/YTD — this is a distinct, smaller vocabulary from the portfolio ranges.
-    expect(screen.queryByRole("button", { name: "1D" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "1D" })).toBeNull();
   });
 });
 
@@ -56,7 +56,7 @@ describe("InstrumentPriceCard", () => {
 
   it("defaults to 1Y and shows the initial history without an extra fetch", () => {
     renderCard();
-    expect(screen.getByRole("button", { name: "1Y" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "1Y" })).toHaveAttribute("aria-checked", "true");
     expect(getInstrumentHistory).not.toHaveBeenCalled();
   });
 
@@ -84,26 +84,26 @@ describe("InstrumentPriceCard", () => {
   it("refetches with the mapped API range token when a chip is clicked", async () => {
     getInstrumentHistory.mockResolvedValue([{ date: "2020-01-01", close: "1", currency: "IDR" }]);
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "6M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "6M" }));
     await waitFor(() => expect(getInstrumentHistory).toHaveBeenCalledWith("i1", "6mo"));
-    expect(screen.getByRole("button", { name: "6M" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "6M" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("maps 1M and All to the provider's 1mo/max tokens", async () => {
     getInstrumentHistory.mockResolvedValue([]);
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "1M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1M" }));
     await waitFor(() => expect(getInstrumentHistory).toHaveBeenCalledWith("i1", "1mo"));
 
     getInstrumentHistory.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    fireEvent.click(screen.getByRole("radio", { name: "All" }));
     await waitFor(() => expect(getInstrumentHistory).toHaveBeenCalledWith("i1", "max"));
   });
 
   it("shows the empty state when a range refetch returns no candles", async () => {
     getInstrumentHistory.mockResolvedValue([]);
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "1M" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1M" }));
     await waitFor(() =>
       expect(screen.getByText(messages.Instrument.noHistory)).toBeInTheDocument(),
     );
@@ -111,7 +111,7 @@ describe("InstrumentPriceCard", () => {
 
   it("does not refetch when clicking the already-active chip", () => {
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "1Y" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1Y" }));
     expect(getInstrumentHistory).not.toHaveBeenCalled();
   });
 });
