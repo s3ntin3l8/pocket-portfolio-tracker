@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import type { SparplanStats, DetectedPlan } from "@portfolio/api-client";
@@ -84,7 +84,7 @@ describe("SparplanSection", () => {
     expect(screen.getByText("Stopped")).toBeInTheDocument();
   });
 
-  it("renders a step-history line when there are multiple levels", () => {
+  it("renders a step-history line when there are multiple levels", async () => {
     const plan = makePlan({
       levels: [
         {
@@ -107,8 +107,11 @@ describe("SparplanSection", () => {
     });
     const stats = makeStats([plan]);
     renderSection(stats);
-    // Step hint is an icon whose title tooltip carries the change ("… since 2026-01").
-    expect(screen.getByTitle(/2026-01/)).toBeInTheDocument();
+    // Step hint is a focusable icon whose tooltip carries the change ("… since 2026-01").
+    const trigger = document.querySelector<HTMLElement>('[data-slot="tooltip-trigger"]');
+    expect(trigger).not.toBeNull();
+    act(() => trigger!.focus());
+    expect((await screen.findAllByText(/2026-01/)).length).toBeGreaterThan(0);
   });
 
   it("renders a 'Detected' badge for heuristic plans", () => {

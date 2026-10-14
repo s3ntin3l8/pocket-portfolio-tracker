@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "./tooltip";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFullScreenOverlayRegistration } from "@/components/full-screen-overlay";
@@ -48,15 +49,16 @@ export function SelectionBarShell({
       )}
     >
       <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label={dismissLabel}
-          title={dismissLabel}
-          className="flex size-11 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground max-md:-ml-2.5 md:size-8"
-        >
-          <X className="size-4" />
-        </button>
+        <InfoTip label={dismissLabel}>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label={dismissLabel}
+            className="flex size-11 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground max-md:-ml-2.5 md:size-8"
+          >
+            <X className="size-4" />
+          </button>
+        </InfoTip>
         {label}
       </span>
       {children && (

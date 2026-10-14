@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Info } from "lucide-react";
 import type { Trade } from "@portfolio/api-client";
 import {
   Table,
@@ -180,11 +179,9 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                     onToggle={toggle}
                     align="right"
                     className="whitespace-nowrap"
+                    hint={t("annualizedTooltip")}
                   >
-                    <span className="inline-flex items-center gap-1" title={t("annualizedTooltip")}>
-                      {t("annualized")}
-                      <Info className="size-3 text-muted-foreground" aria-hidden />
-                    </span>
+                    {t("annualized")}
                   </SortableTableHead>
                 </TableRow>
               </TableHeader>

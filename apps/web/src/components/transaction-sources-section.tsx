@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/tooltip";
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Download } from "lucide-react";
@@ -104,20 +105,21 @@ export function TransactionSourcesSection({
                 )}
               </div>
               {!readOnly && src.hasDocument && (
-                <button
-                  type="button"
-                  aria-label={t("sourcesSection.download")}
-                  title={t("sourcesSection.download")}
-                  disabled={downloading === src.id}
-                  onClick={() => void downloadSource(src.id)}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
-                >
-                  {downloading === src.id ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    <Download className="size-[17px]" />
-                  )}
-                </button>
+                <InfoTip label={t("sourcesSection.download")}>
+                  <button
+                    type="button"
+                    aria-label={t("sourcesSection.download")}
+                    disabled={downloading === src.id}
+                    onClick={() => void downloadSource(src.id)}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-border bg-background text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                  >
+                    {downloading === src.id ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <Download className="size-[17px]" />
+                    )}
+                  </button>
+                </InfoTip>
               )}
             </div>
           );

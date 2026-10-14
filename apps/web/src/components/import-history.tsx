@@ -42,7 +42,7 @@ import { selectAllState } from "@/lib/select-all-state";
  * Timestamp columns). Mobile (`md:hidden`) swaps in a compact card list — reference-style
  * tinted source icon + filename + status, long-press to reveal checkboxes for bulk actions
  * (mirroring `transactions-table.tsx`'s own gesture, via `useLongPressSelect`). Per-row
- * actions are icon-only (native `title=`/`aria-label=` tooltip) in both layouts, except the
+ * actions are icon-only (`InfoTip` tooltip + `aria-label=`) in both layouts, except the
  * transient 2-step Undo confirmation, which keeps visible text — a destructive step
  * shouldn't hide behind an icon.
  */

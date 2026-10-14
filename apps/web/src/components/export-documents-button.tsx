@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,17 +51,18 @@ export function ExportDocumentsButton({
 
   if (iconOnly) {
     return (
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={handleExport}
-        disabled={loading}
-        aria-label={label}
-        title={label}
-        className={className}
-      >
-        <Archive className="size-4" />
-      </Button>
+      <InfoTip label={label}>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleExport}
+          disabled={loading}
+          aria-label={label}
+          className={className}
+        >
+          <Archive className="size-4" />
+        </Button>
+      </InfoTip>
     );
   }
 

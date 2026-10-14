@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/tooltip";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toCsv } from "@/lib/csv";
@@ -43,17 +44,18 @@ export function ExportCsvButton({
 
   if (iconOnly) {
     return (
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={download}
-        disabled={rows.length === 0}
-        aria-label={label}
-        title={label}
-        className={className}
-      >
-        <Download className="size-4" />
-      </Button>
+      <InfoTip label={label}>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={download}
+          disabled={rows.length === 0}
+          aria-label={label}
+          className={className}
+        >
+          <Download className="size-4" />
+        </Button>
+      </InfoTip>
     );
   }
 

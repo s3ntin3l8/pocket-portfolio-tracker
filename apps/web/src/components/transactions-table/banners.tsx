@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/tooltip";
 import { useTranslations } from "next-intl";
 import { AlertCircle, AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,15 +60,16 @@ export function AnomalyBanner({
         </Button>
       )}
       {onDismiss && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label={ta("dismiss")}
-          title={ta("dismiss")}
-          className="flex size-6 shrink-0 items-center justify-center rounded-full text-current/50 hover:text-current"
-        >
-          <X className="size-4" />
-        </button>
+        <InfoTip label={ta("dismiss")}>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label={ta("dismiss")}
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-current/50 hover:text-current"
+          >
+            <X className="size-4" />
+          </button>
+        </InfoTip>
       )}
     </div>
   );
