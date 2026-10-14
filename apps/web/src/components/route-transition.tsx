@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ViewTransition } from "react";
 import { usePathname } from "@/i18n/navigation";
 
 /**
- * Re-keys its children by pathname so every route change replays the `fade-in` blend
- * (opacity + slight blur, see globals.css) instead of popping in. `<AppShell>` stays
- * mounted across navigations and only `<main>`'s children swap, so keying here is enough
- * to retrigger the animation without touching server-rendered content.
+ * Cross-fades route changes with React's `<ViewTransition>` (browser View Transitions API).
+ * Keyed by pathname, so only a real route change enters/exits it: query-only changes
+ * (`?scope=`) keep the key, and the shallow `history.replaceState` writes for range/year
+ * never reach React at all. Router navigations are React transitions, which is what
+ * activates the animation; `default="none"` keeps unrelated updates from crossfading the
+ * whole page. Progressive enhancement: browsers without the API (or users with
+ * `prefers-reduced-motion`, see globals.css) just get the instant swap. `<AppShell>` stays
+ * mounted across navigations and only `<main>`'s children swap.
  */
 export function RouteTransition({
   children,
@@ -36,8 +40,8 @@ export function RouteTransition({
   }, [transitionKey, scrollContainerRef]);
 
   return (
-    <div key={transitionKey} className="animate-fade-in">
-      {children}
-    </div>
+    <ViewTransition key={transitionKey} enter="vt-route" exit="vt-route" default="none">
+      <div>{children}</div>
+    </ViewTransition>
   );
 }
