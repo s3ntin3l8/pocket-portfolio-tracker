@@ -4,7 +4,7 @@ import { mixAlpha, tint, tintStyle } from "@/lib/tint";
 describe("tint", () => {
   it("returns a translucent bg and a solid fg that follow the theme tokens", () => {
     expect(tint("primary")).toEqual({
-      bg: "color-mix(in srgb, var(--primary) 15%, transparent)",
+      bg: "color-mix(in srgb, var(--primary) 14%, transparent)",
       fg: "var(--primary)",
     });
   });
@@ -13,6 +13,11 @@ describe("tint", () => {
     expect(tint("destructive", 12).bg).toBe(
       "color-mix(in srgb, var(--destructive) 12%, transparent)",
     );
+  });
+
+  it("uses per-tone default opacity", () => {
+    expect(tint("gold").bg).toContain(" 16%");
+    expect(tint("destructive").bg).toContain(" 13%");
   });
 
   it("maps every tone to a CSS variable, never a literal colour", () => {

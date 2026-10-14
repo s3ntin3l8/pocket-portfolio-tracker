@@ -151,7 +151,7 @@ export function AppShell({
                     className={cn(
                       "flex items-center gap-[11px] rounded-md px-3 py-2.5 text-sm transition-colors",
                       active
-                        ? "bg-primary/15 font-bold text-primary"
+                        ? "bg-primary/14 font-bold text-primary"
                         : "font-semibold text-text-mute hover:bg-secondary hover:text-foreground",
                     )}
                   >

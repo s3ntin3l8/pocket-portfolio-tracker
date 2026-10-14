@@ -22,19 +22,35 @@ const TONE_VAR: Record<TintTone, string> = {
   slate: "var(--chart-5)",
 };
 
+/** Default tint opacity (percent) per tone — the weights the hand-written badges used. */
+const TINT_ALPHA: Record<TintTone, number> = {
+  primary: 14,
+  destructive: 13,
+  gold: 16,
+  warning: 15,
+  violet: 16,
+  teal: 16,
+  info: 14,
+  orange: 16,
+  slate: 16,
+};
+
 /** `color-mix` of a token at `pct` percent over transparent. */
 export function mixAlpha(cssColor: string, pct: number): string {
   return `color-mix(in srgb, ${cssColor} ${pct}%, transparent)`;
 }
 
-/** `{ bg, fg }` for a tinted badge / icon chip of the given tone (bg at `pct`% opacity). */
-export function tint(tone: TintTone, pct = 15): { bg: string; fg: string } {
+/** `{ bg, fg }` for a tinted badge / icon chip of the given tone (bg at `pct`% opacity, default per tone). */
+export function tint(tone: TintTone, pct = TINT_ALPHA[tone]): { bg: string; fg: string } {
   const fg = TONE_VAR[tone];
   return { bg: mixAlpha(fg, pct), fg };
 }
 
 /** Same as {@link tint} but shaped as inline-style properties (`background` / `color`). */
-export function tintStyle(tone: TintTone, pct = 15): { background: string; color: string } {
+export function tintStyle(
+  tone: TintTone,
+  pct = TINT_ALPHA[tone],
+): { background: string; color: string } {
   const { bg, fg } = tint(tone, pct);
   return { background: bg, color: fg };
 }
