@@ -59,19 +59,25 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
       const ac = new AbortController();
       abortRef.current = ac;
       setStreaming(true);
+      // `abortRef.current !== ac` means this send was superseded (New chat, then a new
+      // question): its late events must not touch the new conversation or its controller.
+      const current = () => abortRef.current === ac;
       try {
         for await (const event of client.streamAssistantChat(
           { messages: request, scope: getScope() },
           { signal: ac.signal },
         )) {
+          if (!current()) break;
           patchLast((t) => applyEvent(t, event));
         }
       } catch (err) {
-        if (!ac.signal.aborted) patchLast((t) => ({ ...t, error: errorKeyFor(err) }));
+        if (!ac.signal.aborted && current()) patchLast((t) => ({ ...t, error: errorKeyFor(err) }));
       } finally {
-        abortRef.current = null;
-        setStreaming(false);
-        patchLast((t) => ({ ...t, pending: false }));
+        if (current()) {
+          abortRef.current = null;
+          setStreaming(false);
+          patchLast((t) => ({ ...t, pending: false }));
+        }
       }
     },
     [client, commit, getScope, patchLast],
@@ -86,8 +92,19 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     commit([]);
   }, [commit]);
 
-  // Leaving the app shell cancels any in-flight answer.
-  useEffect(() => () => abortRef.current?.abort(), []);
+  // Leaving the app shell cancels any in-flight answer. React StrictMode (dev) unmounts and
+  // remounts immediately, which must not kill a request started on mount (e.g. a seeded
+  // "Explain" question) — so only abort if we are still unmounted after the remount window.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      setTimeout(() => {
+        if (!mountedRef.current) abortRef.current?.abort();
+      }, 0);
+    };
+  }, []);
 
   return { turns, streaming, send, stop, reset };
 }

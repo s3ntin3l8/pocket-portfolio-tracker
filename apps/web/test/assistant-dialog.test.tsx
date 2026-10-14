@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
@@ -224,6 +225,37 @@ describe("the chat panel", () => {
   });
 });
 
+describe("superseded answers", () => {
+  it("ignores a stopped-by-New-chat answer's late events and keeps the new one's Stop working", async () => {
+    const first = controllable();
+    const second = controllable();
+    streams.push(first, second);
+    render(<Shell />);
+    await openPanel();
+    type("first question");
+    await waitFor(() => expect(calls).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole("button", { name: /New chat/ })); // while 'first' is streaming
+    expect(calls[0]!.signal!.aborted).toBe(true);
+    type("second question");
+    await waitFor(() => expect(calls).toHaveLength(2));
+
+    // The abandoned stream keeps talking: none of it may appear in the new conversation.
+    first.push({ type: "message", text: "STALE ANSWER" });
+    first.push("end");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("STALE ANSWER")).toBeNull();
+
+    // The new answer is still streaming (the old one finishing must not have cleared that).
+    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    expect(calls[1]!.signal!.aborted).toBe(false);
+    second.push({ type: "message", text: "FRESH ANSWER" });
+    second.push("end");
+    expect(await screen.findByText("FRESH ANSWER")).toBeInTheDocument();
+    expect(screen.queryByText("first question")).toBeNull();
+  });
+});
+
 describe("entry points that ask a question", () => {
   const gain: GainSummary = {
     displayCurrency: "EUR",
@@ -273,5 +305,26 @@ describe("entry points that ask a question", () => {
     }
     render(<Probe />);
     expect(screen.getByText("no")).toBeInTheDocument();
+  });
+  it("an Explain question is not aborted by React StrictMode's simulated unmount (dev)", async () => {
+    const s = controllable();
+    streams.push(s);
+    render(
+      <StrictMode>
+        <Shell>
+          <GainExplainer gain={gain} />
+        </Shell>
+      </StrictMode>,
+    );
+    await screen.findByRole("button", { name: "Open the assistant" });
+    fireEvent.click(screen.getByRole("button", { name: "How is this gain calculated?" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Ask the assistant to explain/ }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 20)); // let any deferred cleanup run
+    expect(calls).toHaveLength(1); // sent exactly once
+    expect(calls[0]!.signal!.aborted).toBe(false); // and still alive
+    s.push({ type: "message", text: "Here you go." });
+    s.push("end");
+    expect(await screen.findByText("Here you go.")).toBeInTheDocument();
   });
 });
