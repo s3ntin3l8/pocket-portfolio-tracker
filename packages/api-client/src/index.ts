@@ -860,6 +860,9 @@ export interface Transaction {
   importId: string | null;
   /** Import dedup key; null for manually-entered transactions. */
   externalId: string | null;
+  /** The cicilan loan a `loan_repayment` belongs to, and the schedule installment it settles. */
+  loanId?: string | null;
+  installmentN?: number | null;
   instrument: InstrumentMeta | null;
   /** True when the parent import has a retained source document available for download (#231). */
   hasDocument: boolean;
@@ -1505,6 +1508,22 @@ export interface GoldPlan {
   value: string | null;
   valuedAtCost: boolean;
   fxMissing: boolean;
+}
+
+/** A loan as offered by the manual-repayment picker (`GET /portfolios/:id/loans`). */
+export interface LoanOption {
+  loanId: string;
+  provider: string | null;
+  contractNo: string | null;
+  currency: string;
+  closedAt: string | null;
+  installments: {
+    n: number;
+    dueDate: string;
+    principal: string;
+    margin: string;
+    status: "paid" | "skipped" | "overdue" | "upcoming" | "closed";
+  }[];
 }
 
 export interface GoldReport {
@@ -2621,6 +2640,8 @@ export function createApiClient(config: ApiClientConfig) {
     deletePortfolio: (portfolioId: string) => request<void>("DELETE", `/portfolios/${portfolioId}`),
 
     // Financed-gold (cicilan) loans: depart from the repayment schedule.
+    listLoans: (portfolioId: string) =>
+      request<LoanOption[]>("GET", `/portfolios/${portfolioId}/loans`),
     skipInstallment: (portfolioId: string, loanId: string, n: number) =>
       request<void>("POST", `/portfolios/${portfolioId}/loans/${loanId}/installments/${n}/skip`),
     unskipInstallment: (portfolioId: string, loanId: string, n: number) =>

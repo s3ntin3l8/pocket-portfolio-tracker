@@ -192,6 +192,8 @@ const transactionRowBase = {
   status: z.enum(["normal", "archived", "cash_neutral", "draft"]),
   importId: z.string().nullable(),
   externalId: z.string().nullable(),
+  loanId: z.string().nullable().optional(),
+  installmentN: z.number().nullable().optional(),
   instrument: instrumentMetaResponseSchema.nullable(),
   needsReview: z.boolean().optional(),
   sources: z.array(sourceSummaryResponseSchema),

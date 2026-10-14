@@ -11,6 +11,7 @@ import { SubTypeToggle } from "./add-transaction-form/sub-type-toggle";
 import { InstrumentField } from "./add-transaction-form/instrument-field";
 import { PricingFields, DetailsFields } from "./add-transaction-form/pricing-fields";
 import { AdvancedFields } from "./add-transaction-form/advanced-fields";
+import { LoanLinkFields } from "./add-transaction-form/loan-link-fields";
 import { SubmitButton } from "./add-transaction-form/submit-button";
 import { SummaryRail } from "./add-transaction-form/summary-rail";
 import { useTransactionForm } from "./add-transaction-form/use-transaction-form";
@@ -146,6 +147,19 @@ export function AddTransactionForm({
           {instrumentFieldEl}
           {subTypeToggleEl}
         </>
+      )}
+
+      {form.isLoanRepaymentType && (
+        <LoanLinkFields
+          loans={form.loans}
+          selectedLoan={form.selectedLoan}
+          loanId={form.loanId}
+          onLoanChange={form.setLoanId}
+          installmentN={form.installmentN}
+          onInstallmentChange={form.selectInstallment}
+          locked={form.linkLocked}
+          t={form.t}
+        />
       )}
 
       <PricingFields

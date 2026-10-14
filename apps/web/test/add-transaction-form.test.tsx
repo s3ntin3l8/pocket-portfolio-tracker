@@ -40,6 +40,7 @@ function makeClient(over: Partial<AddTransactionClient> = {}): AddTransactionCli
     createTransaction: vi.fn(async () => ({}) as never),
     updateTransaction: vi.fn(async () => ({}) as never),
     getGoldSources: vi.fn(async () => [{ market: "ANTAM", label: "Antam buyback" }]),
+    listLoans: vi.fn(async () => []),
     ...over,
   };
 }
@@ -847,6 +848,127 @@ describe("AddTransactionForm", () => {
       "t-loan",
       expect.objectContaining({ fees: "75000" }),
     );
+  });
+
+  describe("linking a loan repayment (#955)", () => {
+    const LOAN = {
+      loanId: "00000000-0000-4000-8000-000000000001",
+      provider: "GALERI24",
+      contractNo: "C-1",
+      currency: "IDR",
+      closedAt: null,
+      installments: [
+        { n: 1, dueDate: "2026-01-10", principal: "1000", margin: "100", status: "paid" as const },
+        {
+          n: 2,
+          dueDate: "2026-02-10",
+          principal: "1000",
+          margin: "100",
+          status: "overdue" as const,
+        },
+      ],
+    };
+
+    it("offers Loan repayment in Cash only when the portfolio has an open loan", async () => {
+      const none = makeClient();
+      const { unmount } = render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <AddTransactionForm client={none} portfolioId="p1" />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      await waitFor(() => expect(none.listLoans).toHaveBeenCalledWith("p1"));
+      expect(screen.queryByRole("button", { name: messages.TxType.loan_repayment })).toBeNull();
+      unmount();
+
+      const some = makeClient({ listLoans: vi.fn(async () => [LOAN]) });
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <AddTransactionForm client={some} portfolioId="p1" />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      expect(
+        await screen.findByRole("button", { name: messages.TxType.loan_repayment }),
+      ).toBeInTheDocument();
+    });
+
+    it("creates a repayment linked to the chosen loan and installment, prefilling the schedule amounts", async () => {
+      const client = makeClient({ listLoans: vi.fn(async () => [LOAN]) });
+      const onSuccess = vi.fn();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <AddTransactionForm client={client} portfolioId="p1" onSuccess={onSuccess} />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(await screen.findByRole("button", { name: messages.TxType.loan_repayment }));
+      fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+        target: { value: "2026-02-10" },
+      });
+
+      fireEvent.change(screen.getByLabelText(m.loan), { target: { value: LOAN.loanId } });
+      // Paid installments are not offered.
+      expect(screen.queryByRole("option", { name: /#1 /u })).toBeNull();
+      fireEvent.change(screen.getByLabelText(m.installment), { target: { value: "2" } });
+      fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+      await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+      expect(client.createTransaction).toHaveBeenCalledWith(
+        "p1",
+        expect.objectContaining({
+          type: "loan_repayment",
+          price: "1000",
+          fees: "100",
+          currency: "IDR",
+          loanId: LOAN.loanId,
+          installmentN: 2,
+        }),
+      );
+    });
+
+    it("requires a loan to create a repayment", async () => {
+      const client = makeClient({ listLoans: vi.fn(async () => [LOAN]) });
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <AddTransactionForm client={client} portfolioId="p1" />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(await screen.findByRole("button", { name: messages.TxType.loan_repayment }));
+      fireEvent.change(screen.getByLabelText(m.amount), { target: { value: "1000" } });
+      fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+        target: { value: "2026-02-10" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: m.submit }));
+      expect(await screen.findByText(m.loanRequired)).toBeInTheDocument();
+      expect(client.createTransaction).not.toHaveBeenCalled();
+    });
+
+    it("shows an existing link on edit, and keeps an auto-booked one read-only", async () => {
+      const client = makeClient({ listLoans: vi.fn(async () => [LOAN]) });
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <AddTransactionForm
+            client={client}
+            portfolioId="p1"
+            transactionId="t-auto"
+            initial={{
+              ...EDIT_INITIAL,
+              type: "loan_repayment",
+              loanId: LOAN.loanId,
+              installmentN: 1,
+              externalId: `loan:${LOAN.loanId}:inst:1`,
+            }}
+          />
+        </NextIntlClientProvider>,
+      );
+      await waitFor(() => expect(screen.getByLabelText(m.loan)).toHaveValue(LOAN.loanId));
+      expect(screen.getByLabelText(m.installment)).toHaveValue("1");
+      expect(screen.getByLabelText(m.loan)).toBeDisabled();
+      expect(screen.getByLabelText(m.installment)).toBeDisabled();
+      expect(screen.getByText(m.loanLinkLocked)).toBeInTheDocument();
+    });
   });
 
   it("shows the tax field for a buy in edit mode (Edit mock: showTax = isAcq || isIncome, unlike Add's sell-only rule)", () => {

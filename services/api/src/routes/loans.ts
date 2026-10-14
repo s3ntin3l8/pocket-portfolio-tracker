@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import {
   LoanActionError,
+  listPortfolioLoans,
   payoffLoan,
   reopenLoan,
   skipInstallment,
@@ -41,6 +42,13 @@ export async function loansRoute(app: FastifyInstance) {
         throw err;
       }
     };
+
+  // Picker feed for linking a manual repayment to a loan / installment.
+  app.get<{ Params: { portfolioId: string } }>(
+    "/portfolios/:portfolioId/loans",
+    pre,
+    async (request) => listPortfolioLoans(app.db, request.params.portfolioId),
+  );
 
   app.post<{ Params: LoanParams & { n: string } }>(
     "/portfolios/:portfolioId/loans/:loanId/installments/:n/skip",

@@ -1738,6 +1738,13 @@
       "extrasMargin": "Tambah margin",
       "loanMargin": "Margin (sewa modal)",
       "extrasFeesTax": "Tambah biaya / pajak",
+      "loan": "Pinjaman",
+      "loanNone": "Pilih pinjaman",
+      "loanRequired": "Pilih pinjaman untuk pembayaran ini.",
+      "installment": "Cicilan",
+      "installmentNone": "Tidak ada (seluruh pinjaman)",
+      "installmentOption": "#{n} · jatuh tempo {date}",
+      "loanLinkLocked": "Cicilan ini dibukukan otomatis oleh jadwal, sehingga tautan pinjamannya tidak dapat diubah.",
       "customInstrumentToggle": "Tidak ditemukan? Tambahkan instrumen kustom"
     },
     "reassign": "Pindahkan"

@@ -112,6 +112,9 @@ export interface TxRow {
   displayCurrency?: string | null;
   executedAt: string;
   source: string;
+  /** The cicilan loan a loan_repayment belongs to, and the installment it settles. */
+  loanId?: string | null;
+  installmentN?: number | null;
   instrument: {
     symbol?: string | null;
     name?: string | null;

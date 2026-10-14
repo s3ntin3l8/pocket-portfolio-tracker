@@ -366,4 +366,172 @@ describe("loan routes (skip / payoff)", () => {
     });
     expect((await loanRow(id)).closedAt).toBeNull();
   });
+
+  describe("manual repayments linked to a loan", () => {
+    const manual = (loanId: string | null, over: Record<string, unknown> = {}) => ({
+      type: "loan_repayment",
+      price: "1000",
+      fees: "100",
+      currency: "IDR",
+      executedAt: "2026-02-10T00:00:00.000Z",
+      ...(loanId ? { loanId } : {}),
+      ...over,
+    });
+    const post = (payload: Record<string, unknown>, token_ = owner, portfolio = pf) =>
+      app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolio}/transactions`,
+        headers: auth(token_),
+        payload,
+      });
+
+    it("links to a loan and installment, which then counts as paid and is not re-booked", async () => {
+      const id = await mkLoan();
+      const res = await post(manual(id, { installmentN: 2 }));
+      expect(res.statusCode).toBe(201);
+      expect(res.json()).toMatchObject({ loanId: id, installmentN: 2 });
+
+      const list = await app.inject({
+        method: "GET",
+        url: `/portfolios/${pf}/loans`,
+        headers: auth(owner),
+      });
+      const loan = list.json().find((l: { loanId: string }) => l.loanId === id);
+      expect(loan.installments.map((i: { status: string }) => i.status)).toEqual([
+        "paid",
+        "paid",
+        "overdue",
+      ]);
+
+      await bookDueInstallments(app.db, new Date("2026-06-01T00:00:00Z"), { loanId: id });
+      expect((await repayments(id)).map((t) => t.installmentN)).toEqual([1, 2, 3]);
+    });
+
+    it("can link to the loan alone (no installment)", async () => {
+      const id = await mkLoan();
+      const res = await post(manual(id));
+      expect(res.statusCode).toBe(201);
+      expect(res.json()).toMatchObject({ loanId: id, installmentN: null });
+    });
+
+    it("rejects an installment already covered, a closed loan, an unknown n and a currency mismatch", async () => {
+      const id = await mkLoan();
+      expect((await post(manual(id, { installmentN: 1 }))).json()).toEqual({
+        error: "installment_already_paid",
+      });
+      expect((await post(manual(id, { installmentN: 9 }))).json()).toEqual({
+        error: "installment_not_found",
+      });
+      expect((await post(manual(id, { installmentN: 2, currency: "EUR" }))).json()).toEqual({
+        error: "currency_mismatch",
+      });
+      await app.inject({
+        method: "POST",
+        url: url(id, "payoff"),
+        headers: auth(owner),
+        payload: { date: toDateKey(new Date()) },
+      });
+      const closed = await post(manual(id));
+      expect(closed.statusCode).toBe(409);
+      expect(closed.json()).toEqual({ error: "loan_closed" });
+    });
+
+    it("404s for another portfolio's loan and 400s a link on a non-repayment", async () => {
+      const id = await mkLoan();
+      const other = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(stranger),
+        payload: { name: "Other", baseCurrency: "idr", cashCounted: false },
+      });
+      const res = await post(manual(id), stranger, other.json().id);
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ error: "loan_not_found" });
+
+      const bad = await post({ ...manual(id), type: "deposit" });
+      expect(bad.statusCode).toBe(400);
+    });
+
+    it("paying a skipped installment clears its skip flag", async () => {
+      const id = await mkLoan();
+      await app.inject({
+        method: "POST",
+        url: url(id, "installments/2/skip"),
+        headers: auth(owner),
+      });
+      expect(skippedNs(await loanRow(id))).toEqual([2]);
+      expect((await post(manual(id, { installmentN: 2 }))).statusCode).toBe(201);
+      expect(skippedNs(await loanRow(id))).toEqual([]);
+    });
+
+    it("PATCH keeps/changes the link, re-saving the same installment is not a conflict", async () => {
+      const id = await mkLoan();
+      const created = (await post(manual(id, { installmentN: 2 }))).json();
+      const patch = (payload: Record<string, unknown>, txId = created.id) =>
+        app.inject({
+          method: "PATCH",
+          url: `/portfolios/${pf}/transactions/${txId}`,
+          headers: auth(owner),
+          payload: { ...manual(null), ...payload },
+        });
+      // Omitting loanId/installmentN (a client unaware of links) leaves them as stored.
+      const same = await patch({ fees: "150" });
+      expect(same.statusCode).toBe(200);
+      expect(same.json()).toMatchObject({ loanId: id, installmentN: 2, fees: "150" });
+      // Explicit re-send of the same installment is fine too.
+      expect((await patch({ loanId: id, installmentN: 2 })).statusCode).toBe(200);
+      // Moving to a covered installment conflicts; to a free one works.
+      expect((await patch({ loanId: id, installmentN: 1 })).statusCode).toBe(409);
+      expect((await patch({ loanId: id, installmentN: 3 })).json()).toMatchObject({
+        installmentN: 3,
+      });
+      // null unlinks; changing the type drops the link.
+      expect((await patch({ loanId: null, installmentN: null })).json()).toMatchObject({
+        loanId: null,
+        installmentN: null,
+      });
+      const relinked = (await post(manual(id, { installmentN: 2 }))).json();
+      const asDeposit = await patch({ type: "deposit" }, relinked.id);
+      expect(asDeposit.json()).toMatchObject({ loanId: null, installmentN: null });
+    });
+
+    it("locks the link of an auto-booked installment but lets its amounts be edited", async () => {
+      const id = await mkLoan();
+      await bookDueInstallments(app.db, new Date("2026-06-01T00:00:00Z"), { loanId: id });
+      const two = (await repayments(id)).find((t) => t.installmentN === 2)!;
+      const patch = (payload: Record<string, unknown>) =>
+        app.inject({
+          method: "PATCH",
+          url: `/portfolios/${pf}/transactions/${two.id}`,
+          headers: auth(owner),
+          payload: {
+            ...manual(null),
+            externalId: two.externalId,
+            source: two.source,
+            ...payload,
+          },
+        });
+      expect((await patch({ fees: "120" })).statusCode).toBe(200);
+      const moved = await patch({ loanId: id, installmentN: 3 });
+      expect(moved.statusCode).toBe(409);
+      expect(moved.json()).toEqual({ error: "loan_link_locked" });
+    });
+
+    it("GET /loans is scoped to the portfolio", async () => {
+      const id = await mkLoan();
+      const mine = await app.inject({
+        method: "GET",
+        url: `/portfolios/${pf}/loans`,
+        headers: auth(owner),
+      });
+      expect(mine.statusCode).toBe(200);
+      expect(mine.json().some((l: { loanId: string }) => l.loanId === id)).toBe(true);
+      const foreign = await app.inject({
+        method: "GET",
+        url: `/portfolios/${pf}/loans`,
+        headers: auth(stranger),
+      });
+      expect(foreign.statusCode).toBe(404);
+    });
+  });
 });
