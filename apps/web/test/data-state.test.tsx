@@ -33,15 +33,24 @@ describe("DataState", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
+  it("requires an icon and copy only for the empty status", () => {
+    // @ts-expect-error `icon` and `empty` are mandatory when status is "empty"
+    const missing: React.ComponentProps<typeof DataState> = { status: "empty" };
+    expect(missing.status).toBe("empty");
+    // Failure states need neither.
+    const failure: React.ComponentProps<typeof DataState> = { status: "unavailable" };
+    expect(failure.status).toBe("unavailable");
+  });
+
   it("renders unavailable with a Retry that refreshes the route", () => {
-    renderState({ status: "unavailable", icon: Layers });
+    renderState({ status: "unavailable" });
     expect(screen.getByText(messages.Empty.unavailableTitle)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: messages.DataState.retry }));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it("renders unauthorized as a session-expired state, not 'can't reach the API'", () => {
-    renderState({ status: "unauthorized", icon: Layers });
+    renderState({ status: "unauthorized" });
     expect(screen.getByText(messages.DataState.unauthorizedTitle)).toBeTruthy();
     expect(screen.queryByText(messages.Empty.unavailableTitle)).toBeNull();
     expect(screen.getByRole("link", { name: messages.DataState.signIn })).toBeTruthy();
@@ -52,7 +61,7 @@ describe("DataState", () => {
     afterEach(() => vi.useRealTimers());
 
     it("counts down, disables Retry until the window passes, then retries", () => {
-      renderState({ status: "rate_limited", retryAfter: 2, icon: Layers });
+      renderState({ status: "rate_limited", retryAfter: 2 });
       expect(screen.getByText(messages.DataState.rateLimitedTitle)).toBeTruthy();
       const waiting = screen.getByRole("button", { name: "Retry in 2s" }) as HTMLButtonElement;
       expect(waiting.disabled).toBe(true);
@@ -74,7 +83,7 @@ describe("DataState", () => {
     });
 
     it("falls back to generic copy when the API gave no wait time", () => {
-      renderState({ status: "rate_limited", retryAfter: null, icon: Layers });
+      renderState({ status: "rate_limited", retryAfter: null });
       expect(screen.getByText(messages.DataState.rateLimitedBodyNoTime)).toBeTruthy();
       expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(false);
     });

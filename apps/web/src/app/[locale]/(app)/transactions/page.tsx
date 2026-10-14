@@ -235,7 +235,7 @@ export default async function TransactionsPage({
     return (
       <div className="space-y-5">
         {heading}
-        <DataState status={status} retryAfter={retryAfter} icon={Receipt} />
+        <DataState status={status} retryAfter={retryAfter} />
       </div>
     );
   }
