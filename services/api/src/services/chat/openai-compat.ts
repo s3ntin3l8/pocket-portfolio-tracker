@@ -152,6 +152,7 @@ export class OpenAICompatChatProvider implements ChatProvider {
     const guard = idleGuard(withTimeout(req.signal), STREAM_IDLE_TIMEOUT_MS);
     try {
       const res = await this.send(req, log, guard.signal, true);
+      guard.touch(); // headers are in: from here on, silence means a dead stream
       if (!res.body) throw new ChatProviderError("provider_bad_response");
 
       let text = "";

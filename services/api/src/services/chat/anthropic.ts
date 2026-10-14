@@ -149,6 +149,7 @@ export class AnthropicChatProvider implements ChatProvider {
     const guard = idleGuard(withTimeout(req.signal), STREAM_IDLE_TIMEOUT_MS);
     try {
       const res = await this.send(req, log, guard.signal, true);
+      guard.touch(); // headers are in: from here on, silence means a dead stream
       if (!res.body) throw new ChatProviderError("provider_bad_response");
 
       // Content blocks are rebuilt in order so the whole assistant turn can be replayed

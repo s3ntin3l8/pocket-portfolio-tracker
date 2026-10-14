@@ -53,8 +53,10 @@ function parseFrame(raw: string): SseFrame | null {
 }
 
 /**
- * Abort signal that also fires when no chunk has arrived for `ms`. Call `touch()` on every
- * frame and `stop()` when the stream ends so the timer never outlives the request.
+ * Abort signal that also fires when no chunk has arrived for `ms`. The timer is NOT armed at
+ * construction: time to first byte (a cold local model load) is bounded by the overall request
+ * timeout, not this one. Call `touch()` once the response headers arrive and on every chunk,
+ * and `stop()` when the stream ends so the timer never outlives the request.
  */
 export function idleGuard(signal: AbortSignal | undefined, ms: number) {
   const idle = new AbortController();
@@ -63,7 +65,6 @@ export function idleGuard(signal: AbortSignal | undefined, ms: number) {
     clearTimeout(timer);
     timer = setTimeout(() => idle.abort(), ms);
   };
-  touch();
   return {
     signal: signal ? AbortSignal.any([signal, idle.signal]) : idle.signal,
     touch,

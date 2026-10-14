@@ -66,10 +66,15 @@ describe("readSseFrames edge cases", () => {
 
 describe("idleGuard", () => {
   it("aborts when no chunk arrives in time and stays quiet once stopped", async () => {
-    const g = idleGuard(undefined, 20);
+    // Not armed until the first touch: a slow first byte is not an idle stream.
+    const fresh = idleGuard(undefined, 20);
     await new Promise((r) => setTimeout(r, 60));
-    expect(g.signal.aborted).toBe(true);
+    expect(fresh.signal.aborted).toBe(false);
+    fresh.touch();
+    await new Promise((r) => setTimeout(r, 60));
+    expect(fresh.signal.aborted).toBe(true);
     const h = idleGuard(undefined, 20);
+    h.touch();
     h.stop();
     await new Promise((r) => setTimeout(r, 60));
     expect(h.signal.aborted).toBe(false);
