@@ -218,6 +218,57 @@
   }
 }
 
+/* View Transitions (React <ViewTransition>, see route-transition.tsx). The class names are
+   assigned by React via `view-transition-class`. Opacity-only for route changes so there is no
+   layout movement; the net-worth tick is short. Unsupported browsers
+   ignore all of this and swap instantly. */
+::view-transition {
+  /* Let clicks through to the live page while a transition runs. */
+  pointer-events: none;
+}
+::view-transition-old(.vt-route) {
+  animation: 120ms ease-in both vt-fade reverse;
+}
+::view-transition-new(.vt-route) {
+  animation: 220ms ease-out 80ms both vt-fade;
+}
+::view-transition-old(.vt-tick-out) {
+  animation: 120ms ease-in both vt-fade reverse;
+}
+::view-transition-new(.vt-tick) {
+  animation:
+    200ms ease-out 60ms both vt-fade,
+    200ms ease-out 60ms both vt-tick-up;
+}
+
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-tick-up {
+  from {
+    translate: 0 6px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+/* Reduced motion: collapse every view-transition animation to its end state (instant swap).
+   Zero duration rather than `animation: none`, so the old snapshot still ends hidden. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
 /* Touch-target floor (WCAG 2.5.5 / audit F7): grows the tappable area of a small control
    to at least 44x44 via an invisible, centred ::before, without changing its visual size
    or its footprint in layout. The element must already be positioned (`relative`, or

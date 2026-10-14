@@ -15,7 +15,7 @@ describe("RouteTransition", () => {
     mockPathname = "/";
   });
 
-  it("wraps children in a fade-in blend container", () => {
+  it("renders children in a wrapper without the legacy fade-in class", () => {
     const scrollContainerRef = createRef<HTMLDivElement>();
     render(
       <RouteTransition scrollContainerRef={scrollContainerRef}>
@@ -24,7 +24,8 @@ describe("RouteTransition", () => {
     );
 
     const content = screen.getByText("page content");
-    expect(content.parentElement).toHaveClass("animate-fade-in");
+    expect(content.parentElement).not.toHaveClass("animate-fade-in");
+    expect(content.parentElement?.tagName).toBe("DIV");
   });
 
   it("resets the scroll container to the top on mount (#584)", () => {
@@ -85,5 +86,21 @@ describe("RouteTransition", () => {
     );
 
     expect(screen.getByText("instrument content").parentElement).not.toBe(before);
+  });
+});
+
+describe("view-transition CSS", () => {
+  it("disables every view-transition animation under prefers-reduced-motion", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const css = readFileSync(
+      fileURLToPath(new URL("../src/app/globals.css", import.meta.url)),
+      "utf8",
+    );
+    const block = css.match(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*::view-transition-old\(\*\)[\s\S]*?\n\}/,
+    );
+    expect(block?.[0]).toContain("animation-duration: 0s !important");
+    expect(block?.[0]).toContain("::view-transition-group(*)");
   });
 });

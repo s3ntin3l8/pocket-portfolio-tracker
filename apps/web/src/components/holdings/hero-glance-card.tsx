@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
 import {
@@ -105,9 +105,19 @@ export function HeroGlanceCard({
       style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
     >
       <p className="text-body-sm font-semibold text-white/78">{t("label")}</p>
-      <p className="tabular mt-1 text-hero font-extrabold leading-tight sm:text-hero">
-        {formatNetWorth(netWorth, currency, locale)}
-      </p>
+      {/* Keyed by the formatted value: a scope switch (a router transition) swaps the key,
+          so the old figure fades out and the new one ticks in. Progressive enhancement: a
+          no-op without View Transitions support or under prefers-reduced-motion. */}
+      <ViewTransition
+        key={formatNetWorth(netWorth, currency, locale)}
+        enter="vt-tick"
+        exit="vt-tick-out"
+        default="none"
+      >
+        <p className="tabular mt-1 text-hero font-extrabold leading-tight sm:text-hero">
+          {formatNetWorth(netWorth, currency, locale)}
+        </p>
+      </ViewTransition>
       {(atCostCount > 0 || fxMissingCount > 0) && (
         <p className="mt-0.5 text-micro font-medium text-white/70">
           <ScopeLink
