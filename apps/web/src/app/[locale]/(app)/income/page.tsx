@@ -1,27 +1,24 @@
+import { Suspense } from "react";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/stat-card";
 import { EmptyState } from "@/components/empty-state";
-import {
-  LazyAllocationDonut as AllocationDonut,
-  LazyIncomeBarChart as IncomeBarChart,
-} from "@/components/charts/lazy";
-import { IncomeBarChartLegend } from "@/components/charts/income-bar-legend";
-import { IncomeHeatmap } from "@/components/charts/income-heatmap";
 import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
-import { YieldsTable } from "@/components/income/yields-table";
-import { TABLE_LABEL, TABLE_SUBLABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
-import { IncomeTimeline } from "@/components/income/income-timeline";
-import { CashInterestLine } from "@/components/income/cash-interest-line";
-import { IncomeCalendar } from "@/components/income/income-calendar";
-import { IncomeCalendarEmpty } from "@/components/income/income-calendar-empty";
-import type { IncomeEventRow } from "@/components/income/income-events-table";
-import { loadIncomeStats } from "@/lib/server-api";
-import { formatMoney, formatPercent, cn } from "@/lib/utils";
+import { incomeStatsOnce } from "@/components/income/income-data";
+import {
+  IncomeYearChartSection,
+  IncomeSeasonalitySection,
+  IncomeSummarySection,
+  IncomeCalendarSection,
+  IncomeTimelineSection,
+  IncomeStatsSection,
+  IncomeCashInterestSection,
+  IncomeAllocationSection,
+  IncomeCurrencySection,
+} from "@/components/income/income-sections";
+import { IncomeCardSkeleton, IncomeStatsSkeleton } from "@/components/income/income-skeletons";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -31,12 +28,11 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Income");
-  const tc = await getTranslations("AssetClass");
   const te = await getTranslations("Empty");
 
   // Holder scope is now global (cookie-based via the portfolio switcher).
   // loadIncomeStats() reads it automatically.
-  const result = await loadIncomeStats();
+  const result = await incomeStatsOnce();
 
   if (TIMING) {
     // eslint-disable-next-line react-hooks/purity
@@ -72,8 +68,6 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
   }
 
   const s = result.data;
-  const currency = s.displayCurrency;
-  const m = (n: number) => formatMoney(n, currency, locale);
   const hasIncome = s.events.length > 0 || s.yields.length > 0 || s.upcoming.length > 0;
 
   if (!hasIncome) {
@@ -85,54 +79,6 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     );
   }
 
-  const lastYearLabel = String(new Date().getUTCFullYear() - 1);
-  const thisFullYear = Number(s.forecastFullYear);
-  const lastYearTotal = Number(s.lastYear);
-  const deltaAbs = thisFullYear - lastYearTotal;
-  const deltaPct = lastYearTotal > 0 ? deltaAbs / lastYearTotal : null;
-
-  const currentYear = String(new Date().getUTCFullYear());
-
-  // Yearly bars: current year includes projected rest-of-year as a stacked segment.
-  const yearBars = [
-    ...s.byYear.map((y) => ({
-      label: y.year,
-      value: Number(y.total),
-      ...(y.year === currentYear ? { projected: Number(s.forecastRestOfYear) } : {}),
-    })),
-    { label: t("nextYear"), value: Number(s.forecastNextYear), forecast: true },
-  ];
-
-  const classSlices = s.byAssetClass.map((c) => ({
-    key: c.assetClass,
-    label: tc(c.assetClass),
-    value: Number(c.total),
-  }));
-
-  // Merge historical events + upcoming payments into one flat row array — the
-  // year-grouping, next-year-forecast split, and per-year subtitle/subtotal logic now
-  // live in <IncomeTimeline>, which re-runs them AFTER its own filters (year/status/
-  // search) so a filtered view still groups and sorts correctly.
-  const timelineRows: IncomeEventRow[] = [
-    ...s.events,
-    ...s.upcoming.map((u) => ({
-      ...u,
-      type: u.kind,
-      growthApplied: u.growthApplied,
-      assumesContributions: u.assumesContributions,
-      perShare: u.perShare,
-      quantity: u.quantity,
-    })),
-  ];
-
-  // Years with data that aren't in the initial 3-year events window → collapsed
-  // year headers that load on demand.
-  const eventYears = new Set(s.events.map((e) => e.date.slice(0, 4)));
-  const olderYears = s.byYear
-    .map((y) => String(y.year))
-    .filter((y) => !eventYears.has(y))
-    .sort((a, b) => Number(b) - Number(a));
-
   return (
     <div className="space-y-5">
       {heading}
@@ -140,175 +86,37 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Main column: charts + summary + calendar + timeline ── */}
         <div className="space-y-5">
-          {s.byYear.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1.5 pb-2">
-                <CardTitle>{t("perYearTitle")}</CardTitle>
-                <IncomeBarChartLegend />
-              </CardHeader>
-              <CardContent>
-                <IncomeBarChart data={yearBars} currency={currency} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Seasonality heatmap — full width for better readability. */}
-          {s.monthly.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>{t("seasonalityTitle")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <IncomeHeatmap monthly={s.monthly} currency={currency} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Summary cards in a two-column grid. */}
-          {(s.byInstrument.length > 0 || s.yields.length > 0 || s.byCurrency.length > 1) && (
-            <div className="@container grid gap-4 @2xl:grid-cols-2 @2xl:items-start">
-              {s.byInstrument.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("topContributorsTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {s.byInstrument.slice(0, 8).map((c) => (
-                      <div key={c.instrumentId ?? c.symbol ?? "—"} className="space-y-1">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className="min-w-0 flex-1 truncate">
-                            <span className={TABLE_LABEL}>{c.symbol ?? "—"}</span>
-                            {(c.displayName ?? c.name) && (
-                              <span className={cn("ml-2", TABLE_SUBLABEL)}>
-                                {c.displayName ?? c.name}
-                              </span>
-                            )}
-                          </div>
-                          <span className={cn("shrink-0", TABLE_VALUE_STRONG)}>
-                            {m(Number(c.total))}{" "}
-                            <span className="text-text-mute">({formatPercent(c.pct, locale)})</span>
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${Math.max(2, c.pct * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-              {s.yields.length > 0 && (
-                <Card className="overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <CardTitle>{t("yieldTitle")}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-0 pb-0">
-                    <YieldsTable rows={s.yields} />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Payments calendar (forward-looking, getquin-style) — sits above the timeline
-              so the user's primary question ("what's paying me next?") has the most
-              prominent slot. Renders its own empty state when `upcoming` is empty. */}
-          {s.upcoming.length > 0 ? (
-            <IncomeCalendar upcoming={s.upcoming} />
-          ) : (
-            <IncomeCalendarEmpty />
-          )}
-
-          {/* Payments timeline — one card, year sub-headers newest-first, with its own
-              year/status filter chips + search (reference). */}
-          {timelineRows.length > 0 && (
-            <IncomeTimeline rows={timelineRows} locale={locale} olderYears={olderYears} />
-          )}
+          <Suspense fallback={<IncomeCardSkeleton />}>
+            <IncomeYearChartSection />
+          </Suspense>
+          <Suspense fallback={<IncomeCardSkeleton />}>
+            <IncomeSeasonalitySection />
+          </Suspense>
+          <Suspense fallback={<IncomeCardSkeleton />}>
+            <IncomeSummarySection locale={locale} />
+          </Suspense>
+          <Suspense fallback={<IncomeCardSkeleton />}>
+            <IncomeCalendarSection />
+          </Suspense>
+          <Suspense fallback={<IncomeCardSkeleton height="h-64" />}>
+            <IncomeTimelineSection locale={locale} />
+          </Suspense>
         </div>
 
         {/* ── Sidebar: stat cards + cash interest + allocation donut (sticky on wide containers) ── */}
         <div className="order-first space-y-3.5 @xl:order-last @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto">
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @xl:grid-cols-1">
-            <StatCard
-              label={t("thisYear")}
-              value={m(thisFullYear)}
-              delta={
-                deltaPct !== null
-                  ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
-                  : undefined
-              }
-              deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
-            />
-            <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
-            <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />
-            <StatCard
-              label={t("lifetime")}
-              value={m(Number(s.lifetimeTotal))}
-              basis={t("lifetimeBasis")}
-            />
-            <StatCard
-              label={t("payments")}
-              value={String(s.paymentCount)}
-              delta={t("avgPerPayment", { avg: m(Number(s.averagePerPayment)) })}
-              className="col-span-2 @xl:col-span-1"
-            />
-          </div>
-
-          {Number(s.interest.lifetime) > 0 && (
-            <CashInterestLine
-              label={t("cashInterest")}
-              ytdLabel={t("thisYear")}
-              ttmLabel={t("ttm")}
-              lifetimeLabel={t("lifetime")}
-              ytd={m(Number(s.interest.ytd))}
-              ttm={m(Number(s.interest.ttm))}
-              lifetime={m(Number(s.interest.lifetime))}
-            />
-          )}
-
-          {classSlices.length > 0 && (
-            <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
-                {t("byClassTitle")}
-              </p>
-              <AllocationDonut
-                data={classSlices}
-                currency={currency}
-                total={Number(s.lifetimeTotal)}
-              />
-            </div>
-          )}
-
-          {s.byCurrency.length > 1 && (
-            <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-              <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
-                {t("currencyTitle")}
-              </p>
-              <div className="grid grid-cols-1 gap-x-5 gap-y-2.5 @sm:grid-cols-2 @sm:gap-x-7 @lg:grid-cols-3">
-                {s.byCurrency.map((c, i) => (
-                  <div key={c.currency} className="flex items-center gap-[9px]">
-                    <span
-                      className="size-[9px] shrink-0 rounded-xs"
-                      style={{
-                        background: `var(--color-chart-${(i % 5) + 1})`,
-                      }}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-body-sm font-semibold">
-                      {c.currency}
-                    </span>
-                    <span className="tabular shrink-0 text-body-sm font-bold text-text-2">
-                      {Number(s.lifetimeTotal) > 0
-                        ? `${((Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100).toFixed(1)}%`
-                        : "—"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <Suspense fallback={<IncomeStatsSkeleton />}>
+            <IncomeStatsSection locale={locale} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <IncomeCashInterestSection locale={locale} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <IncomeAllocationSection />
+          </Suspense>
+          <Suspense fallback={null}>
+            <IncomeCurrencySection />
+          </Suspense>
         </div>
       </div>
     </div>
