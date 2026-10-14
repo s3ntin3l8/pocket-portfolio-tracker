@@ -58,7 +58,7 @@ export default async function SettingsPortfoliosPage({
 
       <div className="space-y-6">
         {result.status !== "ok" ? (
-          <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={Briefcase} />
+          <DataState status={result.status} retryAfter={retryAfterOf(result)} />
         ) : result.portfolios.length > 0 ? (
           <div className="grid gap-3.5 sm:grid-cols-2">
             {result.portfolios.map(({ portfolio, netWorth }) => {
@@ -84,7 +84,7 @@ export default async function SettingsPortfoliosPage({
               return (
                 <Card
                   key={portfolio.id}
-                  className="relative flex flex-col rounded-[18px] border-border shadow-card transition-colors hover:bg-accent/50"
+                  className="relative flex flex-col rounded-xl border-border shadow-card transition-colors hover:bg-accent/50"
                 >
                   {/* Overlay link — the whole card opens the inline edit page (design:
                       chevron affordance, no `⋯` menu). */}
@@ -104,7 +104,7 @@ export default async function SettingsPortfoliosPage({
                       <div className="flex min-w-0 items-center gap-2.5">
                         <BrokerageIcon brokerage={portfolio.brokerage} />
                         <div className="min-w-0">
-                          <p className="truncate text-[15px] font-bold">{portfolio.name}</p>
+                          <p className="truncate text-body font-bold">{portfolio.name}</p>
                           {portfolio.accountHolder && (
                             <p className="truncate text-xs text-muted-foreground">
                               {portfolio.accountHolder}
@@ -118,7 +118,7 @@ export default async function SettingsPortfoliosPage({
                       <div className="mt-2.5">
                         <span
                           className={
-                            "inline-flex items-center gap-1.5 rounded-[7px] px-2 py-1 text-[10px] font-bold " +
+                            "inline-flex items-center gap-1.5 rounded-xs px-2 py-1 text-micro font-bold " +
                             (isSyncing
                               ? "bg-warning/15 text-warning"
                               : "bg-success/15 text-success")
@@ -134,7 +134,7 @@ export default async function SettingsPortfoliosPage({
                         </span>
                       </div>
                     )}
-                    <p className="tabular mt-4 text-[22px] font-extrabold">
+                    <p className="tabular mt-4 text-heading font-extrabold">
                       {formatMoney(Number(netWorth), portfolio.baseCurrency, locale)}
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
@@ -149,7 +149,7 @@ export default async function SettingsPortfoliosPage({
                           {flags.map((flag) => (
                             <span
                               key={flag}
-                              className="text-[11px] font-medium text-muted-foreground"
+                              className="text-micro font-medium text-muted-foreground"
                             >
                               {flag}
                             </span>
@@ -164,9 +164,9 @@ export default async function SettingsPortfoliosPage({
 
             <Link
               href="/settings/portfolios/new"
-              className="flex min-h-[170px] flex-col items-center justify-center gap-2.5 rounded-[18px] border-[1.5px] border-dashed border-border p-[18px] text-center text-muted-foreground transition-colors hover:bg-accent/40"
+              className="flex min-h-[170px] flex-col items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-border p-[18px] text-center text-muted-foreground transition-colors hover:bg-accent/40"
             >
-              <span className="flex size-[42px] items-center justify-center rounded-[13px] bg-success/15 text-success">
+              <span className="flex size-[42px] items-center justify-center rounded-md bg-success/15 text-success">
                 <Plus className="size-[22px]" />
               </span>
               <span className="text-sm font-bold text-foreground">{tf("new")}</span>

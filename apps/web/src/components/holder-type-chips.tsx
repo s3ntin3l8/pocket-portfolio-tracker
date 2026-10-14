@@ -33,7 +33,7 @@ export function HolderTypeChips({
             aria-checked={on}
             onClick={() => onChange(tp)}
             className={cn(
-              "flex-1 rounded-[10px] py-2.5 text-[13px] transition-colors",
+              "flex-1 rounded-sm py-2.5 text-body-sm transition-colors",
               on
                 ? "bg-primary font-bold text-primary-foreground"
                 : "border border-border bg-card font-semibold text-foreground hover:bg-accent/50",

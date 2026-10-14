@@ -16,7 +16,7 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
       <div className="mt-0.5 flex items-baseline justify-between gap-3">
         <p
           className={cn(
-            "tabular text-[22px] font-extrabold leading-none",
+            "tabular text-heading font-extrabold leading-none",
             maxDdpct < 0 ? "text-destructive" : "",
           )}
         >

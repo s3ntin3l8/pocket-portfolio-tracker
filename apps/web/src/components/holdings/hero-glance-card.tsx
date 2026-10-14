@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
 import {
@@ -101,15 +101,25 @@ export function HeroGlanceCard({
 
   return (
     <div
-      className="rounded-[26px] px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-2xl"
+      className="rounded-xl px-6 pb-[18px] pt-[22px] text-white shadow-[0_12px_30px_rgba(14,159,110,.30)] sm:rounded-2xl"
       style={{ background: "linear-gradient(160deg,#0E9F6E,#0B7D58)" }}
     >
-      <p className="text-[13px] font-semibold text-white/78">{t("label")}</p>
-      <p className="tabular mt-1 text-[34px] font-extrabold leading-tight sm:text-[36px]">
-        {formatNetWorth(netWorth, currency, locale)}
-      </p>
+      <p className="text-body-sm font-semibold text-white/78">{t("label")}</p>
+      {/* Keyed by the formatted value: a scope switch (a router transition) swaps the key,
+          so the old figure fades out and the new one ticks in. Progressive enhancement: a
+          no-op without View Transitions support or under prefers-reduced-motion. */}
+      <ViewTransition
+        key={formatNetWorth(netWorth, currency, locale)}
+        enter="vt-tick"
+        exit="vt-tick-out"
+        default="none"
+      >
+        <p className="tabular mt-1 text-hero font-extrabold leading-tight sm:text-hero">
+          {formatNetWorth(netWorth, currency, locale)}
+        </p>
+      </ViewTransition>
       {(atCostCount > 0 || fxMissingCount > 0) && (
-        <p className="mt-0.5 text-[11px] font-medium text-white/70">
+        <p className="mt-0.5 text-micro font-medium text-white/70">
           <ScopeLink
             href={atCostHref}
             aria-label={atCostLabel}
@@ -123,16 +133,16 @@ export function HeroGlanceCard({
       {hasDelta && closeDelta !== null && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {snapshot.isIntraday ? (
-            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
+            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
               {closeDelta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
               {periodWord}
             </span>
           ) : (
-            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
+            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
               {closeDelta >= 0 ? "▲" : "▼"} {formatPercent(closeDelta / 100, locale)} {periodWord}
             </span>
           )}
-          <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-[13px] font-bold">
+          <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
             {tb("vs", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}{" "}
             {benchmarkPct !== null
               ? formatPercent(benchmarkPct / 100, locale)
@@ -155,7 +165,7 @@ export function HeroGlanceCard({
       </div>
 
       {hasDelta && (
-        <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-semibold text-white/78">
+        <div className="mt-2 flex flex-wrap gap-3 text-micro font-semibold text-white/78">
           <span>
             <span
               className="mr-1 inline-block h-[2px] w-3 align-middle"

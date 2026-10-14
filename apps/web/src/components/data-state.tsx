@@ -7,6 +7,25 @@ import { Button } from "@/components/ui/button";
 
 export type DataStateStatus = "empty" | "unauthorized" | "rate_limited" | "unavailable";
 
+type EmptyCopy = { title: string; description: string; action?: React.ReactNode };
+
+export type DataStateProps = { retryAfter?: number | null } & (
+  | {
+      status: "empty";
+      /** Icon for the empty state; failure states use their own. */
+      icon: LucideIcon;
+      /** Copy for `status="empty"`. */
+      empty: EmptyCopy;
+    }
+  | {
+      status: Exclude<DataStateStatus, "empty">;
+      /** Unused by failure states (they use their own icon); accepted so a caller whose
+       * status may be `"empty"` or a failure can pass one set of props. */
+      icon?: LucideIcon;
+      empty?: EmptyCopy;
+    }
+);
+
 /**
  * One place that turns a loader status into the right message instead of a single
  * "Can't reach the API" card: "empty" (the caller's own copy — nothing to show yet),
@@ -18,29 +37,18 @@ export type DataStateStatus = "empty" | "unauthorized" | "rate_limited" | "unava
  * Renders on the server or the client (the interactive bit is `DataStateRetry`), so a
  * server page can pass its `LucideIcon` straight through.
  */
-export function DataState({
-  status,
-  retryAfter,
-  icon,
-  empty,
-}: {
-  status: DataStateStatus;
-  /** Seconds to wait, for `rate_limited`. */
-  retryAfter?: number | null;
-  /** Icon for the empty state; failure states use their own. */
-  icon: LucideIcon;
-  /** Copy for `status="empty"`. */
-  empty?: { title: string; description: string; action?: React.ReactNode };
-}) {
+export function DataState(props: DataStateProps) {
+  const { status, retryAfter } = props;
   const t = useTranslations("DataState");
 
-  if (status === "empty") {
+  if (props.status === "empty") {
+    const { icon, empty } = props;
     return (
       <EmptyState
         icon={icon}
-        title={empty?.title ?? ""}
-        description={empty?.description ?? ""}
-        action={empty?.action}
+        title={empty.title}
+        description={empty.description}
+        action={empty.action}
       />
     );
   }

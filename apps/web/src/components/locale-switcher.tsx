@@ -23,7 +23,7 @@ export function LocaleSwitcher() {
           onClick={() => router.replace(pathname, { locale: l })}
           aria-pressed={locale === l}
           className={cn(
-            "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors",
+            "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
             locale === l
               ? "bg-pill font-bold text-white"
               : "bg-background font-semibold text-foreground",

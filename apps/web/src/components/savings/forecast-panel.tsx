@@ -21,7 +21,7 @@ function num(v: string, min: number, max: number): number {
  * change — no network round-trip.
  *
  * Styled as the reference's green-gradient "hero" (same recipe as Holdings'
- * `HeroGlanceCard`: `linear-gradient(160deg,#0E9F6E,#0B7D58)`, `rounded-[26px]`,
+ * `HeroGlanceCard`: `linear-gradient(160deg,#0E9F6E,#0B7D58)`, `rounded-xl`,
  * `shadow-[0_12px_30px_rgba(14,159,110,.30)]`) — white-on-green controls, chart and
  * a contributed/growth split footer.
  */
@@ -124,8 +124,8 @@ export function ForecastPanel({
       {/* Levers — stacked translucent pills (reference), not a grid. */}
       <div className="mt-4 space-y-2.5">
         {/* Monthly top-up: label left, white-filled numeric input right. */}
-        <div className="flex items-center justify-between gap-2.5 rounded-[13px] bg-white/12 px-[13px] py-[11px]">
-          <Label htmlFor="forecast-monthly" className="text-[11px] font-semibold text-white/82">
+        <div className="flex items-center justify-between gap-2.5 rounded-md bg-white/12 px-[13px] py-[11px]">
+          <Label htmlFor="forecast-monthly" className="text-micro font-semibold text-white/82">
             {t("monthlyAmount")}
           </Label>
           <input
@@ -135,17 +135,17 @@ export function ForecastPanel({
             inputMode="numeric"
             value={monthly}
             onChange={(e) => setMonthly(num(e.target.value, 0, 1_000_000))}
-            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-[13px] font-extrabold text-[#0B3A2A] focus:outline-none"
+            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-body-sm font-extrabold text-[#0B3A2A] focus:outline-none"
           />
         </div>
 
         {/* Expected return: label + bold value on one row, slider below. */}
-        <div className="rounded-[13px] bg-white/12 px-[13px] py-[11px]">
+        <div className="rounded-md bg-white/12 px-[13px] py-[11px]">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <Label htmlFor="forecast-return" className="text-[11px] font-semibold text-white/82">
+            <Label htmlFor="forecast-return" className="text-micro font-semibold text-white/82">
               {t("annualReturn")}
             </Label>
-            <span className="tabular text-[13px] font-extrabold">{returnLabel}</span>
+            <span className="tabular text-body-sm font-extrabold">{returnLabel}</span>
           </div>
           <input
             id="forecast-return"
@@ -160,10 +160,10 @@ export function ForecastPanel({
         </div>
 
         {/* Horizon: label (+ optional age-18 preset) + bold value, slider below. */}
-        <div className="rounded-[13px] bg-white/12 px-[13px] py-[11px]">
+        <div className="rounded-md bg-white/12 px-[13px] py-[11px]">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="forecast-years" className="text-[11px] font-semibold text-white/82">
+              <Label htmlFor="forecast-years" className="text-micro font-semibold text-white/82">
                 {t("horizonYears")}
               </Label>
               {yearsToTarget !== null && (
@@ -171,14 +171,14 @@ export function ForecastPanel({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-5 px-1.5 text-[10px] text-white hover:bg-white/15 hover:text-white"
+                  className="h-5 px-1.5 text-micro text-white hover:bg-white/15 hover:text-white"
                   onClick={() => setYears(yearsToTarget)}
                 >
                   {portfolioType === "child" ? t("toAge18") : t("toRetirement")}
                 </Button>
               )}
             </div>
-            <span className="tabular text-[13px] font-extrabold">
+            <span className="tabular text-body-sm font-extrabold">
               {t("years", { count: years })}
             </span>
           </div>
@@ -201,7 +201,7 @@ export function ForecastPanel({
           {t("projectedInYears", { count: years })}
         </p>
         <p
-          className="tabular mt-0.5 text-[34px] font-extrabold leading-tight"
+          className="tabular mt-0.5 text-hero font-extrabold leading-tight"
           data-testid="projected-value"
         >
           {m(value)}
@@ -220,7 +220,7 @@ export function ForecastPanel({
         <div className="flex h-[11px] overflow-hidden rounded-md bg-white/[.22]">
           <div className="h-full bg-white/60" style={{ width: `${100 - growthPct}%` }} />
         </div>
-        <div className="mt-2 flex items-center justify-between text-[11px] font-semibold text-white/85">
+        <div className="mt-2 flex items-center justify-between text-micro font-semibold text-white/85">
           <span data-testid="projected-contributed">
             {t("projectedContributed")} {m(totalContributed)}
           </span>
@@ -242,14 +242,14 @@ export function ForecastPanel({
             data-active={s.active}
             className={
               s.active
-                ? "rounded-[13px] border border-white/55 bg-white/24 px-3 py-[11px]"
-                : "rounded-[13px] border border-transparent bg-white/12 px-3 py-[11px]"
+                ? "rounded-md border border-white/55 bg-white/24 px-3 py-[11px]"
+                : "rounded-md border border-transparent bg-white/12 px-3 py-[11px]"
             }
           >
-            <p className="text-[10px] font-semibold text-white/75">
+            <p className="text-micro font-semibold text-white/75">
               {formatPercent(s.rate / 100, locale)}
             </p>
-            <p className="tabular mt-0.5 text-[15px] font-extrabold">{mc(s.value)}</p>
+            <p className="tabular mt-0.5 text-body font-extrabold">{mc(s.value)}</p>
           </div>
         ))}
       </div>

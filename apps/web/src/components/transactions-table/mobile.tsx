@@ -7,6 +7,8 @@ import { onActivateKey } from "@/lib/a11y";
 import { TxRow, KIND_ICON } from "./types";
 import { TypeIconChip, SourceChips, txNetAmount, rowPerShareDisplay } from "./utils";
 import type { Anomaly } from "@portfolio/api-client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function MobileView({
   dayGroups,
@@ -43,7 +45,7 @@ export function MobileView({
     <div className="space-y-4 lg:hidden">
       {dayGroups.map((group) => (
         <div key={group.day}>
-          <div className="mb-2 ml-1 text-[12px] font-bold uppercase tracking-[0.04em] text-text-3">
+          <div className="mb-2 ml-1 text-xs font-bold uppercase tracking-[0.04em] text-text-3">
             {group.label}
           </div>
           <div className="overflow-hidden rounded-2xl bg-card shadow-card">
@@ -77,15 +79,14 @@ export function MobileView({
                   )}
                 >
                   {selectionMode && (
-                    <input
-                      type="checkbox"
-                      readOnly
+                    <Checkbox
                       aria-label={tb("selectRow")}
                       checked={isSelected}
-                      className="size-4 shrink-0 accent-primary"
+                      tabIndex={-1}
+                      className="pointer-events-none size-4 shrink-0"
                     />
                   )}
-                  <TypeIconChip type={tx.type} kind={tx.kind} className="size-10 rounded-[12px]" />
+                  <TypeIconChip type={tx.type} kind={tx.kind} className="size-10 rounded-md" />
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-[7px]">
                       <span className="truncate text-sm font-bold">
@@ -93,16 +94,18 @@ export function MobileView({
                         {tx.instrument?.symbol ? ` · ${tx.instrument.symbol}` : ""}
                       </span>
                       {anomaly && (
-                        <span
-                          title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                          aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                        <InfoTip
+                          label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                          focusable
                         >
-                          {anomaly.severity === "error" ? (
-                            <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                          ) : (
-                            <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                          )}
-                        </span>
+                          <span aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}>
+                            {anomaly.severity === "error" ? (
+                              <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                            ) : (
+                              <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                            )}
+                          </span>
+                        </InfoTip>
                       )}
                     </div>
                     <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-text-2">
@@ -111,7 +114,7 @@ export function MobileView({
                         <SourceChips
                           tx={tx}
                           t={t}
-                          chipClassName="inline-flex shrink-0 items-center whitespace-nowrap rounded-[6px] px-1.5 py-[2px] text-[9px] font-bold uppercase"
+                          chipClassName="inline-flex shrink-0 items-center whitespace-nowrap rounded-xs px-1.5 py-[2px] text-micro font-bold uppercase"
                         />
                       </span>
                     </div>

@@ -116,7 +116,7 @@ export function LossCarryforwardEditor({
               value={stock}
               onChange={(e) => setStock(sanitizeAmount(e.target.value))}
             />
-            <p className="mt-1 text-[10px] text-muted-foreground">
+            <p className="mt-1 text-micro text-muted-foreground">
               {t("lossCarryforward.stockHint")}
             </p>
           </div>
@@ -129,7 +129,7 @@ export function LossCarryforwardEditor({
               value={general}
               onChange={(e) => setGeneral(sanitizeAmount(e.target.value))}
             />
-            <p className="mt-1 text-[10px] text-muted-foreground">
+            <p className="mt-1 text-micro text-muted-foreground">
               {t("lossCarryforward.generalHint")}
             </p>
           </div>

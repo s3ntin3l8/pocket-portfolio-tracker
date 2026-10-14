@@ -9,6 +9,7 @@ import { InstrumentLogo } from "@/components/instrument-logo";
 import { ScopeLink } from "@/components/scope-link";
 import { formatSignedMoney, formatPercent, cn } from "@/lib/utils";
 import { tradeKey, toneClass } from "./constants";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function MobileRow({
   tr,
@@ -35,7 +36,7 @@ export function MobileRow({
           symbol={tr.instrument?.symbol}
           market={tr.instrument?.market}
           assetClass={tr.instrument?.assetClass}
-          className="mt-0.5 size-[42px] rounded-[13px]"
+          className="mt-0.5 size-[42px] rounded-md"
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -75,13 +76,12 @@ export function MobileRow({
             </div>
           )}
           {tr.annualizedPct !== null && (
-            <div
-              className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}
-              title={t("annualizedTooltip")}
-            >
-              {formatPercent(tr.annualizedPct, locale)}
-              {t("annualizedAbbr")}
-            </div>
+            <InfoTip label={t("annualizedTooltip")} focusable>
+              <div className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}>
+                {formatPercent(tr.annualizedPct, locale)}
+                {t("annualizedAbbr")}
+              </div>
+            </InfoTip>
           )}
         </div>
       </div>

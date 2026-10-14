@@ -146,7 +146,7 @@ export function TransactionDetailSheet({
   const accountName = account?.name ?? tx.portfolioName ?? null;
 
   const iconBtn =
-    "flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-colors hover:bg-secondary";
+    "flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] transition-colors hover:bg-secondary";
 
   const title = tx.instrument?.symbol ? `${tt(tx.type)} · ${tx.instrument.symbol}` : tt(tx.type);
   // v2 design: the header subtitle is "{date} · {portfolio}", not just the date.
@@ -262,9 +262,9 @@ export function TransactionDetailSheet({
         {showReceipt && (
           <div className="mt-5">
             <SectionHeading>{t("sourcesSection.documentTitle")}</SectionHeading>
-            <div className="flex items-center gap-3 rounded-[18px] border border-border bg-card p-[14px]">
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-[14px]">
               <span
-                className="flex size-[42px] shrink-0 items-center justify-center rounded-[11px]"
+                className="flex size-[42px] shrink-0 items-center justify-center rounded-sm"
                 style={{
                   background: (SOURCE_PILL[tx.source] ?? DEFAULT_PILL).bg,
                   color: (SOURCE_PILL[tx.source] ?? DEFAULT_PILL).fg,
@@ -276,10 +276,10 @@ export function TransactionDetailSheet({
                 })()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-foreground">
+                <p className="truncate text-body-sm font-bold text-foreground">
                   {t(`sources.${tx.source}`)}
                 </p>
-                <p className="mt-0.5 text-[12px] font-medium text-text-2">
+                <p className="mt-0.5 text-xs font-medium text-text-2">
                   {t("sourcesSection.autoParsedRetained")}
                 </p>
               </div>
@@ -288,7 +288,7 @@ export function TransactionDetailSheet({
                 aria-label={t("sourcesSection.download")}
                 title={t("sourcesSection.download")}
                 onClick={() => void downloadReceipt()}
-                className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-border bg-background text-foreground transition-colors hover:bg-secondary"
+                className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border bg-background text-foreground transition-colors hover:bg-secondary"
               >
                 <Download className="size-4" />
               </button>
@@ -297,7 +297,7 @@ export function TransactionDetailSheet({
         )}
 
         {anomaly && (
-          <div className="mt-5 rounded-[16px] border border-amber-400/40 bg-amber-50/40 p-3 text-sm dark:bg-amber-950/10">
+          <div className="mt-5 rounded-lg border border-amber-400/40 bg-amber-50/40 p-3 text-sm dark:bg-amber-950/10">
             <div className="flex items-start gap-2">
               {anomaly.severity === "error" ? (
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
@@ -415,13 +415,13 @@ export function TransactionDetailSheet({
         <div className="sticky top-0 z-[2] gap-0 bg-background px-5 pb-2.5 pt-4">
           <div className="flex items-center gap-3">
             <span
-              className="flex size-11 shrink-0 items-center justify-center rounded-[13px]"
+              className="flex size-11 shrink-0 items-center justify-center rounded-md"
               style={{ background: badge.bg, color: badge.fg }}
             >
               <BadgeIcon className="size-[22px]" strokeWidth={2.2} />
             </span>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate text-[18px] font-extrabold leading-none">
+              <DialogTitle className="truncate text-lg font-extrabold leading-none">
                 {title}
               </DialogTitle>
               <p className="truncate text-xs font-medium text-text-2">{subtitle}</p>

@@ -106,6 +106,12 @@ export function scopeToCookieValue(scope: ScopeSelection): string {
   return "all";
 }
 
+/** Persist a scope pick as the `pf` cookie (the default for scope-less URLs). */
+export function persistScopeCookie(scope: ScopeSelection): void {
+  const oneYear = 60 * 60 * 24 * 365;
+  document.cookie = `${SELECTED_PORTFOLIO_COOKIE}=${scopeToCookieValue(scope)}; path=/; max-age=${oneYear}; samesite=lax`;
+}
+
 /** Decode the `pf` cookie value (absent / "all" = aggregate). */
 export function parseCookieScope(value: string | null | undefined): ScopeSelection {
   if (!value || value === "all") return { kind: "all" };

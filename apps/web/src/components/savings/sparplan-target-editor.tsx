@@ -90,9 +90,9 @@ export function SparplanTargetEditor({
   }
 
   return (
-    <div className="mb-[15px] rounded-[14px] border border-border bg-card-2 p-3.5">
+    <div className="mb-[15px] rounded-lg border border-border bg-card-2 p-3.5">
       <p className="text-xs font-bold">{t("targetAllocation")}</p>
-      <p className="mb-3 mt-px text-[11px] font-medium text-text-2">{t("targetHelper")}</p>
+      <p className="mb-3 mt-px text-micro font-medium text-text-2">{t("targetHelper")}</p>
 
       {loading ? (
         <div className="flex justify-center py-4">
@@ -104,7 +104,7 @@ export function SparplanTargetEditor({
             {sleeves.map((s) => (
               <div key={s.key} className="flex items-center gap-2.5">
                 <span
-                  className="size-[9px] shrink-0 rounded-[3px]"
+                  className="size-[9px] shrink-0 rounded-xs"
                   style={{ backgroundColor: s.color }}
                 />
                 <span className="min-w-0 flex-1 truncate text-xs font-semibold">{s.name}</span>
@@ -118,7 +118,7 @@ export function SparplanTargetEditor({
                     placeholder="0"
                     aria-label={s.name}
                     onChange={(e) => setValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
-                    className="tabular h-[30px] w-[60px] rounded-lg border border-border bg-card px-2 text-right text-[13px] font-bold text-foreground focus:outline-none"
+                    className="tabular h-[30px] w-[60px] rounded-lg border border-border bg-card px-2 text-right text-body-sm font-bold text-foreground focus:outline-none"
                   />
                   <span className="text-xs font-semibold text-text-3">%</span>
                 </span>
@@ -128,7 +128,7 @@ export function SparplanTargetEditor({
 
           <p
             className={cn(
-              "mt-2.5 text-right text-[11px] font-bold",
+              "mt-2.5 text-right text-micro font-bold",
               sumOk ? "text-text-3" : "text-[#E5484D]",
             )}
           >
@@ -136,13 +136,13 @@ export function SparplanTargetEditor({
             {!sumOk && t("targetMustEqual")}
           </p>
 
-          {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
+          {error && <p className="mt-1 text-micro text-destructive">{error}</p>}
 
           <div className="mt-3 flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-[10px] border border-border bg-card py-[9px] text-xs font-bold text-text-mute transition-transform active:scale-95"
+              className="flex-1 rounded-sm border border-border bg-card py-[9px] text-xs font-bold text-text-mute transition-transform active:scale-95"
             >
               {t("targetCancel")}
             </button>
@@ -151,7 +151,7 @@ export function SparplanTargetEditor({
               onClick={handleSave}
               disabled={!sumOk || saving}
               style={{ opacity: sumOk ? 1 : 0.45 }}
-              className="flex flex-1 items-center justify-center gap-1 rounded-[10px] bg-pill py-[9px] text-xs font-bold text-white transition-transform active:scale-95"
+              className="flex flex-1 items-center justify-center gap-1 rounded-sm bg-pill py-[9px] text-xs font-bold text-white transition-transform active:scale-95"
             >
               {saving && <Spinner size="xs" />}
               {t("targetSave")}

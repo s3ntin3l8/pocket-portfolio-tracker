@@ -1,4 +1,16 @@
-import { Layers, List, FileText, LineChart, User, ShieldCheck } from "lucide-react";
+import {
+  Layers,
+  List,
+  FileText,
+  LineChart,
+  User,
+  ShieldCheck,
+  Coins,
+  Receipt,
+  ArrowLeftRight,
+  PiggyBank,
+  Briefcase,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -27,6 +39,33 @@ export const ADMIN_NAV: NavItem = {
   icon: ShieldCheck,
   key: "admin",
 };
+
+/**
+ * Every page the command bar can jump to: the five tabs plus the leaf screens that live
+ * under them. `labelKey` is a `Nav.*` message key; `chord` is the second key of the
+ * `g <key>` go-to shortcut (see `lib/shortcuts.ts`).
+ */
+export type CommandPage = {
+  href: string;
+  icon: LucideIcon;
+  labelKey: string;
+  chord?: string;
+  adminOnly?: boolean;
+};
+
+export const COMMAND_PAGES: readonly CommandPage[] = [
+  { href: "/holdings", icon: Layers, labelKey: "holdings", chord: "h" },
+  { href: "/transactions", icon: List, labelKey: "activity", chord: "a" },
+  { href: "/reports", icon: FileText, labelKey: "reports", chord: "r" },
+  { href: "/insights", icon: LineChart, labelKey: "insights", chord: "i" },
+  { href: "/income", icon: Coins, labelKey: "income" },
+  { href: "/tax", icon: Receipt, labelKey: "tax" },
+  { href: "/trades", icon: ArrowLeftRight, labelKey: "trades" },
+  { href: "/savings", icon: PiggyBank, labelKey: "savings" },
+  { href: "/portfolios", icon: Briefcase, labelKey: "portfolios" },
+  { href: "/settings", icon: User, labelKey: "settings", chord: "s" },
+  { href: "/admin", icon: ShieldCheck, labelKey: "admin", adminOnly: true },
+];
 
 /**
  * Resolve which of the five tabs owns a given pathname (locale prefix already stripped by

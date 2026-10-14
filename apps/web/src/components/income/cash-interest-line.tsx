@@ -29,7 +29,7 @@ export function CashInterestLine({
   return (
     <Card>
       <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
-        <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{label}</p>
+        <p className="text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
         <div className="mt-1.5 space-y-0.5">
           <p className="tabular text-xs sm:text-sm">
             <span className="text-text-mute">{ytdLabel}:</span>{" "}

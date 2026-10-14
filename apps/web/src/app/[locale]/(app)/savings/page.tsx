@@ -103,9 +103,9 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+                <div className="flex shrink-0 items-center gap-3.5 text-micro font-semibold text-text-2">
                   <span className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-[3px] bg-success" />
+                    <span className="size-2.5 rounded-xs bg-success" />
                     {t("chartValue")}
                   </span>
                   <span className="flex items-center gap-1.5">
@@ -168,7 +168,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
             <StatCard label={t("currentValue")} value={m(Number(c.currentValue))} />
             <Card>
               <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
-                <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{t("gainLabel")}</p>
+                <p className="text-micro font-semibold text-text-2 sm:text-xs">{t("gainLabel")}</p>
                 <GainFigure
                   amount={formatSignedMoney(gainAmount, currency, locale)}
                   pct={c.simpleGainPct !== null ? formatPercent(c.simpleGainPct, locale) : null}

@@ -114,7 +114,7 @@ export function IncomeHeatmap({
                       listeners.onClick(e);
                     }}
                     className={cn(
-                      "min-h-11 min-w-11 rounded-[6px] p-0",
+                      "min-h-11 min-w-11 rounded-xs p-0",
                       value > 0 ? "bg-primary" : "bg-muted",
                       isActive && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
                     )}
@@ -129,7 +129,7 @@ export function IncomeHeatmap({
       <div className="flex items-center justify-end gap-1.5 pt-1 text-muted-foreground">
         <span>{t("heatmapLess")}</span>
         {[0.14, 0.4, 0.66, 1].map((opacity) => (
-          <span key={opacity} className="size-2.5 rounded-[3px] bg-primary" style={{ opacity }} />
+          <span key={opacity} className="size-2.5 rounded-xs bg-primary" style={{ opacity }} />
         ))}
         <span>{t("heatmapMore")}</span>
       </div>

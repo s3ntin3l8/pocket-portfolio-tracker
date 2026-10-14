@@ -4,11 +4,12 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
 const push = vi.fn();
+const replace = vi.fn();
 const globalSearch = vi.fn();
 const suppressNextHistoryBack = vi.fn();
 
 vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
   usePathname: () => "/",
   Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
@@ -117,10 +118,10 @@ describe("GlobalSearch", () => {
     expect(screen.getByPlaceholderText(s.placeholder)).toBeInTheDocument();
   });
 
-  it("shows the hint text before any query is typed", () => {
+  it("shows the command groups before any query is typed", () => {
     renderSearch();
     fireEvent.click(screen.getByRole("button", { name: s.triggerLabel }));
-    expect(screen.getByText(s.hint)).toBeInTheDocument();
+    expect(screen.getByText(s.groupNavigate)).toBeInTheDocument();
   });
 
   it("calls globalSearch after debounce and renders instrument results", async () => {
@@ -237,8 +238,8 @@ describe("GlobalSearch", () => {
 
     // globalSearch should NOT have been called again for an empty query.
     expect(globalSearch).toHaveBeenCalledTimes(1);
-    // The hint should reappear.
-    expect(screen.getByText(s.hint)).toBeInTheDocument();
+    // The command groups should reappear.
+    expect(screen.getByText(s.groupNavigate)).toBeInTheDocument();
   });
 
   it("does not open on '/' when an input is focused", () => {

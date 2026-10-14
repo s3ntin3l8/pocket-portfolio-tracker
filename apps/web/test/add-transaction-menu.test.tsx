@@ -216,7 +216,7 @@ describe("AddTransactionMenu", () => {
     const fab = () =>
       screen
         .getAllByRole("button", { name: messages.Manage.addTransaction })
-        .find((b) => b.className.includes("rounded-[18px]"));
+        .find((b) => b.className.includes("rounded-xl"));
 
     const { rerender } = render(
       <NextIntlClientProvider locale="en" messages={messages}>

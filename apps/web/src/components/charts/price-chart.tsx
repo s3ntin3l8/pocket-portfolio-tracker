@@ -12,6 +12,7 @@ import {
 import { useLocale } from "next-intl";
 import type { Candle } from "@portfolio/api-client";
 import { formatMoney } from "@/lib/utils";
+import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export function PriceChart({
@@ -104,29 +105,21 @@ export function PriceChart({
             </>
           )}
           <Tooltip
-            formatter={(v) => formatValue(Number(v))}
-            labelFormatter={formatLabel}
             cursor={
               theme === "inverse"
                 ? { stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }
                 : { stroke: "var(--color-border)", strokeDasharray: "4 4" }
             }
-            contentStyle={
-              theme === "inverse"
-                ? {
-                    background: "#0f1b14",
-                    border: "none",
-                    borderRadius: 10,
-                    color: "#fff",
-                    fontSize: 12,
-                  }
-                : {
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }
-            }
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const v = Number(payload[0]?.value);
+              if (!Number.isFinite(v)) return null;
+              return (
+                <ChartTooltipPanel
+                  rows={[{ label: formatLabel(label, payload), value: formatValue(v) }]}
+                />
+              );
+            }}
           />
           <Area
             isAnimationActive={!reducedMotion}

@@ -9,7 +9,7 @@ import { SOURCE_PILL, DEFAULT_PILL, DRAFT_PILL, INCOME_BREAKDOWN_TYPES } from ".
 
 export function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 ml-0.5 mt-5 text-[12px] font-bold uppercase tracking-[.04em] text-text-3 first:mt-0">
+    <p className="mb-2 ml-0.5 mt-5 text-xs font-bold uppercase tracking-[.04em] text-text-3 first:mt-0">
       {children}
     </p>
   );
@@ -17,7 +17,7 @@ export function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export function DetailCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="divide-y divide-line overflow-hidden rounded-[18px] border border-border bg-card">
+    <div className="divide-y divide-line overflow-hidden rounded-xl border border-border bg-card">
       {children}
     </div>
   );
@@ -39,7 +39,7 @@ export function DetailRow({
       <span
         className={cn(
           "shrink-0 text-text-2",
-          strong ? "text-[14px] font-bold text-foreground" : "text-[13px] font-medium",
+          strong ? "text-sm font-bold text-foreground" : "text-body-sm font-medium",
         )}
       >
         {label}
@@ -47,7 +47,7 @@ export function DetailRow({
       <span
         className={cn(
           "tabular min-w-0 text-right font-bold",
-          strong ? "text-[16px] font-extrabold" : "text-[13px]",
+          strong ? "text-base font-extrabold" : "text-body-sm",
           color,
         )}
       >
@@ -88,20 +88,20 @@ export function HeroAmount({
     <div className="py-2.5 pb-[18px] text-center">
       <div
         className={cn(
-          "tabular text-[34px] font-extrabold leading-none",
+          "tabular text-hero font-extrabold leading-none",
           netAmount > 0 ? "text-success" : "text-foreground",
         )}
       >
         {formatSignedMoney(netAmount, currency, locale)}
       </div>
       {showApproxDisplay && netAmountDisplay !== null && (
-        <div className="tabular mt-0.5 text-[13px] font-medium text-text-2">
+        <div className="tabular mt-0.5 text-body-sm font-medium text-text-2">
           {t("approxDisplay", { amount: m(netAmountDisplay, effectiveDisplayCurrency!) })}
         </div>
       )}
       <div className="mt-2.5">
         <span
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.04em]"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-micro font-bold uppercase tracking-[.04em]"
           style={{ background: pill.bg, color: pill.fg }}
         >
           {SourceIcon && <SourceIcon className="size-3" />}
@@ -109,7 +109,7 @@ export function HeroAmount({
         </span>
         {isDraft && (
           <span
-            className="ml-1.5 inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.04em]"
+            className="ml-1.5 inline-flex items-center rounded-lg px-2.5 py-1 text-micro font-bold uppercase tracking-[.04em]"
             style={{ background: DRAFT_PILL.bg, color: DRAFT_PILL.fg }}
           >
             {tm("status.badgeDraft")}
@@ -237,7 +237,7 @@ export function DetailsCard({
         <DetailRow label={t("instrument")}>
           <span>{instrument.symbol}</span>
           {(instrument.displayName ?? instrument.name) && (
-            <span className="block text-[11px] font-medium text-text-2">
+            <span className="block text-micro font-medium text-text-2">
               {instrument.displayName ?? instrument.name}
             </span>
           )}
@@ -247,12 +247,12 @@ export function DetailsCard({
         <DetailRow label={t("portfolio")}>
           <span className="flex items-center justify-end gap-2.5">
             {account?.brokerage && (
-              <BrokerageIcon brokerage={account.brokerage} className="size-9 rounded-[10px]" />
+              <BrokerageIcon brokerage={account.brokerage} className="size-9 rounded-sm" />
             )}
             <span className="min-w-0 leading-tight">
               <span className="block truncate">{accountName}</span>
               {account?.brokerage && (
-                <span className="block truncate text-[11px] font-medium text-text-2">
+                <span className="block truncate text-micro font-medium text-text-2">
                   {account.brokerage}
                 </span>
               )}

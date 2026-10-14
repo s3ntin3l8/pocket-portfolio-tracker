@@ -41,7 +41,7 @@ export function SettingsInstallItem({ variant }: { variant: "rail" | "landing" }
       className={cn(
         "flex shrink-0 items-center justify-center",
         variant === "rail"
-          ? "size-[30px] rounded-[9px] [&>svg]:size-4"
+          ? "size-[30px] rounded-sm [&>svg]:size-4"
           : "size-9 rounded-xl [&>svg]:size-[18px]",
       )}
       style={{ background: ICON_BG, color: ICON_COLOR }}
@@ -55,7 +55,7 @@ export function SettingsInstallItem({ variant }: { variant: "rail" | "landing" }
       <button
         type="button"
         onClick={handleClick}
-        className="my-0.5 flex w-full items-center gap-2.5 rounded-[12px] px-2.5 py-2.5 text-[13px] font-bold transition-colors hover:bg-background/60"
+        className="my-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2.5 text-body-sm font-bold transition-colors hover:bg-background/60"
       >
         {icon}
         <span className="min-w-0 flex-1 truncate text-left">{t("navInstall")}</span>

@@ -23,6 +23,7 @@ import { useImportSelection } from "./import-history/selection";
 import { useBatchGroups } from "./import-history/batch";
 import { RowActions, DesktopRow, MobileRow } from "./import-history/rows";
 import { SelectionBar } from "./import-history/selection-bar";
+import { Checkbox } from "@/components/ui/checkbox";
 
 /**
  * The user's import history with per-row actions: discard a draft, or undo a
@@ -177,12 +178,11 @@ export function ImportHistory({
               <TableRow>
                 <TableCell className="h-10 w-16 px-3 align-middle">
                   {selectionMode ? (
-                    <input
-                      type="checkbox"
-                      className="size-4 align-middle accent-primary"
+                    <Checkbox
+                      className="size-4"
                       aria-label={t("selectAll")}
                       checked={allSelected}
-                      onChange={toggleAllVisible}
+                      onCheckedChange={() => toggleAllVisible()}
                     />
                   ) : (
                     <Button
@@ -252,12 +252,11 @@ export function ImportHistory({
                   <TableRow key={`batch-${group.batchId}`} className="bg-muted/40">
                     <TableCell className="w-16">
                       {selectionMode && (
-                        <input
-                          type="checkbox"
-                          className="size-4 align-middle accent-primary"
+                        <Checkbox
+                          className="size-4"
                           aria-label={t("selectBatch")}
                           checked={allInGroupSelected}
-                          onChange={() => setMany(groupIds, !allInGroupSelected)}
+                          onCheckedChange={() => setMany(groupIds, !allInGroupSelected)}
                         />
                       )}
                     </TableCell>

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ImportIssue } from "./types";
 import { fmtQty, fmtAmt } from "./types";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function IssueRow({
   issue,
@@ -19,11 +20,9 @@ export function IssueRow({
   return (
     <>
       <TableCell>
-        <input
-          type="checkbox"
-          className="size-4 align-middle opacity-40"
+        <Checkbox
+          className="size-4 opacity-40"
           disabled
-          readOnly
           aria-label={t("review.selectRow")}
           checked={false}
         />

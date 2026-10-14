@@ -140,7 +140,7 @@ export function AdminProvidersForm({
       )}
 
       {encryptionEnabled && (
-        <div className="flex items-center gap-2.5 rounded-[14px] border border-primary/20 bg-primary/10 px-3.5 py-2.5">
+        <div className="flex items-center gap-2.5 rounded-lg border border-primary/20 bg-primary/10 px-3.5 py-2.5">
           <Lock className="size-[17px] shrink-0 text-primary" strokeWidth={2} />
           <p className="text-xs">
             <span className="font-semibold text-foreground">{t("credentialEncrypted")}</span>{" "}
@@ -197,7 +197,7 @@ export function AdminProvidersForm({
                             <GripVertical className="size-5" />
                           </button>
                         )}
-                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-[11px] font-extrabold text-text-2">
+                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-micro font-extrabold text-text-2">
                           {i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -226,7 +226,7 @@ export function AdminProvidersForm({
                             <button
                               type="button"
                               onClick={() => setEditingId(p.id)}
-                              className="whitespace-nowrap rounded-[9px] bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary"
+                              className="whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-1.5 text-micro font-bold text-primary"
                             >
                               {t("credentialSet")}
                             </button>
@@ -236,7 +236,7 @@ export function AdminProvidersForm({
                               type="button"
                               onClick={() => setEditingId(editing ? null : p.id)}
                               aria-label={t("editCredential")}
-                              className="flex size-[30px] items-center justify-center rounded-[9px] bg-background text-text-2 hover:text-foreground"
+                              className="flex size-[30px] items-center justify-center rounded-sm bg-background text-text-2 hover:text-foreground"
                             >
                               <Pencil className="size-[15px]" />
                             </button>

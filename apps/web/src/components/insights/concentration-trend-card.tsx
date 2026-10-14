@@ -40,7 +40,7 @@ export function ConcentrationTrendCard({ trend }: { trend: ConcentrationPoint[] 
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
       {latest ? (
         <>
-          <p className="tabular mt-1 text-[22px] font-extrabold leading-none">
+          <p className="tabular mt-1 text-heading font-extrabold leading-none">
             {latest.top1Pct.toFixed(1)}%
           </p>
           <p className="mt-1 text-xs font-medium text-text-2">
@@ -55,15 +55,15 @@ export function ConcentrationTrendCard({ trend }: { trend: ConcentrationPoint[] 
           </p>
           <div className="mt-2 flex items-center gap-3">
             <div>
-              <p className="text-[10px] text-text-2">{t("hhiTrend")}</p>
+              <p className="text-micro text-text-2">{t("hhiTrend")}</p>
               <MiniSparkline data={hhiData} color="var(--color-chart-4)" />
             </div>
             <div>
-              <p className="text-[10px] text-text-2">{t("top1Trend")}</p>
+              <p className="text-micro text-text-2">{t("top1Trend")}</p>
               <MiniSparkline data={top1Data} color="var(--color-chart-1)" />
             </div>
           </div>
-          <p className="mt-1 text-[10px] text-text-2">
+          <p className="mt-1 text-micro text-text-2">
             {t("samples", { count: trend.length, classes: latest.classCount })}
           </p>
           <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">

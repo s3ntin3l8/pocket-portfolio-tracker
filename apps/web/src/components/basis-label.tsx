@@ -5,5 +5,5 @@
  * (audit G2); `GainFigure`'s inline layout keeps its own span, since it shares the value's line.
  */
 export function BasisLabel({ children }: { children: React.ReactNode }) {
-  return <p className="mt-0.5 text-[11px] font-medium text-text-2">{children}</p>;
+  return <p className="mt-0.5 text-micro font-medium text-text-2">{children}</p>;
 }

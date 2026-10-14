@@ -149,12 +149,32 @@
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;
 
+  /* Radius scale: xs 6 / sm 10 / md 12 / lg 14 / xl 18 (derived from --radius). Never use
+     rounded-[Npx]; pick the nearest step. */
+  --radius-xs: calc(var(--radius) - 8px);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
   --shadow-card: var(--shadow-card);
+
+  /* Type scale (font-size / line-height). Tailwind's text-xs (12) / text-sm (14) /
+     text-base (16) / text-lg (18) stay as-is; these fill the gaps. Floor is 11px — never
+     use text-[Npx]. Headings: page h1 = font-bold (PageHeader), section h2 =
+     text-base font-semibold, card title = font-semibold (CardTitle). */
+  --text-micro: 0.6875rem; /* 11px: badges, axis ticks, eyebrow labels */
+  --text-micro--line-height: 1.35;
+  --text-body-sm: 0.8125rem; /* 13px: dense rows, secondary body */
+  --text-body-sm--line-height: 1.45;
+  --text-body: 0.9375rem; /* 15px: primary body / section titles */
+  --text-body--line-height: 1.5;
+  --text-heading: 1.375rem; /* 22px: page titles */
+  --text-heading--line-height: 1.25;
+  --text-display: 1.75rem; /* 28px */
+  --text-display--line-height: 1.15;
+  --text-hero: 2.25rem; /* 36px: hero figures */
+  --text-hero--line-height: 1.1;
 
   /* Route-transition content blend + skeleton shimmer sweep. Registered here so Tailwind
      generates `animate-fade-in` / `animate-shimmer` utilities (Tailwind v4 CSS config —
@@ -195,6 +215,57 @@
   :root {
     --animate-fade-in: none;
     --animate-shimmer: none;
+  }
+}
+
+/* View Transitions (React <ViewTransition>, see route-transition.tsx). The class names are
+   assigned by React via `view-transition-class`. Opacity-only for route changes so there is no
+   layout movement; the net-worth tick is short. Unsupported browsers
+   ignore all of this and swap instantly. */
+::view-transition {
+  /* Let clicks through to the live page while a transition runs. */
+  pointer-events: none;
+}
+::view-transition-old(.vt-route) {
+  animation: 120ms ease-in both vt-fade reverse;
+}
+::view-transition-new(.vt-route) {
+  animation: 220ms ease-out 80ms both vt-fade;
+}
+::view-transition-old(.vt-tick-out) {
+  animation: 120ms ease-in both vt-fade reverse;
+}
+::view-transition-new(.vt-tick) {
+  animation:
+    200ms ease-out 60ms both vt-fade,
+    200ms ease-out 60ms both vt-tick-up;
+}
+
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-tick-up {
+  from {
+    translate: 0 6px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+/* Reduced motion: collapse every view-transition animation to its end state (instant swap).
+   Zero duration rather than `animation: none`, so the old snapshot still ends hidden. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
 

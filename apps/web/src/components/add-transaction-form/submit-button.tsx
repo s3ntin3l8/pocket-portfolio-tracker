@@ -40,8 +40,8 @@ export function SubmitButton({
       disabled={busy}
       className={
         isDesktop
-          ? "h-auto rounded-[13px] px-[26px] py-[13px] text-[14px] font-bold"
-          : "h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold"
+          ? "h-auto rounded-md px-[26px] py-[13px] text-sm font-bold"
+          : "h-auto w-full rounded-lg py-[15px] text-body font-bold"
       }
     >
       {busy && <Spinner size="sm" />}

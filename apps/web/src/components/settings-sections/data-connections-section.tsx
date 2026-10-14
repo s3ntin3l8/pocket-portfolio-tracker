@@ -102,7 +102,7 @@ export async function DataConnectionsSection({
               </div>
               <span
                 className={cn(
-                  "shrink-0 rounded-md px-2 py-1 text-[11px] font-bold",
+                  "shrink-0 rounded-md px-2 py-1 text-micro font-bold",
                   s.on ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
                 )}
               >

@@ -25,6 +25,8 @@ import {
   rowPerShareDisplay,
 } from "./utils";
 import type { Anomaly } from "@portfolio/api-client";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function DesktopTable({
   rows,
@@ -91,12 +93,11 @@ export function DesktopTable({
           <TableRow>
             <TableHead className="w-16">
               {selectionMode ? (
-                <input
-                  type="checkbox"
-                  className="size-4 align-middle accent-primary"
+                <Checkbox
+                  className="size-4"
                   aria-label={tb("selectAll")}
                   checked={allSelected}
-                  onChange={onToggleAll}
+                  onCheckedChange={() => onToggleAll()}
                 />
               ) : (
                 <Button
@@ -200,7 +201,7 @@ export function DesktopTable({
                   <tr role="presentation">
                     <td
                       colSpan={colSpan}
-                      className="bg-card-2 px-[22px] py-[9px] text-[11px] font-bold uppercase tracking-[0.05em] text-text-3"
+                      className="bg-card-2 px-[22px] py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-3"
                     >
                       {monthFmt.format(new Date(tx.executedAt))}
                     </td>
@@ -215,12 +216,11 @@ export function DesktopTable({
                 >
                   <TableCell className="w-16">
                     {selectionMode && (
-                      <input
-                        type="checkbox"
-                        className="size-4 align-middle accent-primary"
+                      <Checkbox
+                        className="size-4"
                         aria-label={tb("selectRow")}
                         checked={isSelected}
-                        onChange={() => onToggle(tx.id)}
+                        onCheckedChange={() => onToggle(tx.id)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     )}
@@ -249,16 +249,20 @@ export function DesktopTable({
                             )}
                           </span>
                           {anomaly && (
-                            <span
-                              title={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
-                              aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                            <InfoTip
+                              label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                              focusable
                             >
-                              {anomaly.severity === "error" ? (
-                                <AlertCircle className="size-3.5 shrink-0 text-destructive" />
-                              ) : (
-                                <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                              )}
-                            </span>
+                              <span
+                                aria-label={anomalyLabel(anomaly, ta as AnomalyTranslator, locale)}
+                              >
+                                {anomaly.severity === "error" ? (
+                                  <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                                ) : (
+                                  <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                                )}
+                              </span>
+                            </InfoTip>
                           )}
                           {status === "draft" && (
                             <Badge
@@ -269,13 +273,15 @@ export function DesktopTable({
                             </Badge>
                           )}
                           {status === "draft" && tx.needsReview && (
-                            <span
-                              className="inline-flex items-center"
-                              title={tm("status.needsReview")}
-                              aria-label={tm("status.needsReview")}
-                            >
-                              <AlertTriangle className="size-3.5 text-amber-500" />
-                            </span>
+                            <InfoTip label={tm("status.needsReview")} focusable>
+                              <span
+                                className="inline-flex items-center"
+
+                                aria-label={tm("status.needsReview")}
+                              >
+                                <AlertTriangle className="size-3.5 text-amber-500" />
+                              </span>
+                            </InfoTip>
                           )}
                           {status === "archived" && (
                             <Badge variant="outline">{tm("status.badgeArchived")}</Badge>
@@ -295,15 +301,15 @@ export function DesktopTable({
                       {tx.portfolioName ?? "—"}
                     </TableCell>
                   )}
-                  <TableCell className="tabular text-right text-[13px] font-semibold text-text-2">
+                  <TableCell className="tabular text-right text-body-sm font-semibold text-text-2">
                     {Number(tx.quantity) || rowQuantityDisplay(tx) || "—"}
                   </TableCell>
-                  <TableCell className="tabular text-right text-[13px] font-semibold">
+                  <TableCell className="tabular text-right text-body-sm font-semibold">
                     {Number(tx.quantity) > 0
                       ? m(Number(tx.price), tx.currency)
                       : (rowPerShareDisplay(tx, m) ?? "—")}
                   </TableCell>
-                  <TableCell className="tabular hidden text-right text-[13px] font-semibold text-text-2 lg:table-cell">
+                  <TableCell className="tabular hidden text-right text-body-sm font-semibold text-text-2 lg:table-cell">
                     {tx.tax != null && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -311,7 +317,7 @@ export function DesktopTable({
                       <SourceChips
                         tx={tx}
                         t={t}
-                        chipClassName="inline-flex items-center whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[9px] font-bold uppercase"
+                        chipClassName="inline-flex items-center whitespace-nowrap rounded-xs px-2 py-[3px] text-micro font-bold uppercase"
                       />
                     </div>
                   </TableCell>

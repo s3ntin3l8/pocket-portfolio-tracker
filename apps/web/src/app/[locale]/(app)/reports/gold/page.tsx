@@ -82,7 +82,7 @@ export default async function GoldReportPage({ params }: { params: Promise<{ loc
         {/* Spans the row on narrow containers: amount + percent need the width. */}
         <Card className="col-span-2 @xl:col-span-1">
           <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
-            <p className="text-[11px] font-semibold text-text-2 sm:text-xs">{t("statGain")}</p>
+            <p className="text-micro font-semibold text-text-2 sm:text-xs">{t("statGain")}</p>
             {measuredCost > 0 ? (
               <GainFigure
                 amount={formatSignedMoney(unrealized, currency, locale)}
@@ -107,7 +107,7 @@ export default async function GoldReportPage({ params }: { params: Promise<{ loc
       {data.plans.length > 0 && (
         <section className="space-y-3" aria-labelledby="gold-plans">
           <div>
-            <h2 id="gold-plans" className="text-base font-bold">
+            <h2 id="gold-plans" className="text-base font-semibold">
               {t("plansTitle")}
             </h2>
             <p className="text-xs text-text-2">{t("plansSubtitle")}</p>

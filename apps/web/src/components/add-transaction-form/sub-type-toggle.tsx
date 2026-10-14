@@ -36,7 +36,7 @@ export function SubTypeToggle({
             type="button"
             onClick={() => onSelect(ty)}
             className={cn(
-              "rounded-[10px] px-[13px] py-[9px] text-xs transition-colors",
+              "rounded-sm px-[13px] py-[9px] text-xs transition-colors",
               ty === type
                 ? "bg-primary font-bold text-primary-foreground"
                 : "border border-border bg-card-2 font-semibold text-foreground hover:bg-secondary",

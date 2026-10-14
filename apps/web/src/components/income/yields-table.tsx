@@ -144,7 +144,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
             >
               <div className="flex items-baseline justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-bold">{y.symbol}</div>
+                  <div className="truncate text-body font-bold">{y.symbol}</div>
                   {(y.displayName ?? y.name) ? (
                     <div className="truncate text-xs font-medium text-text-2">
                       {y.displayName ?? y.name}
@@ -155,7 +155,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
                   {y.yield !== null ? formatPercent(Number(y.yield), locale) : "—"}
                 </div>
               </div>
-              <div className="mt-1 text-[12px] text-text-2">
+              <div className="mt-1 text-xs text-text-2">
                 <span>
                   <span className="text-text-mute">{t("yieldCardTrailing")} </span>
                   {formatMoney(Number(y.trailingIncome), y.currency, locale)}

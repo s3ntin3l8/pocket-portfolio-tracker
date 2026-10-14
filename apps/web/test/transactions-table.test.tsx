@@ -1810,7 +1810,7 @@ describe("TransactionsTable", () => {
   });
 
   describe("anomaly tooltip", () => {
-    it("localizes the negative_cash flag tooltip with the formatted balance", () => {
+    it("localizes the negative_cash flag tooltip with the formatted balance", async () => {
       render(
         <NextIntlClientProvider locale="en" messages={messages}>
           <TransactionsTable
@@ -1829,7 +1829,9 @@ describe("TransactionsTable", () => {
       );
       // The flag renders in both the desktop table and the mobile list.
       const flag = screen.getAllByLabelText(/Negative cash balance/)[0];
-      expect(flag).toHaveAttribute("title", expect.stringContaining("-€0.98"));
+      expect(flag).toHaveAttribute("aria-label", expect.stringContaining("-€0.98"));
+      fireEvent.focus(flag!);
+      expect((await screen.findAllByText(/-€0\.98/)).length).toBeGreaterThan(0);
     });
   });
 

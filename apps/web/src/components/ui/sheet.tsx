@@ -240,7 +240,7 @@ function SheetContent({
           // div below for why the handle, content, and footer are split into three flex
           // regions instead of one scrolling Drawer.Content.
           side === "bottom" &&
-            "bottom-0 left-0 right-0 mx-auto max-h-[90dvh] w-full max-w-[520px] rounded-t-[28px] shadow-[0_-12px_44px_rgba(0,0,0,.22)]",
+            "bottom-0 left-0 right-0 mx-auto max-h-[90dvh] w-full max-w-[520px] rounded-t-xl shadow-[0_-12px_44px_rgba(0,0,0,.22)]",
           side === "full" &&
             "bottom-0 left-0 right-0 mx-auto h-[100dvh] w-full max-w-none overflow-y-auto overscroll-contain rounded-none bg-card shadow-xl",
           className,
@@ -299,7 +299,7 @@ function SheetContent({
             className={cn(
               "absolute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none",
               side === "bottom"
-                ? "right-5 top-7 flex size-11 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)]"
+                ? "right-5 top-7 flex size-11 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)]"
                 : "right-4 top-4 rounded-md opacity-70 transition-opacity hover:opacity-100",
             )}
           >
@@ -318,7 +318,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
 
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof Drawer.Title>) {
   return (
-    <Drawer.Title className={cn("text-[19px] font-extrabold leading-none", className)} {...props} />
+    <Drawer.Title className={cn("text-lg font-extrabold leading-none", className)} {...props} />
   );
 }
 

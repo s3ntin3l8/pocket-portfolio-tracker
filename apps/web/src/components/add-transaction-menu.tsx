@@ -177,6 +177,20 @@ export function AddTransactionMenu({
     if (!harvestInstrumentParam && !entryParam) return;
 
     let cancelled = false;
+    // Drop only the one-shot params so the rest of the view state (`?scope=`, `?range=`…)
+    // survives the open.
+    const clearEntryParams = () => {
+      const rest = new URLSearchParams(searchParams.toString());
+      rest.delete("entry");
+      rest.delete("harvestInstrument");
+      const qs = rest.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    };
+    // Command bar → "Import transactions" (`?entry=import`).
+    if (entryParam === "import" && !harvestInstrumentParam) {
+      void openImport().then(clearEntryParams);
+      return;
+    }
     void (async () => {
       await loadPortfolios();
       if (cancelled) return;
@@ -207,7 +221,7 @@ export function AddTransactionMenu({
         setManualStepDesktop(isWide);
         setStep("manual");
       }
-      router.replace(pathname);
+      clearEntryParams();
     })();
 
     return () => {
@@ -327,7 +341,7 @@ export function AddTransactionMenu({
   const content =
     step === "choose" ? (
       <>
-        <p className="mx-0.5 mb-3.5 text-[13px] font-medium text-text-2">
+        <p className="mx-0.5 mb-3.5 text-body-sm font-medium text-text-2">
           {tm("addMenu.subtitle")}
         </p>
         <div className="flex flex-col gap-3">
@@ -443,7 +457,7 @@ export function AddTransactionMenu({
         createPortal(
           <Button
             className={cn(
-              "fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 size-14 rounded-[18px] shadow-lg md:hidden",
+              "fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-6 z-40 size-14 rounded-xl shadow-lg md:hidden",
               // Selection mode (and any full-screen overlay) takes over the bottom edge, same
               // as it does for BottomNav — the FAB would float over the selection bar.
               overlayOpen && "hidden",
@@ -472,7 +486,7 @@ export function AddTransactionMenu({
           onInteractOutside={(e) => {
             if (!dismissible) e.preventDefault();
           }}
-          className="flex flex-row gap-0 overflow-hidden bg-background p-0 md:w-[calc(100%-4rem)] md:rounded-[22px] md:border-0 md:shadow-[0_30px_80px_rgba(0,0,0,.4)] md:max-h-[calc(100dvh-64px)]"
+          className="flex flex-row gap-0 overflow-hidden bg-background p-0 md:w-[calc(100%-4rem)] md:rounded-xl md:border-0 md:shadow-[0_30px_80px_rgba(0,0,0,.4)] md:max-h-[calc(100dvh-64px)]"
         >
           <NavRail
             className="max-md:hidden"
@@ -501,12 +515,12 @@ export function AddTransactionMenu({
                   type="button"
                   onClick={() => setStep("choose")}
                   aria-label={tm("back")}
-                  className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                  className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
                 >
                   <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
                 </button>
               )}
-              <DialogTitle className="flex-1 text-[19px] font-extrabold leading-none text-foreground">
+              <DialogTitle className="flex-1 text-lg font-extrabold leading-none text-foreground">
                 {headerTitle}
               </DialogTitle>
               {/* Mobile-only close — desktop has no floating X, only the footer's Cancel
@@ -515,7 +529,7 @@ export function AddTransactionMenu({
                   mid-import — the pre-merge mobile Sheet's built-in close button worked
                   the same way. */}
               <DialogClose
-                className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-[11px] bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
+                className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-[0_1px_2px_rgba(15,27,20,.08)] md:hidden"
                 aria-label={tA("close")}
               >
                 <X className="size-[18px]" strokeWidth={2.2} />
@@ -542,7 +556,7 @@ export function AddTransactionMenu({
                       type="button"
                       variant="outline"
                       onClick={() => onAddOpenChange(false)}
-                      className="h-auto max-md:hidden rounded-[13px] border-border bg-card px-[22px] py-[13px] text-[14px] font-bold text-foreground hover:bg-card"
+                      className="h-auto max-md:hidden rounded-md border-border bg-card px-[22px] py-[13px] text-sm font-bold text-foreground hover:bg-card"
                     >
                       {tm("addMenu.cancel")}
                     </Button>

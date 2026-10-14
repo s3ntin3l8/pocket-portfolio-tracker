@@ -29,7 +29,7 @@ function StatusBadge({ status }: { status: AdminJob["lastStatus"] }) {
   return (
     <span
       className={cn(
-        "shrink-0 rounded-[8px] px-2.5 py-1 text-[10px] font-bold tracking-wide",
+        "shrink-0 rounded-sm px-2.5 py-1 text-micro font-bold tracking-wide",
         failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
       )}
     >
@@ -74,7 +74,7 @@ function TriggerButton({ name, supportsForce, onTriggered, currentLastRunAt }: T
           type="button"
           onClick={() => void trigger(false)}
           disabled={pending || forcePending}
-          className="flex items-center gap-1 rounded-[10px] bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
+          className="flex items-center gap-1 rounded-sm bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
         >
           {pending && <Spinner size="sm" />}
           {pending ? t("jobRunning") : t("jobRunNow")}
@@ -86,7 +86,7 @@ function TriggerButton({ name, supportsForce, onTriggered, currentLastRunAt }: T
             disabled={pending || forcePending}
             aria-label={t("jobForce")}
             title={t("jobForce")}
-            className="flex items-center gap-1 rounded-[10px] border border-border bg-card px-3.5 py-1.5 text-xs font-bold disabled:opacity-60"
+            className="flex items-center gap-1 rounded-sm border border-border bg-card px-3.5 py-1.5 text-xs font-bold disabled:opacity-60"
           >
             {forcePending && <Spinner size="sm" />}
             {forcePending ? t("jobRunning") : t("jobForce")}
@@ -226,7 +226,7 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
               <StatusBadge status={job.lastStatus} />
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <code className="rounded-[7px] bg-background px-2 py-1 font-mono text-[11px] text-text-2">
+              <code className="rounded-xs bg-background px-2 py-1 font-mono text-micro text-text-2">
                 {job.cron ?? "on-demand"}
               </code>
               <span className="text-xs text-text-3">·</span>

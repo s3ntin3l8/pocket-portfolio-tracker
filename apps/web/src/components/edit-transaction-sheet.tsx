@@ -87,7 +87,7 @@ export function EditTransactionSheet({
           that, matching the old desktop chrome). */}
       <DialogContent size="lg" mobileHeader={{ title: tm("editTitle") }} footer={true}>
         <div className="p-5 md:p-[26px]">
-          <DialogTitle className="hidden text-[19px] font-extrabold md:mb-3 md:block">
+          <DialogTitle className="hidden text-lg font-extrabold md:mb-3 md:block">
             {tm("editTitle")}
           </DialogTitle>
           {tx && (

@@ -125,7 +125,7 @@ export function ApiTokensManager({
         <div className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-card">
           {tokens.map((tok) => (
             <div key={tok.id} className="flex items-center gap-3 px-4 py-3">
-              <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[11px] bg-background text-foreground">
+              <span className="flex size-[38px] shrink-0 items-center justify-center rounded-sm bg-background text-foreground">
                 <KeyRound className="size-[18px]" />
               </span>
               <div className="min-w-0 flex-1">
@@ -139,7 +139,7 @@ export function ApiTokensManager({
               </div>
               <span
                 className={cn(
-                  "shrink-0 rounded-[8px] px-2 py-1 text-[11px] font-bold",
+                  "shrink-0 rounded-sm px-2 py-1 text-micro font-bold",
                   tok.scope === "write"
                     ? "bg-[rgba(224,165,58,.16)] text-[var(--gold-fg)]"
                     : "bg-success/15 text-success",
@@ -201,7 +201,7 @@ export function ApiTokensManager({
               <Button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="h-auto w-full rounded-[13px] py-3 text-sm font-bold"
+                className="h-auto w-full rounded-md py-3 text-sm font-bold"
               >
                 {t("tokensDone")}
               </Button>
@@ -250,7 +250,7 @@ export function ApiTokensManager({
                         aria-checked={scope === s}
                         onClick={() => setScope(s)}
                         className={cn(
-                          "flex-1 rounded-[11px] py-[9px] text-center text-[13px] transition-colors",
+                          "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
                           scope === s
                             ? "bg-pill font-bold text-white"
                             : "bg-background font-semibold text-foreground",
@@ -299,14 +299,14 @@ export function ApiTokensManager({
                     type="button"
                     variant="outline"
                     onClick={() => setModalOpen(false)}
-                    className="h-auto rounded-[11px] px-4 py-2.5 text-sm font-bold"
+                    className="h-auto rounded-sm px-4 py-2.5 text-sm font-bold"
                   >
                     {t("tokensCancel")}
                   </Button>
                   <Button
                     type="submit"
                     disabled={busy || !name.trim()}
-                    className="h-auto rounded-[11px] px-4 py-2.5 text-sm font-bold"
+                    className="h-auto rounded-sm px-4 py-2.5 text-sm font-bold"
                   >
                     {busy && <Spinner size="sm" />}
                     {t("tokensCreate")}

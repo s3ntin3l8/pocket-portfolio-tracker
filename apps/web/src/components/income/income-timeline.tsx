@@ -232,17 +232,17 @@ export function IncomeTimeline({
     <div className="rounded-2xl bg-card p-[22px] shadow-card">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-bold">{t("paymentsTimelineTitle")}</h2>
+          <h2 className="text-base font-semibold">{t("paymentsTimelineTitle")}</h2>
           <p className="mt-0.5 text-xs font-medium text-text-2">{t("paymentsTimelineSubtitle")}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-3.5 text-[11px] font-semibold text-text-2">
+        <div className="flex shrink-0 items-center gap-3.5 text-micro font-semibold text-text-2">
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-[3px] bg-success" />
+            <span className="size-2.5 rounded-xs bg-success" />
             {t("legendReceived")}
           </span>
           <span className="flex items-center gap-1.5">
             <span
-              className="size-2.5 rounded-[3px]"
+              className="size-2.5 rounded-xs"
               style={{ backgroundColor: "rgba(16,163,114,.12)", border: "1.5px dashed #0E9F6E" }}
             />
             {t("legendForecast")}
@@ -305,7 +305,7 @@ export function IncomeTimeline({
               {/* Group-by is a display mode, not a filter — a distinct, smaller pill
                   pair kept last so the search still lands at the far right. */}
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className="whitespace-nowrap text-[11px] font-semibold text-text-3">
+                <span className="whitespace-nowrap text-micro font-semibold text-text-3">
                   {t("groupByLabel")}
                 </span>
                 {(
@@ -320,7 +320,7 @@ export function IncomeTimeline({
                     onClick={() => setGroupByInstrument(val)}
                     aria-pressed={groupByInstrument === val}
                     className={cn(
-                      "whitespace-nowrap rounded-full px-3 py-[5px] text-[11px]",
+                      "whitespace-nowrap rounded-full px-3 py-[5px] text-micro",
                       groupByInstrument === val
                         ? "bg-pill font-bold text-white"
                         : "border border-border bg-card font-semibold text-foreground",
@@ -374,15 +374,15 @@ export function IncomeTimeline({
                     ) : (
                       <ChevronRight className="size-4 shrink-0 text-text-3" />
                     )}
-                    <span className="text-[15px] font-extrabold">{g.year}</span>
+                    <span className="text-body font-extrabold">{g.year}</span>
                     {g.subtitle && (
-                      <span className="truncate text-[11px] font-semibold text-text-3">
+                      <span className="truncate text-micro font-semibold text-text-3">
                         {g.subtitle}
                       </span>
                     )}
                   </div>
                   {g.subtotal && (
-                    <span className="tabular shrink-0 text-[13px] font-bold text-text-mute">
+                    <span className="tabular shrink-0 text-body-sm font-bold text-text-mute">
                       {g.subtotal}
                     </span>
                   )}

@@ -23,17 +23,17 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
   const tf = useTranslations("PortfolioForm");
 
   return (
-    <div className="rounded-[18px] bg-card p-[18px] shadow-card">
+    <div className="rounded-xl bg-card p-[18px] shadow-card">
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[15px] font-bold">{t("title")}</h2>
+          <h2 className="text-base font-semibold">{t("title")}</h2>
           <p className="mt-0.5 text-xs font-medium text-text-2">{t("subtitle")}</p>
         </div>
         {/* Reference: soft-green pill; icon-only on mobile, icon+label on desktop. */}
         <Link
           href="/settings/portfolios/holder/new"
           aria-label={t("add")}
-          className="flex shrink-0 items-center gap-1.5 rounded-[9px] bg-primary/10 px-[11px] py-[7px] text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+          className="flex shrink-0 items-center gap-1.5 rounded-sm bg-primary/10 px-[11px] py-[7px] text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
         >
           <Plus className="size-[15px]" strokeWidth={2.4} />
           <span className="hidden sm:inline">{t("add")}</span>
@@ -46,7 +46,7 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
             <Link
               key={h.id}
               href={`/settings/portfolios/holder/${h.id}`}
-              className="flex items-center gap-3 rounded-[12px] bg-card-2 px-[13px] py-[11px] transition-colors hover:bg-card-2/70"
+              className="flex items-center gap-3 rounded-md bg-card-2 px-[13px] py-[11px] transition-colors hover:bg-card-2/70"
             >
               <MonogramBadge label={h.name} />
               <div className="min-w-0 flex-1">

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ImportDraft, ReviewDraft } from "./types";
 import { fmtQty, fmtAmt } from "./types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
 
 export function DraftRow({
   draft,
@@ -50,12 +52,11 @@ export function DraftRow({
   return (
     <>
       <TableCell>
-        <input
-          type="checkbox"
-          className="size-4 align-middle accent-primary"
+        <Checkbox
+          className="size-4"
           aria-label={t("review.selectRow")}
           checked={isSelected}
-          onChange={() => onToggle(draft.uid)}
+          onCheckedChange={() => onToggle(draft.uid)}
         />
       </TableCell>
       <TableCell>
@@ -64,17 +65,14 @@ export function DraftRow({
             {pct(draft.confidence)}
           </Badge>
           {draft.likelyDuplicate && (
-            <Badge
-              variant={draft.likelyDuplicate.kind === "enrichment" ? "default" : "warning"}
-              title={dupLabel(draft)}
-            >
+            <Badge variant={draft.likelyDuplicate.kind === "enrichment" ? "default" : "warning"}>
               {dupLabel(draft)}
             </Badge>
           )}
           {transferNeedsCostBasis(draft) && (
-            <Badge variant="warning" title={t("review.needsCostBasisHint")}>
-              {t("review.needsCostBasis")}
-            </Badge>
+            <InfoTip label={t("review.needsCostBasisHint")} focusable>
+              <Badge variant="warning">{t("review.needsCostBasis")}</Badge>
+            </InfoTip>
           )}
         </div>
       </TableCell>

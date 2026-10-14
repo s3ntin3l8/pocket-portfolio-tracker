@@ -29,7 +29,7 @@ export function EstimatedTaxHero({
 }) {
   return (
     <div
-      className="min-w-0 rounded-[18px] p-5 text-white"
+      className="min-w-0 rounded-xl p-5 text-white"
       style={{
         background:
           tone === "green"
@@ -38,7 +38,7 @@ export function EstimatedTaxHero({
       }}
     >
       <p className="truncate text-xs font-semibold text-white/80">{label}</p>
-      <p className="tabular mt-1 truncate text-lg font-extrabold sm:text-2xl lg:text-[28px]">
+      <p className="tabular mt-1 truncate text-lg font-extrabold sm:text-2xl lg:text-display">
         {value}
       </p>
       <p className="mt-1 text-xs font-medium text-white/80">{description}</p>
@@ -76,31 +76,31 @@ export function AllowanceSummaryBoxes({
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
+      <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
         <div className="flex items-baseline justify-between">
-          <span className="text-[11px] font-semibold text-text-2">{t("allowanceBoxes.left")}</span>
-          <span className="tabular text-[15px] font-extrabold">{money(remaining)}</span>
+          <span className="text-micro font-semibold text-text-2">{t("allowanceBoxes.left")}</span>
+          <span className="tabular text-body font-extrabold">{money(remaining)}</span>
         </div>
         {/* Reference: 7px track, purple allowance fill (#7C5CFC is the tax screen's accent). */}
-        <div className="mt-2 h-[7px] overflow-hidden rounded-[5px] bg-line">
+        <div className="mt-2 h-[7px] overflow-hidden rounded-xs bg-line">
           <div
-            className="h-full rounded-[5px] transition-all"
+            className="h-full rounded-xs transition-all"
             style={{ width: `${Math.min(100, Math.max(0, usedPct))}%`, backgroundColor: "#7C5CFC" }}
           />
         </div>
-        <p className="mt-1.5 text-[10px] font-medium text-text-3">
+        <p className="mt-1.5 text-micro font-medium text-text-3">
           {t("allowanceBoxes.leftDesc", { used: money(usedYtd), annual: money(allowanceAnnual) })}
         </p>
-        <p className="mt-1 text-[10px] font-medium text-text-3">
+        <p className="mt-1 text-micro font-medium text-text-3">
           {t("allowance.taxSaving")}: {money(taxSavingAvailable)}
         </p>
       </div>
-      <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
-        <span className="text-[11px] font-semibold text-text-2">
+      <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
+        <span className="text-micro font-semibold text-text-2">
           {t("allowanceBoxes.taxableGains")}
         </span>
         <p className="tabular mt-1.5 text-xl font-extrabold">{money(taxable)}</p>
-        <p className="mt-1 text-[10px] font-medium text-text-3">
+        <p className="mt-1 text-micro font-medium text-text-3">
           {t("allowanceBoxes.taxableGainsDesc", { tax: money(estimatedTax) })}
         </p>
       </div>
@@ -203,20 +203,20 @@ function PotCard({
   t: TaxTranslator;
 }) {
   return (
-    <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
-      <span className="text-[11px] font-semibold text-text-2">{title}</span>
-      <p className="mt-0.5 text-[10px] text-text-3">{desc}</p>
+    <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
+      <span className="text-micro font-semibold text-text-2">{title}</span>
+      <p className="mt-0.5 text-micro text-text-3">{desc}</p>
       <div className="mt-2 space-y-1">
-        <div className="flex justify-between text-[11px]">
+        <div className="flex justify-between text-micro">
           <span className="text-text-3">{t("coverage.pots.net")}</span>
           <span className="tabular font-bold">{money(netGainLoss)}</span>
         </div>
-        <div className="flex justify-between text-[11px]">
+        <div className="flex justify-between text-micro">
           <span className="text-text-3">{t("coverage.pots.used")}</span>
           <span className="tabular font-bold">{money(used)}</span>
         </div>
         {Number(carryForward) > 0 && (
-          <div className="flex justify-between text-[11px]">
+          <div className="flex justify-between text-micro">
             <span className="text-text-3">{t("coverage.pots.carryForward")}</span>
             <span className="tabular font-bold">{money(carryForward)}</span>
           </div>
@@ -262,30 +262,30 @@ export function CoverageCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {hasFsa ? (
-          <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
-            <span className="text-[11px] font-semibold text-text-2">{t("coverage.fsa.title")}</span>
-            <p className="tabular mt-1 text-[15px] font-extrabold">
+          <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
+            <span className="text-micro font-semibold text-text-2">{t("coverage.fsa.title")}</span>
+            <p className="tabular mt-1 text-body font-extrabold">
               {t("coverage.fsa.usedDesc", {
                 used: money(u.usedYtd),
                 annual: money(u.allowanceAnnual),
               })}
             </p>
-            <div className="mt-2 h-[7px] overflow-hidden rounded-[5px] bg-line">
+            <div className="mt-2 h-[7px] overflow-hidden rounded-xs bg-line">
               <div
-                className="h-full rounded-[5px] transition-all"
+                className="h-full rounded-xs transition-all"
                 style={{
                   width: `${Math.min(100, Math.max(0, usedPct))}%`,
                   backgroundColor: "#7C5CFC",
                 }}
               />
             </div>
-            <p className="mt-1.5 text-[10px] font-medium text-text-3">
+            <p className="mt-1.5 text-micro font-medium text-text-3">
               {isTaxable ? t("coverage.fsa.exceeded") : t("coverage.fsa.allUsed")}
             </p>
           </div>
         ) : (
-          <div className="rounded-[14px] border bg-card-2 px-[15px] py-[13px]">
-            <span className="text-[11px] font-semibold text-text-2">{t("coverage.fsa.title")}</span>
+          <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
+            <span className="text-micro font-semibold text-text-2">{t("coverage.fsa.title")}</span>
             <p className="mt-1 text-sm text-muted-foreground">{t("coverage.fsa.noFsa")}</p>
           </div>
         )}
@@ -312,7 +312,7 @@ export function CoverageCard({
         </div>
 
         {hasCf ? (
-          <p className="text-[10px] font-medium text-text-3">{t("coverage.pots.editorHint")}</p>
+          <p className="text-micro font-medium text-text-3">{t("coverage.pots.editorHint")}</p>
         ) : null}
 
         <Separator />
@@ -430,8 +430,8 @@ export function HarvestRow({
         className="size-[38px]"
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-bold">{s.instrument?.name ?? label}</p>
-        <p className="truncate text-[11px] font-medium text-text-2">
+        <p className="truncate text-body-sm font-bold">{s.instrument?.name ?? label}</p>
+        <p className="truncate text-micro font-medium text-text-2">
           {t("harvest.metaLine", { offset: money(s.harvestableGross), saving: money(s.taxSaving) })}
           {tfPct > 0 && (
             <>
@@ -444,15 +444,15 @@ export function HarvestRow({
       </div>
       <div className="shrink-0 text-right">
         {/* Our German model harvests unrealized GAINS within the allowance → shown green. */}
-        <p className="tabular text-[13px] font-bold text-success">{money(s.unrealizedGross)}</p>
-        <p className="text-[10px] font-semibold text-text-3">{t("harvest.unrealized")}</p>
+        <p className="tabular text-body-sm font-bold text-success">{money(s.unrealizedGross)}</p>
+        <p className="text-micro font-semibold text-text-3">{t("harvest.unrealized")}</p>
       </div>
       {/* Stays on /tax (unlike the retired `/transactions/new` full page) — the shell's
           `AddTransactionMenu` picks up `?harvestInstrument=` reactively and opens the Add
           sheet on a prefilled Sell draft, matching the app's one everyday add flow. */}
       <Link
         href={`/tax?harvestInstrument=${s.instrumentId}`}
-        className="shrink-0 rounded-[10px] px-[13px] py-2 text-xs font-bold text-[#7C5CFC] transition-transform active:scale-95"
+        className="shrink-0 rounded-sm px-[13px] py-2 text-xs font-bold text-[#7C5CFC] transition-transform active:scale-95"
         style={{ backgroundColor: "rgba(124,92,252,.13)" }}
       >
         {t("harvest.button")}

@@ -177,7 +177,7 @@ export function AdminVisionProvidersForm({
                             <GripVertical className="size-5" />
                           </button>
                         )}
-                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-[11px] font-extrabold text-text-2">
+                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-micro font-extrabold text-text-2">
                           {i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -201,7 +201,7 @@ export function AdminVisionProvidersForm({
                           <button
                             type="button"
                             onClick={() => setEditingId(p.id)}
-                            className="shrink-0 whitespace-nowrap rounded-[9px] bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary"
+                            className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-1.5 text-micro font-bold text-primary"
                           >
                             {t("credentialSet")}
                           </button>
@@ -211,7 +211,7 @@ export function AdminVisionProvidersForm({
                             type="button"
                             onClick={() => setEditingId(editing ? null : p.id)}
                             aria-label={t("editCredential")}
-                            className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-background text-text-2 hover:text-foreground"
+                            className="flex size-[30px] shrink-0 items-center justify-center rounded-sm bg-background text-text-2 hover:text-foreground"
                           >
                             <Pencil className="size-[15px]" />
                           </button>

@@ -88,20 +88,20 @@ export function SettingsShell({
           key={item.key}
           href={item.href}
           className={cn(
-            "flex items-center gap-2.5 rounded-[12px] px-2.5 py-2.5 text-[13px] font-bold transition-colors",
+            "flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-body-sm font-bold transition-colors",
             "my-px",
             active ? "bg-background" : "hover:bg-background/60",
           )}
         >
           <span
-            className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] [&>svg]:size-4"
+            className="flex size-[30px] shrink-0 items-center justify-center rounded-sm [&>svg]:size-4"
             style={{ background: item.bg, color: item.color }}
           >
             {item.icon}
           </span>
           <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
           {item.badge && (
-            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-primary">
+            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro font-extrabold tracking-wide text-primary">
               {item.badge}
             </span>
           )}
@@ -114,7 +114,7 @@ export function SettingsShell({
       <div className="md:grid md:grid-cols-[270px_1fr] md:gap-6 md:items-start">
         <div className="hidden md:sticky md:top-[calc(70px+env(safe-area-inset-top))] md:flex md:flex-col md:gap-3 md:self-start">
           {railTop}
-          <nav className={cn("divide-y divide-line rounded-[18px] bg-card p-2", CARD_SHADOW)}>
+          <nav className={cn("divide-y divide-line rounded-xl bg-card p-2", CARD_SHADOW)}>
             {railLinks}
             {railExtra}
           </nav>
@@ -150,7 +150,7 @@ export function SettingsShell({
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-sm font-bold">{item.title}</span>
                           {item.badge && (
-                            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-primary">
+                            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro font-extrabold tracking-wide text-primary">
                               {item.badge}
                             </span>
                           )}

@@ -244,7 +244,7 @@ describe("HoldingsTable", () => {
   });
 
   describe("at-cost P&L cells (audit G3)", () => {
-    it("renders a neutral dash, not '+0.00 / 0.00%', for a row valued at cost", () => {
+    it("renders a neutral dash, not '+0.00 / 0.00%', for a row valued at cost", async () => {
       const atCost: HoldingValuation = {
         ...makeHolding("MWOF", "10", "100"),
         price: null,
@@ -263,10 +263,13 @@ describe("HoldingsTable", () => {
       expect(pnlCell.className).not.toContain("text-success");
       // The tooltip text is still reachable (chip title + screen-reader text in the cell).
       expect(pnlCell.textContent).toContain("No market price; valued at cost");
-      expect(screen.getAllByTitle("No market price; valued at cost").length).toBeGreaterThan(0);
+      fireEvent.focus(screen.getAllByText("At cost")[0]!);
+      expect(
+        (await screen.findAllByText("No market price; valued at cost")).length,
+      ).toBeGreaterThan(0);
     });
 
-    it("renders a dash for a row with no FX rate, with the 'No FX rate' tooltip on its chip", () => {
+    it("renders a dash for a row with no FX rate, with the 'No FX rate' tooltip on its chip", async () => {
       const noFx: HoldingValuation = {
         ...makeHolding("FXLESS", "10", "100"),
         marketValueDisplay: null,
@@ -274,7 +277,8 @@ describe("HoldingsTable", () => {
         fxMissing: true,
       };
       renderTable({ rows: [noFx] });
-      expect(screen.getAllByTitle(/No FX rate/).length).toBeGreaterThan(0);
+      fireEvent.focus(screen.getAllByText("No FX rate")[0]!);
+      expect((await screen.findAllByText(/No FX rate/)).length).toBeGreaterThan(0);
       const row = screen.getAllByRole("row").find((r) => r.textContent?.includes("FXLESS"))!;
       const cells = row.querySelectorAll("td");
       expect(cells[cells.length - 1]!.textContent).toContain("—");

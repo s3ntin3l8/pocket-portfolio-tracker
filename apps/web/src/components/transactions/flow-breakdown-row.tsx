@@ -20,10 +20,10 @@ export function FlowBreakdownRow({
   // would otherwise push each bar to a different x and misalign them vertically).
   return (
     <div className="flex items-center gap-2.5">
-      <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: color }} />
+      <span className="size-2.5 shrink-0 rounded-xs" style={{ background: color }} />
       <span className="min-w-0 flex-1 truncate text-xs font-semibold">{label}</span>
       <span className="tabular shrink-0 text-xs font-bold">{value}</span>
-      <div className="h-[7px] w-16 shrink-0 overflow-hidden rounded-[5px] bg-line">
+      <div className="h-[7px] w-16 shrink-0 overflow-hidden rounded-xs bg-line">
         <div
           className="h-full rounded-full"
           style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }}

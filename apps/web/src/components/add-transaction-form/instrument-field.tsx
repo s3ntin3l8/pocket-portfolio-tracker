@@ -105,17 +105,17 @@ export function InstrumentField({
       <div
         className={cn(
           "mt-1.5 flex flex-col gap-[13px]",
-          boxed && "rounded-[16px] border border-border bg-card-2 p-[14px]",
+          boxed && "rounded-lg border border-border bg-card-2 p-[14px]",
         )}
       >
         {selected ? (
-          <div className="flex items-center gap-2.5 rounded-[12px] border border-border bg-card px-[11px] py-[9px] text-sm">
+          <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-[11px] py-[9px] text-sm">
             <InstrumentLogo
               label={selected.symbol}
               symbol={selected.symbol}
               market={selected.market}
               assetClass={selected.assetClass}
-              className="size-[34px] shrink-0 rounded-[10px]"
+              className="size-[34px] shrink-0 rounded-sm"
             />
             <span className="min-w-0 flex-1 truncate">
               <span className="font-bold">{selected.symbol}</span>
@@ -141,8 +141,8 @@ export function InstrumentField({
             />
             {results.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-text-3">{t("savedResults")}</p>
-                <ul className="divide-y divide-line rounded-[12px] border border-border bg-card">
+                <p className="text-micro font-semibold text-text-3">{t("savedResults")}</p>
+                <ul className="divide-y divide-line rounded-md border border-border bg-card">
                   {results.map((i) => (
                     <li key={i.id}>
                       <button
@@ -155,7 +155,7 @@ export function InstrumentField({
                           symbol={i.symbol}
                           market={i.market}
                           assetClass={i.assetClass}
-                          className="size-8 rounded-[9px]"
+                          className="size-8 rounded-sm"
                         />
                         <span className="min-w-0 flex-1 truncate">
                           <span className="font-bold">{i.symbol}</span>
@@ -170,11 +170,11 @@ export function InstrumentField({
 
             {discovered.length > 0 && (
               <div className="space-y-1.5">
-                <p className="flex items-center gap-1 text-[11px] font-semibold text-text-3">
+                <p className="flex items-center gap-1 text-micro font-semibold text-text-3">
                   <Sparkles className="size-3" />
                   {t("discoveredResults")}
                 </p>
-                <ul className="divide-y divide-line rounded-[12px] border border-border bg-card">
+                <ul className="divide-y divide-line rounded-md border border-border bg-card">
                   {discovered.map((i) => (
                     <li key={`${i.market}:${i.symbol}:${i.source}`}>
                       <button
@@ -187,7 +187,7 @@ export function InstrumentField({
                           symbol={i.symbol}
                           market={i.market}
                           assetClass={i.assetClass}
-                          className="size-8 rounded-[9px]"
+                          className="size-8 rounded-sm"
                         />
                         <span className="min-w-0 flex-1 truncate">
                           <span className="font-bold">{i.symbol}</span>

@@ -1,46 +1,32 @@
+import { Suspense } from "react";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Layers, Plus, AlertCircle, AlertTriangle } from "lucide-react";
-import { ScopeLink } from "@/components/scope-link";
+import { Layers, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ExportCsvButton } from "@/components/export-csv-button";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
-import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
-import { AllocationCard } from "@/components/holdings/allocation-card";
-import { PortfolioValueCard } from "@/components/holdings/portfolio-value-card";
-import { GainExplainer } from "@/components/gain-explainer";
-import { toneOf } from "@/components/gain-figure";
-import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { PositionsPanel } from "@/components/holdings/positions-panel";
+import {
+  HoldingsHeroSection,
+  startHoldingsHeroData,
+} from "@/components/holdings/holdings-hero-section";
+import { HoldingsHeroSkeleton } from "@/components/holdings/holdings-hero-skeleton";
+import { HoldingsAnomalySection } from "@/components/holdings/holdings-anomaly-section";
+import { HoldingsSidebar } from "@/components/holdings/holdings-sidebar";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
 import { collectFxMissing } from "@/lib/fx-missing";
 import {
   loadHoldings,
-  loadAnomalies,
-  loadNetworthAnomalies,
   loadNetWorth,
-  loadNetWorthHistory,
-  loadHasIntraday,
-  loadNetWorthHolderScope,
   loadPreferences,
   loadMe,
-  getSelectedPortfolioId,
+  loadAnomalies,
+  loadNetworthAnomalies,
 } from "@/lib/server-api";
-import {
-  formatNetWorth,
-  formatPercent,
-  formatSignedMoney,
-  rowAnomalyCounts,
-  bannerAnomalies,
-  reconciliationItem,
-  type AnomalyTranslator,
-} from "@/lib/utils";
 import { PageTitle } from "@/components/page-header";
-import { isIntradayHeroRange, resolveHeroRange } from "@/lib/chart-range";
-import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
 
 const CLASS_TABS = [
   "all",
@@ -68,47 +54,28 @@ export default async function HoldingsPage({
   const { portfolio: portfolioParam, filter: filterParam, range: rangeParam } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("Holdings");
-  const ta = await getTranslations("Anomalies");
-  const tc = await getTranslations("AssetClass");
-  const tr = await getTranslations("Region");
   const te = await getTranslations("Empty");
   const tf = await getTranslations("PortfolioForm");
 
-  // Cost basis is a single global preference (Settings → Investing), not a per-page
-  // toggle — threaded into every cost-basis-sensitive loader below. The loaders that
-  // don't need costBasis (anomalies, history, selectedId) are kicked off immediately
-  // in parallel with loadPreferences; only the two that do (loadHoldings, loadNetWorth)
-  // wait on it.
-  const prefsPromise = loadPreferences();
-  // Use the aggregate net-worth anomaly endpoint when no single portfolio is
-  // selected — matches how Activity/Transactions loads anomalies for the
-  // all-portfolios view. Per-portfolio anomalies only work with a specific ID.
-  const anomaliesPromise = portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies();
-  const hasIntradayPromise = loadHasIntraday();
-  // `?range=` deep link: the hero opens on it, except that an intraday range with no
-  // intraday data (its chips are hidden) falls back to the default.
-  const heroRange =
-    rangeParam && isIntradayHeroRange(rangeParam)
-      ? resolveHeroRange(rangeParam, await hasIntradayPromise)
-      : resolveHeroRange(rangeParam);
-  const historyPromise = loadNetWorthHistory(heroRange);
-  const holderScopePromise = loadNetWorthHolderScope();
-  const selectedIdPromise = getSelectedPortfolioId();
-  const mePromise = loadMe();
-
-  const prefs = await prefsPromise;
+  // Blocking path: only what decides WHICH page this is (error / empty / table) plus the
+  // net-worth payload — loadHoldings and loadNetWorth share one cached API call. Everything
+  // else (hero history, anomalies, `me`) is independent and streams in behind <Suspense>
+  // below, so the positions table and the allocation rail no longer wait on it.
+  // Cost basis is a single global preference (Settings → Investing), not a per-page toggle —
+  // threaded into every cost-basis-sensitive loader.
+  // The streamed sections' loaders are started NOW (not awaited) so they overlap with the
+  // blocking fetches below instead of waterfalling after them: the hero via an explicit
+  // promise prop, the anomalies via their request-`cache()`d loaders (the section's own
+  // call returns the same in-flight promise).
+  const heroData = startHoldingsHeroData(rangeParam);
+  void (portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies());
+  const prefs = await loadPreferences();
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
-  const [result, netWorthResult, anomalies, history, selectedId, holderId, hasIntraday] =
-    await Promise.all([
-      loadHoldings(costBasis, portfolioParam),
-      loadNetWorth(costBasis),
-      anomaliesPromise,
-      historyPromise,
-      selectedIdPromise,
-      holderScopePromise,
-      hasIntradayPromise,
-    ]);
+  const [result, netWorthResult] = await Promise.all([
+    loadHoldings(costBasis, portfolioParam),
+    loadNetWorth(costBasis),
+  ]);
 
   if (TIMING) {
     // eslint-disable-next-line react-hooks/purity
@@ -121,9 +88,6 @@ export default async function HoldingsPage({
       }),
     );
   }
-
-  const me = await mePromise;
-  const isAdmin = Boolean(me?.isAdmin);
 
   // Open positions only (computeHoldings also returns closed, zero-quantity ones).
   const holdings =
@@ -214,12 +178,14 @@ export default async function HoldingsPage({
     return (
       <div className="space-y-5">
         {Heading}
-        <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={Layers} />
+        <DataState status={result.status} retryAfter={retryAfterOf(result)} />
       </div>
     );
   }
 
   if (holdings.length === 0 && !hasCash) {
+    // Only this branch needs `me` (the add menu's admin-only entries) — not the happy path.
+    const isAdmin = Boolean((await loadMe())?.isAdmin);
     return (
       <div className="space-y-5">
         {Heading}
@@ -247,61 +213,7 @@ export default async function HoldingsPage({
     );
   }
 
-  // Headline count = ONLY anomalies that attach to a row (missing_transfer_basis, oversell,
-  // negative_cash, …). Unlike Transactions, Holdings is a positions list — it has no
-  // transaction rows and no "Show flagged only" filter, so a row-attached anomaly can never
-  // be located ON this page; it links to Transactions instead, where it can. Anomalies with
-  // nowhere to attach at all (reconciliation_gap, position_gap, …) are rendered below as
-  // their own labeled ReconciliationBanner — already fully locatable right here, no link
-  // needed (see apps/web/src/lib/utils.ts `isRowAnomaly` for why this is a transactionId
-  // partition, not a hardcoded code list).
-  const { errors: errorCount, warnings: warningCount } = rowAnomalyCounts(anomalies ?? []);
-  const standaloneAnomalies = bannerAnomalies(anomalies ?? []);
-  const anomalyBanner =
-    errorCount > 0 || warningCount > 0 ? (
-      <div
-        role="alert"
-        className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
-          errorCount > 0
-            ? "border-destructive/40 bg-destructive/5 text-destructive"
-            : "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-        }`}
-      >
-        {errorCount > 0 ? (
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-        ) : (
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-        )}
-        <span className="flex-1">
-          {errorCount > 0 && warningCount > 0
-            ? ta("bannerBoth", { errors: errorCount, warnings: warningCount })
-            : errorCount > 0
-              ? ta("bannerError", { count: errorCount })
-              : ta("bannerWarning", { count: warningCount })}
-        </span>
-        <ScopeLink
-          href="/transactions"
-          className="shrink-0 font-medium underline underline-offset-2"
-        >
-          {ta("viewTransactions")}
-        </ScopeLink>
-      </div>
-    ) : null;
-
-  // ── Allocation (aggregate/single-portfolio scope via loadNetWorth — same
-  // cookie-driven scope the rest of the app uses, independent of the `?portfolio=`
-  // override that only applies to the positions table below). ──
   const summary = netWorthResult.status === "ok" ? netWorthResult.data : null;
-  const allocation = summary?.allocation;
-  // Value of at-cost holdings per asset class (B7 made the slices sum correctly; G3 marks
-  // which part of each slice is cost rather than a market price).
-  const atCostByClass: Record<string, number> = {};
-  for (const h of summary?.holdings ?? []) {
-    const cls = h.instrument?.assetClass;
-    if (h.valuedAtCost && cls && h.marketValueDisplay != null) {
-      atCostByClass[cls] = (atCostByClass[cls] ?? 0) + Number(h.marketValueDisplay);
-    }
-  }
 
   // Currencies with no FX rate (audit B2): their holdings are left out of the totals.
   const fxMissing = collectFxMissing(
@@ -314,38 +226,24 @@ export default async function HoldingsPage({
       {Heading}
       <FxMissingBanner currencies={fxMissing} />
 
-      {/* ── Hero chart: full-width above the table ── */}
+      {/* ── Hero chart: full-width above the table; streams in behind a skeleton ── */}
       {summary && (
-        <HeroGlanceCard
-          // Remount on a scope change: the chart seeds its state from `initialHistory`.
-          key={`${portfolioParam ?? ""}:${selectedId ?? ""}:${holderId ?? ""}`}
-          netWorth={summary.netWorth}
-          currency={summary.displayCurrency}
-          initialHistory={history}
-          initialRange={heroRange}
-          hasIntraday={hasIntraday}
-          selectedId={selectedId}
-          holderId={holderId}
-          benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
-          atCostCount={summary.holdings.filter((h) => h.valuedAtCost).length}
-          fxMissingCount={summary.holdings.filter((h) => h.fxMissing).length}
-          atCostHref={
-            portfolioParam
-              ? `/holdings?portfolio=${portfolioParam}&filter=at-cost`
-              : "/holdings?filter=at-cost"
-          }
-        />
+        <Suspense fallback={<HoldingsHeroSkeleton />}>
+          <HoldingsHeroSection
+            summary={summary}
+            data={heroData}
+            portfolioParam={portfolioParam}
+            benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
+          />
+        </Suspense>
       )}
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Main column: anomaly banners + tabs + table ── */}
         <div className="space-y-5">
-          {anomalyBanner}
-          <ReconciliationBannerGroup
-            items={standaloneAnomalies.map((a) =>
-              reconciliationItem(a, ta as AnomalyTranslator, locale, portfolioParam ?? undefined),
-            )}
-          />
+          <Suspense fallback={null}>
+            <HoldingsAnomalySection portfolioParam={portfolioParam} locale={locale} />
+          </Suspense>
 
           <PositionsPanel
             rows={holdings}
@@ -358,81 +256,7 @@ export default async function HoldingsPage({
         </div>
 
         {/* ── Sidebar: value stats + allocation donut (sticky on wide containers) ── */}
-        {allocation && (
-          <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
-            <PortfolioValueCard
-              totalLabel={t("allocation.totalLabel")}
-              totalValueFormatted={formatNetWorth(
-                summary.netWorth,
-                summary.displayCurrency,
-                locale,
-              )}
-              allTimeLabel={t("allocation.allTimeLabel")}
-              allTimeAmount={formatSignedMoney(
-                Number(summary.totalUnrealizedPnL),
-                summary.displayCurrency,
-                locale,
-              )}
-              allTimePct={
-                Number(summary.totalCost) > 0
-                  ? formatPercent(
-                      Number(summary.totalUnrealizedPnL) / Number(summary.totalCost),
-                      locale,
-                    )
-                  : null
-              }
-              allTimeTone={toneOf(Number(summary.totalUnrealizedPnL))}
-              allTimeExplainer={summary.gain ? <GainExplainer gain={summary.gain} /> : undefined}
-              todayLabel={t("allocation.todayLabel")}
-              todayAmount={formatSignedMoney(
-                Number(summary.totalDayChange),
-                summary.displayCurrency,
-                locale,
-              )}
-              todayPct={(() => {
-                // Day-change %: the day's move over the prior close's book value. Securities
-                // that lack a previous close contribute nothing to either totalDayChange or
-                // (via a null/0 market value) totalMarketValue, so `market − change` is the
-                // priced book's opening base. Guard a non-positive base.
-                const base = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
-                return base > 0
-                  ? formatPercent(Number(summary.totalDayChange) / base, locale)
-                  : null;
-              })()}
-              todayTone={toneOf(Number(summary.totalDayChange))}
-            />
-
-            {allocation.byAssetClass.some((s) => Number(s.value) > 0) && (
-              <AllocationCard
-                title={t("byAssetClass")}
-                slices={allocation.byAssetClass
-                  .filter((s) => Number(s.value) > 0)
-                  .map((s) => ({
-                    key: s.key,
-                    label: s.key === "cash" ? tc("cash") : tc(s.key),
-                    value: Number(s.value),
-                    // Share of this class valued at cost (no market price) — hatched in the donut.
-                    atCostValue: atCostByClass[s.key],
-                    actualPct: s.pct,
-                  }))}
-                atCostLegend={t("donutAtCostLegend")}
-                currency={summary.displayCurrency}
-                total={Number(summary.netWorth)}
-              />
-            )}
-
-            <RegionCurrencyCard
-              regionTitle={t("byRegion")}
-              currencyTitle={t("byCurrency")}
-              regionRows={allocation.byRegion
-                .filter((s) => Number(s.value) > 0)
-                .map((s) => ({ key: s.key, label: tr(s.key), pct: s.pct }))}
-              currencyRows={allocation.byCurrency
-                .filter((s) => Number(s.value) > 0)
-                .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
-            />
-          </div>
-        )}
+        {summary && <HoldingsSidebar summary={summary} locale={locale} />}
       </div>
     </div>
   );

@@ -108,7 +108,7 @@ export function InstrumentLogo({
   return (
     <span
       className={cn(
-        "inline-flex size-[38px] shrink-0 items-center justify-center overflow-hidden rounded-[11px] bg-muted",
+        "inline-flex size-[38px] shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted",
         className,
       )}
       aria-hidden

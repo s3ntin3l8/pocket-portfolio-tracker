@@ -85,7 +85,7 @@ export default async function TradesPage({
     return (
       <div className="space-y-5">
         {Heading}
-        <DataState status={result.status} retryAfter={retryAfterOf(result)} icon={ScrollText} />
+        <DataState status={result.status} retryAfter={retryAfterOf(result)} />
       </div>
     );
   }
@@ -163,7 +163,7 @@ export default async function TradesPage({
                           <div className="flex w-full flex-1 items-end justify-center">
                             <div
                               className={cn(
-                                "w-full max-w-10 rounded-t-[4px]",
+                                "w-full max-w-10 rounded-t-xs",
                                 amount >= 0 ? "bg-success" : "bg-destructive",
                               )}
                               style={{ height: `${pct}%` }}
@@ -201,7 +201,7 @@ export default async function TradesPage({
                           <span className="tabular text-xs font-bold">{money(d.amount)}</span>
                           <div className="flex w-full flex-1 items-end justify-center">
                             <div
-                              className="w-full max-w-10 rounded-t-[4px] bg-primary"
+                              className="w-full max-w-10 rounded-t-xs bg-primary"
                               style={{ height: `${pct}%` }}
                             />
                           </div>
@@ -255,7 +255,7 @@ export default async function TradesPage({
               <p className="tabular mt-1 text-2xl font-extrabold">
                 {log.winRate === null ? "—" : formatPercent(log.winRate, locale).replace("+", "")}
               </p>
-              <p className="mt-0.5 text-[11px] font-medium text-text-2">
+              <p className="mt-0.5 text-micro font-medium text-text-2">
                 {t("winLossSubtitle", { winners: winners.length, total: closedTrades.length })}
               </p>
               <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">

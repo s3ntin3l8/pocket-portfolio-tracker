@@ -63,21 +63,21 @@ export function SparplanSection({
   return (
     <Card className="min-w-0 rounded-2xl p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-bold">{t("sparplanTitle")}</h2>
+        <h2 className="text-base font-semibold">{t("sparplanTitle")}</h2>
         <div className="flex shrink-0 items-center gap-2">
           {portfolioId && (
             <button
               type="button"
               onClick={() => setTargetsOpen((v) => !v)}
               aria-expanded={targetsOpen}
-              className="flex items-center gap-1.5 rounded-[9px] border border-border bg-card px-2.5 py-1 text-[11px] font-bold text-text-mute transition-transform active:scale-95"
+              className="flex items-center gap-1.5 rounded-sm border border-border bg-card px-2.5 py-1 text-micro font-bold text-text-mute transition-transform active:scale-95"
             >
               <Target className="size-3" />
               {t("setTargets")}
             </button>
           )}
           {activePlans.length > 0 && (
-            <span className="shrink-0 rounded-lg bg-success/15 px-2 py-1 text-[11px] font-bold text-success">
+            <span className="shrink-0 rounded-lg bg-success/15 px-2 py-1 text-micro font-bold text-success">
               {t("activeCount", { count: activePlans.length })}
             </span>
           )}

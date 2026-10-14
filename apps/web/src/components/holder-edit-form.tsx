@@ -13,7 +13,7 @@ import { HolderTypeChips } from "@/components/holder-type-chips";
 import { useRouter } from "@/i18n/navigation";
 import { useHolderForm } from "@/components/holder-form-dialog/hooks";
 
-const CARD_CLASS = "space-y-3.5 rounded-[16px] border border-border bg-card p-4 shadow-card";
+const CARD_CLASS = "space-y-3.5 rounded-lg border border-border bg-card p-4 shadow-card";
 
 /**
  * The design's inline "Edit account holder" / "New account holder" page
@@ -163,12 +163,12 @@ export function HolderEditForm({
                   type="button"
                   onClick={handleDelete}
                   disabled={f.busy}
-                  className="h-auto w-full rounded-[11px] bg-[#E5484D] px-4 py-2.5 text-[13px] font-bold text-white hover:bg-[#E5484D]/90 sm:w-auto"
+                  className="h-auto w-full rounded-sm bg-[#E5484D] px-4 py-2.5 text-body-sm font-bold text-white hover:bg-[#E5484D]/90 sm:w-auto"
                 >
                   {f.busy && <Spinner size="sm" />}
                   {t("confirmDelete")}
                 </Button>
-                <p className="text-[11px] font-medium text-text-3">{t("deleteWarning")}</p>
+                <p className="text-micro font-medium text-text-3">{t("deleteWarning")}</p>
               </div>
             ) : (
               <button
@@ -184,7 +184,7 @@ export function HolderEditForm({
           <Button
             type="submit"
             disabled={f.busy || !f.name.trim()}
-            className="h-auto w-full rounded-[15px] py-[15px] text-[15px] font-bold sm:w-auto sm:rounded-[11px] sm:px-[22px] sm:py-[11px]"
+            className="h-auto w-full rounded-lg py-[15px] text-body font-bold sm:w-auto sm:rounded-sm sm:px-[22px] sm:py-[11px]"
           >
             {f.busy && <Spinner size="sm" />}
             {mode === "edit" ? tf("save") : t("add")}
