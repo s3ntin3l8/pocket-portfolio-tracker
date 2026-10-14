@@ -1224,6 +1224,8 @@
     "actionImport": "Impor transaksi",
     "actionToggleTheme": "Ganti tema",
     "actionShortcuts": "Pintasan papan ketik",
+    "actionAssistant": "Tanya asisten: {query}",
+    "groupAssistant": "Asisten",
     "scopeAll": "Semua portofolio",
     "scopeTo": "Cakupan: {name}",
     "rangeTo": "Rentang: {range}",
@@ -1255,6 +1257,8 @@
     "adminBadge": "ADMIN",
     "preferences": "Preferensi",
     "appearance": "Tampilan",
+    "shortcutsLabel": "Pintasan keyboard",
+    "shortcutsHint": "Pintasan satu tombol (G lalu huruf, N, ?, /). Matikan jika bentrok dengan pembaca layar atau kontrol suara. Ctrl/Cmd-K selalu berfungsi. Hanya disimpan di browser ini.",
     "appearanceOptions": {
       "light": "Terang",
       "dark": "Gelap",

@@ -138,6 +138,25 @@ test.describe("command bar", () => {
     await expect(page.locator("#e2e-focus-marker")).toBeFocused();
   });
 
+  test("focus returns to the previously focused element after closing the add-transaction sheet", async ({
+    page,
+  }) => {
+    await focusMarker(page);
+    await page.keyboard.press("n");
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible();
+    // `n` opens the Radix Dialog primitive (ui/dialog.tsx), not a vaul Sheet/Drawer, at
+    // every viewport width; the vaul `Sheet` is used by other flows.
+    await expect(sheet).not.toHaveAttribute("data-vaul-drawer", /.*/);
+    // Focus really moved into the dialog while open, so the marker is not trivially still
+    // focused when it closes.
+    await expect(page.locator("#e2e-focus-marker")).not.toBeFocused();
+    await expect(sheet.locator(":focus")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(page.locator("#e2e-focus-marker")).toBeFocused();
+  });
+
   test("focus returns to the previously focused element after closing the help sheet", async ({
     page,
   }) => {
@@ -244,5 +263,78 @@ test.describe("Android back (useBackToClose)", () => {
     await expect(help(page)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(help(page)).toBeHidden();
+  });
+});
+
+test.describe("recent instruments", () => {
+  test("a visited instrument shows up (symbol only) in the palette's Recent group", async ({
+    page,
+  }) => {
+    await gotoReady(page, HOLDINGS);
+    const link = page.locator('a[href*="/instruments/"]').first();
+    await expect(link).toBeVisible({ timeout: 20_000 });
+    const href = (await link.getAttribute("href")) as string;
+    const id = href.match(/\/instruments\/([^/?#]+)/)?.[1] as string;
+    await page.goto(`/en/instruments/${id}`);
+    await expect(page.getByRole("button", { name: "Search" }).first()).toBeVisible();
+
+    // Only `{ id, symbol }` is persisted.
+    const stored = await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("pocket:recent-instruments")))
+      .not.toBeNull()
+      .then(() => page.evaluate(() => localStorage.getItem("pocket:recent-instruments")));
+    const [entry] = JSON.parse(stored as string) as Array<Record<string, string>>;
+    expect(Object.keys(entry as object).sort()).toEqual(["id", "symbol"]);
+    expect(entry?.id).toBe(id);
+
+    await gotoReady(page, HOLDINGS);
+    await page.keyboard.press(`${mod}+k`);
+    const recent = palette(page).getByRole("group", { name: "Recent" });
+    await recent.getByRole("option", { name: entry?.symbol as string }).click();
+    await expect(page).toHaveURL(new RegExp(`/instruments/${id}`));
+  });
+});
+
+test.describe("single-key shortcut toggle (Settings -> Account)", () => {
+  test("disabling it turns off g-chords, n, ? and / but Ctrl/Cmd-K still works", async ({
+    page,
+  }) => {
+    await gotoReady(page, "/en/settings");
+    const toggle = page.getByRole("switch", { name: "Keyboard shortcuts" });
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+
+    // Cannot use gotoReady's `?` probe here (shortcuts are off); Cmd/Ctrl-K is the
+    // always-on shortcut, so use it to prove hydration instead.
+    await page.goto(HOLDINGS);
+    await expect(async () => {
+      await page.keyboard.press(`${mod}+k`);
+      await expect(palette(page)).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await page.keyboard.press("Escape");
+    await expect(palette(page)).toBeHidden();
+    await page.keyboard.press("g");
+    await page.keyboard.press("a");
+    await expect(page).toHaveURL(/\/en\/holdings/);
+    await page.keyboard.press("n");
+    await page.keyboard.press("?");
+    await page.keyboard.press("/");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    await page.keyboard.press(`${mod}+k`);
+    await expect(palette(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // Re-enable: shortcuts are back.
+    await page.goto("/en/settings");
+    const again = page.getByRole("switch", { name: "Keyboard shortcuts" });
+    await expect(again).not.toBeChecked();
+    await again.click();
+    await expect(again).toBeChecked();
+    await gotoReady(page, HOLDINGS);
+    await page.keyboard.press("g");
+    await page.keyboard.press("a");
+    await expect(page).toHaveURL(/\/en\/transactions/);
   });
 });

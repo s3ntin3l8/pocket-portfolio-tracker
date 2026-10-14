@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Lock } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { ShortcutsToggle } from "@/components/shortcuts-toggle";
 import { DisplayCurrency } from "@/components/display-currency";
 import { UpdateProfile } from "@/components/update-profile";
 import { ChangePassword } from "@/components/change-password";
@@ -46,6 +47,9 @@ export async function AccountSection({
           <div className="p-4">
             <p className="mb-2 text-xs font-semibold text-text-2">{t("appearance")}</p>
             <ThemeSwitcher />
+          </div>
+          <div className="p-4">
+            <ShortcutsToggle />
           </div>
         </div>
       </div>

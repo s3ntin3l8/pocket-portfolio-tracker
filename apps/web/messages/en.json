@@ -1224,6 +1224,8 @@
     "actionImport": "Import transactions",
     "actionToggleTheme": "Toggle theme",
     "actionShortcuts": "Keyboard shortcuts",
+    "actionAssistant": "Ask the assistant: {query}",
+    "groupAssistant": "Assistant",
     "scopeAll": "All portfolios",
     "scopeTo": "Scope: {name}",
     "rangeTo": "Range: {range}",
@@ -1255,6 +1257,8 @@
     "adminBadge": "ADMIN",
     "preferences": "Preferences",
     "appearance": "Appearance",
+    "shortcutsLabel": "Keyboard shortcuts",
+    "shortcutsHint": "Single-key shortcuts (G then a letter, N, ?, /). Turn off if they clash with a screen reader or voice control. Ctrl/Cmd-K always works. Saved in this browser only.",
     "appearanceOptions": {
       "light": "Light",
       "dark": "Dark",

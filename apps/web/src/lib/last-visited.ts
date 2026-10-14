@@ -1,3 +1,5 @@
+import { safeStorage } from "@/lib/safe-storage";
+
 /**
  * PWA "open where you left off": the last visited in-app URL (path + search, locale prefix
  * stripped — next-intl's `usePathname` already does that) is kept in `localStorage`, and a
@@ -85,12 +87,4 @@ export function isStandaloneLaunch(): boolean {
     (typeof window.matchMedia === "function" &&
       window.matchMedia("(display-mode: standalone)").matches)
   );
-}
-
-function safeStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
 }

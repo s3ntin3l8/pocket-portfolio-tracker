@@ -1,3 +1,5 @@
+import { safeStorage } from "@/lib/safe-storage";
+
 /**
  * Recently visited top-level pages for the command bar's "Recent" group. Only pathnames
  * (locale prefix already stripped) of pages in the command-page list are kept — no query
@@ -10,14 +12,6 @@ export const RECENT_MAX = 6;
 export function topLevelPath(pathname: string): string {
   const first = pathname.split("/").filter(Boolean)[0];
   return first ? `/${first}` : "/";
-}
-
-function safeStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
 }
 
 export function readRecentPages(
