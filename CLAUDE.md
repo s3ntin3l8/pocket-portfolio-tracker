@@ -16,7 +16,10 @@ cash** with live IDX prices and a real-time gold ticker.
   verifies Bearer JWTs (remote JWKS in prod, an injectable key in tests via
   `buildApp({ authKey })`), or a long-lived personal access token (`pt_`-prefixed,
   hashed at rest, `/me/tokens`, mutating methods blocked for read-scoped tokens, unless a route opts in with
-  `config: { scope: "read" }` — a POST that is itself read-only, i.e. `/mcp`);
+  `config: { scope: "read" }` — a POST that is itself read-only, i.e. `/mcp`), or an **OAuth
+  connector token** (claude.ai/mobile: a dedicated Authentik provider's own issuer + audience,
+  `AUTHENTIK_MCP_AUDIENCE`; treated exactly like a PAT — read-only unless it carries
+  `MCP_WRITE_SCOPE`, never admin, cannot mint tokens; `docs/mcp.md`);
   upserts the user by `sub`, and exposes the `app.authenticate` preHandler — every
   route scopes queries to `request.user`. **Routes** (`src/routes/*.ts`, one file per
   domain): `me` (profile + PATs), `account-holders`, `portfolios`, `transactions`

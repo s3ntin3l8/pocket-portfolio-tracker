@@ -125,7 +125,7 @@ function buildMcpServer(client: ApiClient, write: boolean): McpServer {
 export async function mcpRoute(app: FastifyInstance) {
   app.post(
     "/mcp",
-    { preHandler: app.authenticate, config: { scope: "read" } },
+    { preHandler: app.authenticate, config: { scope: "read", oauthResource: true } },
     async (request, reply) => {
       // We write to the raw response ourselves (the transport owns it), so take it over
       // before anything can be sent and carry over the headers Fastify plugins (helmet,

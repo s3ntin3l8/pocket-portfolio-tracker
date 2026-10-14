@@ -86,7 +86,24 @@ describe("auth boot enforcement (issuer/audience)", () => {
     delete process.env.AUTHENTIK_JWKS_URL;
     delete process.env.AUTHENTIK_ISSUER;
     delete process.env.AUTHENTIK_AUDIENCE;
+    delete process.env.AUTHENTIK_MCP_AUDIENCE;
+    delete process.env.AUTHENTIK_MCP_ISSUER;
     await closeDb();
+  });
+
+  it("refuses to start when a connector audience is set but no issuer can verify its tokens", async () => {
+    process.env.AUTHENTIK_MCP_AUDIENCE = "claude-connector-client";
+    await expect(buildApp()).rejects.toThrow(/AUTHENTIK_MCP_AUDIENCE/);
+  });
+
+  it("starts with a connector audience when an issuer is available", async () => {
+    process.env.AUTHENTIK_MCP_AUDIENCE = "claude-connector-client";
+    process.env.AUTHENTIK_MCP_ISSUER = "https://auth.test/application/o/claude-connector/";
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = "portfolio-tracker";
+    const app = await buildApp();
+    expect(app.authenticate).toBeTypeOf("function");
+    await app.close();
   });
 
   it("refuses to start when a real key resolver is configured without audience", async () => {
