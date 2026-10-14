@@ -10,6 +10,11 @@ data/
 .pglite-dev/
 .pglite/
 .storage/
+# Web e2e harness (apps/web/playwright.config.ts): throwaway DB/storage + Playwright output
+.pglite-e2e/
+.storage-e2e/
+apps/web/test-results/
+apps/web/playwright-report/
 
 # Next.js / Turborepo build output
 .next/
