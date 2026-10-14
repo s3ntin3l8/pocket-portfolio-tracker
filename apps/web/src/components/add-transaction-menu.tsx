@@ -177,6 +177,20 @@ export function AddTransactionMenu({
     if (!harvestInstrumentParam && !entryParam) return;
 
     let cancelled = false;
+    // Drop only the one-shot params so the rest of the view state (`?scope=`, `?range=`…)
+    // survives the open.
+    const clearEntryParams = () => {
+      const rest = new URLSearchParams(searchParams.toString());
+      rest.delete("entry");
+      rest.delete("harvestInstrument");
+      const qs = rest.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    };
+    // Command bar → "Import transactions" (`?entry=import`).
+    if (entryParam === "import" && !harvestInstrumentParam) {
+      void openImport().then(clearEntryParams);
+      return;
+    }
     void (async () => {
       await loadPortfolios();
       if (cancelled) return;
@@ -207,7 +221,7 @@ export function AddTransactionMenu({
         setManualStepDesktop(isWide);
         setStep("manual");
       }
-      router.replace(pathname);
+      clearEntryParams();
     })();
 
     return () => {
