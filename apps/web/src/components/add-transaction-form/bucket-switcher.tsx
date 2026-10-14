@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BUCKETS, type Bucket } from "./constants";
 
 /**
@@ -21,7 +22,13 @@ export function BucketSwitcher({
   const activeIndex = bucket ? BUCKETS.indexOf(bucket) : -1;
 
   return (
-    <div className="relative flex rounded-md border border-border bg-card-2 p-1">
+    <ToggleGroup
+      // `bucket` is null until one is chosen; Radix treats "" as "nothing selected".
+      value={bucket ?? ""}
+      onValueChange={(b) => onSelect(b as Bucket)}
+      aria-label={t("bucketLabel")}
+      className="relative rounded-md border border-border bg-card-2 p-1"
+    >
       {activeIndex >= 0 && (
         <div
           aria-hidden
@@ -37,19 +44,17 @@ export function BucketSwitcher({
         />
       )}
       {BUCKETS.map((b) => (
-        <button
+        <ToggleGroupItem
           key={b}
-          type="button"
-          onClick={() => onSelect(b)}
-          aria-pressed={bucket === b}
+          value={b}
           className={cn(
-            "relative z-10 flex-1 rounded-sm px-1 py-2.5 text-xs transition-colors",
+            "relative z-10 flex-1 rounded-sm px-1 py-2.5 text-xs",
             bucket === b ? "font-bold text-foreground" : "font-semibold text-text-2",
           )}
         >
           {t(`bucket${b.charAt(0).toUpperCase()}${b.slice(1)}`)}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

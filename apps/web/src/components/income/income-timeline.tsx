@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CHIP_BASE, CHIP_ACTIVE, CHIP_INACTIVE } from "@/components/ui/table";
 import { TableToolbar, TOOLBAR_FILTERS, ToolbarSearch } from "@/components/table-toolbar";
 import { formatMoney, cn } from "@/lib/utils";
@@ -260,23 +261,28 @@ export function IncomeTimeline({
         <TableToolbar
           filters={
             <div className={TOOLBAR_FILTERS}>
-              {(
-                [
-                  ["all", t("filter_all")],
-                  ["received", t("legendReceived")],
-                  ["forecast", t("legendForecast")],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setStatusFilter(key)}
-                  aria-pressed={statusFilter === key}
-                  className={cn(CHIP_BASE, statusFilter === key ? CHIP_ACTIVE : CHIP_INACTIVE)}
-                >
-                  {label}
-                </button>
-              ))}
+              <ToggleGroup
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                aria-label={t("filterStatus")}
+                className="shrink-0 items-center gap-2"
+              >
+                {(
+                  [
+                    ["all", t("filter_all")],
+                    ["received", t("legendReceived")],
+                    ["forecast", t("legendForecast")],
+                  ] as const
+                ).map(([key, label]) => (
+                  <ToggleGroupItem
+                    key={key}
+                    value={key}
+                    className={cn(CHIP_BASE, statusFilter === key ? CHIP_ACTIVE : CHIP_INACTIVE)}
+                  >
+                    {label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
               {yearOptions.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -312,27 +318,32 @@ export function IncomeTimeline({
                 <span className="whitespace-nowrap text-micro font-semibold text-text-2">
                   {t("groupByLabel")}
                 </span>
-                {(
-                  [
-                    [false, t("groupByDate")],
-                    [true, t("groupByInstrument")],
-                  ] as const
-                ).map(([val, label]) => (
-                  <button
-                    key={String(val)}
-                    type="button"
-                    onClick={() => setGroupByInstrument(val)}
-                    aria-pressed={groupByInstrument === val}
-                    className={cn(
-                      "whitespace-nowrap rounded-full px-3 py-[5px] text-micro",
-                      groupByInstrument === val
-                        ? "bg-pill font-bold text-white"
-                        : "border border-border bg-card font-semibold text-foreground",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
+                <ToggleGroup
+                  value={groupByInstrument ? "instrument" : "date"}
+                  onValueChange={(v) => setGroupByInstrument(v === "instrument")}
+                  aria-label={t("groupByLabel")}
+                  className="items-center gap-1.5"
+                >
+                  {(
+                    [
+                      ["date", t("groupByDate")],
+                      ["instrument", t("groupByInstrument")],
+                    ] as const
+                  ).map(([val, label]) => (
+                    <ToggleGroupItem
+                      key={val}
+                      value={val}
+                      className={cn(
+                        "whitespace-nowrap rounded-full px-3 py-[5px] text-micro",
+                        (val === "instrument") === groupByInstrument
+                          ? "bg-pill font-bold text-white"
+                          : "border border-border bg-card font-semibold text-foreground",
+                      )}
+                    >
+                      {label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
               </div>
             </div>
           }

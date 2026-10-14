@@ -31,21 +31,21 @@ describe("DisplayCurrency", () => {
 
   it("marks the current currency as pressed", () => {
     renderCurrency("EUR");
-    expect(screen.getByRole("button", { name: "EUR" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "USD" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("radio", { name: "EUR" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "USD" })).toHaveAttribute("aria-checked", "false");
   });
 
   it("persists a new currency immediately and refreshes", async () => {
     renderCurrency("IDR");
-    fireEvent.click(screen.getByRole("button", { name: "USD" }));
+    fireEvent.click(screen.getByRole("radio", { name: "USD" }));
     await waitFor(() => expect(updateMe).toHaveBeenCalledWith({ displayCurrency: "USD" }));
     expect(refresh).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "USD" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "USD" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("does nothing when the current currency is clicked again", () => {
     renderCurrency("IDR");
-    fireEvent.click(screen.getByRole("button", { name: "IDR" }));
+    fireEvent.click(screen.getByRole("radio", { name: "IDR" }));
     expect(updateMe).not.toHaveBeenCalled();
   });
 });

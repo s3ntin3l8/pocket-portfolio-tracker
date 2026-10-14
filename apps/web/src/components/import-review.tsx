@@ -14,6 +14,7 @@ import { EnrichmentNotice, DuplicateNotice, IssuesBanner } from "./import-review
 import { FilterBar } from "./import-review/filter-bar";
 import { BulkToolbar } from "./import-review/bulk-toolbar";
 import { ImportTable } from "./import-review/table";
+import { selectAllState } from "@/lib/select-all-state";
 import { MobileView } from "./import-review/mobile";
 import { EditDialog } from "./import-review/edit-dialog";
 import { MapDialog } from "./import-review/map-dialog";
@@ -180,7 +181,11 @@ export function ImportReview({
     () => drafts.filter((d) => selected.has(d.uid)).map((d) => d.uid),
     [drafts, selected],
   );
-  const allVisibleSelected = view.length > 0 && view.every((d) => selected.has(d.uid));
+  const visibleSelectState = selectAllState(
+    view.map((d) => d.uid),
+    selected,
+  );
+  const allVisibleSelected = visibleSelectState === true;
 
   function toggle(uid: string) {
     setSelected((prev) => {
@@ -286,7 +291,7 @@ export function ImportReview({
         issuesByImport={issuesByImport}
         selected={selected}
         onToggle={toggle}
-        allVisibleSelected={allVisibleSelected}
+        selectAllState={visibleSelectState}
         onToggleAll={toggleAll}
         sortKey={sortKey}
         sortDir={sortDir}

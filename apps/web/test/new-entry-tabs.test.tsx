@@ -102,7 +102,7 @@ describe("NewEntryTabs", () => {
       { id: "p1", name: "Main", brokerage: null, accountHolder: null },
       { id: "p2", name: "DKB", brokerage: "DKB", accountHolder: null },
     ]);
-    const bucketButton = screen.getByRole("button", { name: tx.bucketTrade });
+    const bucketButton = screen.getByRole("radio", { name: tx.bucketTrade });
     const picker = screen.getByRole("button", { name: tx.portfolioPicker });
     const instrumentLabel = screen.getByText(tx.instrument);
 

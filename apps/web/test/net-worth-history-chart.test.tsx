@@ -147,7 +147,7 @@ describe("NetWorthHistoryChart", () => {
     renderChart();
     fireEvent.click(screen.getByRole("radio", { name: "1D" }));
     await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1d"));
-    const perfButton = screen.getByRole("button", { name: "Performance" });
+    const perfButton = screen.getByRole("radio", { name: "Performance" });
     expect(perfButton).toBeDisabled();
   });
 
@@ -173,8 +173,8 @@ describe("NetWorthHistoryChart", () => {
       );
 
       // Hero has no Performance/Value mode toggle.
-      expect(screen.queryByRole("button", { name: "Performance" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Value" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Performance" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Value" })).not.toBeInTheDocument();
 
       // Only the 5 hero chips render (no 3M/YTD).
       expect(screen.getByRole("radio", { name: "1D" })).toBeInTheDocument();

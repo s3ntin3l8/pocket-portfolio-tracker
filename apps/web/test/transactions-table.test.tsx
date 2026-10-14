@@ -326,6 +326,24 @@ describe("TransactionsTable", () => {
     });
   }
 
+  it("shows the select-all checkbox as mixed for a partial selection and selects all on click", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TransactionsTable rows={MERGE_ROWS} />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: tb.selectRows }));
+    const selectAll = screen.getByLabelText(tb.selectAll);
+    expect(selectAll).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(selectRowCheckbox("Bank Central Asia"));
+    expect(selectAll).toHaveAttribute("aria-checked", "mixed");
+    fireEvent.click(selectAll);
+    expect(selectAll).toHaveAttribute("aria-checked", "true");
+    // Fully selected: the next click clears the selection.
+    fireEvent.click(selectAll);
+    expect(selectAll).toHaveAttribute("aria-checked", "false");
+  });
+
   it("offers Merge only when exactly two selected rows share a portfolio", async () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>

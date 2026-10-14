@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
@@ -39,25 +40,28 @@ export function DisplayCurrency({ current }: { current: string }) {
 
   return (
     <div className="space-y-1.5">
-      <div role="group" aria-label={t("displayCurrency")} className="flex w-full gap-[7px]">
+      <ToggleGroup
+        value={value}
+        onValueChange={select}
+        disabled={pending !== null}
+        aria-label={t("displayCurrency")}
+        className="w-full gap-[7px]"
+      >
         {CURRENCIES.map((c) => (
-          <button
+          <ToggleGroupItem
             key={c}
-            type="button"
-            onClick={() => select(c)}
-            disabled={pending !== null}
-            aria-pressed={value === c}
+            value={c}
             className={cn(
-              "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors disabled:opacity-60",
+              "flex-1 rounded-sm py-[9px] text-center text-body-sm disabled:opacity-60",
               value === c
                 ? "bg-pill font-bold text-white"
                 : "bg-background font-semibold text-foreground",
             )}
           >
             {c}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
       <p className="text-xs text-muted-foreground">{t("displayCurrencyHint")}</p>
     </div>
   );

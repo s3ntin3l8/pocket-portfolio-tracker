@@ -36,7 +36,7 @@ export interface ImportTableProps {
   issuesByImport?: Map<string, ImportIssue[]>;
   selected: Set<string>;
   onToggle: (uid: string) => void;
-  allVisibleSelected: boolean;
+  selectAllState: boolean | "indeterminate";
   onToggleAll: () => void;
   sortKey: string | null;
   sortDir: SortDir;
@@ -65,7 +65,7 @@ export function ImportTable({
   issuesByImport,
   selected,
   onToggle,
-  allVisibleSelected,
+  selectAllState,
   onToggleAll,
   sortKey,
   sortDir,
@@ -90,7 +90,7 @@ export function ImportTable({
               <Checkbox
                 className="size-4"
                 aria-label={t("review.selectAll")}
-                checked={allVisibleSelected}
+                checked={selectAllState}
                 onCheckedChange={() => onToggleAll()}
               />
             </TableHead>

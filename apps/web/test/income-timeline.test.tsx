@@ -104,14 +104,14 @@ describe("IncomeTimeline", () => {
 
   it("filters to received rows only", () => {
     wrap([bbca2026, tlkm2026Forecast]);
-    fireEvent.click(screen.getByRole("button", { name: "Received" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Received" }));
     expect(screen.getAllByText("BBCA").length).toBeGreaterThan(0);
     expect(screen.queryByText("TLKM")).toBeNull();
   });
 
   it("filters to forecast rows only", () => {
     wrap([bbca2026, tlkm2026Forecast]);
-    fireEvent.click(screen.getByRole("button", { name: "Forecast" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Forecast" }));
     expect(screen.getAllByText("TLKM").length).toBeGreaterThan(0);
     expect(screen.queryByText("BBCA")).toBeNull();
   });

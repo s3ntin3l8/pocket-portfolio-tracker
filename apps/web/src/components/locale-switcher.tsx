@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const LOCALES = ["en", "id"] as const;
 
@@ -15,23 +16,26 @@ export function LocaleSwitcher() {
   const t = useTranslations("Settings");
 
   return (
-    <div className="flex w-full gap-[7px]">
+    <ToggleGroup
+      value={locale}
+      onValueChange={(l) => router.replace(pathname, { locale: l })}
+      aria-label={t("language")}
+      className="w-full gap-[7px]"
+    >
       {LOCALES.map((l) => (
-        <button
+        <ToggleGroupItem
           key={l}
-          type="button"
-          onClick={() => router.replace(pathname, { locale: l })}
-          aria-pressed={locale === l}
+          value={l}
           className={cn(
-            "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
+            "flex-1 rounded-sm py-[9px] text-center text-body-sm",
             locale === l
               ? "bg-pill font-bold text-white"
               : "bg-background font-semibold text-foreground",
           )}
         >
           {t(`languageOptions.${l}`)}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
