@@ -197,6 +197,47 @@ describe("HeroGlanceCard", () => {
     expect(screen.queryByText(/50,?000\.00%|10,?000\.00%/)).not.toBeInTheDocument();
   });
 
+  it("re-renders the pills for the new range inside a transition and leaves the headline and history alone", async () => {
+    getNetWorthHistory.mockResolvedValueOnce([
+      {
+        date: "2026-07-22",
+        netWorth: "950000",
+        marketValue: "950000",
+        pct: "0",
+        benchmarkPct: "0",
+      },
+      {
+        date: "2026-07-29",
+        netWorth: "990000",
+        marketValue: "990000",
+        pct: "3",
+        benchmarkPct: "1",
+      },
+    ]);
+    const historyLen = window.history.length;
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <HeroGlanceCard
+          netWorth="1050000"
+          currency="IDR"
+          initialHistory={initialWithBenchmark}
+          initialRange="1m"
+        />
+      </NextIntlClientProvider>,
+    );
+    const headline = screen.getByText(/IDR\s*1,050,000/);
+    expect(screen.getByText(/past 1M/)).toHaveTextContent("10.00%");
+
+    fireEvent.click(screen.getByRole("radio", { name: "1Y" }));
+    await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1y"));
+    await waitFor(() => expect(screen.getByText(/past 1Y/)).toHaveTextContent("3.00%"));
+    expect(screen.queryByText(/past 1M/)).not.toBeInTheDocument();
+    expect(screen.getByText(/vs S&P 500/)).toHaveTextContent("1.00%");
+    // Headline is the very same node, untouched; a range click adds no history entry.
+    expect(screen.getByText(/IDR\s*1,050,000/)).toBe(headline);
+    expect(window.history.length).toBe(historyLen);
+  });
+
   it("uses the configured benchmark symbol for the pill + legend (not the ^GSPC default)", () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>

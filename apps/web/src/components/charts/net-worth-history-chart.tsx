@@ -200,14 +200,17 @@ export function NetWorthHistoryChart({
       : null;
 
   useEffect(() => {
-    if (!isHero || !heroSeriesSnapshot) return;
+    // Hold the emission while a range fetch is in flight: `range` flips immediately but `data`
+    // is still the old range's series, so emitting now would flash stale values under the new
+    // period label (and tick the hero pills twice). One emission lands once data + range agree.
+    if (!isHero || !heroSeriesSnapshot || loading) return;
     onSeriesChange?.(heroSeriesSnapshot, range);
     // heroSeriesSnapshot is a fresh object on every render; depending on its
     // identity directly would re-fire this effect in a loop with the parent's
     // `onSeriesChange` setter. The snapshot is a pure function of the inputs
     // below, which are referentially stable when they haven't actually changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, range, selectedId, isHero, onSeriesChange]);
+  }, [data, range, loading, selectedId, isHero, onSeriesChange]);
 
   const collectingNote = (
     <p
