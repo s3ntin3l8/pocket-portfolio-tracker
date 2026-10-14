@@ -296,7 +296,7 @@ export function MobileRow({
           tabIndex={-1}
           aria-label={t("selectRow")}
           checked={isSelected}
-          className="size-4 shrink-0"
+          className="pointer-events-none size-4 shrink-0"
         />
       )}
       <span

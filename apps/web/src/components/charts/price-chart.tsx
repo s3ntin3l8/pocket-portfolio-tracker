@@ -110,13 +110,13 @@ export function PriceChart({
                 ? { stroke: "rgba(255,255,255,.55)", strokeDasharray: "4 4" }
                 : { stroke: "var(--color-border)", strokeDasharray: "4 4" }
             }
-            content={({ active, payload }) => {
+            content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               const v = Number(payload[0]?.value);
               if (!Number.isFinite(v)) return null;
               return (
                 <ChartTooltipPanel
-                  rows={[{ label: formatLabel(null, payload), value: formatValue(v) }]}
+                  rows={[{ label: formatLabel(label, payload), value: formatValue(v) }]}
                 />
               );
             }}

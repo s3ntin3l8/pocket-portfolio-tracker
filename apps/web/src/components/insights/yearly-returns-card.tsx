@@ -197,7 +197,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
           </TableHeader>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.year} className="border-border/50">
+              <TableRow key={r.year} className="border-border/50 last:border-0">
                 <TableCell className="px-2 py-1.5 first:pl-2 last:pr-2 text-left text-xs font-medium text-text-2">
                   {r.year}
                   {r.isCurrentYear && (

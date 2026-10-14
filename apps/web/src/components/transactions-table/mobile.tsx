@@ -83,7 +83,7 @@ export function MobileView({
                       aria-label={tb("selectRow")}
                       checked={isSelected}
                       tabIndex={-1}
-                      className="size-4 shrink-0"
+                      className="pointer-events-none size-4 shrink-0"
                     />
                   )}
                   <TypeIconChip type={tx.type} kind={tx.kind} className="size-10 rounded-md" />
