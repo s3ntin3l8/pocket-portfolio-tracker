@@ -111,15 +111,15 @@ describe("getChatProvider (env-only selection under test)", () => {
 
 describe("Gemini chat opt-in", () => {
   it("is not selected by a Gemini key alone, even though it outranks OpenRouter in vision priority", async () => {
-    process.env.GEMINI_API_KEY = "g-key";
+    process.env.GEMINI_API_KEY = "g-key"; // pragma: allowlist secret
     expect(await getChatProvider()).toBeNull();
-    process.env.OPENROUTER_API_KEY = "or-key";
+    process.env.OPENROUTER_API_KEY = "or-key"; // pragma: allowlist secret
     process.env.OPENROUTER_CHAT_MODEL = "some/model";
     expect((await getChatProvider())?.name).toBe("openrouter");
   });
 
   it("is selected once a chat model is set, and honours the pin", async () => {
-    process.env.GEMINI_API_KEY = "g-key";
+    process.env.GEMINI_API_KEY = "g-key"; // pragma: allowlist secret
     process.env.GEMINI_CHAT_MODEL = "gemini-2.5-pro";
     const p = await getChatProvider();
     expect(p).toMatchObject({ name: "gemini", local: false });
@@ -129,9 +129,9 @@ describe("Gemini chat opt-in", () => {
 
   it("accepts a key stored in the admin credentials, still gated on the model", () => {
     const d = CHAT_PROVIDER_REGISTRY.find((c) => c.id === "gemini")!;
-    expect(d.configured({ apiKey: "from-db" } as never)).toBe(false);
+    expect(d.configured({ apiKey: "from-db" } as never)).toBe(false); // pragma: allowlist secret
     process.env.GEMINI_CHAT_MODEL = "m";
-    expect(d.configured({ apiKey: "from-db" } as never)).toBe(true);
-    expect(d.create({ apiKey: "from-db" } as never).isConfigured()).toBe(true);
+    expect(d.configured({ apiKey: "from-db" } as never)).toBe(true); // pragma: allowlist secret
+    expect(d.create({ apiKey: "from-db" } as never).isConfigured()).toBe(true); // pragma: allowlist secret
   });
 });
