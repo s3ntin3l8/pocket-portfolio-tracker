@@ -15,7 +15,10 @@ const portfolioId = z.string().min(1).describe("Portfolio id from list_portfolio
 const optionalPortfolioId = portfolioId
   .optional()
   .describe("Portfolio id from list_portfolios; omit for all portfolios combined");
-const holderId = z.string().optional().describe("Account holder id; omit for everyone");
+const holderId = z
+  .string()
+  .optional()
+  .describe("Account holder id; omit for everyone. Ignored when portfolioId is given.");
 
 const BASIS_NOTE =
   "Name the basis of any gain you quote (vs cost of holdings / vs net contributed) and disclose " +
@@ -95,7 +98,7 @@ export function createTools(client: ApiClient): AiTool[] {
         name: p.name,
         baseCurrency: p.baseCurrency,
         brokerage: p.brokerage,
-        accountHolder: p.accountHolder,
+        accountHolderId: p.accountHolderId,
         portfolioType: p.portfolioType,
         cashCounted: p.cashCounted,
       }));
@@ -156,11 +159,12 @@ export function createTools(client: ApiClient): AiTool[] {
       "measured gain. fxMissing=true means excluded from totals (no FX rate).",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
+      holderId,
       costBasis,
       limit: z.number().int().min(1).max(200).default(100),
     }),
-    handler: async ({ portfolioId: id, costBasis: cb, limit }) => {
-      const src = id ? await client.getSummary(id, cb) : await client.getNetWorth(cb);
+    handler: async ({ portfolioId: id, holderId: h, costBasis: cb, limit }) => {
+      const src = id ? await client.getSummary(id, cb) : await client.getNetWorth(cb, h);
       const sorted = [...src.holdings].sort(
         (a, b) => Number(b.marketValueDisplay ?? 0) - Number(a.marketValueDisplay ?? 0),
       );
@@ -179,7 +183,7 @@ export function createTools(client: ApiClient): AiTool[] {
     title: "Search transactions",
     description:
       "Search transactions (buys, sells, dividends, deposits, transfers …) newest first, with paging. " +
-      "Filter by type, calendar year, free text (description/tags) or instrumentId. Drafts are excluded.",
+      "Filter by type, calendar year, free text (description/tags) or instrumentId. Drafts are excluded. Free-text memos are never returned, but `q` still matches them.",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       type: z.string().optional().describe("e.g. buy, sell, dividend, deposit, transfer_in"),
@@ -226,7 +230,6 @@ export function createTools(client: ApiClient): AiTool[] {
           price: t.price,
           fees: t.fees,
           currency: t.currency,
-          description: t.description,
           fxMissing: t.fxMissing ?? false,
           executedAt: t.executedAt,
         })),
@@ -275,15 +278,28 @@ export function createTools(client: ApiClient): AiTool[] {
     name: "get_tax_summary",
     title: "Tax summary",
     description:
-      "German tax summary for a tax year: realized gains, Freistellungsauftrag (FSA) usage and headroom, " +
+      "Tax summary for a tax year (German regime: Sparerpauschbetrag/FSA; Indonesian final tax under the ID regime). Fails if a depot has no FSA allocation configured. Covers realized gains, Freistellungsauftrag (FSA) usage and headroom, " +
       "loss pots and estimated tax. One portfolio, or all grouped by holder. Not tax advice.",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       year: z.number().int().min(2000).max(2100).optional(),
       holderId,
     }),
-    handler: ({ portfolioId: id, year, holderId: h }) =>
-      id ? client.getPortfolioTax(id, year) : client.getNetworthTax(year, h),
+    handler: async ({ portfolioId: id, year, holderId: h }) => {
+      if (id) return client.getPortfolioTax(id, year);
+      // Holder names are personal data: keep the id and the tax parameters only.
+      const holders = await client.getNetworthTax(year, h);
+      return holders.map(({ holder, ...rest }) => ({
+        ...rest,
+        holder: {
+          id: holder.id,
+          taxAllowanceAnnual: holder.taxAllowanceAnnual,
+          capitalGainsTaxRate: holder.capitalGainsTaxRate,
+          churchTax: holder.churchTax,
+          taxResidence: holder.taxResidence,
+        },
+      }));
+    },
   });
 
   add({

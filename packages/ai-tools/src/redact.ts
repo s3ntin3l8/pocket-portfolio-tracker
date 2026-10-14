@@ -25,7 +25,15 @@ export function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEYS.has(key);
 }
 
+/** IBAN-shaped runs (15+ chars, so 12-char ISINs survive) inside free text, spaced or not. */
+const IBAN_IN_TEXT = /\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]){11,30}\b/g;
+
+export function scrubText(s: string): string {
+  return s.replace(IBAN_IN_TEXT, "[iban]");
+}
+
 export function stripSensitive<T>(value: T): T {
+  if (typeof value === "string") return scrubText(value) as T;
   if (Array.isArray(value)) return value.map((v) => stripSensitive(v)) as T;
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};

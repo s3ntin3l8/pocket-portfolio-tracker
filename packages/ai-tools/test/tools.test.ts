@@ -70,7 +70,9 @@ const calls: string[] = [];
 const rec =
   <T>(name: string, value: T) =>
   async (...args: unknown[]) => {
-    calls.push(`${name}(${args.map((a) => JSON.stringify(a)).join(",")})`);
+    calls.push(
+      `${name}(${args.map((a) => (a === undefined ? "undefined" : JSON.stringify(a))).join(",")})`,
+    );
     return value;
   };
 
@@ -78,10 +80,11 @@ const client = {
   listPortfolios: rec("listPortfolios", [
     {
       id: "p1",
-      name: "Depot",
+      name: "Depot DE89 3704 0044 0532 0130 00",
+      accountHolderId: "h1",
       baseCurrency: "EUR",
       brokerage: "X",
-      accountHolder: "A",
+      accountHolder: "Max Mustermann",
       portfolioType: "standard",
       cashCounted: false,
       ...leaky,
@@ -108,7 +111,7 @@ const client = {
         price: "1",
         fees: "0",
         currency: "EUR",
-        description: null,
+        description: "SEPA DE89370400440532013000 Max Mustermann",
         executedAt: "2026-01-01",
         ...leaky,
       },
@@ -125,7 +128,20 @@ const client = {
   getPortfolioContributions: rec("getPortfolioContributions", { net: "1", ...leaky }),
   getContributions: rec("getContributions", { net: "2", ...leaky }),
   getPortfolioTax: rec("getPortfolioTax", { year: 2026, ...leaky }),
-  getNetworthTax: rec("getNetworthTax", [{ holder: "h", ...leaky }]),
+  getNetworthTax: rec("getNetworthTax", [
+    {
+      holder: {
+        id: "h1",
+        name: "Max Mustermann",
+        taxAllowanceAnnual: "1000",
+        capitalGainsTaxRate: null,
+        churchTax: null,
+        taxResidence: "DE",
+      },
+      year: 2025,
+      ...leaky,
+    },
+  ]),
   getPortfolioTargets: rec("getPortfolioTargets", [{ key: "equity", weight: 60 }]),
   getNetworthTargets: rec("getNetworthTargets", [{ key: "equity", weight: 70 }]),
   getInsights: rec("getInsights", { drawdown: {}, ...leaky }),
@@ -155,7 +171,8 @@ const inputs: Record<string, unknown> = {
   get_performance: { portfolioId: "p1" },
   get_income: { portfolioId: "p1" },
   get_contributions: {},
-  get_tax_summary: { portfolioId: "p1", year: 2025 },
+  get_tax_summary: { year: 2025 },
+  "get_tax_summary#portfolio": { portfolioId: "p1", year: 2025 },
   get_rebalancing: { dimension: "asset_class" },
   get_insights: {},
   lookup_instrument: { q: "abc" },
@@ -173,17 +190,92 @@ function keysDeep(v: unknown, acc: string[] = []): string[] {
 
 describe("ai-tools", () => {
   it("exposes the documented read-only tool set", () => {
-    expect(tools.map((t) => t.name).sort()).toEqual(Object.keys(inputs).sort());
+    expect(tools.map((t) => t.name).sort()).toEqual(
+      Object.keys(inputs)
+        .filter((n) => !n.includes("#"))
+        .sort(),
+    );
     for (const t of tools) expect(t.description.length).toBeGreaterThan(20);
   });
 
   it.each(Object.keys(inputs))("%s never leaks a sensitive key", async (name) => {
-    const t = byName(name);
+    const t = byName(name.split("#")[0]!);
     const out = await t.handler(t.inputSchema.parse(inputs[name]));
     const bad = keysDeep(out).filter(isSensitiveKey);
     expect(bad).toEqual([]);
     expect(JSON.stringify(out)).not.toContain("DE00-SECRET");
-    expect(JSON.stringify(out)).not.toContain("DE89370400440532013000");
+    const json = JSON.stringify(out);
+    expect(json).not.toContain("DE89370400440532013000");
+    expect(json).not.toContain("DE89 3704");
+    expect(json).not.toContain("Mustermann");
+  });
+
+  it("list_portfolios exposes the holder id, never the holder name", async () => {
+    const out = (await byName("list_portfolios").handler({})) as Record<string, unknown>[];
+    expect(out[0]).toMatchObject({ accountHolderId: "h1" });
+    expect(out[0]).not.toHaveProperty("accountHolder");
+    expect(out[0]!.name).toBe("Depot [iban]");
+  });
+
+  it("tax summary across holders keeps tax parameters but drops the holder name", async () => {
+    const out = (await byName("get_tax_summary").handler({ year: 2025 })) as {
+      holder: Record<string, unknown>;
+    }[];
+    expect(out[0]!.holder).toEqual({
+      id: "h1",
+      taxAllowanceAnnual: "1000",
+      capitalGainsTaxRate: null,
+      churchTax: null,
+      taxResidence: "DE",
+    });
+  });
+
+  it("passes positional arguments to the client in the right order", async () => {
+    calls.length = 0;
+    const t = byName("search_transactions");
+    await t.handler(
+      t.inputSchema.parse({
+        portfolioId: "p1",
+        type: "buy",
+        year: "2025",
+        q: "x",
+        instrumentId: "i1",
+        page: 2,
+        pageSize: 10,
+      }),
+    );
+    await t.handler(
+      t.inputSchema.parse({
+        type: "buy",
+        year: "2025",
+        q: "x",
+        instrumentId: "i1",
+        page: 2,
+        pageSize: 10,
+      }),
+    );
+    await byName("get_tax_summary").handler({ year: 2025, holderId: "h1" });
+    expect(calls).toEqual([
+      'listTransactionsPaginated("p1",2,10,undefined,"buy","2025","x","i1")',
+      'listNetworthTransactionsPaginated(2,10,"buy","2025","x","i1")',
+      'getNetworthTax(2025,"h1")',
+    ]);
+  });
+
+  it("portfolio summary merges XIRR from the performance endpoint", async () => {
+    const out = (await byName("get_portfolio_summary").handler({ portfolioId: "p1" })) as Record<
+      string,
+      unknown
+    >;
+    expect(out.xirr).toBe(0.05);
+    expect(out.netWorth).toBe("1750");
+  });
+
+  it("holdings can be scoped to a holder", async () => {
+    calls.length = 0;
+    const t = byName("get_holdings");
+    await t.handler(t.inputSchema.parse({ holderId: "h1" }));
+    expect(calls).toEqual(['getNetWorth(undefined,"h1")']);
   });
 
   it("net worth forwards gain, fx exclusions and at-cost counts; drops the holdings array", async () => {
@@ -270,6 +362,12 @@ describe("redact / compact helpers", () => {
     const out = stripSensitive(input);
     expect(out).toEqual({ a: [{ ok: 1, n: { ok: 2 } }] });
     expect(input.email).toBe("e");
+  });
+
+  it("scrubText redacts IBAN-shaped runs in free text only", () => {
+    expect(stripSensitive("pay DE89370400440532013000 now")).toBe("pay [iban] now");
+    expect(stripSensitive("GB29 NWBK 6016 1331 9268 19")).toBe("[iban]");
+    expect(stripSensitive("ISIN US0378331005 ok")).toBe("ISIN US0378331005 ok");
   });
 
   it("downsample passes short series through untouched", () => {

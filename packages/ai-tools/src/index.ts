@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AiTool } from "./types.js";
 
 export { createTools } from "./tools.js";
-export { stripSensitive, isSensitiveKey } from "./redact.js";
+export { stripSensitive, isSensitiveKey, scrubText } from "./redact.js";
 export { GLOSSARY } from "./glossary.js";
 export type { AiTool } from "./types.js";
 
