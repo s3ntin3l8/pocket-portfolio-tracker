@@ -24,6 +24,8 @@ import { useBatchGroups } from "./import-history/batch";
 import { RowActions, DesktopRow, MobileRow } from "./import-history/rows";
 import { SelectionBar } from "./import-history/selection-bar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InfoTip } from "@/components/ui/tooltip";
+import { selectAllState } from "@/lib/select-all-state";
 
 /**
  * The user's import history with per-row actions: discard a draft, or undo a
@@ -98,7 +100,7 @@ export function ImportHistory({
     consumeLongPress,
     discardedIds,
     confirmedCount,
-    allSelected,
+    selectState,
     selectedConfirmedTx,
     exitSelection,
     toggleOne,
@@ -181,20 +183,21 @@ export function ImportHistory({
                     <Checkbox
                       className="size-4"
                       aria-label={t("selectAll")}
-                      checked={allSelected}
+                      checked={selectState}
                       onCheckedChange={() => toggleAllVisible()}
                     />
                   ) : (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="touch-target relative size-6"
-                      title={t("selectRows")}
-                      aria-label={t("selectRows")}
-                      onClick={() => setSelectionMode(true)}
-                    >
-                      <ListChecks className="size-4" />
-                    </Button>
+                    <InfoTip label={t("selectRows")}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="touch-target relative size-6"
+                        aria-label={t("selectRows")}
+                        onClick={() => setSelectionMode(true)}
+                      >
+                        <ListChecks className="size-4" />
+                      </Button>
+                    </InfoTip>
                   )}
                 </TableCell>
                 <TableCell className="h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground">
@@ -247,7 +250,8 @@ export function ImportHistory({
               )}
               {batchGroups.map((group) => {
                 const groupIds = group.rows.map((r) => r.id);
-                const allInGroupSelected = groupIds.every((id) => selected.has(id));
+                const groupSelectState = selectAllState(groupIds, selected);
+                const allInGroupSelected = groupSelectState === true;
                 return [
                   <TableRow key={`batch-${group.batchId}`} className="bg-muted/40">
                     <TableCell className="w-16">
@@ -255,7 +259,7 @@ export function ImportHistory({
                         <Checkbox
                           className="size-4"
                           aria-label={t("selectBatch")}
-                          checked={allInGroupSelected}
+                          checked={groupSelectState}
                           onCheckedChange={() => setMany(groupIds, !allInGroupSelected)}
                         />
                       )}

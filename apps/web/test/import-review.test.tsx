@@ -100,6 +100,21 @@ describe("ImportReview", () => {
     expect(onRemoveMany).toHaveBeenCalledWith(["a", "b", "c"]);
   });
 
+  it("shows the select-all checkbox as mixed when only some drafts are selected", () => {
+    renderReview();
+    const selectAll = screen.getByLabelText(tr.selectAll);
+    expect(selectAll).toHaveAttribute("aria-checked", "false");
+    const table = screen.getByRole("table");
+    // [select-all, a, b, c] — select one draft.
+    fireEvent.click(within(table).getAllByRole("checkbox")[1]);
+    expect(selectAll).toHaveAttribute("aria-checked", "mixed");
+    // Clicking the mixed header selects every visible draft.
+    fireEvent.click(selectAll);
+    expect(selectAll).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(selectAll);
+    expect(selectAll).toHaveAttribute("aria-checked", "false");
+  });
+
   it("keeps a selection on the right draft after the array reindexes", () => {
     const { rerender } = renderReview();
     const table = screen.getByRole("table");

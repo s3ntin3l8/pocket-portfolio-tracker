@@ -30,9 +30,9 @@ describe("PreferenceChips", () => {
         ]}
       />,
     );
-    expect(screen.getByRole("button", { name: "Germany" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Indonesia" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("radio", { name: "Germany" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Indonesia" })).toHaveAttribute(
+      "aria-checked",
       "false",
     );
   });
@@ -48,7 +48,7 @@ describe("PreferenceChips", () => {
         ]}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Indonesia" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Indonesia" }));
     await waitFor(() => expect(putPreferences).toHaveBeenCalledWith({ taxRegime: "ID" }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
@@ -64,7 +64,7 @@ describe("PreferenceChips", () => {
         ]}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Total paid" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Total paid" }));
     await waitFor(() =>
       expect(putPreferences).toHaveBeenCalledWith({ costBasisMode: "total_paid" }),
     );
@@ -81,7 +81,7 @@ describe("PreferenceChips", () => {
         ]}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Germany" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Germany" }));
     expect(putPreferences).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
   });

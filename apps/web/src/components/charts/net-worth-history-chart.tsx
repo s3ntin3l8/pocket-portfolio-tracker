@@ -15,6 +15,7 @@ import {
   PriceChartSsr as PriceChart,
 } from "@/components/charts/lazy";
 import { RangeToggle, type ChartRange } from "@/components/charts/range-toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EmptyState } from "@/components/empty-state";
 import { useApiClient } from "@/lib/api";
 import { DEFAULT_HERO_RANGE, HERO_RANGES, RANGE_PARAM } from "@/lib/chart-range";
@@ -254,29 +255,28 @@ export function NetWorthHistoryChart({
     <div className="space-y-3" aria-busy={loading}>
       <div className="flex items-center justify-between gap-2">
         {/* Mode toggle */}
-        <div
-          className="flex rounded-md border border-border overflow-hidden text-xs"
-          role="group"
+        <ToggleGroup
+          value={effectiveMode}
+          onValueChange={setMode}
           aria-label={t("modeLabel")}
+          className="overflow-hidden rounded-md border border-border text-xs"
         >
           {(["performance", "value"] as ChartMode[]).map((m) => (
-            <button
+            <ToggleGroupItem
               key={m}
-              type="button"
-              onClick={() => setMode(m)}
+              value={m}
               disabled={intraday && m === "performance"}
-              aria-pressed={effectiveMode === m}
               className={cn(
-                "px-3 py-1 font-medium transition-colors disabled:opacity-50",
+                "px-3 py-1 font-medium",
                 effectiveMode === m
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent",
               )}
             >
               {t(m === "performance" ? "modePerformance" : "modeValue")}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
         <RangeToggle value={range} onChange={pick} />
       </div>
       {intraday && data.length < 2 ? (

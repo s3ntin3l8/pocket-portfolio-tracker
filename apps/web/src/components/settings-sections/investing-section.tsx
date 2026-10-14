@@ -25,6 +25,7 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
             <PreferenceChips
               variant="wide"
               prefKey="taxRegime"
+              aria-label={t("investingTaxLabel")}
               current={taxRegime}
               options={[
                 { value: "DE", label: t("taxCodeGermany") },
@@ -40,6 +41,7 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
             <PreferenceChips
               variant="wide"
               prefKey="costBasisMode"
+              aria-label={t("investingCostBasisLabel")}
               current={costBasisMode}
               options={[
                 { value: "purchase_price", label: t("costBasisPurchasePrice") },

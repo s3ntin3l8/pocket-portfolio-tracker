@@ -642,6 +642,38 @@ describe("ImportHistory", () => {
     expect(new Set(bulkDeleteImports.mock.calls[0][0])).toEqual(new Set(["b-a", "b-b"]));
   });
 
+  it("shows header and batch checkboxes as mixed for a partial selection", () => {
+    const mk = (id: string, batchId: string | null): ImportRecord => ({
+      id,
+      portfolioId: "p1",
+      parser: "dkb",
+      status: "draft",
+      confidence: null,
+      count: 1,
+      createdAt: "2026-06-10T10:00:00.000Z",
+      batchId,
+      document: null,
+      originalFilename: `${id}.pdf`,
+    });
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImportHistory items={[mk("b-a", "batch-1"), mk("b-b", "batch-1"), mk("solo", null)]} />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(desktop().getByRole("button", { name: m.selectRows }));
+    const header = desktop().getByLabelText(m.selectAll);
+    const batch = desktop().getByLabelText(m.selectBatch);
+    // Select one of the two batch rows via its own checkbox.
+    const rowBoxes = desktop().getAllByRole("checkbox");
+    const first = rowBoxes.find((b) => b !== header && b !== batch)!;
+    fireEvent.click(first);
+    expect(header).toHaveAttribute("aria-checked", "mixed");
+    // Clicking a mixed header selects everything visible.
+    fireEvent.click(header);
+    expect(header).toHaveAttribute("aria-checked", "true");
+    expect(batch).toHaveAttribute("aria-checked", "true");
+  });
+
   // -------------------------------------------------------------------------
   // Reference-fidelity redesign: icon+filename column, mobile compact cards,
   // long-press-to-select.

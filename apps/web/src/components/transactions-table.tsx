@@ -30,6 +30,7 @@ import type { SelectionEntry } from "./transactions-table/bulk";
 import { useBatchActions } from "./transactions-table/batch-actions";
 import { ReassignMergeDialogs } from "./transactions-table/reassign-merge";
 import { DesktopTable } from "./transactions-table/desktop";
+import { selectAllState } from "@/lib/select-all-state";
 import { MobileView } from "./transactions-table/mobile";
 import { LoadMoreSection } from "./transactions-table/load-more";
 import {
@@ -243,7 +244,11 @@ export function TransactionsTable({
     [locale],
   );
 
-  const allSelected = visibleRows.length > 0 && visibleRows.every((r) => selected.has(r.id));
+  const selectState = selectAllState(
+    visibleRows.map((r) => r.id),
+    selected,
+  );
+  const allSelected = selectState === true;
 
   function toggle(id: string) {
     const next = new Set(selected);
@@ -520,7 +525,7 @@ export function TransactionsTable({
                 onRowActivate={onRowActivate}
                 onToggle={toggle}
                 onToggleAll={toggleAll}
-                allSelected={allSelected}
+                selectState={selectState}
                 onEnterSelectionMode={() => setSelectionMode(true)}
                 hasActiveFilter={hasActiveFilter}
                 showEmpty={showEmpty}

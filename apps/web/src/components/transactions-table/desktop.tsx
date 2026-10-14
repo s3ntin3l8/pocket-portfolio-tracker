@@ -44,7 +44,7 @@ export function DesktopTable({
   onRowActivate,
   onToggle,
   onToggleAll,
-  allSelected,
+  selectState,
   onEnterSelectionMode,
   hasActiveFilter,
   showEmpty,
@@ -69,7 +69,8 @@ export function DesktopTable({
   onRowActivate: (tx: TxRow) => void;
   onToggle: (id: string) => void;
   onToggleAll: () => void;
-  allSelected: boolean;
+  /** Header checkbox state: `"indeterminate"` when only some visible rows are selected. */
+  selectState: boolean | "indeterminate";
   onEnterSelectionMode: () => void;
   hasActiveFilter: boolean;
   showEmpty: boolean;
@@ -96,20 +97,21 @@ export function DesktopTable({
                 <Checkbox
                   className="size-4"
                   aria-label={tb("selectAll")}
-                  checked={allSelected}
+                  checked={selectState}
                   onCheckedChange={() => onToggleAll()}
                 />
               ) : (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-6"
-                  title={tb("selectRows")}
-                  aria-label={tb("selectRows")}
-                  onClick={onEnterSelectionMode}
-                >
-                  <ListChecks className="size-4" />
-                </Button>
+                <InfoTip label={tb("selectRows")}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6"
+                    aria-label={tb("selectRows")}
+                    onClick={onEnterSelectionMode}
+                  >
+                    <ListChecks className="size-4" />
+                  </Button>
+                </InfoTip>
               )}
             </TableHead>
             <SortableTableHead

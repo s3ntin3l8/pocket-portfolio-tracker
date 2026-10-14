@@ -48,12 +48,12 @@ describe("InvestingSection", () => {
   it("defaults to German / purchase_price chips active when no prefs row exists", async () => {
     const element = await InvestingSection({ prefs: null });
     renderWithIntl(element as React.ReactElement);
-    expect(screen.getByRole("button", { name: "Settings.taxCodeGermany" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("radio", { name: "Settings.taxCodeGermany" })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
-    expect(screen.getByRole("button", { name: "Settings.costBasisPurchasePrice" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("radio", { name: "Settings.costBasisPurchasePrice" })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
     expect(screen.getByText("Settings.investingTaxNoteDe")).toBeInTheDocument();
@@ -73,13 +73,13 @@ describe("InvestingSection", () => {
       },
     });
     renderWithIntl(element as React.ReactElement);
-    expect(screen.getByRole("button", { name: "Settings.taxCodeIndonesia" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("radio", { name: "Settings.taxCodeIndonesia" })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
     expect(screen.getByText("Settings.investingTaxNoteId")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Settings.costBasisPurchasePrice" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Settings.costBasisPurchasePrice" }));
     await waitFor(() =>
       expect(putPreferences).toHaveBeenCalledWith({ costBasisMode: "purchase_price" }),
     );

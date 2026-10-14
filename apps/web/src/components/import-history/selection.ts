@@ -5,6 +5,7 @@ import { useLongPressSelect } from "@/lib/use-long-press-select";
 import { haptics } from "@/lib/haptics";
 import type { ImportRecord } from "@portfolio/api-client";
 import type { ApiClient } from "@portfolio/api-client";
+import { selectAllState } from "@/lib/select-all-state";
 import { isDeadSyncAnchor } from "./utils";
 
 export function useImportSelection(
@@ -33,7 +34,11 @@ export function useImportSelection(
     [allItems],
   );
 
-  const allSelected = visibleItems.length > 0 && visibleItems.every((i) => selected.has(i.id));
+  const selectState = selectAllState(
+    visibleItems.map((i) => i.id),
+    selected,
+  );
+  const allSelected = selectState === true;
 
   const selectedItems = useMemo(
     () => visibleItems.filter((i) => selected.has(i.id)),
@@ -126,7 +131,7 @@ export function useImportSelection(
     consumeLongPress,
     discardedIds,
     confirmedCount,
-    allSelected,
+    selectState,
     selectedItems,
     selectedConfirmedTx,
     exitSelection,

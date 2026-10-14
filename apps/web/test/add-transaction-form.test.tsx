@@ -78,7 +78,7 @@ const EDIT_INITIAL = {
 // ---------------------------------------------------------------------------
 
 function selectBucket(label: string) {
-  fireEvent.click(screen.getByRole("button", { name: label }));
+  fireEvent.click(screen.getByRole("radio", { name: label }));
 }
 
 function selectSubType(label: string) {
@@ -647,7 +647,7 @@ describe("AddTransactionForm", () => {
       messages.Manage.tx.bucketTransfer,
       messages.Manage.tx.bucketCash,
     ]) {
-      expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("radio", { name: label })).toHaveAttribute("aria-checked", "false");
     }
     expect(screen.getByLabelText(m.quantity)).toBeInTheDocument();
     expect(screen.getByLabelText(m.price)).toBeInTheDocument();
@@ -876,7 +876,7 @@ describe("AddTransactionForm", () => {
           <AddTransactionForm client={none} portfolioId="p1" />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(screen.getByRole("radio", { name: m.bucketCash }));
       await waitFor(() => expect(none.listLoans).toHaveBeenCalledWith("p1"));
       expect(screen.queryByRole("button", { name: messages.TxType.loan_repayment })).toBeNull();
       unmount();
@@ -887,7 +887,7 @@ describe("AddTransactionForm", () => {
           <AddTransactionForm client={some} portfolioId="p1" />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(screen.getByRole("radio", { name: m.bucketCash }));
       expect(
         await screen.findByRole("button", { name: messages.TxType.loan_repayment }),
       ).toBeInTheDocument();
@@ -901,7 +901,7 @@ describe("AddTransactionForm", () => {
           <AddTransactionForm client={client} portfolioId="p1" onSuccess={onSuccess} />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(screen.getByRole("radio", { name: m.bucketCash }));
       fireEvent.click(await screen.findByRole("button", { name: messages.TxType.loan_repayment }));
       fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
         target: { value: "2026-02-10" },
@@ -946,7 +946,7 @@ describe("AddTransactionForm", () => {
           <AddTransactionForm client={client} portfolioId="p1" />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(screen.getByRole("radio", { name: m.bucketCash }));
       fireEvent.click(await screen.findByRole("button", { name: messages.TxType.loan_repayment }));
       fireEvent.change(screen.getByLabelText(m.amount), { target: { value: "1000" } });
       fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
@@ -964,7 +964,7 @@ describe("AddTransactionForm", () => {
           <AddTransactionForm client={client} portfolioId="p1" />
         </NextIntlClientProvider>,
       );
-      fireEvent.click(screen.getByRole("button", { name: m.bucketCash }));
+      fireEvent.click(screen.getByRole("radio", { name: m.bucketCash }));
       fireEvent.click(await screen.findByRole("button", { name: messages.TxType.loan_repayment }));
       fireEvent.change(screen.getByLabelText(m.amount), { target: { value: "1000" } });
       fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
