@@ -1,0 +1,29 @@
+{
+  "name": "@portfolio/ai-tools",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "description": "Transport-neutral, read-only portfolio tools for AI assistants (MCP server + in-app chat)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@portfolio/api-client": "*",
+    "zod": "^4.6.5"
+  }
+}
