@@ -74,6 +74,33 @@ export function PortfolioFormBody({
 
   return (
     <>
+      {(f.showTrSection || f.showIbkrSection) && (
+        <div className="mb-[13px] space-y-3">
+          {f.showTrSection && (
+            <TrConnectionSection
+              trConnection={f.trConnection}
+              effectivePortfolio={{ id: f.effectivePortfolio!.id }}
+              cashCounted={f.cashCounted}
+              boundElsewhere={f.boundElsewhere}
+              trInitForFlow={f.trInitForFlow}
+              client={f.api}
+              onRefresh={() => f.router.refresh()}
+              onFetchTrigger={() => f.setTrFetchSeq((s) => s + 1)}
+            />
+          )}
+
+          {f.showIbkrSection && (
+            <IbkrConnectionSection
+              ibkrConnection={f.ibkrConnection}
+              effectivePortfolio={{ id: f.effectivePortfolio!.id }}
+              client={f.api}
+              onRefresh={() => f.router.refresh()}
+              onFetchTrigger={() => f.setIbkrFetchSeq((s) => s + 1)}
+            />
+          )}
+        </div>
+      )}
+
       <form
         id={formId}
         onSubmit={f.submit}
@@ -133,29 +160,6 @@ export function PortfolioFormBody({
           onDocumentRetentionChange={f.setDocumentRetention}
         />
       </form>
-
-      {f.showTrSection && (
-        <TrConnectionSection
-          trConnection={f.trConnection}
-          effectivePortfolio={{ id: f.effectivePortfolio!.id }}
-          cashCounted={f.cashCounted}
-          boundElsewhere={f.boundElsewhere}
-          trInitForFlow={f.trInitForFlow}
-          client={f.api}
-          onRefresh={() => f.router.refresh()}
-          onFetchTrigger={() => f.setTrFetchSeq((s) => s + 1)}
-        />
-      )}
-
-      {f.showIbkrSection && (
-        <IbkrConnectionSection
-          ibkrConnection={f.ibkrConnection}
-          effectivePortfolio={{ id: f.effectivePortfolio!.id }}
-          client={f.api}
-          onRefresh={() => f.router.refresh()}
-          onFetchTrigger={() => f.setIbkrFetchSeq((s) => s + 1)}
-        />
-      )}
 
       {footerEl && createPortal(footerButton, footerEl)}
     </>

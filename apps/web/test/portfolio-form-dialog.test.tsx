@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { AccountHolder, IbkrConnection, Portfolio, TrConnection } from "@portfolio/api-client";
 import messages from "../messages/en.json";
@@ -334,6 +334,37 @@ describe("PortfolioFormDialog", () => {
     await waitFor(() =>
       expect(screen.getByLabelText(messages.TradeRepublic.phone)).toBeInTheDocument(),
     );
+  });
+
+  it("puts the broker connection in a card ABOVE the form, with its state at a glance", async () => {
+    renderEdit({
+      id: "p-tr",
+      name: "TR Portfolio",
+      baseCurrency: "EUR",
+      accountHolderId: null,
+      portfolioType: "standard",
+      brokerage: "Trade Republic",
+      accountNumber: null,
+      iban: null,
+      cashCounted: false,
+      allowNegativeCash: false,
+      documentRetention: false,
+      taxAllowanceAnnual: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.edit }));
+    await waitFor(() =>
+      expect(screen.getByLabelText(messages.TradeRepublic.phone)).toBeInTheDocument(),
+    );
+
+    const card = screen.getByText(m.trSectionTitle).closest("section")!;
+    const save = screen.getByRole("button", { name: m.save });
+    const nameField = screen.getByLabelText(m.name);
+    // The card precedes both the form fields and the Save button in document order — it was
+    // a trailing section after Save, reading as if Save covered it.
+    expect(card.compareDocumentPosition(nameField) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // ...and shows its state without opening anything.
+    expect(within(card).getByText(m.connectionNotConnected)).toBeInTheDocument();
   });
 
   it("does not offer the TR connection for a TR child account (Kinderdepot)", async () => {

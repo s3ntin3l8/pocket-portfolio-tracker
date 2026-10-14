@@ -56,6 +56,33 @@ export function PortfolioEditForm({
         </div>
       )}
 
+      {(f.showTrSection || f.showIbkrSection) && (
+        <div className="space-y-3.5">
+          {f.showTrSection && (
+            <TrConnectionSection
+              trConnection={f.trConnection}
+              effectivePortfolio={{ id: f.effectivePortfolio!.id }}
+              cashCounted={f.cashCounted}
+              boundElsewhere={f.boundElsewhere}
+              trInitForFlow={f.trInitForFlow}
+              client={f.api}
+              onRefresh={() => f.router.refresh()}
+              onFetchTrigger={() => f.setTrFetchSeq((s) => s + 1)}
+            />
+          )}
+
+          {f.showIbkrSection && (
+            <IbkrConnectionSection
+              ibkrConnection={f.ibkrConnection}
+              effectivePortfolio={{ id: f.effectivePortfolio!.id }}
+              client={f.api}
+              onRefresh={() => f.router.refresh()}
+              onFetchTrigger={() => f.setIbkrFetchSeq((s) => s + 1)}
+            />
+          )}
+        </div>
+      )}
+
       <form onSubmit={f.submit} className="space-y-3.5">
         <PortfolioFormSections
           name={f.name}
@@ -151,29 +178,6 @@ export function PortfolioEditForm({
           )}
         </div>
       </form>
-
-      {f.showTrSection && (
-        <TrConnectionSection
-          trConnection={f.trConnection}
-          effectivePortfolio={{ id: f.effectivePortfolio!.id }}
-          cashCounted={f.cashCounted}
-          boundElsewhere={f.boundElsewhere}
-          trInitForFlow={f.trInitForFlow}
-          client={f.api}
-          onRefresh={() => f.router.refresh()}
-          onFetchTrigger={() => f.setTrFetchSeq((s) => s + 1)}
-        />
-      )}
-
-      {f.showIbkrSection && (
-        <IbkrConnectionSection
-          ibkrConnection={f.ibkrConnection}
-          effectivePortfolio={{ id: f.effectivePortfolio!.id }}
-          client={f.api}
-          onRefresh={() => f.router.refresh()}
-          onFetchTrigger={() => f.setIbkrFetchSeq((s) => s + 1)}
-        />
-      )}
     </div>
   );
 }
