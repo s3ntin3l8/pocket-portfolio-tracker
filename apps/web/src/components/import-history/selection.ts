@@ -131,7 +131,6 @@ export function useImportSelection(
     consumeLongPress,
     discardedIds,
     confirmedCount,
-    allSelected,
     selectState,
     selectedItems,
     selectedConfirmedTx,
