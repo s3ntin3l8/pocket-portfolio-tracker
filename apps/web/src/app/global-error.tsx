@@ -33,8 +33,9 @@ export default function GlobalError({
     // read: React adopts this component's own <html lang> onto the live document on commit.
     const urlLocale = window.location.pathname.split("/")[1]?.toLowerCase();
     const preferred = urlLocale === "id" || urlLocale === "en" ? urlLocale : navigator.language;
+    // "in" is the legacy ISO 639-1 code some browsers still report for Indonesian.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- post-hydration locale pick (first paint stays English so hydration matches)
-    setLang(preferred.toLowerCase().startsWith("id") ? "id" : "en");
+    setLang(/^(id|in)\b/.test(preferred.toLowerCase()) ? "id" : "en");
   }, [error]);
 
   const t = COPY[lang];
