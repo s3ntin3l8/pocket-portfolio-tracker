@@ -416,13 +416,19 @@ describe("loan routes (skip / payoff)", () => {
 
     it("rejects an installment already covered, a closed loan, an unknown n and a currency mismatch", async () => {
       const id = await mkLoan();
-      expect((await post(manual(id, { installmentN: 1 }))).json()).toEqual({
+      const paid = await post(manual(id, { installmentN: 1 }));
+      expect(paid.statusCode).toBe(409);
+      expect(paid.json()).toEqual({
         error: "installment_already_paid",
       });
-      expect((await post(manual(id, { installmentN: 9 }))).json()).toEqual({
+      const unknown = await post(manual(id, { installmentN: 9 }));
+      expect(unknown.statusCode).toBe(404);
+      expect(unknown.json()).toEqual({
         error: "installment_not_found",
       });
-      expect((await post(manual(id, { installmentN: 2, currency: "EUR" }))).json()).toEqual({
+      const currency = await post(manual(id, { installmentN: 2, currency: "EUR" }));
+      expect(currency.statusCode).toBe(400);
+      expect(currency.json()).toEqual({
         error: "currency_mismatch",
       });
       await app.inject({
