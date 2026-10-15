@@ -45,10 +45,14 @@ cash** with live IDX prices and a real-time gold ticker.
   the deployed `api`+`web` stack, pull-only — both images come from GHCR rather than
   being built on the deploy host; `make prod-build` is the escape hatch for testing
   unmerged changes locally), so a bare `docker compose` in the repo root can never
-  see or touch a live deployment. Always invoke the prod stack via `-f
-docker-compose.prod.yml --env-file .env.prod` (or `make prod`/`prod-build`/`prod-down`/
-  `prod-logs`/`prod-ps`) — never add a `name:` to either compose file without checking
-  both together.
+  see or touch a live deployment. `docker-compose.prod.yml` is host-agnostic (no ingress);
+  the per-host Traefik labels / `proxy` network (and the optional public `/mcp` router) live in a
+  **gitignored** `docker-compose.prod.override.yml` (template:
+  `docker-compose.prod.override.example.yml`) that the Makefile layers on — `make prod` refuses
+  to run without it unless `FORCE=1`. Always invoke the prod stack via `-f docker-compose.prod.yml
+-f docker-compose.prod.override.yml --env-file .env.prod` (or `make prod`/`prod-build`/`prod-down`/
+  `prod-logs`/`prod-ps`) — never add a `name:` to any compose file (the override included) without
+  checking them together.
 
 ## Commands
 

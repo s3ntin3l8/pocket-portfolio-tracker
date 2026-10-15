@@ -17,7 +17,7 @@
 #     anything.
 #
 #  3. HTTP (80) redirects to HTTPS (443); TLS via the `cloudflare` DNS-01 resolver (same
-#     name docker-compose.prod.yml's web router references) — no inbound port needs to be
+#     name docker-compose.prod.override.example.yml's web router references) — no inbound port needs to be
 #     opened for an HTTP-01 challenge, and no port needs to be reachable before DNS
 #     propagates.
 #
@@ -32,7 +32,7 @@
 #     backstop — explicitly NOT a replacement for the app's own header/CSP work
 #     (next.config.mjs's `headers()`). Either layer alone should still hold if the other
 #     drifts; attach it to app routers via `traefik.http.routers.<name>.middlewares=
-#     secure-headers@docker` (see docker-compose.prod.yml's commented-out example).
+#     secure-headers@docker` (see docker-compose.prod.override.example.yml's commented-out example).
 #
 #  6. The dashboard is gated behind basicauth on its own host rule, not left on
 #     `api.insecure=true` (which serves it unauthenticated on every entrypoint).
@@ -83,7 +83,7 @@ services:
       - traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth
       - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_HTPASSWD}
       # Baseline security-headers middleware, reusable by any app router (see point 5
-      # above) — this is what docker-compose.prod.yml's commented-out
+      # above) — this is what docker-compose.prod.override.example.yml's commented-out
       # `secure-headers@docker` label refers to.
       - traefik.http.middlewares.secure-headers.headers.stsSeconds=63072000
       - traefik.http.middlewares.secure-headers.headers.stsIncludeSubdomains=true

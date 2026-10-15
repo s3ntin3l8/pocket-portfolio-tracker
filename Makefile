@@ -7,12 +7,26 @@
 # share a project — see the header comments in each file for why. Kept as variables here
 # so all three prod targets stay in lockstep instead of repeating the flags.
 COMPOSE_DEV := docker compose -f docker-compose.yml
-COMPOSE_PROD := docker compose -f docker-compose.prod.yml --env-file .env.prod
+# docker-compose.prod.yml is host-agnostic (no ingress). The per-host part — Traefik labels,
+# the external `proxy` network, the optional MCP router — lives in a gitignored
+# docker-compose.prod.override.yml (template: docker-compose.prod.override.example.yml) that
+# is layered on automatically when present. `prod`/`prod-build` refuse to run without it
+# (the site would come up with no ingress) unless FORCE=1.
+PROD_OVERRIDE := docker-compose.prod.override.yml
+PROD_OVERRIDE_FLAG := $(if $(wildcard $(PROD_OVERRIDE)),-f $(PROD_OVERRIDE))
+COMPOSE_PROD := docker compose -f docker-compose.prod.yml $(PROD_OVERRIDE_FLAG) --env-file .env.prod
 # `prod` pulls both images from GHCR (IMAGE_TAG defaults to `edge`); `prod-build`
 # composes the production stack with a tiny override that re-adds local `build:`
 # blocks, for testing an unmerged change on the deploy host without pushing to
 # main. Override file lives at docker-compose.prod.build.yml.
-COMPOSE_PROD_BUILD := docker compose -f docker-compose.prod.yml -f docker-compose.prod.build.yml --env-file .env.prod
+COMPOSE_PROD_BUILD := docker compose -f docker-compose.prod.yml -f docker-compose.prod.build.yml $(PROD_OVERRIDE_FLAG) --env-file .env.prod
+# Shell snippet shared by the two targets that (re)create containers.
+REQUIRE_PROD_OVERRIDE = if [ ! -f $(PROD_OVERRIDE) ] && [ "$(FORCE)" != "1" ]; then \
+		echo "error: $(PROD_OVERRIDE) not found — without it 'web' gets no ingress."; \
+		echo "Copy docker-compose.prod.override.example.yml to $(PROD_OVERRIDE) and adapt it,"; \
+		echo "or re-run with FORCE=1 if you really want the bare stack."; \
+		exit 1; \
+	fi
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -43,7 +57,8 @@ services-down: ## Stop local backing services
 # `pull_policy: always` on both services means `up -d` alone would also pull, but doing
 # it here keeps "did we get the new image?" answerable from exit code without
 # inspecting recreated containers.
-prod: ## Pull images from GHCR and start the production stack (docker-compose.prod.yml; requires .env.prod, see its header comment)
+prod: ## Pull images from GHCR and start the production stack (docker-compose.prod.yml + docker-compose.prod.override.yml; requires .env.prod, see its header comment)
+	@$(REQUIRE_PROD_OVERRIDE)
 	@if [ -z "$$($(COMPOSE_PROD) ps -aq 2>/dev/null)" ]; then \
 		echo "warning: no existing 'pocket-portfolio-tracker' project containers found."; \
 		echo "If you expected this to adopt a running deployment, double-check the project"; \
@@ -55,6 +70,7 @@ prod: ## Pull images from GHCR and start the production stack (docker-compose.pr
 	$(COMPOSE_PROD) up -d
 
 prod-build: ## Build images locally instead of pulling from GHCR (escape hatch for testing unmerged changes on the host)
+	@$(REQUIRE_PROD_OVERRIDE)
 	@if [ -z "$$($(COMPOSE_PROD_BUILD) ps -aq 2>/dev/null)" ]; then \
 		echo "warning: no existing 'pocket-portfolio-tracker' project containers found."; \
 		echo "This will create a fresh stack with empty volumes. Ctrl-C within 5s to abort."; \
