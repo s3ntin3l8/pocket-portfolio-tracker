@@ -99,6 +99,9 @@ export function NetWorthHistoryChart({
   const [mode, setMode] = useState<ChartMode>("performance");
   const [data, setData] = useState<HistoryPoint[]>(initial);
   const [loading, setLoading] = useState(false);
+  // The range `data` was fetched for. `range` flips on click, `data` only once the fetch lands
+  // (and never on a failed one), so the hero emission is gated on the two agreeing.
+  const [dataFor, setDataFor] = useState<ChartRange>(initialRange ?? "1y");
 
   // If the server re-renders with a different range/series (e.g. a non-scope URL change),
   // adopt it. Skipped on mount; chip picks never change `initialRange` (shallow write).
@@ -108,6 +111,7 @@ export function NetWorthHistoryChart({
     seededRange.current = initialRange;
     setRange(initialRange ?? "1y");
     setData(initial);
+    setDataFor(initialRange ?? "1y");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRange]);
 
@@ -131,11 +135,13 @@ export function NetWorthHistoryChart({
     const seq = ++requestSeq.current;
     try {
       const next = await fetchHistory(r);
-      if (seq === requestSeq.current) setData(next);
+      if (seq === requestSeq.current) {
+        setData(next);
+        setDataFor(r);
+      }
     } catch {
       // keep last good series on failed refetch
     } finally {
-      // Keep coupled with `setData(next)` above (same batch): the hero emit effect depends on `loading`.
       if (seq === requestSeq.current) setLoading(false);
     }
   }
@@ -201,17 +207,19 @@ export function NetWorthHistoryChart({
       : null;
 
   useEffect(() => {
-    // Hold the emission while a range fetch is in flight: `range` flips immediately but `data`
-    // is still the old range's series, so emitting now would flash stale values under the new
-    // period label (and tick the hero pills twice). One emission lands once data + range agree.
-    if (!isHero || !heroSeriesSnapshot || loading) return;
+    // Emit only when `data` belongs to `range`: while a fetch is in flight (or after a failed
+    // one) `range` has flipped but `data` is still the old series, and emitting would show
+    // stale values under the new period label (and tick the hero pills twice). `setData` and
+    // `setDataFor` must stay in the same batch. After a failure the hero keeps its previous,
+    // self-consistent snapshot.
+    if (!isHero || !heroSeriesSnapshot || dataFor !== range) return;
     onSeriesChange?.(heroSeriesSnapshot, range);
     // heroSeriesSnapshot is a fresh object on every render; depending on its
     // identity directly would re-fire this effect in a loop with the parent's
     // `onSeriesChange` setter. The snapshot is a pure function of the inputs
     // below, which are referentially stable when they haven't actually changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, range, loading, selectedId, isHero, onSeriesChange]);
+  }, [data, range, dataFor, selectedId, isHero, onSeriesChange]);
 
   const collectingNote = (
     <p
