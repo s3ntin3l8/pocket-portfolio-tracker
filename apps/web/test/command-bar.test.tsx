@@ -34,6 +34,10 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { GlobalSearch } from "../src/components/global-search";
+import { PageCommandsProvider } from "../src/components/page-commands";
+import { HoldingsPageCommands } from "../src/components/holdings/holdings-page-commands";
+import { TaxPageCommands } from "../src/components/tax/tax-page-commands";
+import { TradesPageCommands } from "../src/components/trades-page-commands";
 import { RECENT_PAGES_KEY } from "../src/lib/recent-pages";
 import { isTypingContext, isOverlayOpen } from "../src/lib/shortcuts";
 import { COMMAND_PAGES } from "../src/components/nav-items";
@@ -41,10 +45,14 @@ import { COMMAND_PAGES } from "../src/components/nav-items";
 const s = messages.Search;
 const n = messages.Nav;
 
-function renderBar(props: { isAdmin?: boolean } = {}) {
+function renderBar(props: { isAdmin?: boolean; page?: React.ReactNode } = {}) {
+  const { page, ...rest } = props;
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <GlobalSearch {...props} />
+      <PageCommandsProvider>
+        {page}
+        <GlobalSearch {...rest} />
+      </PageCommandsProvider>
     </NextIntlClientProvider>,
   );
 }
@@ -143,7 +151,7 @@ describe("command bar groups", () => {
   });
 
   it("chart range is offered on Holdings only and replaces the URL", () => {
-    renderBar();
+    renderBar({ page: <HoldingsPageCommands /> });
     openPalette();
     fireEvent.click(screen.getByText(s.rangeTo.replace("{range}", messages.Chart.range["1m"])));
     expect(replace).toHaveBeenCalledWith("/holdings?range=1m");
@@ -151,7 +159,7 @@ describe("command bar groups", () => {
 
   it("the default range keeps a clean URL", () => {
     search = "range=1m";
-    renderBar();
+    renderBar({ page: <HoldingsPageCommands /> });
     openPalette();
     fireEvent.click(screen.getByText(s.rangeTo.replace("{range}", messages.Chart.range["1y"])));
     expect(replace).toHaveBeenCalledWith("/holdings");
@@ -162,6 +170,57 @@ describe("command bar groups", () => {
     renderBar();
     openPalette();
     expect(screen.queryByRole("group", { name: s.groupRange })).not.toBeInTheDocument();
+  });
+
+  describe("page commands", () => {
+    const taxPage = (selected = "2026") => (
+      <TaxPageCommands years={["2026", "2025", "2024"]} selected={selected} currentYear="2026" />
+    );
+
+    it("Tax: lists the other years under the page group and replaces ?year=", () => {
+      pathname = "/tax";
+      renderBar({ page: taxPage() });
+      openPalette();
+      const group = screen.getByRole("group", { name: s.groupPage });
+      expect(within(group).queryByText("Tax year: 2026")).not.toBeInTheDocument();
+      fireEvent.click(within(group).getByText("Tax year: 2025"));
+      expect(replace).toHaveBeenCalledWith("/tax?year=2025");
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("Tax: the current year drops the param and other params survive", () => {
+      pathname = "/tax";
+      search = "year=2025&scope=all";
+      renderBar({ page: taxPage("2025") });
+      openPalette();
+      fireEvent.click(screen.getByText("Tax year: 2026"));
+      expect(replace).toHaveBeenCalledWith("/tax?scope=all");
+    });
+
+    it("page commands are filtered by the query and count toward the empty state", () => {
+      pathname = "/tax";
+      renderBar({ page: taxPage() });
+      openPalette();
+      fireEvent.change(screen.getByPlaceholderText(s.placeholder), { target: { value: "2024" } });
+      expect(screen.getByText("Tax year: 2024")).toBeInTheDocument();
+      expect(screen.queryByText("Tax year: 2025")).not.toBeInTheDocument();
+      expect(screen.queryByText(s.noResults)).not.toBeInTheDocument();
+    });
+
+    it("Trades: switches the cost method with ?method=", () => {
+      pathname = "/trades";
+      renderBar({ page: <TradesPageCommands current="average" /> });
+      openPalette();
+      expect(screen.queryByText(s.methodAverage)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText(s.methodFifo));
+      expect(replace).toHaveBeenCalledWith("/trades?method=fifo");
+    });
+
+    it("no page group when no page registered one", () => {
+      renderBar();
+      openPalette();
+      expect(screen.queryByRole("group", { name: s.groupPage })).not.toBeInTheDocument();
+    });
   });
 
   it("Recent lists previously visited pages except the current one", () => {

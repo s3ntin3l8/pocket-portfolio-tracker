@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
+import { ListFilter } from "lucide-react";
+import { useRegisterPageCommands } from "@/components/page-commands";
 import { useApiClient } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
 import { bannerAnomalies, reconciliationItem, cn, type AnomalyTranslator } from "@/lib/utils";
@@ -39,6 +41,7 @@ import {
   useTransactionBanners,
   useTransactionPagination,
   useFlaggedRows,
+  buildTransactionHref,
 } from "./transactions-table/hooks";
 
 export type { TxRow } from "./transactions-table/types";
@@ -191,6 +194,37 @@ export function TransactionsTable({
   }
 
   const navigateWithParam = useTransactionUrlNav();
+
+  // Command bar: the same drafts toggle the filter chips offer (only when they're shown).
+  const tSearch = useTranslations("Search");
+  useRegisterPageCommands({
+    id: "activity-drafts",
+    heading: tSearch("groupPage"),
+    items:
+      draftFilter === "drafts"
+        ? [
+            {
+              id: "show-all",
+              label: tSearch("showAllTransactions"),
+              icon: ListFilter,
+              run: ({ navigate }) =>
+                navigate(buildTransactionHref(pathname, searchParams.toString(), "status")),
+            },
+          ]
+        : draftCount > 0
+          ? [
+              {
+                id: "show-drafts",
+                label: tSearch("showDrafts"),
+                icon: ListFilter,
+                run: ({ navigate }) =>
+                  navigate(
+                    buildTransactionHref(pathname, searchParams.toString(), "status", "draft"),
+                  ),
+              },
+            ]
+          : [],
+  });
 
   const tBanner = useTranslations("Transactions.banners");
   const activeBannerMode: "all" | "income" | "buy" | "sell" | null =

@@ -14,6 +14,7 @@ import {
   startHoldingsHeroData,
 } from "@/components/holdings/holdings-hero-section";
 import { HoldingsHeroSkeleton } from "@/components/holdings/holdings-hero-skeleton";
+import { HoldingsPageCommands } from "@/components/holdings/holdings-page-commands";
 import { HoldingsAnomalySection } from "@/components/holdings/holdings-anomaly-section";
 import { HoldingsSidebar } from "@/components/holdings/holdings-sidebar";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
@@ -225,6 +226,7 @@ export default async function HoldingsPage({
     <div className="space-y-5">
       {Heading}
       <FxMissingBanner currencies={fxMissing} />
+      <HoldingsPageCommands />
 
       {/* ── Hero chart: full-width above the table; streams in behind a skeleton ── */}
       {summary && (

@@ -42,7 +42,7 @@ import { COMMAND_PAGES } from "@/components/nav-items";
 import { SCOPE_RESET_PARAMS } from "@/components/portfolio-switcher";
 import { ShortcutsHelp } from "@/components/shortcuts-help";
 import { useScopedHref } from "@/components/scope-link";
-import { DEFAULT_HERO_RANGE, HERO_RANGES, RANGE_PARAM } from "@/lib/chart-range";
+import { usePageCommands } from "@/components/page-commands";
 import {
   SCOPE_PARAM,
   formatScopeParam,
@@ -72,7 +72,6 @@ export function GlobalSearch({
 }) {
   const t = useTranslations("Search");
   const tNav = useTranslations("Nav");
-  const tRange = useTranslations("Chart.range");
   const locale = useLocale();
   const client = useApiClient();
   const router = useRouter();
@@ -81,6 +80,7 @@ export function GlobalSearch({
   const scoped = useScopedHref();
   const { resolvedTheme, setTheme } = useTheme();
   const assistant = useAssistant();
+  const pageGroups = usePageCommands();
 
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -227,15 +227,6 @@ export function GlobalSearch({
     }
   }
 
-  function setRange(range: string) {
-    const params = new URLSearchParams(searchParams?.toString() ?? "");
-    if (range === DEFAULT_HERO_RANGE) params.delete(RANGE_PARAM);
-    else params.set(RANGE_PARAM, range);
-    const qs = params.toString();
-    // A server-visible `?range=` — the hero adopts a new `initialRange` on re-render.
-    navigate(qs ? `${pathname}?${qs}` : pathname, { replace: true });
-  }
-
   // Keyboard: Cmd/Ctrl-K always (even from a field); everything else is a plain-page
   // shortcut and is ignored while typing or with any dialog/menu open (see
   // `shouldIgnoreShortcut`). `g` arms a chord: `g h`, `g a`, `g r`, `g i`, `g s`.
@@ -320,13 +311,14 @@ export function GlobalSearch({
     { id: "shortcuts", label: t("actionShortcuts"), icon: CircleHelp, keys: "?" },
   ].filter((a) => matches(a.label, trimmedQuery));
 
-  const onHoldings = pathname === "/holdings";
-  const rangeItems = onHoldings
-    ? HERO_RANGES.map((r) => ({
-        id: r,
-        label: t("rangeTo", { range: tRange(r) }),
-      })).filter((r) => matches(r.label, trimmedQuery))
-    : [];
+  // Page-contributed groups (registered by the current page; see `page-commands.tsx`).
+  const visiblePageGroups = pageGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => matches(`${i.label} ${i.keywords ?? ""}`, trimmedQuery)),
+    }))
+    .filter((g) => g.items.length > 0);
+  const pageCommandCount = visiblePageGroups.reduce((n, g) => n + g.items.length, 0);
 
   const holdersWithMany = scopes.holders.filter(
     (h) => scopes.portfolios.filter((p) => p.accountHolderId === h.id).length >= 2,
@@ -362,7 +354,7 @@ export function GlobalSearch({
     (showAssistant ? 1 : 0) +
     visiblePages.length +
     actions.length +
-    rangeItems.length +
+    pageCommandCount +
     scopeItems.length;
   const anything = commandCount > 0 || hasResults;
 
@@ -483,15 +475,22 @@ export function GlobalSearch({
               </CommandGroup>
             )}
 
-            {rangeItems.length > 0 && (
-              <CommandGroup heading={t("groupRange")}>
-                {rangeItems.map((r) => (
-                  <CommandItem key={r.id} value={`range-${r.id}`} onSelect={() => setRange(r.id)}>
-                    {r.label}
+            {visiblePageGroups.map((g) => (
+              <CommandGroup key={g.id} heading={g.heading}>
+                {g.items.map((item) => (
+                  <CommandItem
+                    key={item.id}
+                    value={`page-command-${g.id}-${item.id}`}
+                    onSelect={() => item.run({ navigate, close: () => handleOpenChange(false) })}
+                  >
+                    {item.icon && (
+                      <item.icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                    )}
+                    {item.label}
                   </CommandItem>
                 ))}
               </CommandGroup>
-            )}
+            ))}
 
             {scopeItems.length > 0 && (
               <CommandGroup heading={t("groupScope")}>

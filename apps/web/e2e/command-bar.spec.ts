@@ -266,6 +266,67 @@ test.describe("Android back (useBackToClose)", () => {
   });
 });
 
+test.describe("contextual page commands (#930)", () => {
+  test("Tax: a year command replaces ?year= and back is sane; absent on Holdings", async ({
+    page,
+  }) => {
+    await gotoReady(page, "/en/holdings");
+    await page.keyboard.press(`${mod}+k`);
+    await expect(palette(page).getByRole("group", { name: "This page" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // A deep link on a past year: the current year is always offered and is the default,
+    // so picking it drops the param.
+    await gotoReady(page, "/en/tax?year=2020");
+    const thisYear = String(new Date().getUTCFullYear());
+    await page.keyboard.press(`${mod}+k`);
+    await palette(page)
+      .getByRole("group", { name: "This page" })
+      .getByRole("option", { name: `Tax year: ${thisYear}` })
+      .click();
+    await expect(palette(page)).toBeHidden();
+    await expect(page).toHaveURL(/\/en\/tax(\?(?!.*year=).*)?$/);
+
+    await page.goBack();
+    await expect(palette(page)).toBeHidden();
+    await expect(page.getByRole("button", { name: "Search" }).first()).toBeVisible();
+  });
+
+  test("Income: a year command sticks in ?year= after the palette closes", async ({ page }) => {
+    await gotoReady(page, "/en/income");
+    await page.keyboard.press(`${mod}+k`);
+    const year = palette(page)
+      .getByRole("option", { name: /^Income year: \d{4}$/ })
+      .first();
+    test.skip((await year.count()) === 0, "demo dataset has income in only one year");
+    const label = (await year.textContent()) ?? "";
+    const picked = label.match(/\d{4}/)![0];
+    await year.click();
+    await expect(palette(page)).toBeHidden();
+    // The palette's back-to-close marker must not undo the write when it pops.
+    await expect(page).toHaveURL(new RegExp(`year=${picked}`));
+    // A fixed wait, on purpose: `expect.poll` would pass on the first match and never see a
+    // later revert from the marker pop, which is exactly what this guards against.
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(new RegExp(`year=${picked}`));
+  });
+
+  test("Activity: the drafts command (a push) leaves the palette closed and back sane", async ({
+    page,
+  }) => {
+    await gotoReady(page, "/en/transactions");
+    await page.keyboard.press(`${mod}+k`);
+    const drafts = palette(page).getByRole("option", { name: "Show drafts only" });
+    test.skip((await drafts.count()) === 0, "demo dataset has no draft transactions");
+    await drafts.click();
+    await expect(palette(page)).toBeHidden();
+    await expect(page).toHaveURL(/status=draft/);
+    await page.goBack();
+    await expect(palette(page)).toBeHidden();
+    await expect(page).not.toHaveURL(/status=draft/);
+  });
+});
+
 test.describe("recent instruments", () => {
   test("a visited instrument shows up (symbol only) in the palette's Recent group", async ({
     page,

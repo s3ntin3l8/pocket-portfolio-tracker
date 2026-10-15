@@ -5,6 +5,7 @@ import messages from "../messages/en.json";
 
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => "/income",
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 let mockSearch = new URLSearchParams();
