@@ -6,6 +6,7 @@ export * from "./instruments.js";
 export * from "./screenshot-imports.js";
 export * from "./connections.js";
 export * from "./admin.js";
+export * from "./assistant.js";
 export * from "./documents.js";
 export * from "./transactions.js";
 export * from "./transaction-sources.js";

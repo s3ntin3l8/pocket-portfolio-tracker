@@ -1383,7 +1383,14 @@
     "dataSourceOn": "Aktif",
     "dataSourceOff": "Nonaktif",
     "installAppIosTitle": "Instal di iOS",
-    "installAppIosHint": "Ketuk Bagikan, lalu \"Add to Home Screen\"."
+    "installAppIosHint": "Ketuk Bagikan, lalu \"Add to Home Screen\".",
+    "assistantLabel": "Asisten",
+    "assistantHistoryLabel": "Simpan percakapan asisten",
+    "assistantHistoryHint": "Nonaktif secara default. Jika aktif, pertanyaan Anda dan jawaban asisten (hanya teks — tanpa data alat) disimpan agar bisa dibuka lagi di perangkat mana pun. Disimpan 90 hari, maksimal 50 percakapan; Anda bisa menghapusnya kapan saja.",
+    "assistantHistoryError": "Tidak dapat memperbarui pengaturan ini. Silakan coba lagi.",
+    "assistantHistoryOffTitle": "Berhenti menyimpan percakapan?",
+    "assistantHistoryOffBody": "Semua percakapan asisten yang tersimpan akan dihapus dari server. Tindakan ini tidak dapat dibatalkan.",
+    "assistantHistoryOffConfirm": "Matikan dan hapus"
   },
   "Holdings": {
     "title": "Kepemilikan",
@@ -2707,6 +2714,16 @@
       "assistant_rate_limited": "Anda telah mencapai batas pertanyaan asisten per jam. Coba lagi nanti.",
       "chat_not_configured": "Asisten belum diatur di server ini.",
       "invalid_request": "Pesan itu tidak dapat dikirim. Coba yang lebih pendek atau mulai obrolan baru."
-    }
+    },
+    "history": "Riwayat",
+    "historyBack": "Kembali ke chat",
+    "historyEmpty": "Belum ada percakapan tersimpan.",
+    "historyLoadError": "Tidak dapat memuat percakapan tersimpan.",
+    "historyOpenError": "Tidak dapat membuka percakapan itu.",
+    "historyDeleteError": "Tidak dapat menghapus percakapan itu.",
+    "historyNote": "Percakapan tersimpan hanya menyimpan teks pertanyaan dan jawaban, selama 90 hari.",
+    "historyOpen": "Buka: {title}",
+    "historyDelete": "Hapus: {title}",
+    "historyFull": "Percakapan ini sudah penuh, sehingga pesan baru tidak disimpan. Mulai chat baru untuk melanjutkan."
   }
 }

@@ -3,29 +3,32 @@
 A chat that answers questions about **your own** portfolio. A model calls the same read-only tools the
 [MCP endpoint](mcp.md) serves (`packages/ai-tools`), in-process and with your own credentials, so per-user scoping,
 redaction (no account numbers/IBANs, no holder names, no memos) and the "model narrates, never computes" rules are
-identical. Nothing is stored: the conversation lives in the client (see [Web UI](#web-ui)).
+identical. **Nothing is stored unless you opt in**: the conversation lives in the client, and only if you turn on
+_Keep assistant conversations_ are the question and answer texts also saved on the server (see
+[Conversation history](#conversation-history-opt-in)).
 
 ## Endpoints
 
-|                         |                                                                                                                                                      |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /assistant/status` | `{ available, provider, label, local }` — `local` is true when the data never leaves your infrastructure (Ollama). Show it before the first message. |
-| `POST /assistant/chat`  | Body `{ messages: [{role: "user"\|"assistant", content}], scope? }`; streams Server-Sent Events.                                                     |
+|                         |                                                                                                                                                                                                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /assistant/status` | `{ available, provider, label, local, saveHistory }` — `saveHistory` is true when you opted in to history (and the credential may write); `local` is true when the data never leaves your infrastructure (Ollama). Show it before the first message. |
+| `POST /assistant/chat`  | Body `{ messages: [{role: "user"\|"assistant", content}], scope?, conversationId? }`; streams Server-Sent Events.                                                                                                                                    |
 
 `scope` has the web's grammar — `all`, `p:<portfolio id>` or `h:<holder id>` — and tells the model what the user is
 looking at so it can pass that id to tools instead of listing portfolios first. Ids must be GUIDs.
 
 ### Events
 
-| event         | data                                                        |
-| ------------- | ----------------------------------------------------------- |
-| `status`      | `{ provider, local }`                                       |
-| `tool_call`   | `{ id, name, input }`                                       |
-| `tool_result` | `{ id, name, ok }`                                          |
-| `delta`       | `{ text }` — a text fragment of the turn being generated    |
-| `message`     | `{ text }` — the turn's complete text; ends the turn        |
-| `error`       | `{ error, status? }` — a short code, never an upstream body |
-| `done`        | `{ rounds }`                                                |
+| event          | data                                                                                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`       | `{ provider, local }`                                                                                                                                                               |
+| `tool_call`    | `{ id, name, input }`                                                                                                                                                               |
+| `tool_result`  | `{ id, name, ok }`                                                                                                                                                                  |
+| `delta`        | `{ text }` — a text fragment of the turn being generated                                                                                                                            |
+| `message`      | `{ text }` — the turn's complete text; ends the turn                                                                                                                                |
+| `conversation` | `{ id, saved }` — history on only: the stored conversation this turn was added to (sent just before `done`); `saved: false` = the conversation is full and this turn was not stored |
+| `error`        | `{ error, status? }` — a short code, never an upstream body                                                                                                                         |
+| `done`         | `{ rounds }`                                                                                                                                                                        |
 
 `delta` events are a live preview: the following `message` carries the same turn's full text and replaces them. A
 turn cut off by `max_tokens` or a refusal still sends its `message` and then an `error`; its tool calls never run (a
@@ -78,6 +81,26 @@ the vision providers page). Only the models are chat-specific:
 
 Provider adapters use plain `fetch` (no SDK), like the vision parsers.
 
+## Conversation history (opt-in)
+
+Off by default (**Settings → Investing → Assistant**, `user_preferences.assistantSaveHistory`). When on, each _completed_
+turn is appended to a stored conversation so it can be reopened on any device (**History** in the panel):
+
+- **What is stored: text only** — the user's message and the assistant's final answer. Tool calls, tool results and
+  provider state are never stored (they can hold derived portfolio figures), and nothing is stored for a turn that
+  failed, was stopped or produced no text. Message text is never written to the logs.
+- **Who:** per user, scoped to the owner; a **read-only token never stores** (storing is a write), even if you opted
+  in. The prompt is still built from the history the client sends — the server never replays stored text on its own,
+  so the redaction rules are unchanged.
+- **Bounds:** 50 conversations per user (the oldest is dropped when a new one starts), 200 messages per conversation
+  (a full conversation stops saving and the stream says `saved: false`), and conversations untouched for 90 days are
+  deleted by the daily sweep (the `gc-staged-receipts` job).
+- **Deleting:** `DELETE /assistant/conversations/:id` and `DELETE /assistant/conversations` (the panel's trash icon).
+  Turning the setting off deletes everything stored, and so does deleting the account.
+- `GET /assistant/conversations` lists `{ id, title, scope, updatedAt, messageCount }`;
+  `GET /assistant/conversations/:id` returns the messages. An unknown or foreign `conversationId` on a chat request
+  just starts a new conversation (the `conversation` event carries the id to use next).
+
 ## Privacy
 
 Tool results (derived figures and holding names — never account numbers, IBANs, holder names or transaction memos)
@@ -104,7 +127,7 @@ The panel (`apps/web/src/components/assistant/`):
 - **Disclosure first:** the header says which provider the figures are sent to, or that data stays on your own
   server (`status.local`), plus the "explanations only" disclaimer.
 - **Conversation lives in memory.** It survives closing and reopening the panel, and is cleared by **New chat** or a
-  reload. History is clipped to the API caps (20 messages × 4000 chars) before sending; only text is sent back, never
+  reload (unless history is on: then **History** reopens it). History is clipped to the API caps (20 messages × 4000 chars) before sending; only text is sent back, never
   tool results.
 - **Scope** is read from the URL's `?scope=` at send time (falling back to the scope the layout rendered for), so the
   model is always told what you are looking at _now_.

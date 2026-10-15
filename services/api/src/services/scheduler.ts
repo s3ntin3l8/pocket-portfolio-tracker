@@ -79,6 +79,7 @@ import {
   runFanOut,
 } from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
+import { purgeExpiredConversations } from "./assistant-history.js";
 import { resetStaleSyncFlags } from "./scheduler/cleanup.js";
 import {
   setActiveBoss,
@@ -393,6 +394,13 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
       app.log.info({ deleted }, "gc-staged-receipts complete");
     } catch (err) {
       app.log.error({ err }, "gc-staged-receipts failed");
+    }
+    // Same daily sweep, failing independently: opt-in assistant conversations past retention.
+    try {
+      const conversations = await purgeExpiredConversations(app.db);
+      app.log.info({ conversations }, "assistant history retention sweep complete");
+    } catch (err) {
+      app.log.error({ err }, "assistant history retention sweep failed");
     }
   });
   await boss.schedule(GC_RECEIPTS_QUEUE, GC_RECEIPTS_CRON);

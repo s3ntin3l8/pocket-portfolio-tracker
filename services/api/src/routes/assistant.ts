@@ -1,9 +1,17 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { createTools, GLOSSARY } from "@portfolio/ai-tools";
 import { createApiClient } from "@portfolio/api-client";
 import { injectFetch } from "../lib/inject-fetch.js";
 import { createWindowLimiter } from "../lib/window-limiter.js";
+import {
+  deleteAllConversations,
+  deleteConversation,
+  getConversation,
+  isHistoryEnabled,
+  listConversations,
+  saveTurn,
+} from "../services/assistant-history.js";
 import { runChat, type ChatEvent } from "../services/chat/loop.js";
 import type { ChatMessage } from "../services/chat/types.js";
 
@@ -29,6 +37,8 @@ const bodySchema = z
       .max(MAX_HISTORY_MESSAGES),
     /** Same grammar as the web's `?scope=`: all | p:<portfolio id> | h:<holder id>. */
     scope: z.string().regex(SCOPE).optional(),
+    /** Append this turn to a stored conversation (only used when history is on). */
+    conversationId: z.string().uuid().optional(),
   })
   .refine((b) => b.messages[0]?.role === "user" && b.messages.at(-1)?.role === "user", {
     message: "conversation must start and end with a user message",
@@ -58,10 +68,12 @@ function systemPrompt(scope: string | undefined): string {
 /**
  * In-app assistant. `POST /assistant/chat` streams Server-Sent Events while a model calls the
  * same read-only tools the MCP endpoint serves (in-process, with the caller's own credentials),
- * so per-user scoping, redaction and rate limits are identical. Nothing is stored.
+ * so per-user scoping, redaction and rate limits are identical. Nothing is stored unless the
+ * user opted in (`assistantSaveHistory`); then only the text of each completed turn is.
  *
- * Events: `status` {provider,local}, `tool_call`, `tool_result`, `message` {text} (one per
- * model turn — not per token), `error` {error,status?}, `done` {rounds}. Failures are short
+ * Events: `status` {provider,local}, `tool_call`, `tool_result`, `delta` {text}, `message` {text}
+ * (one per model turn), `conversation` {id,saved} (history on), `error` {error,status?}, `done`
+ * {rounds}. Failures are short
  * codes; upstream bodies never reach the client.
  *
  * `scope: "read"` — like /mcp it is a POST that only reads, so a read-scoped token may use it
@@ -76,7 +88,11 @@ export async function assistantRoute(app: FastifyInstance) {
     windowMs: 60 * 60 * 1000,
   });
 
-  app.get("/assistant/status", { preHandler: app.authenticate }, async () => {
+  /** Opt-in is the user's preference; a read-scoped token additionally never persists. */
+  const historyOn = async (request: FastifyRequest) =>
+    request.user?.scope === "write" && (await isHistoryEnabled(app.db, request.userId));
+
+  app.get("/assistant/status", { preHandler: app.authenticate }, async (request) => {
     const provider = await app.resolveChatProvider();
     return {
       available: provider !== null,
@@ -84,8 +100,47 @@ export async function assistantRoute(app: FastifyInstance) {
       label: provider?.label ?? null,
       /** True when data never leaves the user's own infrastructure. */
       local: provider?.local ?? false,
+      /** Opted in to keeping conversations, and allowed to (a read-only token never writes). */
+      saveHistory: await historyOn(request),
     };
   });
+
+  // ─── Stored conversations (only exist for users who opted in) ─────────────
+  // Listing and reading are open to any credential of the caller (a read-only token included):
+  // they are the caller's OWN stored conversations. DELETE is a mutating method, so the auth
+  // plugin's default gate already requires a write-scoped credential for it. *Storing* is gated
+  // separately in `historyOn` (write scope + the opt-in).
+  app.get("/assistant/conversations", { preHandler: app.authenticate }, async (request) => ({
+    conversations: await listConversations(app.db, request.userId),
+  }));
+
+  app.get(
+    "/assistant/conversations/:id",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const conv = z.string().uuid().safeParse(id).success
+        ? await getConversation(app.db, request.userId, id)
+        : null;
+      return conv ?? reply.code(404).send({ error: "not_found" });
+    },
+  );
+
+  app.delete(
+    "/assistant/conversations/:id",
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const ok =
+        z.string().uuid().safeParse(id).success &&
+        (await deleteConversation(app.db, request.userId, id));
+      return ok ? reply.code(204).send() : reply.code(404).send({ error: "not_found" });
+    },
+  );
+
+  app.delete("/assistant/conversations", { preHandler: app.authenticate }, async (request) => ({
+    deleted: await deleteAllConversations(app.db, request.userId),
+  }));
 
   app.post(
     "/assistant/chat",
@@ -103,6 +158,8 @@ export async function assistantRoute(app: FastifyInstance) {
       // if that is ever loosened.
       const token = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
       if (!token) return reply.code(401).send({ error: "missing_token" });
+      // Resolved before the stream starts (a failure here just means "don't store").
+      const persist = await historyOn(request).catch(() => false);
       // Counted only once the request is valid and answerable, so 400/503 don't use budget.
       const allowed = limiter.hit(request.userId);
       if (!allowed.ok) {
@@ -152,6 +209,10 @@ export async function assistantRoute(app: FastifyInstance) {
             ? { role: "user", content: m.content }
             : { role: "assistant", text: m.content, toolCalls: [] },
         );
+        // With history on, `done` is held back until the turn has been stored, so the client
+        // learns the conversation id before the stream ends.
+        const answer: string[] = [];
+        let done: ChatEvent | null = null;
         await runChat({
           provider,
           system: systemPrompt(body.data.scope),
@@ -160,10 +221,38 @@ export async function assistantRoute(app: FastifyInstance) {
           signal: abort.signal,
           log: request.log,
           emit: (e: ChatEvent) => {
+            if (e.type === "message") answer.push(e.text);
+            if (e.type === "done" && persist) {
+              done = e;
+              return;
+            }
             const { type, ...data } = e;
             send(type, data);
           },
         });
+        if (done) {
+          const text = answer.join("\n\n").trim();
+          const userText = body.data.messages.at(-1)!.content;
+          if (text && !abort.signal.aborted) {
+            try {
+              const turn = await saveTurn(app.db, request.userId, {
+                conversationId: body.data.conversationId,
+                scope: body.data.scope,
+                user: userText,
+                assistant: text,
+              });
+              if (turn) send("conversation", { id: turn.id, saved: turn.saved });
+            } catch (err) {
+              // Storing is best-effort: the answer was already delivered. Name only, never content.
+              request.log.error(
+                { err: err instanceof Error ? err.name : "unknown" },
+                "assistant history save failed",
+              );
+            }
+          }
+          const { type, ...data } = done as ChatEvent;
+          send(type, data);
+        }
       } catch (err) {
         // Name only: a provider stack/message can echo prompt material, which logs must not hold.
         request.log.error(

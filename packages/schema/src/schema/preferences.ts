@@ -44,5 +44,7 @@ export const userPreferencesSchema = z.object({
   benchmarkSymbols: benchmarkSymbolsSchema.optional(),
   riskFreeRate: z.number().min(0).max(1).nullable().optional(),
   retirementAge: z.number().int().min(50).max(80).nullable().optional(),
+  /** Opt-in: keep assistant conversations server-side. Turning it off deletes them. */
+  assistantSaveHistory: z.boolean().optional(),
 });
 export type UserPreferencesInput = z.infer<typeof userPreferencesSchema>;

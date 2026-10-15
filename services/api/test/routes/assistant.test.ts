@@ -142,6 +142,7 @@ describe("GET /assistant/status", () => {
       provider: "fake",
       label: "Fake model",
       local: true,
+      saveHistory: false,
     });
   });
 });

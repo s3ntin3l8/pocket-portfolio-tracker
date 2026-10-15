@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { PreferenceChips } from "@/components/preference-chips";
 import { BenchmarkSettingsForm } from "@/components/settings-sections/benchmark-settings-form";
+import { AssistantHistoryToggle } from "@/components/settings-sections/assistant-history-toggle";
 import { RetirementAgeForm } from "@/components/settings-sections/retirement-age-form";
 import type { UserPreferences } from "@portfolio/api-client";
 
@@ -76,6 +77,17 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
               symbols={prefs?.benchmarkSymbols ?? []}
               rate={prefs?.riskFreeRate ?? null}
             />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+          {t("assistantLabel")}
+        </p>
+        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="p-4">
+            <AssistantHistoryToggle enabled={prefs?.assistantSaveHistory ?? false} />
           </div>
         </div>
       </div>

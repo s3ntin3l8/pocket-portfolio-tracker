@@ -1,3 +1,4 @@
+import { deleteAllConversations } from "../services/assistant-history.js";
 import type { FastifyInstance } from "fastify";
 import { asc, eq } from "drizzle-orm";
 import { userBenchmarkSymbols, userPreferences } from "@portfolio/db";
@@ -58,6 +59,7 @@ export async function preferencesRoute(app: FastifyInstance) {
           : [{ symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 }],
       riskFreeRate: prefs?.riskFreeRate ? Number(prefs.riskFreeRate) : null,
       retirementAge: prefs?.retirementAge ?? null,
+      assistantSaveHistory: prefs?.assistantSaveHistory ?? false,
     };
   });
 
@@ -87,34 +89,46 @@ export async function preferencesRoute(app: FastifyInstance) {
     // Upsert the user_preferences row (without benchmark_symbol — that column
     // is gone in this PR). benchmarkSymbols live in their own table; we replace
     // the user's set atomically inside the same call.
-    const [updated] = await app.db
-      .insert(userPreferences)
-      .values({
-        userId: id,
-        dashboardPeriod: body.dashboardPeriod ?? "max",
-        dashboardKpis: body.dashboardKpis ?? null,
-        costBasisMode: body.costBasisMode ?? "purchase_price",
-        taxRegime: body.taxRegime ?? "DE",
-        riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null,
-        retirementAge: body.retirementAge ?? null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: userPreferences.userId,
-        set: {
-          ...(body.dashboardPeriod !== undefined ? { dashboardPeriod: body.dashboardPeriod } : {}),
-          ...(body.dashboardKpis !== undefined ? { dashboardKpis: body.dashboardKpis } : {}),
-          ...(body.costBasisMode !== undefined ? { costBasisMode: body.costBasisMode } : {}),
-          ...(body.taxRegime !== undefined ? { taxRegime: body.taxRegime } : {}),
-          ...(body.riskFreeRate !== undefined
-            ? { riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null }
-            : {}),
-          ...(body.retirementAge !== undefined ? { retirementAge: body.retirementAge } : {}),
+    // One transaction: turning history off is also a delete request, and the two must not
+    // diverge ("off" with old rows still stored).
+    const updated = await app.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(userPreferences)
+        .values({
+          userId: id,
+          dashboardPeriod: body.dashboardPeriod ?? "max",
+          dashboardKpis: body.dashboardKpis ?? null,
+          costBasisMode: body.costBasisMode ?? "purchase_price",
+          taxRegime: body.taxRegime ?? "DE",
+          riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null,
+          retirementAge: body.retirementAge ?? null,
+          assistantSaveHistory: body.assistantSaveHistory ?? false,
+          createdAt: now,
           updatedAt: now,
-        },
-      })
-      .returning();
+        })
+        .onConflictDoUpdate({
+          target: userPreferences.userId,
+          set: {
+            ...(body.dashboardPeriod !== undefined
+              ? { dashboardPeriod: body.dashboardPeriod }
+              : {}),
+            ...(body.dashboardKpis !== undefined ? { dashboardKpis: body.dashboardKpis } : {}),
+            ...(body.costBasisMode !== undefined ? { costBasisMode: body.costBasisMode } : {}),
+            ...(body.taxRegime !== undefined ? { taxRegime: body.taxRegime } : {}),
+            ...(body.riskFreeRate !== undefined
+              ? { riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null }
+              : {}),
+            ...(body.retirementAge !== undefined ? { retirementAge: body.retirementAge } : {}),
+            ...(body.assistantSaveHistory !== undefined
+              ? { assistantSaveHistory: body.assistantSaveHistory }
+              : {}),
+            updatedAt: now,
+          },
+        })
+        .returning();
+      if (body.assistantSaveHistory === false) await deleteAllConversations(tx, id);
+      return row;
+    });
 
     if (body.benchmarkSymbols) {
       const unique = dedupeAndLabel(body.benchmarkSymbols);
@@ -154,6 +168,7 @@ export async function preferencesRoute(app: FastifyInstance) {
       benchmarkSymbols: finalSymbols,
       riskFreeRate: updated?.riskFreeRate ? Number(updated.riskFreeRate) : null,
       retirementAge: updated?.retirementAge ?? null,
+      assistantSaveHistory: updated?.assistantSaveHistory ?? false,
     };
   });
 }

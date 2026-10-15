@@ -235,7 +235,7 @@ export const JOB_DESCRIPTORS = [
     name: GC_RECEIPTS_QUEUE,
     label: "Receipt GC",
     description:
-      "Delete staged receipt documents from abandoned draft imports (older than 7 days).",
+      "Delete staged receipt documents from abandoned draft imports (older than 7 days), and opt-in assistant conversations past their 90-day retention.",
     cron: GC_RECEIPTS_CRON,
     cronOnlyActiveInFlight: true,
   },

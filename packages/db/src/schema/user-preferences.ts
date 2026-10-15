@@ -9,6 +9,7 @@ import {
   timestamp,
   uniqueIndex,
   index,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
@@ -22,6 +23,8 @@ export const userPreferences = pgTable("user_preferences", {
   taxRegime: text("tax_regime").notNull().default("DE"),
   riskFreeRate: numeric("risk_free_rate"),
   retirementAge: integer("retirement_age"),
+  /** Opt-in: keep assistant conversations server-side (see `assistant_conversations`). */
+  assistantSaveHistory: boolean("assistant_save_history").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
