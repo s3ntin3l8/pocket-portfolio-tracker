@@ -4,11 +4,12 @@ import { render } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 
+let mockPath = "/transactions";
 const push = vi.fn();
 const replace = vi.fn();
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ push, replace, refresh: vi.fn() }),
-  usePathname: () => "/transactions",
+  usePathname: () => mockPath,
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 let mockSearch = new URLSearchParams();
@@ -49,6 +50,7 @@ beforeEach(() => {
   nav.navigate.mockClear();
   nav.close.mockClear();
   mockSearch = new URLSearchParams();
+  mockPath = "/transactions";
   groups = [];
 });
 
@@ -90,13 +92,17 @@ describe("Income page commands", () => {
     currency: "IDR",
   });
 
+  beforeEach(() => {
+    mockPath = "/income";
+  });
+
   it("offers the other years and navigates with ?year= (replace, so the palette's back marker can't undo it)", () => {
     renderWith(<IncomeTimeline rows={[row("2026-01-01"), row("2025-01-01")]} locale="en" />);
     const group = groups.find((g) => g.id === "income-year")!;
     // The active filter ("all" here) is not offered again.
     expect(group.items.map((i) => i.label)).toEqual(["Income year: 2026", "Income year: 2025"]);
     group.items.find((i) => i.id === "2025")!.run(nav);
-    expect(nav.navigate).toHaveBeenCalledWith("/transactions?year=2025", { replace: true });
+    expect(nav.navigate).toHaveBeenCalledWith("/income?year=2025", { replace: true });
   });
 
   it("offers 'all years' once a year is selected and clears the param", () => {
@@ -106,7 +112,7 @@ describe("Income page commands", () => {
     const group = groups.find((g) => g.id === "income-year")!;
     expect(group.items.map((i) => i.label)).toEqual([s.incomeAllYears, "Income year: 2026"]);
     group.items[0]!.run(nav);
-    expect(nav.navigate).toHaveBeenCalledWith("/transactions", { replace: true });
+    expect(nav.navigate).toHaveBeenCalledWith("/income", { replace: true });
   });
 });
 
