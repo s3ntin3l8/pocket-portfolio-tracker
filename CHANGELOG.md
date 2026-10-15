@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.2.1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.0...v0.2.1) (2026-10-15)
+
+
+### Features
+
+* **activity:** server-side drafts filter, select-all, mobile selection bar fix ([#918](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/918)) ([10660a0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/10660a01391f9e2df395bc9b279bbde9ba96878c))
+* **ai:** add @portfolio/ai-tools shared read-only tool layer ([#926](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/926)) ([256bfbc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/256bfbce30ac2b5cf62f5f9c7f840769ca3573ff))
+* **ai:** propose_transactions creates import drafts only ([#982](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/982)) ([9ea53e2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9ea53e2fbd669335ca8d9a50dbbb0d0133e5ce0a))
+* **api:** auto-book cicilan installments as they fall due ([#913](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/913)) ([5e6a007](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5e6a0075b2171b3c56ff588d26809206b7381ac5))
+* **assistant:** admin controls for the chat provider and model ([#980](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/980)) ([4eba40e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4eba40ec811957738a3180315bfb521ee69088f5))
+* **assistant:** Gemini chat adapter ([#976](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/976)) ([544d5bb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/544d5bb922b0348346b11b02187611c775ddc89c))
+* **assistant:** in-app chat backend (SSE) over the read-only portfolio tools ([#953](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/953)) ([d309204](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d309204aad9383aece18d31ae53e7db157fef061))
+* **assistant:** in-app chat panel in the web app ([#958](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/958)) ([7b05cf0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7b05cf0410c3b6044d1aa4c77a9d67ab366355e1))
+* **assistant:** opt-in conversation persistence ([#981](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/981)) ([3e72b46](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3e72b46ce3a5c87b5a79eab614cc8fc57d7e8379))
+* **assistant:** token-level streaming ([#973](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/973)) ([b3c69d1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b3c69d10bafdfc8d25ef26b53ae04ae4e77d0169))
+* **loans:** let a manually recorded repayment be linked to a loan and installment ([#959](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/959)) ([7b0f8f1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7b0f8f1317e90763a69b8b0f51f6f1ab6c795ec9))
+* **loans:** skip an installment or pay a cicilan off early ([#956](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/956)) ([6ca7d1b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6ca7d1b2f735700311b993d31915578bf0664044))
+* **market-data,api:** UBS gold buyback source ([#910](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/910)) ([abaa1e3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/abaa1e3584f31919a03621be187ffdb7cf8e15b8))
+* **mcp:** OAuth for claude.ai and mobile connectors (Authentik) ([#983](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/983)) ([2fa1b9b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2fa1b9b97a4930d80acb9c096e2cd2ca4235e475))
+* **mcp:** read-only MCP endpoint with a Connect-an-assistant settings card ([#927](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/927)) ([c328055](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c32805517b89c5e8510a8321d798115b3c23f041))
+* **portfolios:** broker connection card above the settings form ([#920](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/920)) ([9d3481b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9d3481b5d0bee9059dde9e647f25621f419076ed))
+* **portfolios:** compact connected state for the broker connection card ([#943](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/943)) ([b551e5d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b551e5d636b72012c9d186f231bee52c78dbf3e0)), closes [#921](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/921)
+* **schema:** response schemas for net-worth, summary and transaction lists, validated in api-client ([#904](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/904)) ([ffffbf9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ffffbf903456fd1000270c100d673ca05116dbbd))
+* **tax:** estimate the Vorabpauschale for funds when the broker books none ([#909](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/909)) ([fcd62a3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/fcd62a3a7952798d52347ac80723871017bd9a55))
+* **tax:** per-instrument Teilfreistellung override ([#895](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/895) part c) ([#902](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/902)) ([4564cc3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4564cc373405c0359bc9bbcc4f29bd0836c40750))
+* **tr:** authenticator-app (TOTP) login when pairing Trade Republic ([#917](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/917)) ([8e9ea41](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8e9ea41a11726009414235bb613a56a93da640f5))
+* **ux:** label the Activity 'Income' stat by its definition ([#901](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/901)) ([571403b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/571403b04b92a8590fd499f16344609d3680f1e6))
+* **ux:** recent instruments, shortcut toggle and assistant fallback in the command bar ([#975](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/975)) ([402f81e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/402f81e4ccc4135e9cad8ebc510f414d7fdaa862))
+* **ux:** shared-element logo morph from holdings row to instrument header ([#977](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/977)) ([a0222d0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a0222d0301a18a308d2de418a012826209d5a329))
+* **ux:** tick the hero delta pills when the chart range changes ([#978](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/978)) ([8cf4165](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8cf416594475822865802649cf87a617b46540ac))
+* **ux:** turn global search into a command bar with shortcuts ([#935](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/935)) ([7c7c2df](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7c7c2df517dad0d17ad5fd015861579d4faf8b4b))
+* **ux:** view-transition route cross-fade and net worth tick ([#939](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/939)) ([9a43822](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9a438222be35094f5263bfefd312c703f67dc502))
+* **web,api:** gold report under /reports ([#914](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/914)) ([fe08c05](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/fe08c051c74bb0a173c9d3c336fdcb8d23a466fc))
+* **web:** add tooltip, checkbox and toggle-group primitives and de-duplicate ad-hoc patterns ([#934](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/934)) ([90f0714](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/90f0714a1a680dea1f6ed1a551bfe0bdda07501c))
+* **web:** show specific messages for rejected loan links ([#961](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/961)) ([c80f711](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c80f71194075cf3cbd7a40471362295edc562fdc))
+* **web:** stream Holdings and Reports sections, add route skeletons and error boundaries ([#942](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/942)) ([da6e748](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/da6e748bd41282c01f3d5b4afc6ef81b43a8fc05))
+
+
+### Bug Fixes
+
+* **a11y:** single h1 on settings/admin index, label remaining inputs, 44px heatmap cells ([#908](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/908)) ([1f1751e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1f1751e797c51ca7732443266477cb23a883d7a6)), closes [#885](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/885)
+* **anomalies:** reconciliation banner titles, number formatting and holding link ([#919](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/919)) ([70a2e30](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/70a2e300a169b8cf6f1232c2e38b769ffc8d6bdd))
+* **web:** admin pages no longer 404 when the me lookup fails transiently ([#898](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/898)) ([61dfabf](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/61dfabfa45cd764e01810b73fdd689500a353ec1))
+* **web:** keep a loan repayment's margin when editing it ([#957](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/957)) ([33b3964](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/33b39643b57aa7da8d744191311396ff7bdf6413))
+* **web:** keep the sidebar net worth in step with the URL scope on back/forward ([#903](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/903)) ([5d29d4f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5d29d4f2a46c51866bee70c1373f660db75dd40f))
+
+
+### Performance Improvements
+
+* **core:** incremental holdings cursor for the historical backfill ([#907](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/907)) ([48f0e41](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/48f0e41d582c97d2c820f2df143491bef0302e1e))
+* **tax:** batch Vorabpauschale price lookups and apply estimates on Trades/Sparplan ([#963](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/963)) ([82e869e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/82e869ef7c033091c13519208db930d46f4ef214))
+* **web:** dedicated loading skeleton for reports/documents ([#974](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/974)) ([38939fe](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/38939fefb9e850018a4eafba3be33abf37c2de99))
+* **web:** stream Income and Instruments pages behind Suspense ([#968](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/968)) ([7723625](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7723625209938ce5e9d3f7af86e43d8f158fcee0))
+
 ## [0.2.0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.1.22...v0.2.0) (2026-10-13)
 
 
