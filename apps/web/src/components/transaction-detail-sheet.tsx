@@ -89,7 +89,8 @@ export function TransactionDetailSheet({
   const router = useRouter();
   const [clientRate, setClientRate] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // The "⋯" tooltip is suppressed while its dropdown is open so the two popups never stack.
+  // The "⋯" tooltip is suppressed while its dropdown is open so the two popups never stack. The
+  // tip keeps its own open state: a bare `open={!menuOpen}` would pin it open whenever the menu is closed.
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTipOpen, setMenuTipOpen] = useState(false);
 

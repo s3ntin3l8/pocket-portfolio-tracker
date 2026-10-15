@@ -1,6 +1,6 @@
 "use client";
 
-import { InfoTip } from "./tooltip";
+import { InfoTip } from "@/components/ui/tooltip";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFullScreenOverlayRegistration } from "@/components/full-screen-overlay";
