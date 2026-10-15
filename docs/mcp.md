@@ -8,6 +8,12 @@ assistant (Claude Code, Claude Desktop, any MCP client) can read and explain you
   Settings → Data & connections. A read-scoped token may call `/mcp` even though it is a `POST`
   (`config: { scope: "read" }` on the route — see `plugins/auth.ts`); everything a tool does goes back through
   the API in-process and is gated like any other request.
+- **Reachability in the Docker prod stack:** the API has no public ingress by default (the browser goes through the
+  web app's same-origin proxy, which drops a client `Authorization` header), so `https://<web-host>/mcp` answers with a
+  redirect/404 from the web app until you opt in. Enable the commented-out `api` block in your gitignored
+  `docker-compose.prod.override.yml` (template: `docker-compose.prod.override.example.yml`): a path-scoped Traefik router
+  that exposes only `/mcp` and `/.well-known/oauth-protected-resource*`; every other API route stays internal. Then
+  `POST /mcp` without a credential should answer `401` with a `WWW-Authenticate` header.
 - **Transport security:** the token is a bearer credential — always use an `https://` API address. (TLS normally terminates at the reverse proxy, so the API itself does not enforce it.)
 - **Tools:** the 16 tools in `packages/ai-tools` (portfolios, net worth, summary, holdings, transaction search,
   value history, income, contributions, tax, targets/drift, insights, instrument lookup, plus the four below),

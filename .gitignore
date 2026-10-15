@@ -32,6 +32,13 @@ apps/web/public/swe-worker-*.js
 .env.*
 !.env.example
 
+# Host-specific prod ingress (Traefik labels, hostnames) — docker-compose.prod.yml is the
+# generic file; the Makefile layers this on top. Template: docker-compose.prod.override.example.yml
+docker-compose.prod.override.yml
+
+# git worktrees
+.worktrees/
+
 # Claude Code local plans + scratch (keep settings.json + hooks tracked)
 .claude/plans/
 .claude/tmp/

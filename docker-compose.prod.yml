@@ -1,14 +1,20 @@
-# Production deployment scoped to this setup: Supabase Cloud for both Postgres and object
+# Production deployment, host-agnostic: Supabase Cloud for both Postgres and object
 # storage (no postgres/minio services — see docker-compose.yml for the local-dev-parity
-# stack that has them), an existing self-hosted Traefik instance (external `proxy` network;
-# see docker-compose.traefik.yml for the reference config it should match), and Authentik
-# OIDC.
+# stack that has them) and Authentik OIDC.
 #
-# `api` has NO Traefik labels and never joins the `proxy` network — only `web` is publicly
-# routed. The browser reaches the API exclusively through web's same-origin proxy
+# INGRESS IS NOT DEFINED HERE. How `web` is reached (Traefik labels, the external `proxy`
+# network, cert resolver, hostnames) is per-host, so it lives in a gitignored
+# `docker-compose.prod.override.yml` that the Makefile layers on top. Start from
+# `docker-compose.prod.override.example.yml` (a Traefik setup, see docker-compose.traefik.yml
+# for the reference Traefik config it should match). Without an override `web` is
+# unreachable from outside the `backend` network.
+#
+# Out of the box `api` has no ingress either — only `web` is publicly routed. The browser
+# reaches the API exclusively through web's same-origin proxy
 # (apps/web/src/app/api/backend/[...path]/route.ts); RSC reads call the API directly,
-# server-to-server, also over the internal `backend` network. This is the security-hardening
-# plan's Part B payoff: the Fastify API needs no public ingress at all.
+# server-to-server, over the internal `backend` network. This is the security-hardening
+# plan's Part B payoff: the Fastify API needs no public ingress at all. The one opt-in
+# exception is the MCP endpoint (`/mcp`), documented in the example override and docs/mcp.md.
 #
 # HARD DEPENDENCY: this compose file assumes Part B (the same-origin proxy) is already
 # merged and live-verified. Deploying it before that lands leaves the browser with no path
@@ -16,9 +22,11 @@
 #
 # Usage:
 #   cp .env.example .env.prod              # fill in Supabase / Authentik / provider secrets
-#   docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-# (or: `make prod` — see the Makefile)
+#   cp docker-compose.prod.override.example.yml docker-compose.prod.override.yml   # then adapt
+#   docker network inspect proxy >/dev/null 2>&1 || docker network create proxy   # if the override uses it
+#   make prod
+# (the Makefile adds `-f docker-compose.prod.yml -f docker-compose.prod.override.yml
+# --env-file .env.prod`; type those flags yourself if you run `docker compose` directly)
 #
 # Both `api` and `web` are pulled from GHCR rather than built on the deploy host.
 # The repo's CI publishes them on every push to `main` (tags: `edge`, `sha-<shortsha>`)
@@ -159,7 +167,6 @@ services:
     restart: unless-stopped
     networks:
       - backend
-      - proxy
     environment:
       NODE_ENV: production
       # Internal-only — resolved server-side per request, never sent to the browser.
@@ -173,24 +180,10 @@ services:
       # (see auth.ts) and the Landing email/password form.
       AUTH_LOCAL_SECRET: ${AUTH_LOCAL_SECRET:-}
       WEB_ALLOWED_HOSTS: ${WEB_ALLOWED_HOSTS}
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=proxy
-      - traefik.http.routers.pocket-web.rule=Host(`${WEB_HOST}`)
-      - traefik.http.routers.pocket-web.entrypoints=websecure
-      - traefik.http.routers.pocket-web.tls=true
-      - traefik.http.routers.pocket-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}
-      - traefik.http.services.pocket-web.loadbalancer.server.port=3005
-      # Optional: attach a security-headers middleware IF an equivalent is defined in your
-      # real Traefik deployment (see docker-compose.traefik.yml's secure-headers example).
-      # Commented out by default — a router referencing a middleware that doesn't resolve
-      # is disabled entirely, so only uncomment once the middleware actually exists.
-      # - traefik.http.routers.pocket-web.middlewares=secure-headers@docker
 
 networks:
-  proxy:
-    external: true
-  # Dedicated internal network between `api` and `web` only — `api` is never on `proxy`.
+  # Dedicated internal network between `api` and `web` only — `api` is not on any ingress
+  # network unless the host override opts it in (MCP).
   # NOT `internal: true`: the API needs real outbound egress (Supabase, Authentik JWKS,
   # market-data providers, LLM vision APIs); a plain user-defined bridge already gets NAT'd
   # internet access without that flag, and `internal: true` would block it entirely.

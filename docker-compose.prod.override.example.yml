@@ -1,0 +1,63 @@
+# Per-host ingress for docker-compose.prod.yml. COPY this to `docker-compose.prod.override.yml`
+# (gitignored) and adapt it to your host; `make prod` / `prod-build` / `prod-down` / `prod-logs`
+# / `prod-ps` layer it on top of the base file automatically when it exists.
+#
+# This example is for the setup the base file used to hardcode: an existing, separately run
+# Traefik (external `proxy` network; docker-compose.traefik.yml documents the config it should
+# match). Create the network once if it doesn't exist:
+#   docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
+#
+# DO NOT set a top-level `name:` here. The base file pins the project name
+# (`pocket-portfolio-tracker`) so compose adopts the running containers; a different name makes
+# it create a second stack with fresh, empty volumes.
+#
+# Compose merges service `networks`/`labels` from the base and this file, so listing only the
+# additions below is enough; verify with
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.override.yml \
+#     --env-file .env.prod config > /tmp/resolved.yml
+# (the output contains resolved secrets — don't paste it anywhere).
+
+services:
+  web:
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.pocket-web.rule=Host(`${WEB_HOST}`)
+      - traefik.http.routers.pocket-web.entrypoints=websecure
+      - traefik.http.routers.pocket-web.tls=true
+      - traefik.http.routers.pocket-web.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}
+      - traefik.http.services.pocket-web.loadbalancer.server.port=3005
+      # Optional: attach a security-headers middleware IF an equivalent is defined in your
+      # real Traefik deployment (see docker-compose.traefik.yml's secure-headers example).
+      # Commented out by default — a router referencing a middleware that doesn't resolve
+      # is disabled entirely, so only uncomment once the middleware actually exists.
+      # - traefik.http.routers.pocket-web.middlewares=secure-headers@docker
+
+  # OPTIONAL — expose the MCP endpoint so AI clients (Claude Code / Desktop with a read-scoped
+  # personal access token, or claude.ai via OAuth) can reach it; see docs/mcp.md. Without this
+  # block `POST https://<WEB_HOST>/mcp` lands on the Next.js app and 404s, because the API has
+  # no public ingress and web's same-origin proxy deliberately drops the client's
+  # Authorization header.
+  #
+  # The router is scoped to exactly `/mcp` plus the RFC 9728 discovery document — no other API
+  # route becomes public. `priority` makes it win over the catch-all `Host()` router above.
+  # Uncomment the whole block (the `api` key included).
+  #
+  # api:
+  #   networks:
+  #     - proxy
+  #   labels:
+  #     - traefik.enable=true
+  #     - traefik.docker.network=proxy
+  #     - traefik.http.routers.pocket-mcp.rule=Host(`${WEB_HOST}`) && (Path(`/mcp`) || PathPrefix(`/.well-known/oauth-protected-resource`))
+  #     - traefik.http.routers.pocket-mcp.priority=100
+  #     - traefik.http.routers.pocket-mcp.entrypoints=websecure
+  #     - traefik.http.routers.pocket-mcp.tls=true
+  #     - traefik.http.routers.pocket-mcp.tls.certresolver=${TRAEFIK_CERTRESOLVER:-cloudflare}
+  #     - traefik.http.services.pocket-mcp.loadbalancer.server.port=3000
+
+networks:
+  proxy:
+    external: true
