@@ -1,6 +1,4 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { and, eq, ne } from "drizzle-orm";
-import { screenshotImports } from "@portfolio/db";
 import { detectCsvFormat } from "../../../services/parsers/detect.js";
 import { assignContentExternalIds, shortHash } from "../../../services/parsers/hash.js";
 import { accountMismatchVerdict } from "../helpers.js";
@@ -16,6 +14,7 @@ import {
   matchAccountNumber,
   soleOwnedPortfolioId,
   annotateLikelyDuplicates,
+  insertDraftImport,
 } from "./helpers.js";
 
 export async function handleCsvUpload(
@@ -73,37 +72,14 @@ export async function handleCsvUpload(
     ? await accountMismatchVerdict(app, id, detected, candidate)
     : null;
 
-  let imp = (
-    await app.db
-      .insert(screenshotImports)
-      .values({
-        userId: id,
-        portfolioId: matchedPortfolioId ?? null,
-        parser: PARSER_TAG[resolved] ?? "csv",
-        parsedJson: result,
-        contentHash,
-        batchId: batchIdFromQuery(request.query),
-        status: "draft",
-      })
-      .onConflictDoNothing()
-      .returning()
-  )[0];
-
-  if (!imp) {
-    const [existing] = await app.db
-      .select()
-      .from(screenshotImports)
-      .where(
-        and(
-          eq(screenshotImports.userId, id),
-          eq(screenshotImports.contentHash, contentHash),
-          ne(screenshotImports.status, "discarded"),
-        ),
-      )
-      .limit(1);
-    if (!existing) throw app.httpErrors.internalServerError("import race recovery failed");
-    imp = existing;
-  }
+  const imp = await insertDraftImport(app, {
+    userId: id,
+    portfolioId: matchedPortfolioId ?? null,
+    parser: PARSER_TAG[resolved] ?? "csv",
+    parsedJson: result,
+    contentHash,
+    batchId: batchIdFromQuery(request.query),
+  });
 
   await storeReceipt(app, {
     userId: id,

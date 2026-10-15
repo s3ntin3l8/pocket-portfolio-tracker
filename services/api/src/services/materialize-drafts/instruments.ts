@@ -17,9 +17,16 @@ export type ResolvedDraft = { draft: ParsedTransaction; instrumentId: string | n
 export async function resolveDraftInstruments(
   ctx: Ctx,
   drafts: ParsedTransaction[],
-  opts: { isEu: boolean },
+  opts: {
+    isEu: boolean;
+    /**
+     * Imports that mix instrument kinds (AI-assisted entry): use the ISIN/EU resolution for the
+     * drafts that carry an ISIN, and the symbol-based path for the rest.
+     */
+    euWhenIsin?: boolean;
+  },
 ): Promise<ResolvedDraft[]> {
-  const { isEu } = opts;
+  const { euWhenIsin = false } = opts;
   const log = ctx.log;
 
   const isinCache = new Map<
@@ -59,6 +66,7 @@ export async function resolveDraftInstruments(
 
   const resolved: ResolvedDraft[] = [];
   for (const d of drafts) {
+    const isEu = opts.isEu || (euWhenIsin && Boolean(d.isin));
     const isCash =
       d.action === "deposit" ||
       d.action === "withdrawal" ||

@@ -187,3 +187,52 @@ export async function annotateLikelyDuplicates(
     };
   }
 }
+
+/**
+ * Insert a draft import row, recovering from the race where an identical `(user, contentHash)`
+ * import was inserted concurrently (the unique index makes the loser's insert a no-op; it then
+ * adopts the winner's row). Shared by every route that turns parsed rows into a draft import.
+ */
+export async function insertDraftImport(
+  app: FastifyInstance,
+  args: {
+    userId: string;
+    portfolioId: string | null;
+    parser: string;
+    parsedJson: unknown;
+    contentHash: string;
+    batchId?: string | null;
+  },
+) {
+  const { userId, portfolioId, parser, parsedJson, contentHash, batchId } = args;
+  const inserted = (
+    await app.db
+      .insert(screenshotImports)
+      .values({
+        userId,
+        portfolioId,
+        parser,
+        parsedJson,
+        contentHash,
+        batchId: batchId ?? null,
+        status: "draft",
+      })
+      .onConflictDoNothing()
+      .returning()
+  )[0];
+  if (inserted) return inserted;
+
+  const [existing] = await app.db
+    .select()
+    .from(screenshotImports)
+    .where(
+      and(
+        eq(screenshotImports.userId, userId),
+        eq(screenshotImports.contentHash, contentHash),
+        ne(screenshotImports.status, "discarded"),
+      ),
+    )
+    .limit(1);
+  if (!existing) throw app.httpErrors.internalServerError("import race recovery failed");
+  return existing;
+}

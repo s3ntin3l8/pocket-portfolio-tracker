@@ -13,6 +13,8 @@ import type {
   ProviderSettingUpdate,
   ProviderCredentialInput,
   ChatProvidersUpdate,
+  ProposeTransactionsBody,
+  ProposeTransactionsResult,
   ImportStrategy,
   ImportSettingsUpdate,
   StorageSettingsUpdate,
@@ -2263,6 +2265,7 @@ export function duplicatesFromError(err: unknown): DuplicateConflict | null {
   return null;
 }
 
+export { proposeTransactionsBodySchema, MAX_PROPOSED_TRANSACTIONS } from "@portfolio/schema";
 export {
   parseAssistantStream,
   type AssistantChatMessage,
@@ -3356,6 +3359,13 @@ export function createApiClient(config: ApiClientConfig) {
         portfolioId,
         enrichments,
       }),
+
+    /**
+     * AI-assisted entry: store transactions as a *draft import* (nothing is committed; the user
+     * confirms them in the import review screen). Needs a write-scoped credential.
+     */
+    proposeTransactions: (body: ProposeTransactionsBody) =>
+      request<ProposeTransactionsResult>("POST", "/imports/propose", body),
 
     // --- In-app assistant (docs/assistant.md) ---
     getAssistantStatus: () => request<AssistantStatus>("GET", "/assistant/status"),

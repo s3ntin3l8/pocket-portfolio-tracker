@@ -124,3 +124,84 @@ export const importIssueSchema = z.object({
     .nullish(),
 });
 export type ImportIssue = z.infer<typeof importIssueSchema>;
+
+/** Most transactions one `propose_transactions` call may carry. */
+export const MAX_PROPOSED_TRANSACTIONS = 100;
+
+const PROPOSAL_CASH_ACTIONS: ReadonlySet<string> = new Set([
+  "deposit",
+  "withdrawal",
+  "interest",
+  "tax",
+]);
+
+/**
+ * What an AI model may propose for a draft import: the economic fields of a trade and nothing
+ * that steers the import itself (no externalId, tax components, document refs, attention
+ * flags or confidence — the server sets those). Unknown fields are rejected so a model can't
+ * smuggle them in.
+ */
+const ISO_DATE =
+  /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** An ISO 8601 date or datetime. A string (not `z.coerce.date()`) so it has a JSON Schema form. */
+const isoDateString = z
+  .string()
+  .regex(ISO_DATE, "must be an ISO 8601 date or datetime")
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: "must be a real date" })
+  .describe("ISO 8601 date or datetime, e.g. 2026-03-02 or 2026-03-02T14:30:00Z");
+
+/** Like `currencyCode` without the upper-casing transform (which has no JSON Schema form). */
+const isoCurrency = z
+  .string()
+  .regex(/^[A-Za-z]{3}$/, "must be a 3-letter ISO 4217 currency code")
+  .describe("ISO 4217 currency code, e.g. EUR");
+
+export const proposedTransactionSchema = parsedTransactionSchema
+  .pick({
+    assetClass: true,
+    action: true,
+    ticker: true,
+    isin: true,
+    wkn: true,
+    name: true,
+    quantity: true,
+    unit: true,
+    price: true,
+    fees: true,
+    total: true,
+    exchangeCode: true,
+    description: true,
+  })
+  .extend({ executedAt: isoDateString, currency: isoCurrency })
+  .strict()
+  .refine(
+    (t) => PROPOSAL_CASH_ACTIONS.has(t.action) || Boolean(t.ticker || t.isin || t.wkn || t.name),
+    { message: "a security needs a ticker, isin, wkn or name" },
+  );
+export type ProposedTransaction = z.infer<typeof proposedTransactionSchema>;
+
+export const proposeTransactionsBodySchema = z
+  .object({
+    /** Target depot; omitted = the only one, else chosen in the review screen. */
+    portfolioId: z.string().uuid().optional(),
+    transactions: z.array(proposedTransactionSchema).min(1).max(MAX_PROPOSED_TRANSACTIONS),
+  })
+  .strict();
+export type ProposeTransactionsBody = z.infer<typeof proposeTransactionsBodySchema>;
+
+export interface ProposeTransactionsResult {
+  importId: string;
+  draftCount: number;
+  /** This exact proposal already exists as a draft import. */
+  alreadyExists: boolean;
+  /** This exact proposal was already confirmed. */
+  alreadyConfirmed: boolean;
+  /** Drafts that look like a transaction already committed to the target portfolio. */
+  likelyDuplicates: number;
+  portfolioId: string | null;
+  /** Web path of the review screen where the user confirms the drafts. */
+  reviewPath: string;
+  /** Absolute link to it, when the server knows the web origin (`PUBLIC_WEB_URL`). */
+  reviewUrl?: string;
+}

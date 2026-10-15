@@ -52,10 +52,11 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
     const res = await materializeDrafts(app, {
       drafts: toWrite,
       targetPortfolioId,
-      source: parserToTxSource(parserTag) as "csv" | "pdf" | "ibkr" | "screenshot",
+      source: parserToTxSource(parserTag) as "csv" | "pdf" | "ibkr" | "screenshot" | "manual",
       importId: imp.id,
       status: "draft",
       isEu: isEuParser(parserTag),
+      euWhenIsin: parserTag === "ai",
     });
 
     await app.db

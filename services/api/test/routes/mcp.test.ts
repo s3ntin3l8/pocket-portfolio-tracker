@@ -141,6 +141,68 @@ describe("POST /mcp", () => {
     expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
   });
 
+  it("offers propose_transactions only to a write-scoped token, annotated as a non-destructive write", async () => {
+    const readTools = (await rpc(ownerPat, "tools/list")).json().result.tools as { name: string }[];
+    expect(readTools.map((t) => t.name)).not.toContain("propose_transactions");
+
+    const writePat = await mintPat(await jwt("mcp-owner"), "write");
+    const tools = (await rpc(writePat, "tools/list")).json().result.tools as {
+      name: string;
+      annotations?: Record<string, boolean>;
+    }[];
+    const propose = tools.find((t) => t.name === "propose_transactions")!;
+    expect(propose.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+    });
+    // Every other tool is still annotated read-only.
+    expect(
+      tools
+        .filter((t) => t.name !== "propose_transactions")
+        .every((t) => t.annotations?.readOnlyHint === true),
+    ).toBe(true);
+  });
+
+  it("creates a draft import through the write tool, and a read token cannot call it", async () => {
+    const owner = await jwt("mcp-owner");
+    const writePat = await mintPat(owner, "write");
+    const args = {
+      transactions: [
+        {
+          action: "buy",
+          name: "Mcp Corp",
+          ticker: "MCP",
+          quantity: "3",
+          price: "10",
+          currency: "EUR",
+          executedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    };
+    const made = await callTool(writePat, "propose_transactions", args);
+    expect(made.isError).toBe(false);
+    expect(made.data).toMatchObject({ draftCount: 1, alreadyConfirmed: false });
+    expect(made.data.reviewPath).toBe(`/transactions/import/${made.data.importId}`);
+    expect(String(made.data.note)).toMatch(/still has to review and confirm/);
+
+    // Nothing was booked: still a draft import the user has to confirm.
+    const imp = await app.inject({
+      method: "GET",
+      url: `/imports/${made.data.importId}`,
+      headers: auth(owner),
+    });
+    expect(imp.json().status).toBe("draft");
+
+    // A read-only token is not even offered the tool; calling it by name is refused.
+    const refused = await rpc(ownerPat, "tools/call", {
+      name: "propose_transactions",
+      arguments: args,
+    });
+    const body = refused.json();
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+  });
+
   it("scopes tool data to the caller and never returns account numbers or IBANs", async () => {
     // Precondition: the secrets really are stored, so the absence below is not vacuous.
     const direct = await app.inject({ method: "GET", url: "/portfolios", headers: auth(ownerPat) });

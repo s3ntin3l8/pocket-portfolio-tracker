@@ -15,19 +15,29 @@ const jsonRpcError = (message: string, code = -32000) => ({
 });
 
 /** One server per request (stateless): the tools close over the caller's own client. */
-function buildMcpServer(client: ApiClient): McpServer {
+function buildMcpServer(client: ApiClient, write: boolean): McpServer {
   // `instructions` is injected into the model's context by clients; the resource below is
   // the same text for clients that only surface resources on demand.
   const server = new McpServer({ name: "pocket", version: "0.1.0" }, { instructions: GLOSSARY });
 
-  for (const tool of createTools(client)) {
+  for (const tool of createTools(client, { write })) {
+    const readOnly = tool.readOnly !== false;
     server.registerTool(
       tool.name,
       {
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema,
-        annotations: { readOnlyHint: true, openWorldHint: false },
+        // A write tool only ever creates drafts the user confirms: additive, repeatable (the same
+        // content is the same import), never destructive.
+        annotations: readOnly
+          ? { readOnlyHint: true, openWorldHint: false }
+          : {
+              readOnlyHint: false,
+              destructiveHint: false,
+              idempotentHint: true,
+              openWorldHint: false,
+            },
       },
       async (args: unknown) => {
         const out = await tool.handler(args);
@@ -107,9 +117,10 @@ function buildMcpServer(client: ApiClient): McpServer {
 /**
  * Remote MCP endpoint (Streamable HTTP, stateless, JSON responses). Authenticated by the
  * normal auth plugin, so a Bearer personal access token works with Claude Desktop/Code.
- * `scope: "read"` lets a read-scoped PAT use this POST: every tool is read-only, and
+ * `scope: "read"` lets a read-scoped PAT use this POST: it is offered read-only tools, and
  * anything a tool calls goes back through the API (via `injectFetch`), where the read-only
- * token gate still applies.
+ * token gate still applies. A write-scoped credential is also offered the draft-only write
+ * tools (`propose_transactions`).
  */
 export async function mcpRoute(app: FastifyInstance) {
   app.post(
@@ -132,7 +143,9 @@ export async function mcpRoute(app: FastifyInstance) {
         fetch: injectFetch(app),
         getToken: () => token,
       });
-      const server = buildMcpServer(client);
+      // Draft-writing tools are offered only to a write-scoped credential (a read-only PAT
+      // could never use them: the API refuses its POSTs).
+      const server = buildMcpServer(client, request.user?.scope === "write");
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,

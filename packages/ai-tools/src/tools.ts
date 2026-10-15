@@ -1,4 +1,9 @@
-import { ApiError, apiErrorCode } from "@portfolio/api-client";
+import {
+  ApiError,
+  apiErrorCode,
+  MAX_PROPOSED_TRANSACTIONS,
+  proposeTransactionsBodySchema,
+} from "@portfolio/api-client";
 import type {
   ApiClient,
   HoldingValuation,
@@ -93,12 +98,22 @@ export function isToolError(out: unknown): boolean {
   );
 }
 
+export interface CreateToolsOptions {
+  /**
+   * Also offer the tools that write. They only ever create *draft* records for the user to
+   * confirm. Pass true only for a write-scoped credential: a read-only one is refused by the
+   * API anyway, but a tool it can never use shouldn't be offered.
+   */
+  write?: boolean;
+}
+
 /**
- * Build the read-only tool set over an API client. The client carries the caller's
- * credentials, so every call is scoped to that user by the API exactly like the web app's.
- * Every handler's output is deep-stripped of sensitive keys before it is returned.
+ * Build the tool set over an API client: read-only tools, plus (with `write`) the draft-only
+ * ones. The client carries the caller's credentials, so every call is scoped to that user by
+ * the API exactly like the web app's. Every handler's output is deep-stripped of sensitive
+ * keys before it is returned.
  */
-export function createTools(client: ApiClient): AiTool[] {
+export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): AiTool[] {
   const defs: AiTool[] = [];
   const add = <S extends z.ZodType>(t: AiTool<S>) => {
     defs.push({
@@ -383,6 +398,36 @@ export function createTools(client: ApiClient): AiTool[] {
       }));
     },
   });
+
+  if (opts.write) {
+    add({
+      name: "propose_transactions",
+      title: "Propose transactions (draft)",
+      readOnly: false,
+      description:
+        "Create a DRAFT import from transactions you extracted from text the user gave you (e.g. a pasted " +
+        "broker email or contract note). Nothing is booked: the user must open the review link and confirm " +
+        "it, and Pocket flags likely duplicates of transactions already recorded. " +
+        "Only include trades you can read in the text — never guess a price, quantity or date; ask the user " +
+        "instead. Dates are ISO 8601, amounts are decimal strings (dot as separator), currency is an ISO " +
+        "code. Give each security a ticker, isin, wkn or name. Pass portfolioId (from list_portfolios) when " +
+        `the user said which depot; at most ${MAX_PROPOSED_TRANSACTIONS} transactions per call. ` +
+        "Afterwards tell the user the draft is waiting for their confirmation and give them the review link " +
+        "(reviewUrl if present, else reviewPath) as a Markdown link.",
+      inputSchema: proposeTransactionsBodySchema,
+      handler: async (input) => {
+        const res = await client.proposeTransactions(input);
+        return {
+          ...res,
+          note: res.alreadyExists
+            ? "This exact proposal was already waiting for review."
+            : res.alreadyConfirmed
+              ? "This exact proposal was already confirmed earlier."
+              : "Draft created. The user still has to review and confirm it.",
+        };
+      },
+    });
+  }
 
   return defs;
 }

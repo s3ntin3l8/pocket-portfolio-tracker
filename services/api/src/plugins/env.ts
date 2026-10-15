@@ -64,6 +64,12 @@ const schema = {
       type: "string",
       default: "",
     },
+    // Public origin of the web app (https://pocket.example.com). Only used to turn the relative
+    // import-review path into a link an external AI client (MCP) can open; unset = path only.
+    PUBLIC_WEB_URL: {
+      type: "string",
+      default: "",
+    },
     RATE_LIMIT_MAX: {
       type: "number",
       // Per credential (see plugins/security.ts). One server-rendered page fans out to
@@ -263,6 +269,7 @@ declare module "fastify" {
       AUTHENTIK_ADMIN_GROUP: string;
       AUTH_LOCAL_SECRET: string;
       CORS_ORIGIN: string;
+      PUBLIC_WEB_URL: string;
       RATE_LIMIT_MAX: number;
       RATE_LIMIT_WINDOW: string;
       ASSISTANT_RATE_LIMIT_MAX: number;

@@ -24,11 +24,12 @@ export const DEFAULT_SRC = { icon: FileText, bg: "var(--border)", fg: "var(--tex
  * for {@link SRC_STYLE} and the `Transactions.sources.*` labels.
  *
  * Mirrors `parserToTxSource()` in `services/api/src/services/parsers/dedup.ts` — same tag
- * semantics (csv/dkb/tr-csv → csv, dkb-pdf/tr-pdf → pdf, ibkr, pytr, else → screenshot).
+ * semantics (csv/dkb/tr-csv → csv, dkb-pdf/tr-pdf → pdf, ibkr, pytr, ai → manual, else → screenshot).
  * Duplicated here because that module lives in the API service package (Node runtime) and
  * isn't reachable from the browser bundle. Keep the two in sync if the tag set changes.
  */
 export function parserToSourceType(parser: string): string {
+  if (parser === "ai") return "manual"; // AI-assisted entry is typed-in data the user confirmed
   if (parser === "pytr") return "pytr";
   if (parser === "ibkr") return "ibkr";
   if (parser === "dkb-pdf" || parser === "tr-pdf") return "pdf";

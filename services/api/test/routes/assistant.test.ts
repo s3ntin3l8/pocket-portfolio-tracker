@@ -328,6 +328,29 @@ describe("POST /assistant/chat — the loop over SSE", () => {
     expect(parseSse(res.body).at(-1)!.data).toEqual({ error: "provider_error", status: 429 });
   });
 
+  it("offers the draft-only write tool to a write-scoped credential, not to a read-only token", async () => {
+    const names = () => provider.requests[0]!.tools.map((t) => t.name);
+
+    use([endTurn("ok")]);
+    await chat(owner, ask());
+    expect(names()).toContain("propose_transactions");
+    // …and the model is told it only creates a draft the user confirms.
+    expect(provider.requests[0]!.system).toMatch(/propose_transactions/);
+    expect(provider.requests[0]!.system).toMatch(/never say it was added or booked/);
+
+    const mint = await app.inject({
+      method: "POST",
+      url: "/me/tokens",
+      headers: auth(owner),
+      payload: { name: "chat-ro-tools", scope: "read" },
+    });
+    use([endTurn("ok")]);
+    await chat(mint.json().token as string, ask());
+    expect(names()).not.toContain("propose_transactions");
+    expect(provider.requests[0]!.system).not.toMatch(/propose_transactions/);
+    expect(names()).toContain("get_net_worth");
+  });
+
   it("lets a read-scoped token chat (read-only POST) while other POSTs stay blocked", async () => {
     const mint = await app.inject({
       method: "POST",

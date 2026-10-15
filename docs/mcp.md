@@ -57,4 +57,23 @@ claude mcp add --transport http pocket https://<your-pocket-api>/mcp \
 
 The in-app chat uses the same tools: see [`assistant.md`](assistant.md).
 
-Not yet: OAuth for claude.ai connectors (#923), draft-only write tools (#924).
+## Draft-only write tool
+
+A **write-scoped** token is also offered `propose_transactions` (a read-scoped token never sees it). Give the model a
+pasted broker email or contract note and it extracts the trades and calls the tool, which creates a **draft import**
+(`POST /imports/propose`): **nothing is booked**. The tool result carries `reviewPath` (and `reviewUrl` when
+`PUBLIC_WEB_URL` is set) — the model hands you that link and you confirm in the normal import review screen, which
+applies every existing gate (account mismatch, inbound-transfer cost basis, cross-source duplicate acknowledgement).
+
+- The tool is annotated `readOnlyHint: false, destructiveHint: false, idempotentHint: true`; every other tool stays
+  `readOnlyHint: true`.
+- A proposal carries only trade fields (`action`, instrument identifiers, `quantity`, `price`, `fees`, `currency`,
+  `executedAt`, …), at most 100 per call. Fields that steer the import — `externalId`, `taxComponents`, `confidence`,
+  `attention` — are rejected; the server sets them. Confidence is a fixed 0.5.
+- Dedup: the same proposal is the same import (`alreadyExists` / `alreadyConfirmed`); drafts that match something
+  already booked are flagged as likely duplicates, and confirm blocks them until acknowledged. A proposal counts as a
+  **manual** entry (parser `ai`, source `manual`), never as a document, so it can only ever be a _duplicate_ of a
+  committed row from another source, never an _enrichment_ of it.
+- Not covered: corporate actions (see [#969](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/969)).
+
+Not yet: OAuth for claude.ai connectors (#923).

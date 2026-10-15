@@ -411,3 +411,140 @@ describe("redact / compact helpers", () => {
     expect(downsample([1, 2, 3], 60)).toEqual({ points: [1, 2, 3], total: 3 });
   });
 });
+
+describe("propose_transactions (draft-only write tool)", () => {
+  const proposal = {
+    transactions: [
+      {
+        action: "buy" as const,
+        name: "ABC Corp",
+        quantity: "10",
+        price: "100.5",
+        currency: "EUR",
+        executedAt: "2026-03-02T00:00:00Z",
+      },
+    ],
+  };
+  const stub = (res: unknown) =>
+    ({
+      ...client,
+      proposeTransactions: async (body: unknown) => {
+        calls.push(`proposeTransactions(${JSON.stringify(body).length})`);
+        return res;
+      },
+    }) as unknown as ApiClient;
+
+  it("is not offered unless the credential may write", () => {
+    expect(createTools(client as unknown as ApiClient).map((t) => t.name)).not.toContain(
+      "propose_transactions",
+    );
+    expect(
+      createTools(client as unknown as ApiClient, { write: false }).map((t) => t.name),
+    ).not.toContain("propose_transactions");
+    const tools = createTools(client as unknown as ApiClient, { write: true });
+    const propose = tools.find((t) => t.name === "propose_transactions")!;
+    expect(propose.readOnly).toBe(false);
+    expect(
+      tools.filter((t) => t.name !== "propose_transactions").every((t) => !t.readOnly === true),
+    ).toBe(true);
+    // Every other tool keeps its read-only marker semantics (absent = read only).
+    expect(tools.filter((t) => t.readOnly === false)).toHaveLength(1);
+  });
+
+  it("tells the model it only creates a draft the user must confirm, and to link the review", () => {
+    const propose = createTools(client as unknown as ApiClient, { write: true }).find(
+      (t) => t.name === "propose_transactions",
+    )!;
+    expect(propose.description).toMatch(/DRAFT/);
+    expect(propose.description).toMatch(/confirm/);
+    expect(propose.description).toMatch(/never guess/i);
+    expect(propose.description).toMatch(/reviewUrl/);
+  });
+
+  it("has a JSON Schema form (the chat loop and MCP both need one) with every tool", () => {
+    for (const t of createTools(client as unknown as ApiClient, { write: true })) {
+      expect(() => toJsonSchema(t), t.name).not.toThrow();
+    }
+    const propose = createTools(client as unknown as ApiClient, { write: true }).find(
+      (t) => t.name === "propose_transactions",
+    )!;
+    const schema = JSON.stringify(toJsonSchema(propose));
+    expect(schema).toMatch(/ISO 8601/);
+    expect(schema).toMatch(/"additionalProperties":false/);
+  });
+
+  it("rejects an invalid date", () => {
+    const propose = createTools(client as unknown as ApiClient, { write: true }).find(
+      (t) => t.name === "propose_transactions",
+    )!;
+    const base = proposal.transactions[0]!;
+    expect(
+      propose.inputSchema.safeParse({ transactions: [{ ...base, executedAt: "31 Feb maybe" }] })
+        .success,
+    ).toBe(false);
+    expect(
+      propose.inputSchema.safeParse({ transactions: [{ ...base, executedAt: "2026-03-02" }] })
+        .success,
+    ).toBe(true);
+  });
+
+  it("validates the proposal strictly: unknown fields, empty and oversized lists, unidentified securities", () => {
+    const propose = createTools(client as unknown as ApiClient, { write: true }).find(
+      (t) => t.name === "propose_transactions",
+    )!;
+    const ok = propose.inputSchema.safeParse(proposal);
+    expect(ok.success).toBe(true);
+    const bad = (transactions: unknown[]) =>
+      propose.inputSchema.safeParse({ transactions }).success;
+    const base = proposal.transactions[0]!;
+    expect(bad([])).toBe(false);
+    expect(bad(Array.from({ length: 101 }, () => base))).toBe(false);
+    expect(bad([{ ...base, externalId: "forged" }])).toBe(false);
+    expect(bad([{ ...base, taxComponents: { quellensteuer: "1" } }])).toBe(false);
+    expect(bad([{ ...base, confidence: 1 }])).toBe(false);
+    expect(bad([{ ...base, name: undefined }])).toBe(false);
+    // A cash movement needs no instrument.
+    expect(
+      bad([{ ...base, action: "deposit", name: undefined, quantity: "1", price: "500" }]),
+    ).toBe(true);
+    expect(propose.inputSchema.safeParse({ ...proposal, portfolioId: "nope" }).success).toBe(false);
+    expect(propose.inputSchema.safeParse({ ...proposal, extra: 1 }).success).toBe(false);
+  });
+
+  it("returns the draft summary with a note, and surfaces API failures as safe errors", async () => {
+    const created = {
+      importId: "imp1",
+      draftCount: 1,
+      alreadyExists: false,
+      alreadyConfirmed: false,
+      likelyDuplicates: 0,
+      portfolioId: null,
+      reviewPath: "/transactions/import/imp1",
+    };
+    const propose = (api: ApiClient) =>
+      createTools(api, { write: true }).find((t) => t.name === "propose_transactions")!;
+
+    const out = (await propose(stub(created)).handler(proposal)) as Record<string, unknown>;
+    expect(out).toMatchObject({ importId: "imp1", reviewPath: "/transactions/import/imp1" });
+    expect(String(out.note)).toMatch(/still has to review and confirm/);
+
+    const again = (await propose(stub({ ...created, alreadyExists: true })).handler(
+      proposal,
+    )) as Record<string, unknown>;
+    expect(String(again.note)).toMatch(/already waiting/);
+    const done = (await propose(stub({ ...created, alreadyConfirmed: true })).handler(
+      proposal,
+    )) as Record<string, unknown>;
+    expect(String(done.note)).toMatch(/already confirmed/);
+
+    const failing = {
+      proposeTransactions: async () => {
+        throw new ApiError(403, '{"error":"read_only_token"}');
+      },
+    } as unknown as ApiClient;
+    expect(await propose(failing).handler(proposal)).toEqual({
+      error: "read_only_token",
+      status: 403,
+    });
+  });
+});

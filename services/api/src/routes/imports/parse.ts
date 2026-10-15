@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { handleCsvUpload } from "./parse/csv-handler.js";
 import { handleScreenshotUpload } from "./parse/screenshot-handler.js";
 import { registerMaterializeRoutes } from "./materialize.js";
+import { registerProposeRoute } from "./propose.js";
 
 export function registerParseImportRoutes(app: FastifyInstance) {
   app.post(
@@ -21,4 +22,5 @@ export function registerParseImportRoutes(app: FastifyInstance) {
   );
 
   registerMaterializeRoutes(app);
+  registerProposeRoute(app);
 }
