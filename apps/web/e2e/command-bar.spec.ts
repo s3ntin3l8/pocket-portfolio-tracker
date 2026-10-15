@@ -305,6 +305,8 @@ test.describe("contextual page commands (#930)", () => {
     await expect(palette(page)).toBeHidden();
     // The palette's back-to-close marker must not undo the write when it pops.
     await expect(page).toHaveURL(new RegExp(`year=${picked}`));
+    // A fixed wait, on purpose: `expect.poll` would pass on the first match and never see a
+    // later revert from the marker pop, which is exactly what this guards against.
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(new RegExp(`year=${picked}`));
   });

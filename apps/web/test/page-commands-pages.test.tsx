@@ -109,3 +109,12 @@ describe("Income page commands", () => {
     expect(nav.navigate).toHaveBeenCalledWith("/transactions", { replace: true });
   });
 });
+
+describe("buildTradesHref", () => {
+  it("sets the method, keeps scope, and resets page", async () => {
+    const { buildTradesHref } = await import("../src/components/trades-page-commands");
+    expect(buildTradesHref("/trades", "scope=all&page=3", "fifo")).toBe(
+      "/trades?scope=all&method=fifo",
+    );
+  });
+});
