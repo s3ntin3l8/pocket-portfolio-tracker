@@ -2,6 +2,8 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { usePathname } from "@/i18n/navigation";
+import { buildPeriodHref } from "@/components/period-select";
 import { replaceUrlParam } from "@/lib/url-state";
 import { useTranslations } from "next-intl";
 import { Calendar, ChevronDown, ChevronRight, Check } from "lucide-react";
@@ -67,6 +69,7 @@ export function IncomeTimeline({
   const t = useTranslations("Income");
   // The year filter is URL state (`?year=`), shallow: a deep link opens on that year.
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const urlYearRaw = searchParams?.get("year");
   const urlYear = urlYearRaw && /^\d{4}$/.test(urlYearRaw) ? urlYearRaw : "all";
   const [yearFilter, setYearFilterState] = useState(urlYear);
@@ -122,10 +125,18 @@ export function IncomeTimeline({
               id: y,
               label: y === "all" ? tSearch("incomeAllYears") : tSearch("incomeYearTo", { year: y }),
               icon: Calendar,
-              run: ({ close }) => {
-                setYearFilter(y);
+              // Via the palette's `navigate` (router.replace), not the shallow write the
+              // dropdown uses: a bare `replaceState` would land on the palette's
+              // back-to-close marker entry and be undone when the palette pops it. The
+              // timeline follows the URL, so no local state write is needed here.
+              run: ({ navigate }) => {
                 if (y !== "all") setExpanded((prev) => new Set(prev).add(y));
-                close();
+                navigate(
+                  buildPeriodHref(pathname, searchParams?.toString() ?? "", "year", y, "all"),
+                  {
+                    replace: true,
+                  },
+                );
               },
             }))
         : [],

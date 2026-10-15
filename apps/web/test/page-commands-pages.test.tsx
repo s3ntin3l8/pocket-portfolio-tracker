@@ -90,16 +90,13 @@ describe("Income page commands", () => {
     currency: "IDR",
   });
 
-  it("offers the other years and writes ?year= shallowly", () => {
-    window.history.replaceState(null, "", "/income");
+  it("offers the other years and navigates with ?year= (replace, so the palette's back marker can't undo it)", () => {
     renderWith(<IncomeTimeline rows={[row("2026-01-01"), row("2025-01-01")]} locale="en" />);
     const group = groups.find((g) => g.id === "income-year")!;
     // The active filter ("all" here) is not offered again.
     expect(group.items.map((i) => i.label)).toEqual(["Income year: 2026", "Income year: 2025"]);
     group.items.find((i) => i.id === "2025")!.run(nav);
-    expect(window.location.search).toBe("?year=2025");
-    expect(nav.close).toHaveBeenCalled();
-    expect(nav.navigate).not.toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalledWith("/transactions?year=2025", { replace: true });
   });
 
   it("offers 'all years' once a year is selected and clears the param", () => {
@@ -109,6 +106,6 @@ describe("Income page commands", () => {
     const group = groups.find((g) => g.id === "income-year")!;
     expect(group.items.map((i) => i.label)).toEqual([s.incomeAllYears, "Income year: 2026"]);
     group.items[0]!.run(nav);
-    expect(window.location.search).toBe("");
+    expect(nav.navigate).toHaveBeenCalledWith("/transactions", { replace: true });
   });
 });

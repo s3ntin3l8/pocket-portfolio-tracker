@@ -292,6 +292,23 @@ test.describe("contextual page commands (#930)", () => {
     await expect(page.getByRole("button", { name: "Search" }).first()).toBeVisible();
   });
 
+  test("Income: a year command sticks in ?year= after the palette closes", async ({ page }) => {
+    await gotoReady(page, "/en/income");
+    await page.keyboard.press(`${mod}+k`);
+    const year = palette(page)
+      .getByRole("option", { name: /^Income year: \d{4}$/ })
+      .first();
+    test.skip((await year.count()) === 0, "demo dataset has income in only one year");
+    const label = (await year.textContent()) ?? "";
+    const picked = label.match(/\d{4}/)![0];
+    await year.click();
+    await expect(palette(page)).toBeHidden();
+    // The palette's back-to-close marker must not undo the write when it pops.
+    await expect(page).toHaveURL(new RegExp(`year=${picked}`));
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(new RegExp(`year=${picked}`));
+  });
+
   test("Activity: the drafts command (a push) leaves the palette closed and back sane", async ({
     page,
   }) => {
