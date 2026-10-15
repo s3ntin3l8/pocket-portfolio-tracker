@@ -9,9 +9,17 @@ assistant (Claude Code, Claude Desktop, any MCP client) can read and explain you
   (`config: { scope: "read" }` on the route — see `plugins/auth.ts`); everything a tool does goes back through
   the API in-process and is gated like any other request.
 - **Transport security:** the token is a bearer credential — always use an `https://` API address. (TLS normally terminates at the reverse proxy, so the API itself does not enforce it.)
-- **Tools:** the 12 tools in `packages/ai-tools` (portfolios, net worth, summary, holdings, transaction search,
-  value history, income, contributions, tax, targets/drift, insights, instrument lookup), plus the
-  `pocket://glossary` resource and three prompts (`monthly_review`, `tax_year_check`, `rebalancing_plan`).
+- **Tools:** the 16 tools in `packages/ai-tools` (portfolios, net worth, summary, holdings, transaction search,
+  value history, income, contributions, tax, targets/drift, insights, instrument lookup, plus the four below),
+  the `pocket://glossary` resource and three prompts (`monthly_review`, `tax_year_check`, `rebalancing_plan`).
+
+  | Tool                          | What it adds                                                                                                                                                                                                                                                          |
+  | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `get_rebalancing` + `newCash` | A what-if: a positive decimal string in the display currency, split buy-only over the under-target buckets in proportion to their target weights (`GET /networth/rebalancing`, `GET /portfolios/:id/rebalancing`; core does the maths).                               |
+  | `explain_tax_concept`         | Static, reviewed text for Vorabpauschale, Teilfreistellung, Basiszins, FSA, Sparerpauschbetrag and the loss pots. Regime-aware: a user on the Indonesian regime gets a "German regime only" caveat. No live rates or user figures; those come from `get_tax_summary`. |
+  | `get_fsa_allocation`          | Per-depot FSA allocated / used / remaining plus the holder's cap (ids only, no portfolio or holder names). Advisory: changing an allocation is a Settings action.                                                                                                     |
+  | `resolve_instrument`          | Provider search / ISIN resolution (`GET /instruments/lookup`) for instruments Pocket does not know yet, up to 10 candidates. `lookup_instrument` stays for known ones.                                                                                                |
+  | `explain_import_duplicates`   | Which drafts of an import were flagged as likely duplicates (`GET /imports/:id`, so no write-scope change) and what `enrichment` vs `duplicate` mean.                                                                                                                 |
 
 ## Connect
 

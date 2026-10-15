@@ -93,7 +93,8 @@ function buildMcpServer(client: ApiClient, write: boolean): McpServer {
       prompt(
         `Check my tax position${year ? ` for ${year}` : " for the current year"}. Use get_tax_summary ` +
           "and get_portfolio_summary. Report allowance used vs available per holder and depot, " +
-          "realized gains, and whether the allocation across depots looks sensible. Not tax advice.",
+          "realized gains, and whether the allocation across depots looks sensible (get_fsa_allocation shows " +
+          "the split per depot; explain_tax_concept explains terms like Vorabpauschale). Not tax advice.",
       ),
   );
   server.registerPrompt(
@@ -107,7 +108,8 @@ function buildMcpServer(client: ApiClient, write: boolean): McpServer {
       prompt(
         `Compare my allocation with my targets by ${dimension ?? "asset_class"} using get_rebalancing ` +
           "and get_holdings. Show the drift per bucket and describe, without computing new figures " +
-          "yourself, which buckets are over or under target.",
+          "yourself, which buckets are over or under target. If I mention fresh cash to invest, pass it as " +
+          "newCash to get_rebalancing for the buy-only split.",
       ),
   );
 

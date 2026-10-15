@@ -13,6 +13,7 @@ import type {
 import { z } from "zod";
 import { downsample } from "./compact.js";
 import { stripSensitive } from "./redact.js";
+import { regimeCaveat, TAX_CONCEPT_TEXT, TAX_CONCEPTS } from "./tax-concepts.js";
 import type { AiTool } from "./types.js";
 
 const costBasis = z.enum(["purchase_price", "total_paid"]).optional();
@@ -30,6 +31,20 @@ const holderId = id()
 const BASIS_NOTE =
   "Name the basis of any gain you quote (vs cost of holdings / vs net contributed) and disclose " +
   "valuedAtCost holdings and fxMissingCurrencies exclusions.";
+
+/** Run `fn` over `items` with at most `limit` in flight; results keep input order. */
+async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
 
 /** Per-holding fields a model needs; drops lots/sparkline and nested metadata noise. */
 function compactHolding(h: HoldingValuation) {
@@ -351,12 +366,33 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     title: "Targets and drift",
     description:
       "Saved target weights for a dimension and the current drift from them. Dimensions: asset_class, " +
-      "currency, region, sector. Empty when the user has not set targets.",
+      "currency, region, sector. Empty when the user has not set targets. Pass newCash to run a what-if: " +
+      "a positive decimal string (dot as separator, no currency symbol) in the display currency, e.g. " +
+      "'1000'. The result then also has `trades`, a buy-only split of that cash over the buckets that are " +
+      "under target, in proportion to their target weights (no selling; buckets within the tolerance band " +
+      "get nothing). Describe those amounts as an illustration of the split, not as advice, and never " +
+      "recompute them. Disclose fxMissingCurrencies exclusions.",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       dimension: z.enum(["asset_class", "currency", "region", "sector"]),
+      newCash: z
+        .string()
+        .max(24)
+        .regex(/^\d+(\.\d+)?$/)
+        .optional()
+        .describe("Fresh cash to deploy, positive decimal string in the display currency"),
     }),
-    handler: async ({ portfolioId: id, dimension }) => {
+    handler: async ({ portfolioId: id, dimension, newCash }) => {
+      if (newCash !== undefined) {
+        const plan = await client.getRebalancingPlan(dimension, newCash, id);
+        return {
+          ...plan,
+          fxMissingCurrencies: plan.fxMissingCurrencies ?? [],
+          note:
+            "Buy-only: newCash is split across under-target buckets in proportion to their target " +
+            "weights. An illustration of the split, not advice.",
+        };
+      }
       const [targets, src] = await Promise.all([
         id ? client.getPortfolioTargets(id, dimension) : client.getNetworthTargets(dimension),
         id ? client.getSummary(id) : client.getNetWorth(),
@@ -396,6 +432,190 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
         market: i.market,
         currency: i.currency,
       }));
+    },
+  });
+
+  add({
+    name: "explain_tax_concept",
+    title: "Explain a tax concept",
+    description:
+      "Plain-language, reviewed explanation of a German tax concept Pocket models: vorabpauschale, " +
+      "teilfreistellung, basiszins, fsa, sparerpauschbetrag, loss_pots. Static text with no live rates and " +
+      "none of the user's figures: for their own numbers (accrued or estimated Vorabpauschale, " +
+      "Teilfreistellung rates per instrument, allowance used) call get_tax_summary. For a user on the " +
+      "Indonesian regime the result carries a caveat that the concept does not apply to them; pass it on. " +
+      "Not tax advice.",
+    inputSchema: z.object({ concept: z.enum(TAX_CONCEPTS) }),
+    handler: async ({ concept }) => {
+      // A failed preferences lookup must not hide the explanation; the caveat then says "unknown".
+      const regime = await client
+        .getPreferences()
+        .then((p) => p.taxRegime)
+        .catch(() => null);
+      const caveat = regimeCaveat(regime);
+      return {
+        concept,
+        taxRegime: regime,
+        ...TAX_CONCEPT_TEXT[concept],
+        ...(caveat ? { caveat } : {}),
+        disclaimer: "Explanation only, not tax advice.",
+      };
+    },
+  });
+
+  add({
+    name: "get_fsa_allocation",
+    title: "FSA allocation across depots",
+    description:
+      "How a holder's Freistellungsauftrag (FSA) is split across depots for a tax year: per depot the " +
+      "allocated amount, the allowance used so far and what remains, plus the holder's cap, total " +
+      "allocated and whether it is over-allocated. Use it to suggest, as an illustration, how the user " +
+      "could re-split the allocation (e.g. move allowance from a depot with headroom to one that is " +
+      "exhausted). It is advisory only: you cannot change anything. Tell the user to change a depot's tax " +
+      "allowance in Settings and, separately, the FSA at the broker. Depots are identified by id and " +
+      "brokerage; German regime only. Not tax advice.",
+    inputSchema: z.object({
+      holderId,
+      year: z.number().int().min(2000).max(2100).optional(),
+    }),
+    handler: async ({ holderId: h, year }) => {
+      const all = await client.listPortfolios();
+      const depots = all.filter((p) => !h || p.accountHolderId === h);
+      const rows = await mapLimited(depots, 3, async (p) => {
+        const base = {
+          portfolioId: p.id,
+          holderId: p.accountHolderId,
+          brokerage: p.brokerage,
+          allocated: p.taxAllowanceAnnual,
+        };
+        // No FSA allocated: the tax route would refuse (422) and there is nothing to split.
+        if (p.taxAllowanceAnnual == null) {
+          return {
+            depot: { ...base, used: null, remaining: null },
+            distribution: null,
+            regime: null,
+          };
+        }
+        try {
+          const tax = await client.getPortfolioTax(p.id, year);
+          return {
+            depot: {
+              ...base,
+              used: tax.allowanceUsage?.usedYtd ?? null,
+              remaining: tax.allowanceUsage?.remaining ?? null,
+              currency: tax.currency,
+            },
+            distribution: tax.holderDistribution ?? null,
+            regime: tax.regime ?? null,
+            year: tax.year,
+          };
+        } catch (err) {
+          const e = toolError(err);
+          return {
+            depot: { ...base, used: null, remaining: null, error: e.error },
+            distribution: null,
+            regime: null,
+          };
+        }
+      });
+      const holders = new Map<string, unknown>();
+      for (const r of rows) {
+        const hid = r.depot.holderId;
+        if (hid && r.distribution && !holders.has(hid)) {
+          // Pick the figures explicitly: a holder name must never ride along.
+          const { holderAllowanceCap, totalAllocated, remainingToDistribute, overAllocated } =
+            r.distribution;
+          holders.set(hid, {
+            holderAllowanceCap,
+            totalAllocated,
+            remainingToDistribute,
+            overAllocated,
+          });
+        }
+      }
+      return {
+        year: rows.find((r) => "year" in r)?.year ?? year ?? null,
+        depots: rows.map((r) => r.depot),
+        holders: [...holders].map(([holderId, holderDistribution]) => ({
+          holderId,
+          holderDistribution,
+        })),
+        ...(rows.some((r) => r.regime === "ID")
+          ? { note: "The Indonesian final-tax regime has no FSA; nothing to allocate." }
+          : {}),
+      };
+    },
+  });
+
+  add({
+    name: "resolve_instrument",
+    title: "Resolve an unknown instrument",
+    description:
+      "Look an instrument up at the market-data providers by ticker, name or ISIN (including ISIN to " +
+      "ticker resolution) when it is not yet in the user's data: returns symbol, isin, name, assetClass, " +
+      "market and currency, up to 10 matches. Use lookup_instrument for instruments already known to " +
+      "Pocket. Present candidates and let the user choose; never assume one when several match.",
+    inputSchema: z.object({ q: z.string().min(1).max(100) }),
+    handler: async ({ q }) => {
+      const list = await client.lookupInstruments(q);
+      return list.slice(0, 10).map((i) => ({
+        symbol: i.symbol,
+        isin: i.isin ?? null,
+        name: i.name,
+        assetClass: i.assetClass,
+        market: i.market,
+        currency: i.currency,
+      }));
+    },
+  });
+
+  add({
+    name: "explain_import_duplicates",
+    title: "Explain import duplicate flags",
+    description:
+      "For a draft import (id from the review link), list which drafts were flagged as likely duplicates " +
+      "of already-booked transactions in the import's target portfolio, with the matching transaction's " +
+      "source and date, and explain the flag. kind 'enrichment' = same trade from a different source and " +
+      "this import adds a document or tax detail, so confirming enriches the existing transaction. kind " +
+      "'duplicate' = same source or nothing new, so it is held back from 'Confirm all'. If the import " +
+      "has no target portfolio yet, nothing was checked: the user picks one in the review screen. Nothing " +
+      "is booked or changed.",
+    inputSchema: z.object({ importId: id().describe("Import id from the review link") }),
+    handler: async ({ importId }) => {
+      const imp = await client.getImport(importId);
+      const flagged = imp.drafts.flatMap((d, draftIndex) =>
+        d.likelyDuplicate
+          ? [
+              {
+                draftIndex,
+                kind: d.likelyDuplicate.kind,
+                draft: {
+                  name: d.name ?? d.isin ?? d.ticker ?? null,
+                  action: d.action,
+                  quantity: d.quantity,
+                  executedAt: String(d.executedAt).slice(0, 10),
+                },
+                matched: {
+                  source: d.likelyDuplicate.source,
+                  executedAt: String(d.likelyDuplicate.executedAt).slice(0, 10),
+                },
+              },
+            ]
+          : [],
+      );
+      return {
+        importId: imp.id,
+        status: imp.status,
+        parser: imp.parser,
+        draftCount: imp.drafts.length,
+        checkedAgainstPortfolio: imp.portfolioId !== null,
+        flagged,
+        explanation:
+          "Pocket dedups in three levels: the same file is recognised by its content hash; within one " +
+          "source a transaction is unique by its external id; and across sources an economic fingerprint " +
+          "(instrument, type, day, quantity, price) flags likely re-imports, counting same-day repeats so " +
+          "genuine ones are not suppressed. Imports never auto-commit: the user always reviews and confirms.",
+      };
     },
   });
 

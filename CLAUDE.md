@@ -26,7 +26,7 @@ cash** with live IDX prices and a real-time gold ticker.
   (also holdings/trades/tax/income/allocation/forecasts/contributions — the largest
   route file), `corporate-actions`, `mergers`, `loans` (skip an installment / early payoff of a cicilan, `docs/loans.md`), `imports` (+`imports/parse`,
   `imports/confirm`), `documents`, `instruments`, `quotes`, `search`, `storage`,
-  `targets`, `tr`, `ibkr`, `preferences`, `mcp` (read-only MCP endpoint, see `docs/mcp.md`),
+  `targets` (+ the new-cash `/rebalancing` what-if), `tr`, `ibkr`, `preferences`, `mcp` (read-only MCP endpoint, see `docs/mcp.md`),
   `assistant` (in-app chat over SSE, see `docs/assistant.md`), `admin`. Schema + migrations come from
   `@portfolio/db`; the API applies them at startup.
 - **`apps/web`** — **Next.js (App Router) PWA**, Tailwind + shadcn/ui, **next-intl**

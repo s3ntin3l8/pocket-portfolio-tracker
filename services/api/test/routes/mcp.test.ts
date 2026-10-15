@@ -135,10 +135,66 @@ describe("POST /mcp", () => {
       annotations?: { readOnlyHint?: boolean };
     }[];
     expect(tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["list_portfolios", "get_net_worth", "get_holdings"]),
+      expect.arrayContaining([
+        "list_portfolios",
+        "get_net_worth",
+        "get_holdings",
+        "explain_tax_concept",
+        "get_fsa_allocation",
+        "resolve_instrument",
+        "explain_import_duplicates",
+      ]),
     );
-    expect(tools.length).toBeGreaterThanOrEqual(12);
+    expect(tools.length).toBeGreaterThanOrEqual(16);
     expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
+  });
+
+  it("explains a tax concept and runs the new-cash what-if through a read-scoped token", async () => {
+    const tax = await callTool(ownerPat, "explain_tax_concept", { concept: "vorabpauschale" });
+    expect(tax.isError).toBe(false);
+    expect(tax.data).toMatchObject({ concept: "vorabpauschale", taxRegime: "DE" });
+    expect(tax.data).not.toHaveProperty("caveat");
+
+    const whatIf = await callTool(ownerPat, "get_rebalancing", {
+      dimension: "asset_class",
+      newCash: "250.50",
+    });
+    expect(whatIf.isError).toBe(false);
+    expect(whatIf.data).toMatchObject({ newCash: "250.50", trades: [], fxMissingCurrencies: [] });
+
+    // Not a positive decimal string: refused by the tool's schema, not computed.
+    const bad = await rpc(ownerPat, "tools/call", {
+      name: "get_rebalancing",
+      arguments: { dimension: "asset_class", newCash: "-1" },
+    });
+    expect(bad.json().result?.isError ?? !!bad.json().error).toBe(true);
+  });
+
+  it("explain_import_duplicates answers import_not_found for another user's import", async () => {
+    const writePat = await mintPat(await jwt("mcp-owner"), "write");
+    const made = await callTool(writePat, "propose_transactions", {
+      transactions: [
+        {
+          action: "buy",
+          name: "Dup Corp",
+          ticker: "DUP",
+          quantity: "1",
+          price: "10",
+          currency: "EUR",
+          executedAt: "2026-04-02T00:00:00.000Z",
+        },
+      ],
+    });
+    const own = await callTool(ownerPat, "explain_import_duplicates", {
+      importId: made.data.importId,
+    });
+    expect(own.isError).toBe(false);
+    expect(own.data).toMatchObject({ draftCount: 1, flagged: [] });
+    const foreign = await callTool(otherPat, "explain_import_duplicates", {
+      importId: made.data.importId,
+    });
+    expect(foreign.isError).toBe(true);
+    expect(foreign.data).toEqual({ error: "import_not_found", status: 404 });
   });
 
   it("offers propose_transactions only to a write-scoped token, annotated as a non-destructive write", async () => {
