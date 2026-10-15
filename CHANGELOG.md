@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.1...v0.2.2) (2026-10-15)
+
+
+### Features
+
+* **ai:** assistant tools for tax explanations, FSA, new-cash rebalancing, instrument and dedup assist ([#986](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/986)) ([539dbeb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/539dbeb6550d9fb47927e10bb57b247157ae15ea))
+* **web:** contextual per-page commands in the command bar ([#985](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/985)) ([b942095](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b942095501df3de02261c3c40c23a0ce7ee271dc))
+
 ## [0.2.1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.0...v0.2.1) (2026-10-15)
 
 
