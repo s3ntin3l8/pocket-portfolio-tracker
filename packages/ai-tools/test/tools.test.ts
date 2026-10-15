@@ -1,4 +1,5 @@
 import { ApiError, type ApiClient } from "@portfolio/api-client";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createTools,
@@ -8,6 +9,7 @@ import {
   toJsonSchema,
 } from "../src/index.js";
 import { downsample } from "../src/compact.js";
+import { TAX_CONCEPTS, TAX_CONCEPT_TEXT } from "../src/tax-concepts.js";
 
 // Fixtures deliberately carry every sensitive key so the walker proves none survive.
 const P1 = "11111111-1111-1111-1111-111111111111";
@@ -352,6 +354,42 @@ describe("ai-tools", () => {
     expect(() => t.inputSchema.parse({ concept: "made_up" })).toThrow();
   });
 
+  it("get_rebalancing rejects a non-positive or zero-padded newCash at the schema", () => {
+    const t = byName("get_rebalancing");
+    for (const bad of ["0", "0.00", "007", "-5", "1e3"]) {
+      expect(() => t.inputSchema.parse({ dimension: "asset_class", newCash: bad }), bad).toThrow();
+    }
+    expect(() =>
+      t.inputSchema.parse({ dimension: "asset_class", newCash: "1000.50" }),
+    ).not.toThrow();
+  });
+
+  it("get_fsa_allocation notes the Indonesian regime from preferences, even with no allocations", async () => {
+    const spy = client.getPreferences;
+    (client as unknown as Record<string, unknown>).getPreferences = async () => ({
+      taxRegime: "ID",
+    });
+    const out = (await byName("get_fsa_allocation").handler({})) as { note?: string };
+    (client as unknown as Record<string, unknown>).getPreferences = spy;
+    expect(out.note).toMatch(/Indonesian final-tax regime has no FSA/);
+  });
+
+  it("tax concept text stays in sync with docs/tax.md (one section per concept)", () => {
+    const doc = readFileSync(new URL("../../../docs/tax.md", import.meta.url), "utf8");
+    const heading: Record<(typeof TAX_CONCEPTS)[number], string> = {
+      vorabpauschale: "### Vorabpauschale (§18(3) InvStG",
+      teilfreistellung: "### Teilfreistellung (partial exemption)",
+      basiszins: "### Basiszins and the Vorabpauschale",
+      fsa: "### Two-level Freistellungsauftrag (FSA)",
+      sparerpauschbetrag: "### Two-level Freistellungsauftrag (FSA)",
+      loss_pots: "### Two-pot loss netting",
+    };
+    for (const concept of TAX_CONCEPTS) {
+      expect(doc, `docs/tax.md lost the section behind "${concept}"`).toContain(heading[concept]);
+      expect(TAX_CONCEPT_TEXT[concept].summary.length).toBeGreaterThan(0);
+    }
+  });
+
   it("get_fsa_allocation reports per-depot headroom by id, with no names", async () => {
     calls.length = 0;
     const out = (await byName("get_fsa_allocation").handler({ year: 2026, holderId: H1 })) as {
@@ -382,7 +420,7 @@ describe("ai-tools", () => {
     expect(out.holders).toHaveLength(1);
     expect(out.holders[0]!.holderDistribution).toMatchObject({ overAllocated: false });
     // Only the allocated depot is queried: the other would be a 422.
-    expect(calls).toEqual(["listPortfolios()", 'getPortfolioTax("p1",2026)']);
+    expect(calls).toEqual(["listPortfolios()", "getPreferences()", 'getPortfolioTax("p1",2026)']);
     expect(JSON.stringify(out)).not.toMatch(/Depot|Mustermann/);
   });
 

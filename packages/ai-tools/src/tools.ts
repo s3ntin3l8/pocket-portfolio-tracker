@@ -35,6 +35,8 @@ const BASIS_NOTE =
 /** Run `fn` over `items` with at most `limit` in flight; results keep input order. */
 async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
   const out: R[] = new Array(items.length);
+  // Shared cursor: safe without a lock, as `next++` and the bounds check run synchronously
+  // between awaits (JS is single-threaded), so no two workers can claim the same index.
   let next = 0;
   const worker = async () => {
     while (next < items.length) {
@@ -367,7 +369,7 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     description:
       "Saved target weights for a dimension and the current drift from them. Dimensions: asset_class, " +
       "currency, region, sector. Empty when the user has not set targets. Pass newCash to run a what-if: " +
-      "a positive decimal string (dot as separator, no currency symbol) in the display currency, e.g. " +
+      "a positive decimal string (dot as separator, no currency symbol) in the result's displayCurrency, e.g. " +
       "'1000'. The result then also has `trades`, a buy-only split of that cash over the buckets that are " +
       "under target, in proportion to their target weights (no selling; buckets within the tolerance band " +
       "get nothing). Describe those amounts as an illustration of the split, not as advice, and never " +
@@ -378,9 +380,12 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       newCash: z
         .string()
         .max(24)
-        .regex(/^\d+(\.\d+)?$/)
+        .regex(/^(0|[1-9]\d*)(\.\d+)?$/)
+        .refine((v) => /[1-9]/.test(v), "must be greater than zero")
         .optional()
-        .describe("Fresh cash to deploy, positive decimal string in the display currency"),
+        .describe(
+          "Fresh cash to deploy, positive decimal string in the response's displayCurrency",
+        ),
     }),
     handler: async ({ portfolioId: id, dimension, newCash }) => {
       if (newCash !== undefined) {
@@ -479,7 +484,16 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       year: z.number().int().min(2000).max(2100).optional(),
     }),
     handler: async ({ holderId: h, year }) => {
-      const all = await client.listPortfolios();
+      // The regime comes from preferences, not from the depot loop: an Indonesian-regime user
+      // whose depots carry no allowance would otherwise never see the note. A failed lookup
+      // must not hide the allocation.
+      const [all, regime] = await Promise.all([
+        client.listPortfolios(),
+        client
+          .getPreferences()
+          .then((pr) => pr.taxRegime)
+          .catch(() => null),
+      ]);
       const depots = all.filter((p) => !h || p.accountHolderId === h);
       const rows = await mapLimited(depots, 3, async (p) => {
         const base = {
@@ -540,7 +554,7 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
           holderId,
           holderDistribution,
         })),
-        ...(rows.some((r) => r.regime === "ID")
+        ...(regime === "ID" || rows.some((r) => r.regime === "ID")
           ? { note: "The Indonesian final-tax regime has no FSA; nothing to allocate." }
           : {}),
       };

@@ -41,9 +41,9 @@ import {
 const REBALANCING_DIMENSIONS = ["asset_class", "currency", "region", "sector"] as const;
 type RebalancingDimension = (typeof REBALANCING_DIMENSIONS)[number];
 
-/** A positive decimal string: digits with an optional fraction, no sign or exponent. */
+/** A positive decimal string: digits with an optional fraction, no sign, exponent or leading zeros. */
 function parseNewCash(v: unknown): string | null {
-  if (typeof v !== "string" || v.length > 24 || !/^\d+(\.\d+)?$/.test(v)) return null;
+  if (typeof v !== "string" || v.length > 24 || !/^(0|[1-9]\d*)(\.\d+)?$/.test(v)) return null;
   return new Decimal(v).gt(0) ? v : null;
 }
 

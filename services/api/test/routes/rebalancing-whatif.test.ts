@@ -151,18 +151,28 @@ describe("rebalancing what-if with new cash", () => {
     expect(res.json()).toMatchObject({ targets: [], drift: [], trades: [] });
   });
 
-  it.each([undefined, "", "0", "0.00", "-5", "abc", "1e3", "1,5", "5 EUR", "1".repeat(30)])(
-    "rejects newCash %j with 400 invalid_new_cash",
-    async (newCash) => {
-      const qs = new URLSearchParams({ dimension: "asset_class" });
-      if (newCash !== undefined) qs.set("newCash", newCash);
-      for (const { base } of urls()) {
-        const res = await app.inject({ method: "GET", url: `${base}?${qs}`, headers: auth(t) });
-        expect(res.statusCode).toBe(400);
-        expect(res.json()).toEqual({ error: "invalid_new_cash" });
-      }
-    },
-  );
+  it.each([
+    undefined,
+    "",
+    "0",
+    "0.00",
+    "-5",
+    "abc",
+    "1e3",
+    "00.10",
+    "007",
+    "1,5",
+    "5 EUR",
+    "1".repeat(30),
+  ])("rejects newCash %j with 400 invalid_new_cash", async (newCash) => {
+    const qs = new URLSearchParams({ dimension: "asset_class" });
+    if (newCash !== undefined) qs.set("newCash", newCash);
+    for (const { base } of urls()) {
+      const res = await app.inject({ method: "GET", url: `${base}?${qs}`, headers: auth(t) });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: "invalid_new_cash" });
+    }
+  });
 
   it("rejects an unknown dimension with 400", async () => {
     for (const { base } of urls()) {
