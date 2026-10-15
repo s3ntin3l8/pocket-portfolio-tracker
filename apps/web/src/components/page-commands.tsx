@@ -50,29 +50,17 @@ const Ctx = createContext<Registry>(EMPTY);
 export function PageCommandsProvider({ children }: { children: ReactNode }) {
   const [map, setMap] = useState<ReadonlyMap<string, PageCommandGroup>>(new Map());
 
-  // Consumers can unmount after the provider does (route transition); their cleanup must
-  // not push state into a dead provider.
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
   const register = useCallback((group: PageCommandGroup) => {
     setMap((prev) => new Map(prev).set(group.id, group));
     // Only remove our own entry: with a duplicate id the later registration wins, and the
     // earlier owner unmounting must not take the newer group down with it.
-    return () => {
-      if (!mounted.current) return;
+    return () =>
       setMap((prev) => {
         if (prev.get(group.id) !== group) return prev;
         const next = new Map(prev);
         next.delete(group.id);
         return next;
       });
-    };
   }, []);
 
   const value = useMemo<Registry>(() => ({ groups: [...map.values()], register }), [map, register]);
@@ -105,6 +93,8 @@ export function useRegisterPageCommands(group: PageCommandGroup): void {
   const signature = JSON.stringify([
     group.id,
     group.heading,
+    // `displayName` is set at runtime by lucide's CJS build and may be empty in ESM builds;
+    // it is only a best-effort part of the key (ids/labels carry the identity).
     group.items.map((i) => [i.id, i.label, i.keywords ?? "", i.icon?.displayName ?? ""]),
   ]);
 
