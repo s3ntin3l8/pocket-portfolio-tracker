@@ -48,7 +48,6 @@ export function OnboardingFlow() {
   const t = useTranslations("Onboarding");
   const api = useApiClient();
   const router = useRouter();
-  // Shared with the app-wide theme controls; defaults dark (matches the design's own default).
 
   // Desktop/mobile layout switch at the app-wide `md` breakpoint (768px) — the same one
   // every overlay uses. `useMediaQuery` reports `false` for the server render and
@@ -155,8 +154,6 @@ export function OnboardingFlow() {
     "",
     "",
   ][step];
-
-  // The toggle's label is the *action* — the opposite of the current theme.
 
   const stepTitle = stepMetaByIndex[step];
   const brandContent = brandByIndex[step];

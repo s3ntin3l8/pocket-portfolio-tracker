@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderToString } from "react-dom/server";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { useTheme } from "next-themes";
@@ -47,5 +48,22 @@ describe("ThemeTogglePill", () => {
     renderPill("light");
     fireEvent.click(screen.getByRole("radio", { name: messages.Onboarding.themeLight }));
     expect(setTheme).not.toHaveBeenCalled();
+  });
+
+  it("marks nothing active before mount (server render)", () => {
+    vi.mocked(useTheme).mockReturnValue({
+      resolvedTheme: "dark",
+      setTheme,
+      theme: "dark",
+      themes: ["light", "dark"],
+      systemTheme: "dark",
+    });
+    const html = renderToString(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ThemeTogglePill />
+      </NextIntlClientProvider>,
+    );
+    expect(html).not.toContain('role="radio"');
+    expect(html).not.toContain("bg-pill");
   });
 });
