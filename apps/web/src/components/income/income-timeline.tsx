@@ -4,7 +4,8 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { replaceUrlParam } from "@/lib/url-state";
 import { useTranslations } from "next-intl";
-import { ChevronDown, ChevronRight, Check } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { useRegisterPageCommands } from "@/components/page-commands";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DropdownMenu,
@@ -107,6 +108,28 @@ export function IncomeTimeline({
     () => [...new Set(rows.map((r) => r.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a)),
     [rows],
   );
+
+  // Command bar: the same year filter the dropdown offers, written shallowly via the URL.
+  const tSearch = useTranslations("Search");
+  useRegisterPageCommands({
+    id: "income-year",
+    heading: tSearch("groupPage"),
+    items:
+      yearOptions.length > 1
+        ? ["all", ...yearOptions]
+            .filter((y) => y !== yearFilter)
+            .map((y) => ({
+              id: y,
+              label: y === "all" ? tSearch("incomeAllYears") : tSearch("incomeYearTo", { year: y }),
+              icon: Calendar,
+              run: ({ close }) => {
+                setYearFilter(y);
+                if (y !== "all") setExpanded((prev) => new Set(prev).add(y));
+                close();
+              },
+            }))
+        : [],
+  });
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();

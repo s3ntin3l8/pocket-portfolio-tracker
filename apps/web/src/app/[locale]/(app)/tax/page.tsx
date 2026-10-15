@@ -18,6 +18,7 @@ import {
   type TaxTranslator,
 } from "@/components/tax/tax-cards";
 import { PeriodSelect } from "@/components/period-select";
+import { TaxPageCommands } from "@/components/tax/tax-page-commands";
 import { RegimeIndicator } from "@/components/tax/regime-indicator";
 import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
 import { loadNetworthTaxResult, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
@@ -122,6 +123,11 @@ export default async function TaxPage({
         value={String(year ?? currentYear)}
         defaultValue={String(currentYear)}
         options={[...yearOptions].sort((a, b) => b - a).map(String)}
+      />
+      <TaxPageCommands
+        years={[...yearOptions].sort((a, b) => b - a).map(String)}
+        selected={String(year ?? currentYear)}
+        currentYear={String(currentYear)}
       />
       {holders.map((entry, idx) => {
         const detail = detailByHolder.get(entry.holder.id) ?? null;

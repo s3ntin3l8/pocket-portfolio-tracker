@@ -30,6 +30,28 @@ export function useAnomalyMap(anomalies: Anomaly[]) {
   }, [anomalies]);
 }
 
+/** The Activity URL after setting/clearing params (falsy value clears) — and resetting
+ *  `page` to 1, since the row set changed. Shared with the command bar's "drafts" command. */
+export function buildTransactionHref(
+  pathname: string,
+  currentQuery: string,
+  keyOrUpdates: string | Record<string, string | undefined>,
+  value?: string,
+): string {
+  const params = new URLSearchParams(currentQuery);
+  const updates: [string, string | undefined][] =
+    typeof keyOrUpdates === "string" ? [[keyOrUpdates, value]] : Object.entries(keyOrUpdates);
+  for (const [key, v] of updates) {
+    if (v) {
+      params.set(key, v);
+    } else {
+      params.delete(key);
+    }
+  }
+  params.set("page", "1");
+  return `${pathname}?${params.toString()}`;
+}
+
 /**
  * Returns a callback for updating one or more URL query params. Accepts either a single
  * `(key, value)` pair (every chip click) or a batch `{ key: value, ... }` object (e.g.
@@ -50,18 +72,7 @@ export function useTransactionUrlNav() {
   const searchParams = useSearchParams();
   return useCallback(
     (keyOrUpdates: string | Record<string, string | undefined>, value?: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      const updates: [string, string | undefined][] =
-        typeof keyOrUpdates === "string" ? [[keyOrUpdates, value]] : Object.entries(keyOrUpdates);
-      for (const [key, v] of updates) {
-        if (v) {
-          params.set(key, v);
-        } else {
-          params.delete(key);
-        }
-      }
-      params.set("page", "1");
-      router.push(`${pathname}?${params.toString()}`);
+      router.push(buildTransactionHref(pathname, searchParams.toString(), keyOrUpdates, value));
     },
     [router, pathname, searchParams],
   );

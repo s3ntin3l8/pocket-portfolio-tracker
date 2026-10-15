@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { TABLE_LABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
 import { TradesTable } from "@/components/trades-table";
 import { TradeMethodToggle } from "@/components/trade-method-toggle";
+import { TradesPageCommands } from "@/components/trades-page-commands";
 import { loadTrades, loadPreferences } from "@/lib/server-api";
 import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
 
@@ -70,11 +71,14 @@ export default async function TradesPage({
         subtitle={t("subtitle")}
         action={
           log ? (
-            <TradeMethodToggle
-              current={method}
-              labelAverage={t("methodAverage")}
-              labelFifo={t("methodFifo")}
-            />
+            <>
+              <TradeMethodToggle
+                current={method}
+                labelAverage={t("methodAverage")}
+                labelFifo={t("methodFifo")}
+              />
+              <TradesPageCommands current={method} />
+            </>
           ) : undefined
         }
       />

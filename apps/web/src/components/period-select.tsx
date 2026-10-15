@@ -5,6 +5,25 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 /**
+ * The URL for switching a period param: `next === defaultValue` drops the param (the
+ * default period is an absent param, keeping the default URL clean). Shared with the
+ * command bar's per-page year commands so both write identical URLs.
+ */
+export function buildPeriodHref(
+  pathname: string,
+  currentQuery: string,
+  param: string,
+  next: string,
+  defaultValue: string,
+): string {
+  const params = new URLSearchParams(currentQuery);
+  if (next === defaultValue) params.delete(param);
+  else params.set(param, next);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+/**
  * Period (year) selector backed by a URL search param (`?year=` by default) — the URL is
  * the state, so a period is shareable, survives reload and PWA restore. The server page
  * reads the param, so a change is a `router.replace` (no history entry, no scroll jump)
@@ -32,11 +51,10 @@ export function PeriodSelect({
   const searchParams = useSearchParams();
 
   function onChange(next: string) {
-    const params = new URLSearchParams(searchParams?.toString() ?? "");
-    if (next === defaultValue) params.delete(param);
-    else params.set(param, next);
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    router.replace(
+      buildPeriodHref(pathname, searchParams?.toString() ?? "", param, next, defaultValue),
+      { scroll: false },
+    );
   }
 
   return (
