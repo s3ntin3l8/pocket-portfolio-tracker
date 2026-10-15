@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, ViewTransition } from "react";
+import { useState, useCallback, useRef, startTransition, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
 import {
@@ -73,9 +73,18 @@ export function HeroGlanceCard({
   });
   const [range, setRange] = useState<ChartRange>(initialRange);
 
+  // The first emission (mount) fills the pills in place; every later one is a range/data change
+  // and goes through `startTransition` so the keyed <ViewTransition> below can tick the pills.
+  // This is client state only: no route transition, URL stays a shallow replaceState.
+  const hasEmitted = useRef(false);
   const onSeriesChange = useCallback((s: HeroSeriesSnapshot, r: ChartRange) => {
-    setSnapshot(s);
-    setRange(r);
+    const apply = () => {
+      setSnapshot(s);
+      setRange(r);
+    };
+    if (hasEmitted.current) startTransition(apply);
+    else apply();
+    hasEmitted.current = true;
   }, []);
 
   const first = snapshot.points[0];
@@ -131,24 +140,35 @@ export function HeroGlanceCard({
       )}
 
       {hasDelta && closeDelta !== null && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {snapshot.isIntraday ? (
+        // Keyed by range + values: a range change swaps the key so the old pills fade out and
+        // the new ones tick in (same pattern as the headline). The headline is not keyed on
+        // range, so it stays put.
+        <ViewTransition
+          // "none" is a sentinel: the first non-null benchmark value changes the key, so it ticks in.
+          key={`${range}|${snapshot.isIntraday}|${closeDelta.toFixed(4)}|${benchmarkPct?.toFixed(4) ?? "none"}`}
+          enter="vt-tick"
+          exit="vt-tick-out"
+          default="none"
+        >
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {snapshot.isIntraday ? (
+              <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
+                {closeDelta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
+                {periodWord}
+              </span>
+            ) : (
+              <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
+                {closeDelta >= 0 ? "▲" : "▼"} {formatPercent(closeDelta / 100, locale)} {periodWord}
+              </span>
+            )}
             <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-              {closeDelta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
-              {periodWord}
+              {tb("vs", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}{" "}
+              {benchmarkPct !== null
+                ? formatPercent(benchmarkPct / 100, locale)
+                : t("benchmarkPillUnavailable")}
             </span>
-          ) : (
-            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-              {closeDelta >= 0 ? "▲" : "▼"} {formatPercent(closeDelta / 100, locale)} {periodWord}
-            </span>
-          )}
-          <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-            {tb("vs", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}{" "}
-            {benchmarkPct !== null
-              ? formatPercent(benchmarkPct / 100, locale)
-              : t("benchmarkPillUnavailable")}
-          </span>
-        </div>
+          </div>
+        </ViewTransition>
       )}
 
       <div className="mt-3.5">

@@ -266,6 +266,58 @@ describe("NetWorthHistoryChart", () => {
       });
     });
 
+    it("holds the emission while a range fetch is in flight, then emits once with the new range", async () => {
+      let resolve!: (v: HistoryPoint[]) => void;
+      getNetWorthHistory.mockImplementationOnce(
+        () => new Promise<HistoryPoint[]>((r) => (resolve = r)),
+      );
+      const onSeriesChange = vi.fn();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <NetWorthHistoryChart
+            initial={pointsWithBenchmark}
+            currency="IDR"
+            variant="hero"
+            initialRange="1y"
+            onSeriesChange={onSeriesChange}
+          />
+        </NextIntlClientProvider>,
+      );
+      await waitFor(() => expect(onSeriesChange).toHaveBeenCalled());
+      onSeriesChange.mockClear();
+      fireEvent.click(screen.getByRole("radio", { name: "1M" }));
+      await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1m"));
+      // Range already flipped, data still the old series: nothing may be emitted yet.
+      expect(onSeriesChange).not.toHaveBeenCalled();
+      await act(async () => resolve(pointsWithBenchmark));
+      await waitFor(() => expect(onSeriesChange).toHaveBeenCalledTimes(1));
+      expect(onSeriesChange.mock.calls[0]?.[1]).toBe("1m");
+    });
+
+    it("never emits the old series under the new range when the refetch fails", async () => {
+      getNetWorthHistory.mockRejectedValueOnce(new Error("boom"));
+      const onSeriesChange = vi.fn();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <NetWorthHistoryChart
+            initial={pointsWithBenchmark}
+            currency="IDR"
+            variant="hero"
+            initialRange="1y"
+            onSeriesChange={onSeriesChange}
+          />
+        </NextIntlClientProvider>,
+      );
+      await waitFor(() => expect(onSeriesChange).toHaveBeenCalled());
+      onSeriesChange.mockClear();
+      fireEvent.click(screen.getByRole("radio", { name: "1M" }));
+      await waitFor(() => expect(getNetWorthHistory).toHaveBeenCalledWith("1m"));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(onSeriesChange).not.toHaveBeenCalled();
+    });
+
     it("emits hasBenchmark=false when benchmark data is absent", async () => {
       const onSeriesChange = vi.fn();
       render(
