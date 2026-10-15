@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -46,48 +47,51 @@ export function RowActions({
     <span className="flex items-center justify-end gap-1">
       {imp.status === "draft" && (
         <>
-          <Button size="icon" variant="ghost" asChild>
-            <Link
-              href={`/transactions/import/${imp.id}`}
-              title={t("review")}
-              aria-label={t("review")}
+          <InfoTip label={t("review")}>
+            <Button size="icon" variant="ghost" asChild>
+              <Link
+                href={`/transactions/import/${imp.id}`}
+                aria-label={t("review")}
+                onPointerDown={stop}
+                onClick={stop}
+              >
+                <Eye className="size-4" />
+              </Link>
+            </Button>
+          </InfoTip>
+          <InfoTip label={t("discard")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={t("discard")}
+              disabled={busy}
               onPointerDown={stop}
-              onClick={stop}
+              onClick={(e) => {
+                stop(e);
+                onDiscard(imp.id);
+              }}
             >
-              <Eye className="size-4" />
-            </Link>
-          </Button>
+              {busy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
+            </Button>
+          </InfoTip>
+        </>
+      )}
+      {imp.status === "discarded" && (
+        <InfoTip label={t("clear")}>
           <Button
             size="icon"
             variant="ghost"
-            title={t("discard")}
-            aria-label={t("discard")}
+            aria-label={t("clear")}
             disabled={busy}
             onPointerDown={stop}
             onClick={(e) => {
               stop(e);
-              onDiscard(imp.id);
+              onClear(imp.id);
             }}
           >
             {busy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
           </Button>
-        </>
-      )}
-      {imp.status === "discarded" && (
-        <Button
-          size="icon"
-          variant="ghost"
-          title={t("clear")}
-          aria-label={t("clear")}
-          disabled={busy}
-          onPointerDown={stop}
-          onClick={(e) => {
-            stop(e);
-            onClear(imp.id);
-          }}
-        >
-          {busy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
-        </Button>
+        </InfoTip>
       )}
       {imp.status === "confirmed" &&
         (confirmId === imp.id ? (
@@ -124,48 +128,52 @@ export function RowActions({
         ) : (
           <>
             {imp.document && (
-              <Button
-                size="icon"
-                variant="ghost"
-                title={imp.document.originalFilename ?? t("downloadReceipt")}
-                aria-label={t("downloadReceipt")}
-                onPointerDown={stop}
-                onClick={(e) => {
-                  stop(e);
-                  onDownload(imp.id);
-                }}
-              >
-                <Download className="size-4" />
-              </Button>
+              // Hover label is the filename on purpose; the accessible name stays "download receipt".
+              <InfoTip label={imp.document.originalFilename ?? t("downloadReceipt")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={t("downloadReceipt")}
+                  onPointerDown={stop}
+                  onClick={(e) => {
+                    stop(e);
+                    onDownload(imp.id);
+                  }}
+                >
+                  <Download className="size-4" />
+                </Button>
+              </InfoTip>
             )}
             {canReassign && (
+              <InfoTip label={t("reassign")}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={t("reassign")}
+                  onPointerDown={stop}
+                  onClick={(e) => {
+                    stop(e);
+                    onReassign(imp.id);
+                  }}
+                >
+                  <FolderInput className="size-4" />
+                </Button>
+              </InfoTip>
+            )}
+            <InfoTip label={t("undo")}>
               <Button
                 size="icon"
                 variant="ghost"
-                title={t("reassign")}
-                aria-label={t("reassign")}
+                aria-label={t("undo")}
                 onPointerDown={stop}
                 onClick={(e) => {
                   stop(e);
-                  onReassign(imp.id);
+                  onSetConfirmId(imp.id);
                 }}
               >
-                <FolderInput className="size-4" />
+                <Undo2 className="size-4" />
               </Button>
-            )}
-            <Button
-              size="icon"
-              variant="ghost"
-              title={t("undo")}
-              aria-label={t("undo")}
-              onPointerDown={stop}
-              onClick={(e) => {
-                stop(e);
-                onSetConfirmId(imp.id);
-              }}
-            >
-              <Undo2 className="size-4" />
-            </Button>
+            </InfoTip>
           </>
         ))}
     </span>

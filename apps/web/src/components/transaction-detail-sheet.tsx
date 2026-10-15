@@ -15,6 +15,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { InfoTip, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TransactionSourcesSection } from "@/components/transaction-sources-section";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -88,6 +89,10 @@ export function TransactionDetailSheet({
   const router = useRouter();
   const [clientRate, setClientRate] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // The "⋯" tooltip is suppressed while its dropdown is open so the two popups never stack. The
+  // tip keeps its own open state: a bare `open={!menuOpen}` would pin it open whenever the menu is closed.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuTipOpen, setMenuTipOpen] = useState(false);
 
   const { dismissing, deleting, statusBusy, dismissAnomaly, onDelete, downloadReceipt, setStatus } =
     useTransactionActions(api, router, tx);
@@ -169,12 +174,17 @@ export function TransactionDetailSheet({
   );
 
   const overflowMenu = hasOverflow && (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button type="button" className={iconBtn} aria-label={tm("actions")} title={tm("actions")}>
-          <MoreHorizontal className="size-[18px]" />
-        </button>
-      </DropdownMenuTrigger>
+    <DropdownMenu modal={false} onOpenChange={setMenuOpen}>
+      <Tooltip open={menuTipOpen && !menuOpen} onOpenChange={setMenuTipOpen}>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className={iconBtn} aria-label={tm("actions")}>
+              <MoreHorizontal className="size-[18px]" />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{tm("actions")}</TooltipContent>
+      </Tooltip>
       <OverflowMenuContent
         tx={tx}
         canReassign={canReassign}
@@ -283,15 +293,16 @@ export function TransactionDetailSheet({
                   {t("sourcesSection.autoParsedRetained")}
                 </p>
               </div>
-              <button
-                type="button"
-                aria-label={t("sourcesSection.download")}
-                title={t("sourcesSection.download")}
-                onClick={() => void downloadReceipt()}
-                className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border bg-background text-foreground transition-colors hover:bg-secondary"
-              >
-                <Download className="size-4" />
-              </button>
+              <InfoTip label={t("sourcesSection.download")}>
+                <button
+                  type="button"
+                  aria-label={t("sourcesSection.download")}
+                  onClick={() => void downloadReceipt()}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-border bg-background text-foreground transition-colors hover:bg-secondary"
+                >
+                  <Download className="size-4" />
+                </button>
+              </InfoTip>
             </div>
           </div>
         )}

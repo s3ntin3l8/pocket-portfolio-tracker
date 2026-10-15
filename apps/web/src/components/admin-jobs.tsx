@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/tooltip";
 import { useState, useRef } from "react";
 import { useApiClient } from "@/lib/api";
 import { useInterval } from "@/lib/use-interval";
@@ -80,17 +81,18 @@ function TriggerButton({ name, supportsForce, onTriggered, currentLastRunAt }: T
           {pending ? t("jobRunning") : t("jobRunNow")}
         </button>
         {supportsForce && (
-          <button
-            type="button"
-            onClick={() => void trigger(true)}
-            disabled={pending || forcePending}
-            aria-label={t("jobForce")}
-            title={t("jobForce")}
-            className="flex items-center gap-1 rounded-sm border border-border bg-card px-3.5 py-1.5 text-xs font-bold disabled:opacity-60"
-          >
-            {forcePending && <Spinner size="sm" />}
-            {forcePending ? t("jobRunning") : t("jobForce")}
-          </button>
+          <InfoTip label={t("jobForce")}>
+            <button
+              type="button"
+              onClick={() => void trigger(true)}
+              disabled={pending || forcePending}
+              aria-label={t("jobForce")}
+              className="flex items-center gap-1 rounded-sm border border-border bg-card px-3.5 py-1.5 text-xs font-bold disabled:opacity-60"
+            >
+              {forcePending && <Spinner size="sm" />}
+              {forcePending ? t("jobRunning") : t("jobForce")}
+            </button>
+          </InfoTip>
         )}
       </div>
       {error && <span className="text-xs text-destructive">{error}</span>}

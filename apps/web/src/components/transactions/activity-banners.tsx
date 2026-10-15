@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/ui/tooltip";
 import { AlertTriangle, X } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -205,15 +206,16 @@ export function ReconciliationBanner({
         {tag}
       </span>
       {onDismiss && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label={dismissLabel ?? title}
-          title={dismissLabel ?? title}
-          className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/50 hover:text-muted-foreground"
-        >
-          <X className="size-4" />
-        </button>
+        <InfoTip label={dismissLabel ?? title}>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label={dismissLabel ?? title}
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/50 hover:text-muted-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </InfoTip>
       )}
     </div>
   );
