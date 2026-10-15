@@ -110,10 +110,12 @@ export interface AuthedUser {
   // Derived from the Authentik `groups` claim each request — not stored on the row.
   isAdmin: boolean;
   // How this request authenticated: an interactive Authentik session ("jwt"), a local
-  // password login ("local"), or a personal access token ("pat"). Minting a new PAT
+  // password login ("local"), a personal access token ("pat"), or an OAuth access token
+  // issued to an AI connector ("oauth"). Minting a new PAT or changing the password
   // requires an interactive session ("jwt" or "local").
-  authMethod: "jwt" | "local" | "pat";
-  // "write" for interactive sessions; a PAT carries its own (read-only by default).
+  authMethod: "jwt" | "local" | "pat" | "oauth";
+  // "write" for interactive sessions; a PAT or connector token carries its own scope
+  // (read-only unless granted).
   scope: "read" | "write";
 }
 
@@ -123,7 +125,23 @@ export interface AuthedUser {
  * for these callers instead of spending quota or writing rows.
  */
 export function isReadOnlyPat(request: FastifyRequest): boolean {
-  return request.user?.authMethod === "pat" && request.user.scope === "read";
+  return isDelegated(request.user) && request.user!.scope === "read";
+}
+
+/**
+ * A credential handed to a tool or connector (PAT, OAuth connector token) rather than an
+ * interactive login. It may never mint credentials or change the password.
+ */
+export function isDelegated(user: Pick<AuthedUser, "authMethod"> | undefined): boolean {
+  return user?.authMethod === "pat" || user?.authMethod === "oauth";
+}
+
+/** Scopes granted to an OAuth access token (`scope` string claim, or a `scp` array). */
+export function tokenScopes(payload: Record<string, unknown>): string[] {
+  if (typeof payload.scope === "string") return payload.scope.split(/\s+/).filter(Boolean);
+  if (Array.isArray(payload.scp))
+    return payload.scp.filter((x): x is string => typeof x === "string");
+  return [];
 }
 
 /** Returns the authenticated user or throws — use inside `authenticate`d handlers. */
@@ -173,7 +191,55 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
     }
   }
 
-  const anyAuthConfigured = keyResolver != null || localJwtKey != null;
+  // OAuth for AI connectors (claude.ai / mobile → /mcp): a dedicated Authentik provider whose
+  // tokens carry its own client_id as audience (and its own issuer, which contains the
+  // application slug). Accepted next to the normal web-login tokens; see docs/mcp.md.
+  const mcpAudience = app.config.AUTHENTIK_MCP_AUDIENCE;
+  const mcpIssuer = app.config.AUTHENTIK_MCP_ISSUER || app.config.AUTHENTIK_ISSUER;
+  const mcpKeyResolver: AuthKey | null = !mcpAudience
+    ? null
+    : (opts.authKey ??
+      (mcpIssuer && mcpIssuer === app.config.AUTHENTIK_ISSUER && keyResolver
+        ? keyResolver
+        : mcpIssuer
+          ? createIssuerJwks(mcpIssuer)
+          : null));
+  if (mcpAudience && !mcpKeyResolver) {
+    throw new Error(
+      "AUTHENTIK_MCP_AUDIENCE is set but there is no issuer to verify its tokens against — " +
+        "set AUTHENTIK_MCP_ISSUER (or AUTHENTIK_ISSUER)",
+    );
+  }
+
+  const anyAuthConfigured = keyResolver != null || localJwtKey != null || mcpKeyResolver != null;
+
+  // A read-scoped credential may not mutate. PATs and connector tokens share this gate:
+  // method-based, plus two route-level opt-ins — `config: { scope: "write" }` makes a GET that
+  // mutates state or spends provider quota need a write credential, and `scope: "read"` is the
+  // inverse for a POST that only reads (the MCP transport; whatever it does internally goes
+  // back through the API and is gated there).
+  const blockedForReadScope = (request: FastifyRequest) => {
+    const routeScope = request.routeOptions?.config?.scope;
+    const methodMutates = MUTATING_METHODS.has(request.method) && routeScope !== "read";
+    return methodMutates || routeScope === "write";
+  };
+
+  // A 401 on the OAuth-protected MCP resource tells the client where to find the metadata
+  // that starts the flow (RFC 9728 / MCP authorization).
+  if (app.config.PUBLIC_API_URL && mcpAudience) {
+    const metadataUrl = `${app.config.PUBLIC_API_URL.trim().replace(/\/+$/, "")}/.well-known/oauth-protected-resource/mcp`;
+    app.addHook("onSend", async (request, reply, payload) => {
+      if (reply.statusCode === 401 && request.routeOptions?.config?.oauthResource) {
+        reply.header(
+          "www-authenticate",
+          `Bearer resource_metadata="${metadataUrl}"${
+            request.headers.authorization ? ', error="invalid_token"' : ""
+          }`,
+        );
+      }
+      return payload;
+    });
+  }
 
   app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
     const header = request.headers.authorization;
@@ -205,16 +271,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
         .set({ lastUsedAt: new Date() })
         .where(eq(apiTokens.id, row.id));
       const scope = row.scope === "write" ? "write" : "read";
-      // Method-based gate, plus two route-level opt-ins: `config: { scope: "write" }` makes
-      // a GET that mutates state or spends provider quota need a write PAT, and
-      // `config: { scope: "read" }` (below) is the inverse for a POST that only reads.
-      const routeScope = request.routeOptions?.config?.scope;
-      const routeNeedsWrite = routeScope === "write";
-      // `scope: "read"` is the inverse opt-in: the route is read-only even though it is a
-      // POST (the MCP transport), so a read PAT may call it. Whatever it does internally
-      // goes back through the API and is gated there.
-      const methodMutates = MUTATING_METHODS.has(request.method) && routeScope !== "read";
-      if (scope === "read" && (methodMutates || routeNeedsWrite)) {
+      if (scope === "read" && blockedForReadScope(request)) {
         return reply.code(403).send({ error: "read_only_token" });
       }
       request.user = {
@@ -263,6 +320,32 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       }
     }
 
+    // Try an AI connector's OAuth token (its own audience/issuer). Treated like a PAT: read-only
+    // unless it was granted MCP_WRITE_SCOPE, never admin, and no more reach than a PAT.
+    let oauthScope: "read" | "write" = "read";
+    if (!authMethod && mcpKeyResolver) {
+      try {
+        const verifyOpts: JWTVerifyOptions = { issuer: mcpIssuer, audience: mcpAudience };
+        const { payload } =
+          typeof mcpKeyResolver === "function"
+            ? await jwtVerify(token, mcpKeyResolver, verifyOpts)
+            : await jwtVerify(token, mcpKeyResolver, verifyOpts);
+        if (payload.sub) {
+          sub = payload.sub;
+          email = typeof payload.email === "string" ? payload.email : `${sub}@users.noreply`;
+          emailVerified = payload.email_verified === true;
+          isAdmin = false;
+          authMethod = "oauth";
+          oauthScope = tokenScopes(payload).includes(app.config.MCP_WRITE_SCOPE) ? "write" : "read";
+        }
+      } catch {
+        // Not a connector token either — fall through to local auth / 401
+      }
+      if (authMethod === "oauth" && oauthScope === "read" && blockedForReadScope(request)) {
+        return reply.code(403).send({ error: "read_only_token" });
+      }
+    }
+
     // Try local auth (symmetric HS256 JWT signed by /auth/local/login)
     if (!authMethod && localJwtKey) {
       try {
@@ -299,6 +382,12 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       // a brand-new, empty, non-admin account under the same credentials.
       if (authMethod === "local") {
         return reply.code(401).send({ error: "invalid_token" });
+      }
+      // A connector token never creates or rebinds an account: it acts for a user who already
+      // has one (made by a normal web login). Otherwise a read-only credential would mutate
+      // user rows, and everyone the connector application admits would get an account.
+      if (authMethod === "oauth") {
+        return reply.code(401).send({ error: "account_required" });
       }
       // OIDC JIT-insert. The happy path is a brand-new user; the recovery path handles
       // the local→OIDC migration when the email we want to use is already taken by a
@@ -380,7 +469,7 @@ export const authPlugin = fp<AuthPluginOptions>(async (app: FastifyInstance, opt
       authSub: user.authSub,
       isAdmin,
       authMethod,
-      scope: "write",
+      scope: authMethod === "oauth" ? oauthScope : "write",
     };
     request.userId = user.id;
   });
@@ -414,6 +503,9 @@ declare module "fastify" {
      *  `"read"`: a read-scoped PAT may use this route despite a mutating method (a
      *  POST that is itself read-only, e.g. the MCP transport). */
     scope?: "write" | "read";
+    /** The OAuth-protected MCP resource: a 401 here carries a `WWW-Authenticate` challenge that
+     *  points clients at the protected-resource metadata, so they can start the OAuth flow. */
+    oauthResource?: boolean;
   }
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;

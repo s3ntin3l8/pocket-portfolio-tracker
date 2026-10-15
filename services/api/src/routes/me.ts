@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { and, desc, eq } from "drizzle-orm";
 import { users, apiTokens } from "@portfolio/db";
 import { userUpdateSchema, apiTokenCreateSchema } from "@portfolio/schema";
-import { requireUser, PAT_PREFIX, hashToken } from "../plugins/auth.js";
+import { requireUser, isDelegated, PAT_PREFIX, hashToken } from "../plugins/auth.js";
 import { deleteOwnedOr404 } from "./helpers.js";
 
 // Columns safe to return to the client — never the hash.
@@ -85,7 +85,7 @@ export async function meRoute(app: FastifyInstance) {
   // perpetuation). Returns the plaintext token ONCE; only its hash is stored.
   app.post("/me/tokens", { preHandler: app.authenticate }, async (request, reply) => {
     const { id, authMethod } = requireUser(request);
-    if (authMethod === "pat") {
+    if (isDelegated({ authMethod })) {
       return reply.code(403).send({ error: "interactive_session_required" });
     }
     const { name, scope, expiresInDays } = apiTokenCreateSchema.parse(request.body);

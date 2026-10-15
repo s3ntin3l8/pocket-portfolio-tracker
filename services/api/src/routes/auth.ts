@@ -10,6 +10,7 @@ import {
   verifyPassword,
   timingSafeVerifyPassword,
   requireUser,
+  isDelegated,
 } from "../plugins/auth.js";
 
 const LOCAL_JWT_EXPIRY = "7d";
@@ -197,7 +198,7 @@ export const authRoute = fp(async (app) => {
       // Only from an interactive session — a leaked PAT must not be able to change the
       // password it was minted under (mirrors /me/tokens' "no credential self-
       // perpetuation" guard in me.ts).
-      if (authMethod === "pat") {
+      if (isDelegated({ authMethod })) {
         return reply.code(403).send({ error: "interactive_session_required" });
       }
 
@@ -253,7 +254,7 @@ export const authRoute = fp(async (app) => {
       // Same guard as change-password: a PAT cannot plant a password on the account it
       // was minted under. Without this, a leaked read/write PAT for an OIDC-only user
       // (passwordHash always null) could grant itself interactive email/password access.
-      if (authMethod === "pat") {
+      if (isDelegated({ authMethod })) {
         return reply.code(403).send({ error: "interactive_session_required" });
       }
 

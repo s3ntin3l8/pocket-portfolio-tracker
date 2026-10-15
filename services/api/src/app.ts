@@ -33,6 +33,7 @@ import { ibkrRoute } from "./routes/ibkr.js";
 import { adminRoute } from "./routes/admin.js";
 import { searchRoute } from "./routes/search.js";
 import { mcpRoute } from "./routes/mcp.js";
+import { oauthMetadataRoute } from "./routes/oauth-metadata.js";
 import { assistantRoute } from "./routes/assistant.js";
 import { getChatProvider } from "./services/chat/registry.js";
 import type { ChatProvider } from "./services/chat/types.js";
@@ -360,6 +361,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(adminRoute);
   await app.register(searchRoute);
   await app.register(mcpRoute);
+  await app.register(oauthMetadataRoute);
   await app.register(assistantRoute);
   await app.register(targetsRoute);
   await app.register(preferencesRoute);

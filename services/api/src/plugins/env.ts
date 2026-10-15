@@ -66,6 +66,31 @@ const schema = {
     },
     // Public origin of the web app (https://pocket.example.com). Only used to turn the relative
     // import-review path into a link an external AI client (MCP) can open; unset = path only.
+    // --- OAuth for AI connectors (claude.ai / mobile → /mcp). See docs/mcp.md. ---
+    // Public origin of THIS API (https://api.example.com): the OAuth protected-resource
+    // metadata and the WWW-Authenticate challenge point clients at it. Unset = no OAuth
+    // discovery (personal access tokens keep working).
+    PUBLIC_API_URL: {
+      type: "string",
+      default: "",
+    },
+    // client_id of a dedicated Authentik OAuth provider for the connector. Its tokens are
+    // accepted next to the normal web-login ones, with PAT-like read/write scope.
+    AUTHENTIK_MCP_AUDIENCE: {
+      type: "string",
+      default: "",
+    },
+    // Issuer of that provider (its URL contains the application slug, so it differs from
+    // AUTHENTIK_ISSUER). Defaults to AUTHENTIK_ISSUER.
+    AUTHENTIK_MCP_ISSUER: {
+      type: "string",
+      default: "",
+    },
+    // Scope that upgrades a connector token from read-only to write (draft-only tools).
+    MCP_WRITE_SCOPE: {
+      type: "string",
+      default: "pocket:write",
+    },
     PUBLIC_WEB_URL: {
       type: "string",
       default: "",
@@ -270,6 +295,10 @@ declare module "fastify" {
       AUTH_LOCAL_SECRET: string;
       CORS_ORIGIN: string;
       PUBLIC_WEB_URL: string;
+      PUBLIC_API_URL: string;
+      AUTHENTIK_MCP_AUDIENCE: string;
+      AUTHENTIK_MCP_ISSUER: string;
+      MCP_WRITE_SCOPE: string;
       RATE_LIMIT_MAX: number;
       RATE_LIMIT_WINDOW: string;
       ASSISTANT_RATE_LIMIT_MAX: number;

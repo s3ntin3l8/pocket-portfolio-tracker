@@ -108,6 +108,24 @@ services:
       GEMINI_VISION_MODEL: ${GEMINI_VISION_MODEL:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-}
+      # In-app assistant (chat): which provider/model answers. The admin UI (Admin > Assistant
+      # providers) overrides these; empty = unset. Credentials are the vision providers' above.
+      CHAT_PROVIDER: ${CHAT_PROVIDER:-}
+      ANTHROPIC_CHAT_MODEL: ${ANTHROPIC_CHAT_MODEL:-}
+      ANTHROPIC_CHAT_EFFORT: ${ANTHROPIC_CHAT_EFFORT:-}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-}
+      OPENROUTER_CHAT_MODEL: ${OPENROUTER_CHAT_MODEL:-}
+      OPENROUTER_ALLOW_DATA_COLLECTION: ${OPENROUTER_ALLOW_DATA_COLLECTION:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-}
+      ASSISTANT_RATE_LIMIT_MAX: ${ASSISTANT_RATE_LIMIT_MAX:-30}
+      # Public web origin, so AI clients that propose transactions get an absolute review link.
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
+      # OAuth for AI connectors (claude.ai / mobile -> /mcp), optional — see docs/mcp.md.
+      AUTHENTIK_MCP_AUDIENCE: ${AUTHENTIK_MCP_AUDIENCE:-}
+      AUTHENTIK_MCP_ISSUER: ${AUTHENTIK_MCP_ISSUER:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      MCP_WRITE_SCOPE: ${MCP_WRITE_SCOPE:-pocket:write}
       # Market data providers (all optional — see .env.example for what each unlocks).
       ITICK_API_KEY: ${ITICK_API_KEY:-}
       TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
