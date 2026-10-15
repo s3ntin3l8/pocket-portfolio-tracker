@@ -2696,7 +2696,11 @@
       "get_tax_summary": "Tax summary",
       "get_rebalancing": "Targets and drift",
       "get_insights": "Insights",
-      "lookup_instrument": "Instrument lookup"
+      "lookup_instrument": "Instrument lookup",
+      "explain_tax_concept": "Tax concept",
+      "get_fsa_allocation": "FSA allocation",
+      "resolve_instrument": "Instrument resolution",
+      "explain_import_duplicates": "Duplicate check"
     },
     "errors": {
       "generic": "Something went wrong. Please try again.",

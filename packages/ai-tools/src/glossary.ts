@@ -13,5 +13,6 @@ export const GLOSSARY = `# Pocket glossary
 - **Income** (dividends, interest, coupons) is return, never contribution.
 - **transfer_in / transfer_out** move shares between depots at carried cost; they are not sales and carry no P&L.
 - **Freistellungsauftrag (FSA)** is allocated per depot; the legal cap lives on the account holder.
+- For what a German tax term means (Vorabpauschale, Teilfreistellung, …) use explain_tax_concept; the user's own figures come from get_tax_summary.
 - Explanations only — this is not financial or tax advice.
 `;

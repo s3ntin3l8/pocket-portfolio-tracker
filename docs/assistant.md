@@ -8,6 +8,14 @@ identical. **Nothing is stored unless you opt in**: the conversation lives in th
 _Keep assistant conversations_ are the question and answer texts also saved on the server (see
 [Conversation history](#conversation-history-opt-in)).
 
+## Tools
+
+The tool set is the one in [mcp.md](mcp.md#ai-assistant-access-mcp). Beyond reading figures, the assistant can
+explain German tax terms (`explain_tax_concept`, caveated for non-DE users), show the FSA split across depots
+(`get_fsa_allocation`, advisory), run a buy-only "invest new cash" what-if (`get_rebalancing` with `newCash`),
+resolve an unknown instrument or ISIN (`resolve_instrument`) and explain duplicate flags on a draft import
+(`explain_import_duplicates`). All are read-only; none changes data.
+
 ## Endpoints
 
 |                         |                                                                                                                                                                                                                                                      |

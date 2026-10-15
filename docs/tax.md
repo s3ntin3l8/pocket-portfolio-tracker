@@ -289,6 +289,14 @@ same-named `costBasisMode` column also exists on the `loans` table for gold cici
 contracts — display-only there, purely about which cost figure a loan's summary shows,
 and entirely unrelated to this user-level preference.)
 
+## Assistant explanations
+
+The in-app assistant and MCP clients can explain the concepts above through the `explain_tax_concept`
+tool (`packages/ai-tools/src/tax-concepts.ts`): static, reviewed text for Vorabpauschale,
+Teilfreistellung, Basiszins, FSA, Sparerpauschbetrag and the loss pots. It cites no live rates and none of the
+user's figures (those come from `get_tax_summary`), and for a user on the `"ID"` regime it carries a "German
+regime only" caveat. **Keep that text in sync with this document** when the rules here change.
+
 ## References
 
 - `packages/core/src/tax.ts` — German Sparerpauschbetrag/Teilfreistellung/two-pot

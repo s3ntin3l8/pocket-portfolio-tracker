@@ -2696,7 +2696,11 @@
       "get_tax_summary": "Ringkasan pajak",
       "get_rebalancing": "Target dan selisih",
       "get_insights": "Wawasan",
-      "lookup_instrument": "Pencarian instrumen"
+      "lookup_instrument": "Pencarian instrumen",
+      "explain_tax_concept": "Penjelasan istilah pajak",
+      "get_fsa_allocation": "Alokasi FSA",
+      "resolve_instrument": "Penelusuran instrumen",
+      "explain_import_duplicates": "Pemeriksaan duplikat"
     },
     "errors": {
       "generic": "Terjadi kesalahan. Silakan coba lagi.",

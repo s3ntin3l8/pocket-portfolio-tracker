@@ -662,6 +662,21 @@ export interface TradeAction {
   side: "buy" | "sell";
 }
 
+/** Response of `GET /networth/rebalancing` and `GET /portfolios/:id/rebalancing`. */
+export interface RebalancingPlan {
+  dimension: "asset_class" | "currency" | "region" | "sector";
+  /** Currency of every amount below (decimal strings). */
+  displayCurrency: string;
+  /** The what-if amount echoed back (decimal string, display currency). */
+  newCash: string;
+  targets: TargetWeight[];
+  drift: DriftRow[];
+  /** Buy-only split of `newCash` across under-target buckets, proportional to their targets. */
+  trades: TradeAction[];
+  /** Currencies excluded from the figures for lack of an FX rate (added by the API). */
+  fxMissingCurrencies?: string[];
+}
+
 export interface Instrument {
   id: string;
   isin: string | null;
@@ -3114,6 +3129,20 @@ export function createApiClient(config: ApiClientConfig) {
      */
     putNetworthTargets: (dimension: string, targets: TargetWeight[]) =>
       request<TargetWeight[]>("PUT", "/networth/targets", { dimension, targets }),
+
+    /**
+     * What-if: split `newCash` (positive decimal string, display currency) over the buckets
+     * currently under target. Computed server-side by core; omit `portfolioId` for all portfolios.
+     */
+    getRebalancingPlan: (dimension: string, newCash: string, portfolioId?: string) => {
+      const params = new URLSearchParams({ dimension, newCash });
+      return request<RebalancingPlan>(
+        "GET",
+        portfolioId
+          ? `/portfolios/${portfolioId}/rebalancing?${params.toString()}`
+          : `/networth/rebalancing?${params.toString()}`,
+      );
+    },
 
     getTrades: (
       portfolioId: string,

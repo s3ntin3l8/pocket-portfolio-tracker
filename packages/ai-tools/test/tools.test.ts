@@ -1,4 +1,5 @@
 import { ApiError, type ApiClient } from "@portfolio/api-client";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createTools,
@@ -8,6 +9,7 @@ import {
   toJsonSchema,
 } from "../src/index.js";
 import { downsample } from "../src/compact.js";
+import { TAX_CONCEPTS, TAX_CONCEPT_TEXT } from "../src/tax-concepts.js";
 
 // Fixtures deliberately carry every sensitive key so the walker proves none survive.
 const P1 = "11111111-1111-1111-1111-111111111111";
@@ -84,12 +86,25 @@ const client = {
     {
       id: "p1",
       name: "Depot DE89 3704 0044 0532 0130 00",
-      accountHolderId: "h1",
+      accountHolderId: H1,
       baseCurrency: "EUR",
       brokerage: "X",
       accountHolder: "Max Mustermann",
       portfolioType: "standard",
       cashCounted: false,
+      taxAllowanceAnnual: "600",
+      ...leaky,
+    },
+    {
+      id: "p2",
+      name: "Second Depot",
+      accountHolderId: H1,
+      baseCurrency: "EUR",
+      brokerage: "Y",
+      accountHolder: "Max Mustermann",
+      portfolioType: "standard",
+      cashCounted: true,
+      taxAllowanceAnnual: null,
       ...leaky,
     },
   ]),
@@ -130,7 +145,19 @@ const client = {
   getIncome: rec("getIncome", { total: "2", ...leaky }),
   getPortfolioContributions: rec("getPortfolioContributions", { net: "1", ...leaky }),
   getContributions: rec("getContributions", { net: "2", ...leaky }),
-  getPortfolioTax: rec("getPortfolioTax", { year: 2026, ...leaky }),
+  getPortfolioTax: rec("getPortfolioTax", {
+    year: 2026,
+    regime: "DE",
+    currency: "EUR",
+    allowanceUsage: { usedYtd: "200", remaining: "400", allowanceAnnual: "600" },
+    holderDistribution: {
+      holderAllowanceCap: "1000",
+      totalAllocated: "600",
+      remainingToDistribute: "400",
+      overAllocated: false,
+    },
+    ...leaky,
+  }),
   getNetworthTax: rec("getNetworthTax", [
     {
       holder: {
@@ -161,6 +188,49 @@ const client = {
       ...leaky,
     },
   ]),
+  getPreferences: rec("getPreferences", { taxRegime: "DE" }),
+  getRebalancingPlan: rec("getRebalancingPlan", {
+    dimension: "asset_class",
+    displayCurrency: "EUR",
+    newCash: "1000",
+    targets: [{ key: "equity", targetPct: 60 }],
+    drift: [{ key: "equity", ...leaky }],
+    trades: [{ key: "equity", deltaValue: "1000", side: "buy" }],
+    ...leaky,
+  }),
+  lookupInstruments: rec(
+    "lookupInstruments",
+    Array.from({ length: 14 }, (_, n) => ({
+      symbol: `S${n}`,
+      name: "Core MSCI World",
+      market: "XETRA",
+      assetClass: "etf",
+      currency: "EUR",
+      isin: "IE00B4L5Y983",
+      source: "openfigi",
+      ...leaky,
+    })),
+  ),
+  getImport: rec("getImport", {
+    id: I1,
+    portfolioId: P1,
+    parser: "csv",
+    status: "draft",
+    errors: [],
+    contracts: [],
+    drafts: [
+      {
+        action: "buy",
+        name: "ABC",
+        quantity: "1",
+        executedAt: "2026-01-02T00:00:00.000Z",
+        notes: "SEPA DE89370400440532013000 Max Mustermann",
+        likelyDuplicate: { kind: "duplicate", source: "pdf", executedAt: "2026-01-02T00:00:00Z" },
+        ...leaky,
+      },
+      { action: "sell", name: "XYZ", quantity: "2", executedAt: "2026-01-03T00:00:00.000Z" },
+    ],
+  }),
 } as unknown as ApiClient;
 
 const tools = createTools(client);
@@ -177,6 +247,11 @@ const inputs: Record<string, unknown> = {
   get_tax_summary: { year: 2025 },
   "get_tax_summary#portfolio": { portfolioId: P1, year: 2025 },
   get_rebalancing: { dimension: "asset_class" },
+  "get_rebalancing#newCash": { dimension: "asset_class", newCash: "1000" },
+  explain_tax_concept: { concept: "vorabpauschale" },
+  get_fsa_allocation: { year: 2026 },
+  resolve_instrument: { q: "IE00B4L5Y983" },
+  explain_import_duplicates: { importId: I1 },
   get_insights: {},
   lookup_instrument: { q: "abc" },
 };
@@ -215,7 +290,7 @@ describe("ai-tools", () => {
 
   it("list_portfolios exposes the holder id, never the holder name", async () => {
     const out = (await byName("list_portfolios").handler({})) as Record<string, unknown>[];
-    expect(out[0]).toMatchObject({ accountHolderId: "h1" });
+    expect(out[0]).toMatchObject({ accountHolderId: H1 });
     expect(out[0]).not.toHaveProperty("accountHolder");
     expect(out[0]!.name).toBe("Depot [iban]");
   });
@@ -231,6 +306,190 @@ describe("ai-tools", () => {
       churchTax: null,
       taxResidence: "DE",
     });
+  });
+
+  it("get_rebalancing with newCash returns the server-computed split, otherwise behaves as before", async () => {
+    calls.length = 0;
+    const t = byName("get_rebalancing");
+    const plan = (await t.handler(
+      t.inputSchema.parse({ dimension: "asset_class", newCash: "1000.50", portfolioId: P1 }),
+    )) as { trades: { deltaValue: string }[]; fxMissingCurrencies: string[]; note: string };
+    expect(plan.trades[0]!.deltaValue).toBe("1000");
+    expect(plan.fxMissingCurrencies).toEqual([]);
+    expect(plan.note).toMatch(/not advice/);
+    expect(calls).toEqual([`getRebalancingPlan("asset_class","1000.50","${P1}")`]);
+    calls.length = 0;
+    await t.handler(t.inputSchema.parse({ dimension: "asset_class" }));
+    expect(calls.some((c) => c.startsWith("getRebalancingPlan"))).toBe(false);
+    expect(calls).toContain('getNetworthTargets("asset_class")');
+  });
+
+  it.each(["-5", "0x10", "1e3", "abc", "", "1,5", "5 EUR"])(
+    "get_rebalancing rejects newCash %j (positive decimal string only)",
+    (newCash) => {
+      const t = byName("get_rebalancing");
+      expect(t.inputSchema.safeParse({ dimension: "asset_class", newCash }).success).toBe(false);
+    },
+  );
+
+  it("explain_tax_concept is static text, with a caveat only for non-DE users", async () => {
+    const t = byName("explain_tax_concept");
+    const de = (await t.handler({ concept: "teilfreistellung" })) as Record<string, unknown>;
+    expect(de.taxRegime).toBe("DE");
+    expect(de).not.toHaveProperty("caveat");
+    expect(String(de.summary)).toMatch(/exempt/);
+    const spy = client.getPreferences;
+    (client as unknown as Record<string, unknown>).getPreferences = async () => ({
+      taxRegime: "ID",
+    });
+    const id = (await t.handler({ concept: "fsa" })) as Record<string, unknown>;
+    expect(String(id.caveat)).toMatch(/German tax regime only.*Indonesian final-tax/);
+    (client as unknown as Record<string, unknown>).getPreferences = async () => {
+      throw new Error("boom");
+    };
+    const unknown = (await t.handler({ concept: "fsa" })) as Record<string, unknown>;
+    expect(unknown.taxRegime).toBeNull();
+    expect(String(unknown.caveat)).toMatch(/could not be determined/);
+    (client as unknown as Record<string, unknown>).getPreferences = spy;
+    expect(() => t.inputSchema.parse({ concept: "made_up" })).toThrow();
+  });
+
+  it("get_rebalancing rejects a non-positive or zero-padded newCash at the schema", () => {
+    const t = byName("get_rebalancing");
+    for (const bad of ["0", "0.00", "007", "-5", "1e3"]) {
+      expect(() => t.inputSchema.parse({ dimension: "asset_class", newCash: bad }), bad).toThrow();
+    }
+    expect(() =>
+      t.inputSchema.parse({ dimension: "asset_class", newCash: "1000.50" }),
+    ).not.toThrow();
+  });
+
+  it("get_fsa_allocation notes the Indonesian regime from preferences, even with no allocations", async () => {
+    const spy = client.getPreferences;
+    (client as unknown as Record<string, unknown>).getPreferences = async () => ({
+      taxRegime: "ID",
+    });
+    const out = (await byName("get_fsa_allocation").handler({})) as { note?: string };
+    (client as unknown as Record<string, unknown>).getPreferences = spy;
+    expect(out.note).toMatch(/Indonesian final-tax regime has no FSA/);
+  });
+
+  it("tax concept text stays in sync with docs/tax.md (one section per concept)", () => {
+    const doc = readFileSync(new URL("../../../docs/tax.md", import.meta.url), "utf8");
+    const heading: Record<(typeof TAX_CONCEPTS)[number], string> = {
+      vorabpauschale: "### Vorabpauschale (§18(3) InvStG",
+      teilfreistellung: "### Teilfreistellung (partial exemption)",
+      basiszins: "### Basiszins and the Vorabpauschale",
+      fsa: "### Two-level Freistellungsauftrag (FSA)",
+      sparerpauschbetrag: "### Two-level Freistellungsauftrag (FSA)",
+      loss_pots: "### Two-pot loss netting",
+    };
+    for (const concept of TAX_CONCEPTS) {
+      expect(doc, `docs/tax.md lost the section behind "${concept}"`).toContain(heading[concept]);
+      expect(TAX_CONCEPT_TEXT[concept].summary.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("get_fsa_allocation reports per-depot headroom by id, with no names", async () => {
+    calls.length = 0;
+    const out = (await byName("get_fsa_allocation").handler({ year: 2026, holderId: H1 })) as {
+      year: number;
+      depots: Record<string, unknown>[];
+      holders: { holderId: string; holderDistribution: Record<string, unknown> }[];
+    };
+    expect(out.year).toBe(2026);
+    expect(out.depots).toEqual([
+      {
+        portfolioId: "p1",
+        holderId: H1,
+        brokerage: "X",
+        allocated: "600",
+        used: "200",
+        remaining: "400",
+        currency: "EUR",
+      },
+      {
+        portfolioId: "p2",
+        holderId: H1,
+        brokerage: "Y",
+        allocated: null,
+        used: null,
+        remaining: null,
+      },
+    ]);
+    expect(out.holders).toHaveLength(1);
+    expect(out.holders[0]!.holderDistribution).toMatchObject({ overAllocated: false });
+    // Only the allocated depot is queried: the other would be a 422.
+    expect(calls).toEqual(["listPortfolios()", "getPreferences()", 'getPortfolioTax("p1",2026)']);
+    expect(JSON.stringify(out)).not.toMatch(/Depot|Mustermann/);
+  });
+
+  it("get_fsa_allocation keeps only the distribution figures, never a holder name", async () => {
+    const orig = client.getPortfolioTax;
+    (client as unknown as Record<string, unknown>).getPortfolioTax = async () => ({
+      year: 2026,
+      currency: "EUR",
+      holderDistribution: {
+        holderAllowanceCap: "1000",
+        totalAllocated: "600",
+        remainingToDistribute: "400",
+        overAllocated: false,
+        holderName: "Max Mustermann",
+      },
+    });
+    const out = await byName("get_fsa_allocation").handler({});
+    (client as unknown as Record<string, unknown>).getPortfolioTax = orig;
+    expect(JSON.stringify(out)).not.toContain("Mustermann");
+  });
+
+  it("get_fsa_allocation filters by holder and turns a failed depot into an error code", async () => {
+    const t = byName("get_fsa_allocation");
+    const none = (await t.handler({ holderId: "other" })) as { depots: unknown[] };
+    expect(none.depots).toEqual([]);
+    const orig = client.getPortfolioTax;
+    (client as unknown as Record<string, unknown>).getPortfolioTax = async () => {
+      throw new ApiError(422, '{"error":"tax_allowance_not_configured"}');
+    };
+    const out = (await t.handler({})) as { depots: { error?: string }[] };
+    expect(out.depots[0]!.error).toBe("tax_allowance_not_configured");
+    (client as unknown as Record<string, unknown>).getPortfolioTax = orig;
+  });
+
+  it("resolve_instrument caps at 10 candidates and keeps the documented fields", async () => {
+    const out = (await byName("resolve_instrument").handler({ q: "IE00B4L5Y983" })) as Record<
+      string,
+      unknown
+    >[];
+    expect(out).toHaveLength(10);
+    expect(Object.keys(out[0]!).sort()).toEqual(
+      ["assetClass", "currency", "isin", "market", "name", "symbol"].sort(),
+    );
+  });
+
+  it("explain_import_duplicates lists only flagged drafts, without memos", async () => {
+    const out = (await byName("explain_import_duplicates").handler({ importId: I1 })) as {
+      draftCount: number;
+      checkedAgainstPortfolio: boolean;
+      flagged: { draftIndex: number; kind: string; matched: { source: string } }[];
+      explanation: string;
+    };
+    expect(out.draftCount).toBe(2);
+    expect(out.checkedAgainstPortfolio).toBe(true);
+    expect(out.flagged).toHaveLength(1);
+    expect(out.flagged[0]).toMatchObject({ draftIndex: 0, kind: "duplicate" });
+    expect(out.flagged[0]!.matched.source).toBe("pdf");
+    expect(out.explanation).toMatch(/three levels/);
+    expect(JSON.stringify(out)).not.toContain("SEPA");
+  });
+
+  it.each([
+    ["explain_import_duplicates", "importId"],
+    ["get_fsa_allocation", "holderId"],
+  ])("%s rejects a non-GUID %s (no path or query injection)", (name, key) => {
+    const t = byName(name);
+    for (const bad of ["../x", "a/b", "1?x=2", "not-a-guid"]) {
+      expect(t.inputSchema.safeParse({ [key]: bad }).success).toBe(false);
+    }
   });
 
   it("passes positional arguments to the client in the right order", async () => {
