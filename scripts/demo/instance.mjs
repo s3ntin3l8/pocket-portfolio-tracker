@@ -1,0 +1,240 @@
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
+
+/**
+ * An isolated, throwaway Pocket instance with the demo dataset: seed a scratch
+ * PGlite database, boot the API and web app against it, tear it all down on stop.
+ *
+ *   make demo          # interactive: prints a URL and a throwaway login
+ *   make screenshots   # uses startDemo() from scripts/screenshots.mjs
+ *
+ * Isolation is enforced, not just documented (see ./env.mjs): a clean env with no
+ * inherited secrets, all state under one mkdtemp dir, loopback-only dedicated
+ * ports that must be free, and the API started from a directory without a .env.
+ * It never touches Docker, so the production compose project is out of reach.
+ */
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const BIN = (name) => path.join(REPO_ROOT, "node_modules", ".bin", name);
+const API_TSCONFIG = path.join(REPO_ROOT, "services/api/tsconfig.json");
+
+export const DEMO_API_PORT = process.env.DEMO_API_PORT ?? "3910";
+export const DEMO_WEB_PORT = process.env.DEMO_WEB_PORT ?? "3915";
+
+// Dummy issuer: satisfies the auth plugins' boot guards; never contacted.
+const ISSUER = "https://demo.invalid/application/o/pocket-demo/";
+
+function run(cmd, args, opts) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: "inherit", ...opts });
+    child.on("exit", (code) =>
+      code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(" ")} exited ${code}`)),
+    );
+    child.on("error", reject);
+  });
+}
+
+/**
+ * Own process group (`detached`) so stop() can kill everything a server forks
+ * (next dev spawns workers); a plain child.kill() would leak them.
+ */
+function spawnServer(name, cmd, args, opts, quiet) {
+  const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], detached: true, ...opts });
+  const out = (d) => !quiet && process.stdout.write(`[${name}] ${d}`);
+  child.stdout.on("data", out);
+  child.stderr.on("data", (d) => process.stderr.write(`[${name}] ${d}`));
+  return child;
+}
+
+/** SIGTERM the whole group, wait for it to go, SIGKILL whatever is left. */
+async function killGroup(child, graceMs = 5_000) {
+  if (!child) return;
+  const signal = (sig) => {
+    try {
+      process.kill(-child.pid, sig);
+      return true;
+    } catch {
+      return false; // Group already gone.
+    }
+  };
+  if (!signal("SIGTERM")) return;
+  const deadline = Date.now() + graceMs;
+  // Done when the direct child has exited and no process in its group remains
+  // (signal 0 only probes). next dev writes its config store on the way out.
+  const alive = () => child.exitCode === null || signal(0);
+  while (Date.now() < deadline && alive()) await new Promise((r) => setTimeout(r, 100));
+  signal("SIGKILL");
+}
+
+async function waitForHttp(url, timeoutMs = 90_000) {
+  const start = Date.now();
+  let lastError;
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(url);
+      if (res.status < 500) return;
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Timed out waiting for ${url}${lastError ? `: ${lastError}` : ""}`);
+}
+
+/**
+ * Start the demo. `login: true` also seeds a local-password user (throwaway
+ * credentials, generated per run) so a human can sign in from a browser.
+ */
+export async function startDemo({ login = false, quiet = false, keep = false } = {}) {
+  await assertPortsFree([DEMO_API_PORT, DEMO_WEB_PORT]);
+
+  const demoDir = await mkdtemp(path.join(tmpdir(), "pocket-demo-"));
+  const runDir = path.join(demoDir, "run"); // API cwd: no .env here, logs/storage land here
+  for (const dir of ["home", "tmp", "run"])
+    await mkdir(path.join(demoDir, dir), { recursive: true });
+
+  const databaseUrl = `pglite://${path.join(demoDir, "db")}`;
+  const patFile = path.join(demoDir, "pat.txt");
+  const authSecret = randomBytes(32).toString("base64url");
+  const local = login
+    ? {
+        AUTH_LOCAL_SECRET: randomBytes(32).toString("base64url"),
+        SEED_DEMO_PASSWORD: randomBytes(12).toString("base64url"),
+      }
+    : {};
+
+  const seedEnv = demoEnv(demoDir, { DATABASE_URL: databaseUrl, ...local });
+  const apiEnv = demoEnv(demoDir, {
+    NODE_ENV: "development",
+    DATABASE_URL: databaseUrl,
+    AUTHENTIK_ISSUER: ISSUER,
+    AUTHENTIK_AUDIENCE: "pocket-demo",
+    // Never stale, so prices come from the seeded cache, never a live provider.
+    MARKET_DATA_TTL_MS: "999999999",
+    // Playwright plus Next's background polling exceed the default 100 req/min.
+    RATE_LIMIT_MAX: "100000",
+    PORT: DEMO_API_PORT,
+    HOST: "127.0.0.1",
+    LOG_LEVEL: "warn",
+    ...(local.AUTH_LOCAL_SECRET && { AUTH_LOCAL_SECRET: local.AUTH_LOCAL_SECRET }),
+  });
+  const webEnv = demoEnv(demoDir, {
+    AUTH_SECRET: authSecret,
+    // Sets the unprefixed (http) session-cookie name mint-session.mjs targets.
+    AUTH_URL: `http://localhost:${DEMO_WEB_PORT}`,
+    AUTHENTIK_ISSUER: ISSUER,
+    AUTHENTIK_CLIENT_ID: "demo",
+    AUTHENTIK_CLIENT_SECRET: "demo", // pragma: allowlist secret
+    API_URL: `http://localhost:${DEMO_API_PORT}`,
+    PORT: DEMO_WEB_PORT,
+    ...(local.AUTH_LOCAL_SECRET && { AUTH_LOCAL_SECRET: local.AUTH_LOCAL_SECRET }),
+  });
+
+  assertDemoEnv(seedEnv, demoDir, { cwd: runDir });
+  assertDemoEnv(apiEnv, demoDir, { cwd: runDir });
+  assertDemoEnv(webEnv, demoDir);
+
+  let api;
+  let web;
+  const stop = async () => {
+    // Wait for every process to exit first: dying next dev workers otherwise
+    // recreate files under the scratch HOME after it was deleted.
+    await Promise.all([killGroup(api), killGroup(web)]);
+    if (keep) return console.log(`[demo] kept ${demoDir}`);
+    // Next's server worker can still write its config store under HOME just after
+    // it is signalled, so delete until the directory stays gone.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await rm(demoDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 }).catch(
+        (err) => console.warn(`[demo] cleanup attempt failed: ${err}`),
+      );
+      await new Promise((r) => setTimeout(r, 1_000));
+      if (!existsSync(demoDir)) return;
+    }
+    console.warn(`[demo] could not fully remove ${demoDir}`);
+  };
+
+  try {
+    console.log(`[demo] scratch dir ${demoDir}`);
+    // The API and web import the workspace packages from their dist/ builds, the
+    // same as `turbo dev` (dependsOn ^build). Cached by turbo, so this is quick.
+    console.log("[demo] building workspace packages...");
+    await run(
+      BIN("turbo"),
+      ["run", "build", "--filter=./packages/*", "--output-logs=errors-only"],
+      {
+        cwd: REPO_ROOT,
+        env: demoEnv(demoDir, { TURBO_TELEMETRY_DISABLED: "1" }),
+      },
+    );
+    console.log("[demo] seeding demo data...");
+    await run(
+      BIN("tsx"),
+      [
+        "--tsconfig",
+        API_TSCONFIG,
+        path.join(REPO_ROOT, "services/api/src/db/seed-demo.ts"),
+        patFile,
+      ],
+      {
+        cwd: runDir,
+        env: seedEnv,
+      },
+    );
+
+    console.log("[demo] starting API and web...");
+    api = spawnServer(
+      "api",
+      BIN("tsx"),
+      ["--tsconfig", API_TSCONFIG, path.join(REPO_ROOT, "services/api/src/server.ts")],
+      { cwd: runDir, env: apiEnv },
+      quiet,
+    );
+    web = spawnServer(
+      "web",
+      BIN("next"),
+      ["dev", "-p", DEMO_WEB_PORT, "-H", "127.0.0.1"],
+      { cwd: path.join(REPO_ROOT, "apps/web"), env: webEnv },
+      quiet,
+    );
+
+    await waitForHttp(`http://127.0.0.1:${DEMO_API_PORT}/health`);
+    await waitForHttp(`http://localhost:${DEMO_WEB_PORT}/en`);
+  } catch (err) {
+    await stop();
+    throw err;
+  }
+
+  return {
+    webUrl: `http://localhost:${DEMO_WEB_PORT}`,
+    patFile,
+    authSecret,
+    demoDir,
+    login: login ? { email: "demo@pocket.invalid", password: local.SEED_DEMO_PASSWORD } : null,
+    stop,
+  };
+}
+
+const invokedDirectly = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (invokedDirectly) {
+  const keep = process.argv.includes("--keep");
+  const demo = await startDemo({ login: true, keep });
+  console.log(`
+[demo] Pocket demo is up: ${demo.webUrl}
+[demo] Sign in with the local login:
+[demo]   email     ${demo.login.email}
+[demo]   password  ${demo.login.password}   (throwaway, generated for this run)
+[demo] Ctrl-C stops it and deletes all demo data.`);
+  const shutdown = async () => {
+    await demo.stop();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}

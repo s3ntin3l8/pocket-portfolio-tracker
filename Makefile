@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
 
 # Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
 # docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
@@ -97,6 +97,15 @@ seed-demo: ## Seed the rich demo dataset (deterministic dev PAT); refuses a non-
 		   fi ;; \
 	esac
 	npm run db:seed-demo --workspace @portfolio/api
+
+demo: ## Isolated throwaway instance with the demo dataset (scratch PGlite, clean env, no .env/Docker); Ctrl-C deletes it
+	node scripts/demo/instance.mjs
+
+screenshots: ## Regenerate README + PWA manifest screenshots from an isolated demo instance
+	node scripts/screenshots.mjs
+
+screenshots-landing: ## Landing-page stills + loop into OUT (default ./landing-shots); needs ffmpeg for the loop
+	node scripts/screenshots.mjs --profile landing --out "$(or $(OUT),landing-shots)"
 
 seed-demo-login: ## Seed demo data with local-password login instead of DEV_AUTH_TOKEN (requires SEED_DEMO_PASSWORD; see AUTH_LOCAL_SECRET)
 	@if [ -z "$(SEED_DEMO_PASSWORD)" ]; then \

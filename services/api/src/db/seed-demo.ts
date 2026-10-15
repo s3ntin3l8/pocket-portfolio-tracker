@@ -1716,45 +1716,81 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   await db.insert(fxRates).values(fxRows);
 
   // --- Portfolio snapshots (daily net-worth history → dashboard/savings charts). ---
-  // A deterministic upward-drift-plus-noise walk from a small starting value to
-  // roughly today's live-valued total, per portfolio — good enough for a chart to
-  // look alive without re-deriving exact historical valuations from the transactions
-  // above (that's the real backend job's responsibility, not this seed's).
+  // A deterministic walk per portfolio that lands on roughly today's live-valued
+  // total: an opening deposit plus monthly contributions, compounding at a plausible
+  // annual return with a little daily noise. Contributions are recorded as
+  // `effectiveFlow`, so time-weighted return (packages/core/src/twr.ts:
+  // 1 + r_t = (V_t − flow_t) / V_{t−1}) sees market movement only, not deposits.
+  // Without the flows every deposit would count as return (TWR in the thousands of
+  // percent) and the day a portfolio opens would read as a single-day spike. This
+  // stays an approximation; deriving exact historical valuations from the
+  // transactions above is the backfill job's responsibility, not this seed's.
 
   const portfolioEndValues: {
     portfolio: typeof portfolios.$inferSelect;
     end: number;
     currency: string;
     days: number;
+    /** Annual return the walk compounds at, and the daily noise around it. */
+    annual: number;
+    noise: number;
   }[] = [
     // Stockbit: BBCA(1100@10.15k) + BBRI(600@4.85k) + BYON(4750@1.28k) + ORI023(50@1.005M)
     //   ≈ 70.4M IDR (ORI020 matured and was redeemed; GOTO/TLKM/GSRT fully sold)
-    { portfolio: idPortfolio, end: 70_500_000, currency: "IDR", days: 2200 },
+    {
+      portfolio: idPortfolio,
+      end: 70_500_000,
+      currency: "IDR",
+      days: 2200,
+      annual: 0.09,
+      noise: 0.012,
+    },
     // TR: VWCE(45.6@118.40) + IWDA(20@89.75) + AAPL(15@228.90 USD→EUR)
     //   + MSFT(13@412.30 USD→EUR) + VFV(20@142.50 CAD→EUR) ≈ 17.2k EUR
-    { portfolio: trPortfolio, end: 17_500, currency: "EUR", days: 2100 },
+    { portfolio: trPortfolio, end: 17_500, currency: "EUR", days: 2100, annual: 0.11, noise: 0.01 },
     // Gold: 40g × 1.52M ≈ 60.8M IDR
-    { portfolio: goldPortfolio, end: 61_000_000, currency: "IDR", days: 2100 },
+    {
+      portfolio: goldPortfolio,
+      end: 61_000_000,
+      currency: "IDR",
+      days: 2100,
+      annual: 0.08,
+      noise: 0.008,
+    },
     // Reksa dana: ~36 monthly buys × ~450 units × 1,850 ≈ 30M IDR
-    { portfolio: mfPortfolio, end: 30_000_000, currency: "IDR", days: 1500 },
+    {
+      portfolio: mfPortfolio,
+      end: 30_000_000,
+      currency: "IDR",
+      days: 1500,
+      annual: 0.06,
+      noise: 0.004,
+    },
     // DKB cash: 9700 deposits − 1800 withdrawals + ~228 interest + 50 bonus + 35.5 adj ≈ 8,213 EUR
-    { portfolio: cashPortfolio, end: 8_300, currency: "EUR", days: 2100 },
+    { portfolio: cashPortfolio, end: 8_300, currency: "EUR", days: 2100, annual: 0.025, noise: 0 },
   ];
 
   const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
-  for (const { portfolio, end, currency, days } of portfolioEndValues) {
-    const start = end * 0.08;
+  for (const { portfolio, end, currency, days, annual, noise } of portfolioEndValues) {
+    const drift = (1 + annual) ** (1 / 365) - 1;
+    // Simulate in units (opening deposit 10, then 1 every 30 days), then scale so
+    // the last day equals `end`; value is linear in the flows, so returns survive.
+    const walk: { d: number; value: number; flow: number }[] = [];
+    let value = 0;
     for (let d = days; d >= 0; d--) {
-      const t = 1 - d / days; // 0 at the start date, 1 at today
-      const trend = start + (end - start) * t;
-      const noise = 1 + (pseudoRandom(d + portfolio.id.length) - 0.5) * 0.03;
-      const netWorth = Math.max(0, trend * noise);
+      const flow = d === days ? 10 : d % 30 === 0 ? 1 : 0;
+      const r = drift + (pseudoRandom(d + portfolio.id.length) - 0.5) * noise;
+      value = value * (1 + r) + flow;
+      walk.push({ d, value, flow });
+    }
+    const scale = end / value;
+    for (const { d, value: v, flow } of walk) {
       snapshotRows.push({
         portfolioId: portfolio.id,
         date: isoDate(daysAgo(d)),
-        netWorth: dec(netWorth),
-        marketValue: dec(netWorth),
-        effectiveFlow: "0",
+        netWorth: dec(v * scale),
+        marketValue: dec(v * scale),
+        effectiveFlow: dec(flow * scale),
         currency,
       });
     }

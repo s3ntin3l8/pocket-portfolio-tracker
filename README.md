@@ -118,14 +118,29 @@ Target one workspace with `--workspace @portfolio/<name>` (e.g.
 
 ## Reproducing the screenshots
 
-`npm run screenshots` regenerates every image in `apps/web/public/screenshots/` (used
-above and by the PWA install dialog's manifest `screenshots`) from a fully scripted,
-throwaway demo: it seeds a rich mock dataset into an isolated PGlite database
-(`services/api/src/db/seed-demo.ts`), boots the API and web app against it on dedicated
-ports, authenticates via a seeded personal-access token (no real Authentik login needed —
-see `apps/web/scripts/mint-session.mjs`), captures each hero screen with Playwright in
-light/dark and mobile/desktop, then tears everything down. Nothing it does touches real
-data or a real account; the whole run is self-contained and safe to re-run at any time.
+`npm run screenshots` (or `make screenshots`) regenerates every image in
+`apps/web/public/screenshots/` (used above and by the PWA install dialog's manifest
+`screenshots`) from a fully scripted, throwaway demo: it seeds a rich mock dataset into an
+isolated PGlite database (`services/api/src/db/seed-demo.ts`), boots the API and web app
+against it on dedicated loopback ports, authenticates via a seeded personal-access token
+(no real Authentik login needed — see `apps/web/scripts/mint-session.mjs`), captures each
+hero screen with Playwright in light/dark and mobile/desktop, then tears everything down.
+
+Other entry points:
+
+| Command                          | What it does                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `make demo`                      | The same demo instance, left running; prints a URL and a throwaway login.                                                |
+| `make screenshots-landing OUT=…` | 2× dark stills plus a short holdings-chart loop (webm/mp4/poster) for the project landing page; the loop needs `ffmpeg`. |
+
+**Isolation is enforced, not assumed** (`scripts/demo/env.mjs`, tested in
+`scripts/demo/env.test.mjs`): every demo process gets a clean environment with nothing
+inherited except `PATH`/locale, all state lives in one `mktemp` directory that is deleted
+afterwards, the API runs from a directory without a `.env` and Next.js is told to skip its
+`.env*` files (so the real `.env` and its `apps/web/.env.local` symlink are never read), the
+ports must be free, and the guard refuses to start if any database, data path or secret
+points outside the scratch directory. It never invokes Docker, so a production compose
+stack on the same host is out of reach.
 
 Requires Playwright's Chromium binary once: `npx playwright install chromium`.
 

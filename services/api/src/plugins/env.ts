@@ -15,6 +15,12 @@ const schema = {
       type: "number",
       default: 3000,
     },
+    // Bind address. All interfaces by default (the container's network is the
+    // boundary); the demo instance binds 127.0.0.1 only.
+    HOST: {
+      type: "string",
+      default: "0.0.0.0",
+    },
     LOG_LEVEL: {
       type: "string",
       default: "info",
@@ -284,6 +290,7 @@ declare module "fastify" {
     config: {
       NODE_ENV: "development" | "production" | "test";
       PORT: number;
+      HOST: string;
       LOG_LEVEL: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
       DATABASE_URL: string;
       DB_ENCRYPTION_KEY: string;
