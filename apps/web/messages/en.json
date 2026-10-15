@@ -2294,6 +2294,7 @@
     "debug": "Debug details"
   },
   "Onboarding": {
+    "themeLabel": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
     "back": "Back",

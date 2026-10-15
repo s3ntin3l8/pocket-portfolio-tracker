@@ -2294,6 +2294,7 @@
     "debug": "Detail debug"
   },
   "Onboarding": {
+    "themeLabel": "Tema",
     "themeLight": "Terang",
     "themeDark": "Gelap",
     "back": "Kembali",
