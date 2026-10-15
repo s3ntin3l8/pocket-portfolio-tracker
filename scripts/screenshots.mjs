@@ -40,6 +40,8 @@ function run(cmd, args, opts) {
 }
 
 async function main() {
+  // Resolve the browser cache now: demo processes get HOME redirected into the
+  // scratch dir, where Playwright would otherwise look for (and not find) them.
   const browsers = playwrightBrowsersPath();
   const demo = await startDemo({ quiet: true, keep: values.keep });
   try {

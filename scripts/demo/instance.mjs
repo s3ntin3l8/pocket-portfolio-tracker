@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -225,11 +225,15 @@ const invokedDirectly = process.argv[1] && import.meta.url === `file://${process
 if (invokedDirectly) {
   const keep = process.argv.includes("--keep");
   const demo = await startDemo({ login: true, keep });
+  // The throwaway login goes to a private file in the scratch dir (deleted on
+  // exit) rather than to the terminal, so it never lands in scrollback or logs.
+  const loginFile = path.join(demo.demoDir, "login.txt");
+  await writeFile(loginFile, `email    ${demo.login.email}\npassword ${demo.login.password}\n`, {
+    mode: 0o600,
+  });
   console.log(`
 [demo] Pocket demo is up: ${demo.webUrl}
-[demo] Sign in with the local login:
-[demo]   email     ${demo.login.email}
-[demo]   password  ${demo.login.password}   (throwaway, generated for this run)
+[demo] Throwaway local login (generated for this run): ${loginFile}
 [demo] Ctrl-C stops it and deletes all demo data.`);
   const shutdown = async () => {
     await demo.stop();

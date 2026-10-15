@@ -100,10 +100,13 @@ export function assertDemoEnv(env, demoDir, { cwd, collect = false } = {}) {
   return [];
 }
 
-/** Rejects if something already listens on one of the ports (likely a real instance). */
-export async function assertPortsFree(ports, host = "127.0.0.1") {
-  for (const port of ports) {
-    const busy = await new Promise((resolve) => {
+/**
+ * Rejects if something already listens on one of the ports (likely a real
+ * instance). Probes IPv4 and IPv6 loopback, so a server bound to either is seen.
+ */
+export async function assertPortsFree(ports, hosts = ["127.0.0.1", "::1"]) {
+  const listening = (port, host) =>
+    new Promise((resolve) => {
       const socket = net.connect({ port: Number(port), host });
       socket.once("connect", () => {
         socket.destroy();
@@ -111,6 +114,8 @@ export async function assertPortsFree(ports, host = "127.0.0.1") {
       });
       socket.once("error", () => resolve(false));
     });
-    if (busy) throw new Error(`port ${port} is already in use; refusing to start the demo`);
-  }
+  for (const port of ports)
+    for (const host of hosts)
+      if (await listening(port, host))
+        throw new Error(`port ${port} is already in use on ${host}; refusing to start the demo`);
 }

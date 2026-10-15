@@ -142,6 +142,9 @@ async function recordLoop(browser, cookie, secure, outDir) {
     console.warn("ffmpeg not found; skipping the landing loop");
     return [];
   }
+  // Playwright records video in viewport (CSS) pixels regardless of
+  // deviceScaleFactor, so the loop is 1× while the stills are 2×. Fine for a
+  // muted background loop and keeps the file small.
   const size = { width: 1600, height: 1000 };
   const videoDir = await mkdtemp(path.join(tmpdir(), "pocket-loop-"));
   const context = await newContext(browser, cookie, secure, "dark", {
