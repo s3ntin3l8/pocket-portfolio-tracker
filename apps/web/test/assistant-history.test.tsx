@@ -121,6 +121,22 @@ describe("assistant history in the panel", () => {
     expect(sent[1]!.conversationId).toBeUndefined();
   });
 
+  it("clears the 'conversation is full' notice when another conversation is opened", async () => {
+    events = [
+      { type: "message", text: "ok" },
+      { type: "conversation", id: CONV_ID, saved: false },
+      { type: "done", rounds: 1 },
+    ];
+    render(<Shell />);
+    await openPanel();
+    ask("q");
+    expect(await screen.findByText(A.historyFull)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: A.history }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open: How am I doing?" }));
+    await screen.findByText("Doing well.");
+    expect(screen.queryByText(A.historyFull)).toBeNull();
+  });
+
   it("offers History only to users who opted in", async () => {
     status = { ...status, saveHistory: false };
     render(<Shell />);

@@ -106,6 +106,10 @@ export async function assistantRoute(app: FastifyInstance) {
   });
 
   // ─── Stored conversations (only exist for users who opted in) ─────────────
+  // Listing and reading are open to any credential of the caller (a read-only token included):
+  // they are the caller's OWN stored conversations. DELETE is a mutating method, so the auth
+  // plugin's default gate already requires a write-scoped credential for it. *Storing* is gated
+  // separately in `historyOn` (write scope + the opt-in).
   app.get("/assistant/conversations", { preHandler: app.authenticate }, async (request) => ({
     conversations: await listConversations(app.db, request.userId),
   }));

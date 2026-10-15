@@ -63,8 +63,9 @@ export async function saveTurn(
           ),
         )
         .limit(1)
-        // Serialises concurrent turns on one conversation (two tabs/devices): the second waits,
-        // then counts the first's messages instead of colliding on the same seq.
+        // Locks the conversation row for the rest of this transaction, so the message count we
+        // read below is still the count we insert against (two tabs/devices racing). The unique
+        // (conversation_id, seq) index is the backstop that makes a collision an error, not corruption.
         .for("update");
       id = own?.id ?? null;
     }
@@ -149,7 +150,10 @@ export async function deleteConversation(db: DB, userId: string, id: string): Pr
   return gone.length > 0;
 }
 
-export async function deleteAllConversations(db: DB, userId: string): Promise<number> {
+export async function deleteAllConversations(
+  db: Pick<DB, "delete">,
+  userId: string,
+): Promise<number> {
   const gone = await db
     .delete(assistantConversations)
     .where(eq(assistantConversations.userId, userId))
