@@ -12,6 +12,7 @@ import type {
   ApiTokenCreate,
   ProviderSettingUpdate,
   ProviderCredentialInput,
+  ChatProvidersUpdate,
   ImportStrategy,
   ImportSettingsUpdate,
   StorageSettingsUpdate,
@@ -130,6 +131,34 @@ export interface AdminVisionProvider {
 }
 
 /** Wrapper returned by GET/PATCH /admin/vision-providers and credential routes. */
+/** A chat assistant provider's effective settings (GET/PATCH /admin/chat-providers). */
+export interface AdminChatProvider {
+  id: string; // "claude" | "gemini" | "openrouter" | "ollama"
+  label: string;
+  /** Credential present and a model resolved: chat can use it. */
+  configured: boolean;
+  enabled: boolean;
+  /** "chat" = set for chat here; "vision" = inherited from the vision provider settings. */
+  enabledSource: "chat" | "vision";
+  priority: number;
+  prioritySource: "chat" | "vision";
+  /** The model chat will use, or null when none is resolved (the provider needs one). */
+  model: string | null;
+  /** Where the model comes from: this setting, the env var, or the adapter's default. */
+  modelSource: "db" | "env" | "default" | null;
+  /** The env var that supplies the model when none is set here. */
+  modelEnvVar: string;
+}
+
+export interface AdminChatProvidersResponse {
+  providers: AdminChatProvider[];
+  /** The pinned provider id (chat uses that provider or nothing), or null. */
+  pinned: string | null;
+  pinnedSource: "db" | "env" | null;
+  /** The provider that answers chat right now, or null when chat is unavailable. */
+  activeProvider: string | null;
+}
+
 export interface AdminVisionProvidersResponse {
   providers: AdminVisionProvider[];
   /** Whether server-side encryption is configured; gates the key-management UI. */
@@ -2507,6 +2536,14 @@ export function createApiClient(config: ApiClientConfig) {
         "DELETE",
         `/admin/vision-providers/${encodeURIComponent(id)}/credential`,
       ),
+
+    // Admin: chat assistant provider/model/pin. Credentials are the vision providers'.
+    getAdminChatProviders: () =>
+      request<AdminChatProvidersResponse>("GET", "/admin/chat-providers"),
+    updateAdminChatProviders: (input: ChatProvidersUpdate) =>
+      request<AdminChatProvidersResponse>("PATCH", "/admin/chat-providers", input),
+    resetAdminChatProviders: () =>
+      request<AdminChatProvidersResponse>("DELETE", "/admin/chat-providers"),
 
     // Admin: import strategy (deterministic parser vs vision-LLM) for screenshots/PDFs.
     getAdminImportSettings: () =>

@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   LineChart,
   Eye,
+  MessageSquare,
   ArrowDownUp,
   HardDrive,
   Database,
@@ -56,6 +57,14 @@ export default async function AdminLayout({
       title: t("visionProviders"),
       subtitle: t("visionProvidersHint"),
       ...tint("violet"),
+    },
+    {
+      key: "assistant",
+      href: "/admin/assistant",
+      icon: <MessageSquare />,
+      title: t("chatProviders"),
+      subtitle: t("chatProvidersHint"),
+      ...tint("primary"),
     },
     {
       key: "imports",
