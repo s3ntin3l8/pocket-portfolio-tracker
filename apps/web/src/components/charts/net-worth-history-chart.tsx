@@ -136,6 +136,7 @@ export function NetWorthHistoryChart({
     try {
       const next = await fetchHistory(r);
       if (seq === requestSeq.current) {
+        // Keep in the same block/batch: the emit effect's `dataFor === range` invariant depends on it.
         setData(next);
         setDataFor(r);
       }
