@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import { useThemeMode } from "@/lib/use-theme-mode";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import type { Portfolio } from "@portfolio/api-client";
@@ -49,8 +48,6 @@ export function OnboardingFlow() {
   const t = useTranslations("Onboarding");
   const api = useApiClient();
   const router = useRouter();
-  // Shared with the app-wide theme controls; defaults dark (matches the design's own default).
-  const { isDark, toggle: toggleTheme } = useThemeMode();
 
   // Desktop/mobile layout switch at the app-wide `md` breakpoint (768px) — the same one
   // every overlay uses. `useMediaQuery` reports `false` for the server render and
@@ -157,9 +154,6 @@ export function OnboardingFlow() {
     "",
     "",
   ][step];
-
-  // The toggle's label is the *action* — the opposite of the current theme.
-  const themeToggleLabel = isDark ? t("themeLight") : t("themeDark");
 
   const stepTitle = stepMetaByIndex[step];
   const brandContent = brandByIndex[step];
@@ -304,14 +298,7 @@ export function OnboardingFlow() {
   return (
     <ImportTasksProvider>
       <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white md:flex-row dark:bg-background">
-        {isDesktop && (
-          <ThemeTogglePill
-            isDark={isDark}
-            label={themeToggleLabel}
-            onToggle={toggleTheme}
-            className="absolute top-5.5 right-5.5 z-5"
-          />
-        )}
+        {isDesktop && <ThemeTogglePill className="absolute top-5.5 right-5.5 z-5" />}
 
         {isDesktop && (
           <BrandPanel
@@ -330,12 +317,7 @@ export function OnboardingFlow() {
             {!isDesktop && (
               <div className="mb-5.5 flex items-center">
                 <BrandLogo size="sm" className="text-foreground" />
-                <ThemeTogglePill
-                  isDark={isDark}
-                  label={themeToggleLabel}
-                  onToggle={toggleTheme}
-                  className="ml-auto"
-                />
+                <ThemeTogglePill className="ml-auto" />
               </div>
             )}
 
