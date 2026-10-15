@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 
 /**
  * Shared theme state for every theme control (header toggle, settings switcher, onboarding
- * pill). `mounted` flips true after hydration; until then `isDark` defaults to dark (the app's
+ * toggle). `mounted` flips true after hydration; until then `isDark` defaults to dark (the app's
  * default) so SSR and the first client render agree.
  */
 export function useThemeMode() {
