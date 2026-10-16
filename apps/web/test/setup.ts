@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { configure } from "@testing-library/react";
+import { configure } from "@testing-library/dom";
 
 // findBy*/waitFor default to 1s. Lazily loaded dialogs (next/dynamic) and their first fetch can
 // exceed that when a CI shard or a developer machine is under load, which showed up as
