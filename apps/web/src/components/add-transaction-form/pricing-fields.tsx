@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Field } from "./field";
+import { FormField } from "@/components/ui/form-field";
 import { NumberField } from "./number-field";
 import { computeTxTotal, formatMoney, totalLabelKey } from "./totals";
 
@@ -79,7 +79,7 @@ export function PricingFields({
       </p>
       <div className="grid grid-cols-2 gap-3">
         {showQuantity && (
-          <Field label={isGold ? t("grams") : t("quantity")} htmlFor="tx-qty">
+          <FormField label={isGold ? t("grams") : t("quantity")} id="tx-qty">
             <NumberField
               id="tx-qty"
               value={quantity}
@@ -87,9 +87,9 @@ export function PricingFields({
               required
               min="0.000001"
             />
-          </Field>
+          </FormField>
         )}
-        <Field label={t(priceLabelKey)} htmlFor="tx-price">
+        <FormField label={t(priceLabelKey)} id="tx-price">
           <NumberField
             id="tx-price"
             value={price}
@@ -100,25 +100,25 @@ export function PricingFields({
             }
           />
           {priceHintKey && <p className="mt-1 text-xs text-muted-foreground">{t(priceHintKey)}</p>}
-        </Field>
+        </FormField>
         {showInlineTax && (
-          <Field label={t("tax")} htmlFor="tx-tax">
+          <FormField label={t("tax")} id="tx-tax">
             <NumberField id="tx-tax" value={tax} onValueChange={setTax} placeholder="0" />
-          </Field>
+          </FormField>
         )}
       </div>
 
       {showExtrasFields && (
         <div className="mt-3 grid grid-cols-2 gap-3">
           {showFees && (
-            <Field label={t(feesLabelKey)} htmlFor="tx-fees">
+            <FormField label={t(feesLabelKey)} id="tx-fees">
               <NumberField id="tx-fees" value={fees} onValueChange={setFees} />
-            </Field>
+            </FormField>
           )}
           {showTax && (
-            <Field label={t("tax")} htmlFor="tx-tax-extra">
+            <FormField label={t("tax")} id="tx-tax-extra">
               <NumberField id="tx-tax-extra" value={tax} onValueChange={setTax} placeholder="0" />
-            </Field>
+            </FormField>
           )}
         </div>
       )}
@@ -181,7 +181,7 @@ export function DetailsFields({
         {t("details")}
       </p>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t("currency")} htmlFor="tx-currency">
+        <FormField label={t("currency")} id="tx-currency">
           <Select id="tx-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>
@@ -189,8 +189,8 @@ export function DetailsFields({
               </option>
             ))}
           </Select>
-        </Field>
-        <Field label={t("date")} htmlFor="tx-date">
+        </FormField>
+        <FormField label={t("date")} id="tx-date">
           <DatePicker
             id="tx-date"
             label={t("date")}
@@ -198,9 +198,9 @@ export function DetailsFields({
             onChange={(e) => setDate(e.target.value)}
             required
           />
-        </Field>
+        </FormField>
         <div className="col-span-2">
-          <Field label={t("notes")} htmlFor="tx-notes">
+          <FormField label={t("notes")} id="tx-notes">
             <textarea
               id="tx-notes"
               value={description}
@@ -209,17 +209,17 @@ export function DetailsFields({
               rows={2}
               className="flex w-full resize-y rounded-md border border-border bg-card px-3.5 py-[13px] text-base font-medium transition-colors placeholder:text-text-2 focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
             />
-          </Field>
+          </FormField>
         </div>
         <div className="col-span-2">
-          <Field label={t("tags")} htmlFor="tx-tags">
+          <FormField label={t("tags")} id="tx-tags">
             <Input
               id="tx-tags"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder={t("tagsPlaceholder")}
             />
-          </Field>
+          </FormField>
         </div>
       </div>
     </div>

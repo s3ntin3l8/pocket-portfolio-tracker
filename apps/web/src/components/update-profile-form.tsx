@@ -1,8 +1,9 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
@@ -54,15 +55,7 @@ export function UpdateProfileForm({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {t("updateError")}
-        </div>
-      )}
+      {error && <ErrorBanner>{t("updateError")}</ErrorBanner>}
 
       <div className="space-y-1.5">
         <Label htmlFor="profile-name">{t("name")}</Label>

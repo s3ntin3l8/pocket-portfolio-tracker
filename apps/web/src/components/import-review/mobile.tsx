@@ -1,8 +1,9 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
 import React from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { ChevronDown, Trash2, SearchX } from "lucide-react";
 import { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,9 +203,7 @@ export function MobileView({
               showRemove={draftsLength > 1}
             />
           ))}
-      {view.length === 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">{t("review.empty")}</p>
-      )}
+      {view.length === 0 && <EmptyState compact icon={SearchX} title={t("review.empty")} />}
     </div>
   );
 }

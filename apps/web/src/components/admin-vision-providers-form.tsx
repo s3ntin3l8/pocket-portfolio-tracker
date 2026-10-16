@@ -1,9 +1,10 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, GripVertical, Pencil } from "lucide-react";
+import { Check, GripVertical, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DndContext,
@@ -121,15 +122,7 @@ export function AdminVisionProvidersForm({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {t("updateError")}
-        </div>
-      )}
+      {error && <ErrorBanner>{t("updateError")}</ErrorBanner>}
 
       <div className="flex items-center justify-end md:hidden">
         <Button type="button" variant="outline" size="sm" onClick={() => setReorderMode((v) => !v)}>

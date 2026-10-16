@@ -1,7 +1,8 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useId, useState } from "react";
-import { AlertCircle, History, MoreVertical, RotateCw, Trash2 } from "lucide-react";
+import { History, MoreVertical, RotateCw, Trash2 } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { useApiClient } from "@/lib/api";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -229,15 +230,7 @@ function UserActionConfirm({
           />
         </div>
       )}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {t("updateError")}
-        </div>
-      )}
+      {error && <ErrorBanner>{t("updateError")}</ErrorBanner>}
     </ConfirmActionDialog>
   );
 }

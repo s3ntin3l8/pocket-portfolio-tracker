@@ -1,7 +1,8 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
-import { AlertCircle } from "lucide-react";
+
 import { useTranslations } from "next-intl";
 import type { AccountHolder } from "@portfolio/api-client";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -72,15 +73,7 @@ export function DeleteHolderDialog({
         busy={busy}
         onConfirm={handleDelete}
       >
-        {error && (
-          <div
-            role="alert"
-            className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            <AlertCircle className="size-4 shrink-0" />
-            {t("error")}
-          </div>
-        )}
+        {error && <ErrorBanner>{t("error")}</ErrorBanner>}
       </ConfirmActionDialog>
     </>
   );

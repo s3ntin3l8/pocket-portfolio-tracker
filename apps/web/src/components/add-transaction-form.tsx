@@ -1,7 +1,8 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useId, useRef } from "react";
-import { AlertCircle } from "lucide-react";
+
 import { TransactionSourcesSection } from "@/components/transaction-sources-section";
 import { useFocusScroll } from "@/lib/use-focus-scroll";
 import { useSheetFooter } from "@/components/ui/sheet";
@@ -119,15 +120,7 @@ export function AddTransactionForm({
       onSubmit={form.submit}
       className={isDesktop ? "flex min-w-0 flex-col gap-[13px]" : "max-w-lg space-y-5"}
     >
-      {form.error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {form.error}
-        </div>
-      )}
+      {form.error && <ErrorBanner>{form.error}</ErrorBanner>}
 
       <BucketSwitcher bucket={form.bucket} onSelect={form.setBucket} t={form.t} />
 

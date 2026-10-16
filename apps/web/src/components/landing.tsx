@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { PwaRestore } from "@/components/pwa-restore";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -26,15 +27,7 @@ const DEMO_GAIN = 0.182;
 const MIN_PASSWORD_LENGTH = 8;
 
 function InlineError({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-    >
-      <AlertCircle className="size-4 shrink-0" />
-      {children}
-    </div>
-  );
+  return <ErrorBanner>{children}</ErrorBanner>;
 }
 
 // Pocket "1A — Split Hero" sign-in (the chosen login concept). Brand panel + auth panel;

@@ -57,7 +57,8 @@ describe("ApiTokensManager", () => {
     renderManager(client, [existing]);
 
     const dialog = openCreateModal();
-    expect(dialog.getByText(m.tokensCreateTitle)).toBeInTheDocument();
+    // Shown twice by design: the mobile header and the (mobile-hidden) accessible DialogTitle.
+    expect(dialog.getAllByText(m.tokensCreateTitle)).toHaveLength(2);
     fireEvent.change(dialog.getByLabelText(m.tokensName), { target: { value: "dev-cli" } });
     fireEvent.click(dialog.getByRole("button", { name: m.tokensCreate }));
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { AccountHolder } from "@portfolio/api-client";
@@ -57,14 +58,7 @@ export function HolderEditForm({
 
   return (
     <div className="max-w-xl space-y-3.5">
-      {f.error && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {t("error")}
-        </p>
-      )}
+      {f.error && <ErrorBanner>{t("error")}</ErrorBanner>}
 
       <form onSubmit={f.submit} className="space-y-3.5">
         <div className={CARD_CLASS}>

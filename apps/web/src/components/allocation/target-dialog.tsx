@@ -155,61 +155,65 @@ export function TargetDialog({ portfolioId, dimension, dimensionLabel, slices, t
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent size="sm">
-        <DialogHeader>
-          <DialogTitle>{t("title", { dimension: dimensionLabel })}</DialogTitle>
-          <DialogDescription>{t("description")}</DialogDescription>
-        </DialogHeader>
+      <DialogContent size="sm" mobileHeader={{ title: t("title", { dimension: dimensionLabel }) }}>
+        <div className="grid gap-4 p-4 md:p-6">
+          <DialogHeader>
+            <DialogTitle className="max-md:sr-only">
+              {t("title", { dimension: dimensionLabel })}
+            </DialogTitle>
+            <DialogDescription>{t("description")}</DialogDescription>
+          </DialogHeader>
 
-        {loading ? (
-          <div className="flex justify-center py-6">
-            <Spinner size="md" className="text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="space-y-3 py-2">
-            {rows.map((row) => (
-              <div key={row.key} className="flex items-center gap-3">
-                <Label className="flex-1 text-sm font-normal">{row.label}</Label>
-                <div className="flex items-center gap-1 w-24">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    value={row.targetPct === 0 ? "" : String(row.targetPct)}
-                    placeholder="0"
-                    className="h-7 text-right tabular text-sm"
-                    onChange={(e) => updateRow(row.key, e.target.value)}
-                  />
-                  <span className="text-sm text-muted-foreground shrink-0">%</span>
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <Spinner size="md" className="text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-3 py-2">
+              {rows.map((row) => (
+                <div key={row.key} className="flex items-center gap-3">
+                  <Label className="flex-1 text-sm font-normal">{row.label}</Label>
+                  <div className="flex items-center gap-1 w-24">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={row.targetPct === 0 ? "" : String(row.targetPct)}
+                      placeholder="0"
+                      className="h-7 text-right tabular text-sm"
+                      onChange={(e) => updateRow(row.key, e.target.value)}
+                    />
+                    <span className="text-sm text-muted-foreground shrink-0">%</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
-        {/* Sum indicator */}
-        {!loading && (
-          <div
-            className={`text-xs text-right tabular ${
-              sumOk ? "text-muted-foreground" : "text-destructive font-medium"
-            }`}
-          >
-            {t("total")}: {total.toFixed(1)}% {!sumOk && t("mustEqual100")}
-          </div>
-        )}
+          {/* Sum indicator */}
+          {!loading && (
+            <div
+              className={`text-xs text-right tabular ${
+                sumOk ? "text-muted-foreground" : "text-destructive font-medium"
+              }`}
+            >
+              {t("total")}: {total.toFixed(1)}% {!sumOk && t("mustEqual100")}
+            </div>
+          )}
 
-        {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
-            {t("cancel")}
-          </Button>
-          <Button onClick={handleSave} disabled={!sumOk || saving || loading}>
-            {saving ? <Spinner size="sm" className="mr-1" /> : null}
-            {t("save")}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>
+              {t("cancel")}
+            </Button>
+            <Button onClick={handleSave} disabled={!sumOk || saving || loading}>
+              {saving ? <Spinner size="sm" className="mr-1" /> : null}
+              {t("save")}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

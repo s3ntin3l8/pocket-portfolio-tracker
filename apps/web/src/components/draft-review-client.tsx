@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
@@ -144,15 +145,7 @@ export function DraftReviewClient({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
       {importedCount !== null && (
         <div
           role="status"

@@ -62,7 +62,7 @@ export function ErrorState({
         className,
       )}
     >
-      <span className={cn("flex size-16 items-center justify-center rounded-xl", CHIP[tone])}>
+      <span className={cn("flex size-16 items-center justify-center rounded-lg", CHIP[tone])}>
         <Icon className="size-7" strokeWidth={1.8} />
       </span>
 
@@ -72,7 +72,7 @@ export function ErrorState({
         </span>
       )}
 
-      <h1 className="text-balance text-2xl font-bold tracking-tight">{title}</h1>
+      <h1 className="text-balance text-heading font-semibold">{title}</h1>
       <p className="max-w-sm text-pretty text-sm leading-relaxed text-muted-foreground">{body}</p>
 
       {code && (

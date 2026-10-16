@@ -7,6 +7,7 @@ export function FormField({
   children,
   className,
 }: {
+  /** The id of the control inside `children` — the label is bound to it. */
   id: string;
   label: string;
   children: React.ReactNode;

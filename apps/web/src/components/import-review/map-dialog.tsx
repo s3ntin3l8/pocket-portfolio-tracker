@@ -33,51 +33,59 @@ export function MapDialog({ open, onClose, form, onChange, onSave }: MapDialogPr
         if (!open) onClose();
       }}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("review.issues.mapTitle")}</DialogTitle>
-        </DialogHeader>
-        {form && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t("review.columns.action")}>
-              <Select value={form.action} onChange={(e) => onChange({ action: e.target.value })}>
-                {MAP_ACTIONS.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label={t("fields.name")}>
-              <Input value={form.name ?? ""} onChange={(e) => onChange({ name: e.target.value })} />
-            </Field>
-            <Field label="ISIN">
-              <Input value={form.isin ?? ""} onChange={(e) => onChange({ isin: e.target.value })} />
-            </Field>
-            <Field label="WKN">
-              <Input value={form.wkn ?? ""} onChange={(e) => onChange({ wkn: e.target.value })} />
-            </Field>
-            <Field label={t("fields.executedAt")}>
-              <DatePicker
-                label={t("fields.executedAt")}
-                value={form.executedAt.slice(0, 10)}
-                onChange={(e) => onChange({ executedAt: e.target.value })}
-              />
-            </Field>
-            <Field label={t("fields.quantity")}>
-              <Input
-                value={form.quantity}
-                onChange={(e) => onChange({ quantity: e.target.value })}
-              />
-            </Field>
-            <Field label={t("fields.price")}>
-              <Input value={form.price} onChange={(e) => onChange({ price: e.target.value })} />
-            </Field>
-          </div>
-        )}
-        <DialogFooter>
-          <Button onClick={onSave}>{t("review.issues.mapSave")}</Button>
-        </DialogFooter>
+      <DialogContent mobileHeader={{ title: t("review.issues.mapTitle") }}>
+        <div className="grid gap-4 p-4 md:p-6">
+          <DialogHeader>
+            <DialogTitle className="max-md:sr-only">{t("review.issues.mapTitle")}</DialogTitle>
+          </DialogHeader>
+          {form && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("review.columns.action")}>
+                <Select value={form.action} onChange={(e) => onChange({ action: e.target.value })}>
+                  {MAP_ACTIONS.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t("fields.name")}>
+                <Input
+                  value={form.name ?? ""}
+                  onChange={(e) => onChange({ name: e.target.value })}
+                />
+              </Field>
+              <Field label="ISIN">
+                <Input
+                  value={form.isin ?? ""}
+                  onChange={(e) => onChange({ isin: e.target.value })}
+                />
+              </Field>
+              <Field label="WKN">
+                <Input value={form.wkn ?? ""} onChange={(e) => onChange({ wkn: e.target.value })} />
+              </Field>
+              <Field label={t("fields.executedAt")}>
+                <DatePicker
+                  label={t("fields.executedAt")}
+                  value={form.executedAt.slice(0, 10)}
+                  onChange={(e) => onChange({ executedAt: e.target.value })}
+                />
+              </Field>
+              <Field label={t("fields.quantity")}>
+                <Input
+                  value={form.quantity}
+                  onChange={(e) => onChange({ quantity: e.target.value })}
+                />
+              </Field>
+              <Field label={t("fields.price")}>
+                <Input value={form.price} onChange={(e) => onChange({ price: e.target.value })} />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={onSave}>{t("review.issues.mapSave")}</Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
