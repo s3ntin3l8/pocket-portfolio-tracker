@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { authViaKey } from "@/lib/auth-label";
 import { isDevAuthBypass } from "@/lib/dev-auth";
 import { getTranslations } from "next-intl/server";
@@ -36,7 +37,7 @@ export async function AccountSection({
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("displayCurrency")}
         </p>
-        <div className="divide-y divide-line overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="divide-y divide-line overflow-hidden">
           <div className="p-4">
             <DisplayCurrency current={me?.displayCurrency ?? ""} />
           </div>
@@ -51,7 +52,7 @@ export async function AccountSection({
           <div className="p-4">
             <ShortcutsToggle />
           </div>
-        </div>
+        </Card>
       </div>
 
       {localAuthAvailable && me && (
@@ -59,11 +60,11 @@ export async function AccountSection({
           <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
             {t("password")}
           </p>
-          <div className="overflow-hidden rounded-lg bg-card shadow-card">
+          <Card className="overflow-hidden">
             <div className="p-4">
               <ChangePassword email={me.email} />
             </div>
-          </div>
+          </Card>
         </div>
       )}
 

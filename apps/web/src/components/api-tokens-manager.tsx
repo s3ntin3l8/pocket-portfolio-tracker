@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
@@ -122,7 +123,7 @@ export function ApiTokensManager({
       )}
 
       {tokens.length > 0 && (
-        <div className="divide-y divide-border overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="divide-y divide-border overflow-hidden">
           {tokens.map((tok) => (
             <div key={tok.id} className="flex items-center gap-3 px-4 py-3">
               <span className="flex size-[38px] shrink-0 items-center justify-center rounded-sm bg-background text-foreground">
@@ -159,7 +160,7 @@ export function ApiTokensManager({
               </Button>
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       <button

@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { AlertCircle, AlertTriangle, ChevronRight, ListChecks } from "lucide-react";
@@ -88,7 +89,7 @@ export function DesktopTable({
   };
 
   return (
-    <div className="scroll-shadow-x hidden rounded-lg bg-card shadow-card lg:block">
+    <Card className="scroll-shadow-x hidden lg:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -352,6 +353,6 @@ export function DesktopTable({
           )}
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }

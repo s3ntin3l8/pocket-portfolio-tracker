@@ -250,7 +250,7 @@ export async function IncomeAllocationSection() {
   }));
   if (classSlices.length === 0) return null;
   return (
-    <div className="@container rounded-lg bg-card px-6 py-5 shadow-card">
+    <Card className="@container px-6 py-5">
       <p className="mb-3 text-micro font-semibold uppercase tracking-label text-text-2">
         {t("byClassTitle")}
       </p>
@@ -259,7 +259,7 @@ export async function IncomeAllocationSection() {
         currency={s.displayCurrency}
         total={Number(s.lifetimeTotal)}
       />
-    </div>
+    </Card>
   );
 }
 
@@ -267,7 +267,7 @@ export async function IncomeCurrencySection() {
   const [t, s] = await Promise.all([getTranslations("Income"), load()]);
   if (!s || s.byCurrency.length <= 1) return null;
   return (
-    <div className="@container rounded-lg bg-card px-6 py-5 shadow-card">
+    <Card className="@container px-6 py-5">
       <p className="mb-3 text-micro font-semibold uppercase tracking-label text-text-2">
         {t("currencyTitle")}
       </p>
@@ -289,6 +289,6 @@ export async function IncomeCurrencySection() {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }

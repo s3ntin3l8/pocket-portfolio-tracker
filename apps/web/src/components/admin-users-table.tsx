@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { AdminUser } from "@portfolio/api-client";
 import { AdminUserActions } from "@/components/admin-user-actions";
@@ -25,7 +26,7 @@ export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg bg-card shadow-card">
+    <Card className="overflow-hidden">
       {users.map((u, i) => (
         <div key={u.id} className={i > 0 ? "border-t border-line px-4 py-3.5" : "px-4 py-3.5"}>
           <div className="flex items-baseline gap-2.5">
@@ -57,6 +58,6 @@ export async function AdminUsersTable({ users }: { users: AdminUser[] }) {
           </div>
         </div>
       ))}
-    </div>
+    </Card>
   );
 }

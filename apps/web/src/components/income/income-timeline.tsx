@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePathname } from "@/i18n/navigation";
@@ -265,7 +266,7 @@ export function IncomeTimeline({
   const nextOlder = yearFilter === "all" && !hasActiveTextFilter ? sortedOlder[0] : null;
 
   return (
-    <div className="rounded-lg bg-card p-[22px] shadow-card">
+    <Card className="p-[22px]">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">{t("paymentsTimelineTitle")}</h2>
@@ -472,6 +473,6 @@ export function IncomeTimeline({
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }

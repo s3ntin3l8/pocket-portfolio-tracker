@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { signToneClass } from "@/lib/tone";
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
@@ -96,11 +97,9 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
       />
 
       {visible.length === 0 ? (
-        <div className="rounded-lg bg-card p-8 text-center text-sm text-muted-foreground shadow-card">
-          {t("noMatches")}
-        </div>
+        <Card className="p-8 text-center text-sm text-muted-foreground">{t("noMatches")}</Card>
       ) : (
-        <div className="rounded-lg bg-card shadow-card">
+        <Card>
           {/* ── Desktop table (lg+) ── */}
           <div className="hidden overflow-x-auto lg:block">
             <Table>
@@ -216,7 +215,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
               <MobileRow key={tradeKey(tr)} tr={tr} currency={currency} onSelect={setDetailTrade} />
             ))}
           </div>
-        </div>
+        </Card>
       )}
 
       <TradeDetailSheet

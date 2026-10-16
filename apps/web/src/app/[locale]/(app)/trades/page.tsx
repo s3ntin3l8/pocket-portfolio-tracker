@@ -250,7 +250,7 @@ export default async function TradesPage({
             />
             <StatCard label={t("totalRealized")} value={money(log.totalRealized)} />
             <StatCard label={t("totalDividends")} value={money(log.totalDividends)} />
-            <div className="rounded-lg bg-card px-5 py-4 shadow-card">
+            <Card className="px-5 py-4">
               <p className="text-xs font-semibold text-muted-foreground">{t("winLossTitle")}</p>
               <p className="tabular mt-1 text-2xl font-bold">
                 {log.winRate === null ? "—" : formatPercent(log.winRate, locale).replace("+", "")}
@@ -262,7 +262,7 @@ export default async function TradesPage({
                 <div className="h-full bg-success" style={{ width: `${winPct}%` }} />
                 <div className="h-full bg-destructive" style={{ width: `${100 - winPct}%` }} />
               </div>
-            </div>
+            </Card>
           </div>
         </div>
       </div>

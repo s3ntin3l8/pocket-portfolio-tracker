@@ -1,5 +1,5 @@
 import { TriangleAlert, Info, Receipt } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardLabel, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import type { TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
@@ -9,35 +9,23 @@ import type { TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
  *  as a prop rather than re-derived in each subcomponent. */
 export type TaxTranslator = (key: string, values?: Record<string, string | number>) => string;
 
-/** The "Estimated tax" hero stat — gradient card, distinct from the plain `StatCard`
- *  tiles beside it (the design's one visually-emphasized headline figure). `tone`
- *  matches the regime: violet for German (Abgeltungsteuer), green for Indonesian
- *  (final tax) — exactly `TaxScreen.dc.html`'s two hero gradients. */
+/** The "Estimated tax" headline stat: a plain card with the figure at display size — the
+ *  one emphasised number on the page, without a coloured surface. */
 export function EstimatedTaxHero({
   label,
   value,
   description,
-  tone = "violet",
 }: {
   label: string;
   value: string;
   description: string;
-  tone?: "violet" | "green";
 }) {
   return (
-    <div
-      className="min-w-0 rounded-xl p-5 text-white"
-      style={{
-        background:
-          tone === "green"
-            ? "linear-gradient(135deg,var(--primary),var(--primary-deep))"
-            : "linear-gradient(135deg,var(--violet),var(--violet-deep))",
-      }}
-    >
-      <p className="truncate text-xs font-semibold text-white/80">{label}</p>
+    <Card className="min-w-0 p-5">
+      <CardLabel className="truncate">{label}</CardLabel>
       <p className="tabular mt-1 truncate text-lg font-bold sm:text-2xl lg:text-display">{value}</p>
-      <p className="mt-1 text-xs font-medium text-white/80">{description}</p>
-    </div>
+      <p className="mt-1 text-xs font-medium text-muted-foreground">{description}</p>
+    </Card>
   );
 }
 

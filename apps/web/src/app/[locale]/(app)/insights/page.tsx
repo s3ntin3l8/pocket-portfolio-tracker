@@ -21,7 +21,9 @@ import {
   getSelectedPortfolioId,
 } from "@/lib/server-api";
 import { bestAndWorst, periodToMover } from "@/lib/movers";
-import { formatPercent } from "@/lib/utils";
+import { cn, formatPercent } from "@/lib/utils";
+import { signToneClass } from "@/lib/tone";
+import { Card, CardLabel } from "@/components/ui/card";
 import { isIntradayPoint } from "@portfolio/api-client";
 import { PageTitle } from "@/components/page-header";
 
@@ -117,23 +119,25 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <PageTitle>{t("title")}</PageTitle>
       </header>
 
-      <div
-        className="rounded-lg p-6 text-white"
-        style={{ background: "linear-gradient(135deg,var(--hero-ink),var(--hero-ink-2))" }}
-      >
-        <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
-        <p className="tabular mt-1 text-hero font-bold leading-none sm:text-hero">
+      <Card className="p-6">
+        <CardLabel>{t("xirr.label")}</CardLabel>
+        <p
+          className={cn(
+            "tabular mt-1 text-hero font-bold leading-none",
+            signToneClass(summary.xirr),
+          )}
+        >
           {summary.xirr !== null ? formatPercent(summary.xirr, locale) : "—"}
         </p>
-        <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">
+        <p className="mt-1 text-xs font-medium leading-[1.5] text-muted-foreground">
           {t("xirr.caption", { year: sinceYear })}
         </p>
         {summary.xirr !== null &&
           contributions.status === "ok" &&
           contributions.data.monthsElapsed < 12 && (
-            <p className="mt-1 text-xs text-white/50">{t("xirr.youngHint")}</p>
+            <p className="mt-1 text-xs text-muted-foreground/80">{t("xirr.youngHint")}</p>
           )}
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         {/* ── Sidebar: overview metrics. DOM-first so overview metrics render near
@@ -143,8 +147,8 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
           {allocation && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-card p-4 shadow-card">
-                <p className="text-xs font-semibold text-text-2">{t("concentration.label")}</p>
+              <Card className="p-4">
+                <CardLabel>{t("concentration.label")}</CardLabel>
                 <p className="tabular mt-1 text-heading font-bold leading-none">
                   {allocation.concentration.top1Pct.toFixed(0)}%
                 </p>
@@ -162,10 +166,10 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                     })}
                   </p>
                 )}
-              </div>
+              </Card>
 
-              <div className="rounded-lg bg-card p-4 shadow-card">
-                <p className="text-xs font-semibold text-text-2">{t("diversification.label")}</p>
+              <Card className="p-4">
+                <CardLabel>{t("diversification.label")}</CardLabel>
                 <p className="mt-1 text-heading font-bold leading-none">
                   {t("diversification.value", { count: assetClassSlices.length })}
                 </p>
@@ -175,7 +179,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                     currencies: currencyCount,
                   })}
                 </p>
-              </div>
+              </Card>
             </div>
           )}
 

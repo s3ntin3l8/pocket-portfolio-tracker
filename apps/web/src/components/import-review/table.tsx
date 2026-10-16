@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import React from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown } from "lucide-react";
@@ -82,7 +83,7 @@ export function ImportTable({
   const tm = useTranslations("Manage");
 
   return (
-    <div className="hidden rounded-lg bg-card shadow-card md:block">
+    <Card className="hidden md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -298,6 +299,6 @@ export function ImportTable({
           )}
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }

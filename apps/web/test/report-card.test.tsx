@@ -127,7 +127,6 @@ describe("TwoStatFooter", () => {
           { label: "Lifetime", value: "Rp 9jt" },
         ]}
         openLabel="Open"
-        accentColor="#0E9F6E"
       />,
     );
     expect(screen.getByText("TTM")).toBeInTheDocument();
@@ -145,8 +144,6 @@ describe("ReportCard", () => {
     wrap(
       <ReportCard
         icon={Coins}
-        iconBg="rgba(14,159,110,.12)"
-        iconFg="#0E9F6E"
         title="Income"
         trend={{ label: "+18% vs 2025", tone: "up", arrow: true }}
         value="Rp 12.400.000"
@@ -179,8 +176,6 @@ describe("ReportCard", () => {
     const { container } = render(
       <ReportCard
         icon={Coins}
-        iconBg="rgba(14,159,110,.12)"
-        iconFg="#0E9F6E"
         title="Tax"
         value="Rp 0"
         caption="No allowance configured"

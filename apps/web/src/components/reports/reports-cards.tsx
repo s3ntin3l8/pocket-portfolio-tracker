@@ -22,15 +22,14 @@ import {
   formatQuantity,
   formatSignedMoney,
 } from "@/lib/utils";
-import { tint } from "@/lib/tint";
 
 const ICONS = {
-  income: { icon: Coins, ...tint("primary") },
-  trades: { icon: ScrollText, ...tint("gold") },
-  savings: { icon: PiggyBank, ...tint("violet") },
-  tax: { icon: Receipt, ...tint("teal") },
-  gold: { icon: Gem, ...tint("gold") },
-  documents: { icon: FileText, ...tint("info") },
+  income: Coins,
+  trades: ScrollText,
+  savings: PiggyBank,
+  tax: Receipt,
+  gold: Gem,
+  documents: FileText,
 } as const;
 
 /*
@@ -76,13 +75,13 @@ export async function IncomeCard({ locale }: CardProps) {
       ? [
           {
             pct: (thisYearAmt / forecastFullYearAmt) * 100,
-            color: ICONS.income.fg,
+            color: "var(--color-primary)",
             label: t("income.tooltipReceived"),
             amount: m(thisYearAmt),
           },
           {
             pct: (remainingAmt / forecastFullYearAmt) * 100,
-            color: ICONS.income.fg,
+            color: "var(--color-primary)",
             striped: true,
             label: t("income.tooltipForecast"),
             amount: m(remainingAmt),
@@ -92,9 +91,7 @@ export async function IncomeCard({ locale }: CardProps) {
 
   return (
     <ReportCard
-      icon={ICONS.income.icon}
-      iconBg={ICONS.income.bg}
-      iconFg={ICONS.income.fg}
+      icon={ICONS.income}
       title={t("income.title")}
       trend={
         deltaPct !== null
@@ -170,9 +167,7 @@ export async function TradesCard({ locale }: CardProps) {
 
   return (
     <ReportCard
-      icon={ICONS.trades.icon}
-      iconBg={ICONS.trades.bg}
-      iconFg={ICONS.trades.fg}
+      icon={ICONS.trades}
       title={t("trades.title")}
       trend={
         log.winRate !== null
@@ -236,9 +231,7 @@ export async function SavingsCard({ locale }: CardProps) {
 
   return (
     <ReportCard
-      icon={ICONS.savings.icon}
-      iconBg={ICONS.savings.bg}
-      iconFg={ICONS.savings.fg}
+      icon={ICONS.savings}
       title={t("savings.title")}
       trend={
         s.xirr !== null
@@ -306,9 +299,7 @@ export async function TaxCard({ locale }: CardProps) {
 
     return (
       <ReportCard
-        icon={ICONS.tax.icon}
-        iconBg={ICONS.tax.bg}
-        iconFg={ICONS.tax.fg}
+        icon={ICONS.tax}
         title={t("tax.title")}
         trend={{ label: t("tax.idTrend"), tone: "neutral" }}
         value={m(totalTax)}
@@ -341,9 +332,7 @@ export async function TaxCard({ locale }: CardProps) {
 
     return (
       <ReportCard
-        icon={ICONS.tax.icon}
-        iconBg={ICONS.tax.bg}
-        iconFg={ICONS.tax.fg}
+        icon={ICONS.tax}
         title={t("tax.title")}
         trend={
           allowanceAnnual > 0
@@ -358,13 +347,13 @@ export async function TaxCard({ locale }: CardProps) {
             ? [
                 {
                   pct: usedPct,
-                  color: "var(--violet)",
+                  color: "var(--color-chart-4)",
                   label: t("tax.tooltipUsed"),
                   amount: m(usedYtd),
                 },
                 {
                   pct: Math.max(0, 100 - usedPct),
-                  color: "var(--violet)",
+                  color: "var(--color-chart-4)",
                   striped: true,
                   label: t("tax.tooltipAllowance"),
                   amount: m(allowanceAnnual),
@@ -401,9 +390,7 @@ export async function GoldCard({ locale }: CardProps) {
     .join(" · ");
   return (
     <ReportCard
-      icon={ICONS.gold.icon}
-      iconBg={ICONS.gold.bg}
-      iconFg={ICONS.gold.fg}
+      icon={ICONS.gold}
       title={t("gold.title")}
       value={formatMoney(Number(g.totals.value), currency, locale)}
       valueCompact={formatMoneyCompact(Number(g.totals.value), currency, locale)}
@@ -448,9 +435,7 @@ export async function DocumentsCard() {
   const fromUpload = taxReports.length - fromTr;
   return (
     <ReportCard
-      icon={ICONS.documents.icon}
-      iconBg={ICONS.documents.bg}
-      iconFg={ICONS.documents.fg}
+      icon={ICONS.documents}
       title={t("documents.title")}
       value={String(taxReports.length)}
       caption={t("documents.caption")}

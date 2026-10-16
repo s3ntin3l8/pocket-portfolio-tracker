@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { authViaKey } from "@/lib/auth-label";
 import { isDevAuthBypass } from "@/lib/dev-auth";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -113,9 +114,7 @@ export default async function SettingsLayout({
       navItems={navItems}
       groups={groups}
       indexHref="/settings"
-      railTop={
-        identityCard && <div className="rounded-lg bg-card p-3.5 shadow-card">{identityCard}</div>
-      }
+      railTop={identityCard && <Card className="p-3.5">{identityCard}</Card>}
       railBottom={<SignOutButton />}
       railExtra={<SettingsInstallItem variant="rail" />}
       landingExtra={<SettingsInstallItem variant="landing" />}
