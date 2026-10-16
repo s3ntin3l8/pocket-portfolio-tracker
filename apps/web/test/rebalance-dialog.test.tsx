@@ -119,6 +119,24 @@ describe("RebalanceDialog", () => {
     });
   });
 
+  it("pads its content itself: a mobileHeader dialog drops the primitive's own padding", async () => {
+    render(
+      <Wrapper>
+        <RebalanceDialog
+          portfolioId="pf-1"
+          plans={PLANS}
+          activeMonthlyTotalDisplay="100"
+          currency="EUR"
+        />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /set target split/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.className).not.toMatch(/(^|\s)p-6(\s|$)/);
+    expect(dialog.querySelector(".md\\:p-6")).not.toBeNull();
+  });
+
   it("pre-fills existing targets when targets are returned from the API", async () => {
     getPortfolioTargets.mockResolvedValue([
       { key: "inst-world", targetPct: 70 },

@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchX } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -161,7 +163,7 @@ export function PositionsPanel({
             <TabsContent key={key} value={key}>
               <Card className="overflow-hidden">
                 {noResults ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">{t("noResults")}</p>
+                  <EmptyState compact icon={SearchX} title={t("noResults")} />
                 ) : (
                   <HoldingsTable rows={classRows} currency={currency} cash={tabCash} />
                 )}

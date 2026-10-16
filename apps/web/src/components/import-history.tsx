@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Eye, EyeOff, ListChecks, Trash2 } from "lucide-react";
@@ -154,14 +155,7 @@ export function ImportHistory({
           </div>
         </CardHeader>
       )}
-      {actionError && (
-        <div
-          role="alert"
-          className="mx-6 mb-3 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {actionError}
-        </div>
-      )}
+      {actionError && <ErrorBanner className="mx-6 mb-3">{actionError}</ErrorBanner>}
       <SelectionBar
         selectionMode={selectionMode}
         selected={selected}

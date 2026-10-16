@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
@@ -67,14 +68,7 @@ export function HolderFormBody({
   return (
     <>
       <form id={formId} onSubmit={f.submit} className="flex max-w-[600px] flex-col gap-[13px]">
-        {f.error && (
-          <p
-            role="alert"
-            className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            {t("error")}
-          </p>
-        )}
+        {f.error && <ErrorBanner>{t("error")}</ErrorBanner>}
 
         <div className="space-y-1.5">
           <Label htmlFor={nameId}>{tf("holderName")}</Label>

@@ -1,9 +1,10 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { AlertCircle } from "lucide-react";
+
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { useSheetFooter } from "@/components/ui/sheet";
@@ -111,15 +112,7 @@ export function PortfolioFormBody({
           {t("subtitle")}
         </p>
 
-        {f.error && (
-          <div
-            role="alert"
-            className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            <AlertCircle className="size-4 shrink-0" />
-            {t("error")}
-          </div>
-        )}
+        {f.error && <ErrorBanner>{t("error")}</ErrorBanner>}
 
         <PortfolioFormSections
           name={f.name}

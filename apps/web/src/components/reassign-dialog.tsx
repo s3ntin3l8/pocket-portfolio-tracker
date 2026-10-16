@@ -55,29 +55,31 @@ export function ReassignDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
-          <DialogDescription>{t("description")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-1.5">
-          <Label>{t("target")}</Label>
-          <PortfolioPicker
-            portfolios={targets}
-            value={value}
-            onChange={setValue}
-            ariaLabel={t("target")}
-            triggerClassName="w-full"
-          />
+      <DialogContent mobileHeader={{ title: t("title") }}>
+        <div className="grid gap-4 p-4 md:p-6">
+          <DialogHeader>
+            <DialogTitle className="max-md:sr-only">{t("title")}</DialogTitle>
+            <DialogDescription>{t("description")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>{t("target")}</Label>
+            <PortfolioPicker
+              portfolios={targets}
+              value={value}
+              onChange={setValue}
+              ariaLabel={t("target")}
+              triggerClassName="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+              {t("cancel")}
+            </Button>
+            <Button onClick={() => void submit()} disabled={busy || !value}>
+              {busy ? <Spinner size="sm" /> : t("confirm")}
+            </Button>
+          </DialogFooter>
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
-            {t("cancel")}
-          </Button>
-          <Button onClick={() => void submit()} disabled={busy || !value}>
-            {busy ? <Spinner size="sm" /> : t("confirm")}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

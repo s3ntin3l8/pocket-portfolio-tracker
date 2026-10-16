@@ -1,9 +1,10 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient, ApiToken } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
@@ -112,15 +113,7 @@ export function ApiTokensManager({
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{t("tokensHint")}</p>
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {t("tokensError")}
-        </div>
-      )}
+      {error && <ErrorBanner>{t("tokensError")}</ErrorBanner>}
 
       {tokens.length > 0 && (
         <Card className="divide-y divide-border overflow-hidden">
@@ -173,149 +166,146 @@ export function ApiTokensManager({
       </button>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent size="sm">
-          {newSecret ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("tokensCreatedTitle")}</DialogTitle>
-                <DialogDescription>{t("tokensCreatedWarning")}</DialogDescription>
-              </DialogHeader>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 overflow-x-auto rounded bg-background px-2 py-1 font-mono text-xs">
-                  {newSecret}
-                </code>
-                <Button
-                  type="button"
-                  variant={copied === "ok" ? "default" : "outline"}
-                  size="sm"
-                  onClick={copySecret}
-                  aria-live="polite"
-                >
-                  {copied === "ok" ? <Check className="size-4" /> : <Copy className="size-4" />}
-                  {copied === "ok"
-                    ? t("tokensCopied")
-                    : copied === "fail"
-                      ? t("tokensCopyFailed")
-                      : t("tokensCopy")}
-                </Button>
-              </div>
-              <Button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="h-auto w-full rounded-md py-3 text-sm font-bold"
-              >
-                {t("tokensDone")}
-              </Button>
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("tokensCreateTitle")}</DialogTitle>
-                <DialogDescription>{t("tokensCreateSubtitle")}</DialogDescription>
-              </DialogHeader>
-
-              <form onSubmit={create} className="space-y-4">
-                {error && (
-                  <div
-                    role="alert"
-                    className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                  >
-                    <AlertCircle className="size-4 shrink-0" />
-                    {t("tokensError")}
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="token-name">{t("tokensName")}</Label>
-                  <Input
-                    id="token-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={t("tokensNamePlaceholder")}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label id="token-scope-label">{t("tokensScope")}</Label>
-                  <div
-                    role="radiogroup"
-                    aria-labelledby="token-scope-label"
-                    className="flex w-full gap-[7px]"
-                  >
-                    {(["read", "write"] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        role="radio"
-                        aria-checked={scope === s}
-                        onClick={() => setScope(s)}
-                        className={cn(
-                          "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
-                          scope === s
-                            ? "bg-pill font-bold text-white"
-                            : "bg-background font-semibold text-foreground",
-                        )}
-                      >
-                        {s === "read" ? t("tokensScopeRead") : t("tokensScopeWrite")}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label id="token-expiry-label">{t("tokensExpiry")}</Label>
-                  <div
-                    role="radiogroup"
-                    aria-labelledby="token-expiry-label"
-                    className="flex flex-wrap gap-[7px]"
-                  >
-                    {EXPIRY_OPTIONS.map((o) => (
-                      <button
-                        key={o.labelKey}
-                        type="button"
-                        role="radio"
-                        aria-checked={expiresInDays === o.value}
-                        onClick={() => setExpiresInDays(o.value)}
-                        className={cn(
-                          "rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors",
-                          expiresInDays === o.value
-                            ? "bg-pill text-white"
-                            : "bg-border text-foreground",
-                        )}
-                      >
-                        {t(o.labelKey)}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {expiresInDays
-                      ? t("tokensExpiryNoteDays", { days: expiresInDays })
-                      : t("tokensExpiryNoteNever")}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-end gap-2.5 pt-1">
+        <DialogContent
+          size="sm"
+          mobileHeader={{ title: newSecret ? t("tokensCreatedTitle") : t("tokensCreateTitle") }}
+        >
+          <div className="grid gap-4 p-4 md:p-6">
+            {newSecret ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="max-md:sr-only">{t("tokensCreatedTitle")}</DialogTitle>
+                  <DialogDescription>{t("tokensCreatedWarning")}</DialogDescription>
+                </DialogHeader>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 overflow-x-auto rounded bg-background px-2 py-1 font-mono text-xs">
+                    {newSecret}
+                  </code>
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={() => setModalOpen(false)}
-                    className="h-auto rounded-sm px-4 py-2.5 text-sm font-bold"
+                    variant={copied === "ok" ? "default" : "outline"}
+                    size="sm"
+                    onClick={copySecret}
+                    aria-live="polite"
                   >
-                    {t("tokensCancel")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={busy || !name.trim()}
-                    className="h-auto rounded-sm px-4 py-2.5 text-sm font-bold"
-                  >
-                    {busy && <Spinner size="sm" />}
-                    {t("tokensCreate")}
+                    {copied === "ok" ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    {copied === "ok"
+                      ? t("tokensCopied")
+                      : copied === "fail"
+                        ? t("tokensCopyFailed")
+                        : t("tokensCopy")}
                   </Button>
                 </div>
-              </form>
-            </>
-          )}
+                <Button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="h-auto w-full rounded-md py-3 text-sm font-bold"
+                >
+                  {t("tokensDone")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="max-md:sr-only">{t("tokensCreateTitle")}</DialogTitle>
+                  <DialogDescription>{t("tokensCreateSubtitle")}</DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={create} className="space-y-4">
+                  {error && <ErrorBanner>{t("tokensError")}</ErrorBanner>}
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="token-name">{t("tokensName")}</Label>
+                    <Input
+                      id="token-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t("tokensNamePlaceholder")}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label id="token-scope-label">{t("tokensScope")}</Label>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="token-scope-label"
+                      className="flex w-full gap-[7px]"
+                    >
+                      {(["read", "write"] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          role="radio"
+                          aria-checked={scope === s}
+                          onClick={() => setScope(s)}
+                          className={cn(
+                            "flex-1 rounded-sm py-[9px] text-center text-body-sm transition-colors",
+                            scope === s
+                              ? "bg-pill font-bold text-white"
+                              : "bg-background font-semibold text-foreground",
+                          )}
+                        >
+                          {s === "read" ? t("tokensScopeRead") : t("tokensScopeWrite")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label id="token-expiry-label">{t("tokensExpiry")}</Label>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="token-expiry-label"
+                      className="flex flex-wrap gap-[7px]"
+                    >
+                      {EXPIRY_OPTIONS.map((o) => (
+                        <button
+                          key={o.labelKey}
+                          type="button"
+                          role="radio"
+                          aria-checked={expiresInDays === o.value}
+                          onClick={() => setExpiresInDays(o.value)}
+                          className={cn(
+                            "rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors",
+                            expiresInDays === o.value
+                              ? "bg-pill text-white"
+                              : "bg-border text-foreground",
+                          )}
+                        >
+                          {t(o.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {expiresInDays
+                        ? t("tokensExpiryNoteDays", { days: expiresInDays })
+                        : t("tokensExpiryNoteNever")}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setModalOpen(false)}
+                      className="h-auto rounded-sm px-4 py-2.5 text-sm font-bold"
+                    >
+                      {t("tokensCancel")}
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={busy || !name.trim()}
+                      className="h-auto rounded-sm px-4 py-2.5 text-sm font-bold"
+                    >
+                      {busy && <Spinner size="sm" />}
+                      {t("tokensCreate")}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

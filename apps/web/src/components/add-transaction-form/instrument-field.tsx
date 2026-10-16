@@ -8,7 +8,7 @@ import { InstrumentLogo } from "@/components/instrument-logo";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Field } from "./field";
+import { FormField } from "@/components/ui/form-field";
 import { unitForClass } from "./constants";
 
 const ASSET_CLASSES = ["equity", "gold", "bond", "mutual_fund", "etf", "crypto"] as const;
@@ -215,7 +215,7 @@ export function InstrumentField({
 
             {customOpen && (
               <div className="flex flex-col gap-[13px] border-t border-line pt-[13px]">
-                <Field label={t("kind")} htmlFor="tx-kind">
+                <FormField label={t("kind")} id="tx-kind">
                   <Select
                     id="tx-kind"
                     value={assetClass}
@@ -231,11 +231,11 @@ export function InstrumentField({
                       </option>
                     ))}
                   </Select>
-                </Field>
+                </FormField>
 
                 {assetClass === "gold" ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label={t("goldSource")} htmlFor="tx-gold-source">
+                    <FormField label={t("goldSource")} id="tx-gold-source">
                       <Select
                         id="tx-gold-source"
                         value={goldMarket}
@@ -247,20 +247,20 @@ export function InstrumentField({
                           </option>
                         ))}
                       </Select>
-                    </Field>
-                    <Field label={t("goldLabel")} htmlFor="tx-gold-label">
+                    </FormField>
+                    <FormField label={t("goldLabel")} id="tx-gold-label">
                       <Input
                         id="tx-gold-label"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder={t("goldLabelPlaceholder")}
                       />
-                    </Field>
+                    </FormField>
                     <p className="col-span-2 text-xs text-text-2">{t("goldNote")}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label={t("symbol")} htmlFor="tx-symbol">
+                    <FormField label={t("symbol")} id="tx-symbol">
                       <Input
                         id="tx-symbol"
                         value={symbol}
@@ -270,12 +270,12 @@ export function InstrumentField({
                           setDiscoveredMarket(null);
                         }}
                       />
-                    </Field>
-                    <Field label={t("name")} htmlFor="tx-name">
+                    </FormField>
+                    <FormField label={t("name")} id="tx-name">
                       <Input id="tx-name" value={name} onChange={(e) => setName(e.target.value)} />
-                    </Field>
+                    </FormField>
                     <div className="col-span-2">
-                      <Field label={t("unit")} htmlFor="tx-unit">
+                      <FormField label={t("unit")} id="tx-unit">
                         <Select
                           id="tx-unit"
                           value={unit}
@@ -287,12 +287,12 @@ export function InstrumentField({
                             </option>
                           ))}
                         </Select>
-                      </Field>
+                      </FormField>
                     </div>
 
                     {assetClass === "bond" && (
                       <>
-                        <Field label={t("bondFaceValueLabel")} htmlFor="tx-bond-face-value">
+                        <FormField label={t("bondFaceValueLabel")} id="tx-bond-face-value">
                           <Input
                             id="tx-bond-face-value"
                             inputMode="decimal"
@@ -300,8 +300,8 @@ export function InstrumentField({
                             onChange={(e) => setFaceValue(e.target.value)}
                             placeholder={t("bondFaceValuePlaceholder")}
                           />
-                        </Field>
-                        <Field label={t("bondCouponRateLabel")} htmlFor="tx-bond-coupon-rate">
+                        </FormField>
+                        <FormField label={t("bondCouponRateLabel")} id="tx-bond-coupon-rate">
                           <Input
                             id="tx-bond-coupon-rate"
                             inputMode="decimal"
@@ -309,8 +309,8 @@ export function InstrumentField({
                             onChange={(e) => setCouponRatePercent(e.target.value)}
                             placeholder="6.35"
                           />
-                        </Field>
-                        <Field label={t("bondCouponSchedule")} htmlFor="tx-bond-coupon-schedule">
+                        </FormField>
+                        <FormField label={t("bondCouponSchedule")} id="tx-bond-coupon-schedule">
                           <Select
                             id="tx-bond-coupon-schedule"
                             value={couponSchedule}
@@ -328,15 +328,15 @@ export function InstrumentField({
                               </option>
                             ))}
                           </Select>
-                        </Field>
-                        <Field label={t("bondMaturityDate")} htmlFor="tx-bond-maturity">
+                        </FormField>
+                        <FormField label={t("bondMaturityDate")} id="tx-bond-maturity">
                           <Input
                             id="tx-bond-maturity"
                             type="date"
                             value={maturityDate}
                             onChange={(e) => setMaturityDate(e.target.value)}
                           />
-                        </Field>
+                        </FormField>
                         <p className="col-span-2 text-xs text-text-2">{t("bondNote")}</p>
                       </>
                     )}

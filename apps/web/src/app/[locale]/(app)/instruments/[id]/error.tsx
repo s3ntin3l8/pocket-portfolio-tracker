@@ -1,13 +1,38 @@
 "use client";
-import { Card } from "@/components/ui/card";
+
+import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { AlertTriangle } from "lucide-react";
+import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
 
-export default function Error({ error, reset }: { error: Error; reset: () => void }) {
+/**
+ * Error boundary for an instrument page. Same translated frame as the app-level boundary:
+ * the raw error message is never shown (it can carry internals), only the digest as a
+ * quotable reference. `reset()` retries the failed segment render.
+ */
+export default function InstrumentError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  const t = useTranslations("Error");
+
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
   return (
-    <Card className="p-6">
-      <h2 className="text-lg font-semibold mb-2">Couldn&apos;t load this page</h2>
-      <p className="text-muted-foreground mb-4">{error.message}</p>
-      <Button onClick={reset}>Try again</Button>
-    </Card>
+    <ErrorState
+      icon={AlertTriangle}
+      tone="warn"
+      eyebrow="500"
+      title={t("title")}
+      body={t("body")}
+      code={error.digest ? `REF · ${error.digest}` : undefined}
+      primary={<Button onClick={reset}>{t("retry")}</Button>}
+    />
   );
 }

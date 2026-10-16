@@ -1,8 +1,9 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { AlertCircle, RefreshCw, Plug, Unplug } from "lucide-react";
+import { RefreshCw, Plug, Unplug } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { apiErrorCode } from "@portfolio/api-client";
@@ -111,15 +112,7 @@ export function IbkrConnectFlow({
 
   return (
     <div className="max-w-md space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {phase === "form" && (
         <form onSubmit={connect} className="space-y-4">

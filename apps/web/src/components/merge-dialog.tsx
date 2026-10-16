@@ -98,83 +98,85 @@ export function MergeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <GitMerge className="size-4" />
-            {t("title")}
-          </DialogTitle>
-          <DialogDescription>{t("description")}</DialogDescription>
-        </DialogHeader>
+      <DialogContent mobileHeader={{ title: t("title") }}>
+        <div className="grid gap-4 p-4 md:p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 max-md:sr-only">
+              <GitMerge className="size-4" />
+              {t("title")}
+            </DialogTitle>
+            <DialogDescription>{t("description")}</DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-2">
-          {[rowA, rowB].map((row) => (
-            <button
-              key={row.id}
-              type="button"
-              onClick={() => setSurvivorId(row.id)}
-              className={cn(
-                "w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                survivorId === row.id
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-muted/50",
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">{optionLabel(row)}</span>
-                {survivorId === row.id && (
-                  <span className="shrink-0 text-xs text-primary">{t("survives")}</span>
+          <div className="space-y-2">
+            {[rowA, rowB].map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => setSurvivorId(row.id)}
+                className={cn(
+                  "w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                  survivorId === row.id
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50",
                 )}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {loadingPreview && (
-          <div className="flex items-center justify-center py-4 text-muted-foreground">
-            <Spinner size="sm" />
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{optionLabel(row)}</span>
+                  {survivorId === row.id && (
+                    <span className="shrink-0 text-xs text-primary">{t("survives")}</span>
+                  )}
+                </div>
+              </button>
+            ))}
           </div>
-        )}
 
-        {!loadingPreview && preview?.ok && preview.merged && (
-          <div className="space-y-1 rounded-lg border border-border bg-card/60 px-3 py-2 text-sm">
-            <div className="font-medium">{t("previewTitle")}</div>
-            <div className="text-muted-foreground">
-              {t("previewLine", {
-                quantity: preview.merged.quantity,
-                price: formatMoney(Number(preview.merged.price), preview.merged.currency, locale),
-                date: new Date(preview.merged.executedAt).toLocaleDateString(locale),
-              })}
+          {loadingPreview && (
+            <div className="flex items-center justify-center py-4 text-muted-foreground">
+              <Spinner size="sm" />
             </div>
-            {preview.merged.fees != null && (
+          )}
+
+          {!loadingPreview && preview?.ok && preview.merged && (
+            <div className="space-y-1 rounded-lg border border-border bg-card/60 px-3 py-2 text-sm">
+              <div className="font-medium">{t("previewTitle")}</div>
               <div className="text-muted-foreground">
-                {t("previewFees", {
-                  fees: formatMoney(Number(preview.merged.fees), preview.merged.currency, locale),
+                {t("previewLine", {
+                  quantity: preview.merged.quantity,
+                  price: formatMoney(Number(preview.merged.price), preview.merged.currency, locale),
+                  date: new Date(preview.merged.executedAt).toLocaleDateString(locale),
                 })}
               </div>
-            )}
-            {preview.merged.documentCount > 0 && (
-              <div className="text-muted-foreground">
-                {t("previewDocuments", { count: preview.merged.documentCount })}
-              </div>
-            )}
-          </div>
-        )}
+              {preview.merged.fees != null && (
+                <div className="text-muted-foreground">
+                  {t("previewFees", {
+                    fees: formatMoney(Number(preview.merged.fees), preview.merged.currency, locale),
+                  })}
+                </div>
+              )}
+              {preview.merged.documentCount > 0 && (
+                <div className="text-muted-foreground">
+                  {t("previewDocuments", { count: preview.merged.documentCount })}
+                </div>
+              )}
+            </div>
+          )}
 
-        {!loadingPreview && blocked && preview?.blockedReason && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {t(`blocked.${preview.blockedReason}`)}
-          </div>
-        )}
+          {!loadingPreview && blocked && preview?.blockedReason && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {t(`blocked.${preview.blockedReason}`)}
+            </div>
+          )}
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
-            {t("cancel")}
-          </Button>
-          <Button onClick={() => void submit()} disabled={busy || loadingPreview || !preview?.ok}>
-            {busy ? <Spinner size="sm" /> : t("confirm")}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+              {t("cancel")}
+            </Button>
+            <Button onClick={() => void submit()} disabled={busy || loadingPreview || !preview?.ok}>
+              {busy ? <Spinner size="sm" /> : t("confirm")}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,13 +1,14 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePathname } from "@/i18n/navigation";
 import { buildPeriodHref } from "@/components/period-select";
 import { replaceUrlParam } from "@/lib/url-state";
 import { useTranslations } from "next-intl";
-import { Calendar, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { Calendar, ChevronDown, ChevronRight, Check, SearchX } from "lucide-react";
 import { useRegisterPageCommands } from "@/components/page-commands";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -394,7 +395,7 @@ export function IncomeTimeline({
       </div>
 
       {timelineGroups.length === 0 && !nextOlder ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">{t("noMatches")}</p>
+        <EmptyState compact icon={SearchX} title={t("noMatches")} />
       ) : (
         <>
           {timelineGroups.length > 0 && <TimelineColumnHeader />}

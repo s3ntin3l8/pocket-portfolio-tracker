@@ -1,9 +1,10 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
-import { AlertCircle, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { apiErrorCode } from "@portfolio/api-client";
 import type { ApiClient } from "@portfolio/api-client";
 import { Spinner } from "@/components/ui/spinner";
@@ -95,15 +96,7 @@ export function ChangePasswordForm({
 
   return (
     <form onSubmit={submit} className="max-w-md space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <div className="space-y-1.5">
         <Label htmlFor="current-password">{t("currentPasswordLabel")}</Label>

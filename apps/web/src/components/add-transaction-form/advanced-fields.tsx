@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Field } from "./field";
+import { FormField } from "@/components/ui/form-field";
 
 // Form-specific: narrower than isIncomeType (excludes interest/bonus_cash shown as Cash)
 const INCOME_TYPES = ["dividend", "coupon"] as const;
@@ -69,7 +69,7 @@ export function AdvancedFields({
       </button>
       {open && (
         <div className="mt-[13px] grid gap-3 grid-cols-2">
-          <Field label={t("fxRate")} htmlFor="tx-fx-rate">
+          <FormField label={t("fxRate")} id="tx-fx-rate">
             <Input
               id="tx-fx-rate"
               inputMode="decimal"
@@ -77,17 +77,17 @@ export function AdvancedFields({
               onChange={(e) => setFxRate(e.target.value)}
               placeholder={t("fxRatePlaceholder")}
             />
-          </Field>
-          <Field label={t("subType")} htmlFor="tx-sub-type">
+          </FormField>
+          <FormField label={t("subType")} id="tx-sub-type">
             <Select id="tx-sub-type" value={kind} onChange={(e) => setKind(e.target.value)}>
               <option value="">{t("subTypeNone")}</option>
               <option value="saveback">{t("subTypeSaveback")}</option>
               <option value="roundup">{t("subTypeRoundup")}</option>
               <option value="merger">{t("subTypeMerger")}</option>
             </Select>
-          </Field>
+          </FormField>
           {isIncome && (
-            <Field label={t("shares")} htmlFor="tx-shares">
+            <FormField label={t("shares")} id="tx-shares">
               <Input
                 id="tx-shares"
                 inputMode="decimal"
@@ -95,10 +95,10 @@ export function AdvancedFields({
                 onChange={(e) => setShares(e.target.value)}
                 placeholder={t("sharesPlaceholder")}
               />
-            </Field>
+            </FormField>
           )}
           {isIncome && (
-            <Field label={t("perShare")} htmlFor="tx-per-share">
+            <FormField label={t("perShare")} id="tx-per-share">
               <Input
                 id="tx-per-share"
                 inputMode="decimal"
@@ -106,10 +106,10 @@ export function AdvancedFields({
                 onChange={(e) => setPerShare(e.target.value)}
                 placeholder={t("perSharePlaceholder")}
               />
-            </Field>
+            </FormField>
           )}
           {isIncome && (
-            <Field label={t("nativeCurrency")} htmlFor="tx-native-currency">
+            <FormField label={t("nativeCurrency")} id="tx-native-currency">
               <Select
                 id="tx-native-currency"
                 value={nativeCurrency}
@@ -122,10 +122,10 @@ export function AdvancedFields({
                   </option>
                 ))}
               </Select>
-            </Field>
+            </FormField>
           )}
           {isIncome && (
-            <Field label={t("grossNative")} htmlFor="tx-gross-native">
+            <FormField label={t("grossNative")} id="tx-gross-native">
               <Input
                 id="tx-gross-native"
                 inputMode="decimal"
@@ -133,7 +133,7 @@ export function AdvancedFields({
                 onChange={(e) => setGrossNative(e.target.value)}
                 placeholder={t("grossNativePlaceholder")}
               />
-            </Field>
+            </FormField>
           )}
         </div>
       )}

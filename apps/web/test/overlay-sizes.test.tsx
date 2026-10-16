@@ -84,6 +84,8 @@ describe("task-tier dialogs use DialogContent's size scale", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: messages.Settings.tokensCreate }));
     await waitFor(() => expectScaleSized(screen.getByRole("dialog")));
-    expect(within(screen.getByRole("dialog")).getByText(messages.Settings.tokensCreateTitle));
+    expect(
+      within(screen.getByRole("dialog")).getAllByText(messages.Settings.tokensCreateTitle),
+    ).toHaveLength(2);
   });
 });

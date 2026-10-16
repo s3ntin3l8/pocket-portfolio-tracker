@@ -1,8 +1,9 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle } from "lucide-react";
+
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/navigation";
@@ -46,15 +47,7 @@ export function PortfolioEditForm({
 
   return (
     <div className="max-w-xl space-y-3.5">
-      {f.error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {t("error")}
-        </div>
-      )}
+      {f.error && <ErrorBanner>{t("error")}</ErrorBanner>}
 
       {(f.showTrSection || f.showIbkrSection) && (
         <div className="space-y-3.5">

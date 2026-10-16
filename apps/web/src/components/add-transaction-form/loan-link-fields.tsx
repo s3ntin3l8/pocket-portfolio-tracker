@@ -2,7 +2,7 @@
 
 import type { LoanOption } from "@portfolio/api-client";
 import { Select } from "@/components/ui/select";
-import { Field } from "./field";
+import { FormField } from "@/components/ui/form-field";
 
 const loanLabel = (l: LoanOption) =>
   [l.provider, l.contractNo].filter(Boolean).join(" · ") || l.loanId.slice(0, 8);
@@ -43,7 +43,7 @@ export function LoanLinkFields({
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label={t("loan")} htmlFor="tx-loan">
+      <FormField label={t("loan")} id="tx-loan">
         <Select
           id="tx-loan"
           value={loanId}
@@ -57,8 +57,8 @@ export function LoanLinkFields({
             </option>
           ))}
         </Select>
-      </Field>
-      <Field label={t("installment")} htmlFor="tx-installment">
+      </FormField>
+      <FormField label={t("installment")} id="tx-installment">
         <Select
           id="tx-installment"
           value={installmentN ?? ""}
@@ -72,7 +72,7 @@ export function LoanLinkFields({
             </option>
           ))}
         </Select>
-      </Field>
+      </FormField>
       {locked && <p className="col-span-2 text-xs text-muted-foreground">{t("loanLinkLocked")}</p>}
     </div>
   );

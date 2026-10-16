@@ -1,9 +1,10 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Check, GripVertical, Lock, Pencil } from "lucide-react";
+import { Check, GripVertical, Lock, Pencil } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DndContext,
@@ -130,15 +131,7 @@ export function AdminProvidersForm({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {error && (
-        <div
-          role="alert"
-          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
-          {t("updateError")}
-        </div>
-      )}
+      {error && <ErrorBanner>{t("updateError")}</ErrorBanner>}
 
       {encryptionEnabled && (
         <div className="flex items-center gap-2.5 rounded-lg border border-primary/20 bg-primary/10 px-3.5 py-2.5">

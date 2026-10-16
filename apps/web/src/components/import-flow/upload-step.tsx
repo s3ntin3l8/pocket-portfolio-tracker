@@ -1,7 +1,8 @@
 "use client";
 
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { useTranslations } from "next-intl";
-import { Upload, AlertCircle } from "lucide-react";
+import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -85,11 +86,7 @@ export function UploadStep({
         onChange={onPick}
       />
       {error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="size-4 shrink-0" />
+        <ErrorBanner className="flex-wrap">
           <span>{error}</span>
           {reImportFile && (
             <Button
@@ -102,7 +99,7 @@ export function UploadStep({
               {t("reImportAnyway")}
             </Button>
           )}
-        </div>
+        </ErrorBanner>
       )}
     </div>
   );
