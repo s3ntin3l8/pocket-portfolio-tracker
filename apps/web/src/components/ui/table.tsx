@@ -9,7 +9,7 @@ import { StickyTableWrapper } from "@/components/ui/sticky-table-wrapper";
  *
  * `stickyHeader` pins the header row under the topbar while the shell scrolls. While the table
  * fits its column the wrapper clips instead of scrolling (see `StickyTableWrapper`); when it does
- * not fit it scrolls horizontally and the header scrolls with the page. Not for `edgeAffordance`.
+ * not fit it scrolls horizontally and the header scrolls with the page. Do not combine with `edgeAffordance`: the sticky wrapper has its own shadows.
  */
 function Table({
   className,
@@ -72,7 +72,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-11 px-3 text-left align-middle text-xs font-medium text-muted-foreground first:pl-5 last:pr-5 [&:has([role=checkbox])]:pr-0",
+        "h-(--table-head-h) px-3 text-left align-middle text-xs font-medium text-muted-foreground first:pl-5 last:pr-5 [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}

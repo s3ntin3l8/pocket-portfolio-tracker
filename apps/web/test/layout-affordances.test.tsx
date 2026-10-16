@@ -178,7 +178,7 @@ describe("Table stickyHeader", () => {
     try {
       const { container } = render(sticky);
       const wrapper = container.firstElementChild as HTMLElement;
-      expect(wrapper.className).toContain("overflow-x-auto");
+      expect(wrapper.className).toContain("scroll-shadow-x");
       expect(wrapper.className).not.toContain("overflow-x-clip");
     } finally {
       widths.mockRestore();
@@ -209,11 +209,13 @@ describe("table layout switch", () => {
     "src/components/import-history.tsx",
     "src/components/corporate-actions-manager.tsx",
     "src/components/tax-reports-inbox.tsx",
+    "src/app/[locale]/(app)/reports/documents/loading.tsx",
   ];
   it("tables and their mobile lists switch at lg, not md", () => {
     for (const f of files) {
       const code = src(f);
-      expect(code, f).not.toMatch(/\b(hidden md:block|md:hidden)\b/);
+      // The back-button skeletons legitimately use md:hidden; only the table/list switch matters.
+      expect(code, f).not.toMatch(/md:block|(?:space-y-[\d.]+|divide-line) md:hidden/);
     }
   });
   it("the tax tables opt into the horizontal-scroll affordance", () => {

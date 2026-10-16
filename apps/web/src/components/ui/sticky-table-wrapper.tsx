@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
  * Scroll wrapper for a table with a sticky header. `position: sticky` is lost inside any scroll
  * container, so while the table fits its column the wrapper clips (`overflow-x: clip`, no scroll
  * container) and the header sticks to the shell's scroller. As soon as the table is wider than
- * its column (a narrow viewport next to the rail) it falls back to `overflow-x: auto`, so every
- * column stays reachable; the header then scrolls with the page instead of pinning.
+ * its column (a narrow viewport next to the rail) it falls back to a scrolling wrapper with the
+ * edge shadows (`scroll-shadow-x`), so every column stays reachable and visibly so; the header then
+ * scrolls with the page instead of pinning. The table's grid column must keep `min-w-0`, or `clip`
+ * would let the track grow instead of the table overflowing.
  */
 export function StickyTableWrapper({
   className,
@@ -36,7 +38,7 @@ export function StickyTableWrapper({
   return (
     <div
       ref={ref}
-      className={cn("relative w-full", fits ? "overflow-x-clip" : "overflow-x-auto", className)}
+      className={cn("relative w-full", fits ? "overflow-x-clip" : "scroll-shadow-x", className)}
     >
       {children}
     </div>

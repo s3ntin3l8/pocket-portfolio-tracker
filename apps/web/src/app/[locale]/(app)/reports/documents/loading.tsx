@@ -18,7 +18,7 @@ export default function Loading() {
           <Skeleton className="h-9 w-48" />
           <Skeleton className="h-9 w-28" />
         </div>
-        <Card className="hidden overflow-hidden md:block">
+        <Card className="hidden overflow-hidden lg:block">
           <div className="space-y-3 p-4">
             <Skeleton className="h-4 w-full" />
             {Array.from({ length: 5 }).map((_, i) => (
@@ -26,7 +26,7 @@ export default function Loading() {
             ))}
           </div>
         </Card>
-        <div className="space-y-2 md:hidden">
+        <div className="space-y-2 lg:hidden">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="flex items-center gap-3 p-3">
               <Skeleton className="size-8 shrink-0" />
