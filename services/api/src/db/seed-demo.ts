@@ -15,9 +15,11 @@ import {
   corporateActions,
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
+import type { MarketDataService } from "@portfolio/market-data";
 import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
 import { normalizeEmail } from "../routes/auth.js";
 import { ensureDb, getDb, closeDb } from "./client.js";
+import { valuePortfolio } from "../services/valuation.js";
 
 /**
  * Rich demo dataset for the screenshot pipeline (see `scripts/screenshots.mjs` at the
@@ -1716,85 +1718,96 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   await db.insert(fxRates).values(fxRows);
 
   // --- Portfolio snapshots (daily net-worth history → dashboard/savings charts). ---
-  // A deterministic walk per portfolio that lands on roughly today's live-valued
-  // total: an opening deposit plus monthly contributions, compounding at a plausible
-  // annual return with a little daily noise. Contributions are recorded as
-  // `effectiveFlow`, so time-weighted return (packages/core/src/twr.ts:
+  // A deterministic walk per portfolio: an opening deposit plus monthly contributions,
+  // compounding at a plausible annual return with a little daily noise. Contributions are
+  // recorded as `effectiveFlow`, so time-weighted return (packages/core/src/twr.ts:
   // 1 + r_t = (V_t − flow_t) / V_{t−1}) sees market movement only, not deposits.
   // Without the flows every deposit would count as return (TWR in the thousands of
-  // percent) and the day a portfolio opens would read as a single-day spike. This
-  // stays an approximation; deriving exact historical valuations from the
-  // transactions above is the backfill job's responsibility, not this seed's.
+  // percent) and the day a portfolio opens would read as a single-day spike. The shape
+  // stays an approximation; deriving exact historical valuations from the transactions
+  // above is the backfill job's responsibility, not this seed's.
+  //
+  // The walk is anchored to the live valuation: today's point is exactly what
+  // `recordDailySnapshots` (services/snapshots.ts) will write for the portfolio — same
+  // `valuePortfolio` call, same summary fields per column — so the job's first run
+  // doesn't put a visible step into the history chart on the seed date (#989). The
+  // valuation reads the `lastPrices`/FX/corporate-action rows inserted above; the stub
+  // quote service throws so a missing price row fails the seed instead of reaching a
+  // live provider.
 
-  const portfolioEndValues: {
+  const offlineQuotes = {
+    getQuotes: async () => {
+      throw new Error(
+        "seed-demo: valuation requested a live quote — every seeded instrument needs a fresh lastPrices row",
+      );
+    },
+  } as unknown as MarketDataService;
+  // `getCachedQuotes` measures freshness against the wall clock, not `NOW`; the rows were
+  // stamped at `NOW` a moment ago, so any generous TTL keeps them fresh.
+  const ANCHOR_TTL_MS = 24 * 60 * 60 * 1000;
+
+  const walkParams: {
     portfolio: typeof portfolios.$inferSelect;
-    end: number;
-    currency: string;
     days: number;
     /** Annual return the walk compounds at, and the daily noise around it. */
     annual: number;
     noise: number;
   }[] = [
-    // Stockbit: BBCA(1100@10.15k) + BBRI(600@4.85k) + BYON(4750@1.28k) + ORI023(50@1.005M)
-    //   ≈ 70.4M IDR (ORI020 matured and was redeemed; GOTO/TLKM/GSRT fully sold)
-    {
-      portfolio: idPortfolio,
-      end: 70_500_000,
-      currency: "IDR",
-      days: 2200,
-      annual: 0.09,
-      noise: 0.012,
-    },
-    // TR: VWCE(45.6@118.40) + IWDA(20@89.75) + AAPL(15@228.90 USD→EUR)
-    //   + MSFT(13@412.30 USD→EUR) + VFV(20@142.50 CAD→EUR) ≈ 17.2k EUR
-    { portfolio: trPortfolio, end: 17_500, currency: "EUR", days: 2100, annual: 0.11, noise: 0.01 },
-    // Gold: 40g × 1.52M ≈ 60.8M IDR
-    {
-      portfolio: goldPortfolio,
-      end: 61_000_000,
-      currency: "IDR",
-      days: 2100,
-      annual: 0.08,
-      noise: 0.008,
-    },
-    // Reksa dana: ~36 monthly buys × ~450 units × 1,850 ≈ 30M IDR
-    {
-      portfolio: mfPortfolio,
-      end: 30_000_000,
-      currency: "IDR",
-      days: 1500,
-      annual: 0.06,
-      noise: 0.004,
-    },
-    // DKB cash: 9700 deposits − 1800 withdrawals + ~228 interest + 50 bonus + 35.5 adj ≈ 8,213 EUR
-    { portfolio: cashPortfolio, end: 8_300, currency: "EUR", days: 2100, annual: 0.025, noise: 0 },
+    { portfolio: idPortfolio, days: 2200, annual: 0.09, noise: 0.012 },
+    { portfolio: trPortfolio, days: 2100, annual: 0.11, noise: 0.01 },
+    { portfolio: goldPortfolio, days: 2100, annual: 0.08, noise: 0.008 },
+    { portfolio: mfPortfolio, days: 1500, annual: 0.06, noise: 0.004 },
+    { portfolio: cashPortfolio, days: 2100, annual: 0.025, noise: 0 },
   ];
 
   const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
-  for (const { portfolio, end, currency, days, annual, noise } of portfolioEndValues) {
+  for (const { portfolio, days, annual, noise } of walkParams) {
+    const { summary } = await valuePortfolio(
+      db,
+      offlineQuotes,
+      ANCHOR_TTL_MS,
+      portfolio.id,
+      portfolio.baseCurrency,
+      undefined,
+      portfolio.cashCounted,
+      undefined,
+      NOW,
+    );
+    if (summary.fxMissingCurrencies.length > 0) {
+      // The daily job would skip this portfolio; anchoring to a partial value is wrong.
+      throw new Error(
+        `seed-demo: no FX rate for ${summary.fxMissingCurrencies.join(", ")} → ${portfolio.baseCurrency}`,
+      );
+    }
     const drift = (1 + annual) ** (1 / 365) - 1;
-    // Simulate in units (opening deposit 10, then 1 every 30 days), then scale so
-    // the last day equals `end`; value is linear in the flows, so returns survive.
+    // Simulate in units (opening deposit 10, then 1 every 30 days), then scale so the
+    // last day equals the valuation; value is linear in the flows, so returns survive.
     // Each flow is stored on the day it lands: TWR subtracts it that same day
-    // (1 + r_t = (V_t − flow_t) / V_{t−1}), which is what keeps the opening
-    // deposit out of the first return. Keep that pairing if flows ever move.
+    // (1 + r_t = (V_t − flow_t) / V_{t−1}), which is what keeps the opening deposit out
+    // of the first return. Keep that pairing if flows ever move. No flow lands today:
+    // the job derives today's flow from today's transactions, and the seed has none.
     const walk: { d: number; value: number; flow: number }[] = [];
     let value = 0;
     for (let d = days; d >= 0; d--) {
-      const flow = d === days ? 10 : d % 30 === 0 ? 1 : 0;
+      const flow = d === days ? 10 : d > 0 && d % 30 === 0 ? 1 : 0;
       const r = drift + (pseudoRandom(d + portfolio.id.length) - 0.5) * noise;
       value = value * (1 + r) + flow;
       walk.push({ d, value, flow });
     }
-    const scale = end / value;
+    // Two anchors, one per column, mirroring the job: `netWorth` is the boundary-aware
+    // net worth, `marketValue` the securities sleeve TWR reads (0 for a cash-only
+    // portfolio). Flows scale with `marketValue`, the series TWR pairs them with.
+    const netScale = Number(summary.netWorth) / value;
+    const mvScale = Number(summary.totalMarketValue) / value;
     for (const { d, value: v, flow } of walk) {
+      const today = d === 0;
       snapshotRows.push({
         portfolioId: portfolio.id,
         date: isoDate(daysAgo(d)),
-        netWorth: dec(v * scale),
-        marketValue: dec(v * scale),
-        effectiveFlow: dec(flow * scale),
-        currency,
+        netWorth: today ? summary.netWorth : dec(v * netScale),
+        marketValue: today ? summary.totalMarketValue : dec(v * mvScale),
+        effectiveFlow: dec(flow * mvScale),
+        currency: portfolio.baseCurrency,
       });
     }
   }
