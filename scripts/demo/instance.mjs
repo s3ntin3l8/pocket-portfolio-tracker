@@ -98,7 +98,10 @@ async function waitForHttp(url, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS) {
   let lastError;
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(url);
+      // Bound each request too: a server that accepts but never answers would
+      // otherwise hold the loop past the deadline (undici's own limit is 5 min).
+      const remaining = Math.max(1, timeoutMs - (Date.now() - start));
+      const res = await fetch(url, { signal: AbortSignal.timeout(remaining) });
       if (res.status < 500) return;
     } catch (err) {
       lastError = err;

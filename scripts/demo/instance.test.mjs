@@ -52,12 +52,14 @@ describe("startDemo startup failure", () => {
     let demoDir;
     let pid;
     const failure = new Error("Timed out waiting for http://127.0.0.1:3910/health");
+    process.env.DEMO_HEALTH_TIMEOUT_MS = "4321";
 
     await expect(
       startDemo({
         quiet: true,
         boot: async (ctx) => {
           demoDir = ctx.demoDir;
+          expect(ctx.timeoutMs).toBe(4321);
           // Stands in for the API: a long-lived server in its own process group.
           const child = ctx.spawnServer(
             "api",
@@ -73,6 +75,7 @@ describe("startDemo startup failure", () => {
         },
       }),
     ).rejects.toBe(failure);
+    delete process.env.DEMO_HEALTH_TIMEOUT_MS;
 
     expect(demoDir.startsWith(scratchRoot)).toBe(true);
     expect(existsSync(demoDir)).toBe(false);
