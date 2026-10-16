@@ -1,7 +1,7 @@
+import { BackLink } from "@/components/back-button";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import type { Instrument } from "@portfolio/api-client";
-import { ScopeLink } from "@/components/scope-link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
@@ -9,21 +9,10 @@ import { instrumentLogoTransitionName } from "@/lib/instrument-logo-transition";
 import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 import { PageTitle } from "@/components/page-header";
 
-export async function InstrumentBackButton() {
+/** `className="md:flex"` keeps it visible on desktop for pages with no topbar title (error states). */
+export async function InstrumentBackButton({ className }: { className?: string }) {
   const tA11y = await getTranslations("A11y");
-  return (
-    <Button
-      variant="outline"
-      size="icon"
-      asChild
-      aria-label={tA11y("backToHoldings")}
-      className="rounded-lg bg-card shadow-card"
-    >
-      <ScopeLink href="/holdings">
-        <ArrowLeft className="size-4" />
-      </ScopeLink>
-    </Button>
-  );
+  return <BackLink href="/holdings" label={tA11y("backToHoldings")} className={className} />;
 }
 
 /**

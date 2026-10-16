@@ -81,7 +81,7 @@ export default async function InstrumentPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <InstrumentBackButton />
+          <InstrumentBackButton className="md:flex" />
         </div>
         <EmptyState icon={LineChart} title={t("notFound")} description={t("notFoundBody")} />
       </div>
@@ -93,7 +93,7 @@ export default async function InstrumentPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <InstrumentBackButton />
+          <InstrumentBackButton className="md:flex" />
         </div>
         <DataState status={instrumentResult.status} retryAfter={retryAfterOf(instrumentResult)} />
       </div>

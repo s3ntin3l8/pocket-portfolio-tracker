@@ -1,9 +1,10 @@
 "use client";
 
+import { BACK_BUTTON_CLASS, BackIcon } from "@/components/back-button";
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useTranslations } from "next-intl";
-import { X, ChevronLeft } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackToClose } from "@/lib/use-back-to-close";
 import { useRestoreFocus } from "@/lib/use-restore-focus";
@@ -179,20 +180,15 @@ function DialogContent({
         {fullScreenOnMobile && <FullScreenOverlayMarker />}
         {fullScreenOnMobile && mobileHeader && (
           <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 md:hidden">
-            <DialogPrimitive.Close
-              aria-label={tA("back")}
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground"
-            >
-              <ChevronLeft className="size-[18px]" />
+            <DialogPrimitive.Close aria-label={tA("back")} className={BACK_BUTTON_CLASS}>
+              <BackIcon />
             </DialogPrimitive.Close>
             {/* Plain heading, not DialogTitle — Radix derives Title's id from the shared
                 Dialog context, so a second Title here would duplicate the id the
                 caller's own DialogTitle already renders. This is the visible mobile
                 heading only; a caller using mobileHeader still owns the one accessible
                 DialogTitle (a visually-hidden one is fine if it has no other use for it). */}
-            <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">
-              {mobileHeader.title}
-            </h1>
+            <h1 className="min-w-0 truncate text-lg font-semibold">{mobileHeader.title}</h1>
           </div>
         )}
 

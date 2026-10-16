@@ -72,7 +72,7 @@ export function PageTitle({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <h1 className={cn("text-2xl font-bold md:sr-only", className)}>{children}</h1>;
+  return <h1 className={cn("text-heading font-semibold md:sr-only", className)}>{children}</h1>;
 }
 
 /** Read the current page header state (used by AppShell). */

@@ -1,18 +1,10 @@
 "use client";
 
+import { BACK_BUTTON_CLASS, BackIcon } from "@/components/back-button";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import {
-  Plus,
-  PenLine,
-  FileSpreadsheet,
-  Camera,
-  ChevronLeft,
-  Briefcase,
-  UserPlus,
-  X,
-} from "lucide-react";
+import { Plus, PenLine, FileSpreadsheet, Camera, Briefcase, UserPlus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
@@ -515,12 +507,12 @@ export function AddTransactionMenu({
                   type="button"
                   onClick={() => setStep("choose")}
                   aria-label={tm("back")}
-                  className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline md:hidden"
+                  className={cn(BACK_BUTTON_CLASS, "md:hidden")}
                 >
-                  <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
+                  <BackIcon />
                 </button>
               )}
-              <DialogTitle className="flex-1 text-lg font-bold leading-none text-foreground">
+              <DialogTitle className="flex-1 text-lg font-semibold leading-none text-foreground">
                 {headerTitle}
               </DialogTitle>
               {/* Mobile-only close — desktop has no floating X, only the footer's Cancel
@@ -528,11 +520,8 @@ export function AddTransactionMenu({
                   above (which only guards Esc/outside-click), this stays clickable even
                   mid-import — the pre-merge mobile Sheet's built-in close button worked
                   the same way. */}
-              <DialogClose
-                className="touch-target relative flex size-[34px] shrink-0 items-center justify-center rounded-sm bg-card text-foreground shadow-hairline md:hidden"
-                aria-label={tA("close")}
-              >
-                <X className="size-[18px]" strokeWidth={2.2} />
+              <DialogClose className={cn(BACK_BUTTON_CLASS, "md:hidden")} aria-label={tA("close")}>
+                <X className="size-[18px]" strokeWidth={2} />
               </DialogClose>
             </div>
 

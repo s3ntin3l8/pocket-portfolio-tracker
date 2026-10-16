@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/back-button";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   LineChart,
@@ -8,10 +9,8 @@ import {
   Database,
   Clock,
   Users,
-  ChevronLeft,
 } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
-import { Link } from "@/i18n/navigation";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
 import { requireAdmin } from "@/lib/server-api";
 import { tint } from "@/lib/tint";
@@ -36,7 +35,6 @@ export default async function AdminLayout({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Admin");
-  const tA = await getTranslations("A11y");
 
   const gate = await requireAdmin();
   if (gate.status !== "ok") return <AdminGateFailure gate={gate} />;
@@ -115,15 +113,9 @@ export default async function AdminLayout({
       title={t("title")}
       landingTop={
         <div className="mb-4 flex items-center gap-3">
-          <Link
-            href="/settings"
-            aria-label={tA("back")}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm"
-          >
-            <ChevronLeft className="size-[18px]" />
-          </Link>
+          <BackLink href="/settings" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xl font-bold tracking-tight">{t("title")}</p>
+            <p className="truncate text-heading font-semibold">{t("title")}</p>
             <p className="truncate text-xs text-muted-foreground">{t("subtitle")}</p>
           </div>
         </div>

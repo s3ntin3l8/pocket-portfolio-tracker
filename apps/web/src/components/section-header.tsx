@@ -1,8 +1,6 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { ScopeLink } from "@/components/scope-link";
+import { BackLink } from "@/components/back-button";
 import { useIsShellIndex } from "@/components/section-heading-context";
 
 /**
@@ -17,20 +15,13 @@ import { useIsShellIndex } from "@/components/section-heading-context";
  * so the desktop topbar always has a title.
  */
 export function SectionHeader({ title, backHref }: { title: string; backHref: string }) {
-  const t = useTranslations("A11y");
   const isShellIndex = useIsShellIndex();
   const Heading = isShellIndex ? "h2" : "h1";
   return (
     <div className="mb-4 md:mb-0">
       <div className="flex items-center gap-3">
-        <ScopeLink
-          href={backHref}
-          aria-label={t("back")}
-          className="relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm before:absolute before:-inset-1 md:hidden"
-        >
-          <ChevronLeft className="size-[18px]" />
-        </ScopeLink>
-        <Heading className="text-xl font-bold tracking-tight md:sr-only">{title}</Heading>
+        <BackLink href={backHref} />
+        <Heading className="text-heading font-semibold md:sr-only">{title}</Heading>
       </div>
     </div>
   );
