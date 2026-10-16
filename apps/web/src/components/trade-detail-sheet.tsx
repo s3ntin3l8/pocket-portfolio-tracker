@@ -1,6 +1,6 @@
 "use client";
 
-import { deltaToneOf, toneClass } from "@/lib/tone";
+import { deltaToneOf, toneClass, type DeltaTone } from "@/lib/tone";
 import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +31,7 @@ function Row({
   value: string;
   divider?: boolean;
   bold?: boolean;
-  tone?: "up" | "down" | "neutral";
+  tone?: DeltaTone;
 }) {
   return (
     <div

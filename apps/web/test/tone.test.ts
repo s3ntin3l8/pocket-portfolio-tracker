@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { pnlToneClass } from "../src/components/trades-table/constants";
 import {
   deltaToneOf,
+  flatToneClass,
   signToneClass,
   toneBgClass,
   toneClass,
@@ -40,7 +42,14 @@ describe("tone", () => {
   });
 });
 
-import { pnlToneClass } from "../src/components/trades-table/constants";
+describe("flatToneClass", () => {
+  it("shows flat muted and non-zero tones coloured", () => {
+    expect(flatToneClass(0)).toBe("text-muted-foreground");
+    expect(flatToneClass(null)).toBe("text-muted-foreground");
+    expect(flatToneClass(2)).toBe("text-success");
+    expect(flatToneClass(-2)).toBe("text-destructive");
+  });
+});
 
 describe("pnlToneClass", () => {
   it("keeps zero muted instead of green or red", () => {

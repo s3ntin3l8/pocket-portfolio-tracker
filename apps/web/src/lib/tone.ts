@@ -32,6 +32,10 @@ export const toneBgClass = (tone: Tone): string =>
 /** Text colour class for a signed number (flat inherits). */
 export const signToneClass = (n: number | null | undefined): string => toneClass(toneOf(n));
 
+/** Text colour class for a signed number, with flat shown muted (rather than inheriting). */
+export const flatToneClass = (n: number | null | undefined): string =>
+  signToneClass(n) || "text-muted-foreground";
+
 /** Direction glyph for a signed number; flat has no arrow (empty string). */
 export const trendGlyphOf = (n: number | null | undefined): string => {
   const t = toneOf(n);

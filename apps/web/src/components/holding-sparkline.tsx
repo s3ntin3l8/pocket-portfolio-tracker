@@ -1,6 +1,6 @@
 "use client";
 
-import { toneClass, toneOf } from "@/lib/tone";
+import { flatToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
@@ -69,7 +69,7 @@ export function HoldingSparkline({ values, className }: { values: number[]; clas
     .join(" ");
 
   // A flat series (first === last) is neutral, not a gain.
-  const tone = toneOf(values[values.length - 1] - values[0]);
+  const tone = flatToneClass(values[values.length - 1] - values[0]);
 
   return (
     <>
@@ -80,7 +80,7 @@ export function HoldingSparkline({ values, className }: { values: number[]; clas
         height={24}
         tabIndex={0}
         aria-label={rangeLabel}
-        className={cn("shrink-0", toneClass(tone) || "text-muted-foreground", className)}
+        className={cn("shrink-0", tone, className)}
       >
         <polyline
           points={points}

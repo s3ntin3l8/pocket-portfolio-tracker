@@ -4,7 +4,8 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import idMessages from "../messages/id.json";
 import type { GainSummary } from "@portfolio/api-client";
-import { GainFigure, toneOf } from "../src/components/gain-figure";
+import { GainFigure } from "../src/components/gain-figure";
+import { toneOf } from "../src/lib/tone";
 import { GainExplainer } from "../src/components/gain-explainer";
 import { formatNetWorth } from "../src/lib/utils";
 

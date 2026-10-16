@@ -1,9 +1,7 @@
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { BasisLabel } from "@/components/basis-label";
-import { toneClass, toneOf, type Tone } from "@/lib/tone";
-
-export { toneOf, type Tone };
+import { toneClass, type Tone } from "@/lib/tone";
 
 /**
  * Which denominator a gain is measured against (audit G2):
