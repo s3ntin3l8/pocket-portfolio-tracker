@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { ScopeLink } from "@/components/scope-link";
 import { formatSignedMoney, formatPercent, cn } from "@/lib/utils";
-import { tradeKey, toneClass } from "./constants";
+import { tradeKey, pnlToneClass } from "./constants";
 import { InfoTip } from "@/components/ui/tooltip";
 
 export function MobileRow({
@@ -69,15 +69,15 @@ export function MobileRow({
           <ChevronRight className="size-3.5" />
         </button>
         <div className="text-right tabular">
-          <div className={cn("text-sm font-bold", toneClass(ret))}>{signed(ret)}</div>
+          <div className={cn("text-sm font-bold", pnlToneClass(ret))}>{signed(ret)}</div>
           {tr.totalReturnPct !== null && (
-            <div className={cn(TABLE_SUBVALUE, toneClass(ret))}>
+            <div className={cn(TABLE_SUBVALUE, pnlToneClass(ret))}>
               {formatPercent(tr.totalReturnPct, locale)}
             </div>
           )}
           {tr.annualizedPct !== null && (
             <InfoTip label={t("annualizedTooltip")} focusable>
-              <div className={cn(TABLE_SUBVALUE, toneClass(tr.annualizedPct))}>
+              <div className={cn(TABLE_SUBVALUE, pnlToneClass(tr.annualizedPct))}>
                 {formatPercent(tr.annualizedPct, locale)}
                 {t("annualizedAbbr")}
               </div>

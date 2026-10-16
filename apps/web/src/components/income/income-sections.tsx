@@ -1,3 +1,4 @@
+import { deltaToneOf } from "@/lib/tone";
 import { getTranslations } from "next-intl/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
@@ -199,7 +200,7 @@ export async function IncomeStatsSection({ locale }: SectionProps) {
             ? `${formatPercent(deltaPct, locale)} ${t("vsLastYear", { year: lastYearLabel })}`
             : undefined
         }
-        deltaTone={deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "neutral"}
+        deltaTone={deltaToneOf(deltaAbs)}
       />
       <StatCard label={t("ttm")} value={m(Number(s.ttm))} />
       <StatCard label={t("forecastNext12")} value={m(Number(s.forecastNextYear))} />

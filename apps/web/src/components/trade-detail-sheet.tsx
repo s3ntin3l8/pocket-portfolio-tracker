@@ -1,5 +1,6 @@
 "use client";
 
+import { deltaToneOf, toneClass, type DeltaTone } from "@/lib/tone";
 import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -30,7 +31,7 @@ function Row({
   value: string;
   divider?: boolean;
   bold?: boolean;
-  tone?: "up" | "down" | "neutral";
+  tone?: DeltaTone;
 }) {
   return (
     <div
@@ -98,7 +99,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
   // Closed: tone follows realized P&L (final number). Open: follows total return
   // (the live number — unrealized + dividends).
   const hero = isOpen ? totalReturn : realized;
-  const tone: "up" | "down" = hero >= 0 ? "up" : "down";
+  const tone = deltaToneOf(hero);
   const heroPct = invested > 0 ? hero / invested : null;
 
   const proceedsTotal = trade.legs.reduce((s, l) => s + Number(l.proceeds), 0);
@@ -142,19 +143,12 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               {isOpen ? t("detail.totalReturn") : t("detail.realizedPnl")}
             </p>
-            <p
-              className={cn(
-                "tabular mt-1 text-4xl font-bold",
-                tone === "up" ? "text-success" : "text-destructive",
-              )}
-            >
-              {signed(hero)}
-            </p>
+            <p className={cn("tabular mt-1 text-4xl font-bold", toneClass(tone))}>{signed(hero)}</p>
             <p className="mt-2">
               <span
                 className={cn(
                   "tabular inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold",
-                  tone === "up" ? "text-success" : "text-destructive",
+                  toneClass(tone),
                 )}
               >
                 {pct(heroPct)} · {heldLabel(trade.holdingDays)} {t("detail.held")}
@@ -175,14 +169,14 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
                   label={t("detail.unrealizedPnl")}
                   value={signed(unrealized)}
                   divider
-                  tone={unrealized >= 0 ? "up" : "down"}
+                  tone={deltaToneOf(unrealized)}
                 />
                 {realized !== 0 && (
                   <Row
                     label={t("detail.realizedPnlRow")}
                     value={signed(realized)}
                     divider
-                    tone={realized > 0 ? "up" : "down"}
+                    tone={deltaToneOf(realized)}
                   />
                 )}
                 {hasDividends && (

@@ -4,7 +4,7 @@ import { AllocationCard } from "@/components/holdings/allocation-card";
 import { PortfolioValueCard } from "@/components/holdings/portfolio-value-card";
 import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { GainExplainer } from "@/components/gain-explainer";
-import { toneOf } from "@/components/gain-figure";
+import { toneOf } from "@/lib/tone";
 import { formatNetWorth, formatPercent, formatSignedMoney } from "@/lib/utils";
 
 /**

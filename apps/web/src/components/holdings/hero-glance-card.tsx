@@ -1,5 +1,6 @@
 "use client";
 
+import { trendGlyphOf } from "@/lib/tone";
 import { useState, useCallback, useRef, startTransition, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
@@ -11,6 +12,9 @@ import type { ChartRange } from "@/components/charts/range-toggle";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import { formatMoney, formatNetWorth, formatPercent } from "@/lib/utils";
 import { ScopeLink } from "@/components/scope-link";
+
+/** Prefix a figure with its direction glyph; a flat figure gets no glyph and no stray space. */
+const withGlyph = (n: number, text: string) => [trendGlyphOf(n), text].filter(Boolean).join(" ");
 
 /**
  * The Holdings "glance" hero: green gradient card with the current total portfolio
@@ -153,12 +157,12 @@ export function HeroGlanceCard({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {snapshot.isIntraday ? (
               <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-                {closeDelta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
+                {withGlyph(closeDelta, formatMoney(Math.abs(closeDelta), currency, locale))}{" "}
                 {periodWord}
               </span>
             ) : (
               <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-                {closeDelta >= 0 ? "▲" : "▼"} {formatPercent(closeDelta / 100, locale)} {periodWord}
+                {withGlyph(closeDelta, formatPercent(closeDelta / 100, locale))} {periodWord}
               </span>
             )}
             <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">

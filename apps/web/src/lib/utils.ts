@@ -205,12 +205,6 @@ export function formatSignedMoney(
   return `${amount >= 0 ? "+" : ""}${formatMoney(amount, currency, locale, opts)}`;
 }
 
-/** Semantic text tone for a signed P&L figure: gain green, loss red, zero/unknown neutral. */
-export function signTone(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n) || n === 0) return "";
-  return n > 0 ? "text-success" : "text-destructive";
-}
-
 /**
  * Locale-formatted quantity. Reference (`Pocket Prototype.dc.html`) renders bare numbers
  * for "shares"/"units" with no suffix, and only "grams" gets a short unit ("8 g") — not

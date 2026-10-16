@@ -1,3 +1,4 @@
+import { deltaToneOf, signToneClass, toneBgClass, toneOf } from "@/lib/tone";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -108,7 +109,7 @@ export default async function TradesPage({
   }
 
   const totalReturn = Number(log.totalReturn);
-  const returnTone = totalReturn > 0 ? "up" : totalReturn < 0 ? "down" : "neutral";
+  const returnTone = deltaToneOf(totalReturn);
   // Capital-weighted return across all trades (same formula as per-row totalReturnPct).
   const totalInvested = log.trades.reduce((s, tr) => s + Number(tr.invested), 0);
   const totalReturnPct = totalInvested > 0 ? totalReturn / totalInvested : null;
@@ -156,19 +157,14 @@ export default async function TradesPage({
                           key={r.year}
                           className="flex h-full flex-1 flex-col items-center gap-1.5"
                         >
-                          <span
-                            className={cn(
-                              "tabular text-xs font-bold",
-                              amount >= 0 ? "text-success" : "text-destructive",
-                            )}
-                          >
+                          <span className={cn("tabular text-xs font-bold", signToneClass(amount))}>
                             {formatSignedMoney(amount, currency, locale)}
                           </span>
                           <div className="flex w-full flex-1 items-end justify-center">
                             <div
                               className={cn(
                                 "w-full max-w-10 rounded-t-xs",
-                                amount >= 0 ? "bg-success" : "bg-destructive",
+                                toneBgClass(toneOf(amount)),
                               )}
                               style={{ height: `${pct}%` }}
                             />

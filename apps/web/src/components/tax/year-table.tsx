@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort, type ColDef } from "@/lib/table-sort";
-import { cn, formatMoney, signTone } from "@/lib/utils";
+import { signToneClass } from "@/lib/tone";
+import { cn, formatMoney } from "@/lib/utils";
 import type { TaxYearRow } from "@/lib/server-api";
 import type { IdYearTax } from "@portfolio/core";
 
@@ -96,7 +97,10 @@ export function ByYearTable({
               <TableRow key={y.year}>
                 <TableCell className="font-semibold">{y.year}</TableCell>
                 <TableCell
-                  className={cn("tabular text-right font-medium", signTone(Number(y.realized)))}
+                  className={cn(
+                    "tabular text-right font-medium",
+                    signToneClass(Number(y.realized)),
+                  )}
                 >
                   {fmt(y.realized)}
                 </TableCell>
@@ -192,7 +196,10 @@ export function IdByYearTable({
               <TableRow key={y.year}>
                 <TableCell className="font-semibold">{y.year}</TableCell>
                 <TableCell
-                  className={cn("tabular text-right font-medium", signTone(Number(y.realized)))}
+                  className={cn(
+                    "tabular text-right font-medium",
+                    signToneClass(Number(y.realized)),
+                  )}
                 >
                   {fmt(y.realized)}
                 </TableCell>

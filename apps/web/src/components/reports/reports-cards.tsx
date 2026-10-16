@@ -1,7 +1,9 @@
+import { deltaToneOf } from "@/lib/tone";
 import { Coins, ScrollText, PiggyBank, Receipt, FileText, Gem } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { ReportCard } from "@/components/reports/report-card";
-import { GainFigure, toneOf } from "@/components/gain-figure";
+import { GainFigure } from "@/components/gain-figure";
+import { toneOf } from "@/lib/tone";
 import type { TrendTone } from "@/components/reports/trend-chip";
 import {
   incomeReport,
@@ -57,8 +59,7 @@ export async function IncomeCard({ locale }: CardProps) {
   const lastYearTotal = Number(s.lastYear);
   const fullYearDeltaAbs = Number(s.forecastFullYear) - lastYearTotal;
   const deltaPct = lastYearTotal > 0 ? fullYearDeltaAbs / lastYearTotal : null;
-  const deltaTone: TrendTone =
-    deltaPct === null || deltaPct === 0 ? "neutral" : deltaPct > 0 ? "up" : "down";
+  const deltaTone: TrendTone = deltaToneOf(deltaPct);
 
   // Realized-to-date vs. forecasted-remainder, same green as the card icon — the
   // forecast segment is drawn as a diagonal-stripe hatch, matching the "Projected"
@@ -243,7 +244,7 @@ export async function SavingsCard({ locale }: CardProps) {
         s.xirr !== null
           ? {
               label: t("savings.trend", { pct: formatPercent(s.xirr, locale) }),
-              tone: s.xirr >= 0 ? "up" : "down",
+              tone: deltaToneOf(s.xirr),
             }
           : undefined
       }

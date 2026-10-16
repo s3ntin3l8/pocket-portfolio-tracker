@@ -13,8 +13,8 @@ import {
   TABLE_VALUE,
   TABLE_VALUE_STRONG,
 } from "@/components/ui/table";
-import { toneOf } from "@/components/gain-figure";
-import { formatMoney, formatQuantity, formatSignedMoney } from "@/lib/utils";
+import { signToneClass } from "@/lib/tone";
+import { cn, formatMoney, formatQuantity, formatSignedMoney } from "@/lib/utils";
 
 /**
  * Every gold holding valued at its buyback rate. A row valued at cost (no usable price) or
@@ -73,15 +73,7 @@ export function GoldHoldingsTable({
                     ? formatMoney(Number(h.value), displayCurrency, locale)
                     : "—"}
                 </TableCell>
-                <TableCell
-                  className={`${TABLE_VALUE} ${
-                    toneOf(gain) === "up"
-                      ? "text-success"
-                      : toneOf(gain) === "down"
-                        ? "text-destructive"
-                        : ""
-                  }`}
-                >
+                <TableCell className={cn(TABLE_VALUE, signToneClass(gain))}>
                   {gain !== null ? formatSignedMoney(gain, displayCurrency, locale) : "—"}
                 </TableCell>
               </TableRow>

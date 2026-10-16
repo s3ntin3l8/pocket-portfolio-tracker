@@ -1,3 +1,4 @@
+import { signToneClass } from "@/lib/tone";
 import { Card } from "@/components/ui/card";
 import { cn, formatPercent } from "@/lib/utils";
 import type { Mover } from "@/lib/movers";
@@ -27,12 +28,7 @@ function MoverRow({ mover, label, locale }: { mover: Mover; label: string; local
         <p className="truncate text-sm font-semibold">{mover.symbol}</p>
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
-      <span
-        className={cn(
-          "tabular shrink-0 text-sm font-bold",
-          mover.pct >= 0 ? "text-success" : "text-destructive",
-        )}
-      >
+      <span className={cn("tabular shrink-0 text-sm font-bold", signToneClass(mover.pct))}>
         {formatPercent(mover.pct, locale)}
       </span>
     </div>

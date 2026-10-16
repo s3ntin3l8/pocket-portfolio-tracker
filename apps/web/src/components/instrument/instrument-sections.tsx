@@ -1,3 +1,4 @@
+import { deltaToneOf } from "@/lib/tone";
 import { getTranslations } from "next-intl/server";
 import { AlertCircle, AlertTriangle, Receipt, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -308,7 +309,7 @@ export async function InstrumentPositionSection({ id, locale }: SectionProps) {
                 pnlDisplay !== null ? formatMoney(pnlDisplay, scope.displayCurrency, locale) : "—"
               }
               delta={pnlPct !== undefined ? formatPercent(pnlPct, locale) : undefined}
-              deltaTone={pnlDisplay === null ? "neutral" : pnlDisplay >= 0 ? "up" : "down"}
+              deltaTone={deltaToneOf(pnlDisplay)}
             />
             <StatCard
               label={t("portfolioWeightLabel")}

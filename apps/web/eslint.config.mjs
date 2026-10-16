@@ -11,6 +11,9 @@ import nextTypescript from "eslint-config-next/typescript";
 // string or template literal; comments are not matched.
 const COLOUR_LITERAL =
   "(#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z_-])|\\b(?:rgb|hsl)a?\\()";
+const zeroToneMessage =
+  'Use signToneClass()/toneClass() from "@/lib/tone" instead of a text-success/text-destructive ternary (zero must be neutral).';
+
 const colourMessage =
   "No colour literals (hex / rgb[a] / hsl[a]) — use a theme token from globals.css (e.g. bg-primary/15, var(--violet), tint() from @/lib/tint). See eslint.config.mjs for the allowlist.";
 
@@ -71,6 +74,18 @@ const eslintConfig = [
           message: colourMessage,
         },
         ...scaleRules,
+        {
+          // Zero is neutral: tone a signed number with signToneClass/toneOf (src/lib/tone.ts),
+          // never a two-way success/destructive ternary — that paints a flat figure green or red.
+          selector:
+            "ConditionalExpression[consequent.value=/(^|\\s)text-success(\\s|$)/][alternate.value=/(^|\\s)text-destructive(\\s|$)/]",
+          message: zeroToneMessage,
+        },
+        {
+          selector:
+            "ConditionalExpression[consequent.value=/(^|\\s)text-destructive(\\s|$)/][alternate.value=/(^|\\s)text-success(\\s|$)/]",
+          message: zeroToneMessage,
+        },
       ],
     },
   },

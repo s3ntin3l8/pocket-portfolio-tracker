@@ -1,10 +1,8 @@
 import { cn } from "@/lib/utils";
-import { GainFigure, type Tone } from "@/components/gain-figure";
+import { GainFigure } from "@/components/gain-figure";
+import { toneClass, type Tone } from "@/lib/tone";
 
 export type { Tone };
-
-const toneClass = (tone: Tone) =>
-  tone === "up" ? "text-success" : tone === "down" ? "text-destructive" : "";
 
 /**
  * The three headline stats (Total value, All-time P&L, Today's change) displayed

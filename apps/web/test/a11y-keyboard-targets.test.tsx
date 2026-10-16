@@ -7,7 +7,7 @@ import { Field } from "../src/components/import-review/edit-dialog";
 import { Field as StorageField } from "../src/components/admin-storage/field";
 import { Input } from "../src/components/ui/input";
 import { onActivateKey } from "../src/lib/a11y";
-import { signTone } from "../src/lib/utils";
+import { signToneClass as signTone } from "../src/lib/tone";
 import type { TaxDisposalRow } from "../src/lib/server-api";
 
 const lot = (gain: string) => ({

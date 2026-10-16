@@ -1,3 +1,4 @@
+import { deltaToneOf } from "@/lib/tone";
 import { Decimal } from "decimal.js";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
@@ -12,7 +13,8 @@ import { ReportHeader } from "@/components/report-header";
 import { PageHeaderSetter } from "@/components/page-header";
 import { CashOnHandCard } from "@/components/savings/cash-on-hand-card";
 import { loadContributions, loadSparplan, loadHoldings, loadNetWorth } from "@/lib/server-api";
-import { GainFigure, toneOf } from "@/components/gain-figure";
+import { GainFigure } from "@/components/gain-figure";
+import { toneOf } from "@/lib/tone";
 import { GainExplainer } from "@/components/gain-explainer";
 import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
 
@@ -188,7 +190,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
                 label={t("totalReturn")}
                 value={formatPercent(c.totalReturnPct, locale)}
                 delta={t("totalReturnHint")}
-                deltaTone={c.totalReturnPct >= 0 ? "up" : "down"}
+                deltaTone={deltaToneOf(c.totalReturnPct)}
               />
             )}
             <StatCard

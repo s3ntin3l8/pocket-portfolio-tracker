@@ -1,16 +1,7 @@
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { BasisLabel } from "@/components/basis-label";
-
-/** Direction of a gain figure — drives the value colour (green up / red down / neutral). */
-export type Tone = "up" | "down" | "flat";
-
-/** Tone of a signed number: positive up, negative down, zero/unknown flat. */
-export const toneOf = (n: number | null | undefined): Tone =>
-  n == null || !Number.isFinite(n) || n === 0 ? "flat" : n > 0 ? "up" : "down";
-
-const toneClass = (tone: Tone) =>
-  tone === "up" ? "text-success" : tone === "down" ? "text-destructive" : "";
+import { toneClass, type Tone } from "@/lib/tone";
 
 /**
  * Which denominator a gain is measured against (audit G2):
