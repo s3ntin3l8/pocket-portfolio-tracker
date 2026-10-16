@@ -2,36 +2,36 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Pocket — dark-default fintech. Green-tinted slate base + brand green (#0E9F6E).
-   Exact hex values ported from the Pocket design system (Claude Design). */
+/* Pocket — calm, data-first. Neutral base; brand green (#0E9F6E) is reserved for primary
+   actions, the active nav item and positive values. */
 :root {
-  --radius: 0.875rem;
+  --radius: 0.75rem;
   color-scheme: light;
 
-  --background: #f4f7f5;
-  --foreground: #11211a;
+  --background: #f6f7f8;
+  --foreground: #111827;
   --card: #ffffff;
-  --card-foreground: #11211a;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #11211a;
+  --popover-foreground: #111827;
 
   --primary: #0e9f6e; /* Pocket brand green */
   --primary-foreground: #ffffff;
 
-  --secondary: #edf1ef;
-  --secondary-foreground: #11211a;
-  --muted: #f0f3f1;
-  --muted-foreground: #64736a;
-  --accent: #edf1ef;
-  --accent-foreground: #11211a;
+  --secondary: #eef0f2;
+  --secondary-foreground: #111827;
+  --muted: #f1f3f5;
+  --muted-foreground: #5f6b76;
+  --accent: #eef0f2;
+  --accent-foreground: #111827;
 
   --destructive: #e5484d;
   --destructive-foreground: #ffffff;
   --success: #0e9f6e;
   --warning: #c98a1e;
 
-  --border: #e7edea;
-  --input: #e7edea;
+  --border: #e6e8eb;
+  --input: #e6e8eb;
   --ring: #0e9f6e;
 
   /* Chart / asset-class palette (Pocket CLASS_DEF) */
@@ -43,25 +43,25 @@
   --chart-6: #d45d8c; /* rose   — crypto */
 
   /* Pocket surface & text ramp (feature components read these directly) */
-  --card-2: #f7faf8;
-  --text-2: #64736a;
-  --text-mute: #5b6b62;
-  --line: #f0f3f1;
-  --row-hover: #fbfcfb;
-  --pill: #11211a;
+  --card-2: #f8f9fa;
+  --text-2: var(--muted-foreground);
+  --text-mute: #55606b;
+  --line: #eef0f2;
+  --row-hover: #fafbfc;
+  --pill: #111827;
   --gold-fg: #c98a1e;
   --warn-strong: #7a5a1a;
   --warn-soft: #9a7b3a;
   --info: #2a6fdb;
   --orange: #f97316; /* consumed via var(--orange) by tint("orange") / chart segments, not as a Tailwind class */
-  --scrim: rgba(17, 33, 26, 0.45);
+  --scrim: rgba(17, 24, 39, 0.45);
 
   /* Brand-surface tokens: the green hero card, the violet tax card and the dark insights
      card look the same in both themes, so these are deliberately not overridden in .dark. */
   --primary-deep: #0b7d58;
   --primary-ink: #0b3a2a;
   --hero-gold: #ffd24a;
-  --violet: #7c5cfc;
+  --violet: var(--chart-4);
   --violet-deep: #5b3fd6;
   --hero-ink: #11211a;
   --hero-ink-2: #1d3a2c;
@@ -69,7 +69,7 @@
   --mint-soft: #5feab6;
 
   /* Elevation extras (hairline lift for small controls, hero glow, modal / bottom-sheet). */
-  --shadow-hairline: 0 1px 2px rgba(15, 27, 20, 0.08);
+  --shadow-hairline: 0 1px 2px rgba(17, 24, 39, 0.06);
   --shadow-hero: 0 12px 30px color-mix(in srgb, var(--primary) 30%, transparent);
   --shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.4);
   --shadow-sheet-up: 0 -12px 44px rgba(0, 0, 0, 0.22);
@@ -78,36 +78,36 @@
      live prototype: rgba(15,27,20,.04) 0 1px 2px, rgba(15,27,20,.05) 0 8px 22px. The
      reference has no real dark render, so the dark variant below is derived (same
      offsets, black-based alpha) rather than measured. */
-  --shadow-card: 0 1px 2px rgba(15, 27, 20, 0.04), 0 8px 22px rgba(15, 27, 20, 0.05);
+  --shadow-card: 0 0 0 1px var(--border), 0 1px 2px rgba(17, 24, 39, 0.04);
 }
 
 .dark {
   color-scheme: dark;
 
-  --background: #0e1512;
-  --foreground: #e7ede9;
-  --card: #18211d;
-  --card-foreground: #e7ede9;
-  --popover: #18211d;
-  --popover-foreground: #e7ede9;
+  --background: #0b0d10;
+  --foreground: #e8ebee;
+  --card: #14171b;
+  --card-foreground: #e8ebee;
+  --popover: #14171b;
+  --popover-foreground: #e8ebee;
 
   --primary: #0e9f6e;
   --primary-foreground: #ffffff;
 
-  --secondary: #222a26;
-  --secondary-foreground: #e7ede9;
-  --muted: #1e2622;
-  --muted-foreground: #8a988f;
-  --accent: #222a26;
-  --accent-foreground: #e7ede9;
+  --secondary: #1c2026;
+  --secondary-foreground: #e8ebee;
+  --muted: #191d22;
+  --muted-foreground: #8b95a1;
+  --accent: #1c2026;
+  --accent-foreground: #e8ebee;
 
   --destructive: #e5484d;
   --destructive-foreground: #ffffff;
   --success: #12b981;
   --warning: #e0a53a;
 
-  --border: #262f2a;
-  --input: #2a342e;
+  --border: #23272d;
+  --input: #2b3037;
   --ring: #12b981;
 
   --chart-1: #12b981;
@@ -117,18 +117,18 @@
   --chart-5: #94a3b8;
   --chart-6: #f078a8;
 
-  --card-2: #141b17;
-  --text-2: #8a988f;
-  --text-mute: #aebbb2;
-  --line: #222a26;
-  --row-hover: #1e2622;
-  --pill: #33423a;
+  --card-2: #101317;
+  --text-2: var(--muted-foreground);
+  --text-mute: #aab3bd;
+  --line: #1f2329;
+  --row-hover: #191d22;
+  --pill: #353b43;
   --gold-fg: #e0a53a;
   --warn-strong: #e6c07a;
   --warn-soft: #c2a878;
   --info: #60a5fa;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 22px rgba(0, 0, 0, 0.28);
+  --shadow-card: 0 0 0 1px var(--border), 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
@@ -183,13 +183,16 @@
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;
 
-  /* Radius scale: xs 6 / sm 10 / md 12 / lg 14 / xl 18 (derived from --radius). Never use
-     rounded-[Npx]; pick the nearest step. */
+  /* Radius scale: xs 4 / sm 6 / md 8 / lg 12 / xl 16 (derived from --radius). Controls use
+     md, cards lg, dialogs xl. Never use rounded-[Npx], rounded-2xl or bare `rounded`. */
   --radius-xs: calc(var(--radius) - 8px);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* One label style: tracking for the few remaining uppercase eyebrows. */
+  --tracking-label: 0.04em;
 
   --shadow-card: var(--shadow-card);
   --shadow-hairline: var(--shadow-hairline);
@@ -471,8 +474,8 @@
    Everything else on the screen uses the regular tokens (foreground, text-2, border, …).
    Not for use outside components/onboarding. */
 :root {
-  --brand-mint: #38e1a4; /* accent on the dark brand panel: bullets, wave strokes, dots */
-  --brand-deep: #0b7d58; /* darker end of the primary-green card gradient */
+  --brand-mint: var(--mint); /* accent on the dark brand panel: bullets, wave strokes, dots */
+  --brand-deep: var(--primary-deep); /* darker end of the primary-green card gradient */
   --brand-grad: linear-gradient(150deg, #11211a 0%, #12271c 46%, #0e3123 100%);
   --brand-grad-intro: linear-gradient(155deg, #0c1a13 0%, #0f2419 44%, #0b2e21 100%);
   --onb-panel: #ffffff; /* form-side surface (dark: a hair darker than --background) */

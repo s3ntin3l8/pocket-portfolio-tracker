@@ -158,7 +158,7 @@ export function PositionsPanel({
 
           return (
             <TabsContent key={key} value={key}>
-              <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+              <div className="overflow-hidden rounded-lg bg-card shadow-card">
                 {noResults ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">{t("noResults")}</p>
                 ) : (

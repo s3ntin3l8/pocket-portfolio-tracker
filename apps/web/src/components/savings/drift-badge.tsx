@@ -29,7 +29,7 @@ export function DriftBadge({
         : `−${absPct}pp`;
   return (
     <span
-      className="shrink-0 rounded-xs px-1.5 py-0.5 text-micro font-extrabold"
+      className="shrink-0 rounded-xs px-1.5 py-0.5 text-micro font-bold"
       style={DRIFT_BADGE_STYLE[status]}
     >
       {label}

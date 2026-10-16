@@ -67,7 +67,7 @@ export function ErrorState({
       </span>
 
       {eyebrow && (
-        <span className={cn("text-micro font-extrabold uppercase tracking-[0.16em]", FG[tone])}>
+        <span className={cn("text-micro font-bold uppercase tracking-[0.16em]", FG[tone])}>
           {eyebrow}
         </span>
       )}

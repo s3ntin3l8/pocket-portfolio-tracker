@@ -14,7 +14,7 @@ export function StreaksCard({ streaks, locale }: { streaks: InsightsStreaks; loc
   const worstRet = streaks.worstStreak ? Number(streaks.worstStreak.totalReturnPct) : null;
 
   return (
-    <Card className="rounded-2xl bg-card p-4 shadow-card">
+    <Card className="rounded-lg bg-card p-4 shadow-card">
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
 
       <div className="mt-3 space-y-3">

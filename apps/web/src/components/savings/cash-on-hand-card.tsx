@@ -41,7 +41,7 @@ export function CashOnHandCard({ cash, locale }: { cash: Record<string, string>;
             <h2 className="text-base font-semibold">{t("cashOnHandTitle")}</h2>
             <p className="text-xs text-muted-foreground">{t("cashOnHandSubtitle")}</p>
           </div>
-          <p className="tabular shrink-0 text-lg font-extrabold">{totalLabel}</p>
+          <p className="tabular shrink-0 text-lg font-bold">{totalLabel}</p>
         </div>
 
         <div className="flex flex-col">

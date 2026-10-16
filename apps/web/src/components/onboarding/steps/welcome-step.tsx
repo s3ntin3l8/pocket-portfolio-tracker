@@ -26,7 +26,7 @@ export function WelcomeStep({ copy }: { copy: WelcomeCopy }) {
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
             <div className="text-micro font-semibold text-white/78">{copy.previewLabel}</div>
-            <div className="mt-1.25 text-heading font-extrabold whitespace-nowrap text-white tabular-nums">
+            <div className="mt-1.25 text-heading font-bold whitespace-nowrap text-white tabular-nums">
               {copy.previewValue}
             </div>
           </div>

@@ -10,8 +10,8 @@
   "lang": "en",
   "dir": "ltr",
   "categories": ["finance", "productivity"],
-  "background_color": "#0e1512",
-  "theme_color": "#0e1512",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
   "icons": [
     {
       "src": "/icon.svg",

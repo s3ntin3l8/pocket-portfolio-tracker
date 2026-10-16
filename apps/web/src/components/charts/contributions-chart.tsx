@@ -187,12 +187,12 @@ export function ContributionsChart({
         <div className="grid grid-cols-3 gap-4 border-t border-border pt-3 sm:flex sm:items-center sm:gap-6">
           <div>
             <p className="text-xs text-muted-foreground">{t("footerInvested")}</p>
-            <p className="tabular mt-0.5 text-sm font-extrabold">{money(invested)}</p>
+            <p className="tabular mt-0.5 text-sm font-bold">{money(invested)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("footerGain")}</p>
             <p
-              className={`tabular mt-0.5 text-sm font-extrabold ${gain >= 0 ? "text-success" : "text-destructive"}`}
+              className={`tabular mt-0.5 text-sm font-bold ${gain >= 0 ? "text-success" : "text-destructive"}`}
             >
               {gain >= 0 ? "+" : ""}
               {money(gain)}
@@ -200,7 +200,7 @@ export function ContributionsChart({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("footerNowWorth")}</p>
-            <p className="tabular mt-0.5 text-sm font-extrabold">{money(nowWorth)}</p>
+            <p className="tabular mt-0.5 text-sm font-bold">{money(nowWorth)}</p>
           </div>
         </div>
       </div>

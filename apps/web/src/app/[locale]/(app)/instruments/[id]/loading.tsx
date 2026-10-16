@@ -37,10 +37,10 @@ export default function Loading() {
               <Skeleton className="h-5 w-1/3" />
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2.5 sm:gap-4 @md:grid-cols-4">
-              <Skeleton className="h-[74px] rounded-2xl" />
-              <Skeleton className="h-[74px] rounded-2xl" />
-              <Skeleton className="h-[74px] rounded-2xl" />
-              <Skeleton className="h-[74px] rounded-2xl" />
+              <Skeleton className="h-[74px] rounded-lg" />
+              <Skeleton className="h-[74px] rounded-lg" />
+              <Skeleton className="h-[74px] rounded-lg" />
+              <Skeleton className="h-[74px] rounded-lg" />
             </CardContent>
           </Card>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
@@ -87,11 +87,11 @@ export default function Loading() {
               <Skeleton className="h-5 w-1/3" />
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-2.5 sm:gap-4">
-              <Skeleton className="h-[60px] rounded-2xl" />
-              <Skeleton className="h-[60px] rounded-2xl" />
-              <Skeleton className="h-[60px] rounded-2xl" />
-              <Skeleton className="h-[60px] rounded-2xl" />
-              <Skeleton className="h-[60px] rounded-2xl" />
+              <Skeleton className="h-[60px] rounded-lg" />
+              <Skeleton className="h-[60px] rounded-lg" />
+              <Skeleton className="h-[60px] rounded-lg" />
+              <Skeleton className="h-[60px] rounded-lg" />
+              <Skeleton className="h-[60px] rounded-lg" />
             </CardContent>
           </Card>
         </div>

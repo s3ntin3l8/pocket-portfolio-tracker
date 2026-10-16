@@ -134,7 +134,7 @@ export default async function SettingsPortfoliosPage({
                         </span>
                       </div>
                     )}
-                    <p className="tabular mt-4 text-heading font-extrabold">
+                    <p className="tabular mt-4 text-heading font-bold">
                       {formatMoney(Number(netWorth), portfolio.baseCurrency, locale)}
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-muted-foreground">

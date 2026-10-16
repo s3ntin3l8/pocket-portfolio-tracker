@@ -24,7 +24,7 @@ export function DoneStep({
       <span className="flex size-15.5 items-center justify-center rounded-full bg-primary shadow-done-badge">
         <Icon d={ICONS.check} size={30} strokeWidth={2.6} className="text-white" />
       </span>
-      <h2 className="mt-6 mb-2 text-2xl font-extrabold text-foreground">{copy.heading}</h2>
+      <h2 className="mt-6 mb-2 text-2xl font-bold text-foreground">{copy.heading}</h2>
       <p className="m-0 max-w-70 text-sm font-medium text-text-2">
         {portfolioCreated ? copy.readySub : copy.skippedSub}
       </p>

@@ -92,7 +92,7 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
   }, [checkOverflow, upcoming]);
 
   return (
-    <div className="rounded-2xl bg-card p-[22px] shadow-card">
+    <div className="rounded-lg bg-card p-[22px] shadow-card">
       <div className="mb-3">
         <h2 className="text-base font-semibold">{t("calendarTitle")}</h2>
         <p className="mt-0.5 text-xs font-medium text-text-2">{t("calendarSubtitle")}</p>

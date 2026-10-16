@@ -10,13 +10,13 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
   const isUnderwater = currDdpct < 0;
 
   return (
-    <Card className="rounded-2xl bg-card p-4 shadow-card">
+    <Card className="rounded-lg bg-card p-4 shadow-card">
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
 
       <div className="mt-0.5 flex items-baseline justify-between gap-3">
         <p
           className={cn(
-            "tabular text-heading font-extrabold leading-none",
+            "tabular text-heading font-bold leading-none",
             maxDdpct < 0 ? "text-destructive" : "",
           )}
         >

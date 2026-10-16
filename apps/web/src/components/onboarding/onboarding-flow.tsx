@@ -359,10 +359,10 @@ export function OnboardingFlow() {
                 </div>
 
                 <div key={stepTitle} className="animate-step-in">
-                  <div className="text-xs font-bold tracking-[0.14em] text-success uppercase">
+                  <div className="text-xs font-bold tracking-label text-success uppercase">
                     {stepKickerByIndex[step]}
                   </div>
-                  <h2 className="mt-2.5 mb-1.5 text-2xl font-extrabold tracking-tight text-foreground">
+                  <h2 className="mt-2.5 mb-1.5 text-2xl font-bold tracking-tight text-foreground">
                     {stepTitle}
                   </h2>
                   <p className="mb-6.5 text-sm/relaxed font-medium text-text-2">
@@ -586,7 +586,7 @@ export function OnboardingFlow() {
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent size="lg" mobileHeader={{ title: t("addData.importSheetTitle") }}>
           <div className="p-5 md:p-6">
-            <DialogTitle className="hidden text-xl font-extrabold md:mb-3 md:block">
+            <DialogTitle className="hidden text-xl font-bold md:mb-3 md:block">
               {t("addData.importSheetTitle")}
             </DialogTitle>
             {importOpen && createdPortfolio && (
@@ -616,7 +616,7 @@ export function OnboardingFlow() {
           footer={true}
         >
           <div className="p-5 md:p-6">
-            <DialogTitle className="hidden text-xl font-extrabold md:mb-3 md:block">
+            <DialogTitle className="hidden text-xl font-bold md:mb-3 md:block">
               {t("addData.manualSheetTitle")}
             </DialogTitle>
             {manualOpen && createdPortfolio && (

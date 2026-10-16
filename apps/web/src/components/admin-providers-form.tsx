@@ -162,7 +162,7 @@ export function AdminProvidersForm({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-          <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="overflow-hidden rounded-lg bg-card shadow-card">
             {rows.map((p, i) => {
               const editable = canEditCredential(p, encryptionEnabled);
               const editing = editingId === p.id;
@@ -197,7 +197,7 @@ export function AdminProvidersForm({
                             <GripVertical className="size-5" />
                           </button>
                         )}
-                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-micro font-extrabold text-text-2">
+                        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-micro font-bold text-text-2">
                           {i + 1}
                         </span>
                         <div className="min-w-0 flex-1">

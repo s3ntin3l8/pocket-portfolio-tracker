@@ -154,7 +154,7 @@ export function FilterBar({
         </SheetHeader>
         <div className="flex flex-col gap-4">
           <div>
-            <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
+            <p className="mb-2 text-micro font-semibold uppercase tracking-label text-text-2">
               {t("filterType")}
             </p>
             <div className="flex flex-wrap gap-2">{typeChips}</div>
@@ -162,7 +162,7 @@ export function FilterBar({
 
           {yearOptions.length > 1 && (
             <div>
-              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
+              <p className="mb-2 text-micro font-semibold uppercase tracking-label text-text-2">
                 {t("filterYear")}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -181,7 +181,7 @@ export function FilterBar({
 
           {(draftCount > 0 || draftFilter !== "all") && (
             <div>
-              <p className="mb-2 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
+              <p className="mb-2 text-micro font-semibold uppercase tracking-label text-text-2">
                 {t("filterDraftLabel")}
               </p>
               <div className="flex gap-2">

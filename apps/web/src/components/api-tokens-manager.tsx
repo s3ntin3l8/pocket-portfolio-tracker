@@ -122,7 +122,7 @@ export function ApiTokensManager({
       )}
 
       {tokens.length > 0 && (
-        <div className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="divide-y divide-border overflow-hidden rounded-lg bg-card shadow-card">
           {tokens.map((tok) => (
             <div key={tok.id} className="flex items-center gap-3 px-4 py-3">
               <span className="flex size-[38px] shrink-0 items-center justify-center rounded-sm bg-background text-foreground">

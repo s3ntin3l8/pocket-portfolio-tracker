@@ -166,7 +166,7 @@ export function AppShell({
                         {badge != null && (
                           <span
                             className={cn(
-                              "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-micro font-extrabold text-white",
+                              "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-micro font-bold text-white",
                               anomalyError ? "bg-destructive" : "bg-gold-fg",
                             )}
                           >
@@ -182,7 +182,7 @@ export function AppShell({
                   {netWorthSummary && (
                     <div className="rounded-lg bg-background p-3.5">
                       <p className="text-micro font-semibold text-text-2">{t("netWorth")}</p>
-                      <p className="tabular mt-0.5 text-lg font-extrabold">
+                      <p className="tabular mt-0.5 text-lg font-bold">
                         {netWorthSummary.valueFormatted}
                       </p>
                       {netWorthSummary.allTimePctFormatted && (

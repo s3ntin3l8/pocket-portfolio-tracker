@@ -31,8 +31,8 @@ const components: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
-  h1: ({ children }) => <p className="mb-1 mt-3 text-base font-extrabold first:mt-0">{children}</p>,
-  h2: ({ children }) => <p className="mb-1 mt-3 text-sm font-extrabold first:mt-0">{children}</p>,
+  h1: ({ children }) => <p className="mb-1 mt-3 text-base font-bold first:mt-0">{children}</p>,
+  h2: ({ children }) => <p className="mb-1 mt-3 text-sm font-bold first:mt-0">{children}</p>,
   h3: ({ children }) => <p className="mb-1 mt-2 text-sm font-bold first:mt-0">{children}</p>,
   strong: ({ children }) => <strong className="font-bold">{children}</strong>,
   code: ({ children }) => (

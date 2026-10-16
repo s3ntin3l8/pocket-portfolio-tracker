@@ -432,9 +432,7 @@ export function TransactionDetailSheet({
               <BadgeIcon className="size-[22px]" strokeWidth={2.2} />
             </span>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate text-lg font-extrabold leading-none">
-                {title}
-              </DialogTitle>
+              <DialogTitle className="truncate text-lg font-bold leading-none">{title}</DialogTitle>
               <p className="truncate text-xs font-medium text-text-2">{subtitle}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">

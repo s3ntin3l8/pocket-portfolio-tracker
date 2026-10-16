@@ -142,7 +142,7 @@ export function MobileIntro({
               <div className="flex items-start justify-between gap-2.5">
                 <div>
                   <div className="text-micro font-semibold text-white/78">{copy.netWorthLabel}</div>
-                  <div className="mt-1.25 text-2xl font-extrabold text-white tabular-nums">
+                  <div className="mt-1.25 text-2xl font-bold text-white tabular-nums">
                     {copy.netWorthValue}
                   </div>
                 </div>
@@ -178,7 +178,7 @@ export function MobileIntro({
           </div>
         )}
         <div className="mt-auto">
-          <h1 className="text-3xl/[1.15] font-extrabold tracking-tight">{cur.h}</h1>
+          <h1 className="text-3xl/[1.15] font-bold tracking-tight">{cur.h}</h1>
           <p className="mt-4 text-body text-white/66">{cur.s}</p>
           <div className="mt-5 flex flex-col gap-2.5">
             {cur.bullets.map((text, i) => (

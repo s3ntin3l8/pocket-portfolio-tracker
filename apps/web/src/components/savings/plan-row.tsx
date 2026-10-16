@@ -29,7 +29,7 @@ export function PlanRow({
   return (
     <div className="flex items-center gap-3">
       <span
-        className="inline-flex size-10 shrink-0 items-center justify-center rounded-md text-xs font-extrabold"
+        className="inline-flex size-10 shrink-0 items-center justify-center rounded-md text-xs font-bold"
         style={{ backgroundColor: tone.bg, color: tone.fg }}
         aria-hidden
       >

@@ -67,7 +67,7 @@ export function InstrumentPriceCard({
         <div>
           <p className="text-xs font-semibold text-muted-foreground">{t("lastPriceLabel")}</p>
           <div className="mt-0.5 flex items-baseline gap-3">
-            <span className="tabular text-3xl font-extrabold">
+            <span className="tabular text-3xl font-bold">
               {formatMoney(lastPrice.price, lastPrice.currency, locale)}
             </span>
             {lastPrice.change != null && lastPrice.changePct != null && (

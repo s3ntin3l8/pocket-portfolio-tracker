@@ -6,7 +6,7 @@ import type { AdminStats as AdminStatsData } from "@portfolio/api-client";
 /**
  * `/admin/database`. Design (`Admin Settings.dc.html`, "DATABASE / STATS" section): two
  * `rounded-lg` stat tiles (Database size / Rows est.), an uppercase "TABLES" eyebrow
- * over a `rounded-2xl` table-list card, and — the design's one deviation from real
+ * over a `rounded-lg` table-list card, and — the design's one deviation from real
  * data — a static "Object storage not used" callout. This app's storage backend is
  * real and configurable (see PR B2's `admin-storage-form.tsx`), so that callout only
  * shows when storage genuinely isn't configured; when it is, the real usage stats render
@@ -34,24 +34,22 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
       <div className="flex gap-3">
         <div className="flex-1 rounded-lg bg-card p-[14px_15px] shadow-card">
           <div className="text-xs font-medium text-text-2">{t("statsDatabaseSize")}</div>
-          <div className="mt-0.5 text-heading font-extrabold tabular-nums">
+          <div className="mt-0.5 text-heading font-bold tabular-nums">
             {db.sizeBytes !== null ? formatBytes(db.sizeBytes) : t("statsSizeUnavailable")}
           </div>
         </div>
         <div className="flex-1 rounded-lg bg-card p-[14px_15px] shadow-card">
           <div className="text-xs font-medium text-text-2">{t("statsRowsEstimate")}</div>
-          <div className="mt-0.5 text-heading font-extrabold tabular-nums">
-            {formatRows(rowsTotal)}
-          </div>
+          <div className="mt-0.5 text-heading font-bold tabular-nums">{formatRows(rowsTotal)}</div>
         </div>
       </div>
 
-      <div className="px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+      <div className="px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
         {t("statsTablesLabel")}
       </div>
       {db.tables.length > 0 ? (
-        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
-          <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-micro font-bold uppercase tracking-[.03em] text-text-2 md:flex">
+        <div className="overflow-hidden rounded-lg bg-card shadow-card">
+          <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-micro font-bold uppercase tracking-label text-text-2 md:flex">
             <span className="flex-1">{t("statsColumnTable")}</span>
             <span className="w-[100px] text-right">{t("statsRowsEstimate")}</span>
             <span className="w-[74px] text-right">{t("statsColumnSize")}</span>

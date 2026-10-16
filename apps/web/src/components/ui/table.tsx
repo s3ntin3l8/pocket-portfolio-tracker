@@ -37,7 +37,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       className={cn(
-        "border-t-2 border-line bg-card-2 text-sm font-extrabold [&_tr]:border-0",
+        "border-t-2 border-line bg-card-2 text-sm font-bold [&_tr]:border-0",
         className,
       )}
       {...props}
@@ -58,7 +58,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-11 px-3 text-left align-middle text-micro font-bold uppercase tracking-[0.04em] text-text-2 first:pl-[22px] last:pr-[22px] [&:has([role=checkbox])]:pr-0",
+        "h-11 px-3 text-left align-middle text-xs font-medium text-muted-foreground first:pl-5 last:pr-5 [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -67,12 +67,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 }
 
 function TableCell({ className, ...props }: React.ComponentProps<"td">) {
-  return (
-    <td
-      className={cn("px-3 py-3 align-middle first:pl-[22px] last:pr-[22px]", className)}
-      {...props}
-    />
-  );
+  return <td className={cn("px-3 py-3 align-middle first:pl-5 last:pr-5", className)} {...props} />;
 }
 
 // Shared cell-typography convention (sourced from the Holdings table, the most fully-realized

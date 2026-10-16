@@ -98,11 +98,11 @@ export default async function SettingsLayout({
 
   const identityCard = me && (
     <div className="flex items-center gap-3">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground text-sm font-bold text-background">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-background">
         {initials}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-body font-extrabold">{me.name || me.email}</p>
+        <p className="truncate text-body font-bold">{me.name || me.email}</p>
         <p className="truncate text-xs text-muted-foreground">{me.email}</p>
       </div>
     </div>
@@ -143,7 +143,7 @@ export default async function SettingsLayout({
           {identityCard && (
             <Link
               href="/settings/account"
-              className="mb-4 flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
+              className="mb-4 flex items-center gap-3.5 rounded-lg border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
             >
               {identityCard}
             </Link>

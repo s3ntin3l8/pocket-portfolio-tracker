@@ -64,7 +64,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
 
   if (rows.length === 0) {
     return (
-      <Card className="rounded-2xl bg-card p-4 shadow-card">
+      <Card className="rounded-lg bg-card p-4 shadow-card">
         <p className="text-xs font-semibold text-text-2">{t("title")}</p>
         <p className="mt-2 text-xs text-text-2">{t("insufficientData")}</p>
       </Card>
@@ -77,7 +77,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
   });
 
   return (
-    <Card className="rounded-2xl bg-card p-4 shadow-card">
+    <Card className="rounded-lg bg-card p-4 shadow-card">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-text-2">{t("title")}</p>

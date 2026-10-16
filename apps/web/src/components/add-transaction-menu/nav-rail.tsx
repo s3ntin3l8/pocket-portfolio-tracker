@@ -61,9 +61,7 @@ export function NavRail({
         className,
       )}
     >
-      <div className="px-2.5 pb-3.5 pt-0.5 text-lg font-extrabold text-foreground">
-        {labels.heading}
-      </div>
+      <div className="px-2.5 pb-3.5 pt-0.5 text-lg font-bold text-foreground">{labels.heading}</div>
       {top.map((item) => (
         <NavButton key={item.key} item={item} active={active === item.key} onSelect={onSelect} />
       ))}

@@ -16,7 +16,7 @@ export function BrandLogo({ size = "lg", className }: { size?: "sm" | "lg"; clas
       >
         <Icon d={ICONS.wallet} size={large ? 22 : 17} className="text-white" />
       </span>
-      <span className={cn("font-extrabold", large ? "text-xl" : "text-base")}>Pocket</span>
+      <span className={cn("font-bold", large ? "text-xl" : "text-base")}>Pocket</span>
     </div>
   );
 }

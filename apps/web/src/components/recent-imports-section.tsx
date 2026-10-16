@@ -34,7 +34,7 @@ export function RecentImportsSection({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-0.5 text-xs font-bold uppercase tracking-[0.04em] text-text-2 transition-colors hover:text-foreground"
+        className="flex items-center gap-1.5 px-0.5 text-xs font-bold uppercase tracking-label text-text-2 transition-colors hover:text-foreground"
       >
         {t("title")}
         <span className="font-semibold normal-case tracking-normal text-text-2">

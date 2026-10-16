@@ -33,10 +33,10 @@ export async function AccountSection({
       {me && <UpdateProfile initialName={me.name ?? ""} />}
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("displayCurrency")}
         </p>
-        <div className="divide-y divide-line overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="divide-y divide-line overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <DisplayCurrency current={me?.displayCurrency ?? ""} />
           </div>
@@ -56,10 +56,10 @@ export async function AccountSection({
 
       {localAuthAvailable && me && (
         <div>
-          <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+          <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
             {t("password")}
           </p>
-          <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="overflow-hidden rounded-lg bg-card shadow-card">
             <div className="p-4">
               <ChangePassword email={me.email} />
             </div>

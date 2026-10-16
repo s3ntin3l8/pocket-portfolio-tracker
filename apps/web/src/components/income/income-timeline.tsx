@@ -265,7 +265,7 @@ export function IncomeTimeline({
   const nextOlder = yearFilter === "all" && !hasActiveTextFilter ? sortedOlder[0] : null;
 
   return (
-    <div className="rounded-2xl bg-card p-[22px] shadow-card">
+    <div className="rounded-lg bg-card p-[22px] shadow-card">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">{t("paymentsTimelineTitle")}</h2>
@@ -423,7 +423,7 @@ export function IncomeTimeline({
                     ) : (
                       <ChevronRight className="size-4 shrink-0 text-text-2" />
                     )}
-                    <span className="text-body font-extrabold">{g.year}</span>
+                    <span className="text-body font-bold">{g.year}</span>
                     {g.subtitle && (
                       <span className="truncate text-micro font-semibold text-text-2">
                         {g.subtitle}
