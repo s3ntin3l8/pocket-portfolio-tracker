@@ -1775,6 +1775,9 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     const drift = (1 + annual) ** (1 / 365) - 1;
     // Simulate in units (opening deposit 10, then 1 every 30 days), then scale so
     // the last day equals `end`; value is linear in the flows, so returns survive.
+    // Each flow is stored on the day it lands: TWR subtracts it that same day
+    // (1 + r_t = (V_t − flow_t) / V_{t−1}), which is what keeps the opening
+    // deposit out of the first return. Keep that pairing if flows ever move.
     const walk: { d: number; value: number; flow: number }[] = [];
     let value = 0;
     for (let d = days; d >= 0; d--) {
