@@ -272,7 +272,7 @@ export function TransactionDetailSheet({
         {showReceipt && (
           <div className="mt-5">
             <SectionHeading>{t("sourcesSection.documentTitle")}</SectionHeading>
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-[14px]">
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3.5">
               <span
                 className="flex size-[42px] shrink-0 items-center justify-center rounded-sm"
                 style={{

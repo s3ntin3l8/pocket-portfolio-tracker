@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations, useLocale } from "next-intl";
@@ -92,7 +93,7 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
   }, [checkOverflow, upcoming]);
 
   return (
-    <div className="rounded-lg bg-card p-[22px] shadow-card">
+    <Card className="p-[22px]">
       <div className="mb-3">
         <h2 className="text-base font-semibold">{t("calendarTitle")}</h2>
         <p className="mt-0.5 text-xs font-medium text-text-2">{t("calendarSubtitle")}</p>
@@ -149,6 +150,6 @@ export function IncomeCalendar({ upcoming }: { upcoming: UpcomingPayment[] }) {
           </div>,
           document.body,
         )}
-    </div>
+    </Card>
   );
 }

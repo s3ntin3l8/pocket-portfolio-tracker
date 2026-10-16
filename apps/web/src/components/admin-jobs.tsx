@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { InfoTip } from "@/components/ui/tooltip";
 import { useState, useRef } from "react";
 import { useApiClient } from "@/lib/api";
@@ -208,7 +209,7 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg bg-card shadow-card">
+    <Card className="overflow-hidden">
       {jobs.map((job, i) => {
         const entry = pending[job.name];
         const isPending = Boolean(entry) && !entry?.timedOut;
@@ -264,6 +265,6 @@ export function AdminJobs({ initialJobs, schedulerAvailable }: AdminJobsProps) {
           </div>
         );
       })}
-    </div>
+    </Card>
   );
 }

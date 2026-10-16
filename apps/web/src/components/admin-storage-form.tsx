@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Check, CheckCircle, XCircle } from "lucide-react";
@@ -79,7 +80,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
   }
 
   return (
-    <div className="rounded-lg bg-card p-4 shadow-card">
+    <Card className="p-4">
       <div className="mb-3.5 space-y-1.5">
         <div className="flex items-center gap-1 px-0.5">
           <label htmlFor="storage-provider" className="text-xs font-semibold text-text-2">
@@ -252,6 +253,6 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
           </span>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

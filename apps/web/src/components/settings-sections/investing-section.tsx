@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { getTranslations } from "next-intl/server";
 import { PreferenceChips } from "@/components/preference-chips";
 import { BenchmarkSettingsForm } from "@/components/settings-sections/benchmark-settings-form";
@@ -21,7 +22,7 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("investingTaxLabel")}
         </p>
-        <div className="divide-y divide-line overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="divide-y divide-line overflow-hidden">
           <div className="p-4">
             <PreferenceChips
               variant="wide"
@@ -53,43 +54,43 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
               {t("investingCostBasisNote")}
             </p>
           </div>
-        </div>
+        </Card>
       </div>
 
       <div>
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("retirementLabel")}
         </p>
-        <div className="overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="overflow-hidden">
           <div className="p-4">
             <RetirementAgeForm age={prefs?.retirementAge ?? null} />
           </div>
-        </div>
+        </Card>
       </div>
 
       <div>
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("benchmarkLabel")}
         </p>
-        <div className="overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="overflow-hidden">
           <div className="p-4">
             <BenchmarkSettingsForm
               symbols={prefs?.benchmarkSymbols ?? []}
               rate={prefs?.riskFreeRate ?? null}
             />
           </div>
-        </div>
+        </Card>
       </div>
 
       <div>
         <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("assistantLabel")}
         </p>
-        <div className="overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="overflow-hidden">
           <div className="p-4">
             <AssistantHistoryToggle enabled={prefs?.assistantSaveHistory ?? false} />
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

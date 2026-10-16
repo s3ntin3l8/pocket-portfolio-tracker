@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { forecastSeries } from "@portfolio/core";
 import { Button } from "@/components/ui/button";
+import { Card, CardLabel } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { LazyForecastChart as ForecastChart } from "@/components/charts/lazy";
 import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/utils";
@@ -20,10 +21,8 @@ function num(v: string, min: number, max: number): number {
  * browser (pure core math) as the monthly amount, expected return and horizon
  * change — no network round-trip.
  *
- * Styled as the reference's green-gradient "hero" (same recipe as Holdings'
- * `HeroGlanceCard`: `linear-gradient(160deg,#0E9F6E,#0B7D58)`, `rounded-xl`,
- * `shadow-hero`) — white-on-green controls, chart and
- * a contributed/growth split footer.
+ * A neutral card (same surface as Holdings' `HeroGlanceCard`) with muted lever rows, a
+ * brand-green projection chart and a contributed/growth split footer.
  */
 export function ForecastPanel({
   currentValue,
@@ -114,18 +113,15 @@ export function ForecastPanel({
   const returnLabel = `${formatPercent(returnPct / 100, locale)} p.a.`;
 
   return (
-    <div
-      className="rounded-lg p-[22px] text-white shadow-hero"
-      style={{ background: "linear-gradient(160deg,var(--primary),var(--primary-deep))" }}
-    >
-      <p className="text-base font-bold">{t("forecastTitle")}</p>
-      <p className="mt-px text-xs font-medium text-white/80">{t("forecastSubtitle")}</p>
+    <Card className="p-5">
+      <p className="text-body font-semibold">{t("forecastTitle")}</p>
+      <CardLabel className="mt-px">{t("forecastSubtitle")}</CardLabel>
 
-      {/* Levers — stacked translucent pills (reference), not a grid. */}
+      {/* Levers — stacked muted rows, not a grid. */}
       <div className="mt-4 space-y-2.5">
-        {/* Monthly top-up: label left, white-filled numeric input right. */}
-        <div className="flex items-center justify-between gap-2.5 rounded-md bg-white/12 px-[13px] py-[11px]">
-          <Label htmlFor="forecast-monthly" className="text-micro font-semibold text-white/82">
+        {/* Monthly top-up: label left, numeric input right. */}
+        <div className="flex items-center justify-between gap-2.5 rounded-md bg-muted px-3 py-2.5">
+          <Label htmlFor="forecast-monthly" className="text-xs font-medium text-muted-foreground">
             {t("monthlyAmount")}
           </Label>
           <input
@@ -135,17 +131,17 @@ export function ForecastPanel({
             inputMode="numeric"
             value={monthly}
             onChange={(e) => setMonthly(num(e.target.value, 0, 1_000_000))}
-            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-body-sm font-bold text-primary-ink focus:outline-none"
+            className="tabular h-8 w-[134px] rounded-md border border-border bg-card px-2.5 text-right text-body-sm font-semibold text-foreground focus-visible:border-primary focus-visible:outline-none"
           />
         </div>
 
         {/* Expected return: label + bold value on one row, slider below. */}
-        <div className="rounded-md bg-white/12 px-[13px] py-[11px]">
+        <div className="rounded-md bg-muted px-3 py-2.5">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <Label htmlFor="forecast-return" className="text-micro font-semibold text-white/82">
+            <Label htmlFor="forecast-return" className="text-xs font-medium text-muted-foreground">
               {t("annualReturn")}
             </Label>
-            <span className="tabular text-body-sm font-bold">{returnLabel}</span>
+            <span className="tabular text-body-sm font-semibold">{returnLabel}</span>
           </div>
           <input
             id="forecast-return"
@@ -155,15 +151,15 @@ export function ForecastPanel({
             step={0.5}
             value={returnPct}
             onChange={(e) => setReturnPct(num(e.target.value, 0, 15))}
-            className="h-[22px] w-full accent-white"
+            className="h-[22px] w-full accent-primary"
           />
         </div>
 
         {/* Horizon: label (+ optional age-18 preset) + bold value, slider below. */}
-        <div className="rounded-md bg-white/12 px-[13px] py-[11px]">
+        <div className="rounded-md bg-muted px-3 py-2.5">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="forecast-years" className="text-micro font-semibold text-white/82">
+              <Label htmlFor="forecast-years" className="text-xs font-medium text-muted-foreground">
                 {t("horizonYears")}
               </Label>
               {yearsToTarget !== null && (
@@ -171,14 +167,16 @@ export function ForecastPanel({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-5 px-1.5 text-micro text-white hover:bg-white/15 hover:text-white"
+                  className="h-5 px-1.5 text-micro text-primary hover:bg-primary/10 hover:text-primary"
                   onClick={() => setYears(yearsToTarget)}
                 >
                   {portfolioType === "child" ? t("toAge18") : t("toRetirement")}
                 </Button>
               )}
             </div>
-            <span className="tabular text-body-sm font-bold">{t("years", { count: years })}</span>
+            <span className="tabular text-body-sm font-semibold">
+              {t("years", { count: years })}
+            </span>
           </div>
           <input
             id="forecast-years"
@@ -188,25 +186,23 @@ export function ForecastPanel({
             step={1}
             value={years}
             onChange={(e) => setYears(num(e.target.value, 1, 50))}
-            className="h-[22px] w-full accent-white"
+            className="h-[22px] w-full accent-primary"
           />
         </div>
       </div>
 
       {/* Hero projected figure + assumptions subtitle. */}
       <div className="mt-[18px]">
-        <p className="text-xs font-semibold text-white/80">
-          {t("projectedInYears", { count: years })}
-        </p>
+        <CardLabel>{t("projectedInYears", { count: years })}</CardLabel>
         <p
           className="tabular mt-0.5 text-hero font-bold leading-tight"
           data-testid="projected-value"
         >
           {m(value)}
         </p>
-        <p className="mt-1 text-xs font-medium text-white/82">
+        <CardLabel className="mt-1">
           {t("forecastAssumptions", { amount: m(monthly), rate: returnLabel })}
-        </p>
+        </CardLabel>
       </div>
 
       <div className="mt-3.5">
@@ -215,10 +211,10 @@ export function ForecastPanel({
 
       {/* Contributed / growth split — reference: thick track, translucent fill. */}
       <div className="mb-2 mt-3">
-        <div className="flex h-[11px] overflow-hidden rounded-md bg-white/[.22]">
-          <div className="h-full bg-white/60" style={{ width: `${100 - growthPct}%` }} />
+        <div className="flex h-2 overflow-hidden rounded-md bg-primary/30">
+          <div className="h-full bg-primary" style={{ width: `${100 - growthPct}%` }} />
         </div>
-        <div className="mt-2 flex items-center justify-between text-micro font-semibold text-white/85">
+        <div className="mt-2 flex items-center justify-between text-micro font-medium text-muted-foreground">
           <span data-testid="projected-contributed">
             {t("projectedContributed")} {m(totalContributed)}
           </span>
@@ -240,17 +236,17 @@ export function ForecastPanel({
             data-active={s.active}
             className={
               s.active
-                ? "rounded-md border border-white/55 bg-white/24 px-3 py-[11px]"
-                : "rounded-md border border-transparent bg-white/12 px-3 py-[11px]"
+                ? "rounded-md border border-primary bg-primary/10 px-3 py-2.5"
+                : "rounded-md border border-transparent bg-muted px-3 py-2.5"
             }
           >
-            <p className="text-micro font-semibold text-white/75">
+            <p className="text-micro font-medium text-muted-foreground">
               {formatPercent(s.rate / 100, locale)}
             </p>
             <p className="tabular mt-0.5 text-body font-bold">{mc(s.value)}</p>
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }

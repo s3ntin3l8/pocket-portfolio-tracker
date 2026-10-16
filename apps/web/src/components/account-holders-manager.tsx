@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useTranslations } from "next-intl";
 import { ChevronRight, Plus } from "lucide-react";
 import type { AccountHolder } from "@portfolio/api-client";
@@ -23,7 +24,7 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
   const tf = useTranslations("PortfolioForm");
 
   return (
-    <div className="rounded-xl bg-card p-[18px] shadow-card">
+    <Card className="p-4">
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold">{t("title")}</h2>
@@ -63,7 +64,7 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
       ) : (
         <p className="text-sm text-text-2">{t("empty")}</p>
       )}
-    </div>
+    </Card>
   );
 }
 

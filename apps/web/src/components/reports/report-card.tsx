@@ -7,7 +7,7 @@ import { ResponsiveMoney } from "@/components/ui/responsive-money";
 import { TwoStatFooter } from "@/components/reports/two-stat-footer";
 
 /**
- * A statement card for the Reports hub: icon chip + title + trend chip, a big headline
+ * A statement card for the Reports hub: neutral icon chip + title + trend chip, a big headline
  * value + caption, an optional two-segment split bar, and a footer of up to two metrics
  * plus an "Open ›" affordance. Server-renderable — the whole card is a `<Link>` rather
  * than taking an `onOpen` closure (the design's `r.on`), since this composes inside a
@@ -15,8 +15,6 @@ import { TwoStatFooter } from "@/components/reports/two-stat-footer";
  */
 export function ReportCard({
   icon: Icon,
-  iconBg,
-  iconFg,
   title,
   trend,
   value,
@@ -29,8 +27,6 @@ export function ReportCard({
   gain,
 }: {
   icon: LucideIcon;
-  iconBg: string;
-  iconFg: string;
   title: string;
   trend?: { label: string; tone: TrendTone; arrow?: boolean };
   value: string;
@@ -46,20 +42,16 @@ export function ReportCard({
    *  inside the card's link. */
   gain?: React.ReactNode;
 }) {
-  // Layout transcribed from the reference's desktop `reports` cards: 44px icon chip +
-  // 700 16px title + delta pill in ONE header row, 800 30px value, 500 13px caption,
-  // 7px split bar, and a bordered footer pinned to the card bottom.
+  // Neutral icon chip + title + trend chip in one header row, a display-size value, a muted
+  // caption, an optional split bar, and a bordered footer pinned to the card bottom.
   return (
     <ScopeLink href={href} className="group block h-full">
-      <Card className="flex h-full min-w-0 flex-col px-5 py-5 transition-colors group-hover:border-primary/40">
+      <Card className="flex h-full min-w-0 flex-col p-5 transition-shadow group-hover:ring-1 group-hover:ring-primary/40">
         <div className="flex w-full items-center gap-3">
-          <span
-            className="flex size-11 shrink-0 items-center justify-center rounded-lg"
-            style={{ background: iconBg, color: iconFg }}
-          >
-            <Icon className="size-[22px]" strokeWidth={1.9} />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            <Icon className="size-[18px]" strokeWidth={1.9} />
           </span>
-          <span className="min-w-0 flex-1 text-base font-bold">{title}</span>
+          <span className="min-w-0 flex-1 text-body font-semibold">{title}</span>
           {trend && <TrendChip label={trend.label} tone={trend.tone} arrow={trend.arrow} />}
         </div>
 
@@ -76,7 +68,7 @@ export function ReportCard({
           </div>
         )}
 
-        <TwoStatFooter metrics={metrics} openLabel={openLabel} accentColor={iconFg} />
+        <TwoStatFooter metrics={metrics} openLabel={openLabel} />
       </Card>
     </ScopeLink>
   );

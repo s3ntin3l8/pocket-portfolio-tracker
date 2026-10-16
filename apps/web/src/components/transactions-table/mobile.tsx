@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useTranslations, useLocale } from "next-intl";
 import { AlertCircle, AlertTriangle } from "lucide-react";
 import { cn, formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
@@ -48,7 +49,7 @@ export function MobileView({
           <div className="mb-2 ml-1 text-xs font-bold uppercase tracking-label text-text-2">
             {group.label}
           </div>
-          <div className="overflow-hidden rounded-lg bg-card shadow-card">
+          <Card className="overflow-hidden">
             {group.rows.map((tx, i) => {
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
@@ -130,13 +131,13 @@ export function MobileView({
                 </div>
               );
             })}
-          </div>
+          </Card>
         </div>
       ))}
       {showEmpty && (
-        <div className="rounded-lg bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
+        <Card className="px-4 py-8 text-center text-sm text-muted-foreground">
           {hasActiveFilter ? t("noResults") : t("empty")}
-        </div>
+        </Card>
       )}
     </div>
   );

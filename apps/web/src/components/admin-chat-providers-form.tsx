@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, ArrowDown, ArrowUp, Check } from "lucide-react";
@@ -132,7 +133,7 @@ export function AdminChatProvidersForm({
         )}
       </p>
 
-      <div className="overflow-hidden rounded-lg bg-card shadow-card">
+      <Card className="overflow-hidden">
         {rows.map((p, i) => (
           <div key={p.id} className={i > 0 ? "border-t border-line" : ""}>
             <div className="flex items-center gap-3 px-4 py-3.5">
@@ -198,7 +199,7 @@ export function AdminChatProvidersForm({
             </div>
           </div>
         ))}
-      </div>
+      </Card>
 
       <div className="space-y-1.5">
         <label className="block text-sm font-bold" htmlFor="chat-pin">

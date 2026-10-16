@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useTranslations } from "next-intl";
 import { CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -12,7 +13,7 @@ import { EmptyState } from "@/components/empty-state";
 export function IncomeCalendarEmpty() {
   const t = useTranslations("Income");
   return (
-    <div className="rounded-lg bg-card p-[22px] shadow-card">
+    <Card className="p-[22px]">
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">{t("calendarTitle")}</h2>
@@ -24,6 +25,6 @@ export function IncomeCalendarEmpty() {
         title={t("calendarEmptyTitle")}
         description={t("calendarEmptyBody")}
       />
-    </div>
+    </Card>
   );
 }

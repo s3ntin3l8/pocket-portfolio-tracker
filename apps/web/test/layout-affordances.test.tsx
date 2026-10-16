@@ -56,7 +56,6 @@ describe("money never truncates (audit G5)", () => {
       <TwoStatFooter
         metrics={[{ label: "Realized all-time", value: "€570.4K" }]}
         openLabel="Open"
-        accentColor="#000"
       />,
     );
     const value = getByText("€570.4K");

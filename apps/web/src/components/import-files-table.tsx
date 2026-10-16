@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
@@ -105,7 +106,7 @@ export function ImportFilesTable({
         </div>
       )}
 
-      <div className="rounded-lg bg-card shadow-card">
+      <Card>
         <Table>
           <TableHeader>
             <TableRow>
@@ -188,7 +189,7 @@ export function ImportFilesTable({
             })}
           </TableBody>
         </Table>
-      </div>
+      </Card>
     </div>
   );
 }

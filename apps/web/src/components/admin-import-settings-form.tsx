@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle } from "lucide-react";
@@ -70,11 +71,7 @@ export function AdminImportSettingsForm({
       <Label id="import-strategy-label" className="block px-0.5">
         {t("importStrategyLabel")}
       </Label>
-      <div
-        role="radiogroup"
-        aria-labelledby="import-strategy-label"
-        className="overflow-hidden rounded-lg bg-card shadow-card"
-      >
+      <Card role="radiogroup" aria-labelledby="import-strategy-label" className="overflow-hidden">
         {STRATEGIES.map((s, i) => {
           const active = strategy === s;
           return (
@@ -110,7 +107,7 @@ export function AdminImportSettingsForm({
             </button>
           );
         })}
-      </div>
+      </Card>
     </div>
   );
 }

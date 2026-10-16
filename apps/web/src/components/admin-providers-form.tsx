@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Check, GripVertical, Lock, Pencil } from "lucide-react";
@@ -162,7 +163,7 @@ export function AdminProvidersForm({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-          <div className="overflow-hidden rounded-lg bg-card shadow-card">
+          <Card className="overflow-hidden">
             {rows.map((p, i) => {
               const editable = canEditCredential(p, encryptionEnabled);
               const editing = editingId === p.id;
@@ -259,7 +260,7 @@ export function AdminProvidersForm({
                 </SortableAdminRow>
               );
             })}
-          </div>
+          </Card>
         </SortableContext>
       </DndContext>
 

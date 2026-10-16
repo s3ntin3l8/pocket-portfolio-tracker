@@ -18,6 +18,11 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("text-body font-semibold leading-none", className)} {...props} />;
 }
 
+/** Small muted label above a figure or section — the one label style for stat/rail cards. */
+function CardLabel({ className, ...props }: React.ComponentProps<"p">) {
+  return <p className={cn("text-xs font-medium text-muted-foreground", className)} {...props} />;
+}
+
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("text-sm text-muted-foreground", className)} {...props} />;
 }
@@ -30,4 +35,4 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("flex items-center p-5 pt-0", className)} {...props} />;
 }
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
+export { Card, CardHeader, CardTitle, CardLabel, CardDescription, CardContent, CardFooter };

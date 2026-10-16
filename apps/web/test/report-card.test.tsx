@@ -127,13 +127,14 @@ describe("TwoStatFooter", () => {
           { label: "Lifetime", value: "Rp 9jt" },
         ]}
         openLabel="Open"
-        accentColor="#0E9F6E"
       />,
     );
     expect(screen.getByText("TTM")).toBeInTheDocument();
     expect(screen.getByText("Rp 1.2jt")).toBeInTheDocument();
     expect(screen.getByText("Lifetime")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
+    // The "Open ›" affordance is the one brand-green action on a report card.
+    expect(screen.getByText("Open").className).toContain("text-primary");
   });
 });
 
@@ -145,8 +146,6 @@ describe("ReportCard", () => {
     wrap(
       <ReportCard
         icon={Coins}
-        iconBg="rgba(14,159,110,.12)"
-        iconFg="#0E9F6E"
         title="Income"
         trend={{ label: "+18% vs 2025", tone: "up", arrow: true }}
         value="Rp 12.400.000"
@@ -173,14 +172,29 @@ describe("ReportCard", () => {
     expect(screen.getByText("TTM")).toBeInTheDocument();
   });
 
+  it("renders the icon chip neutral, with no inline tint", () => {
+    const { container } = render(
+      <ReportCard
+        icon={Coins}
+        title="Income"
+        value="Rp 0"
+        caption="This year"
+        metrics={[]}
+        href="/income"
+        openLabel="Open"
+      />,
+    );
+    const chip = container.querySelector("span.bg-muted.text-muted-foreground");
+    expect(chip).toBeInTheDocument();
+    expect(chip?.getAttribute("style")).toBeNull();
+  });
+
   it("omits the split bar when not provided", () => {
     // No splitBar → no MiniSplitBar → no useTranslations call. Plain render
     // is fine here.
     const { container } = render(
       <ReportCard
         icon={Coins}
-        iconBg="rgba(14,159,110,.12)"
-        iconFg="#0E9F6E"
         title="Tax"
         value="Rp 0"
         caption="No allowance configured"

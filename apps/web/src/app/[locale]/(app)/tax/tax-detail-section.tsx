@@ -82,7 +82,6 @@ export function TaxHolderSectionId({
     <>
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <EstimatedTaxHero
-          tone="green"
           label={t("id.hero.estimatedTax", { year })}
           value={moneyCompact(idTax.estimatedTax)}
           description={t("id.hero.estimatedTaxDesc")}

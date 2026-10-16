@@ -8,11 +8,10 @@ import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
- * Forecast sparkline for the green-gradient forecast hero: a solid white **value**
- * line (present value + contributions + growth) with a soft white fill, and a dashed
- * white **contributed** line underneath it (what you'd have put in with no growth at
- * all) — mirrors the reference's white-on-green treatment, no axes/grid (matches the
- * Holdings hero's "minimal" sparkline convention).
+ * Forecast sparkline for the Savings forecast card: a solid brand-green **value** line
+ * (present value + contributions + growth) with a soft fill, and a dashed muted
+ * **contributed** line underneath it (what you'd have put in with no growth at all) — no
+ * axes/grid, matching the Holdings hero's minimal sparkline convention.
  */
 export function ForecastChart({
   series,
@@ -42,13 +41,13 @@ export function ForecastChart({
         <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="forecast-value-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--primary-foreground)" stopOpacity={0.42} />
-              <stop offset="100%" stopColor="var(--primary-foreground)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
+              <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <Tooltip
             cursor={{
-              stroke: "color-mix(in srgb, var(--primary-foreground) 55%, transparent)",
+              stroke: "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
               strokeDasharray: "4 4",
             }}
             content={({ active, payload, label }) => {
@@ -69,13 +68,13 @@ export function ForecastChart({
             isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="value"
-            stroke="var(--primary-foreground)"
+            stroke="var(--primary)"
             strokeWidth={2.4}
             fill="url(#forecast-value-fill)"
             activeDot={{
               r: 5,
-              fill: "var(--primary-foreground)",
-              stroke: "var(--primary-deep)",
+              fill: "var(--primary)",
+              stroke: "var(--card)",
               strokeWidth: 2.5,
             }}
           />
@@ -83,7 +82,7 @@ export function ForecastChart({
             isAnimationActive={!reducedMotion}
             type="monotone"
             dataKey="contributed"
-            stroke="color-mix(in srgb, var(--primary-foreground) 65%, transparent)"
+            stroke="var(--muted-foreground)"
             strokeWidth={1.6}
             strokeDasharray="4 4"
             dot={false}

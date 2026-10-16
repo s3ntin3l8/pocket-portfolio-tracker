@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { getLocale, getTranslations } from "next-intl/server";
 import { formatBytes as formatBytesLocale } from "@/lib/utils";
 import { Info } from "lucide-react";
@@ -32,23 +33,23 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <div className="flex-1 rounded-lg bg-card p-[14px_15px] shadow-card">
+        <Card className="flex-1 p-[14px_15px]">
           <div className="text-xs font-medium text-text-2">{t("statsDatabaseSize")}</div>
           <div className="mt-0.5 text-heading font-bold tabular-nums">
             {db.sizeBytes !== null ? formatBytes(db.sizeBytes) : t("statsSizeUnavailable")}
           </div>
-        </div>
-        <div className="flex-1 rounded-lg bg-card p-[14px_15px] shadow-card">
+        </Card>
+        <Card className="flex-1 p-[14px_15px]">
           <div className="text-xs font-medium text-text-2">{t("statsRowsEstimate")}</div>
           <div className="mt-0.5 text-heading font-bold tabular-nums">{formatRows(rowsTotal)}</div>
-        </div>
+        </Card>
       </div>
 
       <div className="px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
         {t("statsTablesLabel")}
       </div>
       {db.tables.length > 0 ? (
-        <div className="overflow-hidden rounded-lg bg-card shadow-card">
+        <Card className="overflow-hidden">
           <div className="hidden items-center gap-3 bg-background px-[15px] py-2.5 text-micro font-bold uppercase tracking-label text-text-2 md:flex">
             <span className="flex-1">{t("statsColumnTable")}</span>
             <span className="w-[100px] text-right">{t("statsRowsEstimate")}</span>
@@ -69,7 +70,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
               </span>
             </div>
           ))}
-        </div>
+        </Card>
       ) : (
         <p className="text-xs italic text-muted-foreground">
           {t("statsTableBreakdownUnavailable")}

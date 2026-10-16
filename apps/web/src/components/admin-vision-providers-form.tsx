@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Check, GripVertical, Pencil } from "lucide-react";
@@ -143,7 +144,7 @@ export function AdminVisionProvidersForm({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-          <div className="overflow-hidden rounded-lg bg-card shadow-card">
+          <Card className="overflow-hidden">
             {rows.map((p, i) => {
               const editable = canEditVisionCredential(encryptionEnabled);
               const editing = editingId === p.id;
@@ -237,7 +238,7 @@ export function AdminVisionProvidersForm({
                 </SortableAdminRow>
               );
             })}
-          </div>
+          </Card>
         </SortableContext>
       </DndContext>
 

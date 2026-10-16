@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useTranslations, useLocale } from "next-intl";
 import type { LotView } from "@portfolio/api-client";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -87,7 +88,7 @@ export function InstrumentLotsTable({ lots, currency }: { lots: LotView[]; curre
       </div>
       <div className="space-y-3 md:hidden">
         {sorted.map((lot, i) => (
-          <div key={`${lot.acqDate}-${i}`} className="rounded-lg bg-card shadow-card px-4 py-3">
+          <Card key={`${lot.acqDate}-${i}`} className="px-4 py-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{dateFmt.format(new Date(lot.acqDate))}</div>
@@ -104,7 +105,7 @@ export function InstrumentLotsTable({ lots, currency }: { lots: LotView[]; curre
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </>
