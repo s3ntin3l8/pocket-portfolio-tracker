@@ -90,6 +90,10 @@ function TableCell({
   );
 }
 
+// Which to reach for: `<TableCell numeric>` for a plain right-aligned figure; `TABLE_VALUE` /
+// `TABLE_VALUE_STRONG` for a figure that must never wrap (they add `whitespace-nowrap` and the
+// 13px weight) or when the styled node is not a cell (a `<span>`, a footer total).
+//
 // Shared cell-typography convention (sourced from the Holdings table, the most fully-realized
 // instance). Not baked into TableCell itself since weight/role varies by column — compose with
 // `cn()` (e.g. `cn(TABLE_VALUE, "text-text-mute")` for a de-emphasized secondary number).

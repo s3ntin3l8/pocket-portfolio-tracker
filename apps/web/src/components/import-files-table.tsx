@@ -180,7 +180,7 @@ export function ImportFilesTable({
                       />
                     </TableCell>
                   )}
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell numeric className="text-muted-foreground">
                     {count}
                   </TableCell>
                 </TableRow>
