@@ -124,7 +124,7 @@ export function PortfolioEditForm({
                   type="button"
                   onClick={handleDelete}
                   disabled={f.busy}
-                  className="h-auto w-full rounded-sm bg-destructive-fill px-4 py-2.5 text-body-sm font-bold text-white hover:bg-destructive-fill/95 sm:w-auto"
+                  className="h-auto w-full rounded-sm bg-destructive-fill px-4 py-2.5 text-body-sm font-bold text-destructive-foreground hover:bg-destructive-fill/95 sm:w-auto"
                 >
                   {f.busy && <Spinner size="sm" />}
                   {t("confirmDelete")}

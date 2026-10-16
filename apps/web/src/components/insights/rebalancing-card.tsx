@@ -131,7 +131,7 @@ export function RebalancingCard({
             <span
               className={cn(
                 "rounded-lg px-[9px] py-1 text-micro font-bold",
-                editing ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warning",
+                editing ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warn-strong",
               )}
             >
               {t("drift", { pct: maxAbsDrift.toFixed(1) })}

@@ -120,8 +120,8 @@ export default async function SettingsPortfoliosPage({
                           className={
                             "inline-flex items-center gap-1.5 rounded-xs px-2 py-1 text-micro font-bold " +
                             (isSyncing
-                              ? "bg-warning/15 text-warning"
-                              : "bg-success/15 text-success")
+                              ? "bg-warning/15 text-warn-strong"
+                              : "bg-success/15 text-success-strong")
                           }
                         >
                           <span
@@ -166,7 +166,7 @@ export default async function SettingsPortfoliosPage({
               href="/settings/portfolios/new"
               className="flex min-h-[170px] flex-col items-center justify-center gap-2.5 rounded-lg border-[1.5px] border-dashed border-border p-[18px] text-center text-muted-foreground transition-colors hover:bg-accent/40"
             >
-              <span className="flex size-[42px] items-center justify-center rounded-md bg-success/15 text-success">
+              <span className="flex size-[42px] items-center justify-center rounded-md bg-success/15 text-success-strong">
                 <Plus className="size-[22px]" />
               </span>
               <span className="text-sm font-bold text-foreground">{tf("new")}</span>

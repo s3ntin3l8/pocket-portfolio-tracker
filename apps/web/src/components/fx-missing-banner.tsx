@@ -18,7 +18,7 @@ export function FxMissingBanner({ currencies }: { currencies: string[] | null | 
   return (
     <div
       role="status"
-      className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning"
+      className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warn-strong"
     >
       <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>

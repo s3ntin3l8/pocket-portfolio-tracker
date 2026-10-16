@@ -108,7 +108,7 @@ export function CredentialEditorPanel({
               type="button"
               onClick={() => void clear()}
               disabled={busy}
-              className="rounded-sm bg-destructive/10 px-3.5 py-2 text-body-sm font-bold text-destructive disabled:cursor-default disabled:opacity-50"
+              className="rounded-sm bg-destructive/10 px-3.5 py-2 text-body-sm font-bold text-destructive-strong disabled:cursor-default disabled:opacity-50"
             >
               {clearState.busy ? <Spinner size="sm" /> : t("credentialClear")}
             </button>

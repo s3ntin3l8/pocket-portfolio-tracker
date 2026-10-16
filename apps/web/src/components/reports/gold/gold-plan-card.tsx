@@ -128,7 +128,9 @@ export function GoldPlanCard({
         {plan.nextDue && (
           <p
             className={`rounded-md border px-3 py-2 text-sm ${
-              overdue ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-muted/40"
+              overdue
+                ? "border-destructive/40 bg-destructive/10 text-destructive-strong"
+                : "bg-muted/40"
             }`}
           >
             <span className="font-semibold">{overdue ? t("nextOverdue") : t("nextDue")}</span>{" "}

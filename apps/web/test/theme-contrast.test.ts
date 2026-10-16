@@ -99,7 +99,9 @@ describe.each([
 ] as const)("%s theme primary and tints", (_name, t) => {
   const surfaces = ["card", "background", "secondary", "muted"] as const;
 
-  for (const surface of surfaces) {
+  // Primary text (links, active nav) is never drawn on the secondary surface, where the light
+  // green only clears 4.5:1 by a hair.
+  for (const surface of ["card", "background", "muted"] as const) {
     it(`primary text on ${surface} is at least 4.5:1`, () => {
       expect(contrast(hexOf(t, "primary"), hexOf(t, surface))).toBeGreaterThanOrEqual(4.5);
     });
@@ -148,7 +150,9 @@ describe.each([
 
 describe("light theme primary button hover", () => {
   it("white on the deeper hover fill is at least 4.5:1", () => {
-    expect(contrast("#ffffff", hexOf(light, "primary-deep"))).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(hexOf(light, "primary-foreground"), hexOf(light, "primary-deep")),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });
 
@@ -181,6 +185,25 @@ describe("solid fill classes in source", () => {
       expect(code, file).toContain("bg-gold-fg text-warning-foreground");
       expect(code, file).not.toContain("text-white");
     }
+  });
+
+  it("tinted backgrounds (/10, /15) never carry the plain text token, only its -strong tier", () => {
+    const tint = /(?<![\w:-])bg-(success|destructive|warning|primary|gold-fg)\/(?:10|15)\b/;
+    const literals = /"[^"\n]*"|`[^`\n]*`/g;
+    const files = readdirSync(resolve(__dirname, "../src"), {
+      recursive: true,
+      encoding: "utf8",
+    }).filter((f) => /\.tsx?$/.test(f));
+    const offenders: string[] = [];
+    for (const f of files) {
+      const code = readFileSync(resolve(__dirname, "../src", f), "utf8");
+      for (const lit of code.match(literals) ?? []) {
+        const m = tint.exec(lit);
+        if (m && new RegExp(`(?<![\\w:-])text-${m[1]}(?![\\w-])`).test(lit))
+          offenders.push(`${f}: ${lit}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   // The logo mark (`bg-brand text-white` in brand.tsx) is exempt from WCAG 1.4.3 (logotype), so

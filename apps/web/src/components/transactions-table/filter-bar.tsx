@@ -107,7 +107,7 @@ export function FilterBar({
             "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
             showFlagged
               ? "border-gold-fg bg-gold-fg text-warning-foreground"
-              : "border-gold-fg/35 bg-gold-fg/15 text-gold-fg",
+              : "border-gold-fg/35 bg-gold-fg/15 text-warn-strong",
           )}
         >
           {tBanner("chipIssues", { count: flaggedCount })}

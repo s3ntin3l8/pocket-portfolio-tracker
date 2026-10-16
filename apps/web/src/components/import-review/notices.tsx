@@ -17,7 +17,7 @@ export function DuplicateNotice({ count }: { count: number }) {
   const t = useTranslations("Import");
   if (count === 0) return null;
   return (
-    <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
+    <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warn-strong">
       {t("review.duplicateNotice", { count })}
     </div>
   );
