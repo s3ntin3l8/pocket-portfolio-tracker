@@ -13,6 +13,9 @@ import { benchmarkLabel } from "@/lib/benchmark-labels";
 import { formatMoney, formatNetWorth, formatPercent } from "@/lib/utils";
 import { ScopeLink } from "@/components/scope-link";
 
+/** Prefix a figure with its direction glyph; a flat figure gets no glyph and no stray space. */
+const withGlyph = (n: number, text: string) => [trendGlyphOf(n), text].filter(Boolean).join(" ");
+
 /**
  * The Holdings "glance" hero: green gradient card with the current total portfolio
  * value (static — always today's figure), two period pills (portfolio TWR % and the
@@ -22,9 +25,6 @@ import { ScopeLink } from "@/components/scope-link";
  * baseline cash flows so a deposit doesn't manufacture phantom gains in the period
  * comparison.
  */
-/** Prefix a figure with its direction glyph; a flat figure gets no glyph and no stray space. */
-const withGlyph = (n: number, text: string) => [trendGlyphOf(n), text].filter(Boolean).join(" ");
-
 export function HeroGlanceCard({
   netWorth,
   currency,
