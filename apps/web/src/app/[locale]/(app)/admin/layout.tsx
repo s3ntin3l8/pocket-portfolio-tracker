@@ -123,7 +123,7 @@ export default async function AdminLayout({
             <ChevronLeft className="size-[18px]" />
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xl font-extrabold tracking-tight">{t("title")}</p>
+            <p className="truncate text-xl font-bold tracking-tight">{t("title")}</p>
             <p className="truncate text-xs text-muted-foreground">{t("subtitle")}</p>
           </div>
         </div>

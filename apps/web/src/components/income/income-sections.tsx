@@ -249,8 +249,8 @@ export async function IncomeAllocationSection() {
   }));
   if (classSlices.length === 0) return null;
   return (
-    <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
+    <div className="@container rounded-lg bg-card px-6 py-5 shadow-card">
+      <p className="mb-3 text-micro font-semibold uppercase tracking-label text-text-2">
         {t("byClassTitle")}
       </p>
       <AllocationDonut
@@ -266,8 +266,8 @@ export async function IncomeCurrencySection() {
   const [t, s] = await Promise.all([getTranslations("Income"), load()]);
   if (!s || s.byCurrency.length <= 1) return null;
   return (
-    <div className="@container rounded-xl bg-card px-6 py-5 shadow-card">
-      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
+    <div className="@container rounded-lg bg-card px-6 py-5 shadow-card">
+      <p className="mb-3 text-micro font-semibold uppercase tracking-label text-text-2">
         {t("currencyTitle")}
       </p>
       <div className="grid grid-cols-1 gap-x-5 gap-y-2.5 @sm:grid-cols-2 @sm:gap-x-7 @lg:grid-cols-3">

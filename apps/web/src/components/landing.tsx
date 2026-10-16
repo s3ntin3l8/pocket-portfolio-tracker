@@ -146,12 +146,12 @@ export function Landing({
           <span className="flex size-9 items-center justify-center rounded-sm bg-primary">
             <Wallet className="size-[18px]" strokeWidth={2} />
           </span>
-          <span className="text-lg font-extrabold tracking-tight">Pocket</span>
+          <span className="text-lg font-bold tracking-tight">Pocket</span>
         </div>
 
         <div className="relative mt-10 space-y-6 md:mt-auto">
           <div className="space-y-3">
-            <h1 className="whitespace-pre-line text-[clamp(2rem,3.4vw,3.1rem)] font-extrabold leading-[1.1] tracking-tight">
+            <h1 className="whitespace-pre-line text-[clamp(2rem,3.4vw,3.1rem)] font-bold leading-[1.1] tracking-tight">
               {t("heroHeadline")}
             </h1>
             <p className="max-w-md text-white/70">{t("heroSub")}</p>
@@ -161,7 +161,7 @@ export function Landing({
           <div className="max-w-md rounded-xl border border-white/15 bg-white/[0.07] p-6 backdrop-blur">
             <div className="text-sm text-white/60">{t("glanceLabel")}</div>
             <div className="mt-1 flex items-center gap-3">
-              <span className="font-mono text-3xl font-extrabold tabular-nums">{demoAmount}</span>
+              <span className="font-mono text-3xl font-bold tabular-nums">{demoAmount}</span>
               <span className="rounded-full bg-mint/20 px-2 py-0.5 text-sm font-semibold text-mint-soft">
                 ▲ {demoGain}
               </span>
@@ -193,10 +193,10 @@ export function Landing({
       <section className="flex flex-1 items-center justify-center bg-background p-6 md:p-12">
         <div className="w-full max-w-sm space-y-6">
           <div className="space-y-2">
-            <div className="text-micro font-extrabold uppercase tracking-[0.14em] text-primary">
+            <div className="text-micro font-bold uppercase tracking-label text-primary">
               {needsSetup ? t("setupKicker") : t("kicker")}
             </div>
-            <h2 className="text-3xl font-extrabold tracking-tight">
+            <h2 className="text-3xl font-bold tracking-tight">
               {needsSetup ? t("setupTitle") : t("signInTitle")}
             </h2>
             <p className="text-sm text-muted-foreground">

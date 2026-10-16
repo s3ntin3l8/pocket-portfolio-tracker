@@ -45,10 +45,10 @@ export function MobileView({
     <div className="space-y-4 lg:hidden">
       {dayGroups.map((group) => (
         <div key={group.day}>
-          <div className="mb-2 ml-1 text-xs font-bold uppercase tracking-[0.04em] text-text-2">
+          <div className="mb-2 ml-1 text-xs font-bold uppercase tracking-label text-text-2">
             {group.label}
           </div>
-          <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+          <div className="overflow-hidden rounded-lg bg-card shadow-card">
             {group.rows.map((tx, i) => {
               const netAmount = txNetAmount(tx);
               const isSelected = selected.has(tx.id);
@@ -134,7 +134,7 @@ export function MobileView({
         </div>
       ))}
       {showEmpty && (
-        <div className="rounded-2xl bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
+        <div className="rounded-lg bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-card">
           {hasActiveFilter ? t("noResults") : t("empty")}
         </div>
       )}

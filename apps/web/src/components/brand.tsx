@@ -37,7 +37,7 @@ export function Brand({
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <PocketLogo variant={variant} />
-      <span className="text-lg font-extrabold tracking-tight">Pocket</span>
+      <span className="text-lg font-bold tracking-tight">Pocket</span>
     </div>
   );
 }

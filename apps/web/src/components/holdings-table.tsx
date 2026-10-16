@@ -391,7 +391,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
         <div className="flex items-center gap-3 border-t-2 border-border py-3 pl-4 pr-4">
           <span className="flex-1 font-bold">{t("total")}</span>
           <div className="shrink-0 text-right tabular">
-            <div className="text-sm font-extrabold">{money(totals.value)}</div>
+            <div className="text-sm font-bold">{money(totals.value)}</div>
             <div className={cn("text-xs font-bold", totalPnlColor)}>
               {totalPct !== null ? formatPercent(totalPct / 100, locale) : ""}
             </div>

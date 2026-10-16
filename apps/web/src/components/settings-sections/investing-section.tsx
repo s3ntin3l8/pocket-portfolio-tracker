@@ -18,10 +18,10 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("investingTaxLabel")}
         </p>
-        <div className="divide-y divide-line overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="divide-y divide-line overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <PreferenceChips
               variant="wide"
@@ -57,10 +57,10 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("retirementLabel")}
         </p>
-        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <RetirementAgeForm age={prefs?.retirementAge ?? null} />
           </div>
@@ -68,10 +68,10 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("benchmarkLabel")}
         </p>
-        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <BenchmarkSettingsForm
               symbols={prefs?.benchmarkSymbols ?? []}
@@ -82,10 +82,10 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("assistantLabel")}
         </p>
-        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <AssistantHistoryToggle enabled={prefs?.assistantSaveHistory ?? false} />
           </div>

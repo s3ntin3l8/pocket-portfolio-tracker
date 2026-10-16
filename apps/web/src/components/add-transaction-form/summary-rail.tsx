@@ -38,7 +38,7 @@ export function SummaryRail({
   return (
     <aside className="sticky top-0 flex flex-col gap-3 self-start">
       <div className="flex flex-col gap-3.5 rounded-xl border border-border bg-card-2 p-4">
-        <div className="text-micro font-bold uppercase tracking-[.06em] text-text-2">
+        <div className="text-micro font-bold uppercase tracking-label text-text-2">
           {t("summary")}
         </div>
 
@@ -93,7 +93,7 @@ export function SummaryRail({
           <span className="text-body-sm font-semibold text-text-2">
             {t(total ? totalLabelKey(total.kind) : "totalEstimated")}
           </span>
-          <span className="text-lg font-extrabold text-foreground">
+          <span className="text-lg font-bold text-foreground">
             {total ? formatMoney(total.total, currency) : "—"}
           </span>
         </div>

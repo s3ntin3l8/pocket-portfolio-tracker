@@ -185,9 +185,7 @@ export function AllocationDonut({
         {formattedTotal && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2">
             <span className="text-center text-micro font-semibold text-text-2">{label}</span>
-            <span className="tabular mt-0.5 text-center text-body font-extrabold">
-              {formattedTotal}
-            </span>
+            <span className="tabular mt-0.5 text-center text-body font-bold">{formattedTotal}</span>
           </div>
         )}
       </div>

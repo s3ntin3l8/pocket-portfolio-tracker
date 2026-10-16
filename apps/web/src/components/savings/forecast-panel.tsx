@@ -115,7 +115,7 @@ export function ForecastPanel({
 
   return (
     <div
-      className="rounded-2xl p-[22px] text-white shadow-hero"
+      className="rounded-lg p-[22px] text-white shadow-hero"
       style={{ background: "linear-gradient(160deg,var(--primary),var(--primary-deep))" }}
     >
       <p className="text-base font-bold">{t("forecastTitle")}</p>
@@ -135,7 +135,7 @@ export function ForecastPanel({
             inputMode="numeric"
             value={monthly}
             onChange={(e) => setMonthly(num(e.target.value, 0, 1_000_000))}
-            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-body-sm font-extrabold text-primary-ink focus:outline-none"
+            className="tabular h-[30px] w-[134px] rounded-lg border-none bg-white/[.92] px-2.5 text-right text-body-sm font-bold text-primary-ink focus:outline-none"
           />
         </div>
 
@@ -145,7 +145,7 @@ export function ForecastPanel({
             <Label htmlFor="forecast-return" className="text-micro font-semibold text-white/82">
               {t("annualReturn")}
             </Label>
-            <span className="tabular text-body-sm font-extrabold">{returnLabel}</span>
+            <span className="tabular text-body-sm font-bold">{returnLabel}</span>
           </div>
           <input
             id="forecast-return"
@@ -178,9 +178,7 @@ export function ForecastPanel({
                 </Button>
               )}
             </div>
-            <span className="tabular text-body-sm font-extrabold">
-              {t("years", { count: years })}
-            </span>
+            <span className="tabular text-body-sm font-bold">{t("years", { count: years })}</span>
           </div>
           <input
             id="forecast-years"
@@ -201,7 +199,7 @@ export function ForecastPanel({
           {t("projectedInYears", { count: years })}
         </p>
         <p
-          className="tabular mt-0.5 text-hero font-extrabold leading-tight"
+          className="tabular mt-0.5 text-hero font-bold leading-tight"
           data-testid="projected-value"
         >
           {m(value)}
@@ -249,7 +247,7 @@ export function ForecastPanel({
             <p className="text-micro font-semibold text-white/75">
               {formatPercent(s.rate / 100, locale)}
             </p>
-            <p className="tabular mt-0.5 text-body font-extrabold">{mc(s.value)}</p>
+            <p className="tabular mt-0.5 text-body font-bold">{mc(s.value)}</p>
           </div>
         ))}
       </div>

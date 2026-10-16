@@ -132,11 +132,11 @@ export function AdminChatProvidersForm({
         )}
       </p>
 
-      <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+      <div className="overflow-hidden rounded-lg bg-card shadow-card">
         {rows.map((p, i) => (
           <div key={p.id} className={i > 0 ? "border-t border-line" : ""}>
             <div className="flex items-center gap-3 px-4 py-3.5">
-              <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-micro font-extrabold text-text-2">
+              <span className="flex size-[26px] shrink-0 items-center justify-center rounded-lg bg-background text-micro font-bold text-text-2">
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">

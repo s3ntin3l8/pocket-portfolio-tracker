@@ -119,7 +119,7 @@ export function InstrumentGroupRow({
           return (
             <Fragment key={`${e.instrumentId}-${e.date}-${i}`}>
               {showBand && (
-                <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-2">
+                <div className="bg-card-2 px-0.5 py-[9px] text-micro font-bold uppercase tracking-label text-text-2">
                   {monthFmt!.format(new Date(e.date))}
                   <span className="ml-2 font-normal normal-case">{monthTotals.get(mc)}</span>
                 </div>

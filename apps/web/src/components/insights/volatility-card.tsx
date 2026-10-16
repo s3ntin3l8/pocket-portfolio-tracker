@@ -10,14 +10,14 @@ export function VolatilityCard({ volatility }: { volatility: InsightsVolatility 
   const sortino = volatility.sortinoRatio ? Number(volatility.sortinoRatio) : null;
 
   return (
-    <Card className="rounded-2xl bg-card p-4 shadow-card">
+    <Card className="rounded-lg bg-card p-4 shadow-card">
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
       {vol !== null ? (
-        <p className="tabular mt-1 text-heading font-extrabold leading-none">
+        <p className="tabular mt-1 text-heading font-bold leading-none">
           {(vol * 100).toFixed(1)}%
         </p>
       ) : (
-        <p className="mt-1 text-heading font-extrabold leading-none text-text-2">—</p>
+        <p className="mt-1 text-heading font-bold leading-none text-text-2">—</p>
       )}
       <p className="mt-1 text-xs font-medium text-text-2">{t("annualized")}</p>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-2">

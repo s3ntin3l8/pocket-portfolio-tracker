@@ -69,7 +69,7 @@ export function TimelineBadge({
     type === "coupon" || type === "interest" ? { ...tint("teal") } : { ...tint("primary") };
   return (
     <span
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-sm text-micro font-extrabold"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-sm text-micro font-bold"
       style={
         forecast
           ? { backgroundColor: "transparent", color: tone.fg, border: `1.5px dashed ${tone.fg}` }

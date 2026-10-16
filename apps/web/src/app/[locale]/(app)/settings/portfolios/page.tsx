@@ -84,7 +84,7 @@ export default async function SettingsPortfoliosPage({
               return (
                 <Card
                   key={portfolio.id}
-                  className="relative flex flex-col rounded-xl border-border shadow-card transition-colors hover:bg-accent/50"
+                  className="relative flex flex-col rounded-lg border-border shadow-card transition-colors hover:bg-accent/50"
                 >
                   {/* Overlay link — the whole card opens the inline edit page (design:
                       chevron affordance, no `⋯` menu). */}
@@ -134,7 +134,7 @@ export default async function SettingsPortfoliosPage({
                         </span>
                       </div>
                     )}
-                    <p className="tabular mt-4 text-heading font-extrabold">
+                    <p className="tabular mt-4 text-heading font-bold">
                       {formatMoney(Number(netWorth), portfolio.baseCurrency, locale)}
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
@@ -164,7 +164,7 @@ export default async function SettingsPortfoliosPage({
 
             <Link
               href="/settings/portfolios/new"
-              className="flex min-h-[170px] flex-col items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-border p-[18px] text-center text-muted-foreground transition-colors hover:bg-accent/40"
+              className="flex min-h-[170px] flex-col items-center justify-center gap-2.5 rounded-lg border-[1.5px] border-dashed border-border p-[18px] text-center text-muted-foreground transition-colors hover:bg-accent/40"
             >
               <span className="flex size-[42px] items-center justify-center rounded-md bg-success/15 text-success">
                 <Plus className="size-[22px]" />

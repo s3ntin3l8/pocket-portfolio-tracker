@@ -47,7 +47,7 @@ function Row({
       <span
         className={cn(
           "tabular text-sm",
-          bold ? "font-extrabold" : "font-semibold",
+          bold ? "font-bold" : "font-semibold",
           tone === "up" && "text-success",
           tone === "down" && "text-destructive",
           !tone && !bold && "text-foreground",
@@ -122,7 +122,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
               lives here regardless of breakpoint, just visually hidden below md. */}
           <div className="hidden items-center gap-3 md:mb-1 md:flex">
             <span
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl text-xs font-extrabold text-white"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
               style={{ backgroundColor: tintFor(symbol) }}
               aria-hidden
             >
@@ -144,7 +144,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
             </p>
             <p
               className={cn(
-                "tabular mt-1 text-4xl font-extrabold",
+                "tabular mt-1 text-4xl font-bold",
                 tone === "up" ? "text-success" : "text-destructive",
               )}
             >
@@ -167,7 +167,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
           <h3 className="mb-2 mt-2 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
             {t("detail.breakdown")}
           </h3>
-          <div className="overflow-hidden rounded-2xl border border-border">
+          <div className="overflow-hidden rounded-lg border border-border">
             {isOpen ? (
               <>
                 <Row label={t("detail.invested")} value={money(invested)} />
@@ -214,7 +214,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
           <h3 className="mb-2 mt-5 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
             {t("detail.tradeDetails")}
           </h3>
-          <div className="overflow-hidden rounded-2xl border border-border">
+          <div className="overflow-hidden rounded-lg border border-border">
             <Row
               label={t("detail.quantity")}
               value={formatQuantity(Number(trade.quantity), trade.instrument?.unit, locale)}
@@ -251,7 +251,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
               <h3 className="mb-2 mt-5 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 {t("detail.incomeWhileHeld")}
               </h3>
-              <div className="overflow-hidden rounded-2xl border border-border">
+              <div className="overflow-hidden rounded-lg border border-border">
                 <Row
                   label={t("detail.dividendsCollected")}
                   value={money(Number(trade.dividends))}

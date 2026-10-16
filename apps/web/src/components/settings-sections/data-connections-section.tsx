@@ -58,10 +58,10 @@ export async function DataConnectionsSection({
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("tokens")}
         </p>
-        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <ApiTokens initialTokens={apiTokens} />
           </div>
@@ -69,10 +69,10 @@ export async function DataConnectionsSection({
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("mcpTitle")}
         </p>
-        <div className="overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="overflow-hidden rounded-lg bg-card shadow-card">
           <div className="p-4">
             <McpConnectCard />
           </div>
@@ -80,10 +80,10 @@ export async function DataConnectionsSection({
       </div>
 
       <div>
-        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-[.04em] text-text-2">
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
           {t("dataSourcesLabel")}
         </p>
-        <div className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-card">
+        <div className="divide-y divide-border overflow-hidden rounded-lg bg-card shadow-card">
           {sources.map((s) => (
             <div key={s.key} className="flex items-center gap-3 px-4 py-3">
               {s.key === "import" ? (

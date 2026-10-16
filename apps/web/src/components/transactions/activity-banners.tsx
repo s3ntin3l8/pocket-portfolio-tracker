@@ -6,7 +6,7 @@ import { BasisLabel } from "@/components/basis-label";
 import { FlowBreakdownRow } from "@/components/transactions/flow-breakdown-row";
 import type { AllBannerData, IncomeBannerData, TradeBannerData } from "@/lib/transaction-banners";
 
-const CARD = "@container rounded-2xl bg-card p-[22px] shadow-card";
+const CARD = "@container rounded-lg bg-card p-[22px] shadow-card";
 
 const TONE_CLASS: Record<"up" | "down" | "neutral", string> = {
   up: "text-success",
@@ -39,9 +39,7 @@ function StatBlock({
       )}
     >
       <p className="truncate text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
-      <p className="tabular mt-1 truncate text-sm font-extrabold sm:text-xl @xl:text-display">
-        {value}
-      </p>
+      <p className="tabular mt-1 truncate text-sm font-bold sm:text-xl @xl:text-display">{value}</p>
       {sub && (
         <p
           className={cn(
@@ -60,7 +58,7 @@ function StatBlock({
 function Breakdown({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="col-span-full border-t border-line pt-4 @xl:col-span-2 @xl:border-l @xl:border-t-0 @xl:pl-6 @xl:pt-0">
-      <p className="mb-2.5 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
+      <p className="mb-2.5 text-micro font-semibold uppercase tracking-label text-text-2">
         {label}
       </p>
       <div className="flex flex-col gap-2.5">{children}</div>
@@ -186,7 +184,7 @@ export function ReconciliationBanner({
   onDismiss?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-warning/40 bg-card px-4 py-3.5 shadow-hairline">
+    <div className="flex items-center gap-3 rounded-lg border border-warning/40 bg-card px-4 py-3.5 shadow-hairline">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
         <AlertTriangle className="size-4.5" />
       </span>

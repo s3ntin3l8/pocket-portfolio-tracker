@@ -35,7 +35,7 @@ export function ReportStep({
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
-        <span className="flex size-12 items-center justify-center rounded-2xl bg-secondary">
+        <span className="flex size-12 items-center justify-center rounded-lg bg-secondary">
           <FileText className="size-6 text-primary" />
         </span>
         <div>

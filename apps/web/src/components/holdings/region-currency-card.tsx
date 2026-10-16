@@ -19,9 +19,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
   const locale = useLocale();
   return (
     <div className="min-w-0">
-      <p className="mb-3 text-micro font-semibold uppercase tracking-[.04em] text-text-2">
-        {title}
-      </p>
+      <p className="mb-3 text-micro font-semibold uppercase tracking-label text-text-2">{title}</p>
       {rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-x-5 gap-y-2.5 @sm:grid-cols-2 @sm:gap-x-7 @lg:grid-cols-3">
           {rows.map((r, i) => (
@@ -64,7 +62,7 @@ export function RegionCurrencyCard({
   currencyRows: Row[];
 }) {
   return (
-    <div className="@container flex flex-col gap-5 rounded-xl bg-card px-6 py-5 shadow-card">
+    <div className="@container flex flex-col gap-5 rounded-lg bg-card px-6 py-5 shadow-card">
       <Section title={regionTitle} rows={regionRows} />
       <div className="border-t border-line pt-5">
         <Section title={currencyTitle} rows={currencyRows} />

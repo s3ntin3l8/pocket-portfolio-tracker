@@ -35,9 +35,7 @@ export function EstimatedTaxHero({
       }}
     >
       <p className="truncate text-xs font-semibold text-white/80">{label}</p>
-      <p className="tabular mt-1 truncate text-lg font-extrabold sm:text-2xl lg:text-display">
-        {value}
-      </p>
+      <p className="tabular mt-1 truncate text-lg font-bold sm:text-2xl lg:text-display">{value}</p>
       <p className="mt-1 text-xs font-medium text-white/80">{description}</p>
     </div>
   );
@@ -76,7 +74,7 @@ export function AllowanceSummaryBoxes({
       <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
         <div className="flex items-baseline justify-between">
           <span className="text-micro font-semibold text-text-2">{t("allowanceBoxes.left")}</span>
-          <span className="tabular text-body font-extrabold">{money(remaining)}</span>
+          <span className="tabular text-body font-bold">{money(remaining)}</span>
         </div>
         {/* Reference: 7px track, purple allowance fill (#7C5CFC is the tax screen's accent). */}
         <div className="mt-2 h-[7px] overflow-hidden rounded-xs bg-line">
@@ -99,7 +97,7 @@ export function AllowanceSummaryBoxes({
         <span className="text-micro font-semibold text-text-2">
           {t("allowanceBoxes.taxableGains")}
         </span>
-        <p className="tabular mt-1.5 text-xl font-extrabold">{money(taxable)}</p>
+        <p className="tabular mt-1.5 text-xl font-bold">{money(taxable)}</p>
         <p className="mt-1 text-micro font-medium text-text-2">
           {t("allowanceBoxes.taxableGainsDesc", { tax: money(estimatedTax) })}
         </p>
@@ -264,7 +262,7 @@ export function CoverageCard({
         {hasFsa ? (
           <div className="rounded-lg border bg-card-2 px-[15px] py-[13px]">
             <span className="text-micro font-semibold text-text-2">{t("coverage.fsa.title")}</span>
-            <p className="tabular mt-1 text-body font-extrabold">
+            <p className="tabular mt-1 text-body font-bold">
               {t("coverage.fsa.usedDesc", {
                 used: money(u.usedYtd),
                 annual: money(u.allowanceAnnual),

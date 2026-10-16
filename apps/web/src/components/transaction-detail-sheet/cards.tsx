@@ -9,7 +9,7 @@ import { SOURCE_PILL, DEFAULT_PILL, DRAFT_PILL, INCOME_BREAKDOWN_TYPES } from ".
 
 export function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 ml-0.5 mt-5 text-xs font-bold uppercase tracking-[.04em] text-text-2 first:mt-0">
+    <p className="mb-2 ml-0.5 mt-5 text-xs font-bold uppercase tracking-label text-text-2 first:mt-0">
       {children}
     </p>
   );
@@ -47,7 +47,7 @@ export function DetailRow({
       <span
         className={cn(
           "tabular min-w-0 text-right font-bold",
-          strong ? "text-base font-extrabold" : "text-body-sm",
+          strong ? "text-base font-bold" : "text-body-sm",
           color,
         )}
       >
@@ -88,7 +88,7 @@ export function HeroAmount({
     <div className="py-2.5 pb-[18px] text-center">
       <div
         className={cn(
-          "tabular text-hero font-extrabold leading-none",
+          "tabular text-hero font-bold leading-none",
           netAmount > 0 ? "text-success" : "text-foreground",
         )}
       >
@@ -101,7 +101,7 @@ export function HeroAmount({
       )}
       <div className="mt-2.5">
         <span
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-micro font-bold uppercase tracking-[.04em]"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-micro font-bold uppercase tracking-label"
           style={{ background: pill.bg, color: pill.fg }}
         >
           {SourceIcon && <SourceIcon className="size-3" />}
@@ -109,7 +109,7 @@ export function HeroAmount({
         </span>
         {isDraft && (
           <span
-            className="ml-1.5 inline-flex items-center rounded-lg px-2.5 py-1 text-micro font-bold uppercase tracking-[.04em]"
+            className="ml-1.5 inline-flex items-center rounded-lg px-2.5 py-1 text-micro font-bold uppercase tracking-label"
             style={{ background: DRAFT_PILL.bg, color: DRAFT_PILL.fg }}
           >
             {tm("status.badgeDraft")}

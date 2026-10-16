@@ -317,9 +317,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof Drawer.Title>) {
-  return (
-    <Drawer.Title className={cn("text-lg font-extrabold leading-none", className)} {...props} />
-  );
+  return <Drawer.Title className={cn("text-lg font-bold leading-none", className)} {...props} />;
 }
 
 export { Sheet, SheetTrigger, SheetClose, SheetContent, SheetHeader, SheetTitle };

@@ -120,11 +120,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
       </header>
 
       <div
-        className="rounded-2xl p-6 text-white"
+        className="rounded-lg p-6 text-white"
         style={{ background: "linear-gradient(135deg,var(--hero-ink),var(--hero-ink-2))" }}
       >
         <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
-        <p className="tabular mt-1 text-hero font-extrabold leading-none sm:text-hero">
+        <p className="tabular mt-1 text-hero font-bold leading-none sm:text-hero">
           {summary.xirr !== null ? formatPercent(summary.xirr, locale) : "—"}
         </p>
         <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">
@@ -145,9 +145,9 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
           {allocation && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-card p-4 shadow-card">
+              <div className="rounded-lg bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("concentration.label")}</p>
-                <p className="tabular mt-1 text-heading font-extrabold leading-none">
+                <p className="tabular mt-1 text-heading font-bold leading-none">
                   {allocation.concentration.top1Pct.toFixed(0)}%
                 </p>
                 {topClass && (
@@ -166,9 +166,9 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                 )}
               </div>
 
-              <div className="rounded-2xl bg-card p-4 shadow-card">
+              <div className="rounded-lg bg-card p-4 shadow-card">
                 <p className="text-xs font-semibold text-text-2">{t("diversification.label")}</p>
-                <p className="mt-1 text-heading font-extrabold leading-none">
+                <p className="mt-1 text-heading font-bold leading-none">
                   {t("diversification.value", { count: assetClassSlices.length })}
                 </p>
                 <p className="mt-1 text-xs font-medium text-text-2">

@@ -88,7 +88,7 @@ export function DesktopTable({
   };
 
   return (
-    <div className="scroll-shadow-x hidden rounded-2xl bg-card shadow-card lg:block">
+    <div className="scroll-shadow-x hidden rounded-lg bg-card shadow-card lg:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -203,7 +203,7 @@ export function DesktopTable({
                   <tr role="presentation">
                     <td
                       colSpan={colSpan}
-                      className="bg-card-2 px-[22px] py-[9px] text-micro font-bold uppercase tracking-[0.05em] text-text-2"
+                      className="bg-card-2 px-[22px] py-[9px] text-micro font-bold uppercase tracking-label text-text-2"
                     >
                       {monthFmt.format(new Date(tx.executedAt))}
                     </td>

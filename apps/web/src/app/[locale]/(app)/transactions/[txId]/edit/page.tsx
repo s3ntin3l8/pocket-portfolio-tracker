@@ -30,7 +30,7 @@ export default async function EditTransactionPage({
           size="icon"
           asChild
           aria-label={t("back")}
-          className="rounded-xl bg-card shadow-card md:hidden"
+          className="rounded-lg bg-card shadow-card md:hidden"
         >
           <Link href="/transactions">
             <ArrowLeft className="size-4" />

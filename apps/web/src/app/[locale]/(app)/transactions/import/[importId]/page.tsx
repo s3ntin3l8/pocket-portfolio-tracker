@@ -40,7 +40,7 @@ export default async function ImportReviewPage({
           size="icon"
           asChild
           aria-label={t("title")}
-          className="rounded-xl bg-card shadow-card md:hidden"
+          className="rounded-lg bg-card shadow-card md:hidden"
         >
           <Link href="/transactions">
             <ArrowLeft className="size-4" />

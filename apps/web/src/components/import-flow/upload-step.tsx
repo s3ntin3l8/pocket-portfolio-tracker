@@ -59,7 +59,7 @@ export function UploadStep({
           dragActive ? "border-primary bg-primary/5" : "hover:border-primary/50 hover:bg-card",
         )}
       >
-        <span className="flex size-12 items-center justify-center rounded-2xl bg-secondary">
+        <span className="flex size-12 items-center justify-center rounded-lg bg-secondary">
           <Upload className="size-6 text-primary" />
         </span>
         {dragActive ? (

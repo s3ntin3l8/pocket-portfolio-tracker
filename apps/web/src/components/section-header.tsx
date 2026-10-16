@@ -30,7 +30,7 @@ export function SectionHeader({ title, backHref }: { title: string; backHref: st
         >
           <ChevronLeft className="size-[18px]" />
         </ScopeLink>
-        <Heading className="text-xl font-extrabold tracking-tight md:sr-only">{title}</Heading>
+        <Heading className="text-xl font-bold tracking-tight md:sr-only">{title}</Heading>
       </div>
     </div>
   );

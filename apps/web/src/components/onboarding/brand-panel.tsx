@@ -34,9 +34,7 @@ export function BrandPanel({
 
       <div className="relative mt-auto max-w-105">
         <div key={stepTitle} className="animate-step-in">
-          <h1 className="text-display font-extrabold tracking-tight xl:text-hero">
-            {brandHeadline}
-          </h1>
+          <h1 className="text-display font-bold tracking-tight xl:text-hero">{brandHeadline}</h1>
           <p className="mt-4 text-body text-white/62">{brandSub}</p>
           <div className="mt-5.5 flex flex-col gap-2">
             {brandBullets.map((text, i) => (

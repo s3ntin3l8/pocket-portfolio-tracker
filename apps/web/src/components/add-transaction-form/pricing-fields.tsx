@@ -74,7 +74,7 @@ export function PricingFields({
 
   return (
     <div className="border-t border-line pt-[18px]">
-      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-2">
+      <p className="mb-2.5 text-micro font-bold uppercase tracking-label text-text-2">
         {t("amount")}
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -140,7 +140,7 @@ export function PricingFields({
           <span className="text-body-sm font-semibold text-text-2">
             {t(totalLabelKey(total.kind))}
           </span>
-          <span className="text-lg font-extrabold text-foreground">
+          <span className="text-lg font-bold text-foreground">
             {formatMoney(total.total, currency)}
           </span>
         </div>
@@ -177,7 +177,7 @@ export function DetailsFields({
 }: DetailsFieldsProps) {
   return (
     <div className="border-t border-line pt-[18px]">
-      <p className="mb-2.5 text-micro font-bold uppercase tracking-[.06em] text-text-2">
+      <p className="mb-2.5 text-micro font-bold uppercase tracking-label text-text-2">
         {t("details")}
       </p>
       <div className="grid grid-cols-2 gap-3">

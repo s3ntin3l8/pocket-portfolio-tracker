@@ -520,7 +520,7 @@ export function AddTransactionMenu({
                   <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
                 </button>
               )}
-              <DialogTitle className="flex-1 text-lg font-extrabold leading-none text-foreground">
+              <DialogTitle className="flex-1 text-lg font-bold leading-none text-foreground">
                 {headerTitle}
               </DialogTitle>
               {/* Mobile-only close — desktop has no floating X, only the footer's Cancel

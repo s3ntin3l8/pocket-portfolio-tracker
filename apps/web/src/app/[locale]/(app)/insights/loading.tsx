@@ -9,7 +9,7 @@ export default function Loading() {
         <Skeleton className="h-4 w-2/3" />
       </div>
 
-      <Card className="rounded-2xl">
+      <Card className="rounded-lg">
         <div className="space-y-3 p-6">
           <Skeleton className="h-3 w-1/3" />
           <Skeleton className="h-10 w-1/2" />
@@ -20,14 +20,14 @@ export default function Loading() {
       <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
         <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
-            <Card className="rounded-2xl">
+            <Card className="rounded-lg">
               <div className="space-y-2 p-4">
                 <Skeleton className="h-3 w-2/3" />
                 <Skeleton className="h-7 w-1/2" />
                 <Skeleton className="h-3 w-3/4" />
               </div>
             </Card>
-            <Card className="rounded-2xl">
+            <Card className="rounded-lg">
               <div className="space-y-2 p-4">
                 <Skeleton className="h-3 w-2/3" />
                 <Skeleton className="h-7 w-1/2" />

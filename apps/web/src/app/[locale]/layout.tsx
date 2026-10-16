@@ -15,7 +15,7 @@ import { IosSplashLinks } from "@/components/ios-splash-links";
 import { AuthSessionProvider } from "@/components/session-provider";
 import "../globals.css";
 
-// Pocket type system: Plus Jakarta Sans for UI, DM Mono for figures/codes.
+// Pocket type system: Plus Jakarta Sans for UI, DM Mono for codes/tokens (figures stay in Jakarta with tabular numbers).
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
@@ -77,13 +77,13 @@ export async function generateMetadata({
 
 export const viewport: Viewport = {
   // SSR/pre-hydration default, following the OS scheme so the browser/status-bar chrome
-  // matches the rendered background (`--background`: light `#f4f7f5`, dark `#0e1512`)
+  // matches the rendered background (`--background`: light `#f6f7f8`, dark `#0b0d10`)
   // before the in-app theme is known. Once mounted, `<ThemeColorSync>` overwrites this
   // tag's content to track the actual applied theme (which can differ from the OS scheme
   // via the in-app toggle).
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f7f5" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e1512" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f7f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0d10" },
   ],
   // Draw into the display cutout / safe areas; insets are reclaimed in the shell.
   viewportFit: "cover",

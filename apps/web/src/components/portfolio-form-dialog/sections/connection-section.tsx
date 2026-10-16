@@ -42,7 +42,7 @@ function ConnectionCard({
             ? { tone: "bad" as const, label: t("connectionAttention") }
             : { tone: "idle" as const, label: t("connectionNotConnected") };
   return (
-    <section className="rounded-2xl border border-line bg-card p-4">
+    <section className="rounded-lg border border-line bg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-medium">{title}</h3>
         {pill && (

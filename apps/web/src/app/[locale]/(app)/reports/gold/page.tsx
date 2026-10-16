@@ -92,7 +92,7 @@ export default async function GoldReportPage({ params }: { params: Promise<{ loc
                 className="mt-1"
               />
             ) : (
-              <p className="mt-1 text-xl font-extrabold text-text-2">—</p>
+              <p className="mt-1 text-xl font-bold text-text-2">—</p>
             )}
           </CardContent>
         </Card>

@@ -61,7 +61,7 @@ export function BottomNav({
               {badge != null && (
                 <span
                   className={cn(
-                    "absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-micro font-extrabold text-white ring-2 ring-card",
+                    "absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-micro font-bold text-white ring-2 ring-card",
                     anomalyError ? "bg-destructive" : "bg-gold-fg",
                   )}
                 >

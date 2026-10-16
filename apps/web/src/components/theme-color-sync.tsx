@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useTheme } from "next-themes";
 
 // Keep in sync with globals.css `--background` (light/dark).
-const THEME_COLOR = { light: "#f4f7f5", dark: "#0e1512" } as const;
+const THEME_COLOR = { light: "#f6f7f8", dark: "#0b0d10" } as const;
 
 /**
  * The static `<meta name="theme-color">` (set via Next's `viewport.themeColor` media

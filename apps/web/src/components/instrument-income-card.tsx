@@ -42,9 +42,7 @@ export function InstrumentIncomeCard({
         {dividendsReceived !== null ? (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="tabular text-2xl font-extrabold text-success">
-                {dividendsReceived}
-              </span>
+              <span className="tabular text-2xl font-bold text-success">{dividendsReceived}</span>
               <span className="text-xs text-muted-foreground">{receivedCaption}</span>
             </div>
             {yieldOnCost !== null && (
