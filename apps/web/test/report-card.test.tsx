@@ -170,6 +170,23 @@ describe("ReportCard", () => {
     expect(screen.getByText("TTM")).toBeInTheDocument();
   });
 
+  it("renders the icon chip neutral, with no inline tint", () => {
+    const { container } = render(
+      <ReportCard
+        icon={Coins}
+        title="Income"
+        value="Rp 0"
+        caption="This year"
+        metrics={[]}
+        href="/income"
+        openLabel="Open"
+      />,
+    );
+    const chip = container.querySelector("span.bg-muted.text-muted-foreground");
+    expect(chip).toBeInTheDocument();
+    expect(chip?.getAttribute("style")).toBeNull();
+  });
+
   it("omits the split bar when not provided", () => {
     // No splitBar → no MiniSplitBar → no useTranslations call. Plain render
     // is fine here.

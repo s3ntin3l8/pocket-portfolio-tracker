@@ -64,13 +64,13 @@ export function AllowanceSummaryBoxes({
           <span className="text-micro font-semibold text-text-2">{t("allowanceBoxes.left")}</span>
           <span className="tabular text-body font-bold">{money(remaining)}</span>
         </div>
-        {/* Reference: 7px track, purple allowance fill (#7C5CFC is the tax screen's accent). */}
+        {/* Reference: 7px track, purple allowance fill (chart-4 violet is the tax screen's accent). */}
         <div className="mt-2 h-[7px] overflow-hidden rounded-xs bg-line">
           <div
             className="h-full rounded-xs transition-all"
             style={{
               width: `${Math.min(100, Math.max(0, usedPct))}%`,
-              backgroundColor: "var(--violet)",
+              backgroundColor: "var(--color-chart-4)",
             }}
           />
         </div>
@@ -261,7 +261,7 @@ export function CoverageCard({
                 className="h-full rounded-xs transition-all"
                 style={{
                   width: `${Math.min(100, Math.max(0, usedPct))}%`,
-                  backgroundColor: "var(--violet)",
+                  backgroundColor: "var(--color-chart-4)",
                 }}
               />
             </div>

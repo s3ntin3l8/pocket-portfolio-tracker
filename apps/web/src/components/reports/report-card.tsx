@@ -46,7 +46,7 @@ export function ReportCard({
   // caption, an optional split bar, and a bordered footer pinned to the card bottom.
   return (
     <ScopeLink href={href} className="group block h-full">
-      <Card className="flex h-full min-w-0 flex-col p-5 transition-colors group-hover:bg-card-2">
+      <Card className="flex h-full min-w-0 flex-col p-5 transition-shadow group-hover:ring-1 group-hover:ring-primary/40">
         <div className="flex w-full items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
             <Icon className="size-[18px]" strokeWidth={1.9} />

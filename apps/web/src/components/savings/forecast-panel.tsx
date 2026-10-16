@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { forecastSeries } from "@portfolio/core";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardLabel } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { LazyForecastChart as ForecastChart } from "@/components/charts/lazy";
 import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/utils";
@@ -115,7 +115,7 @@ export function ForecastPanel({
   return (
     <Card className="p-5">
       <p className="text-body font-semibold">{t("forecastTitle")}</p>
-      <p className="mt-px text-xs font-medium text-muted-foreground">{t("forecastSubtitle")}</p>
+      <CardLabel className="mt-px">{t("forecastSubtitle")}</CardLabel>
 
       {/* Levers — stacked muted rows, not a grid. */}
       <div className="mt-4 space-y-2.5">
@@ -193,18 +193,16 @@ export function ForecastPanel({
 
       {/* Hero projected figure + assumptions subtitle. */}
       <div className="mt-[18px]">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("projectedInYears", { count: years })}
-        </p>
+        <CardLabel>{t("projectedInYears", { count: years })}</CardLabel>
         <p
           className="tabular mt-0.5 text-hero font-bold leading-tight"
           data-testid="projected-value"
         >
           {m(value)}
         </p>
-        <p className="mt-1 text-xs font-medium text-muted-foreground">
+        <CardLabel className="mt-1">
           {t("forecastAssumptions", { amount: m(monthly), rate: returnLabel })}
-        </p>
+        </CardLabel>
       </div>
 
       <div className="mt-3.5">

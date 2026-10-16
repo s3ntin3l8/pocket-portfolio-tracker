@@ -153,7 +153,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                   {allocation.concentration.top1Pct.toFixed(0)}%
                 </p>
                 {topClass && (
-                  <p className="mt-1 text-xs font-medium text-text-2">
+                  <CardLabel className="mt-1">
                     {t("concentration.top", {
                       label: topClass.key === "cash" ? tc("cash") : tc(topClass.key),
                       tone: td(
@@ -164,7 +164,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                             : "concentrationConcentrated",
                       ).toLowerCase(),
                     })}
-                  </p>
+                  </CardLabel>
                 )}
               </Card>
 
@@ -173,12 +173,12 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                 <p className="mt-1 text-heading font-bold leading-none">
                   {t("diversification.value", { count: assetClassSlices.length })}
                 </p>
-                <p className="mt-1 text-xs font-medium text-text-2">
+                <CardLabel className="mt-1">
                   {t("diversification.caption", {
                     markets: marketCount,
                     currencies: currencyCount,
                   })}
-                </p>
+                </CardLabel>
               </Card>
             </div>
           )}
