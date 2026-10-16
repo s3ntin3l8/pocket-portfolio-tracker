@@ -30,7 +30,7 @@ async function start() {
   try {
     const address = await app.listen({
       port: app.config.PORT,
-      host: "0.0.0.0",
+      host: app.config.HOST,
     });
     app.log.info(`Server listening at ${address}`);
   } catch (err) {
