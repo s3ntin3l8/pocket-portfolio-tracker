@@ -1,3 +1,4 @@
+import { deltaToneOf } from "@/lib/tone";
 import { isIncomeType, INCOME_TYPES as INCOME_TYPE_VALUES } from "@portfolio/core";
 import { txAmountDisplay, txNetAmountDisplay, type TxRow } from "@/components/transactions-table";
 import { formatMoneyCompact, formatPercent } from "@/lib/utils";
@@ -129,7 +130,7 @@ export function computeAllBanner(
         label: labels.incomeYtd,
         value: money(incomeYtdTotal),
         sub: trendPct === null ? "" : labels.vsLastYear(formatPercent(trendPct, locale)),
-        tone: trendPct === null ? "neutral" : trendPct >= 0 ? "up" : "down",
+        tone: deltaToneOf(trendPct),
       },
     ],
     mix: [
@@ -241,7 +242,7 @@ export function computeIncomeBanner(
     currency: scopeCurrency,
     ytd: money(ytdTotal),
     trendLabel: trendPct === null ? labels.new : labels.vsLastYear(formatPercent(trendPct, locale)),
-    trendTone: trendPct === null ? "neutral" : trendPct >= 0 ? "up" : "down",
+    trendTone: deltaToneOf(trendPct),
     projected: money(projectedTotal),
     projectedNote: labels.perMonth(money(projectedTotal / 12)),
     bySource,

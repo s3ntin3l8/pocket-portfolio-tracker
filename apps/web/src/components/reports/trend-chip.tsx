@@ -1,6 +1,7 @@
+import type { DeltaTone } from "@/lib/tone";
 import { cn } from "@/lib/utils";
 
-export type TrendTone = "up" | "down" | "neutral";
+export type TrendTone = DeltaTone;
 
 /**
  * Small colored pill used in the top-right of a {@link ReportCard} — e.g. "+18% vs 2025"

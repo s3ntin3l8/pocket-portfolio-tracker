@@ -1,5 +1,6 @@
 import type { Trade } from "@portfolio/api-client";
 import type { ColDef } from "@/lib/table-sort";
+import { signToneClass } from "@/lib/tone";
 
 export type StatusFilter = "all" | "open" | "closed";
 export type PnlFilter = "all" | "gain" | "loss";
@@ -19,5 +20,5 @@ export const COLS: ColDef<Trade>[] = [
 export const tradeKey = (t: Trade) => `${t.instrumentId}:${t.entryDate}`;
 
 export function toneClass(n: number): string {
-  return n > 0 ? "text-success" : n < 0 ? "text-destructive" : "text-muted-foreground";
+  return signToneClass(n) || "text-muted-foreground";
 }

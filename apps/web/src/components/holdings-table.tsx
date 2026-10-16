@@ -1,5 +1,6 @@
 "use client";
 
+import { signToneClass } from "@/lib/tone";
 import { useTranslations, useLocale } from "next-intl";
 import type { HoldingValuation } from "@portfolio/api-client";
 import {
@@ -107,7 +108,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
     },
   );
   const totalPct = totals.cost !== 0 ? (totals.pnl / totals.cost) * 100 : null;
-  const totalPnlColor = totals.pnl > 0 ? "text-success" : totals.pnl < 0 ? "text-destructive" : "";
+  const totalPnlColor = signToneClass(totals.pnl);
   const money = (n: number) => formatMoney(n, currency, locale);
 
   return (
@@ -308,8 +309,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
       <div className="flex flex-col lg:hidden">
         {sorted.map((h, i) => {
           const { pnl, pct, display } = computeRowValues(h, currency, locale);
-          const pnlColor =
-            pnl === null ? "text-muted-foreground" : pnl >= 0 ? "text-success" : "text-destructive";
+          const pnlColor = pnl === null ? "text-muted-foreground" : signToneClass(pnl);
           const qty = formatQuantity(Number(h.quantity), h.instrument?.unit, locale);
           const name = h.instrument?.displayName ?? h.instrument?.name ?? h.instrumentId;
           const subtitle = qty ? `${name} · ${qty}` : name;

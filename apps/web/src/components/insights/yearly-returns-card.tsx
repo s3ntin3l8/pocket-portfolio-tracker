@@ -1,5 +1,6 @@
 "use client";
 
+import { signToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -13,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
-import { cn, formatPercent } from "@/lib/utils";
+import { formatPercent } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import type { BenchmarkSymbolEntry, YearlyReturnRow } from "@portfolio/api-client";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -252,9 +253,5 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
 }
 
 function PercentCell({ value, locale }: { value: number; locale: string }) {
-  return (
-    <span className={cn(value >= 0 ? "text-success" : "text-destructive")}>
-      {formatPercent(value, locale)}
-    </span>
-  );
+  return <span className={signToneClass(value)}>{formatPercent(value, locale)}</span>;
 }

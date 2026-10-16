@@ -1,5 +1,6 @@
 "use client";
 
+import { trendGlyphOf } from "@/lib/tone";
 import { useState, useCallback, useRef, startTransition, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
@@ -153,12 +154,12 @@ export function HeroGlanceCard({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {snapshot.isIntraday ? (
               <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-                {closeDelta >= 0 ? "▲" : "▼"} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
+                {trendGlyphOf(closeDelta)} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
                 {periodWord}
               </span>
             ) : (
               <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-                {closeDelta >= 0 ? "▲" : "▼"} {formatPercent(closeDelta / 100, locale)} {periodWord}
+                {trendGlyphOf(closeDelta)} {formatPercent(closeDelta / 100, locale)} {periodWord}
               </span>
             )}
             <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">

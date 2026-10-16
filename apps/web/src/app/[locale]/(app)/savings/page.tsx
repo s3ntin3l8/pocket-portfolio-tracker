@@ -1,3 +1,4 @@
+import { deltaToneOf } from "@/lib/tone";
 import { Decimal } from "decimal.js";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
@@ -188,7 +189,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
                 label={t("totalReturn")}
                 value={formatPercent(c.totalReturnPct, locale)}
                 delta={t("totalReturnHint")}
-                deltaTone={c.totalReturnPct >= 0 ? "up" : "down"}
+                deltaTone={deltaToneOf(c.totalReturnPct)}
               />
             )}
             <StatCard

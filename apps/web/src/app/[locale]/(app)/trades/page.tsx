@@ -1,3 +1,4 @@
+import { signToneClass, toneBgClass, toneOf } from "@/lib/tone";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -156,19 +157,14 @@ export default async function TradesPage({
                           key={r.year}
                           className="flex h-full flex-1 flex-col items-center gap-1.5"
                         >
-                          <span
-                            className={cn(
-                              "tabular text-xs font-bold",
-                              amount >= 0 ? "text-success" : "text-destructive",
-                            )}
-                          >
+                          <span className={cn("tabular text-xs font-bold", signToneClass(amount))}>
                             {formatSignedMoney(amount, currency, locale)}
                           </span>
                           <div className="flex w-full flex-1 items-end justify-center">
                             <div
                               className={cn(
                                 "w-full max-w-10 rounded-t-xs",
-                                amount >= 0 ? "bg-success" : "bg-destructive",
+                                toneBgClass(toneOf(amount)),
                               )}
                               style={{ height: `${pct}%` }}
                             />

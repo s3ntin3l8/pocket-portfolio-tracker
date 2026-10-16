@@ -1,5 +1,6 @@
 "use client";
 
+import { deltaToneOf } from "@/lib/tone";
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { LineChart } from "lucide-react";
@@ -59,7 +60,7 @@ export function InstrumentPriceCard({
     }
   }
 
-  const changeTone = lastPrice?.change == null ? "neutral" : lastPrice.change >= 0 ? "up" : "down";
+  const changeTone = deltaToneOf(lastPrice?.change);
 
   return (
     <div className="space-y-4">

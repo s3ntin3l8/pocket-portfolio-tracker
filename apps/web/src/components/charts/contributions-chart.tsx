@@ -1,5 +1,6 @@
 "use client";
 
+import { signToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { PiggyBank, Info } from "lucide-react";
@@ -191,9 +192,7 @@ export function ContributionsChart({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t("footerGain")}</p>
-            <p
-              className={`tabular mt-0.5 text-sm font-bold ${gain >= 0 ? "text-success" : "text-destructive"}`}
-            >
+            <p className={`tabular mt-0.5 text-sm font-bold ${signToneClass(gain)}`}>
               {gain >= 0 ? "+" : ""}
               {money(gain)}
             </p>

@@ -1,3 +1,4 @@
+import { deltaToneOf } from "@/lib/tone";
 import { Coins, ScrollText, PiggyBank, Receipt, FileText, Gem } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { ReportCard } from "@/components/reports/report-card";
@@ -243,7 +244,7 @@ export async function SavingsCard({ locale }: CardProps) {
         s.xirr !== null
           ? {
               label: t("savings.trend", { pct: formatPercent(s.xirr, locale) }),
-              tone: s.xirr >= 0 ? "up" : "down",
+              tone: deltaToneOf(s.xirr),
             }
           : undefined
       }

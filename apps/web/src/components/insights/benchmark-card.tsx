@@ -1,5 +1,6 @@
 "use client";
 
+import { signToneClass } from "@/lib/tone";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Pencil, TrendingUp } from "lucide-react";
@@ -66,7 +67,7 @@ export function BenchmarkCard({
       <p
         className={cn(
           "tabular mt-1 text-heading font-bold leading-none",
-          activeReturn >= 0 ? "text-success" : "text-destructive",
+          signToneClass(activeReturn),
         )}
       >
         {formatPercent(activeReturn, locale)}
