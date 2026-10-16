@@ -199,9 +199,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
               <TableFooter>
                 <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={4}>{t("totalRealized")}</TableCell>
-                  <TableCell
-                    className={cn("tabular text-right text-body-sm", signToneClass(closedTotal))}
-                  >
+                  <TableCell numeric className={cn("text-body-sm", signToneClass(closedTotal))}>
                     {signed(closedTotal)}
                   </TableCell>
                   <TableCell colSpan={3} />

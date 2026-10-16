@@ -153,10 +153,8 @@ export function DisposalTable({
                   {money(totalProceeds)}
                 </TableCell>
                 <TableCell
-                  className={cn(
-                    "tabular text-right font-semibold",
-                    signToneClass(Number(totalGain)),
-                  )}
+                  numeric
+                  className={cn("font-semibold", signToneClass(Number(totalGain)))}
                 >
                   {money(totalGain)}
                 </TableCell>

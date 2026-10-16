@@ -96,12 +96,7 @@ export function ByYearTable({
             {sorted.map((y) => (
               <TableRow key={y.year}>
                 <TableCell className="font-semibold">{y.year}</TableCell>
-                <TableCell
-                  className={cn(
-                    "tabular text-right font-medium",
-                    signToneClass(Number(y.realized)),
-                  )}
-                >
+                <TableCell numeric className={cn("font-medium", signToneClass(Number(y.realized)))}>
                   {fmt(y.realized)}
                 </TableCell>
                 <TableCell numeric className="text-muted-foreground">
@@ -197,12 +192,7 @@ export function IdByYearTable({
             {sorted.map((y) => (
               <TableRow key={y.year}>
                 <TableCell className="font-semibold">{y.year}</TableCell>
-                <TableCell
-                  className={cn(
-                    "tabular text-right font-medium",
-                    signToneClass(Number(y.realized)),
-                  )}
-                >
+                <TableCell numeric className={cn("font-medium", signToneClass(Number(y.realized)))}>
                   {fmt(y.realized)}
                 </TableCell>
                 <TableCell numeric className="text-muted-foreground">

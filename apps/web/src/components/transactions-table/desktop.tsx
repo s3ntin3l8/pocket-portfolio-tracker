@@ -324,7 +324,8 @@ export function DesktopTable({
                     </div>
                   </TableCell>
                   <TableCell
-                    className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
+                    numeric
+                    className={`text-body-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
                   >
                     {m(netAmount, tx.currency)}
                   </TableCell>

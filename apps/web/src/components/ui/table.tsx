@@ -37,7 +37,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       className={cn(
-        "border-t-2 border-line bg-card-2 text-sm font-bold [&_tr]:border-0",
+        "border-t-2 border-line bg-card-2 text-body-sm font-bold [&_tr]:border-0",
         className,
       )}
       {...props}
@@ -66,8 +66,13 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   );
 }
 
-/** `numeric` right-aligns the cell with tabular figures — the one spelling for a money or
- *  quantity column (compose weight/colour via `className`). */
+/** Right-aligned tabular figures — the one spelling for a money or quantity column. */
+export const TABLE_NUMERIC = "tabular text-right";
+
+/** `numeric` right-aligns the cell with tabular figures (`TABLE_NUMERIC`); compose weight and
+ *  colour via `className`, which wins over it. It deliberately omits `whitespace-nowrap` so the
+ *  `table-fixed` tax tables can still wrap; add it (or use `TABLE_VALUE`) where a figure must
+ *  never break. */
 function TableCell({
   className,
   numeric = false,
@@ -77,7 +82,7 @@ function TableCell({
     <td
       className={cn(
         "px-3 py-3 align-middle first:pl-5 last:pr-5",
-        numeric && "tabular text-right",
+        numeric && TABLE_NUMERIC,
         className,
       )}
       {...props}
@@ -90,8 +95,8 @@ function TableCell({
 // `cn()` (e.g. `cn(TABLE_VALUE, "text-text-mute")` for a de-emphasized secondary number).
 export const TABLE_LABEL = "text-sm font-bold";
 export const TABLE_SUBLABEL = "text-xs font-medium text-text-2";
-export const TABLE_VALUE = "tabular whitespace-nowrap text-right text-body-sm font-medium";
-export const TABLE_VALUE_STRONG = "tabular whitespace-nowrap text-right text-body-sm font-bold";
+export const TABLE_VALUE = `${TABLE_NUMERIC} whitespace-nowrap text-body-sm font-medium`;
+export const TABLE_VALUE_STRONG = `${TABLE_NUMERIC} whitespace-nowrap text-body-sm font-bold`;
 export const TABLE_SUBVALUE = "text-micro font-semibold";
 
 // Shared filter-chip pill spec, used by the toolbar filter rows above a table (Activity,
