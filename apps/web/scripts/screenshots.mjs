@@ -171,7 +171,10 @@ async function recordLoop(browser, cookie, secure, outDir) {
   }
   await context.close();
 
-  const [raw] = await readdir(videoDir);
+  const videos = (await readdir(videoDir)).filter((f) => f.endsWith(".webm"));
+  if (videos.length !== 1)
+    throw new Error(`expected one recording in ${videoDir}, found ${videos.length}`);
+  const [raw] = videos;
   const src = path.join(videoDir, raw);
   const base = path.join(outDir, "holdings-range");
   const trim = ["-ss", offset.toFixed(2), "-i", src, "-an"];

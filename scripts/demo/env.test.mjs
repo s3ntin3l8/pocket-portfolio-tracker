@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -47,11 +48,21 @@ describe("assertDemoEnv refuses a poisoned environment", () => {
   it("real provider keys", () => refuses({ OPENROUTER_API_KEY: "sk-x", DEV_AUTH_TOKEN: "pt_x" })); // pragma: allowlist secret
   it("the encryption key", () => refuses({ DB_ENCRYPTION_KEY: "k" }));
   it("data paths outside the demo dir", () => refuses({ STORAGE_FOLDER_PATH: "/srv/pocket" }));
+  it("relative data paths that escape the demo dir", () =>
+    refuses({ STORAGE_FOLDER_PATH: "../../srv/pocket" }));
   it("HOME outside the demo dir", () => refuses({ HOME: "/home/me" }));
   it("a working directory holding a .env", () => {
     const cwd = mkdtempSync(path.join(demoDir, "cwd-"));
     writeFileSync(path.join(cwd, ".env"), "DATABASE_URL=postgresql://prod\n");
     refuses({}, { cwd });
+  });
+
+  it("a Next app dir with .env files when Next is not told to skip them", () => {
+    const cwd = mkdtempSync(path.join(demoDir, "web-"));
+    writeFileSync(path.join(cwd, ".env.local"), "AUTH_SECRET=real\n"); // pragma: allowlist secret
+    refuses({ __NEXT_PROCESSED_ENV: undefined }, { cwd, nextApp: true });
+    // With the flag set, the files are expected on a dev box and only warned about.
+    expect(assertDemoEnv(base, demoDir, { cwd, nextApp: true, collect: true })).toEqual([]);
   });
 
   it("throws unless collecting", () => {
@@ -66,6 +77,17 @@ describe("assertDemoEnv refuses a poisoned environment", () => {
       SCREENSHOTS_PAT_FILE: path.join(demoDir, "pat.txt"),
     };
     expect(assertDemoEnv(env, demoDir, { collect: true })).toEqual([]);
+  });
+});
+
+describe("the installed Next.js", () => {
+  // demoEnv relies on @next/env skipping every .env* file when this flag is
+  // set. If an upgrade drops it, the web app would load the real .env.local.
+  it("still honours __NEXT_PROCESSED_ENV", () => {
+    const fromWeb = createRequire(new URL("../../apps/web/package.json", import.meta.url));
+    const fromNext = createRequire(fromWeb.resolve("next/package.json"));
+    const source = readFileSync(fromNext.resolve("@next/env"), "utf8");
+    expect(source).toContain("__NEXT_PROCESSED_ENV");
   });
 });
 

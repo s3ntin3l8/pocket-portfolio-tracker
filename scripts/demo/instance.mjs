@@ -24,6 +24,7 @@ import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const BIN = (name) => path.join(REPO_ROOT, "node_modules", ".bin", name);
 const API_TSCONFIG = path.join(REPO_ROOT, "services/api/tsconfig.json");
+const WEB_DIR = path.join(REPO_ROOT, "apps/web");
 
 export const DEMO_API_PORT = process.env.DEMO_API_PORT ?? "3910";
 export const DEMO_WEB_PORT = process.env.DEMO_WEB_PORT ?? "3915";
@@ -139,11 +140,20 @@ export async function startDemo({ login = false, quiet = false, keep = false } =
 
   assertDemoEnv(seedEnv, demoDir, { cwd: runDir });
   assertDemoEnv(apiEnv, demoDir, { cwd: runDir });
-  assertDemoEnv(webEnv, demoDir);
+  assertDemoEnv(webEnv, demoDir, { cwd: WEB_DIR, nextApp: true });
 
   let api;
   let web;
-  const stop = async () => {
+  let stopping;
+  const stop = () => (stopping ??= teardown());
+  // Installed before anything is spawned: the servers run in their own process
+  // groups, so a Ctrl-C during the build or boot would otherwise orphan them.
+  const onSignal = () => stop().then(() => process.exit(0));
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
+  const teardown = async () => {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
     // Wait for every process to exit first: dying next dev workers otherwise
     // recreate files under the scratch HOME after it was deleted.
     await Promise.all([killGroup(api), killGroup(web)]);
@@ -200,7 +210,7 @@ export async function startDemo({ login = false, quiet = false, keep = false } =
       "web",
       BIN("next"),
       ["dev", "-p", DEMO_WEB_PORT, "-H", "127.0.0.1"],
-      { cwd: path.join(REPO_ROOT, "apps/web"), env: webEnv },
+      { cwd: WEB_DIR, env: webEnv },
       quiet,
     );
 
@@ -235,10 +245,4 @@ if (invokedDirectly) {
 [demo] Pocket demo is up: ${demo.webUrl}
 [demo] Throwaway local login (generated for this run): ${loginFile}
 [demo] Ctrl-C stops it and deletes all demo data.`);
-  const shutdown = async () => {
-    await demo.stop();
-    process.exit(0);
-  };
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
 }

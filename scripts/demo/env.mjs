@@ -58,6 +58,9 @@ export function demoEnv(demoDir, vars = {}, parent = process.env) {
   };
 }
 
+/** Every file `next dev` would read from its working directory. */
+export const NEXT_ENV_FILES = [".env", ".env.local", ".env.development", ".env.development.local"];
+
 const inside = (dir, p) => {
   const rel = path.relative(dir, p);
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
@@ -66,8 +69,15 @@ const inside = (dir, p) => {
 /**
  * Throws if `env` could reach anything outside `demoDir`. Returns the list of
  * problems instead when `collect` is true (used by the tests).
+ *
+ * `cwd` is where the process will run. A plain process must not find a `.env`
+ * there. For `nextApp`, the `.env*` files are expected on a dev box (the
+ * `make web-env` symlink), so finding one is only a warning, as long as
+ * `__NEXT_PROCESSED_ENV` is set: @next/env then skips merging them. Without it
+ * they are refused. `scripts/demo/env.test.mjs` fails if the installed
+ * @next/env stops honouring that flag.
  */
-export function assertDemoEnv(env, demoDir, { cwd, collect = false } = {}) {
+export function assertDemoEnv(env, demoDir, { cwd, nextApp = false, collect = false } = {}) {
   const problems = [];
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;
@@ -77,8 +87,8 @@ export function assertDemoEnv(env, demoDir, { cwd, collect = false } = {}) {
     if (
       PATH_KEY.test(key) &&
       !PATH_ALLOW.has(key) &&
-      path.isAbsolute(value) &&
-      !inside(demoDir, value)
+      // Relative values resolve against the process's working directory.
+      !inside(demoDir, path.resolve(cwd ?? demoDir, value))
     )
       problems.push(`${key}=${value} is outside the demo dir`);
   }
@@ -91,8 +101,18 @@ export function assertDemoEnv(env, demoDir, { cwd, collect = false } = {}) {
   for (const key of ["HOME", "TMPDIR"])
     if (!env[key] || !inside(demoDir, env[key]))
       problems.push(`${key} must be inside the demo dir`);
-  if (cwd && existsSync(path.join(cwd, ".env")))
-    problems.push(`${cwd} contains a .env that the API would load`);
+  if (cwd && !nextApp && existsSync(path.join(cwd, ".env")))
+    problems.push(`${cwd} contains a .env that the process would load`);
+  const nextFiles =
+    cwd && nextApp ? NEXT_ENV_FILES.filter((f) => existsSync(path.join(cwd, f))) : [];
+  if (nextFiles.length > 0) {
+    if (env.__NEXT_PROCESSED_ENV !== "true")
+      problems.push(`${cwd} has ${nextFiles.join(", ")} and Next is not told to skip them`);
+    else if (!collect)
+      console.warn(
+        `[demo] ignoring ${nextFiles.join(", ")} in ${cwd} (__NEXT_PROCESSED_ENV is set)`,
+      );
+  }
 
   if (collect) return problems;
   if (problems.length > 0)
