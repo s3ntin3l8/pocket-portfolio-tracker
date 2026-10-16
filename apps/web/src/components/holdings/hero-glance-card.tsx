@@ -1,6 +1,6 @@
 "use client";
 
-import { toneClass, toneOf, trendGlyphOf } from "@/lib/tone";
+import { flatToneClass, trendGlyphOf } from "@/lib/tone";
 import { useState, useCallback, useRef, startTransition, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
@@ -157,7 +157,7 @@ export function HeroGlanceCard({
               <span
                 className={cn(
                   "tabular rounded-full bg-muted px-2.5 py-1 text-body-sm font-semibold",
-                  toneClass(toneOf(closeDelta)),
+                  flatToneClass(closeDelta),
                 )}
               >
                 {withGlyph(closeDelta, formatMoney(Math.abs(closeDelta), currency, locale))}{" "}
@@ -167,7 +167,7 @@ export function HeroGlanceCard({
               <span
                 className={cn(
                   "tabular rounded-full bg-muted px-2.5 py-1 text-body-sm font-semibold",
-                  toneClass(toneOf(closeDelta)),
+                  flatToneClass(closeDelta),
                 )}
               >
                 {withGlyph(closeDelta, formatPercent(closeDelta / 100, locale))} {periodWord}

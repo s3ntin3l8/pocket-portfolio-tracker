@@ -28,7 +28,7 @@ export interface HeroOverlayPoint {
  *
  * No axes, no grid, no legend — the parent renders the legend so the
  * benchmark label can be localised via next-intl. Inherits its container's width and
- * the standard hero height (~74px). Hovering any point shows a standard
+ * the standard hero height (96px). Hovering any point shows a standard
  * {@link ChartTooltipPanel} with the date + portfolio value + benchmark value
  * (benchmark row omitted when its series is null at that date). The tooltip
  * follows Recharts' Pattern A2 (v3 hooks + custom `content`), matching

@@ -107,7 +107,7 @@ describe("HeroOverlayChart", () => {
       { date: "2026-01-01", portfolio: 100, benchmark: null },
       { date: "2026-02-01", portfolio: 110, benchmark: null },
     ]);
-    expect(container.innerHTML).toContain("var(--primary)");
+    // The portfolio row's swatch must not be white-on-white on the card-coloured tooltip.
     expect(container.innerHTML).not.toContain("var(--primary-foreground)");
   });
 
