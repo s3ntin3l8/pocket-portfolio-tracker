@@ -7,6 +7,7 @@ import { AlertCircle, AlertTriangle, ChevronRight, ListChecks } from "lucide-rea
 import {
   Table,
   TableBody,
+  TABLE_VALUE_STRONG,
   TableCell,
   TableHead,
   TableHeader,
@@ -16,7 +17,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScopeLink } from "@/components/scope-link";
-import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
+import { cn, formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 import { TxRow, KIND_ICON } from "./types";
 import {
   SourceChips,
@@ -296,10 +297,7 @@ export function DesktopTable({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell
-                    numeric
-                    className={`whitespace-nowrap text-body-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
-                  >
+                  <TableCell className={cn(TABLE_VALUE_STRONG, netAmount > 0 && "text-success")}>
                     {m(netAmount, tx.currency)}
                   </TableCell>
                   {showPortfolio && (
