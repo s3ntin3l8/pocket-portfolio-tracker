@@ -1,6 +1,6 @@
 "use client";
 
-import { deltaToneOf, signToneClass } from "@/lib/tone";
+import { deltaToneOf, toneClass } from "@/lib/tone";
 import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -143,14 +143,12 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               {isOpen ? t("detail.totalReturn") : t("detail.realizedPnl")}
             </p>
-            <p className={cn("tabular mt-1 text-4xl font-bold", signToneClass(hero))}>
-              {signed(hero)}
-            </p>
+            <p className={cn("tabular mt-1 text-4xl font-bold", toneClass(tone))}>{signed(hero)}</p>
             <p className="mt-2">
               <span
                 className={cn(
                   "tabular inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold",
-                  signToneClass(hero),
+                  toneClass(tone),
                 )}
               >
                 {pct(heroPct)} · {heldLabel(trade.holdingDays)} {t("detail.held")}
@@ -178,7 +176,7 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
                     label={t("detail.realizedPnlRow")}
                     value={signed(realized)}
                     divider
-                    tone={realized > 0 ? "up" : "down"}
+                    tone={deltaToneOf(realized)}
                   />
                 )}
                 {hasDividends && (

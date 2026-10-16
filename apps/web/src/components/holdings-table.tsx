@@ -178,12 +178,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
           <TableBody>
             {sorted.map((h) => {
               const { pnl, pct, native, display } = computeRowValues(h, currency, locale);
-              const pnlColor =
-                pnl === null
-                  ? "text-muted-foreground"
-                  : pnl >= 0
-                    ? "text-success"
-                    : "text-destructive";
+              const pnlColor = pnl === null ? "text-muted-foreground" : signToneClass(pnl);
               return (
                 <TableRow key={h.instrumentId}>
                   <TableCell>

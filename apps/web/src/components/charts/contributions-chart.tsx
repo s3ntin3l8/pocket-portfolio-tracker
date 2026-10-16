@@ -193,7 +193,7 @@ export function ContributionsChart({
           <div>
             <p className="text-xs text-muted-foreground">{t("footerGain")}</p>
             <p className={`tabular mt-0.5 text-sm font-bold ${signToneClass(gain)}`}>
-              {gain >= 0 ? "+" : ""}
+              {gain > 0 ? "+" : ""}
               {money(gain)}
             </p>
           </div>

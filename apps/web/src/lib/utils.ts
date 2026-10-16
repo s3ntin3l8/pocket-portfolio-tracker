@@ -1,7 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 import type { Anomaly } from "@portfolio/api-client";
-import { signToneClass } from "./tone";
 
 /**
  * Named type/radius steps from `globals.css` `@theme` — twMerge must know them, otherwise
@@ -204,11 +203,6 @@ export function formatSignedMoney(
   opts: Intl.NumberFormatOptions = {},
 ) {
   return `${amount >= 0 ? "+" : ""}${formatMoney(amount, currency, locale, opts)}`;
-}
-
-/** Semantic text tone for a signed P&L figure: gain green, loss red, zero/unknown neutral. */
-export function signTone(n: number | null | undefined): string {
-  return signToneClass(n);
 }
 
 /**

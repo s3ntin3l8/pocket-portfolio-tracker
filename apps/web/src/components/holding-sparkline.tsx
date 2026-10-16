@@ -1,5 +1,6 @@
 "use client";
 
+import { toneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
@@ -78,7 +79,7 @@ export function HoldingSparkline({ values, className }: { values: number[]; clas
         height={24}
         tabIndex={0}
         aria-label={rangeLabel}
-        className={cn("shrink-0", up ? "text-success" : "text-destructive", className)}
+        className={cn("shrink-0", toneClass(up ? "up" : "down"), className)}
       >
         <polyline
           points={points}

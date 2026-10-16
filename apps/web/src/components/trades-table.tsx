@@ -1,5 +1,6 @@
 "use client";
 
+import { signToneClass } from "@/lib/tone";
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
@@ -199,10 +200,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                 <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={4}>{t("totalRealized")}</TableCell>
                   <TableCell
-                    className={cn(
-                      "tabular text-right text-body-sm",
-                      closedTotal > 0 ? "text-success" : closedTotal < 0 ? "text-destructive" : "",
-                    )}
+                    className={cn("tabular text-right text-body-sm", signToneClass(closedTotal))}
                   >
                     {signed(closedTotal)}
                   </TableCell>

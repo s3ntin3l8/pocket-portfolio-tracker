@@ -1,4 +1,4 @@
-import { signToneClass, toneBgClass, toneOf } from "@/lib/tone";
+import { deltaToneOf, signToneClass, toneBgClass, toneOf } from "@/lib/tone";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -109,7 +109,7 @@ export default async function TradesPage({
   }
 
   const totalReturn = Number(log.totalReturn);
-  const returnTone = totalReturn > 0 ? "up" : totalReturn < 0 ? "down" : "neutral";
+  const returnTone = deltaToneOf(totalReturn);
   // Capital-weighted return across all trades (same formula as per-row totalReturnPct).
   const totalInvested = log.trades.reduce((s, tr) => s + Number(tr.invested), 0);
   const totalReturnPct = totalInvested > 0 ? totalReturn / totalInvested : null;

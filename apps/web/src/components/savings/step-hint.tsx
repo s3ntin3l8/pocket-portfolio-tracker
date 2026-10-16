@@ -1,5 +1,6 @@
 "use client";
 
+import { toneClass } from "@/lib/tone";
 import { InfoTip } from "@/components/ui/tooltip";
 import type { DetectedPlan } from "@portfolio/api-client";
 import type { useTranslations } from "next-intl";
@@ -31,7 +32,7 @@ export function StepHint({
       <span
         className={cn(
           "inline-flex shrink-0 items-center gap-0.5",
-          isIncrease ? "text-success" : "text-destructive",
+          toneClass(isIncrease ? "up" : "down"),
         )}
       >
         {isIncrease ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}

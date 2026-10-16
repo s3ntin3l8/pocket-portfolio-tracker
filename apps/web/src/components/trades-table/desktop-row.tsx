@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatSignedMoney, formatPercent, cn } from "@/lib/utils";
-import { toneClass } from "./constants";
+import { pnlToneClass } from "./constants";
 import { InfoTip } from "@/components/ui/tooltip";
 
 export function DesktopRow({
@@ -93,20 +93,20 @@ export function DesktopRow({
       <TableCell className={cn(TABLE_VALUE, "whitespace-nowrap")}>
         {money(Number(tr.invested))}
       </TableCell>
-      <TableCell className={cn(TABLE_VALUE_STRONG, "whitespace-nowrap", toneClass(realized))}>
+      <TableCell className={cn(TABLE_VALUE_STRONG, "whitespace-nowrap", pnlToneClass(realized))}>
         {realized === 0 ? "—" : signed(realized)}
       </TableCell>
       <TableCell className={cn(TABLE_VALUE, "whitespace-nowrap")}>
         {Number(tr.dividends) === 0 ? "—" : money(Number(tr.dividends))}
       </TableCell>
-      <TableCell className={cn(TABLE_VALUE_STRONG, "whitespace-nowrap", toneClass(ret))}>
+      <TableCell className={cn(TABLE_VALUE_STRONG, "whitespace-nowrap", pnlToneClass(ret))}>
         {signed(ret)}
         {tr.totalReturnPct !== null && (
           <div className={TABLE_SUBVALUE}>{formatPercent(tr.totalReturnPct, locale)}</div>
         )}
       </TableCell>
       <TableCell
-        className={cn(TABLE_VALUE_STRONG, "whitespace-nowrap", toneClass(tr.annualizedPct ?? 0))}
+        className={cn(TABLE_VALUE_STRONG, "whitespace-nowrap", pnlToneClass(tr.annualizedPct ?? 0))}
       >
         {tr.annualizedPct === null ? "—" : formatPercent(tr.annualizedPct, locale)}
       </TableCell>

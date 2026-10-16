@@ -19,6 +19,6 @@ export const COLS: ColDef<Trade>[] = [
 
 export const tradeKey = (t: Trade) => `${t.instrumentId}:${t.entryDate}`;
 
-export function toneClass(n: number): string {
+export function pnlToneClass(n: number): string {
   return signToneClass(n) || "text-muted-foreground";
 }

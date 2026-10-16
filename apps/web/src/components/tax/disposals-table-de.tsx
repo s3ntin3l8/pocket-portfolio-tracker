@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/table";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import type { TaxDisposalRow } from "@/lib/server-api";
-import { cn, formatMoney, signTone } from "@/lib/utils";
+import { signToneClass } from "@/lib/tone";
+import { cn, formatMoney } from "@/lib/utils";
 import { useTableSort, type ColDef } from "@/lib/table-sort";
 import { onActivateKey } from "@/lib/a11y";
 import { useExpandedRows } from "./use-expanded-rows";
@@ -118,7 +119,7 @@ export function DisposalTable({
                         {money(r.proceeds)}
                       </TableCell>
                       <TableCell className="tabular text-right">
-                        <span className={cn("font-semibold", signTone(Number(r.gain)))}>
+                        <span className={cn("font-semibold", signToneClass(Number(r.gain)))}>
                           {money(r.gain)}
                         </span>
                         {Number(r.tfRate) > 0 && (
@@ -138,7 +139,7 @@ export function DisposalTable({
                           lot={lot}
                           money={money}
                           secondaryValue={money(lot.gain)}
-                          secondaryClassName={cn("font-medium", signTone(Number(lot.gain)))}
+                          secondaryClassName={cn("font-medium", signToneClass(Number(lot.gain)))}
                         />
                       ))}
                   </Fragment>
@@ -152,7 +153,10 @@ export function DisposalTable({
                   {money(totalProceeds)}
                 </TableCell>
                 <TableCell
-                  className={cn("tabular text-right font-semibold", signTone(Number(totalGain)))}
+                  className={cn(
+                    "tabular text-right font-semibold",
+                    signToneClass(Number(totalGain)),
+                  )}
                 >
                   {money(totalGain)}
                 </TableCell>

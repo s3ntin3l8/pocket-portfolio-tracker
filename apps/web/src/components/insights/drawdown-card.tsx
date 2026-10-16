@@ -1,3 +1,4 @@
+import { signToneClass } from "@/lib/tone";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { cn, formatPercent } from "@/lib/utils";
@@ -24,9 +25,7 @@ export function DrawdownCard({ drawdown, locale }: { drawdown: InsightsDrawdown;
         </p>
         <span className="text-xs text-text-2">
           {t("current")}:{" "}
-          <span
-            className={cn("font-semibold", currDdpct < 0 ? "text-destructive" : "text-success")}
-          >
+          <span className={cn("font-semibold", signToneClass(currDdpct))}>
             {formatPercent(currDdpct, locale)}
             {isUnderwater && <span className="text-text-2"> · {t("stillUnderwater")}</span>}
           </span>

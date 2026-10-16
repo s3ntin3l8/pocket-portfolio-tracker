@@ -1,5 +1,6 @@
 "use client";
 
+import { signToneClass } from "@/lib/tone";
 import { useMemo, Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -99,11 +100,7 @@ export function InstrumentGroupRow({
           const typeLabel = tt(e.type);
           const dateLabel = df.format(new Date(e.date));
           const amountLabel = formatMoney(Number(e.amount), e.currency, locale);
-          const amountClass = forecast
-            ? "text-text-2"
-            : Number(e.amount) >= 0
-              ? "text-success"
-              : "text-destructive";
+          const amountClass = forecast ? "text-text-2" : signToneClass(Number(e.amount));
           const shares =
             e.quantity != null
               ? Number(e.quantity).toLocaleString(locale, { maximumFractionDigits: 4 })

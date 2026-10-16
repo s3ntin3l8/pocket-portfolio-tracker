@@ -14,7 +14,7 @@ describe("tone", () => {
       expect(toneOf(n)).toBe("flat");
       expect(signToneClass(n)).toBe("");
       expect(deltaToneOf(n)).toBe("neutral");
-      expect(trendGlyphOf(n)).toBe("–");
+      expect(trendGlyphOf(n)).toBe("");
     }
   });
 

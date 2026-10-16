@@ -21,7 +21,7 @@ export const deltaToneOf = (n: number | null | undefined): DeltaTone => {
 };
 
 /** Text colour class for a tone; flat inherits the surrounding colour. */
-export const toneClass = (tone: Tone): string =>
+export const toneClass = (tone: Tone | DeltaTone): string =>
   tone === "up" ? "text-success" : tone === "down" ? "text-destructive" : "";
 
 /** Background colour class for a tone (bars, dots); flat is muted. */
@@ -31,8 +31,8 @@ export const toneBgClass = (tone: Tone): string =>
 /** Text colour class for a signed number (flat inherits). */
 export const signToneClass = (n: number | null | undefined): string => toneClass(toneOf(n));
 
-/** Direction glyph for a signed number; flat has no arrow. */
+/** Direction glyph for a signed number; flat has no arrow (empty string). */
 export const trendGlyphOf = (n: number | null | undefined): string => {
   const t = toneOf(n);
-  return t === "up" ? "▲" : t === "down" ? "▼" : "–";
+  return t === "up" ? "▲" : t === "down" ? "▼" : "";
 };

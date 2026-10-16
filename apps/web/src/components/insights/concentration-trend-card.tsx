@@ -1,3 +1,4 @@
+import { signToneClass } from "@/lib/tone";
 import { useTranslations } from "next-intl";
 import { Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -46,7 +47,7 @@ export function ConcentrationTrendCard({ trend }: { trend: ConcentrationPoint[] 
           <p className="mt-1 text-xs font-medium text-text-2">
             {t("topHolding", { hhi: (latest.hhi * 100).toFixed(1) })}
             {first && first.hhi !== latest.hhi && (
-              <span className={latest.hhi < first.hhi ? " text-success" : " text-destructive"}>
+              <span className={signToneClass(first.hhi - latest.hhi)}>
                 {" "}
                 ({latest.hhi > first.hhi ? "+" : ""}
                 {((latest.hhi - first.hhi) * 100).toFixed(2)} since {first.date})
