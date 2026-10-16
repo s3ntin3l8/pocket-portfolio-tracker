@@ -96,7 +96,22 @@ async function settle(page) {
   // system font first, then swaps once Plus Jakarta Sans/DM Mono finish loading.
   // Without this, captures can race that swap and ship with the wrong font.
   await page.evaluate(() => document.fonts.ready);
-  // Let charts/animations settle (recharts entrance transitions, skeleton→data).
+  // `networkidle` can fire while the dev server is still compiling a route or a
+  // query is in flight, which on a loaded host shipped a hero with no chart.
+  // Wait until nothing is busy, every recharts chart has drawn, and Next's dev
+  // indicator has stopped compiling; throw rather than capture an empty state.
+  await page.waitForFunction(
+    () => {
+      if (document.querySelector('[aria-busy="true"]')) return false;
+      const charts = [...document.querySelectorAll(".recharts-wrapper")];
+      if (charts.some((c) => !c.querySelector(".recharts-surface path[d]"))) return false;
+      const portal = document.querySelector("nextjs-portal")?.shadowRoot;
+      return !portal?.textContent?.includes("Compiling");
+    },
+    null,
+    { timeout: 60_000, polling: 250 },
+  );
+  // Let charts/animations settle (recharts entrance transitions).
   await page.waitForTimeout(600);
 }
 
