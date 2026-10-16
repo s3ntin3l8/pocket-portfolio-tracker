@@ -78,12 +78,12 @@ const eslintConfig = [
           // Zero is neutral: tone a signed number with signToneClass/toneOf (src/lib/tone.ts),
           // never a two-way success/destructive ternary — that paints a flat figure green or red.
           selector:
-            "ConditionalExpression[consequent.value=/^\\s*text-success\\s*$/][alternate.value=/^\\s*text-destructive\\s*$/]",
+            "ConditionalExpression[consequent.value=/(^|\\s)text-success(\\s|$)/][alternate.value=/(^|\\s)text-destructive(\\s|$)/]",
           message: zeroToneMessage,
         },
         {
           selector:
-            "ConditionalExpression[consequent.value=/^\\s*text-destructive\\s*$/][alternate.value=/^\\s*text-success\\s*$/]",
+            "ConditionalExpression[consequent.value=/(^|\\s)text-destructive(\\s|$)/][alternate.value=/(^|\\s)text-success(\\s|$)/]",
           message: zeroToneMessage,
         },
       ],
