@@ -529,6 +529,17 @@ describe("TransactionsTable", () => {
     expect(screen.getByRole("button", { name: /amount/i })).toBeInTheDocument();
   });
 
+  it("puts Amount right after Transaction so it stays visible when the table scrolls sideways", () => {
+    renderTable();
+    const order = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim() ?? "");
+    const transaction = order.findIndex((t) => t.includes(messages.Transactions.transactionCol));
+    const amount = order.findIndex((t) => t.includes(messages.Transactions.amount));
+    const price = order.findIndex((t) => t.includes(messages.Transactions.price));
+    expect(transaction).toBeGreaterThanOrEqual(0);
+    expect(amount).toBe(transaction + 1);
+    expect(amount).toBeLessThan(price);
+  });
+
   it("shows a desktop-only Tax column with the withheld amount, dash when none", () => {
     renderTable();
     expect(screen.getByRole("button", { name: messages.Transactions.tax })).toBeInTheDocument();

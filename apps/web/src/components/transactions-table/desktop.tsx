@@ -131,6 +131,15 @@ export function DesktopTable({
             >
               {t("transactionCol")}
             </SortableTableHead>
+            <SortableTableHead
+              colKey="netAmount"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onToggle={onToggleSort}
+              align="right"
+            >
+              {t("amount")}
+            </SortableTableHead>
             {showPortfolio && (
               <SortableTableHead
                 colKey="portfolio"
@@ -177,15 +186,6 @@ export function DesktopTable({
               className="hidden sm:table-cell"
             >
               {t("source")}
-            </SortableTableHead>
-            <SortableTableHead
-              colKey="netAmount"
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onToggle={onToggleSort}
-              align="right"
-            >
-              {t("amount")}
             </SortableTableHead>
           </TableRow>
         </TableHeader>
@@ -296,6 +296,12 @@ export function DesktopTable({
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell
+                    numeric
+                    className={`whitespace-nowrap text-body-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
+                  >
+                    {m(netAmount, tx.currency)}
+                  </TableCell>
                   {showPortfolio && (
                     <TableCell className="text-xs font-medium text-text-2">
                       {tx.portfolioName ?? "—"}
@@ -323,12 +329,6 @@ export function DesktopTable({
                         chipClassName="inline-flex items-center whitespace-nowrap rounded-xs px-2 py-[3px] text-micro font-bold uppercase"
                       />
                     </div>
-                  </TableCell>
-                  <TableCell
-                    numeric
-                    className={`text-body-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
-                  >
-                    {m(netAmount, tx.currency)}
                   </TableCell>
                   <TableCell className="w-10 pr-2 text-right">
                     <Button
