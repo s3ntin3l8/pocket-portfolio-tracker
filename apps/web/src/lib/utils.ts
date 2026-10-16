@@ -11,6 +11,7 @@ const twMerge = extendTailwindMerge({
     theme: {
       text: ["micro", "body-sm", "body", "heading", "display", "hero"],
       radius: ["xs"],
+      tracking: ["label"],
     },
   },
 });

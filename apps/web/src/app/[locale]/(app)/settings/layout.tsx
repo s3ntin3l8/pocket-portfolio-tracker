@@ -114,11 +114,7 @@ export default async function SettingsLayout({
       groups={groups}
       indexHref="/settings"
       railTop={
-        identityCard && (
-          <div className="rounded-xl border border-border bg-card p-3.5 shadow-card">
-            {identityCard}
-          </div>
-        )
+        identityCard && <div className="rounded-lg bg-card p-3.5 shadow-card">{identityCard}</div>
       }
       railBottom={<SignOutButton />}
       railExtra={<SettingsInstallItem variant="rail" />}
@@ -143,7 +139,7 @@ export default async function SettingsLayout({
           {identityCard && (
             <Link
               href="/settings/account"
-              className="mb-4 flex items-center gap-3.5 rounded-lg border border-border bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
+              className="mb-4 flex items-center gap-3.5 rounded-lg bg-card p-4 shadow-card transition-colors hover:bg-muted/50"
             >
               {identityCard}
             </Link>

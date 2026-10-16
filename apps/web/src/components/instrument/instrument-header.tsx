@@ -17,7 +17,7 @@ export async function InstrumentBackButton() {
       size="icon"
       asChild
       aria-label={tA11y("backToHoldings")}
-      className="rounded-xl bg-card shadow-card"
+      className="rounded-lg bg-card shadow-card"
     >
       <ScopeLink href="/holdings">
         <ArrowLeft className="size-4" />

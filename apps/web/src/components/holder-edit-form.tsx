@@ -13,7 +13,7 @@ import { HolderTypeChips } from "@/components/holder-type-chips";
 import { useRouter } from "@/i18n/navigation";
 import { useHolderForm } from "@/components/holder-form-dialog/hooks";
 
-const CARD_CLASS = "space-y-3.5 rounded-lg border border-border bg-card p-4 shadow-card";
+const CARD_CLASS = "space-y-3.5 rounded-lg bg-card p-4 shadow-card";
 
 /**
  * The design's inline "Edit account holder" / "New account holder" page

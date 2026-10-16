@@ -39,7 +39,7 @@ export function PortfolioValueCard({
   todayTone?: Tone;
 }) {
   return (
-    <div className="rounded-xl bg-card px-6 py-5 shadow-card">
+    <div className="rounded-lg bg-card px-6 py-5 shadow-card">
       <div className="flex flex-col gap-3">
         {/* Total value */}
         <div>

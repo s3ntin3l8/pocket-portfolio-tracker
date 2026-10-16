@@ -35,9 +35,7 @@ export function EstimatedTaxHero({
       }}
     >
       <p className="truncate text-xs font-semibold text-white/80">{label}</p>
-      <p className="tabular mt-1 truncate text-lg font-extrabold sm:text-2xl lg:text-display">
-        {value}
-      </p>
+      <p className="tabular mt-1 truncate text-lg font-bold sm:text-2xl lg:text-display">{value}</p>
       <p className="mt-1 text-xs font-medium text-white/80">{description}</p>
     </div>
   );

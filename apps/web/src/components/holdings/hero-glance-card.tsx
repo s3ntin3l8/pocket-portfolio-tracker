@@ -110,7 +110,7 @@ export function HeroGlanceCard({
 
   return (
     <div
-      className="rounded-xl px-6 pb-[18px] pt-[22px] text-white shadow-hero sm:rounded-lg"
+      className="rounded-lg px-6 pb-[18px] pt-[22px] text-white shadow-hero"
       style={{ background: "linear-gradient(160deg,var(--primary),var(--primary-deep))" }}
     >
       <p className="text-body-sm font-semibold text-white/78">{t("label")}</p>
@@ -123,7 +123,7 @@ export function HeroGlanceCard({
         exit="vt-tick-out"
         default="none"
       >
-        <p className="tabular mt-1 text-hero font-extrabold leading-tight sm:text-hero">
+        <p className="tabular mt-1 text-hero font-bold leading-tight sm:text-hero">
           {formatNetWorth(netWorth, currency, locale)}
         </p>
       </ViewTransition>

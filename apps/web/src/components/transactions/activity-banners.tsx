@@ -39,9 +39,7 @@ function StatBlock({
       )}
     >
       <p className="truncate text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
-      <p className="tabular mt-1 truncate text-sm font-extrabold sm:text-xl @xl:text-display">
-        {value}
-      </p>
+      <p className="tabular mt-1 truncate text-sm font-bold sm:text-xl @xl:text-display">{value}</p>
       {sub && (
         <p
           className={cn(

@@ -51,7 +51,7 @@ export function ReportCard({
   // 7px split bar, and a bordered footer pinned to the card bottom.
   return (
     <ScopeLink href={href} className="group block h-full">
-      <Card className="flex h-full min-w-0 flex-col rounded-xl px-[22px] py-5 transition-colors group-hover:border-primary/40">
+      <Card className="flex h-full min-w-0 flex-col px-5 py-5 transition-colors group-hover:border-primary/40">
         <div className="flex w-full items-center gap-3">
           <span
             className="flex size-11 shrink-0 items-center justify-center rounded-lg"
@@ -63,7 +63,7 @@ export function ReportCard({
           {trend && <TrendChip label={trend.label} tone={trend.tone} arrow={trend.arrow} />}
         </div>
 
-        <p className="tabular mt-4 text-display font-extrabold">
+        <p className="tabular mt-4 text-display font-bold">
           <ResponsiveMoney full={value} compact={valueCompact} />
         </p>
         <p className="mt-[3px] truncate text-body-sm font-medium text-text-2">{caption}</p>

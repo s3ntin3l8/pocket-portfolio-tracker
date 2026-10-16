@@ -13,4 +13,7 @@ describe("cn with the named type/radius scale", () => {
   it("dedupes radius steps including xs", () => {
     expect(cn("rounded-xs", "rounded-xl")).toBe("rounded-xl");
   });
+  it("lets a later tracking step override the label token", () => {
+    expect(cn("tracking-label", "tracking-tight")).toBe("tracking-tight");
+  });
 });

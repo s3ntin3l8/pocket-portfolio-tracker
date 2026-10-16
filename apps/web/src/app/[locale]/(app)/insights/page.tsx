@@ -124,7 +124,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         style={{ background: "linear-gradient(135deg,var(--hero-ink),var(--hero-ink-2))" }}
       >
         <p className="text-xs font-semibold text-white/70">{t("xirr.label")}</p>
-        <p className="tabular mt-1 text-hero font-extrabold leading-none sm:text-hero">
+        <p className="tabular mt-1 text-hero font-bold leading-none sm:text-hero">
           {summary.xirr !== null ? formatPercent(summary.xirr, locale) : "—"}
         </p>
         <p className="mt-1 text-xs font-medium leading-[1.5] text-white/70">

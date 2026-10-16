@@ -31,7 +31,7 @@ export function StatCard({
     <Card className={className}>
       <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
         <p className="text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
-        <p className="tabular mt-1 truncate min-w-0 text-body font-extrabold sm:text-xl lg:text-display">
+        <p className="tabular mt-1 truncate min-w-0 text-body font-bold sm:text-xl lg:text-display">
           {value}
         </p>
         {delta && (

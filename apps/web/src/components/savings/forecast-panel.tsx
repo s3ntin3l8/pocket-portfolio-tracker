@@ -199,7 +199,7 @@ export function ForecastPanel({
           {t("projectedInYears", { count: years })}
         </p>
         <p
-          className="tabular mt-0.5 text-hero font-extrabold leading-tight"
+          className="tabular mt-0.5 text-hero font-bold leading-tight"
           data-testid="projected-value"
         >
           {m(value)}

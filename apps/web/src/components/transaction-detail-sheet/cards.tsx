@@ -88,7 +88,7 @@ export function HeroAmount({
     <div className="py-2.5 pb-[18px] text-center">
       <div
         className={cn(
-          "tabular text-hero font-extrabold leading-none",
+          "tabular text-hero font-bold leading-none",
           netAmount > 0 ? "text-success" : "text-foreground",
         )}
       >

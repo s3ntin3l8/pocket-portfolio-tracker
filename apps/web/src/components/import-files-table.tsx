@@ -105,7 +105,7 @@ export function ImportFilesTable({
         </div>
       )}
 
-      <div className="rounded-xl bg-card shadow-card">
+      <div className="rounded-lg bg-card shadow-card">
         <Table>
           <TableHeader>
             <TableRow>

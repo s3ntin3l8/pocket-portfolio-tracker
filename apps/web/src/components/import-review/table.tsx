@@ -82,7 +82,7 @@ export function ImportTable({
   const tm = useTranslations("Manage");
 
   return (
-    <div className="hidden rounded-xl bg-card shadow-card md:block">
+    <div className="hidden rounded-lg bg-card shadow-card md:block">
       <Table>
         <TableHeader>
           <TableRow>
