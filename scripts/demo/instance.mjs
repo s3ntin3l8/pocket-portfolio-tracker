@@ -200,7 +200,9 @@ export async function startDemo({ login = false, quiet = false, keep = false } =
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
         rmSync(demoDir, { recursive: true, force: true });
-        if (++attempts < 5) return setTimeout(finish, 500);
+        // Re-check after a beat; exit as soon as the directory stays gone.
+        if (++attempts < 5)
+          return setTimeout(() => (existsSync(demoDir) ? finish() : process.exit(130)), 500);
         if (existsSync(demoDir)) console.warn(`[demo] hard stop: remove ${demoDir} by hand`);
         process.exit(130);
       };

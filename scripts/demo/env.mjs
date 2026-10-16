@@ -104,7 +104,10 @@ export function assertDemoEnv(
       problems.push("DATABASE_URL must be a pglite:// path inside the demo dir");
   }
   // The API's default storage backend is S3; anything but the local folder
-  // would reach an object store.
+  // would reach an object store. This checks the env only: a storage_settings
+  // row would override it, but the scratch DB is created fresh on every run and
+  // the demo seed never writes one. (STORAGE_FOLDER_PATH must be inside the demo
+  // dir like every other *_PATH, checked above.)
   if (api && env.STORAGE_PROVIDER !== "folder")
     problems.push("the API must use STORAGE_PROVIDER=folder (inside the demo dir)");
   for (const key of ["HOME", "TMPDIR"])
