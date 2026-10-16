@@ -100,10 +100,31 @@ describe("light theme destructive button", () => {
     expect(contrast(foreground, fill)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("stays at least 4.5:1 in the hover state (bg-destructive/95) on the card and the page", () => {
+  // Every destructive button class string, read from source so reverting one fails the guard.
+  const SOURCES = [
+    "src/components/ui/button.tsx",
+    "src/components/portfolio-form-dialog.tsx",
+    "src/components/portfolio-edit-form.tsx",
+    "src/components/holder-edit-form.tsx",
+  ];
+
+  it("every destructive button hovers at /95 in light and /90 in dark", () => {
+    for (const file of SOURCES) {
+      const src = readFileSync(resolve(__dirname, "..", file), "utf8");
+      expect(src, file).toContain("hover:bg-destructive/95");
+      expect(src, file).toContain("dark:hover:bg-destructive/90");
+    }
+  });
+
+  it("white stays at least 4.5:1 on the hovered fill in light (/95) on card and page", () => {
     for (const surface of ["card", "background"] as const) {
       const hovered = over(fill, hexOf(light, surface), 0.95);
       expect(contrast(foreground, hovered), surface).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("white stays at least 4.5:1 on the hovered fill in dark (/90) on the card", () => {
+    const hovered = over(hexOf(dark, "destructive"), hexOf(dark, "card"), 0.9);
+    expect(contrast("#ffffff", hovered)).toBeGreaterThanOrEqual(4.5);
   });
 });

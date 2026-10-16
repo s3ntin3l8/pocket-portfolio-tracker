@@ -170,7 +170,7 @@ export function PortfolioFormDialog({
                       type="button"
                       onClick={f.onDelete}
                       disabled={f.busy}
-                      className="h-auto w-full rounded-lg bg-destructive py-[15px] text-body font-bold text-white hover:bg-destructive/95"
+                      className="h-auto w-full rounded-lg bg-destructive py-[15px] text-body font-bold text-white hover:bg-destructive/95 dark:hover:bg-destructive/90"
                     >
                       {f.busy && <Spinner size="sm" />}
                       {t("confirmDelete")}
