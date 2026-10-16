@@ -33,8 +33,19 @@ describe("tone", () => {
     expect(toneClass("up")).toBe("text-success");
     expect(toneClass("down")).toBe("text-destructive");
     expect(toneClass("flat")).toBe("");
+    expect(toneClass("neutral")).toBe("");
     expect(toneBgClass("up")).toBe("bg-success");
     expect(toneBgClass("down")).toBe("bg-destructive");
     expect(toneBgClass("flat")).toBe("bg-muted-foreground");
+  });
+});
+
+import { pnlToneClass } from "../src/components/trades-table/constants";
+
+describe("pnlToneClass", () => {
+  it("keeps zero muted instead of green or red", () => {
+    expect(pnlToneClass(0)).toBe("text-muted-foreground");
+    expect(pnlToneClass(12)).toBe("text-success");
+    expect(pnlToneClass(-12)).toBe("text-destructive");
   });
 });

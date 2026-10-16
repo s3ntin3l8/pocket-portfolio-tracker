@@ -22,6 +22,9 @@ import { ScopeLink } from "@/components/scope-link";
  * baseline cash flows so a deposit doesn't manufacture phantom gains in the period
  * comparison.
  */
+/** Prefix a figure with its direction glyph; a flat figure gets no glyph and no stray space. */
+const withGlyph = (n: number, text: string) => [trendGlyphOf(n), text].filter(Boolean).join(" ");
+
 export function HeroGlanceCard({
   netWorth,
   currency,
@@ -154,12 +157,12 @@ export function HeroGlanceCard({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {snapshot.isIntraday ? (
               <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-                {trendGlyphOf(closeDelta)} {formatMoney(Math.abs(closeDelta), currency, locale)}{" "}
+                {withGlyph(closeDelta, formatMoney(Math.abs(closeDelta), currency, locale))}{" "}
                 {periodWord}
               </span>
             ) : (
               <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
-                {trendGlyphOf(closeDelta)} {formatPercent(closeDelta / 100, locale)} {periodWord}
+                {withGlyph(closeDelta, formatPercent(closeDelta / 100, locale))} {periodWord}
               </span>
             )}
             <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">

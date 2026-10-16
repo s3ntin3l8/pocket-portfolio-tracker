@@ -40,6 +40,14 @@ describe("HoldingSparkline", () => {
     );
   });
 
+  it("is neutral, not a gain, when the series is flat", () => {
+    const { container } = wrap(<HoldingSparkline values={[3, 3, 3]} />);
+    const cls = container.querySelector("svg")?.getAttribute("class") ?? "";
+    expect(cls).not.toContain("text-success");
+    expect(cls).not.toContain("text-destructive");
+    expect(cls).toContain("text-muted-foreground");
+  });
+
   it("draws a flat midline (no NaN) when all values are equal", () => {
     const { container } = wrap(<HoldingSparkline values={[3, 3, 3]} />);
     const pts = points(container);

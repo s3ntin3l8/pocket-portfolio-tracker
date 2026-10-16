@@ -20,7 +20,8 @@ export const deltaToneOf = (n: number | null | undefined): DeltaTone => {
   return t === "flat" ? "neutral" : t;
 };
 
-/** Text colour class for a tone; flat inherits the surrounding colour. */
+/** Text colour class for a tone. Flat deliberately yields "" so the figure inherits the
+ *  surrounding colour; callers that want a muted flat state add `|| "text-muted-foreground"`. */
 export const toneClass = (tone: Tone | DeltaTone): string =>
   tone === "up" ? "text-success" : tone === "down" ? "text-destructive" : "";
 
