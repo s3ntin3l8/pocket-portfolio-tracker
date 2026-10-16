@@ -1,0 +1,105 @@
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import net from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+/** A port nothing listens on right now, so assertPortsFree passes. */
+const freePort = () =>
+  new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      server.close(() => resolve(String(port)));
+    });
+  });
+
+const groupAlive = (pid) => {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// The scratch dirs go under a private TMPDIR (os.tmpdir() reads it per call), and
+// the ports are module-level constants, so both are set before the import.
+const ENV_KEYS = ["TMPDIR", "DEMO_API_PORT", "DEMO_WEB_PORT", "DEMO_HEALTH_TIMEOUT_MS"];
+const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+const scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
+let startDemo;
+let healthTimeoutMs;
+
+beforeAll(async () => {
+  process.env.TMPDIR = scratchRoot;
+  process.env.DEMO_API_PORT = await freePort();
+  process.env.DEMO_WEB_PORT = await freePort();
+  ({ startDemo, healthTimeoutMs } = await import("./instance.mjs"));
+});
+
+afterAll(() => {
+  for (const [key, value] of Object.entries(saved))
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  rmSync(scratchRoot, { recursive: true, force: true });
+});
+
+describe("startDemo startup failure", () => {
+  it("kills the started process groups and removes the scratch dir", async () => {
+    const listeners = process.listenerCount("SIGINT");
+    let demoDir;
+    let pid;
+    const failure = new Error("Timed out waiting for http://127.0.0.1:3910/health");
+
+    await expect(
+      startDemo({
+        quiet: true,
+        boot: async (ctx) => {
+          demoDir = ctx.demoDir;
+          // Stands in for the API: a long-lived server in its own process group.
+          const child = ctx.spawnServer(
+            "api",
+            process.execPath,
+            ["-e", "setInterval(() => {}, 1000)"],
+            { cwd: ctx.runDir, env: ctx.apiEnv },
+            true,
+          );
+          pid = child.pid;
+          expect(existsSync(path.join(demoDir, "home"))).toBe(true);
+          expect(groupAlive(pid)).toBe(true);
+          throw failure;
+        },
+      }),
+    ).rejects.toBe(failure);
+
+    expect(demoDir.startsWith(scratchRoot)).toBe(true);
+    expect(existsSync(demoDir)).toBe(false);
+    expect(groupAlive(pid)).toBe(false);
+    expect(readdirSync(scratchRoot)).toEqual([]);
+    expect(process.listenerCount("SIGINT")).toBe(listeners);
+  }, 20_000);
+
+  it("refuses a bad DEMO_HEALTH_TIMEOUT_MS before creating anything", async () => {
+    process.env.DEMO_HEALTH_TIMEOUT_MS = "soon";
+    try {
+      await expect(startDemo({ boot: () => {} })).rejects.toThrow(/DEMO_HEALTH_TIMEOUT_MS/);
+    } finally {
+      delete process.env.DEMO_HEALTH_TIMEOUT_MS;
+    }
+    expect(readdirSync(scratchRoot)).toEqual([]);
+  });
+});
+
+describe("healthTimeoutMs", () => {
+  it("defaults to 90 s and accepts a positive integer", () => {
+    expect(healthTimeoutMs(undefined)).toBe(90_000);
+    expect(healthTimeoutMs("")).toBe(90_000);
+    expect(healthTimeoutMs("240000")).toBe(240_000);
+  });
+
+  it.each(["0", "-5", "1.5", "abc", "1e400"])("rejects %s", (value) => {
+    expect(() => healthTimeoutMs(value)).toThrow(/positive integer/);
+  });
+});
