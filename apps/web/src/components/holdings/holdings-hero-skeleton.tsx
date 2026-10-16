@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function HoldingsHeroSkeleton() {
   return (
     <Card>
-      <div className="space-y-4 p-6" aria-hidden>
+      <div className="space-y-4 px-6 pb-4 pt-5" aria-hidden>
         <Skeleton className="h-7 w-1/3" />
         <Skeleton className="h-24 w-full" />
       </div>

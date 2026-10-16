@@ -223,11 +223,7 @@ export function NetWorthHistoryChart({
   }, [data, range, dataFor, selectedId, isHero, onSeriesChange]);
 
   const collectingNote = (
-    <p
-      className={cn("py-8 text-center text-sm", isHero ? "text-white/80" : "text-muted-foreground")}
-    >
-      {t("collectingIntraday")}
-    </p>
+    <p className="py-8 text-center text-sm text-muted-foreground">{t("collectingIntraday")}</p>
   );
 
   const chart = (
@@ -235,7 +231,6 @@ export function NetWorthHistoryChart({
       data={chartData}
       currency={currency}
       unit={effectiveMode === "performance" ? "percent" : "currency"}
-      theme={isHero ? "inverse" : "default"}
       minimal={isHero}
       height={isHero ? 150 : 280}
     />

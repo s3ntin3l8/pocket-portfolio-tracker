@@ -134,7 +134,7 @@ function HeroTooltip({
       value: isIntraday
         ? formatMoney(p.portfolio, currency, locale)
         : formatPercent(p.portfolio / 100, locale),
-      dot: "var(--primary-foreground)",
+      dot: "var(--primary)",
     },
   ];
   if (p.benchmark !== null) {

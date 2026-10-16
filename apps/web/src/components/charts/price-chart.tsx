@@ -19,7 +19,6 @@ export function PriceChart({
   data,
   currency,
   unit = "currency",
-  theme = "default",
   minimal = false,
   showYAxis = true,
   height = 280,
@@ -27,8 +26,6 @@ export function PriceChart({
   data: Candle[];
   currency: string;
   unit?: "currency" | "percent";
-  /** "inverse" = white line/fill/tooltip for use inside a dark/brand-colored hero card. */
-  theme?: "default" | "inverse";
   /** Hide axes/grid — just the area+line, for a compact sparkline (e.g. the Holdings hero). */
   minimal?: boolean;
   /** Show Y-axis on the left. Disable on narrow viewports — the tooltip cursor already shows the price. */
@@ -38,8 +35,8 @@ export function PriceChart({
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const points = data.map((d) => ({ date: d.date, close: Number(d.close) }));
-  const gradientId = theme === "inverse" ? "price-fill-inverse" : "price-fill";
-  const lineColor = theme === "inverse" ? "var(--primary-foreground)" : "var(--color-primary)";
+  const gradientId = "price-fill";
+  const lineColor = "var(--color-primary)";
 
   const formatValue = (v: number) =>
     unit === "percent" ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : formatMoney(v, currency, locale);
@@ -76,11 +73,7 @@ export function PriceChart({
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor={lineColor}
-                stopOpacity={theme === "inverse" ? 0.42 : 0.35}
-              />
+              <stop offset="0%" stopColor={lineColor} stopOpacity={0.35} />
               <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
             </linearGradient>
           </defs>
@@ -105,14 +98,7 @@ export function PriceChart({
             </>
           )}
           <Tooltip
-            cursor={
-              theme === "inverse"
-                ? {
-                    stroke: "color-mix(in srgb, var(--primary-foreground) 55%, transparent)",
-                    strokeDasharray: "4 4",
-                  }
-                : { stroke: "var(--color-border)", strokeDasharray: "4 4" }
-            }
+            cursor={{ stroke: "var(--color-border)", strokeDasharray: "4 4" }}
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               const v = Number(payload[0]?.value);
@@ -131,16 +117,7 @@ export function PriceChart({
             stroke={lineColor}
             strokeWidth={2.4}
             fill={`url(#${gradientId})`}
-            activeDot={
-              theme === "inverse"
-                ? {
-                    r: 5,
-                    fill: "var(--primary-foreground)",
-                    stroke: "var(--primary-deep)",
-                    strokeWidth: 2.5,
-                  }
-                : { r: 4 }
-            }
+            activeDot={{ r: 4 }}
           />
         </AreaChart>
       </ResponsiveContainer>

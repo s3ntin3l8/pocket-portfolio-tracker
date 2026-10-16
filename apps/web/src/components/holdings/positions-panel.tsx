@@ -1,5 +1,6 @@
 "use client";
 
+import { Card } from "@/components/ui/card";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { HoldingValuation } from "@portfolio/api-client";
@@ -158,13 +159,13 @@ export function PositionsPanel({
 
           return (
             <TabsContent key={key} value={key}>
-              <div className="overflow-hidden rounded-lg bg-card shadow-card">
+              <Card className="overflow-hidden">
                 {noResults ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">{t("noResults")}</p>
                 ) : (
                   <HoldingsTable rows={classRows} currency={currency} cash={tabCash} />
                 )}
-              </div>
+              </Card>
             </TabsContent>
           );
         })}
