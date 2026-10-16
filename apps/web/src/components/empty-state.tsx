@@ -34,7 +34,13 @@ export function EmptyState({
       >
         <Icon className={compact ? "size-5" : "size-6"} />
       </div>
-      <h3 className="text-body font-semibold">{title}</h3>
+      {/* The compact form sits inside a card or list with no heading of its own, so it is a
+          paragraph: an <h3> there would add a stray level to heading navigation. */}
+      {compact ? (
+        <p className="text-body font-semibold">{title}</p>
+      ) : (
+        <h3 className="text-body font-semibold">{title}</h3>
+      )}
       {description && (
         <p className="mt-1 max-w-sm text-body-sm text-muted-foreground">{description}</p>
       )}

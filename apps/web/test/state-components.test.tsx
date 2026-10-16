@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { Inbox } from "lucide-react";
@@ -15,6 +15,8 @@ const wrap = (ui: React.ReactElement) =>
     </NextIntlClientProvider>,
   );
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("EmptyState", () => {
   it("renders the framed full-region form by default", () => {
     const { container } = render(
@@ -27,9 +29,11 @@ describe("EmptyState", () => {
 
   it("renders the compact form without a frame and with no description", () => {
     const { container } = render(<EmptyState compact icon={Inbox} title="No matches" />);
-    expect(screen.getByRole("heading", { name: "No matches" })).toBeInTheDocument();
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+    // A paragraph, not a heading: the compact form adds no level to heading navigation.
+    expect(screen.queryByRole("heading")).toBeNull();
     expect(container.firstElementChild?.className).not.toContain("border-dashed");
-    expect(container.querySelector("p")).toBeNull();
+    expect(container.querySelectorAll("p")).toHaveLength(1);
   });
 });
 
