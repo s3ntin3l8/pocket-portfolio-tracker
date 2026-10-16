@@ -71,7 +71,11 @@ describe("seedDemo — snapshot history anchored to the live valuation (#989)", 
     expect(pfs).toHaveLength(5);
 
     // The seed's clock: every lastPrices row is stamped at its module-level NOW.
-    const [{ asOf }] = await db.select({ asOf: lastPrices.asOf }).from(lastPrices).limit(1);
+    const [{ asOf }] = await db
+      .select({ asOf: lastPrices.asOf })
+      .from(lastPrices)
+      .orderBy(desc(lastPrices.asOf))
+      .limit(1);
     const now = new Date(asOf);
 
     let quoteCalls = 0;
