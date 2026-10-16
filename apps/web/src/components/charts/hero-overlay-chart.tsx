@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Area,
   ComposedChart,
   Line,
   ResponsiveContainer,
@@ -21,13 +22,13 @@ export interface HeroOverlayPoint {
 
 /**
  * The Holdings glance hero chart. Two TWR-rebased `<Line>`s on a shared base of 100:
- *   - portfolio: white solid, drawn in front
- *   - benchmark: yellow dashed, drawn behind (or omitted entirely when its series
+ *   - portfolio: brand-green solid with a soft area fill, drawn in front
+ *   - benchmark: muted dashed, drawn behind (or omitted entirely when its series
  *     is all-null, e.g. intraday or "no benchmark configured").
  *
  * No axes, no grid, no legend — the parent renders the legend so the
  * benchmark label can be localised via next-intl. Inherits its container's width and
- * the standard hero height (~74px). Hovering any point shows a standard
+ * the standard hero height (96px). Hovering any point shows a standard
  * {@link ChartTooltipPanel} with the date + portfolio value + benchmark value
  * (benchmark row omitted when its series is null at that date). The tooltip
  * follows Recharts' Pattern A2 (v3 hooks + custom `content`), matching
@@ -47,14 +48,28 @@ export function HeroOverlayChart({
 }) {
   const locale = useLocale();
   return (
-    <div data-testid="hero-overlay-chart" className="w-full" style={{ height: 74 }}>
+    <div data-testid="hero-overlay-chart" className="w-full" style={{ height: 96 }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={points} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="hero-portfolio-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
+              <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="portfolio"
+            stroke="none"
+            fill="url(#hero-portfolio-fill)"
+            isAnimationActive={false}
+            activeDot={false}
+          />
           <Line
             type="monotone"
             dataKey="benchmark"
-            stroke="var(--hero-gold)"
-            strokeWidth={1.8}
+            stroke="var(--muted-foreground)"
+            strokeWidth={1.5}
             strokeDasharray="5 3"
             dot={false}
             connectNulls
@@ -63,14 +78,14 @@ export function HeroOverlayChart({
           <Line
             type="monotone"
             dataKey="portfolio"
-            stroke="var(--primary-foreground)"
-            strokeWidth={2.2}
+            stroke="var(--primary)"
+            strokeWidth={2}
             dot={false}
             isAnimationActive={false}
           />
           <Tooltip
             cursor={{
-              stroke: "color-mix(in srgb, var(--primary-foreground) 55%, transparent)",
+              stroke: "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
               strokeDasharray: "4 4",
             }}
             content={<HeroTooltip isIntraday={isIntraday} currency={currency} locale={locale} />}
@@ -119,7 +134,7 @@ function HeroTooltip({
       value: isIntraday
         ? formatMoney(p.portfolio, currency, locale)
         : formatPercent(p.portfolio / 100, locale),
-      dot: "var(--primary-foreground)",
+      dot: "var(--primary)",
     },
   ];
   if (p.benchmark !== null) {
@@ -128,7 +143,7 @@ function HeroTooltip({
       value: isIntraday
         ? formatMoney(p.benchmark, currency, locale)
         : formatPercent(p.benchmark / 100, locale),
-      dot: "var(--hero-gold)",
+      dot: "var(--muted-foreground)",
     });
   }
 

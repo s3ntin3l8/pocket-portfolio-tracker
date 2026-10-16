@@ -18,6 +18,9 @@ let _isTooltipActive = false;
 let _activeTooltipDataPoints: HeroOverlayPoint[] | undefined;
 
 vi.mock("recharts", () => ({
+  Area: ({ dataKey, fill }: { dataKey: string; fill?: string }) => (
+    <div data-testid={`area-${dataKey}`} data-fill={fill ?? ""} />
+  ),
   ComposedChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="composed-chart">{children}</div>
   ),
@@ -64,7 +67,7 @@ describe("HeroOverlayChart", () => {
     expect(screen.getByTestId("hero-overlay-chart")).toBeInTheDocument();
   });
 
-  it("renders two <Line>s — portfolio (white) + benchmark (yellow dashed)", () => {
+  it("renders two <Line>s — portfolio (brand green) + benchmark (muted dashed)", () => {
     renderChart([
       { date: "2026-01-01", portfolio: 100, benchmark: 100 },
       { date: "2026-02-01", portfolio: 110, benchmark: 105 },
@@ -72,10 +75,20 @@ describe("HeroOverlayChart", () => {
     ]);
     const portfolioLine = screen.getByTestId("line-portfolio");
     const benchmarkLine = screen.getByTestId("line-benchmark");
-    expect(portfolioLine).toHaveAttribute("data-stroke", "var(--primary-foreground)");
+    expect(portfolioLine).toHaveAttribute("data-stroke", "var(--primary)");
     expect(portfolioLine).toHaveAttribute("data-dash", "");
-    expect(benchmarkLine).toHaveAttribute("data-stroke", "var(--hero-gold)");
+    expect(benchmarkLine).toHaveAttribute("data-stroke", "var(--muted-foreground)");
     expect(benchmarkLine).toHaveAttribute("data-dash", "5 3");
+    expect(screen.getByTestId("area-portfolio")).toHaveAttribute(
+      "data-fill",
+      "url(#hero-portfolio-fill)",
+    );
+    const stops = Array.from(document.querySelectorAll("linearGradient#hero-portfolio-fill stop"));
+    expect(stops.map((s) => s.getAttribute("stop-color"))).toEqual([
+      "var(--primary)",
+      "var(--primary)",
+    ]);
+    expect(screen.getByTestId("hero-overlay-chart")).toHaveStyle({ height: "96px" });
   });
 
   it("renders no tooltip panel when tooltip is inactive", () => {
@@ -85,6 +98,17 @@ describe("HeroOverlayChart", () => {
       { date: "2026-02-01", portfolio: 110, benchmark: 105 },
     ]);
     expect(screen.getByTestId("tooltip-stub")).toBeEmptyDOMElement();
+  });
+
+  it("uses a visible brand-green swatch for the portfolio tooltip row", () => {
+    _isTooltipActive = true;
+    _activeTooltipDataPoints = [{ date: "2026-01-01", portfolio: 100, benchmark: null }];
+    const { container } = renderChart([
+      { date: "2026-01-01", portfolio: 100, benchmark: null },
+      { date: "2026-02-01", portfolio: 110, benchmark: null },
+    ]);
+    // The portfolio row's swatch must not be white-on-white on the card-coloured tooltip.
+    expect(container.innerHTML).not.toContain("var(--primary-foreground)");
   });
 
   it("renders tooltip panel with date + portfolio row for a day-grained point (no benchmark)", () => {

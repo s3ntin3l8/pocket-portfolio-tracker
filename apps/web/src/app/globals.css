@@ -60,7 +60,6 @@
      card look the same in both themes, so these are deliberately not overridden in .dark. */
   --primary-deep: #0b7d58;
   --primary-ink: #0b3a2a;
-  --hero-gold: #ffd24a;
   --violet: #7c5cfc;
   --violet-deep: #5b3fd6;
   --hero-ink: #11211a;
@@ -173,7 +172,6 @@
   --color-scrim: var(--scrim);
   --color-primary-deep: var(--primary-deep);
   --color-primary-ink: var(--primary-ink);
-  --color-hero-gold: var(--hero-gold);
   --color-violet: var(--violet);
   --color-violet-deep: var(--violet-deep);
   --color-hero-ink: var(--hero-ink);
