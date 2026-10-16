@@ -96,21 +96,18 @@ export function ByYearTable({
             {sorted.map((y) => (
               <TableRow key={y.year}>
                 <TableCell className="font-semibold">{y.year}</TableCell>
-                <TableCell
-                  className={cn(
-                    "tabular text-right font-medium",
-                    signToneClass(Number(y.realized)),
-                  )}
-                >
+                <TableCell numeric className={cn("font-medium", signToneClass(Number(y.realized)))}>
                   {fmt(y.realized)}
                 </TableCell>
-                <TableCell className="tabular text-right text-muted-foreground">
+                <TableCell numeric className="text-muted-foreground">
                   {fmt(y.dividends)}
                 </TableCell>
-                <TableCell className="tabular text-right text-muted-foreground">
+                <TableCell numeric className="text-muted-foreground">
                   {fmt(y.fsaUsed)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">{fmt(y.tax)}</TableCell>
+                <TableCell numeric className="font-semibold">
+                  {fmt(y.tax)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -195,18 +192,15 @@ export function IdByYearTable({
             {sorted.map((y) => (
               <TableRow key={y.year}>
                 <TableCell className="font-semibold">{y.year}</TableCell>
-                <TableCell
-                  className={cn(
-                    "tabular text-right font-medium",
-                    signToneClass(Number(y.realized)),
-                  )}
-                >
+                <TableCell numeric className={cn("font-medium", signToneClass(Number(y.realized)))}>
                   {fmt(y.realized)}
                 </TableCell>
-                <TableCell className="tabular text-right text-muted-foreground">
+                <TableCell numeric className="text-muted-foreground">
                   {fmt(y.dividends)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">{fmt(y.tax)}</TableCell>
+                <TableCell numeric className="font-semibold">
+                  {fmt(y.tax)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -67,10 +67,10 @@ export function LotRow({
       <TableCell className="pl-9 text-muted-foreground">
         {lot.acqDate} · {lot.quantity} @ {money(lot.buyPrice)} → {money(lot.sellPrice)}
       </TableCell>
-      <TableCell className="tabular text-right text-muted-foreground">
+      <TableCell numeric className="text-muted-foreground">
         {money(lot.proceeds)}
       </TableCell>
-      <TableCell className={cn("tabular text-right", secondaryClassName)}>
+      <TableCell numeric className={secondaryClassName}>
         {secondaryValue}
       </TableCell>
     </TableRow>

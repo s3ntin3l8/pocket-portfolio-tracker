@@ -107,13 +107,13 @@ export function DividendsTable({
               {sorted.map((r, i) => (
                 <TableRow key={`${r.symbol}:${r.currency}:${i}`}>
                   <TableCell className="font-medium">{r.symbol}</TableCell>
-                  <TableCell className="tabular text-right text-muted-foreground">
+                  <TableCell numeric className="text-muted-foreground">
                     {fmt(r.gross, r.currency)}
                   </TableCell>
-                  <TableCell className="tabular text-right font-semibold">
+                  <TableCell numeric className="font-semibold">
                     {fmt(r.tax, r.currency)}
                   </TableCell>
-                  <TableCell className="tabular text-right text-success">
+                  <TableCell numeric className="text-success">
                     {fmt(r.net, r.currency)}
                   </TableCell>
                 </TableRow>
@@ -122,13 +122,13 @@ export function DividendsTable({
             <TableFooter>
               <TableRow>
                 <TableCell className="font-semibold">{t("dividendsTable.total")}</TableCell>
-                <TableCell className="tabular text-right font-semibold">
+                <TableCell numeric className="font-semibold">
                   {joinTotals("gross")}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">
+                <TableCell numeric className="font-semibold">
                   {joinTotals("tax")}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold text-success">
+                <TableCell numeric className="font-semibold text-success">
                   {joinTotals("net")}
                 </TableCell>
               </TableRow>

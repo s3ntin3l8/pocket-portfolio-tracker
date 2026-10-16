@@ -201,14 +201,14 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                     <span className="ml-1 text-micro text-text-2">· {t("ytdLabel")}</span>
                   )}
                 </TableCell>
-                <TableCell className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs">
+                <TableCell numeric className="px-2 py-1.5 first:pl-2 last:pr-2 text-xs">
                   {r.portfolioTwr !== null ? (
                     <PercentCell value={Number(r.portfolioTwr)} locale={locale} />
                   ) : (
                     <span className="text-text-2">{t("noData")}</span>
                   )}
                 </TableCell>
-                <TableCell className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs">
+                <TableCell numeric className="px-2 py-1.5 first:pl-2 last:pr-2 text-xs">
                   {r.portfolioXirr !== null ? (
                     <PercentCell value={Number(r.portfolioXirr)} locale={locale} />
                   ) : (
@@ -218,7 +218,8 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                 {r.benchmarks.map((b) => (
                   <TableCell
                     key={b.symbol}
-                    className="tabular px-2 py-1.5 first:pl-2 last:pr-2 text-right text-xs"
+                    numeric
+                    className="px-2 py-1.5 first:pl-2 last:pr-2 text-xs"
                   >
                     {b.twr !== null ? (
                       <PercentCell value={Number(b.twr)} locale={locale} />
@@ -230,7 +231,8 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
                 {r.benchmarks.map((b) => (
                   <TableCell
                     key={`act-${b.symbol}`}
-                    className="tabular px-2 py-1.5 text-right text-xs first:pl-2 last:pr-2"
+                    numeric
+                    className="px-2 py-1.5 text-xs first:pl-2 last:pr-2"
                   >
                     {b.activeReturn !== null ? (
                       <PercentCell value={Number(b.activeReturn)} locale={locale} />

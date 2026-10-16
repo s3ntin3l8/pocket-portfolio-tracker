@@ -115,10 +115,10 @@ export function DisposalTable({
                       onKeyDown={hasLots ? onActivateKey(() => toggle(key)) : undefined}
                     >
                       <DisposalCell row={r} money={money} t={t} isOpen={isOpen} />
-                      <TableCell className="tabular text-right text-muted-foreground">
+                      <TableCell numeric className="text-muted-foreground">
                         {money(r.proceeds)}
                       </TableCell>
-                      <TableCell className="tabular text-right">
+                      <TableCell numeric>
                         <span className={cn("font-semibold", signToneClass(Number(r.gain)))}>
                           {money(r.gain)}
                         </span>
@@ -149,14 +149,12 @@ export function DisposalTable({
             <TableFooter>
               <TableRow>
                 <TableCell className="font-semibold">{t("disposals.total")}</TableCell>
-                <TableCell className="tabular text-right font-semibold">
+                <TableCell numeric className="font-semibold">
                   {money(totalProceeds)}
                 </TableCell>
                 <TableCell
-                  className={cn(
-                    "tabular text-right font-semibold",
-                    signToneClass(Number(totalGain)),
-                  )}
+                  numeric
+                  className={cn("font-semibold", signToneClass(Number(totalGain)))}
                 >
                   {money(totalGain)}
                 </TableCell>

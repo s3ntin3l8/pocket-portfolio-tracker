@@ -129,10 +129,10 @@ export function IdSalesTable({
                         t={t}
                         isOpen={isOpen}
                       />
-                      <TableCell className="tabular text-right text-muted-foreground">
+                      <TableCell numeric className="text-muted-foreground">
                         {money(r.proceeds)}
                       </TableCell>
-                      <TableCell className="tabular text-right font-semibold">
+                      <TableCell numeric className="font-semibold">
                         {money(r.tax)}
                       </TableCell>
                     </TableRow>
@@ -153,10 +153,10 @@ export function IdSalesTable({
             <TableFooter>
               <TableRow>
                 <TableCell className="font-semibold">{t("id.sales.total")}</TableCell>
-                <TableCell className="tabular text-right font-semibold text-muted-foreground">
+                <TableCell numeric className="font-semibold text-muted-foreground">
                   {money(totalProceeds)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">
+                <TableCell numeric className="font-semibold">
                   {money(totalSalesTax)}
                 </TableCell>
               </TableRow>

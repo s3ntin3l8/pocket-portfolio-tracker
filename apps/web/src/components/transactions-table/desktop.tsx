@@ -301,15 +301,18 @@ export function DesktopTable({
                       {tx.portfolioName ?? "—"}
                     </TableCell>
                   )}
-                  <TableCell className="tabular text-right text-body-sm font-semibold text-text-2">
+                  <TableCell numeric className="text-body-sm font-semibold text-text-2">
                     {Number(tx.quantity) || rowQuantityDisplay(tx) || "—"}
                   </TableCell>
-                  <TableCell className="tabular text-right text-body-sm font-semibold">
+                  <TableCell numeric className="text-body-sm font-semibold">
                     {Number(tx.quantity) > 0
                       ? m(Number(tx.price), tx.currency)
                       : (rowPerShareDisplay(tx, m) ?? "—")}
                   </TableCell>
-                  <TableCell className="tabular hidden text-right text-body-sm font-semibold text-text-2 lg:table-cell">
+                  <TableCell
+                    numeric
+                    className="hidden text-body-sm font-semibold text-text-2 lg:table-cell"
+                  >
                     {tx.tax != null && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -322,7 +325,8 @@ export function DesktopTable({
                     </div>
                   </TableCell>
                   <TableCell
-                    className={`tabular text-right text-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
+                    numeric
+                    className={`text-body-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
                   >
                     {m(netAmount, tx.currency)}
                   </TableCell>
