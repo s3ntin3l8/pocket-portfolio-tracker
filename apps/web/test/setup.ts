@@ -1,4 +1,11 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/dom";
+
+// findBy*/waitFor default to 1s. Lazily loaded dialogs (next/dynamic) and their first fetch can
+// exceed that when a CI shard or a developer machine is under load, which showed up as
+// intermittent "Unable to find role=dialog" failures. A longer ceiling costs nothing when the
+// element appears promptly (they resolve as soon as it does) and only slows a real failure.
+configure({ asyncUtilTimeout: 4000 });
 
 // Radix UI primitives (e.g. DropdownMenu, Switch) call DOM APIs that jsdom doesn't implement.
 // Stub the ones they touch so the portalled menus and form controls work under test.
