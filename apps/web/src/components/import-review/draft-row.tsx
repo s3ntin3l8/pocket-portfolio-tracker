@@ -94,8 +94,8 @@ export function DraftRow({
       <TableCell className="tabular whitespace-nowrap text-muted-foreground">
         {dateOf(draft)}
       </TableCell>
-      <TableCell className="tabular text-right">{fmtQty(draft.quantity)}</TableCell>
-      <TableCell className="tabular text-right">
+      <TableCell numeric>{fmtQty(draft.quantity)}</TableCell>
+      <TableCell numeric>
         {needsCostBasis && onUpdate ? (
           <Input
             inputMode="decimal"
@@ -109,10 +109,10 @@ export function DraftRow({
           fmtAmt(draft.price)
         )}
       </TableCell>
-      <TableCell className="tabular text-right text-muted-foreground">
+      <TableCell numeric className="text-muted-foreground">
         {draft.total ? fmtAmt(draft.total) : "—"}
       </TableCell>
-      <TableCell className="tabular text-right text-muted-foreground">
+      <TableCell numeric className="text-muted-foreground">
         {draft.fees ? fmtAmt(draft.fees) : "—"}
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{draft.currency}</TableCell>

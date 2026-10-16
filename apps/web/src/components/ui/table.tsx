@@ -15,7 +15,7 @@ function Table({
     <div className={cn("relative w-full overflow-x-auto", edgeAffordance && "scroll-shadow-x")}>
       <table
         className={cn(
-          "w-full caption-bottom text-sm",
+          "w-full caption-bottom text-body-sm",
           edgeAffordance && "sticky-first-col",
           className,
         )}
@@ -66,8 +66,23 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   );
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
-  return <td className={cn("px-3 py-3 align-middle first:pl-5 last:pr-5", className)} {...props} />;
+/** `numeric` right-aligns the cell with tabular figures — the one spelling for a money or
+ *  quantity column (compose weight/colour via `className`). */
+function TableCell({
+  className,
+  numeric = false,
+  ...props
+}: React.ComponentProps<"td"> & { numeric?: boolean }) {
+  return (
+    <td
+      className={cn(
+        "px-3 py-3 align-middle first:pl-5 last:pr-5",
+        numeric && "tabular text-right",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 // Shared cell-typography convention (sourced from the Holdings table, the most fully-realized

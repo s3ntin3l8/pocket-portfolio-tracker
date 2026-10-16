@@ -101,24 +101,28 @@ export function IdDividendsTable({
               {sorted.map((r, i) => (
                 <TableRow key={`${r.symbol}:${r.currency}:${i}`}>
                   <TableCell className="font-medium">{r.symbol}</TableCell>
-                  <TableCell className="tabular text-right text-muted-foreground">
+                  <TableCell numeric className="text-muted-foreground">
                     {fmt(r.gross)}
                   </TableCell>
-                  <TableCell className="tabular text-right font-semibold">{fmt(r.tax)}</TableCell>
-                  <TableCell className="tabular text-right text-success">{fmt(r.net)}</TableCell>
+                  <TableCell numeric className="font-semibold">
+                    {fmt(r.tax)}
+                  </TableCell>
+                  <TableCell numeric className="text-success">
+                    {fmt(r.net)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
             <TableFooter>
               <TableRow>
                 <TableCell className="font-semibold">{t("id.dividendsTable.total")}</TableCell>
-                <TableCell className="tabular text-right font-semibold text-muted-foreground">
+                <TableCell numeric className="font-semibold text-muted-foreground">
                   {fmt(totalDividendGross)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">
+                <TableCell numeric className="font-semibold">
                   {fmt(totalDividendTax)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold text-success">
+                <TableCell numeric className="font-semibold text-success">
                   {fmt(totalDividendNet)}
                 </TableCell>
               </TableRow>

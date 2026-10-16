@@ -46,10 +46,10 @@ export function IssueRow({
       <TableCell className="tabular whitespace-nowrap text-muted-foreground">
         {issue.raw?.executedAt?.slice(0, 10) ?? "—"}
       </TableCell>
-      <TableCell className="tabular text-right text-muted-foreground">
+      <TableCell numeric className="text-muted-foreground">
         {issue.raw?.shares != null ? fmtQty(String(issue.raw.shares)) : "—"}
       </TableCell>
-      <TableCell className="tabular text-right text-muted-foreground">
+      <TableCell numeric className="text-muted-foreground">
         {issue.raw?.amount != null ? fmtAmt(String(Math.abs(issue.raw.amount))) : "—"}
       </TableCell>
       <TableCell />

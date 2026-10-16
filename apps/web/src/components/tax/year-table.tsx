@@ -104,13 +104,15 @@ export function ByYearTable({
                 >
                   {fmt(y.realized)}
                 </TableCell>
-                <TableCell className="tabular text-right text-muted-foreground">
+                <TableCell numeric className="text-muted-foreground">
                   {fmt(y.dividends)}
                 </TableCell>
-                <TableCell className="tabular text-right text-muted-foreground">
+                <TableCell numeric className="text-muted-foreground">
                   {fmt(y.fsaUsed)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">{fmt(y.tax)}</TableCell>
+                <TableCell numeric className="font-semibold">
+                  {fmt(y.tax)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -203,10 +205,12 @@ export function IdByYearTable({
                 >
                   {fmt(y.realized)}
                 </TableCell>
-                <TableCell className="tabular text-right text-muted-foreground">
+                <TableCell numeric className="text-muted-foreground">
                   {fmt(y.dividends)}
                 </TableCell>
-                <TableCell className="tabular text-right font-semibold">{fmt(y.tax)}</TableCell>
+                <TableCell numeric className="font-semibold">
+                  {fmt(y.tax)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
