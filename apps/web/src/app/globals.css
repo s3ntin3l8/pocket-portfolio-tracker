@@ -2,8 +2,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Pocket — calm, data-first. Neutral base; brand green (#0E9F6E) is the primary action colour
-   and the chart accent. Semantic text and fills (success, destructive, warning, info) are
+/* Pocket — calm, data-first. Neutral base; the primary action colour is the AA green --primary;
+   the brighter #0E9F6E lives on as --brand (logo mark) and --chart-1. Semantic text and fills (success, destructive, warning, info) are
    separate tokens tuned to WCAG AA in the light theme (see test/theme-contrast.test.ts). */
 :root {
   --radius: 0.75rem;
@@ -30,7 +30,7 @@
   /* Semantic text colours are tuned for >= 4.5:1 on the card and page backgrounds. */
   --destructive: #c9363b;
   --destructive-foreground: #ffffff;
-  --destructive-fill: #c9363b; /* solid button fill; dark theme needs its own value */
+  --destructive-fill: #c9363b; /* solid button fill; same in both themes because the dark --destructive text colour is lighter than any fill white text can sit on */
   --success: #0a7d57;
   --warning: #946200;
   --warning-foreground: #ffffff;
@@ -96,7 +96,6 @@
 
   --primary: #0e9f6e;
   --primary-foreground: #0b0d10;
-  --brand: #0e9f6e;
 
   --secondary: #1c2026;
   --secondary-foreground: #e8ebee;
@@ -107,11 +106,11 @@
 
   --destructive: #ff6b70;
   --destructive-foreground: #ffffff;
-  --destructive-fill: #c9363b;
   --success: #12b981;
   --warning: #e0a53a;
   --warning-foreground: #0b0d10;
-  --primary-strong: #0e9f6e;
+  /* Dark success and destructive text already clear 4.5:1 on their own tint, so their strong tier equals the base token; primary needs a lighter step for the muted surfaces. */
+  --primary-strong: #12b981;
   --success-strong: #12b981;
   --destructive-strong: #ff6b70;
 

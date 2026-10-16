@@ -97,7 +97,7 @@ describe.each([
   ["light", light],
   ["dark", dark],
 ] as const)("%s theme primary and tints", (_name, t) => {
-  const surfaces = ["card", "background"] as const;
+  const surfaces = ["card", "background", "secondary", "muted"] as const;
 
   for (const surface of surfaces) {
     it(`primary text on ${surface} is at least 4.5:1`, () => {
@@ -172,6 +172,19 @@ describe("solid fill classes in source", () => {
     }
   });
 
+  it("the needs-review badges pair their fills with foreground tokens, not hard-coded white", () => {
+    for (const [file, code] of FILES([
+      "src/components/app-shell.tsx",
+      "src/components/bottom-nav.tsx",
+    ])) {
+      expect(code, file).toContain("bg-destructive-fill text-destructive-foreground");
+      expect(code, file).toContain("bg-gold-fg text-warning-foreground");
+      expect(code, file).not.toContain("text-white");
+    }
+  });
+
+  // The logo mark (`bg-brand text-white` in brand.tsx) is exempt from WCAG 1.4.3 (logotype), so
+  // `bg-brand` is deliberately not part of this scan.
   it("no component pairs a brand fill with hard-coded white text", () => {
     const glob = [
       ...readdirSync(resolve(__dirname, "../src/components"), {
