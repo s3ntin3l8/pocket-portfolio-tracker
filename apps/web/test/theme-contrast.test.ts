@@ -11,6 +11,8 @@ const css = readFileSync(resolve(__dirname, "../src/app/globals.css"), "utf8");
 
 function block(selector: string): Record<string, string> {
   const start = css.indexOf(`${selector} {`);
+  // Fail loudly if a selector is renamed rather than slicing from -1.
+  expect(start, `${selector} block not found in globals.css`).toBeGreaterThanOrEqual(0);
   const end = css.indexOf("\n}", start);
   const body = css.slice(start, end);
   const tokens: Record<string, string> = {};
@@ -34,7 +36,16 @@ function contrast(a: string, b: string): number {
 const light = { ...block(":root") };
 const dark = { ...light, ...block(".dark") };
 
-const TEXT = ["success", "destructive", "warning", "muted-foreground", "foreground"] as const;
+const TEXT = [
+  "success",
+  "destructive",
+  "warning",
+  "gold-fg",
+  "info",
+  "warn-soft",
+  "muted-foreground",
+  "foreground",
+] as const;
 
 describe.each([
   ["light", light],
@@ -56,7 +67,9 @@ describe.each([
 // A solid destructive fill with white text can only pass in the light theme: in dark the same
 // token is also the text colour on the dark card, and no single value satisfies both.
 describe("light theme destructive button", () => {
-  it("white on the destructive fill is at least 4.5:1", () => {
-    expect(contrast("#ffffff", light.destructive)).toBeGreaterThanOrEqual(4.5);
+  it("the destructive foreground on the destructive fill is at least 4.5:1", () => {
+    expect(contrast(light["destructive-foreground"], light.destructive)).toBeGreaterThanOrEqual(
+      4.5,
+    );
   });
 });

@@ -52,8 +52,8 @@
   --pill: #111827;
   --gold-fg: #946200;
   --warn-strong: #7a5a1a;
-  --warn-soft: #9a7b3a;
-  --info: #2a6fdb;
+  --warn-soft: #85692a;
+  --info: #2160c4;
   --orange: #f97316; /* consumed via var(--orange) by tint("orange") / chart segments, not as a Tailwind class */
   --scrim: rgba(17, 24, 39, 0.45);
 
