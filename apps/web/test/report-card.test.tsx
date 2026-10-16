@@ -133,6 +133,8 @@ describe("TwoStatFooter", () => {
     expect(screen.getByText("Rp 1.2jt")).toBeInTheDocument();
     expect(screen.getByText("Lifetime")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
+    // The "Open ›" affordance is the one brand-green action on a report card.
+    expect(screen.getByText("Open").className).toContain("text-primary");
   });
 });
 

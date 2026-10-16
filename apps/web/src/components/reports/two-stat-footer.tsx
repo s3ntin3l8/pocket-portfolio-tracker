@@ -1,3 +1,4 @@
+import { CardLabel } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
 
 /**
@@ -16,9 +17,9 @@ export function TwoStatFooter({
       <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-2">
         {metrics.map((m, i) => (
           <div key={i} className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground [overflow-wrap:normal] [word-break:break-word]">
+            <CardLabel className="[overflow-wrap:normal] [word-break:break-word]">
               {m.label}
-            </p>
+            </CardLabel>
             <p
               className="tabular mt-[3px] whitespace-nowrap text-body font-bold"
               style={m.color ? { color: m.color } : undefined}
