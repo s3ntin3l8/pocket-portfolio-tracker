@@ -240,7 +240,7 @@ export default async function TradesPage({
         </div>
 
         {/* ── Sidebar: KPI cards + charts (sticky on wide containers) ── */}
-        <div className="min-w-0 space-y-5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+        <div className="min-w-0 space-y-5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @xl:grid-cols-1">
             <StatCard
               label={t("totalReturn")}

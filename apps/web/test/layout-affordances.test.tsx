@@ -6,7 +6,14 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { ResponsiveMoney } from "../src/components/ui/responsive-money";
 import { TwoStatFooter } from "../src/components/reports/two-stat-footer";
-import { Table, TABLE_VALUE, TABLE_VALUE_STRONG } from "../src/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableRow,
+  TABLE_VALUE,
+  TABLE_VALUE_STRONG,
+} from "../src/components/ui/table";
 import { MobileView } from "../src/components/transactions-table/mobile";
 import { HoldingsTable } from "../src/components/holdings-table";
 import { TOOLBAR_FILTERS } from "../src/components/table-toolbar";
@@ -143,5 +150,61 @@ describe("auth label (audit G8)", () => {
     expect(authViaKey("local|abc", false)).toBe("authViaLocal");
     expect(authViaKey("abc", false)).toBe("authVia");
     expect(authViaKey(undefined, false)).toBe("authVia");
+  });
+});
+
+describe("Table stickyHeader", () => {
+  it("clips instead of scrolling so the header can stick, and pins the header cells under the topbar", () => {
+    const { container } = render(
+      <Table stickyHeader>
+        <TableHeader>
+          <TableRow>
+            <TableHead>A</TableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.className).toContain("overflow-x-clip");
+    expect(wrapper.className).not.toContain("overflow-x-auto");
+    expect(container.querySelector("table")!.className).toContain("top-(--topbar-h)");
+  });
+
+  it("keeps the scrolling wrapper by default", () => {
+    const { container } = render(<Table />);
+    expect((container.firstElementChild as HTMLElement).className).toContain("overflow-x-auto");
+  });
+
+  it("defines the topbar height token", () => {
+    expect(src("src/app/globals.css")).toContain("--topbar-h:");
+  });
+});
+
+describe("table layout switch", () => {
+  const files = [
+    "src/components/instrument-lots-table.tsx",
+    "src/components/import-review/table.tsx",
+    "src/components/import-review/mobile.tsx",
+    "src/components/import-history.tsx",
+    "src/components/corporate-actions-manager.tsx",
+    "src/components/tax-reports-inbox.tsx",
+  ];
+  it("tables and their mobile lists switch at lg, not md", () => {
+    for (const f of files) {
+      const code = src(f);
+      expect(code, f).not.toMatch(/\b(hidden md:block|md:hidden)\b/);
+    }
+  });
+  it("the tax tables opt into the horizontal-scroll affordance", () => {
+    for (const f of [
+      "dividends-table",
+      "id-dividends-table",
+      "disposals-table-de",
+      "sales-table-id",
+      "year-table",
+    ]) {
+      const code = src(`src/components/tax/${f}.tsx`);
+      expect(code, f).toContain("edgeAffordance");
+    }
   });
 });

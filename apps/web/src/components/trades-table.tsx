@@ -101,8 +101,8 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
       ) : (
         <Card>
           {/* ── Desktop table (lg+) ── */}
-          <div className="hidden overflow-x-auto lg:block">
-            <Table>
+          <div className="hidden lg:block">
+            <Table stickyHeader>
               <TableHeader>
                 <TableRow>
                   <SortableTableHead

@@ -5,18 +5,31 @@ import { cn } from "@/lib/utils";
  * `edgeAffordance` (audit G5) opts a wide table into the scroll-shadow wrapper
  * (`scroll-shadow-x`, shadows appear only on an edge with more content past it) and a
  * pinned first column (`sticky-first-col`), so horizontal overflow is never silent.
+ *
+ * `stickyHeader` pins the header row under the topbar while the shell scrolls. `position: sticky`
+ * is lost inside any scroll container, so the wrapper clips (`overflow-x: clip`) instead of
+ * scrolling: use it only on tables that never need horizontal scroll, and not with `edgeAffordance`.
  */
 function Table({
   className,
   edgeAffordance = false,
+  stickyHeader = false,
   ...props
-}: React.ComponentProps<"table"> & { edgeAffordance?: boolean }) {
+}: React.ComponentProps<"table"> & { edgeAffordance?: boolean; stickyHeader?: boolean }) {
   return (
-    <div className={cn("relative w-full overflow-x-auto", edgeAffordance && "scroll-shadow-x")}>
+    <div
+      className={cn(
+        "relative w-full",
+        stickyHeader ? "overflow-x-clip" : "overflow-x-auto",
+        edgeAffordance && "scroll-shadow-x",
+      )}
+    >
       <table
         className={cn(
           "w-full caption-bottom text-body-sm",
           edgeAffordance && "sticky-first-col",
+          stickyHeader &&
+            "[&_thead_th]:sticky [&_thead_th]:top-(--topbar-h) [&_thead_th]:z-10 [&_thead_th]:bg-card",
           className,
         )}
         {...props}

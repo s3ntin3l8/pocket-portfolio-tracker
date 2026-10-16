@@ -29,7 +29,7 @@ export function InstrumentLotsTable({ lots, currency }: { lots: LotView[]; curre
 
   return (
     <>
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -86,7 +86,7 @@ export function InstrumentLotsTable({ lots, currency }: { lots: LotView[]; curre
           </TableBody>
         </Table>
       </div>
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-3 lg:hidden">
         {sorted.map((lot, i) => (
           <Card key={`${lot.acqDate}-${i}`} className="px-4 py-3">
             <div className="flex items-center justify-between">

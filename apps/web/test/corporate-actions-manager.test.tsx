@@ -163,7 +163,7 @@ describe("CorporateActionsManager", () => {
     expect(rows[1]).toHaveTextContent("10");
   });
 
-  // The mobile card list (md:hidden) opens CaSheetContent on tap — a separate path
+  // The mobile card list (lg:hidden) opens CaSheetContent on tap — a separate path
   // from the desktop table's inline row-editing above, and previously untested.
   describe("mobile card → overlay chrome (#625 migration)", () => {
     function openMobileCard() {
@@ -172,7 +172,7 @@ describe("CorporateActionsManager", () => {
       // viewport, not conditionally mounted — same badge text, two places) — scope to
       // the mobile card list container. The whole card is the role="button" trigger
       // (isAdmin), not a separately labeled button.
-      const mobileList = container.querySelector(".md\\:hidden")!;
+      const mobileList = container.querySelector(".lg\\:hidden")!;
       const badge = Array.from(mobileList.querySelectorAll("span")).find(
         (el) => el.textContent === messages.TxType.split,
       )!;

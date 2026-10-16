@@ -112,7 +112,7 @@ export function SettingsShell({
   return (
     <SectionHeadingContext.Provider value={isIndex}>
       <div className="md:grid md:grid-cols-[270px_1fr] md:gap-6 md:items-start">
-        <div className="hidden md:sticky md:top-[calc(70px+env(safe-area-inset-top))] md:flex md:flex-col md:gap-3 md:self-start">
+        <div className="hidden md:sticky md:top-[calc(var(--topbar-h)+0.5rem)] md:flex md:flex-col md:gap-3 md:self-start">
           {railTop}
           <nav className={cn("divide-y divide-line rounded-xl bg-card p-2", CARD_SHADOW)}>
             {railLinks}

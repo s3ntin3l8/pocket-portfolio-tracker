@@ -43,7 +43,7 @@ export function ByYearTable({
         <CardTitle className="text-base">{t("byYear.title")}</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pt-0">
-        <Table>
+        <Table edgeAffordance className="min-w-[560px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead
@@ -148,7 +148,7 @@ export function IdByYearTable({
         <CardTitle className="text-base">{t("id.byYear.title")}</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pt-0">
-        <Table>
+        <Table edgeAffordance className="min-w-[560px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead

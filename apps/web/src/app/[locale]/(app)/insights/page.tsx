@@ -144,7 +144,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
         the top on mobile (matching the pre-sidebar position after the XIRR hero);
         @xl:order-last visually moves it right on desktop. Overflow capped so the
         rail doesn't eat the entire viewport when stacked deep. ── */}
-        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
+        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
           {allocation && (
             <div className="grid grid-cols-2 gap-3">
               <Card className="p-4">

@@ -418,7 +418,7 @@ export function TransactionsTable({
       >
         {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
         {showFilterBanners && (
-          <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+          <div className="space-y-3 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
             {allBanner && (
               <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
             )}

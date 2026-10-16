@@ -160,7 +160,7 @@ export default async function InstrumentPage({
         </div>
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
-        <div className="space-y-6 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto @xl:order-last">
+        <div className="space-y-6 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto @xl:order-last">
           <Suspense fallback={<InstrumentCardSkeleton />}>
             <InstrumentPositionSection id={id} locale={locale} />
           </Suspense>
