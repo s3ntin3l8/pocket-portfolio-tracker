@@ -101,7 +101,7 @@ export function SettingsShell({
           </span>
           <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
           {item.badge && (
-            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro font-bold tracking-wide text-primary">
+            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro font-bold tracking-wide text-primary-strong">
               {item.badge}
             </span>
           )}
@@ -150,7 +150,7 @@ export function SettingsShell({
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-sm font-bold">{item.title}</span>
                           {item.badge && (
-                            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro font-bold tracking-wide text-primary">
+                            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro font-bold tracking-wide text-primary-strong">
                               {item.badge}
                             </span>
                           )}

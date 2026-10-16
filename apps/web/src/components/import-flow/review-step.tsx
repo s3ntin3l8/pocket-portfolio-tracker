@@ -79,7 +79,7 @@ export function ReviewStep({
       {accountMismatch && (
         <div
           role="alert"
-          className="flex flex-wrap items-center gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning"
+          className="flex flex-wrap items-center gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warn-strong"
         >
           <AlertCircle className="size-4 shrink-0" />
           <span className="min-w-0 flex-1">
@@ -143,7 +143,7 @@ export function ReviewStep({
       )}
 
       {savedReports.length > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2.5 text-sm text-success">
+        <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2.5 text-sm text-success-strong">
           <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" />
           <ul className="flex-1 space-y-1">
             {savedReports.map((r) => (

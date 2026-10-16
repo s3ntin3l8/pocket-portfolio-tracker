@@ -77,7 +77,7 @@ export function SparplanSection({
             </button>
           )}
           {activePlans.length > 0 && (
-            <span className="shrink-0 rounded-lg bg-success/15 px-2 py-1 text-micro font-bold text-success">
+            <span className="shrink-0 rounded-lg bg-success/15 px-2 py-1 text-micro font-bold text-success-strong">
               {t("activeCount", { count: activePlans.length })}
             </span>
           )}

@@ -36,7 +36,7 @@ export function DuplicateConflictBanner({
   return (
     <div
       role="alert"
-      className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning"
+      className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warn-strong"
     >
       <div className="flex items-start gap-3">
         <AlertCircle className="mt-0.5 size-4 shrink-0" />

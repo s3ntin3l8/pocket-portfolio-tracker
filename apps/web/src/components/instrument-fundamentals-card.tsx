@@ -204,7 +204,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
           <div className="flex flex-wrap gap-2.5">
             {data.earningsDate && (
               <div className="flex items-center gap-2.5 rounded-xl bg-muted/50 px-3.5 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-warning/15 text-warning">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-warning/15 text-warn-strong">
                   <CalendarClock className="size-4.5" />
                 </span>
                 <div>
@@ -221,7 +221,7 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
             )}
             {data.exDividendDate && (
               <div className="flex items-center gap-2.5 rounded-xl bg-muted/50 px-3.5 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-warning/15 text-warning">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-warning/15 text-warn-strong">
                   <CalendarClock className="size-4.5" />
                 </span>
                 <div>

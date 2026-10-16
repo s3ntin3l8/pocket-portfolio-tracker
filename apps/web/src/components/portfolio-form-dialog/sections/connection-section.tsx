@@ -9,9 +9,9 @@ import type { Portfolio, TrConnection, IbkrConnection } from "@portfolio/api-cli
 type ConnectionStatus = "connected" | "awaiting_2fa" | "expired" | "error" | "disconnected";
 
 const PILL_TONE: Record<"ok" | "pending" | "bad" | "idle", string> = {
-  ok: "bg-success/15 text-success",
+  ok: "bg-success/15 text-success-strong",
   pending: "bg-warning/15 text-warn-strong",
-  bad: "bg-destructive/15 text-destructive",
+  bad: "bg-destructive/15 text-destructive-strong",
   idle: "bg-muted text-muted-foreground",
 };
 

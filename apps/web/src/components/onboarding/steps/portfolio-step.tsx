@@ -157,7 +157,9 @@ export function PortfolioStep({
                 onClick={() => onCurrencyChange(code)}
                 className={cn(
                   "cursor-pointer rounded-sm px-3.5 py-2 text-xs font-bold transition-colors",
-                  selected ? "bg-primary text-white" : "bg-muted text-text-mute dark:text-text-2",
+                  selected
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-text-mute dark:text-text-2",
                 )}
               >
                 {code}

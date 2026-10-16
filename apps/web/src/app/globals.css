@@ -2,8 +2,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Pocket — calm, data-first. Neutral base; brand green (#0E9F6E) is the primary action colour
-   and the chart accent. Semantic text and fills (success, destructive, warning, info) are
+/* Pocket — calm, data-first. Neutral base; the primary action colour is the AA green --primary;
+   the brighter #0E9F6E lives on as --brand (logo mark) and --chart-1. Semantic text and fills (success, destructive, warning, info) are
    separate tokens tuned to WCAG AA in the light theme (see test/theme-contrast.test.ts). */
 :root {
   --radius: 0.75rem;
@@ -16,8 +16,9 @@
   --popover: #ffffff;
   --popover-foreground: #111827;
 
-  --primary: #0e9f6e; /* Pocket brand green */
+  --primary: #0a7d57; /* AA green for text and button fills (white on it is 5.1:1); --brand keeps the bright mark colour */
   --primary-foreground: #ffffff;
+  --brand: #0e9f6e;
 
   --secondary: #eef0f2;
   --secondary-foreground: #111827;
@@ -29,8 +30,14 @@
   /* Semantic text colours are tuned for >= 4.5:1 on the card and page backgrounds. */
   --destructive: #c9363b;
   --destructive-foreground: #ffffff;
+  --destructive-fill: #c9363b; /* solid button fill; same in both themes because the dark --destructive text colour is lighter than any fill white text can sit on */
   --success: #0a7d57;
   --warning: #946200;
+  --warning-foreground: #ffffff;
+  /* Text on its own 10% tint (badges, chips): darker than the plain text colour so it stays >= 4.5:1 on tinted surfaces. */
+  --primary-strong: #086a4a;
+  --success-strong: #086a4a;
+  --destructive-strong: #b02a2f;
 
   --border: #e6e8eb;
   --input: #e6e8eb;
@@ -60,7 +67,7 @@
 
   /* Brand-surface tokens: used by the onboarding brand panel and a few accents, and the same
      in both themes, so these are deliberately not overridden in .dark. */
-  --primary-deep: #0a7d57; /* same value as the light --success; kept literal so dark mode does not shift the brand gradient */
+  --primary-deep: #086a4a; /* kept literal so dark mode does not shift the brand gradient; also the primary button hover */
   --violet: #7c5cfc;
   --mint: #38e1a4;
   --mint-soft: #5feab6;
@@ -88,7 +95,7 @@
   --popover-foreground: #e8ebee;
 
   --primary: #0e9f6e;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #0b0d10;
 
   --secondary: #1c2026;
   --secondary-foreground: #e8ebee;
@@ -97,10 +104,15 @@
   --accent: #1c2026;
   --accent-foreground: #e8ebee;
 
-  --destructive: #e5484d;
+  --destructive: #ff6b70;
   --destructive-foreground: #ffffff;
   --success: #12b981;
   --warning: #e0a53a;
+  --warning-foreground: #0b0d10;
+  /* Dark success and destructive text already clear 4.5:1 on their own tint, so their strong tier equals the base token; primary needs a lighter step for the muted surfaces. */
+  --primary-strong: #12b981;
+  --success-strong: #12b981;
+  --destructive-strong: #ff6b70;
 
   --border: #23272d;
   --input: #2b3037;
@@ -137,6 +149,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -145,6 +158,11 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-fill: var(--destructive-fill);
+  --color-destructive-strong: var(--destructive-strong);
+  --color-primary-strong: var(--primary-strong);
+  --color-success-strong: var(--success-strong);
+  --color-warning-foreground: var(--warning-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-border: var(--border);

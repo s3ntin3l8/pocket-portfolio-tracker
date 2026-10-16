@@ -186,7 +186,7 @@ export async function InstrumentTransactionsSection({
           <span
             className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
               instrumentAnomalyErrors > 0
-                ? "bg-destructive/10 text-destructive"
+                ? "bg-destructive/10 text-destructive-strong"
                 : "bg-warning/10 text-warn-strong"
             }`}
           >

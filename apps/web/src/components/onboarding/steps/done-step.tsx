@@ -31,7 +31,7 @@ export function DoneStep({
       <button
         type="button"
         onClick={onFinish}
-        className="mt-6.5 inline-flex cursor-pointer items-center gap-[7px] rounded-md bg-primary px-6 py-3 text-sm font-bold text-white shadow-cta"
+        className="mt-6.5 inline-flex cursor-pointer items-center gap-[7px] rounded-md bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-cta"
       >
         {copy.cta}
         <Icon d={ICONS.arrowRight} size={16} strokeWidth={2.2} />

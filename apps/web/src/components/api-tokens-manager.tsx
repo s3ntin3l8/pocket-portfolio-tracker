@@ -135,8 +135,8 @@ export function ApiTokensManager({
                 className={cn(
                   "shrink-0 rounded-sm px-2 py-1 text-micro font-bold",
                   tok.scope === "write"
-                    ? "bg-gold-fg/15 text-gold-fg"
-                    : "bg-success/15 text-success",
+                    ? "bg-gold-fg/15 text-warn-strong"
+                    : "bg-success/15 text-success-strong",
                 )}
               >
                 {tok.scope === "write" ? t("tokensScopeWrite") : t("tokensScopeRead")}

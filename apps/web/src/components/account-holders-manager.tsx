@@ -34,7 +34,7 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
         <Link
           href="/settings/portfolios/holder/new"
           aria-label={t("add")}
-          className="flex shrink-0 items-center gap-1.5 rounded-sm bg-primary/10 px-[11px] py-[7px] text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+          className="flex shrink-0 items-center gap-1.5 rounded-sm bg-primary/10 px-[11px] py-[7px] text-xs font-semibold text-primary-strong transition-colors hover:bg-primary/15"
         >
           <Plus className="size-[15px]" strokeWidth={2.4} />
           <span className="hidden sm:inline">{t("add")}</span>

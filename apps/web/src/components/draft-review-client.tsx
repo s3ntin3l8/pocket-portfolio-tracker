@@ -149,7 +149,7 @@ export function DraftReviewClient({
       {importedCount !== null && (
         <div
           role="status"
-          className="flex items-center gap-2 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success"
+          className="flex items-center gap-2 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success-strong"
         >
           <CheckCircle2 className="size-4 shrink-0" />
           {t("importedBanner", { count: importedCount })}
@@ -159,7 +159,7 @@ export function DraftReviewClient({
       {accountMismatch && (
         <div
           role="alert"
-          className="flex flex-wrap items-center gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning"
+          className="flex flex-wrap items-center gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warn-strong"
         >
           <AlertCircle className="size-4 shrink-0" />
           <span className="flex-1">

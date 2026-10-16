@@ -170,8 +170,10 @@ export function AppShell({
                         {badge != null && (
                           <span
                             className={cn(
-                              "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-micro font-bold text-white",
-                              anomalyError ? "bg-destructive" : "bg-gold-fg",
+                              "flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-micro font-bold",
+                              anomalyError
+                                ? "bg-destructive-fill text-destructive-foreground"
+                                : "bg-gold-fg text-warning-foreground",
                             )}
                           >
                             <span aria-hidden>{badge > 99 ? "99+" : badge}</span>

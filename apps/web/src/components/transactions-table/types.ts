@@ -69,9 +69,9 @@ export const KIND_ICON: Record<
 };
 
 export const TYPE_TONE_CLASSES = {
-  success: "bg-success/15 text-success",
-  destructive: "bg-destructive/15 text-destructive",
-  warning: "bg-warning/15 text-warning",
+  success: "bg-success/10 text-success-strong",
+  destructive: "bg-destructive/10 text-destructive-strong",
+  warning: "bg-warning/10 text-warn-strong",
   violet: "bg-violet/15 text-violet",
   teal: "bg-chart-3/15 text-chart-3",
 } as const;

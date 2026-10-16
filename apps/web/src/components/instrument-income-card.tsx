@@ -47,7 +47,7 @@ export function InstrumentIncomeCard({
             </div>
             {yieldOnCost !== null && (
               <div className="mt-3.5 flex items-center gap-2.5 rounded-xl bg-muted/50 px-3.5 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-warning/15 text-warning">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-warning/15 text-warn-strong">
                   <Coins className="size-4.5" />
                 </span>
                 <div className="flex-1">

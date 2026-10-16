@@ -210,7 +210,7 @@ export function MobileIntro({
           <button
             type="button"
             onClick={onEnter}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 text-base font-bold text-white shadow-cta-lg"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 text-base font-bold text-primary-foreground shadow-cta-lg"
           >
             {copy.getStarted}
             <Icon d={ICONS.arrowRight} size={17} strokeWidth={2.2} />

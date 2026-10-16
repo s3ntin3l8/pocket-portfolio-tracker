@@ -32,7 +32,7 @@ function StatusBadge({ status }: { status: AdminJob["lastStatus"] }) {
     <span
       className={cn(
         "shrink-0 rounded-sm px-2.5 py-1 text-micro font-bold tracking-wide",
-        failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+        failed ? "bg-destructive/10 text-destructive-strong" : "bg-primary/10 text-primary-strong",
       )}
     >
       {failed ? t("jobStatusFailed") : t("jobStatusCompleted")}

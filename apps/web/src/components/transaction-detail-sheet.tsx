@@ -397,7 +397,7 @@ export function TransactionDetailSheet({
               </Button>
             )}
             <Button
-              className="flex-1 border-none bg-destructive/15 text-destructive hover:bg-destructive/20"
+              className="flex-1 border-none bg-destructive/15 text-destructive-strong hover:bg-destructive/20"
               aria-label={td("label")}
               onClick={() => setConfirmingDelete(true)}
             >

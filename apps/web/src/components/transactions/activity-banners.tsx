@@ -185,7 +185,7 @@ export function ReconciliationBanner({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-warning/40 bg-card px-4 py-3.5 shadow-hairline">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warn-strong">
         <AlertTriangle className="size-4.5" />
       </span>
       <div className="min-w-0 flex-1">

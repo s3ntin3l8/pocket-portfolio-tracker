@@ -2,7 +2,7 @@
  * Tinted-badge colours derived from the theme tokens in `globals.css` — a translucent
  * background plus a solid foreground of the same hue. Use this instead of hand-written
  * `rgba(...)`/hex pairs wherever a style object (not a Tailwind class) needs the colours;
- * in class strings prefer `bg-primary/15 text-primary` and friends.
+ * in class strings prefer `bg-primary/15 text-primary-strong` and friends.
  *
  * The values are plain CSS strings (`var()` / `color-mix()`), so they follow the active
  * light/dark theme with no JS involvement.

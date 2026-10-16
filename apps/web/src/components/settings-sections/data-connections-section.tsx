@@ -104,7 +104,7 @@ export async function DataConnectionsSection({
               <span
                 className={cn(
                   "shrink-0 rounded-md px-2 py-1 text-micro font-bold",
-                  s.on ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
+                  s.on ? "bg-success/15 text-success-strong" : "bg-muted text-muted-foreground",
                 )}
               >
                 {s.on ? t("dataSourceOn") : t("dataSourceOff")}
