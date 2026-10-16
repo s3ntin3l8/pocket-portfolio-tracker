@@ -28,5 +28,8 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, "e2e/**"],
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],
+    // The default 5s test budget is shorter than a lazily loaded dialog needs on a loaded CI
+    // shard; keep it above the 4s `asyncUtilTimeout` set in test/setup.ts.
+    testTimeout: 15_000,
   },
 });
