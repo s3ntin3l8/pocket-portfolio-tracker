@@ -70,7 +70,7 @@ export function LotRow({
       <TableCell numeric className="text-muted-foreground">
         {money(lot.proceeds)}
       </TableCell>
-      <TableCell className={cn("tabular text-right", secondaryClassName)}>
+      <TableCell numeric className={secondaryClassName}>
         {secondaryValue}
       </TableCell>
     </TableRow>

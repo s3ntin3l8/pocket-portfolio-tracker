@@ -276,7 +276,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={4}>{t("total")}</TableCell>
               <TableCell numeric>{money(totals.value)}</TableCell>
-              <TableCell className={cn("tabular text-right text-body-sm", totalPnlColor)}>
+              <TableCell numeric className={cn("text-body-sm", totalPnlColor)}>
                 {formatSignedMoney(totals.pnl, currency, locale)}
                 {totalPct !== null && (
                   <div className="text-micro font-bold">
