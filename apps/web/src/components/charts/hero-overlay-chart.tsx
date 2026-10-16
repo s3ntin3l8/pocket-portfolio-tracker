@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_CURSOR, CHART_SERIES_DASH } from "@/lib/chart-style";
 import {
   Area,
   ComposedChart,
@@ -70,7 +71,7 @@ export function HeroOverlayChart({
             dataKey="benchmark"
             stroke="var(--muted-foreground)"
             strokeWidth={1.5}
-            strokeDasharray="5 3"
+            strokeDasharray={CHART_SERIES_DASH}
             dot={false}
             connectNulls
             isAnimationActive={false}
@@ -84,10 +85,7 @@ export function HeroOverlayChart({
             isAnimationActive={false}
           />
           <Tooltip
-            cursor={{
-              stroke: "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
-              strokeDasharray: "4 4",
-            }}
+            cursor={CHART_CURSOR}
             content={<HeroTooltip isIntraday={isIntraday} currency={currency} locale={locale} />}
           />
         </ComposedChart>

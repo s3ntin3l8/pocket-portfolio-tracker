@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_AXIS_TICK, CHART_CURSOR, CHART_GRID } from "@/lib/chart-style";
 import {
   AreaChart,
   Area,
@@ -79,16 +80,11 @@ export function PriceChart({
           </defs>
           {!minimal && (
             <>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                tickLine={false}
-                minTickGap={32}
-              />
+              <CartesianGrid {...CHART_GRID} />
+              <XAxis dataKey="date" tick={CHART_AXIS_TICK} tickLine={false} minTickGap={32} />
               {showYAxis && (
                 <YAxis
-                  tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                  tick={CHART_AXIS_TICK}
                   tickLine={false}
                   axisLine={false}
                   width={72}
@@ -98,7 +94,7 @@ export function PriceChart({
             </>
           )}
           <Tooltip
-            cursor={{ stroke: "var(--color-border)", strokeDasharray: "4 4" }}
+            cursor={CHART_CURSOR}
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               const v = Number(payload[0]?.value);

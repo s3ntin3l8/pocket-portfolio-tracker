@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_AXIS_TICK, CHART_SERIES_DASH } from "@/lib/chart-style";
 import { signToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
@@ -118,7 +119,7 @@ export function ContributionsChart({
               </defs>
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                tick={CHART_AXIS_TICK}
                 tickLine={false}
                 axisLine={false}
                 minTickGap={48}
@@ -167,7 +168,7 @@ export function ContributionsChart({
                 stroke="var(--color-muted-foreground)"
                 strokeWidth={1.5}
                 dot={false}
-                strokeDasharray="4 3"
+                strokeDasharray={CHART_SERIES_DASH}
               />
               {/* Crisp boundary: daily value line */}
               <Line

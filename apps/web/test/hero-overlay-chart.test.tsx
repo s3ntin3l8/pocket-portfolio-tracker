@@ -78,7 +78,7 @@ describe("HeroOverlayChart", () => {
     expect(portfolioLine).toHaveAttribute("data-stroke", "var(--primary)");
     expect(portfolioLine).toHaveAttribute("data-dash", "");
     expect(benchmarkLine).toHaveAttribute("data-stroke", "var(--muted-foreground)");
-    expect(benchmarkLine).toHaveAttribute("data-dash", "5 3");
+    expect(benchmarkLine).toHaveAttribute("data-dash", "4 3");
     expect(screen.getByTestId("area-portfolio")).toHaveAttribute(
       "data-fill",
       "url(#hero-portfolio-fill)",

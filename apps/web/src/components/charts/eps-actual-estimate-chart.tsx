@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_AXIS_TICK, CHART_SERIES_DASH } from "@/lib/chart-style";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTranslations } from "next-intl";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
@@ -115,7 +116,7 @@ export function EpsActualEstimateChart({
         <BarChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="period"
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+            tick={CHART_AXIS_TICK}
             tickLine={false}
             axisLine={false}
             minTickGap={8}
@@ -139,7 +140,7 @@ export function EpsActualEstimateChart({
                   fillOpacity={0.12}
                   stroke="var(--color-chart-1)"
                   strokeWidth={2}
-                  strokeDasharray="4 3"
+                  strokeDasharray={CHART_SERIES_DASH}
                 />
               ) : undefined,
             )}

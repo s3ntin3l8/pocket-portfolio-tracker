@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_AXIS_TICK } from "@/lib/chart-style";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
 import { formatMoneyCompact } from "@/lib/utils";
@@ -68,7 +69,7 @@ export function RevenueEarningsChart({
         <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="year"
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+            tick={CHART_AXIS_TICK}
             tickLine={false}
             axisLine={false}
             minTickGap={8}

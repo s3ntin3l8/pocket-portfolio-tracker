@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * Shared visual shell for all chart tooltips in the app. Renders a
- * var(--color-card) panel with a title row and a list of label/value rows
+ * card-surface panel (bordered, hairline shadow) with a title row and a list of label/value rows
  * (each row can carry an optional 8x8 colored dot). Matches the visual
  * styling of Recharts' built-in `<Tooltip>` so every chart in the app
  * (donut, bar, area, overlay, and the bespoke non-Recharts tooltips
@@ -78,43 +79,24 @@ export function ChartTooltipPanel({
   return (
     <div
       ref={ref}
-      style={{
-        background: "var(--color-card)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 8,
-        fontSize: 12,
-        padding: "8px 12px",
-        minWidth: 168,
-      }}
+      className="min-w-42 rounded-md border border-border bg-card px-3 py-2 text-xs text-card-foreground shadow-hairline"
     >
-      {title && <p style={{ marginBottom: 6, fontWeight: 700 }}>{title}</p>}
+      {title && <p className="mb-1.5 font-semibold">{title}</p>}
       {rows.map((row, i) => (
         <div
           key={row.label}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 14,
-            marginTop: i === 0 ? 0 : 4,
-          }}
+          className={cn("flex items-center justify-between gap-3.5", i > 0 && "mt-1")}
         >
-          <span style={{ display: "flex", alignItems: "center", gap: 6, opacity: 0.85 }}>
+          <span className="flex items-center gap-1.5 text-muted-foreground">
             {row.dot && (
               <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 2,
-                  background: row.dot,
-                  opacity: row.dotOpacity ?? 1,
-                  display: "inline-block",
-                }}
+                className="inline-block size-2 rounded-xs"
+                style={{ background: row.dot, opacity: row.dotOpacity ?? 1 }}
               />
             )}
             {row.label}
           </span>
-          <span style={{ fontWeight: 700 }}>{row.value}</span>
+          <span className="tabular font-semibold">{row.value}</span>
         </div>
       ))}
     </div>
