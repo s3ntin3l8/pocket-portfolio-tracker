@@ -25,10 +25,11 @@
   --accent: #eef0f2;
   --accent-foreground: #111827;
 
-  --destructive: #e5484d;
+  /* Semantic text colours are tuned for >= 4.5:1 on the card and page backgrounds. */
+  --destructive: #c9363b;
   --destructive-foreground: #ffffff;
-  --success: #0e9f6e;
-  --warning: #c98a1e;
+  --success: #0a7d57;
+  --warning: #946200;
 
   --border: #e6e8eb;
   --input: #e6e8eb;
@@ -49,27 +50,22 @@
   --line: #eef0f2;
   --row-hover: #fafbfc;
   --pill: #111827;
-  --gold-fg: #c98a1e;
+  --gold-fg: #946200;
   --warn-strong: #7a5a1a;
   --warn-soft: #9a7b3a;
   --info: #2a6fdb;
   --orange: #f97316; /* consumed via var(--orange) by tint("orange") / chart segments, not as a Tailwind class */
   --scrim: rgba(17, 24, 39, 0.45);
 
-  /* Brand-surface tokens: the green hero card, the violet tax card and the dark insights
-     card look the same in both themes, so these are deliberately not overridden in .dark. */
+  /* Brand-surface tokens: used by the onboarding brand panel and a few accents, and the same
+     in both themes, so these are deliberately not overridden in .dark. */
   --primary-deep: #0b7d58;
-  --primary-ink: #0b3a2a;
   --violet: #7c5cfc;
-  --violet-deep: #5b3fd6;
-  --hero-ink: #11211a;
-  --hero-ink-2: #1d3a2c;
   --mint: #38e1a4;
   --mint-soft: #5feab6;
 
   /* Elevation extras (hairline lift for small controls, hero glow, modal / bottom-sheet). */
   --shadow-hairline: 0 1px 2px rgba(17, 24, 39, 0.06);
-  --shadow-hero: 0 12px 30px color-mix(in srgb, var(--primary) 30%, transparent);
   --shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.4);
   --shadow-sheet-up: 0 -12px 44px rgba(0, 0, 0, 0.22);
 
@@ -171,11 +167,7 @@
   --color-info: var(--info);
   --color-scrim: var(--scrim);
   --color-primary-deep: var(--primary-deep);
-  --color-primary-ink: var(--primary-ink);
   --color-violet: var(--violet);
-  --color-violet-deep: var(--violet-deep);
-  --color-hero-ink: var(--hero-ink);
-  --color-hero-ink-2: var(--hero-ink-2);
   --color-mint: var(--mint);
   --color-mint-soft: var(--mint-soft);
 
@@ -195,7 +187,6 @@
 
   --shadow-card: var(--shadow-card);
   --shadow-hairline: var(--shadow-hairline);
-  --shadow-hero: var(--shadow-hero);
   --shadow-modal: var(--shadow-modal);
   --shadow-sheet-up: var(--shadow-sheet-up);
 

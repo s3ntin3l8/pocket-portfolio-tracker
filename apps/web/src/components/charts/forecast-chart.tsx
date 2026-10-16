@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_CURSOR, CHART_SERIES_DASH } from "@/lib/chart-style";
 import { AreaChart, Area, Line, Tooltip, ResponsiveContainer } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
 import type { ForecastPoint } from "@portfolio/core";
@@ -46,10 +47,7 @@ export function ForecastChart({
             </linearGradient>
           </defs>
           <Tooltip
-            cursor={{
-              stroke: "color-mix(in srgb, var(--muted-foreground) 55%, transparent)",
-              strokeDasharray: "4 4",
-            }}
+            cursor={CHART_CURSOR}
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               return (
@@ -84,7 +82,7 @@ export function ForecastChart({
             dataKey="contributed"
             stroke="var(--muted-foreground)"
             strokeWidth={1.6}
-            strokeDasharray="4 4"
+            strokeDasharray={CHART_SERIES_DASH}
             dot={false}
             activeDot={false}
           />
