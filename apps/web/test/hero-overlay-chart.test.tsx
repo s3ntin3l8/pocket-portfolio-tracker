@@ -18,6 +18,7 @@ let _isTooltipActive = false;
 let _activeTooltipDataPoints: HeroOverlayPoint[] | undefined;
 
 vi.mock("recharts", () => ({
+  Area: ({ dataKey }: { dataKey: string }) => <div data-testid={`area-${dataKey}`} />,
   ComposedChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="composed-chart">{children}</div>
   ),
@@ -64,7 +65,7 @@ describe("HeroOverlayChart", () => {
     expect(screen.getByTestId("hero-overlay-chart")).toBeInTheDocument();
   });
 
-  it("renders two <Line>s — portfolio (white) + benchmark (yellow dashed)", () => {
+  it("renders two <Line>s — portfolio (brand green) + benchmark (muted dashed)", () => {
     renderChart([
       { date: "2026-01-01", portfolio: 100, benchmark: 100 },
       { date: "2026-02-01", portfolio: 110, benchmark: 105 },
@@ -72,10 +73,11 @@ describe("HeroOverlayChart", () => {
     ]);
     const portfolioLine = screen.getByTestId("line-portfolio");
     const benchmarkLine = screen.getByTestId("line-benchmark");
-    expect(portfolioLine).toHaveAttribute("data-stroke", "var(--primary-foreground)");
+    expect(portfolioLine).toHaveAttribute("data-stroke", "var(--primary)");
     expect(portfolioLine).toHaveAttribute("data-dash", "");
-    expect(benchmarkLine).toHaveAttribute("data-stroke", "var(--hero-gold)");
+    expect(benchmarkLine).toHaveAttribute("data-stroke", "var(--muted-foreground)");
     expect(benchmarkLine).toHaveAttribute("data-dash", "5 3");
+    expect(screen.getByTestId("area-portfolio")).toBeInTheDocument();
   });
 
   it("renders no tooltip panel when tooltip is inactive", () => {

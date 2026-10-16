@@ -17,47 +17,32 @@ export function RangeToggle({
   onChange,
   disabled,
   ranges = RANGES,
-  theme = "default",
 }: {
   value: ChartRange;
   onChange: (range: ChartRange) => void;
   disabled?: boolean;
   /** Subset of ranges to render as chips (e.g. the hero card only shows 1D/7D/1M/1Y/ALL). */
   ranges?: readonly ChartRange[];
-  /** "inverse" = white-on-green pills for use inside a dark/brand-colored hero card. */
-  theme?: "default" | "inverse";
 }) {
   const t = useTranslations("Chart.range");
-  // Transcribed from `Pocket Prototype.dc.html`: hero (`pOn`/`pOff`) = flex:1 buttons
-  // spanning the full chart width, white pill w/ green text when active; default
-  // (`pdOn`/`pdOff`) = compact 11px buttons, active = card bg + small shadow.
+  // Compact chips; the active one gets the card surface and a hairline lift.
   return (
     <ToggleGroup
       value={value}
       onValueChange={onChange}
       disabled={disabled}
       aria-label={t("label")}
-      className={theme === "inverse" ? "w-full gap-1.5" : "gap-0.5"}
+      className="gap-0.5"
     >
       {ranges.map((r) => (
         <ToggleGroupItem
           key={r}
           value={r}
           className={cn(
-            "touch-target relative",
-            theme === "inverse"
-              ? cn(
-                  "flex-1 rounded-full py-1.5 text-center text-xs",
-                  value === r
-                    ? "bg-white font-bold text-primary-deep"
-                    : "bg-transparent font-semibold text-white/85 hover:bg-white/10",
-                )
-              : cn(
-                  "rounded-lg px-[11px] py-1.5 text-micro",
-                  value === r
-                    ? "bg-card font-bold text-foreground shadow-hairline"
-                    : "font-semibold text-text-2 hover:text-foreground",
-                ),
+            "touch-target relative rounded-md px-3 py-1.5 text-micro",
+            value === r
+              ? "bg-muted font-semibold text-foreground"
+              : "font-medium text-muted-foreground hover:text-foreground",
           )}
         >
           {t(r)}

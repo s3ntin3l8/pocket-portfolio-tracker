@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { GainFigure } from "@/components/gain-figure";
 import { toneClass, type Tone } from "@/lib/tone";
@@ -37,16 +38,16 @@ export function PortfolioValueCard({
   todayTone?: Tone;
 }) {
   return (
-    <div className="rounded-lg bg-card px-6 py-5 shadow-card">
+    <Card className="p-5">
       <div className="flex flex-col gap-3">
         {/* Total value */}
         <div>
-          <p className="text-micro font-semibold text-text-2">{totalLabel}</p>
+          <p className="text-xs font-medium text-muted-foreground">{totalLabel}</p>
           <p className="tabular mt-0.5 text-heading font-bold">{totalValueFormatted}</p>
         </div>
         {/* All-time P&L */}
         <div className="border-t border-line pt-3">
-          <p className="text-micro font-semibold text-text-2">{allTimeLabel}</p>
+          <p className="text-xs font-medium text-muted-foreground">{allTimeLabel}</p>
           <GainFigure
             amount={allTimeAmount}
             pct={allTimePct}
@@ -58,7 +59,7 @@ export function PortfolioValueCard({
         </div>
         {/* Today's change */}
         <div className="border-t border-line pt-3">
-          <p className="text-micro font-semibold text-text-2">{todayLabel}</p>
+          <p className="text-xs font-medium text-muted-foreground">{todayLabel}</p>
           <div className="mt-0.5 flex items-baseline gap-2">
             <p className={cn("tabular text-lg font-bold", toneClass(todayTone))}>{todayAmount}</p>
             {todayPct != null && (
@@ -69,6 +70,6 @@ export function PortfolioValueCard({
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

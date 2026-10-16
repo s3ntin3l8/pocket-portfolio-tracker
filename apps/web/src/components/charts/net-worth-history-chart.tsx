@@ -257,9 +257,9 @@ export function NetWorthHistoryChart({
             currency={currency}
           />
         ) : (
-          <p className="py-8 text-center text-sm text-white/80">{te("historyTitle")}</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">{te("historyTitle")}</p>
         )}
-        <RangeToggle value={range} onChange={pick} ranges={heroRanges} theme="inverse" />
+        <RangeToggle value={range} onChange={pick} ranges={heroRanges} />
       </div>
     );
   }

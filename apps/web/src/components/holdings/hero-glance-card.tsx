@@ -1,6 +1,6 @@
 "use client";
 
-import { trendGlyphOf } from "@/lib/tone";
+import { toneClass, toneOf, trendGlyphOf } from "@/lib/tone";
 import { useState, useCallback, useRef, startTransition, ViewTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { HistoryPoint } from "@portfolio/api-client";
@@ -10,14 +10,15 @@ import {
 } from "@/components/charts/net-worth-history-chart";
 import type { ChartRange } from "@/components/charts/range-toggle";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
-import { formatMoney, formatNetWorth, formatPercent } from "@/lib/utils";
+import { cn, formatMoney, formatNetWorth, formatPercent } from "@/lib/utils";
 import { ScopeLink } from "@/components/scope-link";
+import { Card } from "@/components/ui/card";
 
 /** Prefix a figure with its direction glyph; a flat figure gets no glyph and no stray space. */
 const withGlyph = (n: number, text: string) => [trendGlyphOf(n), text].filter(Boolean).join(" ");
 
 /**
- * The Holdings "glance" hero: green gradient card with the current total portfolio
+ * The Holdings "glance" hero: neutral card with the current total portfolio
  * value (static — always today's figure), two period pills (portfolio TWR % and the
  * user's chosen benchmark's period %), a tiny legend, and the chart itself in its
  * "hero" variant. The pill values are derived from {@link NetWorthHistoryChart}'s
@@ -113,11 +114,8 @@ export function HeroGlanceCard({
     .join(" · ");
 
   return (
-    <div
-      className="rounded-lg px-6 pb-[18px] pt-[22px] text-white shadow-hero"
-      style={{ background: "linear-gradient(160deg,var(--primary),var(--primary-deep))" }}
-    >
-      <p className="text-body-sm font-semibold text-white/78">{t("label")}</p>
+    <Card className="px-6 pb-4 pt-5">
+      <p className="text-body-sm font-medium text-muted-foreground">{t("label")}</p>
       {/* Keyed by the formatted value: a scope switch (a router transition) swaps the key,
           so the old figure fades out and the new one ticks in. Progressive enhancement: a
           no-op without View Transitions support or under prefers-reduced-motion. */}
@@ -127,16 +125,16 @@ export function HeroGlanceCard({
         exit="vt-tick-out"
         default="none"
       >
-        <p className="tabular mt-1 text-hero font-bold leading-tight sm:text-hero">
+        <p className="tabular mt-1 text-hero font-bold leading-tight text-foreground">
           {formatNetWorth(netWorth, currency, locale)}
         </p>
       </ViewTransition>
       {(atCostCount > 0 || fxMissingCount > 0) && (
-        <p className="mt-0.5 text-micro font-medium text-white/70">
+        <p className="mt-0.5 text-micro font-medium text-muted-foreground">
           <ScopeLink
             href={atCostHref}
             aria-label={atCostLabel}
-            className="underline underline-offset-2 hover:text-white"
+            className="underline underline-offset-2 hover:text-foreground"
           >
             {atCostLabel}
           </ScopeLink>
@@ -156,16 +154,26 @@ export function HeroGlanceCard({
         >
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {snapshot.isIntraday ? (
-              <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
+              <span
+                className={cn(
+                  "tabular rounded-full bg-muted px-2.5 py-1 text-body-sm font-semibold",
+                  toneClass(toneOf(closeDelta)),
+                )}
+              >
                 {withGlyph(closeDelta, formatMoney(Math.abs(closeDelta), currency, locale))}{" "}
                 {periodWord}
               </span>
             ) : (
-              <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
+              <span
+                className={cn(
+                  "tabular rounded-full bg-muted px-2.5 py-1 text-body-sm font-semibold",
+                  toneClass(toneOf(closeDelta)),
+                )}
+              >
                 {withGlyph(closeDelta, formatPercent(closeDelta / 100, locale))} {periodWord}
               </span>
             )}
-            <span className="tabular rounded-full bg-white/18 px-2.5 py-1 text-body-sm font-bold">
+            <span className="tabular rounded-full bg-muted px-2.5 py-1 text-body-sm font-semibold text-muted-foreground">
               {tb("vs", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}{" "}
               {benchmarkPct !== null
                 ? formatPercent(benchmarkPct / 100, locale)
@@ -189,11 +197,11 @@ export function HeroGlanceCard({
       </div>
 
       {hasDelta && (
-        <div className="mt-2 flex flex-wrap gap-3 text-micro font-semibold text-white/78">
+        <div className="mt-2 flex flex-wrap gap-3 text-micro font-medium text-muted-foreground">
           <span>
             <span
               className="mr-1 inline-block h-[2px] w-3 align-middle"
-              style={{ background: "var(--primary-foreground)" }}
+              style={{ background: "var(--primary)" }}
             />
             {t("legendPortfolio")}
           </span>
@@ -203,7 +211,7 @@ export function HeroGlanceCard({
                 className="mr-1 inline-block h-[2px] w-3 align-middle"
                 style={{
                   backgroundImage:
-                    "repeating-linear-gradient(90deg, var(--hero-gold) 0 5px, transparent 5px 8px)",
+                    "repeating-linear-gradient(90deg, var(--muted-foreground) 0 5px, transparent 5px 8px)",
                 }}
               />
               {t("legendBenchmark", { symbol: benchmarkLabel(benchmarkSymbol ?? "^GSPC") })}
@@ -211,6 +219,6 @@ export function HeroGlanceCard({
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

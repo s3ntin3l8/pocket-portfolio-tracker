@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { useTranslations } from "next-intl";
 import type { DonutSlice } from "@/components/charts/allocation-donut";
 import { AllocationDonutSsr as AllocationDonut } from "@/components/charts/lazy";
@@ -30,8 +31,8 @@ export function AllocationCard({
 }) {
   const tHoldings = useTranslations("Holdings");
   return (
-    <div className="@container rounded-lg bg-card px-6 py-5 shadow-card">
-      <p className="mb-3 text-micro font-semibold uppercase tracking-label text-text-2">{title}</p>
+    <Card className="@container p-5">
+      <p className="mb-3 text-xs font-medium text-muted-foreground">{title}</p>
       <AllocationDonut
         data={slices}
         currency={currency}
@@ -39,6 +40,6 @@ export function AllocationCard({
         atCostLegend={atCostLegend}
         atCostLabel={tHoldings("valuedAtCostBadge")}
       />
-    </div>
+    </Card>
   );
 }
