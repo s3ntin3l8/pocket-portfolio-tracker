@@ -529,6 +529,29 @@ describe("TransactionsTable", () => {
     expect(screen.getByRole("button", { name: /amount/i })).toBeInTheDocument();
   });
 
+  it("puts Amount right after Transaction so it stays visible when the table scrolls sideways", () => {
+    renderTable();
+    const order = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim() ?? "");
+    const transaction = order.findIndex((t) => t.includes(messages.Transactions.transactionCol));
+    const amount = order.findIndex((t) => t.includes(messages.Transactions.amount));
+    const price = order.findIndex((t) => t.includes(messages.Transactions.price));
+    expect(transaction).toBeGreaterThanOrEqual(0);
+    expect(amount).toBe(transaction + 1);
+    expect(amount).toBeLessThan(price);
+
+    // The header and the data cells must move together: a header-only move would misalign
+    // every row. A data row's cell under "Amount" holds a currency amount, while the cell
+    // under "Source" does not.
+    const dataRow = screen
+      .getAllByRole("row")
+      .find((r) => r.querySelectorAll("td").length >= order.length);
+    expect(dataRow).toBeDefined();
+    const cells = Array.from(dataRow!.querySelectorAll("td"));
+    expect(cells[amount].textContent).toMatch(/IDR|\$/);
+    const source = order.findIndex((t) => t.includes(messages.Transactions.source));
+    expect(cells[source].textContent).not.toMatch(/IDR|\$/);
+  });
+
   it("shows a desktop-only Tax column with the withheld amount, dash when none", () => {
     renderTable();
     expect(screen.getByRole("button", { name: messages.Transactions.tax })).toBeInTheDocument();

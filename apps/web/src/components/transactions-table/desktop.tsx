@@ -7,6 +7,7 @@ import { AlertCircle, AlertTriangle, ChevronRight, ListChecks } from "lucide-rea
 import {
   Table,
   TableBody,
+  TABLE_VALUE_STRONG,
   TableCell,
   TableHead,
   TableHeader,
@@ -16,7 +17,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScopeLink } from "@/components/scope-link";
-import { formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
+import { cn, formatMoney, anomalyLabel, type AnomalyTranslator } from "@/lib/utils";
 import { TxRow, KIND_ICON } from "./types";
 import {
   SourceChips,
@@ -131,6 +132,15 @@ export function DesktopTable({
             >
               {t("transactionCol")}
             </SortableTableHead>
+            <SortableTableHead
+              colKey="netAmount"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onToggle={onToggleSort}
+              align="right"
+            >
+              {t("amount")}
+            </SortableTableHead>
             {showPortfolio && (
               <SortableTableHead
                 colKey="portfolio"
@@ -177,15 +187,6 @@ export function DesktopTable({
               className="hidden sm:table-cell"
             >
               {t("source")}
-            </SortableTableHead>
-            <SortableTableHead
-              colKey="netAmount"
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onToggle={onToggleSort}
-              align="right"
-            >
-              {t("amount")}
             </SortableTableHead>
           </TableRow>
         </TableHeader>
@@ -296,6 +297,9 @@ export function DesktopTable({
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell className={cn(TABLE_VALUE_STRONG, netAmount > 0 && "text-success")}>
+                    {m(netAmount, tx.currency)}
+                  </TableCell>
                   {showPortfolio && (
                     <TableCell className="text-xs font-medium text-text-2">
                       {tx.portfolioName ?? "—"}
@@ -323,12 +327,6 @@ export function DesktopTable({
                         chipClassName="inline-flex items-center whitespace-nowrap rounded-xs px-2 py-[3px] text-micro font-bold uppercase"
                       />
                     </div>
-                  </TableCell>
-                  <TableCell
-                    numeric
-                    className={`text-body-sm font-bold ${netAmount > 0 ? "text-success" : ""}`}
-                  >
-                    {m(netAmount, tx.currency)}
                   </TableCell>
                   <TableCell className="w-10 pr-2 text-right">
                     <Button
