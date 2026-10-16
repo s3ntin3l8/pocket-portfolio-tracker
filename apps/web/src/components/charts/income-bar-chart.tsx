@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_AXIS_TICK, CHART_SERIES_DASH } from "@/lib/chart-style";
 import {
   BarChart,
   Bar,
@@ -158,7 +159,7 @@ export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency
           </defs>
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+            tick={CHART_AXIS_TICK}
             tickLine={false}
             axisLine={false}
             minTickGap={8}
@@ -177,11 +178,11 @@ export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency
             {data.map((d, i) => (
               <Cell
                 key={i}
-                fill={d.forecast ? "var(--color-primary)" : "var(--color-primary)"}
+                fill="var(--color-primary)"
                 fillOpacity={d.forecast ? 0.12 : 1}
                 stroke={d.forecast ? "var(--color-primary)" : undefined}
                 strokeWidth={d.forecast ? 2 : undefined}
-                strokeDasharray={d.forecast ? "4 3" : undefined}
+                strokeDasharray={d.forecast ? CHART_SERIES_DASH : undefined}
               />
             ))}
           </Bar>

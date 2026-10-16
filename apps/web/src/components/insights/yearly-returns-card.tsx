@@ -1,5 +1,6 @@
 "use client";
 
+import { CHART_AXIS_TICK, CHART_GRID } from "@/lib/chart-style";
 import { signToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
@@ -89,15 +90,10 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
       <div className="mt-3 h-44 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="var(--color-border)" vertical={false} />
-            <XAxis
-              dataKey="year"
-              tick={{ fontSize: 10, fill: "var(--color-text-2)" }}
-              tickLine={false}
-              axisLine={false}
-            />
+            <CartesianGrid {...CHART_GRID} />
+            <XAxis dataKey="year" tick={CHART_AXIS_TICK} tickLine={false} axisLine={false} />
             <YAxis
-              tick={{ fontSize: 10, fill: "var(--color-text-2)" }}
+              tick={CHART_AXIS_TICK}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => `${v.toFixed(0)}%`}
