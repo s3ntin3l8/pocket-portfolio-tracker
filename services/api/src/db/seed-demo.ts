@@ -1800,12 +1800,12 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     const netScale = Number(summary.netWorth) / value;
     const mvScale = Number(summary.totalMarketValue) / value;
     for (const { d, value: v, flow } of walk) {
-      const today = d === 0;
+      const isToday = d === 0;
       snapshotRows.push({
         portfolioId: portfolio.id,
         date: isoDate(daysAgo(d)),
-        netWorth: today ? summary.netWorth : dec(v * netScale),
-        marketValue: today ? summary.totalMarketValue : dec(v * mvScale),
+        netWorth: isToday ? summary.netWorth : dec(v * netScale),
+        marketValue: isToday ? summary.totalMarketValue : dec(v * mvScale),
         effectiveFlow: dec(flow * mvScale),
         currency: portfolio.baseCurrency,
       });
