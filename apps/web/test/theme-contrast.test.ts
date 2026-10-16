@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -90,41 +90,99 @@ describe("dark theme overrides", () => {
   });
 });
 
-// A solid destructive fill with white text can only pass in the light theme: in dark the same
-// token is also the text colour on the dark card, and no single value satisfies both.
-describe("light theme destructive button", () => {
-  const fill = hexOf(light, "destructive");
-  const foreground = hexOf(light, "destructive-foreground");
+const FILES = (list: string[]) =>
+  list.map((file) => [file, readFileSync(resolve(__dirname, "..", file), "utf8")] as const);
 
-  it("the destructive foreground on the destructive fill is at least 4.5:1", () => {
-    expect(contrast(foreground, fill)).toBeGreaterThanOrEqual(4.5);
+describe.each([
+  ["light", light],
+  ["dark", dark],
+] as const)("%s theme primary and tints", (_name, t) => {
+  const surfaces = ["card", "background"] as const;
+
+  for (const surface of surfaces) {
+    it(`primary text on ${surface} is at least 4.5:1`, () => {
+      expect(contrast(hexOf(t, "primary"), hexOf(t, surface))).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  it("the primary foreground on the primary fill is at least 4.5:1", () => {
+    expect(contrast(hexOf(t, "primary-foreground"), hexOf(t, "primary"))).toBeGreaterThanOrEqual(
+      4.5,
+    );
   });
 
-  // Every destructive button class string, read from source so reverting one fails the guard.
-  const SOURCES = [
-    "src/components/ui/button.tsx",
-    "src/components/portfolio-form-dialog.tsx",
-    "src/components/portfolio-edit-form.tsx",
-    "src/components/holder-edit-form.tsx",
-  ];
+  it("the warning foreground on the gold chip fill is at least 4.5:1", () => {
+    expect(contrast(hexOf(t, "warning-foreground"), hexOf(t, "gold-fg"))).toBeGreaterThanOrEqual(
+      4.5,
+    );
+  });
 
-  it("every destructive button hovers at /95 in light and /90 in dark", () => {
-    for (const file of SOURCES) {
-      const src = readFileSync(resolve(__dirname, "..", file), "utf8");
-      expect(src, file).toContain("hover:bg-destructive/95");
-      expect(src, file).toContain("dark:hover:bg-destructive/90");
+  it("the destructive foreground on the destructive button fill, rest and hovered (/95), is at least 4.5:1", () => {
+    const fill = hexOf(t, "destructive-fill");
+    const fg = hexOf(t, "destructive-foreground");
+    expect(contrast(fg, fill)).toBeGreaterThanOrEqual(4.5);
+    for (const surface of surfaces) {
+      expect(contrast(fg, over(fill, hexOf(t, surface), 0.95)), surface).toBeGreaterThanOrEqual(
+        4.5,
+      );
     }
   });
 
-  it("white stays at least 4.5:1 on the hovered fill in light (/95) on card and page", () => {
-    for (const surface of ["card", "background"] as const) {
-      const hovered = over(fill, hexOf(light, surface), 0.95);
-      expect(contrast(foreground, hovered), surface).toBeGreaterThanOrEqual(4.5);
+  // Badge and chip tints are 10% of the colour over the surface; the text colour is the
+  // stronger token so it clears 4.5:1 on its own tint.
+  const TINTS = [
+    ["success", "success-strong"],
+    ["destructive", "destructive-strong"],
+    ["warning", "warn-strong"],
+    ["primary", "primary-strong"],
+  ] as const;
+  for (const [fill, text] of TINTS) {
+    for (const surface of surfaces) {
+      it(`${text} on its 10% ${fill} tint over ${surface} is at least 4.5:1`, () => {
+        const tint = over(hexOf(t, fill), hexOf(t, surface), 0.1);
+        expect(contrast(hexOf(t, text), tint)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+
+describe("light theme primary button hover", () => {
+  it("white on the deeper hover fill is at least 4.5:1", () => {
+    expect(contrast("#ffffff", hexOf(light, "primary-deep"))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("dark theme primary button hover", () => {
+  it("the near-black foreground on the /90 hovered fill is at least 4.5:1 over the card", () => {
+    const hovered = over(hexOf(dark, "primary"), hexOf(dark, "card"), 0.9);
+    expect(contrast(hexOf(dark, "primary-foreground"), hovered)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("solid fill classes in source", () => {
+  it("every destructive button uses the dedicated fill with a /95 hover", () => {
+    for (const [file, src] of FILES([
+      "src/components/ui/button.tsx",
+      "src/components/portfolio-form-dialog.tsx",
+      "src/components/portfolio-edit-form.tsx",
+      "src/components/holder-edit-form.tsx",
+    ])) {
+      expect(src, file).toContain("bg-destructive-fill");
+      expect(src, file).toContain("hover:bg-destructive-fill/95");
     }
   });
 
-  it("white stays at least 4.5:1 on the hovered fill in dark (/90) on the card", () => {
-    const hovered = over(hexOf(dark, "destructive"), hexOf(dark, "card"), 0.9);
-    expect(contrast("#ffffff", hovered)).toBeGreaterThanOrEqual(4.5);
+  it("no component pairs a brand fill with hard-coded white text", () => {
+    const glob = [
+      ...readdirSync(resolve(__dirname, "../src/components"), {
+        recursive: true,
+        encoding: "utf8",
+      }),
+    ].filter((f) => f.endsWith(".tsx"));
+    for (const f of glob) {
+      const src = readFileSync(resolve(__dirname, "../src/components", f), "utf8");
+      expect(src, f).not.toMatch(/bg-primary[^"`']*text-white/);
+      expect(src, f).not.toMatch(/bg-gold-fg[^"`']*text-white/);
+    }
   });
 });

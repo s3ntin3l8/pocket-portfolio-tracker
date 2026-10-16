@@ -43,7 +43,7 @@ export const MethodCard = forwardRef<
         </span>
       </span>
       {tag && (
-        <span className="shrink-0 rounded-xs bg-primary/15 px-2 py-1 text-micro font-bold text-primary">
+        <span className="shrink-0 rounded-xs bg-primary/15 px-2 py-1 text-micro font-bold text-primary-strong">
           {tag}
         </span>
       )}

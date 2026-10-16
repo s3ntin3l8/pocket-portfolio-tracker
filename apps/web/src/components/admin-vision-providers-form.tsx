@@ -195,7 +195,7 @@ export function AdminVisionProvidersForm({
                           <button
                             type="button"
                             onClick={() => setEditingId(p.id)}
-                            className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-1.5 text-micro font-bold text-primary"
+                            className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-1.5 text-micro font-bold text-primary-strong"
                           >
                             {t("credentialSet")}
                           </button>

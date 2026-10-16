@@ -106,7 +106,7 @@ export function FilterBar({
           className={cn(
             "whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-bold",
             showFlagged
-              ? "border-gold-fg bg-gold-fg text-white"
+              ? "border-gold-fg bg-gold-fg text-warning-foreground"
               : "border-gold-fg/35 bg-gold-fg/15 text-gold-fg",
           )}
         >

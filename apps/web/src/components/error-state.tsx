@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 export type ErrorTone = "brand" | "warn" | "neutral";
 
 const CHIP: Record<ErrorTone, string> = {
-  brand: "bg-primary/10 text-primary",
-  warn: "bg-warning/10 text-warning",
+  brand: "bg-primary/10 text-primary-strong",
+  warn: "bg-warning/10 text-warn-strong",
   neutral: "bg-muted text-muted-foreground",
 };
 

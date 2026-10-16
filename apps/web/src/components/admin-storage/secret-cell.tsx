@@ -71,7 +71,7 @@ export function SecretCell({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-2 text-micro font-bold text-primary"
+            className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-2.5 py-2 text-micro font-bold text-primary-strong"
           >
             {t("credentialSet")}
           </button>

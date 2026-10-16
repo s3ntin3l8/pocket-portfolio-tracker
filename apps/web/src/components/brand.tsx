@@ -17,7 +17,7 @@ export function PocketLogo({
   return (
     <span
       className={cn(
-        "flex size-8 items-center justify-center rounded-sm bg-primary text-primary-foreground",
+        "flex size-8 items-center justify-center rounded-sm bg-brand text-white",
         className,
       )}
     >

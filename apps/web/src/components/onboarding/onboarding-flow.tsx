@@ -513,7 +513,7 @@ export function OnboardingFlow() {
                       onClick={handlePrimaryCta}
                       disabled={creating}
                       className={cn(
-                        "mt-2 flex w-full items-center justify-center gap-[7px] rounded-lg bg-primary p-[15px] text-body font-bold text-white shadow-cta",
+                        "mt-2 flex w-full items-center justify-center gap-[7px] rounded-lg bg-primary p-[15px] text-body font-bold text-primary-foreground shadow-cta",
                         creating ? "cursor-default opacity-70" : "cursor-pointer",
                       )}
                     >

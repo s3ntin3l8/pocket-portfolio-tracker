@@ -167,7 +167,7 @@ export function ForecastPanel({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-5 px-1.5 text-micro text-primary hover:bg-primary/10 hover:text-primary"
+                  className="h-5 px-1.5 text-micro text-primary hover:bg-primary/10 hover:text-primary-strong"
                   onClick={() => setYears(yearsToTarget)}
                 >
                   {portfolioType === "child" ? t("toAge18") : t("toRetirement")}
