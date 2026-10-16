@@ -1,9 +1,8 @@
+import { BackLink } from "@/components/back-button";
 import { DataState } from "@/components/data-state";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Wallet } from "lucide-react";
-import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
+import { Wallet } from "lucide-react";
 import { EditTransaction } from "@/components/edit-transaction";
 import { PageHeaderSetter, PageTitle } from "@/components/page-header";
 import { loadTransactionsAcrossPortfolios } from "@/lib/server-api";
@@ -25,17 +24,7 @@ export default async function EditTransactionPage({
     <>
       <PageHeaderSetter title={title} backHref="/transactions" />
       <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="icon"
-          asChild
-          aria-label={t("back")}
-          className="rounded-lg bg-card shadow-card md:hidden"
-        >
-          <Link href="/transactions">
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Button>
+        <BackLink href="/transactions" label={t("back")} />
         <div>
           <PageTitle>{title}</PageTitle>
           <p className="text-sm text-muted-foreground">{subtitle}</p>

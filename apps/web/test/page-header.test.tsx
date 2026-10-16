@@ -96,7 +96,7 @@ describe("PageTitle", () => {
   it("merges an optional className without leaving a trailing space", () => {
     render(<PageTitle className="custom-class">Holdings</PageTitle>);
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1.className).toBe("text-2xl font-bold md:sr-only custom-class");
+    expect(h1.className).toBe("text-heading font-semibold md:sr-only custom-class");
   });
 });
 

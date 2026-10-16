@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageTitle } from "@/components/page-header";
 import { ReportCardSkeleton } from "@/components/reports/report-card-skeleton";
 import {
   IncomeCard,
@@ -33,7 +33,6 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>
       </header>
 

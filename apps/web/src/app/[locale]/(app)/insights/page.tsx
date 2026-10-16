@@ -23,7 +23,7 @@ import {
 import { bestAndWorst, periodToMover } from "@/lib/movers";
 import { formatPercent } from "@/lib/utils";
 import { isIntradayPoint } from "@portfolio/api-client";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageTitle } from "@/components/page-header";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -72,7 +72,6 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
     return (
       <div className="space-y-5">
         <header className="space-y-1">
-          <PageHeaderSetter title={t("title")} />
           <PageTitle>{t("title")}</PageTitle>
         </header>
         <DataState
@@ -115,7 +114,6 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <PageHeaderSetter title={t("title")} />
         <PageTitle>{t("title")}</PageTitle>
       </header>
 

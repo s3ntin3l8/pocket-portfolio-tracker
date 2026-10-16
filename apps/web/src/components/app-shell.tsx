@@ -138,8 +138,8 @@ export function AppShell({
           (#472). */}
             <div className="flex h-app-viewport overflow-hidden">
               {/* Desktop sidebar — transcribed from the reference: 236px, 22/16 padding, nav
-          items 600 14px text-mute (inactive) / 700 14px green on a green tint (active),
-          12px radius, 19px icons, 3px gap. */}
+          items 600 14px text-mute (inactive) / foreground on a neutral tint with a green icon
+          (active), 8px radius, 19px icons, 3px gap. */}
               <aside className="hidden w-[236px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-border bg-card px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pt-[max(22px,env(safe-area-inset-top))] md:flex">
                 <div className="px-2 pb-6">
                   <Brand />
@@ -156,12 +156,15 @@ export function AppShell({
                         className={cn(
                           "flex items-center gap-[11px] rounded-md px-3 py-2.5 text-sm transition-colors",
                           active
-                            ? "bg-primary/14 font-bold text-primary"
+                            ? "bg-accent font-semibold text-foreground"
                             : "font-semibold text-text-mute hover:bg-secondary hover:text-foreground",
                         )}
                       >
                         <LinkPendingSignal id={`sidebar-${key}`} />
-                        <Icon className="size-[19px]" strokeWidth={active ? 2 : 1.8} />
+                        <Icon
+                          className={cn("size-[19px]", active && "text-primary")}
+                          strokeWidth={active ? 2 : 1.8}
+                        />
                         <span className="flex-1">{t(key)}</span>
                         {badge != null && (
                           <span
