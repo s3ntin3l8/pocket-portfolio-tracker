@@ -1735,13 +1735,15 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // quote service throws so a missing price row fails the seed instead of reaching a
   // live provider.
 
-  const offlineQuotes = {
-    getQuotes: async () => {
+  // Every member access throws, so any provider path a future valuation adds fails with
+  // this message too, not an `undefined is not a function`.
+  const offlineQuotes = new Proxy({} as MarketDataService, {
+    get(_target, prop) {
       throw new Error(
-        "seed-demo: valuation requested a live quote — every seeded instrument needs a fresh lastPrices row",
+        `seed-demo: valuation reached the quote service (${String(prop)}) — every seeded instrument needs a fresh lastPrices row`,
       );
     },
-  } as unknown as MarketDataService;
+  });
   // `getCachedQuotes` measures freshness against the wall clock, not `NOW`; the rows were
   // stamped at `NOW` a moment ago, so any generous TTL keeps them fresh.
   const ANCHOR_TTL_MS = 24 * 60 * 60 * 1000;
@@ -1800,6 +1802,8 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     const netScale = Number(summary.netWorth) / value;
     const mvScale = Number(summary.totalMarketValue) / value;
     for (const { d, value: v, flow } of walk) {
+      // Today's row takes the summary strings verbatim: `dec()` rounds to 2 dp, and the
+      // row must equal what the job writes exactly.
       const isToday = d === 0;
       snapshotRows.push({
         portfolioId: portfolio.id,

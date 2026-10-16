@@ -4,8 +4,10 @@ import { Decimal } from "decimal.js";
 import { lastPrices, portfolios, portfolioSnapshots, users } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
+import type { FastifyBaseLogger } from "fastify";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import { valuePortfolio } from "../../src/services/valuation.js";
+import { recordDailySnapshots } from "../../src/services/snapshots.js";
 
 /**
  * SEED_EMAIL/SEED_PASSWORD (and DEMO_AUTH_SUB, which depends on them) are read from
@@ -110,6 +112,36 @@ describe("seedDemo — snapshot history anchored to the live valuation (#989)", 
         `${p.name} marketValue`,
       ).toBe(true);
       expect(new Decimal(last.effectiveFlow).isZero(), `${p.name} effectiveFlow`).toBe(true);
+    }
+
+    // The invariant itself: the daily job's first run over the seeded data rewrites
+    // today's rows with identical values. A per-portfolio failure is swallowed by the job
+    // (and would leave the row untouched), so its logger must stay silent too.
+    const todayKey = toDateKey(now);
+    const todayRows = async () =>
+      (await db.select().from(portfolioSnapshots).where(eq(portfolioSnapshots.date, todayKey)))
+        .filter((r) => pfs.some((p) => p.id === r.portfolioId))
+        .map(({ portfolioId, netWorth, marketValue, effectiveFlow, currency }) => ({
+          portfolioId,
+          netWorth,
+          marketValue,
+          effectiveFlow,
+          currency,
+        }))
+        .sort((a, b) => a.portfolioId.localeCompare(b.portfolioId));
+    const before = await todayRows();
+    expect(before).toHaveLength(5);
+    const log = { warn: vi.fn(), error: vi.fn() } as unknown as FastifyBaseLogger;
+    const written = await recordDailySnapshots(db, stub, 24 * 60 * 60 * 1000, now, log);
+    expect(written).toBeGreaterThanOrEqual(5);
+    expect(log.error).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalled();
+    const after = await todayRows();
+    expect(after.map((r) => [r.netWorth, r.marketValue, r.currency])).toEqual(
+      before.map((r) => [r.netWorth, r.marketValue, r.currency]),
+    );
+    for (const [i, r] of after.entries()) {
+      expect(new Decimal(r.effectiveFlow).eq(before[i].effectiveFlow)).toBe(true);
     }
 
     expect(quoteCalls).toBe(0);
