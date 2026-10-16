@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { SectionHeader } from "@/components/section-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { PortfolioEditForm } from "@/components/portfolio-edit-form";
 import { loadPortfolioList } from "@/lib/server-api";
 
@@ -25,8 +24,7 @@ export default async function EditPortfolioPage({
 
   return (
     <>
-      <PageHeaderSetter title={t("editTitle")} backHref="/settings/portfolios" />
-      <SectionHeader title={t("editTitle")} backHref="/settings/portfolios" />
+      <PageHeader title={t("editTitle")} backHref="/settings/portfolios" />
       <PortfolioEditForm mode="edit" portfolio={portfolio} />
     </>
   );

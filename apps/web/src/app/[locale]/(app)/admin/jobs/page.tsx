@@ -1,8 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminJobs } from "@/components/admin-jobs";
 import { UnmappedTypesAlert } from "@/components/unmapped-types-alert";
-import { SectionHeader } from "@/components/section-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
 import { requireAdmin, loadAdminJobs, loadUnmappedEventTypes } from "@/lib/server-api";
 
@@ -18,8 +17,7 @@ export default async function AdminJobsPage({ params }: { params: Promise<{ loca
 
   return (
     <>
-      <PageHeaderSetter title={t("jobs")} backHref="/admin" />
-      <SectionHeader title={t("jobs")} backHref="/admin" />
+      <PageHeader title={t("jobs")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("jobsHint")}</p>
 
       <UnmappedTypesAlert types={unmappedTypes} />

@@ -1,6 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { SectionHeader } from "@/components/section-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { AccountSection } from "@/components/settings-sections/account-section";
 import { loadMe } from "@/lib/server-api";
 
@@ -17,8 +16,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const me = await loadMe();
   return (
     <>
-      <PageHeaderSetter title={t("navAccount")} />
-      <SectionHeader title={t("navAccount")} backHref="/settings" />
+      <PageHeader desktopBack={false} title={t("navAccount")} backHref="/settings" />
       <AccountSection me={me} localAuthAvailable={Boolean(process.env.AUTH_LOCAL_SECRET)} />
     </>
   );

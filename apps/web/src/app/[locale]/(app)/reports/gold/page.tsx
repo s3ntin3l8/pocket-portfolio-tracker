@@ -4,10 +4,9 @@ import { DataState } from "@/components/data-state";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
 import { GainFigure } from "@/components/gain-figure";
 import { toneOf } from "@/lib/tone";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { GoldHoldingsTable } from "@/components/reports/gold/gold-holdings-table";
 import { GoldPlanCard } from "@/components/reports/gold/gold-plan-card";
-import { ReportHeader } from "@/components/report-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { retryAfterOf } from "@/lib/data-status";
@@ -24,8 +23,7 @@ export default async function GoldReportPage({ params }: { params: Promise<{ loc
 
   const heading = (
     <>
-      <PageHeaderSetter title={t("title")} backHref="/reports" />
-      <ReportHeader title={t("title")} subtitle={t("subtitle")} />
+      <PageHeader backHref="/reports" title={t("title")} subtitle={t("subtitle")} />
     </>
   );
 

@@ -27,6 +27,7 @@ import {
   InstrumentCardSkeleton,
   InstrumentTransactionsSkeleton,
 } from "@/components/instrument/instrument-skeletons";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -118,7 +119,7 @@ export default async function InstrumentPage({
       <InstrumentVisitTracker id={id} symbol={instrument.symbol} />
       <InstrumentHeader instrument={instrument} heroName={heroName} isAdmin={isAdmin} />
 
-      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[minmax(0,1fr)_300px] @xl:items-start">
+      <PageWithRail size="narrow">
         {/* ── Main column: price chart + fundamentals + lots + transactions ──
             `min-w-0` is the standard grid-item reset: without it, a child sized to its
             intrinsic content (chart, wide table) can blow past the 1fr track and produce
@@ -160,12 +161,12 @@ export default async function InstrumentPage({
         </div>
 
         {/* ── Sidebar: position stats (sticky on wide containers) ── */}
-        <div className="space-y-6 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto @xl:order-last">
+        <PageRail className="space-y-6">
           <Suspense fallback={<InstrumentCardSkeleton />}>
             <InstrumentPositionSection id={id} locale={locale} />
           </Suspense>
-        </div>
-      </div>
+        </PageRail>
+      </PageWithRail>
     </div>
   );
 }

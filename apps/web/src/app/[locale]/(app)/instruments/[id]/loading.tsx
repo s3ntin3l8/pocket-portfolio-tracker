@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { InstrumentLogoPlaceholder } from "@/components/instrument/instrument-logo-placeholder";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 export default function Loading() {
   return (
@@ -22,7 +23,7 @@ export default function Loading() {
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 @xl:grid-cols-[minmax(0,1fr)_300px] @xl:items-start">
+      <PageWithRail size="narrow">
         <div className="space-y-6 min-w-0">
           <Card>
             <CardHeader>
@@ -81,7 +82,7 @@ export default function Loading() {
             </CardContent>
           </Card>
         </div>
-        <div className="space-y-6 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto @xl:order-last">
+        <PageRail className="space-y-6">
           <Card>
             <CardHeader>
               <Skeleton className="h-5 w-1/3" />
@@ -94,8 +95,8 @@ export default function Loading() {
               <Skeleton className="h-[60px] rounded-lg" />
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </PageRail>
+      </PageWithRail>
     </div>
   );
 }

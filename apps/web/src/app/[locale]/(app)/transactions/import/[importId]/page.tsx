@@ -1,8 +1,7 @@
-import { BackLink } from "@/components/back-button";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { DraftReviewClient } from "@/components/draft-review-client";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import type { ImportDraft, ImportTargetPortfolio } from "@/components/import-flow/types";
 import { loadImport, loadPortfolioList } from "@/lib/server-api";
 
@@ -32,14 +31,13 @@ export default async function ImportReviewPage({
 
   return (
     <div className="space-y-6">
-      <PageHeaderSetter title={t("reviewTitle")} backHref="/transactions" />
-      <div className="flex items-center gap-3">
-        <BackLink href="/transactions" label={t("title")} />
-        <div>
-          <PageTitle>{t("reviewTitle")}</PageTitle>
-          <p className="text-sm text-muted-foreground">{t("reviewSubtitle")}</p>
-        </div>
-      </div>
+      <PageHeader
+        title={t("reviewTitle")}
+        subtitle={t("reviewSubtitle")}
+        backHref="/transactions"
+        backLabel={t("title")}
+        className="mb-0"
+      />
 
       <DraftReviewClient
         importId={importId}

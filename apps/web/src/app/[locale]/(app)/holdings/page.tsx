@@ -27,7 +27,8 @@ import {
   loadAnomalies,
   loadNetworthAnomalies,
 } from "@/lib/server-api";
-import { PageTitle } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
+import { PageWithRail } from "@/components/page-with-rail";
 
 const CLASS_TABS = [
   "all",
@@ -166,14 +167,7 @@ export default async function HoldingsPage({
     />
   );
 
-  const Heading = (
-    <>
-      <PageTitle>
-        <span className="sm:hidden">{t("titleMobile")}</span>
-        <span className="hidden sm:inline">{t("title")}</span>
-      </PageTitle>
-    </>
-  );
+  const Heading = <PageHeader title={t("title")} mobileTitle={t("titleMobile")} />;
 
   if (result.status !== "ok" && result.status !== "empty") {
     return (
@@ -240,7 +234,7 @@ export default async function HoldingsPage({
         </Suspense>
       )}
 
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+      <PageWithRail>
         {/* ── Main column: anomaly banners + tabs + table ── */}
         <div className="space-y-5">
           <Suspense fallback={null}>
@@ -259,7 +253,7 @@ export default async function HoldingsPage({
 
         {/* ── Sidebar: value stats + allocation donut (sticky on wide containers) ── */}
         {summary && <HoldingsSidebar summary={summary} locale={locale} />}
-      </div>
+      </PageWithRail>
     </div>
   );
 }

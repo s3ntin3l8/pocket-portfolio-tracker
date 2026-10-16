@@ -1,10 +1,9 @@
-import { BackLink } from "@/components/back-button";
 import { DataState } from "@/components/data-state";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { EditTransaction } from "@/components/edit-transaction";
-import { PageHeaderSetter, PageTitle } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { loadTransactionsAcrossPortfolios } from "@/lib/server-api";
 
 export default async function EditTransactionPage({
@@ -21,16 +20,13 @@ export default async function EditTransactionPage({
   const result = await loadTransactionsAcrossPortfolios(txId);
 
   const header = (title: string, subtitle: string) => (
-    <>
-      <PageHeaderSetter title={title} backHref="/transactions" />
-      <div className="flex items-center gap-3">
-        <BackLink href="/transactions" label={t("back")} />
-        <div>
-          <PageTitle>{title}</PageTitle>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-      </div>
-    </>
+    <PageHeader
+      title={title}
+      subtitle={subtitle}
+      backHref="/transactions"
+      backLabel={t("back")}
+      className="mb-0"
+    />
   );
 
   if (result.status !== "ok") {

@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 export default function Loading() {
   return (
@@ -17,8 +18,8 @@ export default function Loading() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
-        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
+      <PageWithRail>
+        <PageRail railFirstOnMobile className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             <Card className="rounded-lg">
               <div className="space-y-2 p-4">
@@ -77,7 +78,7 @@ export default function Loading() {
               <Skeleton className="h-20 w-full" />
             </div>
           </Card>
-        </div>
+        </PageRail>
 
         <div className="space-y-5">
           <Card>
@@ -99,7 +100,7 @@ export default function Loading() {
             </div>
           </Card>
         </div>
-      </div>
+      </PageWithRail>
     </div>
   );
 }

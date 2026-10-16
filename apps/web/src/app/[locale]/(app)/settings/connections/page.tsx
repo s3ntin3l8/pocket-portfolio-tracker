@@ -1,6 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { SectionHeader } from "@/components/section-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { DataConnectionsSection } from "@/components/settings-sections/data-connections-section";
 import { loadApiTokens, loadTrConnection, loadIbkrConnection } from "@/lib/server-api";
 
@@ -21,8 +20,7 @@ export default async function SettingsConnectionsPage({
 
   return (
     <>
-      <PageHeaderSetter title={t("navData")} backHref="/settings" />
-      <SectionHeader title={t("navData")} backHref="/settings" />
+      <PageHeader title={t("navData")} backHref="/settings" />
       <DataConnectionsSection
         apiTokens={apiTokens}
         trConnection={trConnection}

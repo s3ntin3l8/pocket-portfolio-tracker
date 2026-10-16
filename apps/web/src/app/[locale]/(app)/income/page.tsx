@@ -4,8 +4,7 @@ import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Coins } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { ReportHeader } from "@/components/report-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { incomeStatsOnce } from "@/components/income/income-data";
 import {
   IncomeYearChartSection,
@@ -19,6 +18,7 @@ import {
   IncomeCurrencySection,
 } from "@/components/income/income-sections";
 import { IncomeCardSkeleton, IncomeStatsSkeleton } from "@/components/income/income-skeletons";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -48,8 +48,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
 
   const heading = (
     <>
-      <PageHeaderSetter title={t("title")} backHref="/reports" />
-      <ReportHeader title={t("title")} subtitle={t("subtitle")} />
+      <PageHeader backHref="/reports" title={t("title")} subtitle={t("subtitle")} />
     </>
   );
 
@@ -83,7 +82,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     <div className="space-y-5">
       {heading}
 
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+      <PageWithRail>
         {/* ── Main column: charts + summary + calendar + timeline ── */}
         <div className="space-y-5">
           <Suspense fallback={<IncomeCardSkeleton />}>
@@ -104,7 +103,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
         </div>
 
         {/* ── Sidebar: stat cards + cash interest + allocation donut (sticky on wide containers) ── */}
-        <div className="order-first space-y-3.5 @xl:order-last @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto">
+        <PageRail className="space-y-3.5">
           <Suspense fallback={<IncomeStatsSkeleton />}>
             <IncomeStatsSection locale={locale} />
           </Suspense>
@@ -117,8 +116,8 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
           <Suspense fallback={null}>
             <IncomeCurrencySection />
           </Suspense>
-        </div>
-      </div>
+        </PageRail>
+      </PageWithRail>
     </div>
   );
 }

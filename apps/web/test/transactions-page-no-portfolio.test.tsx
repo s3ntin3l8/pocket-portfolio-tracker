@@ -42,7 +42,7 @@ vi.mock("@/components/export-documents-button", () => ({ ExportDocumentsButton: 
 vi.mock("@/components/recent-imports-section", () => ({ RecentImportsSection: () => null }));
 vi.mock("@/components/fx-missing-banner", () => ({ FxMissingBanner: () => null }));
 vi.mock("@/components/page-header", () => ({
-  PageTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
+  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
 
 import TransactionsPage from "../src/app/[locale]/(app)/transactions/page";

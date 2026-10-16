@@ -4,8 +4,7 @@ import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ScrollText } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { ReportHeader } from "@/components/report-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { TABLE_LABEL, TABLE_VALUE_STRONG } from "@/components/ui/table";
@@ -14,6 +13,7 @@ import { TradeMethodToggle } from "@/components/trade-method-toggle";
 import { TradesPageCommands } from "@/components/trades-page-commands";
 import { loadTrades, loadPreferences } from "@/lib/server-api";
 import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 type Method = "average" | "fifo";
 
@@ -66,8 +66,8 @@ export default async function TradesPage({
 
   const Heading = (
     <>
-      <PageHeaderSetter title={t("title")} backHref="/reports" />
-      <ReportHeader
+      <PageHeader
+        backHref="/reports"
         title={t("title")}
         subtitle={t("subtitle")}
         action={
@@ -130,7 +130,7 @@ export default async function TradesPage({
     <div className="space-y-5">
       {Heading}
 
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+      <PageWithRail>
         {/* ── Main column: trades table + tax lens ── */}
         <div className="min-w-0 space-y-5">
           <TradesTable trades={log.trades} currency={currency} />
@@ -240,7 +240,7 @@ export default async function TradesPage({
         </div>
 
         {/* ── Sidebar: KPI cards + charts (sticky on wide containers) ── */}
-        <div className="min-w-0 space-y-5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
+        <PageRail className="space-y-5">
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @xl:grid-cols-1">
             <StatCard
               label={t("totalReturn")}
@@ -264,8 +264,8 @@ export default async function TradesPage({
               </div>
             </Card>
           </div>
-        </div>
-      </div>
+        </PageRail>
+      </PageWithRail>
     </div>
   );
 }
