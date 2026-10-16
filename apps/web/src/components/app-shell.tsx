@@ -47,7 +47,7 @@ function DesktopTopbarTitle() {
       )}
       {/* Not a heading: the page itself renders the one <h1> (screen-reader-only at md+),
           so a second <h1> here would double the document outline on every route. */}
-      <p className="min-w-0 truncate text-lg font-bold">{title}</p>
+      <p className="min-w-0 truncate text-lg font-semibold">{title}</p>
     </div>
   );
 }

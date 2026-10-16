@@ -188,9 +188,7 @@ function DialogContent({
                 caller's own DialogTitle already renders. This is the visible mobile
                 heading only; a caller using mobileHeader still owns the one accessible
                 DialogTitle (a visually-hidden one is fine if it has no other use for it). */}
-            <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">
-              {mobileHeader.title}
-            </h1>
+            <h1 className="min-w-0 truncate text-lg font-semibold">{mobileHeader.title}</h1>
           </div>
         )}
 

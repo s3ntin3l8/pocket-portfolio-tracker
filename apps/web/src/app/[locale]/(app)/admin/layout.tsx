@@ -113,7 +113,7 @@ export default async function AdminLayout({
       title={t("title")}
       landingTop={
         <div className="mb-4 flex items-center gap-3">
-          <BackLink href="/settings" className="flex" />
+          <BackLink href="/settings" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-heading font-semibold">{t("title")}</p>
             <p className="truncate text-xs text-muted-foreground">{t("subtitle")}</p>

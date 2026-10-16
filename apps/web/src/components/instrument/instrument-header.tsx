@@ -9,9 +9,10 @@ import { instrumentLogoTransitionName } from "@/lib/instrument-logo-transition";
 import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 import { PageTitle } from "@/components/page-header";
 
-export async function InstrumentBackButton() {
+/** `className="md:flex"` keeps it visible on desktop for pages with no topbar title (error states). */
+export async function InstrumentBackButton({ className }: { className?: string }) {
   const tA11y = await getTranslations("A11y");
-  return <BackLink href="/holdings" label={tA11y("backToHoldings")} />;
+  return <BackLink href="/holdings" label={tA11y("backToHoldings")} className={className} />;
 }
 
 /**

@@ -29,11 +29,19 @@ describe("BackLink", () => {
     expect(link.className).toContain("md:hidden");
   });
 
-  it("accepts a custom label and lets a caller keep it visible on desktop", () => {
-    wrap(<BackLink href="/holdings" label="Back to holdings" className="flex" />);
-    const link = screen.getByRole("link", { name: "Back to holdings" });
-    expect(link.className).toContain("md:hidden");
-    expect(link.className).toContain("flex");
+  it("accepts a custom label", () => {
+    wrap(<BackLink href="/holdings" label="Back to holdings" />);
+    expect(screen.getByRole("link", { name: "Back to holdings" })).toHaveAttribute(
+      "href",
+      "/holdings",
+    );
+  });
+
+  it("lets a caller keep it visible on desktop with md:flex", () => {
+    wrap(<BackLink href="/holdings" className="md:flex" />);
+    const link = screen.getByRole("link", { name: messages.A11y.back });
+    expect(link.className).toContain("md:flex");
+    expect(link.className).not.toContain("md:hidden");
   });
 });
 
