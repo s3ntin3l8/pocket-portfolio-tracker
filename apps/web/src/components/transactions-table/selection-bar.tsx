@@ -133,6 +133,8 @@ export function SelectionBar({
       label={selectedCount > 0 ? tb("selected", { count: selectedCount }) : tb("selectPrompt")}
       onDismiss={onClearSelection}
       dismissLabel={tb("cancel")}
+      // Sits under the sticky table header (h-11) instead of covering it.
+      className="md:top-[calc(var(--topbar-h)+2.75rem)]"
     >
       {actions}
     </SelectionBarShell>

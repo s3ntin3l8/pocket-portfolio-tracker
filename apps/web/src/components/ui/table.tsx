@@ -1,14 +1,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { StickyTableWrapper } from "@/components/ui/sticky-table-wrapper";
 
 /**
  * `edgeAffordance` (audit G5) opts a wide table into the scroll-shadow wrapper
  * (`scroll-shadow-x`, shadows appear only on an edge with more content past it) and a
  * pinned first column (`sticky-first-col`), so horizontal overflow is never silent.
  *
- * `stickyHeader` pins the header row under the topbar while the shell scrolls. `position: sticky`
- * is lost inside any scroll container, so the wrapper clips (`overflow-x: clip`) instead of
- * scrolling: use it only on tables that never need horizontal scroll, and not with `edgeAffordance`.
+ * `stickyHeader` pins the header row under the topbar while the shell scrolls. While the table
+ * fits its column the wrapper clips instead of scrolling (see `StickyTableWrapper`); when it does
+ * not fit it scrolls horizontally and the header scrolls with the page. Not for `edgeAffordance`.
  */
 function Table({
   className,
@@ -16,11 +17,11 @@ function Table({
   stickyHeader = false,
   ...props
 }: React.ComponentProps<"table"> & { edgeAffordance?: boolean; stickyHeader?: boolean }) {
+  const Wrapper = stickyHeader ? StickyTableWrapper : "div";
   return (
-    <div
+    <Wrapper
       className={cn(
-        "relative w-full",
-        stickyHeader ? "overflow-x-clip" : "overflow-x-auto",
+        stickyHeader ? undefined : "relative w-full overflow-x-auto",
         edgeAffordance && "scroll-shadow-x",
       )}
     >
@@ -29,12 +30,12 @@ function Table({
           "w-full caption-bottom text-body-sm",
           edgeAffordance && "sticky-first-col",
           stickyHeader &&
-            "[&_thead_th]:sticky [&_thead_th]:top-(--topbar-h) [&_thead_th]:z-10 [&_thead_th]:bg-card",
+            "[&_thead_th]:sticky [&_thead_th]:top-(--topbar-h) [&_thead_th]:z-10 [&_thead_th]:bg-card [&_thead_th]:shadow-[inset_0_-1px_0_var(--border)]",
           className,
         )}
         {...props}
       />
-    </div>
+    </Wrapper>
   );
 }
 

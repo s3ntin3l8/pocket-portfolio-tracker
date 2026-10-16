@@ -154,20 +154,36 @@ describe("auth label (audit G8)", () => {
 });
 
 describe("Table stickyHeader", () => {
-  it("clips instead of scrolling so the header can stick, and pins the header cells under the topbar", () => {
-    const { container } = render(
-      <Table stickyHeader>
-        <TableHeader>
-          <TableRow>
-            <TableHead>A</TableHead>
-          </TableRow>
-        </TableHeader>
-      </Table>,
-    );
+  const sticky = (
+    <Table stickyHeader>
+      <TableHeader>
+        <TableRow>
+          <TableHead>A</TableHead>
+        </TableRow>
+      </TableHeader>
+    </Table>
+  );
+
+  it("clips instead of scrolling while the table fits, so the header can stick under the topbar", () => {
+    const { container } = render(sticky);
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.className).toContain("overflow-x-clip");
     expect(wrapper.className).not.toContain("overflow-x-auto");
     expect(container.querySelector("table")!.className).toContain("top-(--topbar-h)");
+  });
+
+  it("falls back to a scrolling wrapper when the table is wider than its column", () => {
+    const widths = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(900);
+    const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    try {
+      const { container } = render(sticky);
+      const wrapper = container.firstElementChild as HTMLElement;
+      expect(wrapper.className).toContain("overflow-x-auto");
+      expect(wrapper.className).not.toContain("overflow-x-clip");
+    } finally {
+      widths.mockRestore();
+      client.mockRestore();
+    }
   });
 
   it("keeps the scrolling wrapper by default", () => {
@@ -177,6 +193,11 @@ describe("Table stickyHeader", () => {
 
   it("defines the topbar height token", () => {
     expect(src("src/app/globals.css")).toContain("--topbar-h:");
+  });
+
+  it("is opted into by the Activity and Trades desktop tables", () => {
+    expect(src("src/components/transactions-table/desktop.tsx")).toContain("<Table stickyHeader>");
+    expect(src("src/components/trades-table.tsx")).toContain("<Table stickyHeader>");
   });
 });
 
