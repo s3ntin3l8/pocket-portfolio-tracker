@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -124,6 +124,10 @@ export async function startDemo({ login = false, quiet = false, keep = false } =
     PORT: DEMO_API_PORT,
     HOST: "127.0.0.1",
     LOG_LEVEL: "warn",
+    // Local folder storage: the default S3 backend would try to reach (and,
+    // outside production, create a bucket on) an object store.
+    STORAGE_PROVIDER: "folder",
+    STORAGE_FOLDER_PATH: path.join(demoDir, "storage"),
     ...(local.AUTH_LOCAL_SECRET && { AUTH_LOCAL_SECRET: local.AUTH_LOCAL_SECRET }),
   });
   const webEnv = demoEnv(demoDir, {
@@ -139,24 +143,26 @@ export async function startDemo({ login = false, quiet = false, keep = false } =
   });
 
   assertDemoEnv(seedEnv, demoDir, { cwd: runDir });
-  assertDemoEnv(apiEnv, demoDir, { cwd: runDir });
+  assertDemoEnv(apiEnv, demoDir, { cwd: runDir, api: true });
   assertDemoEnv(webEnv, demoDir, { cwd: WEB_DIR, nextApp: true });
 
   let api;
   let web;
   let stopping;
-  const stop = () => (stopping ??= teardown());
-  // Installed before anything is spawned: the servers run in their own process
-  // groups, so a Ctrl-C during the build or boot would otherwise orphan them.
-  const onSignal = () => stop().then(() => process.exit(0));
-  process.once("SIGINT", onSignal);
-  process.once("SIGTERM", onSignal);
+  const hardKill = () => {
+    for (const child of [api, web])
+      try {
+        if (child) process.kill(-child.pid, "SIGKILL");
+      } catch {
+        // Group already gone.
+      }
+  };
   const teardown = async () => {
-    process.off("SIGINT", onSignal);
-    process.off("SIGTERM", onSignal);
     // Wait for every process to exit first: dying next dev workers otherwise
     // recreate files under the scratch HOME after it was deleted.
     await Promise.all([killGroup(api), killGroup(web)]);
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
     if (keep) return console.log(`[demo] kept ${demoDir}`);
     // Next's server worker can still write its config store under HOME just after
     // it is signalled, so delete until the directory stays gone.
@@ -169,6 +175,41 @@ export async function startDemo({ login = false, quiet = false, keep = false } =
     }
     console.warn(`[demo] could not fully remove ${demoDir}`);
   };
+  const stop = () => (stopping ??= teardown());
+  // Installed before anything is spawned: the servers run in their own process
+  // groups, so a Ctrl-C during the build or boot would otherwise orphan them.
+  // They stay registered until both groups are gone; a second Ctrl-C during the
+  // grace period skips it and SIGKILLs the groups instead of leaving them behind.
+  function onSignal() {
+    if (stopping) {
+      hardKill();
+      // Give the killed groups a moment to exit, or a dying next dev worker
+      // recreates its config store under HOME right after the delete.
+      const gone = (child) => {
+        try {
+          return !child || (process.kill(-child.pid, 0), false);
+        } catch {
+          return true;
+        }
+      };
+      const deadline = Date.now() + 2_000;
+      let attempts = 0;
+      const finish = () => {
+        if (!(gone(api) && gone(web)) && Date.now() < deadline) return setTimeout(finish, 50);
+        if (keep) process.exit(130);
+        // As in teardown: a dying worker can recreate files just after the
+        // delete, so repeat it a few times before exiting.
+        rmSync(demoDir, { recursive: true, force: true });
+        if (++attempts < 5) return setTimeout(finish, 500);
+        if (existsSync(demoDir)) console.warn(`[demo] hard stop: remove ${demoDir} by hand`);
+        process.exit(130);
+      };
+      return finish();
+    }
+    stop().then(() => process.exit(0));
+  }
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   try {
     console.log(`[demo] scratch dir ${demoDir}`);

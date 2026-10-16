@@ -70,6 +70,7 @@ const inside = (dir, p) => {
  * Throws if `env` could reach anything outside `demoDir`. Returns the list of
  * problems instead when `collect` is true (used by the tests).
  *
+ * `api` marks the API server's env, which must use folder storage.
  * `cwd` is where the process will run. A plain process must not find a `.env`
  * there. For `nextApp`, the `.env*` files are expected on a dev box (the
  * `make web-env` symlink), so finding one is only a warning, as long as
@@ -77,7 +78,11 @@ const inside = (dir, p) => {
  * they are refused. `scripts/demo/env.test.mjs` fails if the installed
  * @next/env stops honouring that flag.
  */
-export function assertDemoEnv(env, demoDir, { cwd, nextApp = false, collect = false } = {}) {
+export function assertDemoEnv(
+  env,
+  demoDir,
+  { cwd, nextApp = false, api = false, collect = false } = {},
+) {
   const problems = [];
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;
@@ -98,6 +103,10 @@ export function assertDemoEnv(env, demoDir, { cwd, nextApp = false, collect = fa
     if (!local || !inside(demoDir, path.resolve(local)))
       problems.push("DATABASE_URL must be a pglite:// path inside the demo dir");
   }
+  // The API's default storage backend is S3; anything but the local folder
+  // would reach an object store.
+  if (api && env.STORAGE_PROVIDER !== "folder")
+    problems.push("the API must use STORAGE_PROVIDER=folder (inside the demo dir)");
   for (const key of ["HOME", "TMPDIR"])
     if (!env[key] || !inside(demoDir, env[key]))
       problems.push(`${key} must be inside the demo dir`);

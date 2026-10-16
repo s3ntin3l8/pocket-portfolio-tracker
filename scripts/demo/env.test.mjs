@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -65,6 +65,18 @@ describe("assertDemoEnv refuses a poisoned environment", () => {
     expect(assertDemoEnv(base, demoDir, { cwd, nextApp: true, collect: true })).toEqual([]);
   });
 
+  it("an API env on the default S3 storage", () => {
+    refuses({}, { api: true });
+    refuses({ STORAGE_PROVIDER: "s3" }, { api: true });
+    expect(
+      assertDemoEnv(
+        { ...base, STORAGE_PROVIDER: "folder", STORAGE_FOLDER_PATH: path.join(demoDir, "s") },
+        demoDir,
+        { api: true, collect: true },
+      ),
+    ).toEqual([]);
+  });
+
   it("throws unless collecting", () => {
     expect(() => assertDemoEnv({ ...base, MULLION_HOOK_TOKEN: "t" }, demoDir)).toThrow(/refused/);
   });
@@ -82,12 +94,40 @@ describe("assertDemoEnv refuses a poisoned environment", () => {
 
 describe("the installed Next.js", () => {
   // demoEnv relies on @next/env skipping every .env* file when this flag is
-  // set. If an upgrade drops it, the web app would load the real .env.local.
-  it("still honours __NEXT_PROCESSED_ENV", () => {
-    const fromWeb = createRequire(new URL("../../apps/web/package.json", import.meta.url));
-    const fromNext = createRequire(fromWeb.resolve("next/package.json"));
-    const source = readFileSync(fromNext.resolve("@next/env"), "utf8");
-    expect(source).toContain("__NEXT_PROCESSED_ENV");
+  // set. If an upgrade drops that, the web app would load the real .env.local.
+  // Checked by behaviour, not by grepping for the flag's name.
+  const fromWeb = createRequire(new URL("../../apps/web/package.json", import.meta.url));
+  const fromNext = createRequire(fromWeb.resolve("next/package.json"));
+  const envModule = fromNext.resolve("@next/env");
+  const MARKER = "POCKET_DEMO_ENV_CANARY";
+
+  // A fresh copy per call: @next/env caches its first result, and a forced
+  // reload would bypass the flag (which `next dev` itself never passes here).
+  const loadsMarker = (flag) => {
+    delete fromNext.cache[envModule];
+    const { loadEnvConfig } = fromNext(envModule);
+    const dir = mkdtempSync(path.join(demoDir, "next-env-"));
+    // .env, not .env.local: under NODE_ENV=test Next skips .env.local anyway.
+    writeFileSync(path.join(dir, ".env"), `${MARKER}=leaked\n`);
+    const saved = process.env.__NEXT_PROCESSED_ENV;
+    if (flag) process.env.__NEXT_PROCESSED_ENV = "true";
+    else delete process.env.__NEXT_PROCESSED_ENV;
+    try {
+      loadEnvConfig(dir, true, { info() {}, error() {} });
+      return process.env[MARKER] === "leaked";
+    } finally {
+      delete process.env[MARKER];
+      if (saved === undefined) delete process.env.__NEXT_PROCESSED_ENV;
+      else process.env.__NEXT_PROCESSED_ENV = saved;
+    }
+  };
+
+  it("loads .env files without the flag (the test can see a leak)", () => {
+    expect(loadsMarker(false)).toBe(true);
+  });
+
+  it("skips .env files when __NEXT_PROCESSED_ENV is set", () => {
+    expect(loadsMarker(true)).toBe(false);
   });
 });
 
