@@ -8,10 +8,18 @@ import {
   portfolioIntradaySnapshots,
   portfolioSnapshots,
 } from "@portfolio/db";
-import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../services/fx.js";
+import { getFxRatesForDates, makeFxRateFn, type FxProvider } from "../../services/fx.js";
 import { getMarketData } from "../../services/market-data.js";
 import { rangeStart } from "../../services/snapshots.js";
-import { aggregateValueFlows, xirr, chainIndex, convert, fxAvailable } from "@portfolio/core";
+import {
+  aggregateValueFlows,
+  xirr,
+  chainIndex,
+  convert,
+  fxAvailable,
+  toDateKey,
+  type FxRateFn,
+} from "@portfolio/core";
 import { cacheKey } from "../helpers.js";
 import { isReadOnlyPat } from "../../plugins/auth.js";
 import type { PortfolioParams } from "./shared.js";
@@ -33,6 +41,35 @@ import {
   computeBenchmarkIndex,
   carryForwardBenchmark,
 } from "../../services/benchmark.js";
+
+/**
+ * Per-point FX for intraday (1D/7D) rows: each row converts at the rate of its own
+ * `capturedAt` UTC date, exactly as the daily series converts each snapshot at its date's
+ * rate (#1038), so an FX move inside a 7-day window lands between the points it happened
+ * between instead of scaling the whole window by today's rate. `fxProvider` is `null` for a
+ * read-scoped PAT (cached rates only, audit A7). A currency without any rate yields `null`
+ * from the rate function (never 1:1), which `fxAvailable` turns into an exclusion reported
+ * as fxMissingCurrencies.
+ *
+ * Carry-forward follows the daily series, not `getFxRates`: `getFxRatesForDates` carries a
+ * currency's newest cached rate to every later date with no `FX_MAX_CARRY_FORWARD_DAYS`
+ * bound (that bound only gates its back-fill), so a currency whose newest rate is older
+ * than 14 days still converts here, exactly as the same day does in the daily series.
+ */
+async function intradayFxAt(
+  app: FastifyInstance,
+  rows: { currency: string; capturedAt: Date }[],
+  target: string,
+  fxProvider: FxProvider | null | undefined,
+): Promise<(row: { capturedAt: Date }) => FxRateFn> {
+  const currencies = [...new Set(rows.map((r) => r.currency))];
+  const dates = [...new Set(rows.map((r) => toDateKey(r.capturedAt)))];
+  const ratesByDate = await getFxRatesForDates(app.db, currencies, target, dates, fxProvider);
+  const byDate = new Map(
+    [...ratesByDate.entries()].map(([d, rates]) => [d, makeFxRateFn(rates, target)]),
+  );
+  return (row) => byDate.get(toDateKey(row.capturedAt)) ?? makeFxRateFn({}, target);
+}
 
 export function registerHistoryRoutes(app: FastifyInstance) {
   // Net-worth-over-time for one portfolio, from the daily snapshots, in the portfolio's
@@ -67,14 +104,11 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             ),
           )
           .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
-        // Same as the aggregate intraday series: today's rate into the current base; a
-        // row whose currency has none is left out and reported as fxMissingCurrencies.
-        const currencies = [...new Set(intradayRows.map((r) => r.currency))];
-        const fx = makeFxRateFn(
-          await getFxRates(app.db, currencies, base, new Date(), fxProvider),
-          base,
-        );
-        const rows = intradayRows.filter((r) => fxAvailable(r.currency, base, fx));
+        // Same as the aggregate intraday series: each point at its capture date's rate into
+        // the current base; a row whose currency has none is left out and reported as
+        // fxMissingCurrencies.
+        const fxAt = await intradayFxAt(app, intradayRows, base, fxProvider);
+        const rows = intradayRows.filter((r) => fxAvailable(r.currency, base, fxAt(r)));
         request.timingMeta = {
           portfolioId,
           range,
@@ -82,8 +116,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         };
         return rows.map((r) => ({
           at: r.capturedAt.toISOString(),
-          netWorth: convert(r.netWorth, r.currency, base, fx),
-          marketValue: convert(r.marketValue ?? "0", r.currency, base, fx),
+          netWorth: convert(r.netWorth, r.currency, base, fxAt(r)),
+          marketValue: convert(r.marketValue ?? "0", r.currency, base, fxAt(r)),
         }));
       }
 
@@ -202,9 +236,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const portfolio = request.portfolio;
       const boundary = portfolio.cashCounted ? "inside" : "outside";
       const costBasisMode = await resolveCostBasisMode(app, request.userId);
+      // A read-scoped PAT values and converts with cached FX rates only (audit A7); its
+      // possibly-degraded result is cached under its own key.
+      const readOnlyPat = isReadOnlyPat(request);
+      const fxProvider = readOnlyPat ? null : undefined;
       const cached = await withDerivationCache(
         performanceCache,
-        `${portfolioId}:${boundary}`,
+        `${portfolioId}:${boundary}${readOnlyPat ? ":ro" : ""}`,
         async () => {
           const { coreTxns, summary, corporateActions } = await loadValuation(
             app,
@@ -212,6 +250,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             portfolio.baseCurrency,
             costBasisMode,
             portfolio.cashCounted,
+            undefined,
+            fxProvider,
           );
 
           // Flows and net worth exclude the same fxMissing instruments (audit B2).
@@ -221,6 +261,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             boundary,
             portfolio.baseCurrency,
             corporateActions,
+            "today",
+            fxProvider,
           );
           const asOf = new Date();
           flows.push({ amount: summary.netWorth, date: asOf });
@@ -315,6 +357,9 @@ export function registerHistoryRoutes(app: FastifyInstance) {
     const display = u?.displayCurrency ?? "IDR";
 
     const readOnlyPat = isReadOnlyPat(request);
+    // A read-scoped PAT converts with cached rates only (no provider fetch/persist, audit
+    // A7) — the snapshot, intraday and benchmark rates alike, as /portfolios/:id/history.
+    const fxProvider = readOnlyPat ? null : undefined;
     const ck =
       cacheKey(id, range, holderId ?? "", includeParam, excludeParam) + (readOnlyPat ? ":ro" : "");
     const cached = await withDerivationCache(historyCache, ck, async () => {
@@ -333,17 +378,18 @@ export function registerHistoryRoutes(app: FastifyInstance) {
           .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
         if (intradayRows.length === 0) return [];
 
-        const currencies = [...new Set(intradayRows.map((r) => r.currency))];
-        const fx = makeFxRateFn(await getFxRates(app.db, currencies, display), display);
-        // A portfolio whose base currency has no rate is left out (never 1:1, audit B2);
-        // the miss is reported as fxMissingCurrencies via the request scope.
-        const rows = intradayRows.filter((r) => fxAvailable(r.currency, display, fx));
+        // Each point at its capture date's rate (#1038). A portfolio whose base currency has
+        // no rate is left out (never 1:1, audit B2); the miss is reported as
+        // fxMissingCurrencies via the request scope.
+        const fxAt = await intradayFxAt(app, intradayRows, display, fxProvider);
+        const rows = intradayRows.filter((r) => fxAvailable(r.currency, display, fxAt(r)));
 
         // Decimal sums (audit B12) — these are serialised as money strings.
         const byAt = new Map<string, { netWorth: Decimal; marketValue: Decimal }>();
         for (const r of rows) {
           const at = r.capturedAt.toISOString();
           const entry = byAt.get(at) ?? { netWorth: new Decimal(0), marketValue: new Decimal(0) };
+          const fx = fxAt(r);
           entry.netWorth = entry.netWorth.add(convert(r.netWorth, r.currency, display, fx));
           entry.marketValue = entry.marketValue.add(
             convert(r.marketValue ?? "0", r.currency, display, fx),
@@ -368,19 +414,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         .where(and(...conds))
         .orderBy(asc(portfolioSnapshots.date));
 
-      // The benchmark's currency rides along so its closes convert at the same per-date
-      // rates as the snapshots (#1020) — except for a read-scoped PAT: its benchmark
-      // conversion below uses cached rates only, like its benchmark prices. (The snapshot
-      // currencies' own FX load predates this and is not part of that guard.)
+      // One per-date rate load for the snapshot currencies and the benchmark's, so both
+      // convert at the same rates (#1020); cached-only for a read-scoped PAT (#1039), like
+      // its benchmark prices below.
       const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
-      const currencies = [
-        ...new Set([
-          ...snapRows.map((r) => r.currency),
-          ...(readOnlyPat ? [] : [bmConfig.currency]),
-        ]),
-      ];
+      const currencies = [...new Set([...snapRows.map((r) => r.currency), bmConfig.currency])];
       const dates = [...new Set(snapRows.map((r) => r.date))];
-      const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates);
+      const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates, fxProvider);
       // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported as
       // fxMissingCurrencies. Rates carry forward/back over the whole date grid, so this
       // drops a portfolio's whole leg consistently, never single days of it.
@@ -445,14 +485,15 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
         if (refreshedBm.size >= 1) {
           // In the display currency, at each date's FX rate — the same series the
-          // Insights card and per-year table compare against (#1020).
+          // Insights card and per-year table compare against (#1020). `ratesByDate` was
+          // loaded cached-only for a read-scoped PAT.
           const { closes: bmPrices, fxMissingDates } = await benchmarkClosesInCurrency(
             app.db,
             refreshedBm,
             bmDates,
             bmConfig.currency,
             display,
-            readOnlyPat ? { cachedFxOnly: true } : { ratesByDate },
+            { ratesByDate },
           );
           if (fxMissingDates > 0) {
             request.log.warn(

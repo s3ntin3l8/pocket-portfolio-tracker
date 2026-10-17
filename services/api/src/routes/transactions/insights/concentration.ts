@@ -14,7 +14,7 @@ import {
   fxAvailable,
 } from "@portfolio/core";
 import { toCoreTxns } from "../../../services/tx-core.js";
-import { getFxRatesForDates, makeFxRateFn } from "../../../services/fx.js";
+import { getFxRatesForDates, makeFxRateFn, type FxProvider } from "../../../services/fx.js";
 
 /** Whole days between two YYYY-MM-DD date keys (b − a). */
 function daysBetween(a: string, b: string): number {
@@ -52,6 +52,8 @@ export async function computeConcentrationSection(
   pfIds: string[],
   dates: string[],
   display: string,
+  /** `null` = cached FX rates only (read-scoped PAT, audit A7); default the provider. */
+  fxProvider?: FxProvider | null,
 ): Promise<{
   concentrationTrend: { date: string; hhi: number; top1Pct: number; classCount: number }[];
   bestWorstMonthly: BestWorstPair;
@@ -172,6 +174,7 @@ export async function computeConcentrationSection(
       priceCurrencies,
       display,
       monthEndDates,
+      fxProvider,
     );
 
     // The most recent date this whole /insights response covers — the only date at

@@ -117,6 +117,38 @@ describe("valuePortfolioCached", () => {
     expect(counter.n).toBe(1);
   });
 
+  it("keeps a cached-only (read-PAT) valuation in its own entry (#1039)", async () => {
+    const portfolioId = await setupPortfolio();
+    const db = getDb();
+    const counter = { n: 0 };
+    const t0 = Date.parse("2026-02-08T10:00:00.000Z");
+    const value = (now: number, fxProvider?: null) =>
+      valuePortfolioCached(
+        db,
+        countingService(counter),
+        0,
+        portfolioId,
+        "IDR",
+        undefined,
+        true,
+        now,
+        undefined,
+        fxProvider,
+      );
+
+    // A cached-only valuation (FX provider `null`) may be degraded, so a session's call
+    // for the same key recomputes rather than reading it — and vice versa.
+    const ro = await value(t0, null);
+    expect(counter.n).toBe(1);
+    const rw = await value(t0 + 1_000);
+    expect(counter.n).toBe(2);
+    expect(rw).not.toBe(ro);
+    // Each variant is still served from its own entry within the TTL.
+    expect(await value(t0 + 2_000, null)).toBe(ro);
+    expect(await value(t0 + 2_000)).toBe(rw);
+    expect(counter.n).toBe(2);
+  });
+
   it("recomputes once the TTL has elapsed", async () => {
     const portfolioId = await setupPortfolio();
     const db = getDb();

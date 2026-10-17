@@ -25,7 +25,12 @@ import { valuePortfolioCached, type InstrumentMeta } from "../../../services/val
 import { toCoreTxns } from "../../../services/tx-core.js";
 import { netManualAdjustments } from "../../../services/pytr/reconcile.js";
 import { withDerivationCache } from "../../../lib/derivation-cache.js";
-import { getFxRatesForDates, makeFxRateFn, recordFxMissing } from "../../../services/fx.js";
+import {
+  getFxRatesForDates,
+  makeFxRateFn,
+  recordFxMissing,
+  type FxProvider,
+} from "../../../services/fx.js";
 import { anomaliesCache } from "./caches.js";
 
 export function yearRange(year: number): { start: Date; end: Date } {
@@ -302,6 +307,8 @@ export async function loadValuation(
   costBasisMode?: CostBasisMode,
   cashCounted = true,
   log?: FastifyBaseLogger,
+  /** `null` = cached FX rates only (read-scoped PAT, audit A7); default the provider. */
+  fxProvider?: FxProvider | null,
 ) {
   return valuePortfolioCached(
     app.db,
@@ -313,6 +320,7 @@ export async function loadValuation(
     cashCounted,
     undefined,
     log,
+    fxProvider,
   );
 }
 

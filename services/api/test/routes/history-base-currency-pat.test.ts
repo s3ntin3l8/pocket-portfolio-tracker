@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { portfolioIntradaySnapshots, portfolioSnapshots } from "@portfolio/db";
+import { fxRates, portfolioIntradaySnapshots, portfolioSnapshots } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import type * as FxModule from "../../src/services/fx.js";
 
-// The daily series loads rates via getFxRatesForDates. The HTTP provider configured below
-// has no rate history, so record the provider argument the route passes instead: `null`
-// means cached-only.
+// Both the daily and (since #1038) the intraday series load rates via getFxRatesForDates.
+// The HTTP provider configured below has no rate history, so record the provider argument
+// the route passes instead: `null` means cached-only.
 const ratesForDates = vi.hoisted(() => ({ providers: [] as unknown[] }));
 vi.mock("../../src/services/fx.js", async (importOriginal) => {
   const mod = await importOriginal<typeof FxModule>();
@@ -73,7 +74,7 @@ afterAll(async () => {
 });
 
 describe("per-portfolio history FX conversion for a read-scoped PAT (#1031)", () => {
-  it("converts with cached rates only for a read PAT, and fetches for a session", async () => {
+  it("converts with cached rates only for a read PAT, and with the configured provider for a session", async () => {
     const owner = await jwt("history-fx-pat");
     await app.inject({ method: "GET", url: "/me", headers: auth(owner) });
     const minted = await app.inject({
@@ -107,17 +108,32 @@ describe("per-portfolio history FX conversion for a read-scoped PAT (#1031)", ()
     });
     const url = `/portfolios/${pf}/history?range=1d`;
 
-    // No cached EUR→IDR rate: the read PAT gets the row excluded, not a provider fetch.
+    // No cached EUR→IDR rate: the read PAT gets the row excluded, not a provider fetch —
+    // its intraday rate load is cached-only (provider `null`).
+    ratesForDates.providers.length = 0;
     const ro = await app.inject({ method: "GET", url, headers: auth(readPat) });
     expect(ro.statusCode).toBe(200);
     expect(ro.json()).toEqual([]);
     expect(ro.headers["x-fx-missing-currencies"]).toBe("EUR");
     expect(fxFetches()).toBe(0);
+    expect(ratesForDates.providers).toEqual([null]);
 
-    // A session may fetch (and cache) the rate.
+    // A session's uses the configured provider (argument left to its default). This HTTP
+    // provider has no rate history to back-fill from, so once a rate is cached (as the
+    // valuation and the intraday capture job do for today) the session converts with it.
+    ratesForDates.providers.length = 0;
+    const rwMissing = await app.inject({ method: "GET", url, headers: auth(owner) });
+    expect(rwMissing.statusCode).toBe(200);
+    expect(ratesForDates.providers).toEqual([undefined]);
+    await app.db.insert(fxRates).values({
+      base: "EUR",
+      quote: "IDR",
+      rate: "17000",
+      date: toDateKey(new Date(Date.now() - 60_000)),
+    });
     const rw = await app.inject({ method: "GET", url, headers: auth(owner) });
     expect(rw.statusCode).toBe(200);
-    expect(fxFetches()).toBe(1);
+    expect(rw.headers["x-fx-missing-currencies"]).toBeUndefined();
     expect(rw.json().map((p: { netWorth: string }) => Number(p.netWorth))).toEqual([17_000_000]);
 
     // Daily series: the read PAT's rate load is cached-only (provider `null`); a session's

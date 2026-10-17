@@ -14,7 +14,12 @@ import {
   type FxAt,
 } from "@portfolio/core";
 import type { DB } from "../../../db/client.js";
-import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../../services/fx.js";
+import {
+  getFxRates,
+  getFxRatesForDates,
+  makeFxRateFn,
+  type FxProvider,
+} from "../../../services/fx.js";
 
 /**
  * Dated, signed cash flows crossing a portfolio's investment boundary, in XIRR
@@ -84,13 +89,21 @@ export async function boundaryFlows(
    * year-end net worths are (#1020).
    */
   fxDate: "today" | "flowDate" = "today",
+  /** `null` = cached FX rates only (read-scoped PAT, audit A7); default the provider. */
+  fxProvider?: FxProvider | null,
 ): Promise<KindedCashFlowPoint[]> {
   let fxAt: FxAt;
   if (fxDate === "flowDate") {
-    fxAt = await fxAtFlowDates(app.db, allTxns, target);
+    fxAt = await fxAtFlowDates(app.db, allTxns, target, fxProvider);
   } else {
     const fx = makeFxRateFn(
-      await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], target),
+      await getFxRates(
+        app.db,
+        [...new Set(allTxns.map((t) => t.currency))],
+        target,
+        new Date(),
+        fxProvider,
+      ),
       target,
     );
     fxAt = () => fx;
@@ -110,12 +123,15 @@ export async function fxAtFlowDates(
   db: DB,
   txns: CoreTransaction[],
   target: string,
+  /** `null` = cached FX rates only (read-scoped PAT, audit A7); default the provider. */
+  fxProvider?: FxProvider | null,
 ): Promise<FxAt> {
   const ratesByDate = await getFxRatesForDates(
     db,
     [...new Set(txns.map((t) => t.currency))],
     target,
     [...new Set([...txns.map((t) => toDateKey(t.executedAt)), toDateKey(new Date())])],
+    fxProvider,
   );
   return (date) => {
     const rates = ratesByDate.get(toDateKey(date));

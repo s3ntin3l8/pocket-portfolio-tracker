@@ -15,7 +15,7 @@ import {
   getBenchmarkPricesMulti,
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
-import { getFxRatesForDates } from "../../../services/fx.js";
+import { getFxRatesForDates, type FxProvider } from "../../../services/fx.js";
 import { boundaryFlows, excludeFxMissingInstruments } from "../shared/flows.js";
 import { loadValuation } from "../shared/helpers.js";
 import type { FastifyInstance } from "fastify";
@@ -46,12 +46,20 @@ export interface ComputeYearlyReturnsArgs {
    * this function treats the list as already boundary-correct.
    */
   boundaryFlows: { amount: string; date: Date }[];
-} /**
+  /**
+   * A read-scoped PAT (audit A7): no benchmark price back-fill from the market-data
+   * provider, and FX from cached rates only. The caller keeps such a result out of the
+   * shared cache entry.
+   */
+  readOnly?: boolean;
+}
+
+/**
  * Compute per-year portfolio and benchmark returns for the Insights page.
  *
  * Side effects: may backfill missing benchmark price rows for any of the user's
- * selected symbols. Errors during backfill are logged and treated as missing
- * data (the affected benchmark gets a null TWR for that year), not a hard fail.
+ * selected symbols (never for `readOnly`). Errors during backfill are logged and treated
+ * as missing data (the affected benchmark gets a null TWR for that year), not a hard fail.
  *
  * Returns a `YearlyReturnRow[]` ordered oldest → newest. The current calendar
  * year is the last row, flagged `isCurrentYear: true`.
@@ -79,6 +87,7 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     aggregatedFlows,
     perPortfolio,
     boundaryFlows: bflows,
+    readOnly = false,
   } = args;
   const db = app.db;
 
@@ -118,8 +127,10 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   const allDates = pfIndex.map((p) => p.date);
   const symbolNames = benchmarkSymbols.map((b) => b.symbol);
 
-  for (const sym of symbolNames) {
-    await ensureBenchmarkPrices(db, getMarketData, userId, sym, allDates);
+  if (!readOnly) {
+    for (const sym of symbolNames) {
+      await ensureBenchmarkPrices(db, getMarketData, userId, sym, allDates);
+    }
   }
 
   const priceMap = await getBenchmarkPricesMulti(db, userId, symbolNames, allDates);
@@ -129,7 +140,13 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   const ratesByDate =
     fx && bmCurrencies.every((c) => c === displayCurrency || fx.currencies.includes(c))
       ? fx.ratesByDate
-      : await getFxRatesForDates(db, bmCurrencies, displayCurrency, allDates);
+      : await getFxRatesForDates(
+          db,
+          bmCurrencies,
+          displayCurrency,
+          allDates,
+          readOnly ? null : undefined,
+        );
 
   const benchmarkInputs: {
     symbol: string;
@@ -203,6 +220,9 @@ export async function loadBoundaryFlowsForUser(
   portfolioIds: string[],
   displayCurrency: string,
   boundary: "inside" | "outside",
+  /** `null` = cached FX rates only (read-scoped PAT, audit A7) for both the valuation and
+   *  the per-date flow conversion; default the provider. */
+  fxProvider?: FxProvider | null,
 ): Promise<{ amount: string; date: Date }[]> {
   if (portfolioIds.length === 0) return [];
   const owned = await app.db
@@ -217,6 +237,8 @@ export async function loadBoundaryFlowsForUser(
         displayCurrency,
         undefined,
         boundary === "inside",
+        undefined,
+        fxProvider,
       );
       return boundaryFlows(
         app,
@@ -225,6 +247,7 @@ export async function loadBoundaryFlowsForUser(
         displayCurrency,
         corporateActions,
         "flowDate",
+        fxProvider,
       );
     }),
   );

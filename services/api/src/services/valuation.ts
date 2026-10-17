@@ -16,7 +16,7 @@ import {
 import type { InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { getCachedQuotes } from "./price-cache.js";
-import { getFxRates, makeFxRateFn, recordFxMissing } from "./fx.js";
+import { getFxRates, makeFxRateFn, recordFxMissing, type FxProvider } from "./fx.js";
 import { materializeManualPriceRow } from "./instruments.js";
 import { toCoreTxns } from "./tx-core.js";
 import { logTiming } from "../lib/timing.js";
@@ -87,6 +87,9 @@ export async function valuePortfolio(
   _log?: FastifyBaseLogger,
   /** Injectable clock for deterministic date handling. Defaults to the real clock. */
   now: Date = new Date(),
+  /** FX provider for today's rates; `null` = cached rates only (read-scoped PAT, audit A7).
+   *  Left `undefined`, the configured provider. */
+  fxProvider?: FxProvider | null,
 ): Promise<Valuation> {
   const t0 = performance.now();
   const rows = await db
@@ -219,7 +222,7 @@ export async function valuePortfolio(
   for (const p of Object.values(prices)) currencies.add(p.currency);
   for (const r of rows) currencies.add(r.currency);
   const tFxStart = performance.now();
-  const rates = await getFxRates(db, [...currencies], displayCurrency, now);
+  const rates = await getFxRates(db, [...currencies], displayCurrency, now, fxProvider);
   const fx = makeFxRateFn(rates, displayCurrency);
   const tFx = performance.now();
 
@@ -317,8 +320,13 @@ export async function valuePortfolioCached(
    *  defaults to the real clock in production. */
   now: number = Date.now(),
   _log?: FastifyBaseLogger,
+  /** See {@link valuePortfolio}. A cached-only (`null`) valuation is cached under its own
+   *  key, so a read-scoped PAT's possibly-degraded result is never served to a session. */
+  fxProvider?: FxProvider | null,
 ): Promise<Valuation> {
-  const key = derivationCacheKey(portfolioId, displayCurrency, costBasisMode, cashCounted);
+  const key =
+    derivationCacheKey(portfolioId, displayCurrency, costBasisMode, cashCounted) +
+    (fxProvider === null ? "|ro" : "");
   const hit = derivationCache.get(key);
   if (hit && hit.expiresAt > now) {
     logTiming(undefined, "valuePortfolioCached HIT", 0, { key, ttlRemaining: hit.expiresAt - now });
@@ -335,6 +343,7 @@ export async function valuePortfolioCached(
     cashCounted,
     _log,
     new Date(now),
+    fxProvider,
   );
   derivationCache.set(key, { expiresAt: now + DERIVATION_CACHE_TTL_MS, promise });
   // A failed computation must not poison the cache for the rest of the TTL window — drop
