@@ -6,9 +6,11 @@
  * of all series. Portfolio TWR is anchored to the prior year's close when one
  * exists (falling back to the year's first point for the inception year), so a
  * year doesn't silently omit the Dec 31 → first-trading-day move; benchmark TWR
- * is computed from the same endpoints after FX-converting the year-start and
- * year-end levels to the display currency (only 2 fx calls per benchmark per
- * year — ratio-based, so intermediate FX isn't needed).
+ * is computed from the same endpoints. Every benchmark index must already be in
+ * the display currency, built from closes converted at each date's own FX rate
+ * (the API's `benchmarkClosesInCurrency`, #1020): a ratio of native-currency
+ * closes is NOT currency-invariant, because it leaves out the FX move over the
+ * year that the display-currency portfolio return includes.
  *
  * Portfolio XIRR pairs the year's boundary flows with an OPENING NAV outflow
  * (the prior year's closing NAV, if any) and a closing NAV inflow — omitting
@@ -28,14 +30,22 @@ import { XIRR_MAX_RATE } from "./sanity-gates.js";
 export interface YearlyReturnBenchmarkInput {
   symbol: string;
   displayName: string;
+  /**
+   * The index's quote currency, e.g. "USD" for ^GSPC. A label only — `index` is NOT
+   * in this currency.
+   */
   nativeCurrency: string;
-  /** Chained TWR index for this benchmark, in `nativeCurrency`. */
+  /**
+   * Chained TWR index for this benchmark, in the DISPLAY currency (closes converted at
+   * each date's FX rate before chaining), so it is comparable with the portfolio index.
+   */
   index: IndexPoint[];
 }
 
 export interface YearlyReturnBenchmarkOutput {
   symbol: string;
   displayName: string;
+  /** The index's quote currency (label only); `twr` is measured in the display currency. */
   nativeCurrency: string;
   twr: string | null;
   activeReturn: string | null;

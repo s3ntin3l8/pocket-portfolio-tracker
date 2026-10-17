@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import {
+  benchmarkPrices,
   corporateActions,
+  fxRates,
   instruments,
   portfolioSnapshots,
   portfolios,
   prices,
   transactions,
+  users,
 } from "@portfolio/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { buildApp } from "../../src/app.js";
 import {
   loadBoundaryFlowsForUser,
@@ -930,6 +933,111 @@ describe("GET /insights", () => {
       expect(sell).toBeTruthy();
       // 10 × 150 − 1 fee − 131.88 tax = 1367.12 (pre-fix: 1499, the gross proceeds).
       expect(sell!.amount).toBe("1367.12");
+    });
+  });
+
+  // Issue #1020: the per-year table and the hero chart chained the benchmark's native-USD
+  // closes while the card converted them to the display currency first, so an IDR
+  // portfolio was compared against a USD index in two of three places. With USD/IDR
+  // rising, all three must measure the benchmark in IDR.
+  describe("benchmark in the display currency (#1020)", () => {
+    // A close and a distinct, rising USD→IDR rate on every snapshot date, so the card's
+    // first-common-date rebase and the table's prior-close anchor see the same window.
+    const DATES = ["2013-12-31", "2014-06-30", "2014-12-31", "2015-06-30", "2015-12-31"];
+    const NAV = ["1000", "1050", "1100", "1200", "1300"];
+    const CLOSE = ["100", "110", "120", "125", "130"];
+    const FX = ["10000", "11000", "12000", "13000", "14000"];
+    const idr = (i: number) => Number(CLOSE[i]) * Number(FX[i]);
+
+    async function seed(sub: string): Promise<{ t: string; portfolioId: string }> {
+      const t = await token(sub);
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Benchmark FX", baseCurrency: "IDR", cashCounted: true },
+      });
+      const portfolioId = create.json().id as string;
+      const [u] = await app.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.authSub, sub))
+        .limit(1);
+      await app.db
+        .insert(fxRates)
+        .values(DATES.map((date, i) => ({ base: "USD", quote: "IDR", rate: FX[i]!, date })))
+        .onConflictDoUpdate({
+          target: [fxRates.base, fxRates.quote, fxRates.date],
+          set: { rate: sql`excluded.rate` },
+        });
+      await app.db.insert(benchmarkPrices).values(
+        DATES.map((date, i) => ({
+          userId: u!.id,
+          symbol: "^GSPC",
+          date,
+          close: CLOSE[i]!,
+          currency: "USD",
+          source: "test",
+        })),
+      );
+      await app.db.insert(portfolioSnapshots).values(
+        DATES.map((date, i) => ({
+          portfolioId,
+          date,
+          netWorth: NAV[i]!,
+          marketValue: NAV[i]!,
+          effectiveFlow: i === 0 ? NAV[0]! : "0",
+          currency: "IDR",
+        })),
+      );
+      return { t, portfolioId };
+    }
+
+    it("measures the per-year benchmark TWR in IDR and reconciles it with the card", async () => {
+      const { t } = await seed("insights-bm-fx-user");
+      const res = await app.inject({ method: "GET", url: "/insights?range=all", headers: auth(t) });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      type Row = {
+        year: number;
+        portfolioTwr: string | null;
+        benchmarks: { symbol: string; twr: string | null }[];
+      };
+      const row = (y: number) => body.yearlyReturns.find((r: Row) => r.year === y) as Row;
+      const bmTwr = (y: number) => Number(row(y).benchmarks.find((b) => b.symbol === "^GSPC")!.twr);
+
+      // The IDR ratio (+44%, +26.39%), not the USD one (+20%, +8.33%).
+      expect(bmTwr(2014)).toBeCloseTo(idr(2) / idr(0) - 1, 6);
+      expect(bmTwr(2015)).toBeCloseTo(idr(4) / idr(2) - 1, 6);
+
+      // Card active return = chained per-year portfolio TWR − chained per-year benchmark TWR.
+      let pf = 1;
+      let bm = 1;
+      for (const y of [2014, 2015]) {
+        pf *= 1 + Number(row(y).portfolioTwr);
+        bm *= 1 + bmTwr(y);
+      }
+      expect(body.benchmark).not.toBeNull();
+      expect(Number(body.benchmark.activeReturn)).toBeCloseTo(pf - bm, 6);
+      // 1300/1000 − 130·14000/(100·10000) = 0.3 − 0.82.
+      expect(Number(body.benchmark.activeReturn)).toBeCloseTo(-0.52, 6);
+    });
+
+    it("measures the hero and per-portfolio history benchmark in IDR", async () => {
+      const { t, portfolioId } = await seed("history-bm-fx-user");
+      const total = (idr(4) / idr(0) - 1) * 100; // +82%, vs +30% in USD
+      for (const url of [
+        "/networth/history?range=all",
+        `/portfolios/${portfolioId}/history?range=all`,
+      ]) {
+        const res = await app.inject({ method: "GET", url, headers: auth(t) });
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as { date: string; benchmarkPct?: string }[];
+        expect(body).toHaveLength(DATES.length);
+        expect(body[0]!.benchmarkPct).toBe("0");
+        expect(Number(body[2]!.benchmarkPct)).toBeCloseTo((idr(2) / idr(0) - 1) * 100, 6);
+        expect(Number(body.at(-1)!.benchmarkPct)).toBeCloseTo(total, 6);
+      }
     });
   });
 });

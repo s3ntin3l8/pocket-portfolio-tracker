@@ -7,9 +7,10 @@ import {
   carryForwardBenchmark,
   ensureBenchmarkPrices,
   clearBenchmarkFetchCache,
+  benchmarkClosesInCurrency,
 } from "../../src/services/benchmark.js";
 import { buildApp } from "../../src/app.js";
-import { users, userBenchmarkSymbols, benchmarkPrices } from "@portfolio/db";
+import { users, userBenchmarkSymbols, benchmarkPrices, fxRates } from "@portfolio/db";
 
 const TEST_KEY = new TextEncoder().encode("test-key");
 
@@ -403,6 +404,100 @@ describe("getBenchmarkPricesMulti", () => {
         .returning();
       const got = await getBenchmarkPricesMulti(app.db, u.id, [], ["2026-01-15"]);
       expect(got.size).toBe(0);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("benchmarkClosesInCurrency (#1020)", () => {
+  const closes = new Map([
+    ["2011-03-02", "110"],
+    ["2011-03-01", "100"],
+    ["2011-03-03", "120"],
+  ]);
+
+  it("converts each close at its own date's rate and returns them date-sorted", async () => {
+    const db = {} as never; // not touched: rates are supplied
+    const ratesByDate = new Map([
+      ["2011-03-01", { USD: "10000" }],
+      ["2011-03-02", { USD: "11000" }],
+      ["2011-03-03", { USD: "12000" }],
+    ]);
+    const got = await benchmarkClosesInCurrency(
+      db,
+      closes,
+      ["2011-03-03", "2011-03-01", "2011-03-02", "2011-03-04"],
+      "USD",
+      "IDR",
+      ratesByDate,
+    );
+    expect(got.fxMissingDates).toBe(0);
+    expect(got.closes).toEqual([
+      { date: "2011-03-01", close: "1000000" },
+      { date: "2011-03-02", close: "1210000" },
+      { date: "2011-03-03", close: "1440000" },
+    ]);
+  });
+
+  it("drops (and counts) days without a rate instead of converting them 1:1", async () => {
+    const ratesByDate = new Map([
+      ["2011-03-01", { USD: "10000" }],
+      ["2011-03-03", { USD: "12000" }],
+    ]);
+    const got = await benchmarkClosesInCurrency(
+      {} as never,
+      closes,
+      ["2011-03-01", "2011-03-02", "2011-03-03"],
+      "USD",
+      "IDR",
+      ratesByDate,
+    );
+    expect(got.fxMissingDates).toBe(1);
+    expect(got.closes.map((c) => c.date)).toEqual(["2011-03-01", "2011-03-03"]);
+  });
+
+  it("passes closes through unchanged when the quote and target currency match", async () => {
+    const got = await benchmarkClosesInCurrency(
+      {} as never,
+      closes,
+      ["2011-03-01", "2011-03-02", "2011-03-03"],
+      "IDR",
+      "IDR",
+    );
+    expect(got).toEqual({
+      closes: [
+        { date: "2011-03-01", close: "100" },
+        { date: "2011-03-02", close: "110" },
+        { date: "2011-03-03", close: "120" },
+      ],
+      fxMissingDates: 0,
+    });
+  });
+
+  it("loads the per-date rates itself when none are supplied", async () => {
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      await app.db
+        .insert(fxRates)
+        .values([
+          { base: "USD", quote: "IDR", rate: "10000", date: "2011-03-01" },
+          { base: "USD", quote: "IDR", rate: "12000", date: "2011-03-03" },
+        ])
+        .onConflictDoNothing();
+      const got = await benchmarkClosesInCurrency(
+        app.db,
+        closes,
+        ["2011-03-01", "2011-03-02", "2011-03-03"],
+        "USD",
+        "IDR",
+      );
+      // 03-02 has no row of its own and carries 03-01's rate forward.
+      expect(got.closes).toEqual([
+        { date: "2011-03-01", close: "1000000" },
+        { date: "2011-03-02", close: "1100000" },
+        { date: "2011-03-03", close: "1440000" },
+      ]);
     } finally {
       await app.close();
     }

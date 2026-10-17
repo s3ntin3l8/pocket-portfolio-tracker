@@ -3268,6 +3268,23 @@ describe("auth + portfolios + transactions", () => {
       displayName: "S&P 500",
       displayOrder: 0,
     });
+    // The USD benchmark is converted into the IDR portfolio's currency (#1020); a flat
+    // rate keeps the expected +4.444% equal to the USD move.
+    const { fxRates } = await import("@portfolio/db");
+    await app.db
+      .insert(fxRates)
+      .values(
+        ["2026-02-01", "2026-02-02", "2026-02-03"].map((date) => ({
+          base: "USD",
+          quote: "IDR",
+          rate: "16000",
+          date,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [fxRates.base, fxRates.quote, fxRates.date],
+        set: { rate: "16000" },
+      });
     await app.db.insert(benchmarkPrices).values([
       {
         userId: u!.id,
