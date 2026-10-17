@@ -21,7 +21,8 @@ import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
  * It never touches Docker, so the production compose project is out of reach.
  *
  * Any startup failure runs the same teardown as a normal stop before the error
- * propagates. DEMO_HEALTH_TIMEOUT_MS (default 90000) bounds each readiness probe.
+ * propagates. A stop mid-build or mid-seed kills that step's process group first.
+ * DEMO_HEALTH_TIMEOUT_MS (default 90000) bounds each readiness probe.
  */
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -50,11 +51,25 @@ export function healthTimeoutMs(value = process.env.DEMO_HEALTH_TIMEOUT_MS) {
 // Dummy issuer: satisfies the auth plugins' boot guards; never contacted.
 const ISSUER = "https://demo.invalid/application/o/pocket-demo/";
 
-function run(cmd, args, opts) {
+/**
+ * Run one build/seed step to completion. Own process group (`detached`) so teardown
+ * can kill it together with everything it forks (turbo runs tsc per package); a
+ * terminal Ctrl-C no longer reaches it directly and goes through onSignal instead.
+ * stdin is ignored: a background group reading the terminal would be stopped.
+ * `onSpawn` hands the child to the caller for tracking.
+ */
+function run(cmd, args, opts, onSpawn) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: "inherit", ...opts });
-    child.on("exit", (code) =>
-      code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(" ")} exited ${code}`)),
+    const child = spawn(cmd, args, {
+      stdio: ["ignore", "inherit", "inherit"],
+      detached: true,
+      ...opts,
+    });
+    onSpawn?.(child);
+    child.on("exit", (code, signal) =>
+      code === 0
+        ? resolve()
+        : reject(new Error(`${cmd} ${args.join(" ")} exited ${code ?? signal}`)),
     );
     child.on("error", reject);
   });
@@ -163,7 +178,11 @@ export async function waitForHttp(url, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS) {
   throw new Error(`Timed out waiting for ${url}${lastError ? `: ${lastError}` : ""}`);
 }
 
-/** The real startup sequence: build, seed, start both servers, wait until ready. */
+/**
+ * The real startup sequence: build, seed, start both servers, wait until ready.
+ * `run` is startDemo's tracked step runner, so a stop mid-build or mid-seed kills
+ * the step's process group instead of deleting the scratch dir under it.
+ */
 async function bootDemo({
   demoDir,
   runDir,
@@ -174,6 +193,7 @@ async function bootDemo({
   quiet,
   timeoutMs,
   spawnServer,
+  run,
 }) {
   // The API and web import the workspace packages from their dist/ builds, the
   // same as `turbo dev` (dependsOn ^build). Cached by turbo, so this is quick.
@@ -235,10 +255,14 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
 
   /** Every server process group started so far; teardown kills them all. */
   const children = [];
+  /** The build/seed step running right now (its own process group), if any. */
+  let step = null;
+  /** Servers plus the in-flight step: every group a stop has to take down. */
+  const groups = () => (step ? [...children, step] : children);
   const home = path.join(demoDir, "home");
   let stopping;
-  const hardKill = () => {
-    for (const child of children)
+  const hardKill = (targets) => {
+    for (const child of targets)
       try {
         process.kill(-child.pid, "SIGKILL");
       } catch {
@@ -248,7 +272,9 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
   const teardown = async () => {
     // Wait for every process to exit first: dying next dev workers otherwise
     // recreate files under the scratch HOME after it was deleted.
-    await Promise.all(children.map((child) => killGroup(child)));
+    // That includes an in-flight build/seed step (turbo, tsx and their children):
+    // tracked explicitly, so this works without the Linux-only /proc sweep below.
+    await Promise.all(groups().map((child) => killGroup(child)));
     // Then anything they spawned outside their groups (Next's telemetry flush).
     await killStrays(home);
     process.off("SIGINT", onSignal);
@@ -266,13 +292,17 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     console.warn(`[demo] could not fully remove ${demoDir}`);
   };
   const stop = () => (stopping ??= teardown());
-  // Installed before anything is spawned: the servers run in their own process
-  // groups, so a Ctrl-C during the build or boot would otherwise orphan them.
+  // Installed before anything is spawned: the build/seed steps and the servers run
+  // in their own process groups, out of reach of the terminal's Ctrl-C, so without
+  // this a Ctrl-C during the build or boot would orphan them.
   // They stay registered until all groups are gone; a second Ctrl-C during the
   // grace period skips it and SIGKILLs the groups instead of leaving them behind.
   function onSignal() {
     if (stopping) {
-      hardKill();
+      // Snapshot: the step is untracked as soon as its direct child exits, but
+      // its group (turbo's subprocesses) must still be waited for.
+      const targets = groups();
+      hardKill(targets);
       // Give the killed groups a moment to exit, or a dying next dev worker
       // recreates its config store under HOME right after the delete.
       const gone = (child) => {
@@ -285,7 +315,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       const deadline = Date.now() + 2_000;
       let attempts = 0;
       const finish = () => {
-        if (!children.every(gone) && Date.now() < deadline) return setTimeout(finish, 50);
+        if (!targets.every(gone) && Date.now() < deadline) return setTimeout(finish, 50);
         if (keep) process.exit(130);
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
@@ -310,6 +340,20 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     const child = spawnServer(...args);
     children.push(child);
     return child;
+  };
+
+  /**
+   * run() with the step tracked while it runs, so a stop kills its group; refuses
+   * once stopping. Untracked on exit: a finished step's group id could be reused.
+   */
+  const runStep = async (cmd, args, opts) => {
+    if (stopping) throw new Error("demo is stopping; not starting more steps");
+    let child;
+    try {
+      await run(cmd, args, opts, (spawned) => (step = child = spawned));
+    } finally {
+      if (step === child) step = null;
+    }
   };
 
   // Everything from here on runs under the same teardown as a normal stop, so a
@@ -367,10 +411,12 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       quiet,
       timeoutMs,
       spawnServer: startServer,
+      run: runStep,
       stop,
     });
   } catch (err) {
-    console.error(`[demo] startup failed, tearing down: ${err?.message ?? err}`);
+    // A stop (Ctrl-C/SIGTERM) mid-step fails the step it killed; that is no startup failure.
+    if (!stopping) console.error(`[demo] startup failed, tearing down: ${err?.message ?? err}`);
     await stop();
     throw err;
   }

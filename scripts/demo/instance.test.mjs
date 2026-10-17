@@ -113,6 +113,10 @@ describe("startDemo startup failure", () => {
               env: ctx.apiEnv,
             }),
           ).toThrow(/stopping/);
+          // Nor another build/seed step.
+          await expect(ctx.run(process.execPath, ["-e", ""], { cwd: ctx.runDir })).rejects.toThrow(
+            /stopping/,
+          );
           await stopping;
           throw new Error("build interrupted");
         },
@@ -175,6 +179,106 @@ describe("startDemo startup failure", () => {
     }
     expect(readdirSync(scratchRoot)).toEqual([]);
   });
+});
+
+/**
+ * Runs startDemo in its own node process (a real SIGTERM there must not hit the test
+ * worker) with a boot that runs one long build/seed-like step through ctx.run. The
+ * step forks a grandchild, as turbo does, and both keep recreating a file under the
+ * scratch dir, so either one outliving the delete brings the dir back. Neither carries
+ * the scratch HOME, so the /proc HOME sweep cannot find them: only explicit tracking can.
+ */
+function bootWithLongStep({ ignoreTerm = false } = {}) {
+  const keepTouching = `
+    const fs = require("fs"), path = require("path");
+    ${ignoreTerm ? 'process.on("SIGTERM", () => {});' : ""}
+    setInterval(() => fs.mkdirSync(path.join(process.env.DEMO_DIR, "home/step"), { recursive: true }), 50);`;
+  const step = `
+    const { spawn } = require("child_process");
+    const grandchild = spawn(process.execPath, ["-e", ${JSON.stringify(keepTouching)}], { stdio: "ignore" });
+    console.log("PIDS " + process.pid + " " + grandchild.pid);
+    ${keepTouching}`;
+  const driver = `
+    const { startDemo } = await import(${JSON.stringify(new URL("./instance.mjs", import.meta.url).href)});
+    await startDemo({
+      quiet: true,
+      boot: async (ctx) => {
+        console.log("DEMO_DIR " + ctx.demoDir);
+        await ctx.run(process.execPath, ["-e", ${JSON.stringify(step)}], {
+          env: { PATH: process.env.PATH, DEMO_DIR: ctx.demoDir },
+        });
+      },
+    });`;
+  const proc = spawn(process.execPath, ["--input-type=module", "-e", driver], {
+    env: { ...process.env },
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  let out = "";
+  proc.stdout.on("data", (d) => (out += d));
+  const exited = new Promise((resolve) => proc.on("exit", (code) => resolve(code)));
+  const ready = async () => {
+    // Bounded, but generous: three node startups under a loaded host.
+    for (let i = 0; i < 600; i++) {
+      const dir = /DEMO_DIR (\S+)/.exec(out)?.[1];
+      const pids = /PIDS (\d+) (\d+)/.exec(out)?.slice(1).map(Number);
+      if (dir && pids && existsSync(path.join(dir, "home/step"))) return { demoDir: dir, pids };
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error(`long step never started; driver output: ${out}`);
+  };
+  return { proc, exited, ready };
+}
+
+const pidAlive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+describe("startDemo stop during a build/seed step", () => {
+  it("SIGTERM terminates the in-flight step and its subprocesses before removing the scratch dir", async () => {
+    const { proc, exited, ready } = bootWithLongStep();
+    let pids = [];
+    try {
+      const started = await ready();
+      pids = started.pids;
+      expect(pids.every(pidAlive)).toBe(true);
+      proc.kill("SIGTERM");
+      expect(await exited).toBe(0);
+      expect(pids.some(pidAlive)).toBe(false);
+      expect(existsSync(started.demoDir)).toBe(false);
+      // Stays gone: nothing is left to recreate it.
+      await new Promise((r) => setTimeout(r, 300));
+      expect(existsSync(started.demoDir)).toBe(false);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+    }
+  }, 60_000);
+
+  it("a second signal hard-kills a step that ignores SIGTERM, without waiting out the grace period", async () => {
+    const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: true });
+    let pids = [];
+    try {
+      const started = await ready();
+      pids = started.pids;
+      proc.kill("SIGTERM");
+      await new Promise((r) => setTimeout(r, 300));
+      const second = Date.now();
+      proc.kill("SIGINT");
+      expect(await exited).toBe(130);
+      // Well inside killGroup's 5 s grace: the second signal did not wait for it.
+      expect(Date.now() - second).toBeLessThan(4_500);
+      expect(pids.some(pidAlive)).toBe(false);
+      expect(existsSync(started.demoDir)).toBe(false);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+    }
+  }, 60_000);
 });
 
 describe("waitForHttp", () => {
