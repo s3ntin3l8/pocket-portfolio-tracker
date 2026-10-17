@@ -39,14 +39,18 @@ beforeAll(async () => {
   process.env.TMPDIR = scratchRoot;
   process.env.DEMO_API_PORT = await freePort();
   // Each probe listener closes before the next binds, so the OS may hand back the same one.
-  do process.env.DEMO_WEB_PORT = await freePort();
-  while (process.env.DEMO_WEB_PORT === process.env.DEMO_API_PORT);
+  for (let attempt = 0; ; attempt++) {
+    process.env.DEMO_WEB_PORT = await freePort();
+    if (process.env.DEMO_WEB_PORT !== process.env.DEMO_API_PORT) break;
+    if (attempt >= 10) throw new Error("could not get two distinct free ports");
+  }
   ({ startDemo, healthTimeoutMs, strayPids, waitForHttp } = await import("./instance.mjs"));
 });
 
 // Tests set it per case; never let a failed assertion leak it into the next one.
 afterEach(() => {
-  delete process.env.DEMO_HEALTH_TIMEOUT_MS;
+  if (saved.DEMO_HEALTH_TIMEOUT_MS === undefined) delete process.env.DEMO_HEALTH_TIMEOUT_MS;
+  else process.env.DEMO_HEALTH_TIMEOUT_MS = saved.DEMO_HEALTH_TIMEOUT_MS;
 });
 
 afterAll(() => {
