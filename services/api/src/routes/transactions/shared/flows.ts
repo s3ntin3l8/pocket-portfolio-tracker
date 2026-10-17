@@ -117,7 +117,12 @@ export async function fxAtFlowDates(
     target,
     [...new Set([...txns.map((t) => toDateKey(t.executedAt)), toDateKey(new Date())])],
   );
-  return (date) => makeFxRateFn(ratesByDate.get(toDateKey(date)) ?? {}, target);
+  return (date) => {
+    const rates = ratesByDate.get(toDateKey(date));
+    // A date outside the grid is a caller bug, not missing FX data — say so.
+    if (!rates) throw new Error(`fxAtFlowDates: ${toDateKey(date)} is not on the loaded date grid`);
+    return makeFxRateFn(rates, target);
+  };
 }
 
 /**

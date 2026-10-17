@@ -307,6 +307,18 @@ describe("demoSnapshotWalk (#1020)", () => {
     ).toThrow(/below zero/);
   });
 
+  it("refuses flows that all lie after today", () => {
+    expect(() =>
+      demoSnapshotWalk({
+        flows: [{ amount: -100, date: at("2025-02-01") }],
+        today: "2025-01-01",
+        target: 100,
+        noise: () => 0,
+        label: "test",
+      }),
+    ).toThrow(/after 2025-01-01/);
+  });
+
   it("refuses a target no drift can reach", () => {
     expect(() =>
       demoSnapshotWalk({

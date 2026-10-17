@@ -103,6 +103,9 @@ export function demoSnapshotWalk(args: {
   }
   const firstMs = Date.parse(`${[...byDay.keys()].sort()[0]}T00:00:00.000Z`);
   const days = Math.round((Date.parse(`${args.today}T00:00:00.000Z`) - firstMs) / DAY_MS);
+  if (days < 0) {
+    throw new Error(`seed-demo: ${args.label}'s first flow is after ${args.today}`);
+  }
   const grid = Array.from({ length: days + 1 }, (_, i) => {
     const date = toDateKey(new Date(firstMs + i * DAY_MS));
     return { date, flow: byDay.get(date) ?? 0, noise: args.noise(days - i) };
