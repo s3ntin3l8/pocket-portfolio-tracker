@@ -218,6 +218,92 @@ describe("NetWorthHistoryChart", () => {
     });
   });
 
+  describe("selected portfolio with no securities sleeve (cash-only)", () => {
+    const cashOnly: IntradayPoint[] = [
+      { at: "2026-06-01T02:00:00.000Z", netWorth: "1000", marketValue: "0" },
+      { at: "2026-06-01T03:00:00.000Z", netWorth: "1050", marketValue: "0" },
+    ];
+
+    it("plots netWorth even when marketValue is non-zero (the line always matches the headline)", async () => {
+      getPortfolioHistory.mockResolvedValueOnce([
+        { at: "2026-06-01T02:00:00.000Z", netWorth: "1000", marketValue: "900" },
+        { at: "2026-06-01T03:00:00.000Z", netWorth: "1050", marketValue: "950" },
+      ] as IntradayPoint[]);
+      const onSeriesChange = vi.fn();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <NetWorthHistoryChart
+            initial={initial}
+            currency="EUR"
+            variant="hero"
+            selectedId="p-loan"
+            onSeriesChange={onSeriesChange}
+          />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
+      await waitFor(() => {
+        const lastCall = onSeriesChange.mock.calls.at(-1);
+        expect(lastCall?.[1]).toBe("1d");
+        expect(lastCall?.[0].points.map((p: { close: number }) => p.close)).toEqual([1000, 1050]);
+      });
+    });
+
+    it("plots netWorth, not the zero marketValue, on the hero's intraday line", async () => {
+      getPortfolioHistory.mockResolvedValueOnce(cashOnly);
+      const onSeriesChange = vi.fn();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <NetWorthHistoryChart
+            initial={initial}
+            currency="EUR"
+            variant="hero"
+            selectedId="p-cash"
+            onSeriesChange={onSeriesChange}
+          />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
+      await waitFor(() => expect(getPortfolioHistory).toHaveBeenCalledWith("p-cash", "1d"));
+      await waitFor(() => {
+        const lastCall = onSeriesChange.mock.calls.at(-1);
+        expect(lastCall?.[1]).toBe("1d");
+        expect(lastCall?.[0].points.map((p: { close: number }) => p.close)).toEqual([1000, 1050]);
+      });
+    });
+
+    it("plots netWorth in the card variant's intraday and Value series", async () => {
+      getPortfolioHistory.mockResolvedValueOnce(cashOnly);
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <NetWorthHistoryChart initial={initial} currency="EUR" selectedId="p-cash" />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
+      await waitFor(() => expect(getPortfolioHistory).toHaveBeenCalledWith("p-cash", "1d"));
+      await waitFor(() =>
+        expect(chartProps.at(-1)?.data).toEqual([
+          { date: expect.any(String), close: "1000" },
+          { date: expect.any(String), close: "1050" },
+        ]),
+      );
+
+      getPortfolioHistory.mockResolvedValueOnce([
+        { date: "2026-01-01", netWorth: "500", marketValue: "0", index: "100", pct: "0" },
+        { date: "2026-02-01", netWorth: "510", marketValue: "0", index: "100", pct: "0" },
+      ] as PerformancePoint[]);
+      fireEvent.click(screen.getByRole("radio", { name: "3M" }));
+      await waitFor(() => expect(getPortfolioHistory).toHaveBeenCalledWith("p-cash", "3m"));
+      fireEvent.click(screen.getByRole("radio", { name: "Value" }));
+      await waitFor(() =>
+        expect(chartProps.at(-1)?.data).toEqual([
+          { date: "2026-01-01", close: "500" },
+          { date: "2026-02-01", close: "510" },
+        ]),
+      );
+    });
+  });
+
   describe("hero variant with benchmark overlay", () => {
     const pointsWithBenchmark: PerformancePoint[] = [
       { date: "2026-01-01", netWorth: "100", pct: "0", benchmarkPct: "0" },
