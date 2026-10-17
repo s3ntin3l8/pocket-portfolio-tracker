@@ -1,9 +1,8 @@
 import { useTranslations } from "next-intl";
 import { Card, CardLabel } from "@/components/ui/card";
-import type { AllocationBreakdown } from "@portfolio/api-client";
+import type { AllocationBreakdown, AllocationSlice } from "@portfolio/api-client";
 
-const nonZero = (slices: AllocationBreakdown["byRegion"]) =>
-  slices.filter((s) => Number(s.value) > 0).length;
+const nonZero = (slices: AllocationSlice[]) => slices.filter((s) => Number(s.value) > 0).length;
 
 /**
  * Insights rail tile: how many asset classes are held, captioned with the number of
