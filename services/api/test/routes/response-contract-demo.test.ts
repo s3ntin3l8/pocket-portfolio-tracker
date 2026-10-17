@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateKeyPair } from "jose";
+import { Decimal } from "decimal.js";
 import {
   netWorthResponseSchema,
   portfolioSummaryResponseSchema,
@@ -53,6 +54,14 @@ describe("response schemas over the demo dataset", () => {
     expect(body.holdings.length).toBeGreaterThan(0);
     netWorthResponseSchema.parse(body);
     netWorthResponseSchema.parse(await get("/networth?period=1y"));
+  }, 60_000);
+
+  it("/networth total equals the last /networth/history point (#1006)", async () => {
+    const nw = await get("/networth");
+    const history = (await get("/networth/history?range=all")) as { netWorth: string }[];
+    const last = history.at(-1)!.netWorth;
+    const diff = new Decimal(nw.netWorth).sub(last).abs().div(nw.netWorth);
+    expect(diff.lt("1e-6"), `${nw.netWorth} vs ${last}`).toBe(true);
   }, 60_000);
 
   it("/portfolios/:id/summary for every portfolio", async () => {

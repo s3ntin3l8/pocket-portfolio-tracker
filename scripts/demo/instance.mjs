@@ -328,6 +328,8 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       AUTHENTIK_AUDIENCE: "pocket-demo",
       // Never stale, so prices come from the seeded cache, never a live provider.
       MARKET_DATA_TTL_MS: "999999999",
+      // Same for FX: the seeded daily rates are the whole table; never fetch live ones.
+      FX_PROVIDER: "none",
       // Playwright plus Next's background polling exceed the default 100 req/min.
       RATE_LIMIT_MAX: "100000",
       PORT: DEMO_API_PORT,

@@ -1,11 +1,13 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { desc, eq } from "drizzle-orm";
 import { Decimal } from "decimal.js";
-import { lastPrices, portfolios, portfolioSnapshots, users } from "@portfolio/db";
+import { fxRates, lastPrices, portfolios, portfolioSnapshots, users } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { FastifyBaseLogger } from "fastify";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
+import { getFxRatesForDates } from "../../src/services/fx.js";
+import type { FxProvider } from "../../src/services/fx.js";
 import { valuePortfolio } from "../../src/services/valuation.js";
 import { recordDailySnapshots } from "../../src/services/snapshots.js";
 
@@ -151,4 +153,79 @@ describe("seedDemo — snapshot history anchored to the live valuation (#989)", 
     expect(quoteCalls).toBe(0);
     expect(fetchSpy).not.toHaveBeenCalled();
   }, 60_000);
+});
+
+describe("seedDemo — FX rates (#989, #1006)", () => {
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await getDb().delete(users).where(eq(users.email, "seed-demo-admin-test@example.com"));
+    await closeDb();
+  });
+
+  const rel = (a: Decimal.Value, b: Decimal.Value) => new Decimal(a).sub(b).abs().div(b);
+
+  it("has a rate for every recent day, so no lookup reaches a live provider", async () => {
+    await ensureDb();
+    await seedDemo();
+    const db = getDb();
+    const provider = {
+      getRate: vi.fn(async () => null),
+      getRateHistory: vi.fn(async () => ({})),
+    } satisfies FxProvider;
+    const dates = Array.from({ length: 400 }, (_, i) =>
+      toDateKey(new Date(Date.now() - i * 864e5)),
+    );
+    const rates = await getFxRatesForDates(db, ["EUR", "USD", "CAD"], "IDR", dates, provider);
+    expect(provider.getRate).not.toHaveBeenCalled();
+    expect(provider.getRateHistory).not.toHaveBeenCalled();
+    // No step: consecutive days move by well under 1%.
+    const sorted = [...dates].sort();
+    for (let i = 1; i < sorted.length; i++) {
+      for (const ccy of ["EUR", "USD", "CAD"]) {
+        const prev = rates.get(sorted[i - 1])![ccy];
+        const cur = rates.get(sorted[i])![ccy];
+        expect(prev && cur, `${ccy} ${sorted[i]}`).toBeTruthy();
+        expect(rel(cur, prev).lt("0.005"), `${ccy} ${sorted[i]}`).toBe(true);
+      }
+    }
+  }, 60_000);
+
+  it("is triangularly consistent: USD→EUR × EUR→IDR == USD→IDR (same for CAD)", async () => {
+    await ensureDb();
+    await seedDemo();
+    const rows = await getDb().select().from(fxRates);
+    const byDate = new Map<string, Map<string, string>>();
+    for (const r of rows) {
+      if (!byDate.has(r.date)) byDate.set(r.date, new Map());
+      byDate.get(r.date)!.set(`${r.base}:${r.quote}`, r.rate);
+    }
+    let checked = 0;
+    for (const [, m] of byDate) {
+      const eurIdr = m.get("EUR:IDR");
+      if (!eurIdr) continue;
+      for (const ccy of ["USD", "CAD"]) {
+        const direct = m.get(`${ccy}:IDR`);
+        const cross = m.get(`${ccy}:EUR`);
+        if (!direct || !cross) continue;
+        expect(rel(new Decimal(cross).mul(eurIdr), direct).lt("1e-9")).toBe(true);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(2000);
+  }, 60_000);
+});
+
+describe("getFxProvider — FX_PROVIDER=none", () => {
+  it("FX_PROVIDER=none disables live lookups", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("FX_PROVIDER", "none");
+    const fresh = await import("../../src/services/fx.js");
+    expect(fresh.getFxProvider()).toBeNull();
+    vi.stubEnv("FX_PROVIDER", "");
+    vi.resetModules();
+    const live = await import("../../src/services/fx.js");
+    expect(live.getFxProvider()).not.toBeNull();
+    vi.unstubAllEnvs();
+  });
 });

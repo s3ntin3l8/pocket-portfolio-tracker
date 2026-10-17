@@ -102,11 +102,14 @@ let provider: FxProvider | null | undefined;
  * The configured FX provider. A custom `FX_BASE_URL` selects the keyed
  * exchangerate.host-style provider; otherwise we default to the key-less
  * Frankfurter source — except under test, where providers are injected explicitly
- * so the suite stays hermetic (no live network calls).
+ * so the suite stays hermetic (no live network calls). `FX_PROVIDER=none` disables live
+ * lookups outright (the demo instance, whose seeded rates must never be overwritten).
  */
 export function getFxProvider(): FxProvider | null {
   if (provider === undefined) {
-    if (process.env.FX_BASE_URL) {
+    if (process.env.FX_PROVIDER === "none") {
+      provider = null;
+    } else if (process.env.FX_BASE_URL) {
       provider = new HttpFxProvider(process.env.FX_BASE_URL);
     } else if (process.env.NODE_ENV === "test") {
       provider = null;

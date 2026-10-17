@@ -70,11 +70,22 @@ describe("assertDemoEnv refuses a poisoned environment", () => {
     refuses({ STORAGE_PROVIDER: "s3" }, { api: true });
     expect(
       assertDemoEnv(
-        { ...base, STORAGE_PROVIDER: "folder", STORAGE_FOLDER_PATH: path.join(demoDir, "s") },
+        {
+          ...base,
+          STORAGE_PROVIDER: "folder",
+          STORAGE_FOLDER_PATH: path.join(demoDir, "s"),
+          FX_PROVIDER: "none",
+        },
         demoDir,
         { api: true, collect: true },
       ),
     ).toEqual([]);
+  });
+
+  it("an API env that may fetch live FX rates", () => {
+    const folder = { STORAGE_PROVIDER: "folder", STORAGE_FOLDER_PATH: path.join(demoDir, "s") };
+    refuses(folder, { api: true });
+    refuses({ ...folder, FX_PROVIDER: "frankfurter" }, { api: true });
   });
 
   it("throws unless collecting", () => {
