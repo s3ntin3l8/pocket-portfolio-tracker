@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 /** A port nothing listens on right now, so assertPortsFree passes. */
 const freePort = () =>
@@ -38,8 +38,15 @@ let healthTimeoutMs;
 beforeAll(async () => {
   process.env.TMPDIR = scratchRoot;
   process.env.DEMO_API_PORT = await freePort();
-  process.env.DEMO_WEB_PORT = await freePort();
+  // Each probe listener closes before the next binds, so the OS may hand back the same one.
+  do process.env.DEMO_WEB_PORT = await freePort();
+  while (process.env.DEMO_WEB_PORT === process.env.DEMO_API_PORT);
   ({ startDemo, healthTimeoutMs, strayPids, waitForHttp } = await import("./instance.mjs"));
+});
+
+// Tests set it per case; never let a failed assertion leak it into the next one.
+afterEach(() => {
+  delete process.env.DEMO_HEALTH_TIMEOUT_MS;
 });
 
 afterAll(() => {
