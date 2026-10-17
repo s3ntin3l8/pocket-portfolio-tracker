@@ -35,7 +35,11 @@ import {
 } from "../../services/benchmark.js";
 
 export function registerHistoryRoutes(app: FastifyInstance) {
-  // Net-worth-over-time for one portfolio, from the daily snapshots (base currency).
+  // Net-worth-over-time for one portfolio, from the daily snapshots, in the portfolio's
+  // current base currency. Snapshot rows keep the currency they were written in, so after a
+  // `baseCurrency` change the table holds two currencies (#1031): every row is converted
+  // from its own currency at its own date's rate (never 1:1) before the TWR index is
+  // chained, exactly as /networth/history converts into the display currency.
   app.get<{ Params: PortfolioParams; Querystring: { range?: string } }>(
     "/portfolios/:portfolioId/history",
     { preHandler: [app.authenticate, app.requirePortfolio] },
@@ -43,13 +47,17 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       request.timingName = "GET /portfolios/:id/history";
       const { portfolioId } = request.params;
       const range = request.query.range ?? "1y";
+      const base = request.portfolio!.baseCurrency;
+      const readOnlyPat = isReadOnlyPat(request);
+      // A read-scoped PAT converts with cached rates only (no provider fetch/persist).
+      const fxProvider = readOnlyPat ? null : undefined;
 
       // 1D/7D: read the intraday (timestamped) table instead of the day-grained one.
       // No stored intraday history exists to backfill — this is prospective-only, so an
       // empty array is a normal, expected response until the capture job has run.
       if (range === "1d" || range === "7d") {
         const since = new Date(Date.now() - (range === "1d" ? 1 : 7) * 86_400_000);
-        const rows = await app.db
+        const intradayRows = await app.db
           .select()
           .from(portfolioIntradaySnapshots)
           .where(
@@ -59,6 +67,14 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             ),
           )
           .orderBy(asc(portfolioIntradaySnapshots.capturedAt));
+        // Same as the aggregate intraday series: today's rate into the current base; a
+        // row whose currency has none is left out and reported as fxMissingCurrencies.
+        const currencies = [...new Set(intradayRows.map((r) => r.currency))];
+        const fx = makeFxRateFn(
+          await getFxRates(app.db, currencies, base, new Date(), fxProvider),
+          base,
+        );
+        const rows = intradayRows.filter((r) => fxAvailable(r.currency, base, fx));
         request.timingMeta = {
           portfolioId,
           range,
@@ -66,8 +82,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         };
         return rows.map((r) => ({
           at: r.capturedAt.toISOString(),
-          netWorth: r.netWorth,
-          marketValue: r.marketValue ?? "0",
+          netWorth: convert(r.netWorth, r.currency, base, fx),
+          marketValue: convert(r.marketValue ?? "0", r.currency, base, fx),
         }));
       }
 
@@ -75,59 +91,74 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         historyCache,
         // A read-scoped PAT gets a benchmark-less variant (no provider fetch/persist);
         // keep it out of the shared entry so it can't serve a degraded series to others.
-        `${portfolioId}:${range}${isReadOnlyPat(request) ? ":ro" : ""}`,
+        `${portfolioId}:${range}${readOnlyPat ? ":ro" : ""}`,
         async () => {
           const start = rangeStart(range);
           const conds = [eq(portfolioSnapshots.portfolioId, portfolioId)];
           if (start) conds.push(gte(portfolioSnapshots.date, start));
-          const rows = await app.db
+          const snapRows = await app.db
             .select()
             .from(portfolioSnapshots)
             .where(and(...conds))
             .orderBy(asc(portfolioSnapshots.date));
 
-          // Compute TWR chain from stored (marketValue, effectiveFlow) pairs.
-          const series = rows.map((r) => ({
-            date: r.date,
-            marketValue: r.marketValue ?? "0",
-            effectiveFlow: r.effectiveFlow ?? "0",
-          }));
-          const indexed = chainIndex(series);
+          // One per-date rate load for the snapshot currencies and the benchmark's, so both
+          // convert into the current base at the same rates (#1020, #1031).
+          const userId = request.userId;
+          const bmConfig = await getUserBenchmarkConfig(app.db, userId, "");
+          const currencies = [...new Set([...snapRows.map((r) => r.currency), bmConfig.currency])];
+          const dates = [...new Set(snapRows.map((r) => r.date))];
+          const ratesByDate = await getFxRatesForDates(app.db, currencies, base, dates, fxProvider);
+          const fxOn = (date: string) => makeFxRateFn(ratesByDate.get(date) ?? {}, base);
+          // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported
+          // as fxMissingCurrencies. Rates carry forward/back over the whole date grid, so a
+          // pre-switch currency drops out as a whole leg, never as single days.
+          const rows = snapRows
+            .filter((r) => fxAvailable(r.currency, base, fxOn(r.date)))
+            .map((r) => {
+              const fx = fxOn(r.date);
+              return {
+                date: r.date,
+                netWorth: convert(r.netWorth, r.currency, base, fx),
+                marketValue: convert(r.marketValue ?? "0", r.currency, base, fx),
+                effectiveFlow: convert(r.effectiveFlow ?? "0", r.currency, base, fx),
+              };
+            });
+
+          // Compute TWR chain from the converted (marketValue, effectiveFlow) pairs.
+          const indexed = chainIndex(rows);
           const indexById = new Map(indexed.map((p) => [p.date, p]));
 
           const result = rows.map((r) => ({
             date: r.date,
             netWorth: r.netWorth,
-            marketValue: r.marketValue ?? "0",
+            marketValue: r.marketValue,
             index: indexById.get(r.date)?.index ?? "100",
             pct: indexById.get(r.date)?.pct ?? "0",
           }));
 
-          // Benchmark enrichment — same pattern as /networth/history, except the
-          // target currency is the portfolio's base currency (this endpoint returns
-          // snapshots in their stored base currency). The benchmark is converted into
-          // it at each date's FX rate (#1020): a native-currency index would leave out
+          // Benchmark enrichment — same pattern as /networth/history, except the target
+          // currency is the portfolio's current base currency. The benchmark is converted
+          // into it at each date's FX rate (#1020): a native-currency index would leave out
           // the FX move that the portfolio's own index includes. Lives inside the cache
           // callback so the `userPreferences`/`benchmarkPrices`/FX queries + possible
           // market-data fetch are skipped on repeated calls for the same (portfolioId, range).
-          const userId = request.userId;
-          const bmConfig = await getUserBenchmarkConfig(app.db, userId, "");
           if (result.length > 0) {
             const bmDates = result.map((p) => p.date);
-            if (!isReadOnlyPat(request)) {
+            if (!readOnlyPat) {
               await ensureBenchmarkPrices(app.db, getMarketData, userId, bmConfig.symbol, bmDates);
             }
             const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
             if (refreshedBm.size >= 1) {
-              // A read-scoped PAT converts with cached rates only (no provider fetch/persist),
-              // like the benchmark prices above. Days without a rate drop out (never 1:1).
+              // `ratesByDate` was loaded cached-only for a read-scoped PAT, like the benchmark
+              // prices above. Days without a rate drop out (never 1:1).
               const { closes: bmPrices, fxMissingDates } = await benchmarkClosesInCurrency(
                 app.db,
                 refreshedBm,
                 bmDates,
                 bmConfig.currency,
-                request.portfolio!.baseCurrency,
-                { cachedFxOnly: isReadOnlyPat(request) },
+                base,
+                { ratesByDate },
               );
               if (fxMissingDates > 0) {
                 request.log.warn(
