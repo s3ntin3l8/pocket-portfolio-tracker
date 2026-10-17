@@ -10,6 +10,7 @@ import { StreaksCard } from "@/components/insights/streaks-card";
 import { BenchmarkCard } from "@/components/insights/benchmark-card";
 import { ConcentrationTrendCard } from "@/components/insights/concentration-trend-card";
 import { CompositionCard } from "@/components/insights/composition-card";
+import { DiversificationCard } from "@/components/insights/diversification-card";
 import { LazyYearlyReturnsCard as YearlyReturnsCard } from "@/components/charts/lazy";
 import {
   loadNetWorth,
@@ -101,8 +102,6 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
   }));
   const topClass =
     filteredClasses.length > 0 ? [...filteredClasses].sort((a, b) => b.pct - a.pct)[0] : null;
-  const marketCount = allocation?.byRegion.filter((s) => Number(s.value) > 0).length ?? 0;
-  const currencyCount = allocation?.byCurrency.filter((s) => Number(s.value) > 0).length ?? 0;
 
   const movers = bestAndWorst(
     holdingsView.status === "ok"
@@ -164,18 +163,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
                 )}
               </Card>
 
-              <Card className="p-4">
-                <CardLabel>{t("diversification.label")}</CardLabel>
-                <p className="mt-1 text-heading font-bold leading-none">
-                  {t("diversification.value", { count: assetClassSlices.length })}
-                </p>
-                <CardLabel className="mt-1">
-                  {t("diversification.caption", {
-                    markets: marketCount,
-                    currencies: currencyCount,
-                  })}
-                </CardLabel>
-              </Card>
+              <DiversificationCard allocation={allocation} classCount={assetClassSlices.length} />
             </div>
           )}
 

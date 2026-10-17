@@ -215,7 +215,7 @@
     },
     "diversification": {
       "label": "Diversifikasi",
-      "caption": "{markets} pasar · {currencies} mata uang",
+      "caption": "{regions} wilayah · {currencies} mata uang",
       "value": "{count} kelas"
     },
     "bestWorst": {
