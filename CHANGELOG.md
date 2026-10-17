@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.3...v0.2.4) (2026-10-17)
+
+
+### Bug Fixes
+
+* **allocation:** one region vocabulary ([#1027](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1027)) ([95f0108](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/95f0108552656f259683562ad60c6dd0b4bb8b69))
+* **demo:** stop the in-flight build/seed child on teardown ([#1036](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1036)) ([0b0fbcc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0b0fbccc98db09d1dfa2d8bbf5cb491cb3e607b0))
+* **insights:** count regions in the diversification caption ([#1033](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1033)) ([1e25765](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1e2576581752d56d2383be3170dc9b2c394b5df8))
+* **insights:** measure the benchmark in the display currency ([#1026](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1026)) ([f68c2b4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f68c2b45a876da6b48781108057aaf80210e7cd2))
+* **insights:** per-year XIRR from consistent flows and values ([#1032](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1032)) ([a2d907b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a2d907b3102244a73605cc42388e9217ad6fc1c9))
+* **seed:** daily, triangularly consistent demo FX rates ([#1021](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1021)) ([7640441](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7640441105b884eaafbc834035a18ce2cebfc91c))
+* **web:** one bar-chart hover cursor ([#1017](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1017)) ([bf50761](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bf50761c268659b3a4f7d69b8e0ef7e98b5deec8))
+* **web:** plot net worth on a selected portfolio's value line ([#1022](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1022)) ([0a6cbc6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0a6cbc62a9af3c1985a49a5d2ff07928178fa2d5))
+* **web:** size chart Y axes to their tick labels ([#1024](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1024)) ([4460cde](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4460cde59a6594d286b9569bc5603c567a340ae4))
+
 ## [0.2.3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.2...v0.2.3) (2026-10-17)
 
 
