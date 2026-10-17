@@ -172,14 +172,16 @@ export const DEMO_GSPC_YEAR_END_CLOSES: Readonly<Record<number, number>> = {
 };
 
 /**
- * The demo benchmark's close today: about the real index's level on
- * {@link DEMO_GSPC_TODAY_AS_OF}. Refresh both with the table above each January: the
- * seed-demo test fails once the newest year-end is more than a year (plus a month's grace)
- * old, or when the table has a year-end newer than this level's date.
+ * The demo benchmark's close today: about the real index's level (`close`) on a dated real
+ * session (`asOf`, ISO; the 6 Oct 2026 close was 7,819). One record, so the level and its
+ * date are edited together. Refresh it with the table above each January: the seed-demo
+ * test fails once the newest year-end is more than a year (plus a month's grace) old, or
+ * when the table has a year-end on or after `asOf`.
  */
-export const DEMO_GSPC_TODAY_CLOSE = 7800;
-/** When {@link DEMO_GSPC_TODAY_CLOSE} was the real level (the 6 Oct 2026 close was 7,819). */
-export const DEMO_GSPC_TODAY_AS_OF = "2026-10-06";
+export const DEMO_GSPC_TODAY: Readonly<{ asOf: string; close: number }> = {
+  asOf: "2026-10-06",
+  close: 7800,
+};
 
 /**
  * The demo's ^GSPC closes, one per calendar day from `start` through `today` (#1029):
@@ -2034,7 +2036,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     start: isoDate(new Date(Date.parse(`${firstFlowKey}T00:00:00.000Z`) - 92 * DAY_MS)),
     today: isoDate(NOW),
     yearEnds: DEMO_GSPC_YEAR_END_CLOSES,
-    todayClose: DEMO_GSPC_TODAY_CLOSE,
+    todayClose: DEMO_GSPC_TODAY.close,
     noise: (daysAgoN) => BENCHMARK_NOISE * marketShock(daysAgoN),
   });
   const benchmarkRows: (typeof benchmarkPrices.$inferInsert)[] = benchmarkWalk.map((p) => ({

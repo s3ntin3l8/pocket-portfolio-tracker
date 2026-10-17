@@ -41,7 +41,7 @@ const {
   demoSnapshotWalk,
   demoBenchmarkWalk,
   DEMO_GSPC_YEAR_END_CLOSES,
-  DEMO_GSPC_TODAY_AS_OF,
+  DEMO_GSPC_TODAY,
 } = await import("../../src/db/seed-demo.js");
 
 describe("seedDemo — admin bootstrap", () => {
@@ -407,6 +407,13 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
       .from(benchmarkPrices)
       .where(and(eq(benchmarkPrices.userId, user.id), eq(benchmarkPrices.symbol, "^GSPC")));
     const byDate = new Map(closes.map((c) => [c.date, Number(c.close)]));
+    // Every year the table anchors inside the seeded range needs its real return above,
+    // typed in by hand: next January's new close is then checked against reality too.
+    for (const year of Object.keys(DEMO_GSPC_YEAR_END_CLOSES).map(Number)) {
+      if (byDate.has(`${year - 1}-12-31`) && byDate.has(`${year}-12-31`)) {
+        expect(realReturns, `add the real ${year} ^GSPC return here`).toHaveProperty(String(year));
+      }
+    }
     let checked = 0;
     for (const [year, real] of Object.entries(realReturns)) {
       const open = byDate.get(`${Number(year) - 1}-12-31`);
@@ -542,12 +549,13 @@ describe("demoBenchmarkWalk", () => {
     const staleFrom = Date.UTC(newest + 1, 11, 31) + 31 * 86_400_000;
     expect(
       Date.now() < staleFrom,
-      `add the real ${newest + 1} ^GSPC year-end close to DEMO_GSPC_YEAR_END_CLOSES and refresh DEMO_GSPC_TODAY_CLOSE`,
+      `add the real ${newest + 1} ^GSPC year-end close to DEMO_GSPC_YEAR_END_CLOSES and refresh DEMO_GSPC_TODAY`,
     ).toBe(true);
     // A year-end added without refreshing today's level would bridge toward a stale close.
+    expect(DEMO_GSPC_TODAY.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(
-      DEMO_GSPC_TODAY_AS_OF > `${newest}-12-31`,
-      `refresh DEMO_GSPC_TODAY_CLOSE/DEMO_GSPC_TODAY_AS_OF to a level after ${newest}-12-31`,
+      Date.parse(`${DEMO_GSPC_TODAY.asOf}T00:00:00.000Z`) > Date.UTC(newest, 11, 31),
+      `refresh DEMO_GSPC_TODAY to a real level after ${newest}-12-31`,
     ).toBe(true);
   });
 
