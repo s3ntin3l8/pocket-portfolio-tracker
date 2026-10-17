@@ -5,10 +5,12 @@ import type { NetWorth } from "@portfolio/api-client";
 import {
   allocationBreakdown,
   summarizePortfolio,
+  REGION_NAMES,
   type CoreTransaction,
   type AllocationInstrumentMeta,
 } from "@portfolio/core";
 import messages from "../messages/en.json";
+import idMessages from "../messages/id.json";
 
 // Real en.json translations, so a region key renders the label a user would see.
 vi.mock("next-intl/server", () => ({
@@ -83,5 +85,11 @@ describe("HoldingsSidebar — region rows", () => {
     );
     expect(screen.getAllByText("North America")).toHaveLength(1);
     expect(screen.getByText("100.0%")).toBeInTheDocument();
+  });
+
+  it("has a Region message for every region name core can emit, in every locale", () => {
+    for (const bag of [messages.Region, idMessages.Region]) {
+      expect(Object.keys(bag).sort()).toEqual([...REGION_NAMES].sort());
+    }
   });
 });

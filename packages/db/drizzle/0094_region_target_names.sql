@@ -6,6 +6,8 @@
 --   EU                         -> Europe
 --   ID, JP, SG, HK, AU         -> Asia
 --   Commodity                  -> Other
+-- These are the values MARKET_TO_REGION / CURRENCY_TO_REGION in
+-- packages/core/src/allocation/maps.ts now return; keep the two in step.
 --
 -- Two codes can map to one name (US + CA), and a code can map to a name the scope already
 -- holds, so a plain UPDATE would hit allocation_targets_scope_dim_key_idx. Instead, every

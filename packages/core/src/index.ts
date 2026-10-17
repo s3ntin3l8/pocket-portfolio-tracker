@@ -149,6 +149,7 @@ export {
   normalizeSector,
   marketToRegion,
   countryToRegion,
+  REGION_NAMES,
   type AllocationInstrumentMeta,
   type AllocationSlice,
   type TopHolding,

@@ -590,7 +590,7 @@ export interface InstrumentMeta {
 
 /** A single slice in an allocation breakdown (one category in one dimension). */
 export interface AllocationSlice {
-  /** Canonical category key (asset-class name, currency code, region code, sector name, …). */
+  /** Canonical category key (asset-class name, currency code, region name, sector name, …). */
   key: string;
   /** Value in the display currency (decimal string). */
   value: string;

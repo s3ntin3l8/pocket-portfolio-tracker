@@ -100,6 +100,16 @@ const SECTOR_ALIAS_MAP: Record<string, string> = {
   "Health Care": "Health Care",
 };
 
+/** Every region name a slice key can take: what the maps above emit, plus the "Other" fallback. */
+export const REGION_NAMES: readonly string[] = [
+  ...new Set([
+    ...Object.values(MARKET_TO_REGION),
+    ...Object.values(CURRENCY_TO_REGION),
+    ...Object.values(COUNTRY_TO_REGION),
+    "Other",
+  ]),
+];
+
 export function marketToRegion(market: string): string {
   return MARKET_TO_REGION[market.toUpperCase()] ?? "Other";
 }
