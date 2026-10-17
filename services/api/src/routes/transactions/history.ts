@@ -231,9 +231,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const portfolio = request.portfolio;
       const boundary = portfolio.cashCounted ? "inside" : "outside";
       const costBasisMode = await resolveCostBasisMode(app, request.userId);
+      // A read-scoped PAT values and converts with cached FX rates only (audit A7); its
+      // possibly-degraded result is cached under its own key.
+      const readOnlyPat = isReadOnlyPat(request);
+      const fxProvider = readOnlyPat ? null : undefined;
       const cached = await withDerivationCache(
         performanceCache,
-        `${portfolioId}:${boundary}`,
+        `${portfolioId}:${boundary}${readOnlyPat ? ":ro" : ""}`,
         async () => {
           const { coreTxns, summary, corporateActions } = await loadValuation(
             app,
@@ -241,6 +245,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             portfolio.baseCurrency,
             costBasisMode,
             portfolio.cashCounted,
+            undefined,
+            fxProvider,
           );
 
           // Flows and net worth exclude the same fxMissing instruments (audit B2).
@@ -250,6 +256,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             boundary,
             portfolio.baseCurrency,
             corporateActions,
+            "today",
+            fxProvider,
           );
           const asOf = new Date();
           flows.push({ amount: summary.netWorth, date: asOf });

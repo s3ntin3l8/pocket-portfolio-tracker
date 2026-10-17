@@ -92,9 +92,10 @@ const reset = () => {
   calls.ensure = 0;
 };
 
-describe("FX provider for a read-scoped PAT on /networth/history and /insights (#1039)", () => {
+describe("FX provider for a read-scoped PAT on /networth/history, /insights and /portfolios/:id/performance (#1039)", () => {
   let owner: string;
   let readPat: string;
+  const pfIds: string[] = [];
 
   beforeAll(async () => {
     const sub = "networth-insights-fx-pat";
@@ -115,7 +116,6 @@ describe("FX provider for a read-scoped PAT on /networth/history and /insights (
 
     // One cash-outside and one cash-inside portfolio, both in EUR, so /insights loads the
     // per-year flows for both boundaries.
-    const pfIds: string[] = [];
     for (const cashCounted of [false, true]) {
       const created = await app.inject({
         method: "POST",
@@ -187,7 +187,9 @@ describe("FX provider for a read-scoped PAT on /networth/history and /insights (
     ["/networth/history?range=7d"],
     ["/networth/history?range=1d"],
     ["/insights?range=all"],
-  ])("%s: a read PAT loads every rate cached-only and back-fills no benchmark", async (url) => {
+    ["/portfolios/:pf/performance"],
+  ])("%s: a read PAT loads every rate cached-only and back-fills no benchmark", async (path) => {
+    const url = path.replace(":pf", pfIds[0]!);
     reset();
     const ro = await app.inject({ method: "GET", url, headers: auth(readPat) });
     expect(ro.statusCode).toBe(200);
@@ -202,7 +204,7 @@ describe("FX provider for a read-scoped PAT on /networth/history and /insights (
     expect(rw.statusCode).toBe(200);
     expect(calls.fx.length).toBeGreaterThan(0);
     expect(calls.fx.some((c) => c.provider === null)).toBe(false);
-    if (!url.includes("range=1d") && !url.includes("range=7d")) {
+    if (url.includes("range=all")) {
       expect(calls.ensure).toBeGreaterThan(0);
     }
   });
