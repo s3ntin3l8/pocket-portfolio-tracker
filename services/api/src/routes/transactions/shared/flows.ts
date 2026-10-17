@@ -10,8 +10,11 @@ import {
   boundaryFlowPoints,
   transferFlowPoints,
   partitionConvertible,
+  toDateKey,
+  type FxAt,
 } from "@portfolio/core";
-import { getFxRates, makeFxRateFn } from "../../../services/fx.js";
+import type { DB } from "../../../db/client.js";
+import { getFxRates, getFxRatesForDates, makeFxRateFn } from "../../../services/fx.js";
 
 /**
  * Dated, signed cash flows crossing a portfolio's investment boundary, in XIRR
@@ -73,15 +76,79 @@ export async function boundaryFlows(
   /** Split/bonus actions for the pool replay behind transfer valuation (audit B9) —
    *  pass the valuation's `corporateActions`. */
   corporateActions: CorporateAction[] = [],
+  /**
+   * `"today"` (default): every flow converts at today's rate — right for an all-time XIRR
+   * whose terminal value is today's net worth at today's rate (`/networth`).
+   * `"flowDate"`: each flow converts at its own date's rate — right when the flows are
+   * paired with values converted at their own (past) dates, as the per-year XIRR's
+   * year-end net worths are (#1020).
+   */
+  fxDate: "today" | "flowDate" = "today",
 ): Promise<KindedCashFlowPoint[]> {
-  const rates = await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], target);
-  const fx = makeFxRateFn(rates, target);
+  let fxAt: FxAt;
+  if (fxDate === "flowDate") {
+    fxAt = await fxAtFlowDates(app.db, allTxns, target);
+  } else {
+    const fx = makeFxRateFn(
+      await getFxRates(app.db, [...new Set(allTxns.map((t) => t.currency))], target),
+      target,
+    );
+    fxAt = () => fx;
+  }
+  return boundaryFlowsAt(allTxns, boundary, target, fxAt, corporateActions);
+}
+
+/**
+ * Per-date FX for a transaction list: `getFxRatesForDates` over the rows' own dates and
+ * currencies, so each flow converts at the rate in effect when it happened. Those rates
+ * carry forward and back over the whole date grid, so a currency is either convertible
+ * on every one of these dates or on none. Today is part of the grid so the lookup sees
+ * the same cached rows as the snapshot conversion it is paired with (which reaches
+ * today): a currency whose only rate is today's must not be convertible on one side only.
+ */
+export async function fxAtFlowDates(
+  db: DB,
+  txns: CoreTransaction[],
+  target: string,
+): Promise<FxAt> {
+  const ratesByDate = await getFxRatesForDates(
+    db,
+    [...new Set(txns.map((t) => t.currency))],
+    target,
+    [...new Set([...txns.map((t) => toDateKey(t.executedAt)), toDateKey(new Date())])],
+  );
+  return (date) => {
+    const rates = ratesByDate.get(toDateKey(date));
+    // A date outside the grid is a caller bug, not missing FX data — say so.
+    if (!rates) throw new Error(`fxAtFlowDates: ${toDateKey(date)} is not on the loaded date grid`);
+    return makeFxRateFn(rates, target);
+  };
+}
+
+/**
+ * {@link boundaryFlows} with the FX lookup supplied: `fxAt(date)` is the rate set used
+ * for a row executed on `date`. Pure, so the demo seed builds its snapshot history from
+ * exactly the flows the per-year XIRR reads (#1020).
+ */
+export function boundaryFlowsAt(
+  allTxns: CoreTransaction[],
+  boundary: "inside" | "outside",
+  target: string,
+  fxAt: FxAt,
+  corporateActions: CorporateAction[] = [],
+): KindedCashFlowPoint[] {
   // Exclude rows with no FX rate (audit B2) — reported as fxMissingCurrencies; the
-  // matching value (summary net worth) excludes the same currencies.
-  const txns = partitionConvertible(allTxns, target, fx).convertible;
+  // matching value (summary net worth) excludes the same currencies. Whole instruments
+  // drop, so the probe date doesn't matter: a currency has a rate on every date or none.
+  const last = allTxns.reduce<Date | null>(
+    (m, t) => (m === null || t.executedAt > m ? t.executedAt : m),
+    null,
+  );
+  if (last === null) return [];
+  const txns = partitionConvertible(allTxns, target, fxAt(last)).convertible;
 
   if (boundary === "inside") {
-    return boundaryFlowPoints(txns, "inside", target, fx, corporateActions);
+    return boundaryFlowPoints(txns, "inside", target, fxAt(last), corporateActions, fxAt);
   }
 
   const isLegacyTransferBonus = (t: CoreTransaction): boolean =>
@@ -93,11 +160,18 @@ export async function boundaryFlows(
     return false;
   };
   const cashValued: KindedCashFlowPoint[] = txns.filter(isInvestmentFlow).map((t) => ({
-    amount: Number(convert(cashFlow(t).toString(), t.currency, target, fx)),
+    amount: Number(convert(cashFlow(t).toString(), t.currency, target, fxAt(t.executedAt))),
     date: t.executedAt,
     kind: t.kind ?? null,
   }));
-  const transferValued = transferFlowPoints(txns, "outside", target, fx, corporateActions);
+  const transferValued = transferFlowPoints(
+    txns,
+    "outside",
+    target,
+    fxAt(last),
+    corporateActions,
+    fxAt,
+  );
   return [...cashValued, ...transferValued].sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 

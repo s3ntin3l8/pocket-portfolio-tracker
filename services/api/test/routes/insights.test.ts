@@ -13,6 +13,7 @@ import {
   users,
 } from "@portfolio/db";
 import { eq, sql } from "drizzle-orm";
+import { toDateKey } from "@portfolio/core";
 import { buildApp } from "../../src/app.js";
 import {
   loadBoundaryFlowsForUser,
@@ -934,6 +935,54 @@ describe("GET /insights", () => {
       expect(sell).toBeTruthy();
       // 10 × 150 − 1 fee − 131.88 tax = 1367.12 (pre-fix: 1499, the gross proceeds).
       expect(sell!.amount).toBe("1367.12");
+    });
+
+    // Issue #1020 (b): the year-end NAVs convert at each snapshot date's rate, so the flows
+    // paired with them must convert at THEIR own dates' rates — not all at today's.
+    it("converts each flow at its own date's FX rate", async () => {
+      const t = await token("insights-yearly-xirr-fx-date-user");
+      const create = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "EUR savings", baseCurrency: "EUR", cashCounted: true },
+      });
+      const portfolioId = create.json().id as string;
+      const [pf] = await app.db.select().from(portfolios).where(eq(portfolios.id, portfolioId));
+      await app.db
+        .insert(fxRates)
+        .values([
+          { base: "EUR", quote: "IDR", rate: "14000", date: "2012-03-01" },
+          { base: "EUR", quote: "IDR", rate: "12000", date: "2013-03-01" },
+        ])
+        .onConflictDoUpdate({
+          target: [fxRates.base, fxRates.quote, fxRates.date],
+          set: { rate: sql`excluded.rate` },
+        });
+      // Today's rate exists too, so the pre-fix path converts instead of dropping.
+      await app.db
+        .insert(fxRates)
+        .values({ base: "EUR", quote: "IDR", rate: "17000", date: toDateKey(new Date()) })
+        .onConflictDoNothing();
+      await app.db.insert(transactions).values([
+        {
+          portfolioId,
+          type: "deposit",
+          price: "100",
+          currency: "EUR",
+          executedAt: new Date("2012-03-01T10:00:00Z"),
+        },
+        {
+          portfolioId,
+          type: "deposit",
+          price: "100",
+          currency: "EUR",
+          executedAt: new Date("2013-03-01T10:00:00Z"),
+        },
+      ]);
+
+      const flows = await loadBoundaryFlowsForUser(app, pf!.userId, [portfolioId], "IDR", "inside");
+      expect(flows.map((f) => Number(f.amount))).toEqual([-1_400_000, -1_200_000]);
     });
   });
 

@@ -146,6 +146,10 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   `services/api/src/routes/transactions/shared/flows.ts`. Getting this distinction wrong is
   exactly how #736 (transfers valued at ≈0) happened, and re-collapsing the two is how a second,
   different bug (dropping realized gains/dividends from `totalReturnPct`) would happen next.
+  **FX date follows the paired value:** the all-time XIRR (`/networth`) converts every flow at
+  today's rate, because its terminal value is today's; the per-year XIRR (`/insights`) pairs
+  flows with past year-end net worths, so it converts each flow at its own date
+  (`boundaryFlows(…, "flowDate")`); both apply `excludeFxMissingInstruments` (#1020).
   **The TWR securities sleeve is a third, separate definition:** `buildDailyValueFlows`
   (`packages/core/src/twr.ts`) and the daily snapshot job (`services/api/src/services/snapshots.ts`)
   book a transfer as an `effectiveFlow` equal to the market value it adds/removes that day
