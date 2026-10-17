@@ -137,10 +137,9 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
       </Card>
 
       <PageWithRail>
-        {/* ── Sidebar: overview metrics. DOM-first so overview metrics render near
-        the top on mobile (matching the pre-sidebar position after the XIRR hero);
-        @xl:order-last visually moves it right on desktop. Overflow capped so the
-        rail doesn't eat the entire viewport when stacked deep. ── */}
+        {/* ── Sidebar: overview metrics. `railFirstOnMobile` keeps them near the top on
+        mobile (right after the XIRR hero); `PageRail` moves them right on desktop and
+        caps their height so the rail doesn't eat the viewport. ── */}
         <PageRail railFirstOnMobile className="space-y-3.5">
           {allocation && (
             <div className="grid grid-cols-2 gap-3">

@@ -40,12 +40,21 @@ describe("PageWithRail", () => {
   });
 
   it("only Insights asks for a rail-first mobile order", () => {
+    // Comments are stripped so a note mentioning the class cannot trip the scan.
     const read = (p: string) =>
-      readFileSync(resolve(__dirname, "../src/app/[locale]/(app)", p), "utf8");
-    expect(read("insights/page.tsx")).toContain("railFirstOnMobile");
-    for (const p of ["income", "tax", "savings", "trades", "holdings"]) {
-      expect(read(`${p}/page.tsx`), p).not.toContain("railFirstOnMobile");
-      expect(read(`${p}/page.tsx`), p).not.toContain("order-first");
+      readFileSync(resolve(__dirname, "..", p), "utf8")
+        .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+    const page = (name: string) => `src/app/[locale]/(app)/${name}/page.tsx`;
+    expect(read(page("insights"))).toContain("railFirstOnMobile");
+    const pagesAndRails = [
+      ...["income", "tax", "savings", "trades", "holdings"].map(page),
+      "src/components/holdings/holdings-sidebar.tsx",
+    ];
+    for (const f of pagesAndRails) {
+      expect(read(f), f).not.toContain("railFirstOnMobile");
+      expect(read(f), f).not.toContain("order-first");
     }
   });
 });
