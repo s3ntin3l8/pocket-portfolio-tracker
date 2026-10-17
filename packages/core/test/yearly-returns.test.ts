@@ -99,11 +99,11 @@ describe("computeYearlyReturns", () => {
     expect(rows[0].portfolioTwr).not.toBeNull();
   });
 
-  it("computes benchmark TWR (ratio-based, currency-invariant)", () => {
+  it("computes benchmark TWR as the ratio of its (display-currency) index levels", () => {
     const pfIndex: IndexPoint[] = linearIndex("2024-01-02", "2024-12-31", 100, 110);
-    // Benchmark in native EUR: 200 → 220 (+10%) in 2024. TWR is ratio-based so
-    // it's the same regardless of native/display currency; the route layer is
-    // responsible for any pre-conversion if needed.
+    // Benchmark index 200 → 220 (+10%) in 2024. The index is taken as given: the route
+    // layer converts the closes to the display currency at each date's FX rate first
+    // (#1020), because a ratio of native closes leaves out the year's FX move.
     const bmIndex: IndexPoint[] = linearIndex("2024-01-02", "2024-12-31", 200, 220);
     const benchmarks: YearlyReturnBenchmarkInput[] = [
       { symbol: "^GDAXI", displayName: "DAX", nativeCurrency: "EUR", index: bmIndex },

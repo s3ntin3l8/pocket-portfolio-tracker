@@ -20,6 +20,7 @@ import {
   getUserBenchmarkConfig,
   ensureBenchmarkPrices,
   getBenchmarkPrices,
+  benchmarkClosesInCurrency,
   computeBenchmarkIndex,
   computeActiveReturn,
 } from "../../services/benchmark.js";
@@ -176,6 +177,8 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         const yearlyReturns = await computeInsightsYearlyReturns({
           app,
           userId: id,
+          displayCurrency: display,
+          fx: { ratesByDate, currencies },
           aggregatedFlows: aggregated,
           perPortfolio: perPortfolioForYearly,
           boundaryFlows: boundaryFlowsForYearly,
@@ -224,24 +227,17 @@ export function registerInsightsRoutes(app: FastifyInstance) {
           await ensureBenchmarkPrices(app.db, getMarketData, id, bmConfig.symbol, bmDates);
           const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
           if (refreshedBm.size > 1) {
-            let bmFxMissingDates = 0;
             // Benchmark days with no FX rate are dropped (never 1:1, audit B2) and the
             // currency reported as fxMissingCurrencies.
-            const bmPrices = bmDates
-              .filter((d) => refreshedBm.has(d))
-              .flatMap((d) => {
-                const fx = makeFxRateFn(ratesByDate.get(d) ?? {}, display);
-                if (!fxAvailable(bmConfig.currency, display, fx)) {
-                  bmFxMissingDates++;
-                  return [];
-                }
-                return [
-                  {
-                    date: d,
-                    close: convert(refreshedBm.get(d)!, bmConfig.currency, display, fx),
-                  },
-                ];
-              });
+            const { closes: bmPrices, fxMissingDates: bmFxMissingDates } =
+              await benchmarkClosesInCurrency(
+                app.db,
+                refreshedBm,
+                bmDates,
+                bmConfig.currency,
+                display,
+                { ratesByDate },
+              );
             if (bmFxMissingDates > 0) {
               app.log.warn(
                 {

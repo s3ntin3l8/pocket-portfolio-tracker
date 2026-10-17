@@ -1306,6 +1306,8 @@ export interface PeriodMover {
 export interface YearlyReturnBenchmark {
   symbol: string;
   displayName: string;
+  /** The index's quote currency (e.g. "USD" for ^GSPC), a label only: `twr` and
+   *  `activeReturn` are measured in the display currency (#1020). */
   nativeCurrency: string;
   twr: string | null;
   activeReturn: string | null;

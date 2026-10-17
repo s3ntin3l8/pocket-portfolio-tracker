@@ -29,6 +29,7 @@ import {
   getUserBenchmarkConfig,
   ensureBenchmarkPrices,
   getBenchmarkPrices,
+  benchmarkClosesInCurrency,
   computeBenchmarkIndex,
   carryForwardBenchmark,
 } from "../../services/benchmark.js";
@@ -102,12 +103,13 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             pct: indexById.get(r.date)?.pct ?? "0",
           }));
 
-          // Benchmark enrichment — same pattern as /networth/history, minus the
-          // display currency (this endpoint returns snapshots in their stored
-          // base currency; the benchmark is a separate indexed series, so no FX
-          // conversion is involved). Lives inside the cache callback so the
-          // 2× `userPreferences`/`benchmarkPrices` queries + possible market-data
-          // fetch are skipped on repeated calls for the same (portfolioId, range).
+          // Benchmark enrichment — same pattern as /networth/history, except the
+          // target currency is the portfolio's base currency (this endpoint returns
+          // snapshots in their stored base currency). The benchmark is converted into
+          // it at each date's FX rate (#1020): a native-currency index would leave out
+          // the FX move that the portfolio's own index includes. Lives inside the cache
+          // callback so the `userPreferences`/`benchmarkPrices`/FX queries + possible
+          // market-data fetch are skipped on repeated calls for the same (portfolioId, range).
           const userId = request.userId;
           const bmConfig = await getUserBenchmarkConfig(app.db, userId, "");
           if (result.length > 0) {
@@ -117,9 +119,22 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             }
             const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
             if (refreshedBm.size >= 1) {
-              const bmPrices = bmDates
-                .filter((d) => refreshedBm.has(d))
-                .map((d) => ({ date: d, close: refreshedBm.get(d)! }));
+              // A read-scoped PAT converts with cached rates only (no provider fetch/persist),
+              // like the benchmark prices above. Days without a rate drop out (never 1:1).
+              const { closes: bmPrices, fxMissingDates } = await benchmarkClosesInCurrency(
+                app.db,
+                refreshedBm,
+                bmDates,
+                bmConfig.currency,
+                request.portfolio!.baseCurrency,
+                { cachedFxOnly: isReadOnlyPat(request) },
+              );
+              if (fxMissingDates > 0) {
+                request.log.warn(
+                  { portfolioId, symbol: bmConfig.symbol, missingDates: fxMissingDates },
+                  "history: benchmark FX rate missing for some dates — those days dropped",
+                );
+              }
               const bmIndex = computeBenchmarkIndex(bmPrices);
               const bmById = new Map(bmIndex.map((p) => [p.date, p]));
               carryForwardBenchmark(
@@ -316,7 +331,17 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         .where(and(...conds))
         .orderBy(asc(portfolioSnapshots.date));
 
-      const currencies = [...new Set(snapRows.map((r) => r.currency))];
+      // The benchmark's currency rides along so its closes convert at the same per-date
+      // rates as the snapshots (#1020) — except for a read-scoped PAT: its benchmark
+      // conversion below uses cached rates only, like its benchmark prices. (The snapshot
+      // currencies' own FX load predates this and is not part of that guard.)
+      const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
+      const currencies = [
+        ...new Set([
+          ...snapRows.map((r) => r.currency),
+          ...(readOnlyPat ? [] : [bmConfig.currency]),
+        ]),
+      ];
       const dates = [...new Set(snapRows.map((r) => r.date))];
       const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates);
       // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported as
@@ -375,7 +400,6 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       }));
 
       // Benchmark comparison: fetch prices and compute parallel TWR index.
-      const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
       if (result.length > 0) {
         const bmDates = result.map((p) => p.date);
         if (!readOnlyPat) {
@@ -383,9 +407,22 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         }
         const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
         if (refreshedBm.size >= 1) {
-          const bmPrices = bmDates
-            .filter((d) => refreshedBm.has(d))
-            .map((d) => ({ date: d, close: refreshedBm.get(d)! }));
+          // In the display currency, at each date's FX rate — the same series the
+          // Insights card and per-year table compare against (#1020).
+          const { closes: bmPrices, fxMissingDates } = await benchmarkClosesInCurrency(
+            app.db,
+            refreshedBm,
+            bmDates,
+            bmConfig.currency,
+            display,
+            readOnlyPat ? { cachedFxOnly: true } : { ratesByDate },
+          );
+          if (fxMissingDates > 0) {
+            request.log.warn(
+              { symbol: bmConfig.symbol, display, missingDates: fxMissingDates },
+              "networth history: benchmark FX rate missing for some dates — those days dropped",
+            );
+          }
           const bmIndex = computeBenchmarkIndex(bmPrices);
           const bmById = new Map(bmIndex.map((p) => [p.date, p]));
           carryForwardBenchmark(

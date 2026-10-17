@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { benchmarkPrices, userBenchmarkSymbols } from "@portfolio/db";
-import { chainIndex, type DailyValueFlow } from "@portfolio/core";
+import { chainIndex, convert, fxAvailable, type DailyValueFlow } from "@portfolio/core";
 import { MarketDataError, type MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { chunk } from "../lib/chunk.js";
+import { getFxProvider, getFxRatesForDates, makeFxRateFn, type FxProvider } from "./fx.js";
 
 export interface BenchmarkIndexPoint {
   date: string;
@@ -315,6 +316,55 @@ export async function getBenchmarkPricesMulti(
     inner.set(r.date, r.close);
   }
   return out;
+}
+
+/**
+ * A benchmark's closes on `dates`, date-sorted and converted from the index's quote
+ * currency into `targetCurrency` at each date's OWN FX rate (#1020). This is the one
+ * place a benchmark series gets its currency: the Insights card, the per-year table and
+ * the history charts all compare it against a portfolio index measured in that target
+ * currency, and a ratio of native closes is not currency-invariant once FX moves.
+ *
+ * `closes` is the already-loaded `date → close` map (single- or multi-symbol loaders);
+ * dates without a close are skipped. Pass `ratesByDate` when the caller already loaded
+ * `getFxRatesForDates` with the benchmark's currency among its currencies; otherwise
+ * it is loaded here. `cachedFxOnly` restricts that load to cached `fx_rates` rows (no
+ * provider fetch or persist — for read-scoped PATs); `fxProvider` overrides the
+ * configured provider otherwise (tests). A day with no rate is dropped (never 1:1,
+ * audit B2) — `makeFxRateFn` records the currency for `fxMissingCurrencies` — and
+ * counted in `fxMissingDates`.
+ */
+export async function benchmarkClosesInCurrency(
+  db: DB,
+  closes: Map<string, string>,
+  dates: string[],
+  quoteCurrency: string,
+  targetCurrency: string,
+  opts: {
+    ratesByDate?: Map<string, Record<string, string>>;
+    cachedFxOnly?: boolean;
+    fxProvider?: FxProvider;
+  } = {},
+): Promise<{ closes: { date: string; close: string }[]; fxMissingDates: number }> {
+  const wanted = [...new Set(dates)].filter((d) => closes.has(d)).sort();
+  if (quoteCurrency === targetCurrency) {
+    return { closes: wanted.map((d) => ({ date: d, close: closes.get(d)! })), fxMissingDates: 0 };
+  }
+  const provider = opts.cachedFxOnly ? null : (opts.fxProvider ?? getFxProvider());
+  const rates =
+    opts.ratesByDate ??
+    (await getFxRatesForDates(db, [quoteCurrency], targetCurrency, wanted, provider));
+  let fxMissingDates = 0;
+  const out: { date: string; close: string }[] = [];
+  for (const d of wanted) {
+    const fx = makeFxRateFn(rates.get(d) ?? {}, targetCurrency);
+    if (!fxAvailable(quoteCurrency, targetCurrency, fx)) {
+      fxMissingDates++;
+      continue;
+    }
+    out.push({ date: d, close: convert(closes.get(d)!, quoteCurrency, targetCurrency, fx) });
+  }
+  return { closes: out, fxMissingDates };
 }
 
 export function computeBenchmarkIndex(

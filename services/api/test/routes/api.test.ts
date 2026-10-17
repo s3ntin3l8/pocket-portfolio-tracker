@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT, exportJWK, type JWK } from "jose";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   benchmarkPrices,
   corporateActions,
@@ -3268,6 +3268,22 @@ describe("auth + portfolios + transactions", () => {
       displayName: "S&P 500",
       displayOrder: 0,
     });
+    // The USD benchmark is converted into the IDR portfolio's currency at each date's
+    // rate (#1020): 4500 → 4700 USD is +4.444%, but ×16000 → ×16200 IDR is +5.75%.
+    const { fxRates } = await import("@portfolio/db");
+    await app.db
+      .insert(fxRates)
+      .values(
+        [
+          ["2026-02-01", "16000"],
+          ["2026-02-02", "16100"],
+          ["2026-02-03", "16200"],
+        ].map(([date, rate]) => ({ base: "USD", quote: "IDR", rate: rate!, date: date! })),
+      )
+      .onConflictDoUpdate({
+        target: [fxRates.base, fxRates.quote, fxRates.date],
+        set: { rate: sql`excluded.rate` },
+      });
     await app.db.insert(benchmarkPrices).values([
       {
         userId: u!.id,
@@ -3335,7 +3351,7 @@ describe("auth + portfolios + transactions", () => {
     expect(body[0]).toHaveProperty("benchmarkPct");
     expect(body[0].benchmarkIndex).toBe("100");
     expect(body[0].benchmarkPct).toBe("0");
-    expect(Number(body[2].benchmarkPct)).toBeCloseTo(4.444, 2);
+    expect(Number(body[2].benchmarkPct)).toBeCloseTo(5.75, 6);
   });
 
   it("omits benchmarkIndex/benchmarkPct on /portfolios/:id/history when no benchmark is configured", async () => {

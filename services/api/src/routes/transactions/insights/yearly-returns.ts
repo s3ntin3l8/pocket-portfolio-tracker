@@ -9,11 +9,13 @@ import {
 import { portfolios, transactions } from "@portfolio/db";
 import { getMarketData } from "../../../services/market-data.js";
 import {
+  benchmarkClosesInCurrency,
   computeBenchmarkIndex,
   ensureBenchmarkPrices,
   getBenchmarkPricesMulti,
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
+import { getFxRatesForDates } from "../../../services/fx.js";
 import { toCoreTxns } from "../../../services/tx-core.js";
 import { boundaryFlows } from "../shared/flows.js";
 import { corporateActionsFor } from "../shared/helpers.js";
@@ -22,6 +24,14 @@ import type { FastifyInstance } from "fastify";
 export interface ComputeYearlyReturnsArgs {
   app: FastifyInstance;
   userId: string;
+  /** The currency every series here is measured in; each benchmark is converted into it. */
+  displayCurrency: string;
+  /**
+   * Per-date FX the caller already loaded into `displayCurrency` over the same date grid,
+   * and the currencies it covers. Reused when it covers every selected benchmark's
+   * currency; otherwise one load here covers them all.
+   */
+  fx?: { ratesByDate: Map<string, Record<string, string>>; currencies: string[] };
   /** Per-portfolio display-currency flows (marketValue + effectiveFlow) — already aggregated by the caller. */
   aggregatedFlows: { date: string; marketValue: string; effectiveFlow: string }[];
   /**
@@ -62,7 +72,15 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     }[];
   }[]
 > {
-  const { app, userId, aggregatedFlows, perPortfolio, boundaryFlows: bflows } = args;
+  const {
+    app,
+    userId,
+    displayCurrency,
+    fx,
+    aggregatedFlows,
+    perPortfolio,
+    boundaryFlows: bflows,
+  } = args;
   const db = app.db;
 
   // Portfolio index = same chainIndex the rest of /insights uses.
@@ -106,6 +124,13 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   }
 
   const priceMap = await getBenchmarkPricesMulti(db, userId, symbolNames, allDates);
+  // One per-date FX map for every selected benchmark's currency, shared by all symbols:
+  // the caller's when it covers them (the usual single-benchmark case), else one load.
+  const bmCurrencies = [...new Set(benchmarkSymbols.map((b) => b.currency ?? "USD"))];
+  const ratesByDate =
+    fx && bmCurrencies.every((c) => c === displayCurrency || fx.currencies.includes(c))
+      ? fx.ratesByDate
+      : await getFxRatesForDates(db, bmCurrencies, displayCurrency, allDates);
 
   const benchmarkInputs: {
     symbol: string;
@@ -116,18 +141,25 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   for (const b of benchmarkSymbols) {
     const inner = priceMap.get(b.symbol);
     if (!inner) continue;
-    // Build a date-sorted array of closes in the benchmark's NATIVE currency.
-    // The core compute is ratio-based so the native currency is fine; the route
-    // layer doesn't need to pre-convert (the per-year ratio is currency-invariant).
-    const sorted = allDates
-      .filter((d) => inner.has(d))
-      .map((d) => ({ date: d, close: inner.get(d)! }));
-    const idx = computeBenchmarkIndex(sorted);
+    // Closes converted to the display currency at each date's own FX rate, like the
+    // portfolio index this is compared against (#1020). A per-year ratio of native
+    // closes is NOT currency-invariant: it ignores the year's FX move, which the
+    // display-currency portfolio return includes.
+    const nativeCurrency = b.currency ?? "USD";
+    const { closes } = await benchmarkClosesInCurrency(
+      db,
+      inner,
+      allDates,
+      nativeCurrency,
+      displayCurrency,
+      { ratesByDate },
+    );
+    const idx = computeBenchmarkIndex(closes);
     if (idx.length === 0) continue;
     benchmarkInputs.push({
       symbol: b.symbol,
       displayName: b.displayName,
-      nativeCurrency: b.currency ?? "USD",
+      nativeCurrency,
       index: idx,
     });
   }
