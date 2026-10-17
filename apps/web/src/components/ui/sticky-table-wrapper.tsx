@@ -14,13 +14,21 @@ import { cn } from "@/lib/utils";
  */
 export function StickyTableWrapper({
   className,
+  onFitChange,
   children,
 }: {
   className?: string;
+  /** Called when the table starts or stops fitting, i.e. when its header starts or stops pinning. */
+  onFitChange?: (fits: boolean) => void;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState(false);
+  const onFitChangeRef = useRef(onFitChange);
+  useEffect(() => {
+    onFitChangeRef.current = onFitChange;
+  });
+  useEffect(() => onFitChangeRef.current?.(fits), [fits]);
 
   useEffect(() => {
     const el = ref.current;

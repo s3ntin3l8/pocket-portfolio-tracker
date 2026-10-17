@@ -15,27 +15,36 @@ function Table({
   className,
   edgeAffordance = false,
   stickyHeader = false,
+  onStickyChange,
   ...props
-}: React.ComponentProps<"table"> & { edgeAffordance?: boolean; stickyHeader?: boolean }) {
-  const Wrapper = stickyHeader ? StickyTableWrapper : "div";
-  return (
-    <Wrapper
+}: React.ComponentProps<"table"> & {
+  edgeAffordance?: boolean;
+  stickyHeader?: boolean;
+  /** With `stickyHeader`: called when the header starts or stops pinning (the table fits). */
+  onStickyChange?: (pinned: boolean) => void;
+}) {
+  const wrapperClass = cn(
+    !stickyHeader && "relative w-full overflow-x-auto",
+    edgeAffordance && "scroll-shadow-x",
+  );
+  const element = (
+    <table
       className={cn(
-        stickyHeader ? undefined : "relative w-full overflow-x-auto",
-        edgeAffordance && "scroll-shadow-x",
+        "w-full caption-bottom text-body-sm",
+        edgeAffordance && "sticky-first-col",
+        stickyHeader &&
+          "[&_thead_th]:sticky [&_thead_th]:top-(--topbar-h) [&_thead_th]:z-10 [&_thead_th]:bg-card [&_thead_th]:shadow-[inset_0_-1px_0_var(--line)]",
+        className,
       )}
-    >
-      <table
-        className={cn(
-          "w-full caption-bottom text-body-sm",
-          edgeAffordance && "sticky-first-col",
-          stickyHeader &&
-            "[&_thead_th]:sticky [&_thead_th]:top-(--topbar-h) [&_thead_th]:z-10 [&_thead_th]:bg-card [&_thead_th]:shadow-[inset_0_-1px_0_var(--border)]",
-          className,
-        )}
-        {...props}
-      />
-    </Wrapper>
+      {...props}
+    />
+  );
+  return stickyHeader ? (
+    <StickyTableWrapper className={wrapperClass} onFitChange={onStickyChange}>
+      {element}
+    </StickyTableWrapper>
+  ) : (
+    <div className={wrapperClass}>{element}</div>
   );
 }
 

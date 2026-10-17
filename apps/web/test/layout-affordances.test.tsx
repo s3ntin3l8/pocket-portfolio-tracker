@@ -186,6 +186,20 @@ describe("Table stickyHeader", () => {
     }
   });
 
+  it("reports when the header starts pinning", () => {
+    const onStickyChange = vi.fn();
+    render(
+      <Table stickyHeader onStickyChange={onStickyChange}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>A</TableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+    expect(onStickyChange).toHaveBeenLastCalledWith(true);
+  });
+
   it("keeps the scrolling wrapper by default", () => {
     const { container } = render(<Table />);
     expect((container.firstElementChild as HTMLElement).className).toContain("overflow-x-auto");
@@ -196,8 +210,8 @@ describe("Table stickyHeader", () => {
   });
 
   it("is opted into by the Activity and Trades desktop tables", () => {
-    expect(src("src/components/transactions-table/desktop.tsx")).toContain("<Table stickyHeader>");
-    expect(src("src/components/trades-table.tsx")).toContain("<Table stickyHeader>");
+    expect(src("src/components/transactions-table/desktop.tsx")).toContain("<Table stickyHeader");
+    expect(src("src/components/trades-table.tsx")).toContain("<Table stickyHeader");
   });
 });
 

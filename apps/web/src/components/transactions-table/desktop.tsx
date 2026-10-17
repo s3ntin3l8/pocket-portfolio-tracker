@@ -50,6 +50,7 @@ export function DesktopTable({
   onEnterSelectionMode,
   hasActiveFilter,
   showEmpty,
+  onHeaderPinChange,
 }: {
   rows: TxRow[];
   selectionMode: boolean;
@@ -76,6 +77,8 @@ export function DesktopTable({
   onEnterSelectionMode: () => void;
   hasActiveFilter: boolean;
   showEmpty: boolean;
+  /** Reports whether the sticky table header is currently pinned (the table fits its column). */
+  onHeaderPinChange?: (pinned: boolean) => void;
 }) {
   const t = useTranslations("Transactions");
   const tb = useTranslations("Transactions.batch");
@@ -91,7 +94,7 @@ export function DesktopTable({
 
   return (
     <Card className="hidden lg:block">
-      <Table stickyHeader>
+      <Table stickyHeader onStickyChange={onHeaderPinChange}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-16">

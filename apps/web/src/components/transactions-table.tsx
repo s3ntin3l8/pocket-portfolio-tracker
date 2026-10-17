@@ -115,6 +115,7 @@ export function TransactionsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showFlagged, setShowFlagged] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [headerPinned, setHeaderPinned] = useState(false);
   const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
 
   const { flaggedRows, flaggedLoading } = useFlaggedRows(showFlagged, anomalyByTxId, portfolioId);
@@ -501,6 +502,7 @@ export function TransactionsTable({
           />
 
           <SelectionBar
+            belowPinnedHeader={headerPinned}
             selectionMode={selectionMode}
             selectedCount={selected.size}
             selectedDraftCount={selectedDraftIds.length}
@@ -544,6 +546,7 @@ export function TransactionsTable({
           ) : (
             <>
               <DesktopTable
+                onHeaderPinChange={setHeaderPinned}
                 rows={windowedRows}
                 selectionMode={selectionMode}
                 selected={selected}
