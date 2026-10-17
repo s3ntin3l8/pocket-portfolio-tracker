@@ -1,11 +1,18 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeAll, vi } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateKeyPair } from "jose";
-import { desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Decimal } from "decimal.js";
-import { fxRates, lastPrices, portfolios, portfolioSnapshots, users } from "@portfolio/db";
+import {
+  benchmarkPrices,
+  fxRates,
+  lastPrices,
+  portfolios,
+  portfolioSnapshots,
+  users,
+} from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { FastifyBaseLogger } from "fastify";
@@ -14,6 +21,10 @@ import { getFxRatesForDates } from "../../src/services/fx.js";
 import type { FxProvider } from "../../src/services/fx.js";
 import { valuePortfolio } from "../../src/services/valuation.js";
 import { recordDailySnapshots } from "../../src/services/snapshots.js";
+import {
+  clearBenchmarkFetchCache,
+  earliestUnsatisfiedBenchmarkDate,
+} from "../../src/services/benchmark.js";
 import { buildApp } from "../../src/app.js";
 
 /**
@@ -220,48 +231,111 @@ describe("seedDemo — FX rates (#989, #1006)", () => {
   }, 60_000);
 });
 
-describe("seedDemo — per-year XIRR consistent with TWR (#1020)", () => {
+describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () => {
+  let dir: string;
+  let app: Awaited<ReturnType<typeof buildApp>>;
+  let insights: {
+    yearlyReturns: { year: number; portfolioTwr: string | null; portfolioXirr: string | null }[];
+    benchmark: { symbol: string; activeReturn: string; correlation: string } | null;
+  };
+  // Any network call (a live benchmark or FX fetch) is recorded here. `ensureBenchmarkPrices`
+  // swallows fetch errors, so the assertion is "never called", not "didn't throw".
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeAll(async () => {
+    process.env.RATE_LIMIT_MAX = "10000";
+    clearBenchmarkFetchCache();
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("the seeded demo must not hit the network"));
+    await ensureDb();
+    dir = await mkdtemp(join(tmpdir(), "seed-demo-insights-"));
+    await seedDemo(join(dir, "pat"));
+    app = await buildApp({ authKey: (await generateKeyPair("ES256")).publicKey });
+    const pat = (await readFile(join(dir, "pat"), "utf8")).trim();
+    const res = await app.inject({
+      method: "GET",
+      url: "/insights?range=all",
+      headers: { authorization: `Bearer ${pat}` },
+    });
+    expect(res.statusCode).toBe(200);
+    insights = res.json();
+  }, 120_000);
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    // Before app.close(), which closes the shared DB handle.
+    await getDb().delete(users).where(eq(users.email, "seed-demo-admin-test@example.com"));
+    await app.close();
+    await closeDb();
+    await rm(dir, { recursive: true, force: true });
+    delete process.env.RATE_LIMIT_MAX;
+  });
+
   // The seeded snapshot history is driven by the portfolios' real boundary flows, so each
   // year's money-weighted return (flows + year-end net worth, as GET /insights computes
   // it) describes the same path as its time-weighted return. The old synthetic history
   // paired the real flows with a NAV that never received them: −76% XIRR against +7% TWR.
-  it("gives every year a finite XIRR within 15pp of that year's TWR", async () => {
-    process.env.RATE_LIMIT_MAX = "10000";
-    await ensureDb();
-    const dir = await mkdtemp(join(tmpdir(), "seed-demo-xirr-"));
-    await seedDemo(join(dir, "pat"));
-    const app = await buildApp({ authKey: (await generateKeyPair("ES256")).publicKey });
-    try {
-      const pat = (await readFile(join(dir, "pat"), "utf8")).trim();
-      const res = await app.inject({
-        method: "GET",
-        url: "/insights?range=all",
-        headers: { authorization: `Bearer ${pat}` },
-      });
-      expect(res.statusCode).toBe(200);
-      const rows = res.json().yearlyReturns as {
-        year: number;
-        portfolioTwr: string | null;
-        portfolioXirr: string | null;
-      }[];
-      expect(rows.length).toBeGreaterThanOrEqual(5);
-      for (const r of rows) {
-        const twr = Number(r.portfolioTwr);
-        const xirr = Number(r.portfolioXirr);
-        expect(r.portfolioTwr, `${r.year} TWR`).not.toBeNull();
-        expect(r.portfolioXirr, `${r.year} XIRR`).not.toBeNull();
-        expect(Number.isFinite(xirr), `${r.year} XIRR ${r.portfolioXirr}`).toBe(true);
-        expect(Math.abs(xirr - twr), `${r.year}: XIRR ${xirr} vs TWR ${twr}`).toBeLessThan(0.15);
-      }
-    } finally {
-      // Before app.close(), which closes the shared DB handle.
-      await getDb().delete(users).where(eq(users.email, "seed-demo-admin-test@example.com"));
-      await app.close();
-      await closeDb();
-      await rm(dir, { recursive: true, force: true });
-      delete process.env.RATE_LIMIT_MAX;
+  it("gives every year a finite XIRR within 15pp of that year's TWR", () => {
+    const rows = insights.yearlyReturns;
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+    for (const r of rows) {
+      const twr = Number(r.portfolioTwr);
+      const xirr = Number(r.portfolioXirr);
+      expect(r.portfolioTwr, `${r.year} TWR`).not.toBeNull();
+      expect(r.portfolioXirr, `${r.year} XIRR`).not.toBeNull();
+      expect(Number.isFinite(xirr), `${r.year} XIRR ${r.portfolioXirr}`).toBe(true);
+      expect(Math.abs(xirr - twr), `${r.year}: XIRR ${xirr} vs TWR ${twr}`).toBeLessThan(0.15);
     }
-  }, 120_000);
+  });
+
+  // The benchmark is seeded from a walk that shares a market factor with the equity
+  // walks' daily noise, so the card reads like a real equity portfolio against the S&P 500
+  // rather than the ≈0 of an independent walk against live closes.
+  it("correlates the portfolio with the seeded ^GSPC in a realistic band", () => {
+    expect(insights.benchmark).not.toBeNull();
+    expect(insights.benchmark!.symbol).toBe("^GSPC");
+    const r = Number(insights.benchmark!.correlation);
+    expect(r, `correlation ${r}`).toBeGreaterThanOrEqual(0.5);
+    expect(r, `correlation ${r}`).toBeLessThanOrEqual(0.8);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("covers every snapshot date with seeded USD closes, so nothing is fetched", async () => {
+    const db = getDb();
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, "seed-demo-admin-test@example.com"));
+    const pfIds = (
+      await db.select({ id: portfolios.id }).from(portfolios).where(eq(portfolios.userId, user.id))
+    ).map((p) => p.id);
+    const dates = [
+      ...new Set(
+        (
+          await db
+            .select({ date: portfolioSnapshots.date })
+            .from(portfolioSnapshots)
+            .where(inArray(portfolioSnapshots.portfolioId, pfIds))
+        ).map((r) => r.date),
+      ),
+    ].sort();
+    expect(dates.length).toBeGreaterThan(1000);
+    expect(await earliestUnsatisfiedBenchmarkDate(db, user.id, "^GSPC", dates)).toBeNull();
+
+    const closes = await db
+      .select()
+      .from(benchmarkPrices)
+      .where(and(eq(benchmarkPrices.userId, user.id), eq(benchmarkPrices.symbol, "^GSPC")))
+      .orderBy(asc(benchmarkPrices.date));
+    expect(closes.every((c) => c.currency === "USD")).toBe(true);
+    expect(closes[0]!.date <= dates[0]!).toBe(true);
+    expect(closes.at(-1)!.date).toBe(dates.at(-1));
+    // Plausible S&P 500 levels: about 3,300 at the start, about 6,500 today.
+    expect(Number(closes[0]!.close)).toBeCloseTo(3300, 0);
+    expect(Number(closes.at(-1)!.close)).toBeCloseTo(6500, 0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("demoSnapshotWalk (#1020)", () => {
