@@ -69,7 +69,11 @@ function run(cmd, args, opts, onSpawn) {
     child.on("exit", (code, signal) =>
       code === 0
         ? resolve()
-        : reject(new Error(`${cmd} ${args.join(" ")} exited ${code ?? signal}`)),
+        : reject(
+            new Error(
+              `${cmd} ${args.join(" ")} ${code === null ? `killed by ${signal}` : `exited ${code}`}`,
+            ),
+          ),
     );
     child.on("error", reject);
   });
