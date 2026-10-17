@@ -7,6 +7,9 @@
    separate tokens tuned to WCAG AA in the light theme (see test/theme-contrast.test.ts). */
 :root {
   --radius: 0.75rem;
+  /* App topbar height (matches the sticky header in app-shell); sticky table headers and rails sit under it. */
+  --topbar-h: calc(62px + env(safe-area-inset-top));
+  --table-head-h: 2.75rem; /* table header row; the bulk-selection bar pins just under it */
   color-scheme: light;
 
   --background: #f6f7f8;

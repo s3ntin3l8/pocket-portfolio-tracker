@@ -6,7 +6,14 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { ResponsiveMoney } from "../src/components/ui/responsive-money";
 import { TwoStatFooter } from "../src/components/reports/two-stat-footer";
-import { Table, TABLE_VALUE, TABLE_VALUE_STRONG } from "../src/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableRow,
+  TABLE_VALUE,
+  TABLE_VALUE_STRONG,
+} from "../src/components/ui/table";
 import { MobileView } from "../src/components/transactions-table/mobile";
 import { HoldingsTable } from "../src/components/holdings-table";
 import { TOOLBAR_FILTERS } from "../src/components/table-toolbar";
@@ -143,5 +150,98 @@ describe("auth label (audit G8)", () => {
     expect(authViaKey("local|abc", false)).toBe("authViaLocal");
     expect(authViaKey("abc", false)).toBe("authVia");
     expect(authViaKey(undefined, false)).toBe("authVia");
+  });
+});
+
+describe("Table stickyHeader", () => {
+  const sticky = (
+    <Table stickyHeader>
+      <TableHeader>
+        <TableRow>
+          <TableHead>A</TableHead>
+        </TableRow>
+      </TableHeader>
+    </Table>
+  );
+
+  it("clips instead of scrolling while the table fits, so the header can stick under the topbar", () => {
+    const { container } = render(sticky);
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.className).toContain("overflow-x-clip");
+    expect(wrapper.className).not.toContain("overflow-x-auto");
+    expect(container.querySelector("table")!.className).toContain("top-(--topbar-h)");
+  });
+
+  it("falls back to a scrolling wrapper when the table is wider than its column", () => {
+    const widths = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(900);
+    const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    try {
+      const { container } = render(sticky);
+      const wrapper = container.firstElementChild as HTMLElement;
+      expect(wrapper.className).toContain("scroll-shadow-x");
+      expect(wrapper.className).not.toContain("overflow-x-clip");
+    } finally {
+      widths.mockRestore();
+      client.mockRestore();
+    }
+  });
+
+  it("reports when the header starts pinning", () => {
+    const onStickyChange = vi.fn();
+    render(
+      <Table stickyHeader onStickyChange={onStickyChange}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>A</TableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+    expect(onStickyChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("keeps the scrolling wrapper by default", () => {
+    const { container } = render(<Table />);
+    expect((container.firstElementChild as HTMLElement).className).toContain("overflow-x-auto");
+  });
+
+  it("defines the topbar height token", () => {
+    expect(src("src/app/globals.css")).toContain("--topbar-h:");
+  });
+
+  it("is opted into by the Activity and Trades desktop tables", () => {
+    expect(src("src/components/transactions-table/desktop.tsx")).toContain("<Table stickyHeader");
+    expect(src("src/components/trades-table.tsx")).toContain("<Table stickyHeader");
+  });
+});
+
+describe("table layout switch", () => {
+  const files = [
+    "src/components/instrument-lots-table.tsx",
+    "src/components/import-review/table.tsx",
+    "src/components/import-review/mobile.tsx",
+    "src/components/import-history.tsx",
+    "src/components/corporate-actions-manager.tsx",
+    "src/components/tax-reports-inbox.tsx",
+    "src/app/[locale]/(app)/reports/documents/loading.tsx",
+  ];
+  it("tables and their mobile lists switch at lg, not md", () => {
+    for (const f of files) {
+      const code = src(f);
+      // The back-button skeletons legitimately use md:hidden; only the table/list switch matters.
+      expect(code, f).not.toMatch(/md:block|(?:space-y-[\d.]+|divide-line) md:hidden/);
+    }
+  });
+  it("the tax tables opt into the horizontal-scroll affordance", () => {
+    for (const f of [
+      "dividends-table",
+      "id-dividends-table",
+      "disposals-table-de",
+      "sales-table-id",
+      "year-table",
+    ]) {
+      const code = src(`src/components/tax/${f}.tsx`);
+      expect(code, f).toContain("edgeAffordance");
+    }
   });
 });

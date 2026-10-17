@@ -104,7 +104,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
         </div>
 
         {/* ── Sidebar: stat cards + cash interest + allocation donut (sticky on wide containers) ── */}
-        <div className="order-first space-y-3.5 @xl:order-last @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto">
+        <div className="order-first space-y-3.5 @xl:order-last @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:max-h-[calc(100dvh-90px)] @xl:overflow-y-auto">
           <Suspense fallback={<IncomeStatsSkeleton />}>
             <IncomeStatsSection locale={locale} />
           </Suspense>

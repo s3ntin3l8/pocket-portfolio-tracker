@@ -50,6 +50,7 @@ export function DesktopTable({
   onEnterSelectionMode,
   hasActiveFilter,
   showEmpty,
+  onHeaderPinChange,
 }: {
   rows: TxRow[];
   selectionMode: boolean;
@@ -76,6 +77,8 @@ export function DesktopTable({
   onEnterSelectionMode: () => void;
   hasActiveFilter: boolean;
   showEmpty: boolean;
+  /** Reports whether the sticky table header is currently pinned (the table fits its column). */
+  onHeaderPinChange?: (pinned: boolean) => void;
 }) {
   const t = useTranslations("Transactions");
   const tb = useTranslations("Transactions.batch");
@@ -90,8 +93,8 @@ export function DesktopTable({
   };
 
   return (
-    <Card className="scroll-shadow-x hidden lg:block">
-      <Table>
+    <Card className="hidden lg:block">
+      <Table stickyHeader onStickyChange={onHeaderPinChange}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-16">
@@ -175,7 +178,6 @@ export function DesktopTable({
               sortDir={sortDir}
               onToggle={onToggleSort}
               align="right"
-              className="hidden lg:table-cell"
             >
               {t("tax")}
             </SortableTableHead>
@@ -184,7 +186,6 @@ export function DesktopTable({
               sortKey={sortKey}
               sortDir={sortDir}
               onToggle={onToggleSort}
-              className="hidden sm:table-cell"
             >
               {t("source")}
             </SortableTableHead>
@@ -313,13 +314,10 @@ export function DesktopTable({
                       ? m(Number(tx.price), tx.currency)
                       : (rowPerShareDisplay(tx, m) ?? "—")}
                   </TableCell>
-                  <TableCell
-                    numeric
-                    className="hidden text-body-sm font-semibold text-text-2 lg:table-cell"
-                  >
+                  <TableCell numeric className="text-body-sm font-semibold text-text-2">
                     {tx.tax != null && Number(tx.tax) !== 0 ? m(Number(tx.tax), tx.currency) : "—"}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">
+                  <TableCell>
                     <div className="flex flex-wrap items-center gap-1">
                       <SourceChips
                         tx={tx}

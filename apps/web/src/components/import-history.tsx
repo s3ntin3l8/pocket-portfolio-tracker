@@ -40,7 +40,7 @@ import { selectAllState } from "@/lib/select-all-state";
  * that trip the API rate limiter.
  *
  * Desktop keeps the full table (always-visible checkboxes, sortable Parser/Status/Items/
- * Timestamp columns). Mobile (`md:hidden`) swaps in a compact card list — reference-style
+ * Timestamp columns). Mobile (`lg:hidden`) swaps in a compact card list — reference-style
  * tinted source icon + filename + status, long-press to reveal checkboxes for bulk actions
  * (mirroring `transactions-table.tsx`'s own gesture, via `useLongPressSelect`). Per-row
  * actions are icon-only (`InfoTip` tooltip + `aria-label=`) in both layouts, except the
@@ -168,7 +168,7 @@ export function ImportHistory({
         className="md:mx-6 md:mb-3"
       />
       <CardContent className="p-0">
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -327,7 +327,7 @@ export function ImportHistory({
           </Table>
         </div>
 
-        <div className="divide-y divide-line md:hidden">
+        <div className="divide-y divide-line lg:hidden">
           {visibleItems.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               {t("onlyCompleted", { count: confirmedCount })}

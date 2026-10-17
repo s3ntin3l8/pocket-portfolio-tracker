@@ -185,7 +185,7 @@ export function TaxReportsInbox({
       </div>
 
       {/* Desktop table */}
-      <Card className="hidden overflow-hidden md:block">
+      <Card className="hidden overflow-hidden lg:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -287,7 +287,7 @@ export function TaxReportsInbox({
       </Card>
 
       {/* Mobile cards */}
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-2 lg:hidden">
         {sortedDocs.map((doc) => (
           <Card key={doc.id} className="flex items-center gap-3 p-3">
             <FileText className="size-8 shrink-0 text-muted-foreground" />

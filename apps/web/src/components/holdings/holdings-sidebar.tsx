@@ -40,7 +40,7 @@ export async function HoldingsSidebar({ summary, locale }: { summary: NetWorth; 
   const dayBase = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
 
   return (
-    <div className="space-y-3.5 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+    <div className="space-y-3.5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
       <PortfolioValueCard
         totalLabel={t("allocation.totalLabel")}
         totalValueFormatted={formatNetWorth(summary.netWorth, summary.displayCurrency, locale)}

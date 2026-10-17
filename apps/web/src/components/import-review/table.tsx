@@ -83,7 +83,7 @@ export function ImportTable({
   const tm = useTranslations("Manage");
 
   return (
-    <Card className="hidden md:block">
+    <Card className="hidden lg:block">
       <Table>
         <TableHeader>
           <TableRow>

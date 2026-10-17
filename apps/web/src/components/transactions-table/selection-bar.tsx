@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SelectionBarShell } from "@/components/ui/selection-bar-shell";
 
 export function SelectionBar({
+  belowPinnedHeader = false,
   selectionMode,
   selectedCount,
   selectedDraftCount,
@@ -28,6 +29,8 @@ export function SelectionBar({
   onConfirmDelete,
   onCancelDelete,
 }: {
+  /** The table header is pinned under the topbar, so the bar pins under it instead of covering it. */
+  belowPinnedHeader?: boolean;
   selectionMode: boolean;
   selectedCount: number;
   selectedDraftCount: number;
@@ -133,6 +136,9 @@ export function SelectionBar({
       label={selectedCount > 0 ? tb("selected", { count: selectedCount }) : tb("selectPrompt")}
       onDismiss={onClearSelection}
       dismissLabel={tb("cancel")}
+      className={
+        belowPinnedHeader ? "md:top-[calc(var(--topbar-h)+var(--table-head-h))]" : undefined
+      }
     >
       {actions}
     </SelectionBarShell>

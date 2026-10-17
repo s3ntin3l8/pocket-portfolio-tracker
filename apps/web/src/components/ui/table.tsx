@@ -1,27 +1,50 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { StickyTableWrapper } from "@/components/ui/sticky-table-wrapper";
 
 /**
  * `edgeAffordance` (audit G5) opts a wide table into the scroll-shadow wrapper
  * (`scroll-shadow-x`, shadows appear only on an edge with more content past it) and a
  * pinned first column (`sticky-first-col`), so horizontal overflow is never silent.
+ *
+ * `stickyHeader` pins the header row under the topbar while the shell scrolls. While the table
+ * fits its column the wrapper clips instead of scrolling (see `StickyTableWrapper`); when it does
+ * not fit it scrolls horizontally and the header scrolls with the page. Do not combine with `edgeAffordance`: the sticky wrapper has its own shadows.
  */
 function Table({
   className,
   edgeAffordance = false,
+  stickyHeader = false,
+  onStickyChange,
   ...props
-}: React.ComponentProps<"table"> & { edgeAffordance?: boolean }) {
-  return (
-    <div className={cn("relative w-full overflow-x-auto", edgeAffordance && "scroll-shadow-x")}>
-      <table
-        className={cn(
-          "w-full caption-bottom text-body-sm",
-          edgeAffordance && "sticky-first-col",
-          className,
-        )}
-        {...props}
-      />
-    </div>
+}: React.ComponentProps<"table"> & {
+  edgeAffordance?: boolean;
+  stickyHeader?: boolean;
+  /** With `stickyHeader`: called when the header starts or stops pinning (the table fits). */
+  onStickyChange?: (pinned: boolean) => void;
+}) {
+  const wrapperClass = cn(
+    !stickyHeader && "relative w-full overflow-x-auto",
+    edgeAffordance && "scroll-shadow-x",
+  );
+  const element = (
+    <table
+      className={cn(
+        "w-full caption-bottom text-body-sm",
+        edgeAffordance && "sticky-first-col",
+        stickyHeader &&
+          "[&_thead_th]:sticky [&_thead_th]:top-(--topbar-h) [&_thead_th]:z-10 [&_thead_th]:bg-card [&_thead_th]:shadow-[inset_0_-1px_0_var(--line)]",
+        className,
+      )}
+      {...props}
+    />
+  );
+  return stickyHeader ? (
+    <StickyTableWrapper className={wrapperClass} onFitChange={onStickyChange}>
+      {element}
+    </StickyTableWrapper>
+  ) : (
+    <div className={wrapperClass}>{element}</div>
   );
 }
 
@@ -58,7 +81,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "h-11 px-3 text-left align-middle text-xs font-medium text-muted-foreground first:pl-5 last:pr-5 [&:has([role=checkbox])]:pr-0",
+        "h-(--table-head-h) px-3 text-left align-middle text-xs font-medium text-muted-foreground first:pl-5 last:pr-5 [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}

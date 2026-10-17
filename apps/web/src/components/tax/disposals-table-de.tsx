@@ -66,7 +66,7 @@ export function DisposalTable({
         {rows.length === 0 ? (
           <p className="px-6 text-sm text-muted-foreground">{t("disposals.empty", { year })}</p>
         ) : (
-          <Table className="table-fixed">
+          <Table edgeAffordance className="min-w-[760px] table-fixed">
             <TableHeader>
               <TableRow>
                 <SortableTableHead

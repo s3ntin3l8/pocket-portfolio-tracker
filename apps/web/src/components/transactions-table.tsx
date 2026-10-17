@@ -115,6 +115,7 @@ export function TransactionsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showFlagged, setShowFlagged] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [headerPinned, setHeaderPinned] = useState(false);
   const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
 
   const { flaggedRows, flaggedLoading } = useFlaggedRows(showFlagged, anomalyByTxId, portfolioId);
@@ -418,7 +419,7 @@ export function TransactionsTable({
       >
         {/* ── Sidebar: stat banners (sticky on wide containers) ── */}
         {showFilterBanners && (
-          <div className="space-y-3 @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] @xl:order-last">
+          <div className="space-y-3 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
             {allBanner && (
               <AllFilterBanner data={allBanner} cashFlowMixLabel={tBanner("cashFlowMix")} />
             )}
@@ -501,6 +502,7 @@ export function TransactionsTable({
           />
 
           <SelectionBar
+            belowPinnedHeader={headerPinned}
             selectionMode={selectionMode}
             selectedCount={selected.size}
             selectedDraftCount={selectedDraftIds.length}
@@ -544,6 +546,7 @@ export function TransactionsTable({
           ) : (
             <>
               <DesktopTable
+                onHeaderPinChange={setHeaderPinned}
                 rows={windowedRows}
                 selectionMode={selectionMode}
                 selected={selected}

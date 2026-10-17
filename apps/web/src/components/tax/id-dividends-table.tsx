@@ -57,7 +57,7 @@ export function IdDividendsTable({
             {t("id.dividendsTable.empty", { year })}
           </p>
         ) : (
-          <Table>
+          <Table edgeAffordance className="min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <SortableTableHead

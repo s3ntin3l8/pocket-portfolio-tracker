@@ -144,7 +144,7 @@ export function MobileView({
 }: MobileViewProps) {
   const t = useTranslations("Import");
   return (
-    <div className="space-y-2 md:hidden">
+    <div className="space-y-2 lg:hidden">
       {isGrouped
         ? groups!.map((g) => {
             const isCollapsed = collapsed.has(g.importId);

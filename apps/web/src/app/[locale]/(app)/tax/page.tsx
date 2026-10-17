@@ -321,7 +321,7 @@ function TaxHolderOverviewDe({
         </div>
 
         {/* ── Sidebar: KPI stat cards (sticky on wide containers) ── */}
-        <div className="order-first min-w-0 space-y-2.5 @xl:order-last @xl:sticky @xl:top-[calc(70px+env(safe-area-inset-top))] sm:space-y-4">
+        <div className="order-first min-w-0 space-y-2.5 @xl:order-last @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] sm:space-y-4">
           <StatCard
             label={t("hero.fsaUsed")}
             value={money(u.usedYtd)}
