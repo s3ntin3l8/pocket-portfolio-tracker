@@ -135,11 +135,14 @@ describe("per-portfolio history FX conversion for a read-scoped PAT (#1031)", ()
     expect(
       (await app.inject({ method: "GET", url: daily, headers: auth(readPat) })).statusCode,
     ).toBe(200);
-    expect(ratesForDates.providers).toEqual([null]);
+    // The first load is the route's own (snapshot + benchmark currencies); a later one
+    // would be benchmarkClosesInCurrency's, which this pin is not about.
+    expect(ratesForDates.providers[0]).toBeNull();
     ratesForDates.providers.length = 0;
     expect((await app.inject({ method: "GET", url: daily, headers: auth(owner) })).statusCode).toBe(
       200,
     );
-    expect(ratesForDates.providers).toEqual([undefined]);
+    expect(ratesForDates.providers.length).toBeGreaterThan(0);
+    expect(ratesForDates.providers[0]).toBeUndefined();
   });
 });
