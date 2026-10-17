@@ -15,33 +15,6 @@ export default function Loading() {
         <Skeleton className="size-5 rounded" />
         <Skeleton className="h-6 w-1/3" />
       </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
-        <Card>
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-10 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-          </div>
-        </Card>
-        <Card>
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </div>
-        </Card>
-        <Card>
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </div>
-        </Card>
-        <Card>
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </div>
-        </Card>
-      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           <Card>
@@ -84,6 +57,34 @@ export default function Loading() {
                 </div>
               ))}
             </div>
+          </div>
+        </Card>
+      </div>
+      {/* KPI cards sit after the detail cards, as in the loaded page (rail after main on mobile). */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+        <Card>
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-10 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-2 p-6">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-7 w-1/2" />
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-2 p-6">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-7 w-1/2" />
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-2 p-6">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-7 w-1/2" />
           </div>
         </Card>
       </div>

@@ -35,7 +35,6 @@ export default async function ImportReviewPage({
         title={t("reviewTitle")}
         subtitle={t("reviewSubtitle")}
         backHref="/transactions"
-        backLabel={t("title")}
         className="mb-0"
       />
 

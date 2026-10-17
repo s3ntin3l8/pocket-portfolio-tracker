@@ -23,7 +23,7 @@ export function PageWithRail({
         "grid grid-cols-1 @xl:items-start",
         size === "narrow"
           ? "gap-6 @xl:grid-cols-[minmax(0,1fr)_300px]"
-          : "gap-5 @xl:grid-cols-[1fr_320px]",
+          : "gap-5 @xl:grid-cols-[minmax(0,1fr)_320px]",
         className,
       )}
       {...props}
@@ -41,7 +41,7 @@ export function PageRail({
   return (
     <div
       className={cn(
-        "min-w-0 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last @xl:max-h-[calc(100dvh-var(--topbar-h)-1.5rem)] @xl:overflow-y-auto",
+        "min-w-0 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last @xl:max-h-[calc(100vh-var(--topbar-h)-1.5rem)] @xl:overflow-y-auto",
         railFirstOnMobile && "order-first @xl:order-last",
         className,
       )}

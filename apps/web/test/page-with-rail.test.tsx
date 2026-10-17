@@ -13,7 +13,7 @@ describe("PageWithRail", () => {
       </PageWithRail>,
     );
     const grid = screen.getByTestId("grid");
-    expect(grid.className).toContain("@xl:grid-cols-[1fr_320px]");
+    expect(grid.className).toContain("@xl:grid-cols-[minmax(0,1fr)_320px]");
     expect(grid.children[0]).toHaveTextContent("main");
     expect(grid.children[1]).toBe(screen.getByTestId("rail"));
     expect(screen.getByTestId("rail").className).toContain("@xl:order-last");
