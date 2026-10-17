@@ -1,4 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { generateKeyPair } from "jose";
 import { desc, eq } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { fxRates, lastPrices, portfolios, portfolioSnapshots, users } from "@portfolio/db";
@@ -10,6 +14,7 @@ import { getFxRatesForDates } from "../../src/services/fx.js";
 import type { FxProvider } from "../../src/services/fx.js";
 import { valuePortfolio } from "../../src/services/valuation.js";
 import { recordDailySnapshots } from "../../src/services/snapshots.js";
+import { buildApp } from "../../src/app.js";
 
 /**
  * SEED_EMAIL/SEED_PASSWORD (and DEMO_AUTH_SUB, which depends on them) are read from
@@ -18,7 +23,7 @@ import { recordDailySnapshots } from "../../src/services/snapshots.js";
  */
 process.env.SEED_DEMO_EMAIL = "seed-demo-admin-test@example.com";
 process.env.SEED_DEMO_PASSWORD = "bootstrap-password"; // pragma: allowlist secret
-const { seedDemo } = await import("../../src/db/seed-demo.js");
+const { seedDemo, demoSnapshotWalk } = await import("../../src/db/seed-demo.js");
 
 describe("seedDemo — admin bootstrap", () => {
   afterEach(async () => {
@@ -213,6 +218,106 @@ describe("seedDemo — FX rates (#989, #1006)", () => {
     }
     expect(checked).toBeGreaterThan(2000);
   }, 60_000);
+});
+
+describe("seedDemo — per-year XIRR consistent with TWR (#1020)", () => {
+  // The seeded snapshot history is driven by the portfolios' real boundary flows, so each
+  // year's money-weighted return (flows + year-end net worth, as GET /insights computes
+  // it) describes the same path as its time-weighted return. The old synthetic history
+  // paired the real flows with a NAV that never received them: −76% XIRR against +7% TWR.
+  it("gives every year a finite XIRR within 15pp of that year's TWR", async () => {
+    process.env.RATE_LIMIT_MAX = "10000";
+    await ensureDb();
+    const dir = await mkdtemp(join(tmpdir(), "seed-demo-xirr-"));
+    await seedDemo(join(dir, "pat"));
+    const app = await buildApp({ authKey: (await generateKeyPair("ES256")).publicKey });
+    try {
+      const pat = (await readFile(join(dir, "pat"), "utf8")).trim();
+      const res = await app.inject({
+        method: "GET",
+        url: "/insights?range=all",
+        headers: { authorization: `Bearer ${pat}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const rows = res.json().yearlyReturns as {
+        year: number;
+        portfolioTwr: string | null;
+        portfolioXirr: string | null;
+      }[];
+      expect(rows.length).toBeGreaterThanOrEqual(5);
+      for (const r of rows) {
+        const twr = Number(r.portfolioTwr);
+        const xirr = Number(r.portfolioXirr);
+        expect(r.portfolioTwr, `${r.year} TWR`).not.toBeNull();
+        expect(r.portfolioXirr, `${r.year} XIRR`).not.toBeNull();
+        expect(Number.isFinite(xirr), `${r.year} XIRR ${r.portfolioXirr}`).toBe(true);
+        expect(Math.abs(xirr - twr), `${r.year}: XIRR ${xirr} vs TWR ${twr}`).toBeLessThan(0.15);
+      }
+    } finally {
+      // Before app.close(), which closes the shared DB handle.
+      await getDb().delete(users).where(eq(users.email, "seed-demo-admin-test@example.com"));
+      await app.close();
+      await closeDb();
+      await rm(dir, { recursive: true, force: true });
+      delete process.env.RATE_LIMIT_MAX;
+    }
+  }, 120_000);
+});
+
+describe("demoSnapshotWalk (#1020)", () => {
+  const at = (date: string) => new Date(`${date}T10:00:00.000Z`);
+
+  it("lands each net flow on its own day and ends on the target", () => {
+    const walk = demoSnapshotWalk({
+      // XIRR convention: negative = money in.
+      flows: [
+        { amount: -1000, date: at("2025-01-01") },
+        { amount: "-500", date: at("2025-01-03") },
+        { amount: 200, date: at("2025-01-05") },
+      ],
+      today: "2025-01-10",
+      target: 1310,
+      noise: () => 0,
+      label: "test",
+    });
+    expect(walk.map((p) => p.date)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `2025-01-${String(i + 1).padStart(2, "0")}`),
+    );
+    expect(walk.map((p) => p.flow)).toEqual([1000, 0, 500, 0, -200, 0, 0, 0, 0, 0]);
+    expect(walk.at(-1)!.value).toBeCloseTo(1310, 6);
+    // TWR's 1 + r = (V_t − F_t) / V_{t−1} recovers one constant daily return (no noise).
+    const r = walk.slice(1).map((p, i) => (p.value - p.flow) / walk[i]!.value - 1);
+    for (const x of r) expect(x).toBeCloseTo(r[0]!, 9);
+    expect(r[0]!).toBeGreaterThan(0); // 1,300 contributed net, 1,310 at the end
+  });
+
+  it("refuses a path that dips below zero", () => {
+    expect(() =>
+      demoSnapshotWalk({
+        flows: [
+          { amount: -100, date: at("2025-01-01") },
+          { amount: 1000, date: at("2025-01-02") },
+          { amount: -2000, date: at("2025-01-03") },
+        ],
+        today: "2025-01-04",
+        target: 1100,
+        noise: () => 0,
+        label: "test",
+      }),
+    ).toThrow(/below zero/);
+  });
+
+  it("refuses a target no drift can reach", () => {
+    expect(() =>
+      demoSnapshotWalk({
+        flows: [{ amount: -100, date: at("2025-01-01") }],
+        today: "2025-01-02",
+        target: 1_000_000,
+        noise: () => 0,
+        label: "test",
+      }),
+    ).toThrow(/no drift/);
+  });
 });
 
 describe("getFxProvider — FX_PROVIDER=none", () => {

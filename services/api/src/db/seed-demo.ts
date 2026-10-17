@@ -21,6 +21,7 @@ import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
 import { normalizeEmail } from "../routes/auth.js";
 import { ensureDb, getDb, closeDb } from "./client.js";
 import { valuePortfolio } from "../services/valuation.js";
+import { boundaryFlowsAt, fxAtFlowDates } from "../routes/transactions/shared/flows.js";
 
 /**
  * Rich demo dataset for the screenshot pipeline (see `scripts/screenshots.mjs` at the
@@ -70,6 +71,67 @@ function dec(n: number, digits = 2): string {
 function pseudoRandom(seed: number): number {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
   return x - Math.floor(x);
+}
+
+/**
+ * One portfolio's demo value path (#1020), daily from its first boundary flow to `today`:
+ * `V_t = V_{t−1} · (1 + drift + noise(t)) + F_t`, where `F_t` is the day's net
+ * contribution (the negated sum of that day's XIRR-convention `flows`) and `drift` is
+ * solved by bisection so the final value equals `target` (the live valuation). Returns
+ * one `{ date, value, flow }` per day; `flow` is `F_t`.
+ *
+ * Throws when no drift in a wide band reaches `target`, or when the path would dip below
+ * zero (a withdrawal larger than the simulated balance) — a seed that can't be modelled
+ * is a seed bug, not something to paper over.
+ */
+export function demoSnapshotWalk(args: {
+  flows: { amount: number | string; date: Date }[];
+  today: string;
+  target: number;
+  /** Daily return noise around the drift, keyed by days before `today`. */
+  noise: (daysAgo: number) => number;
+  label: string;
+}): { date: string; value: number; flow: number }[] {
+  const DAY_MS = 86_400_000;
+  const byDay = new Map<string, number>();
+  for (const f of args.flows) {
+    const key = toDateKey(f.date);
+    byDay.set(key, (byDay.get(key) ?? 0) - Number(f.amount));
+  }
+  if (byDay.size === 0) {
+    throw new Error(`seed-demo: ${args.label} has no boundary flows to build a history from`);
+  }
+  const firstMs = Date.parse(`${[...byDay.keys()].sort()[0]}T00:00:00.000Z`);
+  const days = Math.round((Date.parse(`${args.today}T00:00:00.000Z`) - firstMs) / DAY_MS);
+  const grid = Array.from({ length: days + 1 }, (_, i) => {
+    const date = toDateKey(new Date(firstMs + i * DAY_MS));
+    return { date, flow: byDay.get(date) ?? 0, noise: args.noise(days - i) };
+  });
+  const path = (annual: number) => {
+    const drift = (1 + annual) ** (1 / 365) - 1;
+    let value = 0;
+    return grid.map(({ date, flow, noise }) => {
+      value = value * (1 + drift + noise) + flow;
+      return { date, value, flow };
+    });
+  };
+  const endValue = (annual: number) => path(annual).at(-1)!.value;
+  let lo = -0.9;
+  let hi = 5;
+  if (!(endValue(lo) <= args.target && args.target <= endValue(hi))) {
+    throw new Error(`seed-demo: no drift takes ${args.label} to its live value ${args.target}`);
+  }
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (endValue(mid) < args.target) lo = mid;
+    else hi = mid;
+  }
+  const out = path((lo + hi) / 2);
+  const negative = out.find((p) => p.value < 0);
+  if (negative) {
+    throw new Error(`seed-demo: ${args.label}'s history dips below zero on ${negative.date}`);
+  }
+  return out;
 }
 
 // --- seed ------------------------------------------------------------------
@@ -1732,14 +1794,31 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   }
 
   // --- Portfolio snapshots (daily net-worth history → dashboard/savings charts). ---
-  // A deterministic walk per portfolio: an opening deposit plus monthly contributions,
-  // compounding at a plausible annual return with a little daily noise. Contributions are
-  // recorded as `effectiveFlow`, so time-weighted return (packages/core/src/twr.ts:
-  // 1 + r_t = (V_t − flow_t) / V_{t−1}) sees market movement only, not deposits.
-  // Without the flows every deposit would count as return (TWR in the thousands of
-  // percent) and the day a portfolio opens would read as a single-day spike. The shape
-  // stays an approximation; deriving exact historical valuations from the transactions
-  // above is the backfill job's responsibility, not this seed's.
+  // Each portfolio's history is built from its REAL boundary flows (#1020): exactly the
+  // flows the per-year XIRR reads (`boundaryFlowsAt`, kind-aware, under the portfolio's own
+  // `cashCounted` boundary, each converted to the base currency at its own date's rate),
+  // on their real dates. From the first flow, the value walks forward day by day:
+  //
+  //   V_t = V_{t−1} · (1 + r_t) + F_t,   r_t = drift + noise_t
+  //
+  // with F_t the day's net contribution and a deterministic noise term. `drift` is solved
+  // by bisection so today's V equals the live valuation. Because the flows are the XIRR's
+  // flows and the values are their consequence, each year's XIRR and TWR describe the same
+  // path; a synthetic contribution schedule (the old "10 units, then 1 every 30 days")
+  // paired the real flows with a NAV that never received them.
+  //
+  // One scale for all three columns: `netWorth` = V; `marketValue` and `effectiveFlow` =
+  // V and F times the securities sleeve's share of today's net worth. In this dataset that
+  // share is exactly 1 for every outside-boundary portfolio (net worth is the securities)
+  // and 0 for the cash-only Tagesgeld (cash inside its boundary, no securities), so TWR,
+  // which reads only the sleeve, ignores the Tagesgeld as the daily job does; no demo
+  // portfolio has a fractional share. TWR's 1 + r_t = (V_t − flow_t) / V_{t−1} then
+  // recovers r_t exactly. Today's flow (none in this dataset) lands on today's row.
+  //
+  // A modelling choice, not the daily job's bookkeeping: outside the boundary a sell,
+  // dividend or coupon is money leaving to the investor, so here it leaves the sleeve
+  // too (a negative `effectiveFlow` that day), where the job values the securities alone
+  // and books only trades. Each day's (value, flow) pair is self-consistent either way.
   //
   // The walk is anchored to the live valuation: today's point is exactly what
   // `recordDailySnapshots` (services/snapshots.ts) will write for the portfolio — same
@@ -1747,7 +1826,8 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // doesn't put a visible step into the history chart on the seed date (#989). The
   // valuation reads the `lastPrices`/FX/corporate-action rows inserted above; the stub
   // quote service throws so a missing price row fails the seed instead of reaching a
-  // live provider.
+  // live provider. The flows convert with the seeded, triangular `fx_rates` rows above
+  // (#1006/#1021), which cover every day since before the first transaction.
 
   // Every member access throws, so any provider path a future valuation adds fails with
   // this message too, not an `undefined is not a function`.
@@ -1762,23 +1842,18 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // stamped at `NOW` a moment ago, so any generous TTL keeps them fresh.
   const ANCHOR_TTL_MS = 24 * 60 * 60 * 1000;
 
-  const walkParams: {
-    portfolio: typeof portfolios.$inferSelect;
-    days: number;
-    /** Annual return the walk compounds at, and the daily noise around it. */
-    annual: number;
-    noise: number;
-  }[] = [
-    { portfolio: idPortfolio, days: 2200, annual: 0.09, noise: 0.012 },
-    { portfolio: trPortfolio, days: 2100, annual: 0.11, noise: 0.01 },
-    { portfolio: goldPortfolio, days: 2100, annual: 0.08, noise: 0.008 },
-    { portfolio: mfPortfolio, days: 1500, annual: 0.06, noise: 0.004 },
-    { portfolio: cashPortfolio, days: 2100, annual: 0.025, noise: 0 },
+  /** Daily noise amplitude around the solved drift (0: a smooth savings-account path). */
+  const walkParams: { portfolio: typeof portfolios.$inferSelect; noise: number }[] = [
+    { portfolio: idPortfolio, noise: 0.012 },
+    { portfolio: trPortfolio, noise: 0.01 },
+    { portfolio: goldPortfolio, noise: 0.008 },
+    { portfolio: mfPortfolio, noise: 0.004 },
+    { portfolio: cashPortfolio, noise: 0 },
   ];
 
   const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
-  for (const { portfolio, days, annual, noise } of walkParams) {
-    const { summary } = await valuePortfolio(
+  for (const { portfolio, noise } of walkParams) {
+    const { summary, coreTxns, corporateActions } = await valuePortfolio(
       db,
       offlineQuotes,
       ANCHOR_TTL_MS,
@@ -1795,36 +1870,31 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         `seed-demo: no FX rate for ${summary.fxMissingCurrencies.join(", ")} → ${portfolio.baseCurrency}`,
       );
     }
-    const drift = (1 + annual) ** (1 / 365) - 1;
-    // Simulate in units (opening deposit 10, then 1 every 30 days), then scale so the
-    // last day equals the valuation; value is linear in the flows, so returns survive.
-    // Each flow is stored on the day it lands: TWR subtracts it that same day
-    // (1 + r_t = (V_t − flow_t) / V_{t−1}), which is what keeps the opening deposit out
-    // of the first return. Keep that pairing if flows ever move. No flow lands today:
-    // the job derives today's flow from today's transactions, and the seed has none.
-    const walk: { d: number; value: number; flow: number }[] = [];
-    let value = 0;
-    for (let d = days; d >= 0; d--) {
-      const flow = d === days ? 10 : d > 0 && d % 30 === 0 ? 1 : 0;
-      const r = drift + (pseudoRandom(d + portfolio.id.length) - 0.5) * noise;
-      value = value * (1 + r) + flow;
-      walk.push({ d, value, flow });
-    }
-    // Two anchors, one per column, mirroring the job: `netWorth` is the boundary-aware
-    // net worth, `marketValue` the securities sleeve TWR reads (0 for a cash-only
-    // portfolio). Flows scale with `marketValue`, the series TWR pairs them with.
-    const netScale = Number(summary.netWorth) / value;
-    const mvScale = Number(summary.totalMarketValue) / value;
-    for (const { d, value: v, flow } of walk) {
+    const walk = demoSnapshotWalk({
+      flows: boundaryFlowsAt(
+        coreTxns,
+        portfolio.cashCounted ? "inside" : "outside",
+        portfolio.baseCurrency,
+        await fxAtFlowDates(db, coreTxns, portfolio.baseCurrency),
+        corporateActions,
+      ),
+      today: isoDate(NOW),
+      target: Number(summary.netWorth),
+      noise: (daysAgoN) => (pseudoRandom(daysAgoN + portfolio.id.length) - 0.5) * noise,
+      label: portfolio.name,
+    });
+    const netWorth = Number(summary.netWorth);
+    const sleeve = netWorth === 0 ? 0 : Number(summary.totalMarketValue) / netWorth;
+    for (const { date, value, flow } of walk) {
       // Today's row takes the summary strings verbatim: `dec()` rounds to 2 dp, and the
       // row must equal what the job writes exactly.
-      const isToday = d === 0;
+      const isToday = date === isoDate(NOW);
       snapshotRows.push({
         portfolioId: portfolio.id,
-        date: isoDate(daysAgo(d)),
-        netWorth: isToday ? summary.netWorth : dec(v * netScale),
-        marketValue: isToday ? summary.totalMarketValue : dec(v * mvScale),
-        effectiveFlow: dec(flow * mvScale),
+        date,
+        netWorth: isToday ? summary.netWorth : dec(value),
+        marketValue: isToday ? summary.totalMarketValue : dec(value * sleeve),
+        effectiveFlow: dec(flow * sleeve),
         currency: portfolio.baseCurrency,
       });
     }

@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { fxRates, instruments } from "@portfolio/db";
+import { eq } from "drizzle-orm";
+import { fxRates, instruments, portfolios } from "@portfolio/db";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
 import { toDateKey } from "@portfolio/core";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
+import { loadBoundaryFlowsForUser } from "../../src/routes/transactions/insights/yearly-returns.js";
 import { overrideMarketData, invalidateMarketData } from "../../src/services/market-data.js";
 import { netWorthResponseSchema } from "@portfolio/schema";
 
@@ -262,6 +264,17 @@ describe("missing QUOTE currency keeps contributions and value on one boundary (
     const body = res.json();
     expect(Number(body.netWorth)).toBe(1100);
     expect(body.xirr).toBeGreaterThan(0);
+  });
+
+  it("leaves no dangling buy in the per-year XIRR flows either (#1020)", async () => {
+    const [row] = await app.db
+      .select({ userId: portfolios.userId })
+      .from(portfolios)
+      .where(eq(portfolios.id, pf));
+    const flows = await loadBoundaryFlowsForUser(app, row!.userId, [pf], "EUR", "outside");
+    // Only the EUR stock's buy; before the fix the USD-quoted buy (no value against it on
+    // the year-end NAV side) was a second −1,000.
+    expect(flows.map((f) => Number(f.amount))).toEqual([-1000]);
   });
 });
 

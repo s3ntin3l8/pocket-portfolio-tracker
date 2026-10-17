@@ -301,7 +301,7 @@ function transferOutCarriedCosts(
  */
 function walkInsideDays(
   txns: CoreTransaction[],
-  fx: FxRateFn,
+  fxAt: FxAt,
   display: string,
   corporateActions: CorporateAction[] = [],
 ): DayWalkResult {
@@ -309,6 +309,7 @@ function walkInsideDays(
   const points: FlowPoint[] = [];
   const transferOutCosts = transferOutCarriedCosts(txns, corporateActions);
   for (const tx of txns) {
+    const fx = fxAt(tx.executedAt);
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
     if (tx.type === "deposit") {
@@ -350,7 +351,7 @@ function insideDays(
   display: string,
   corporateActions: CorporateAction[],
 ): Map<string, FlowAgg> {
-  return walkInsideDays(txns, fx, display, corporateActions).days;
+  return walkInsideDays(txns, () => fx, display, corporateActions).days;
 }
 
 /**
@@ -363,7 +364,7 @@ function insideDays(
  */
 function walkOutsideDays(
   txns: CoreTransaction[],
-  fx: FxRateFn,
+  fxAt: FxAt,
   display: string,
   corporateActions: CorporateAction[] = [],
 ): DayWalkResult {
@@ -386,6 +387,7 @@ function walkOutsideDays(
     advanceCorporateActions(tx.executedAt);
     if (!tx.instrumentId) continue;
     if (skippedInstruments.has(tx.instrumentId)) continue;
+    const fx = fxAt(tx.executedAt);
     const key = dayKey(tx.executedAt);
     const m = months.get(key) ?? { inflow: D(0), outflow: D(0) };
 
@@ -447,8 +449,16 @@ function outsideDays(
   display: string,
   corporateActions: CorporateAction[],
 ): Map<string, FlowAgg> {
-  return walkOutsideDays(txns, fx, display, corporateActions).days;
+  return walkOutsideDays(txns, () => fx, display, corporateActions).days;
 }
+
+/**
+ * The FX rates in effect on a given date. A boundary walk converts each row with the
+ * rates of that row's own `executedAt`, so a flow list can be paired with values that
+ * were themselves converted at their own dates (per-year XIRR, #1020). Every consumer
+ * that values the terminal amount at today's rate passes a constant (`() => fx`).
+ */
+export type FxAt = (date: Date) => FxRateFn;
 
 /** One dated, signed cash-flow crossing a portfolio's investment boundary, in XIRR
  * convention (negative = contribution, positive = withdrawal/return of capital). */
@@ -487,13 +497,17 @@ export function boundaryFlowPoints(
   displayCurrency: string,
   fx: FxRateFn,
   corporateActions: CorporateAction[] = [],
+  /** Per-date rates (see {@link FxAt}); when given, each row converts at its own date's
+   *  rate and `fx` is unused. */
+  fxAt?: FxAt,
 ): BoundaryFlowPoint[] {
   // Archived + draft rows are excluded from every derivation — mirror contributionStats.
   const relevant = txns.filter((t) => t.status !== "archived" && t.status !== "draft");
+  const at = fxAt ?? (() => fx);
   const { points } =
     boundary === "outside"
-      ? walkOutsideDays(relevant, fx, displayCurrency, corporateActions)
-      : walkInsideDays(relevant, fx, displayCurrency, corporateActions);
+      ? walkOutsideDays(relevant, at, displayCurrency, corporateActions)
+      : walkInsideDays(relevant, at, displayCurrency, corporateActions);
   return points
     .slice()
     .sort((a, b) => a.date.getTime() - b.date.getTime())
@@ -517,12 +531,16 @@ export function transferFlowPoints(
   displayCurrency: string,
   fx: FxRateFn,
   corporateActions: CorporateAction[] = [],
+  /** Per-date rates (see {@link FxAt}); when given, each row converts at its own date's
+   *  rate and `fx` is unused. */
+  fxAt?: FxAt,
 ): BoundaryFlowPoint[] {
   const relevant = txns.filter((t) => t.status !== "archived" && t.status !== "draft");
+  const at = fxAt ?? (() => fx);
   const { points } =
     boundary === "outside"
-      ? walkOutsideDays(relevant, fx, displayCurrency, corporateActions)
-      : walkInsideDays(relevant, fx, displayCurrency, corporateActions);
+      ? walkOutsideDays(relevant, at, displayCurrency, corporateActions)
+      : walkInsideDays(relevant, at, displayCurrency, corporateActions);
   return points
     .filter((p) => p.isTransfer)
     .slice()

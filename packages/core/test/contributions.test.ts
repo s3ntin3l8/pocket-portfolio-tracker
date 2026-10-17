@@ -703,3 +703,44 @@ describe("split-aware average-cost pool (audit B9)", () => {
     ]);
   });
 });
+
+// #1020: a per-year XIRR pairs these flows with year-end values converted at their own
+// dates, so each flow must convert at ITS date's rate, not one rate for the whole list.
+describe("boundaryFlowPoints / transferFlowPoints — per-date FX (fxAt)", () => {
+  const rateOn: Record<string, string> = { "2024-01-10": "16000", "2025-01-10": "18000" };
+  const fxAt = (d: Date) => (from: string, to: string) =>
+    from === to
+      ? "1"
+      : from === "EUR" && to === "IDR"
+        ? (rateOn[d.toISOString().slice(0, 10)] ?? null)
+        : null;
+  const unused = () => {
+    throw new Error("the constant fx must not be used when fxAt is given");
+  };
+
+  it("converts each inside row at its own date's rate", () => {
+    const txns = [
+      tx({ type: "deposit", price: "100", executedAt: new Date("2024-01-10") }),
+      tx({ type: "withdrawal", price: "50", executedAt: new Date("2025-01-10") }),
+    ];
+    expect(boundaryFlowPoints(txns, "inside", "IDR", unused, [], fxAt)).toEqual([
+      { amount: -1_600_000, date: new Date("2024-01-10") },
+      { amount: 900_000, date: new Date("2025-01-10") },
+    ]);
+  });
+
+  it("converts outside acquisitions, sells-at-cost and transfers at their own dates", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "2", price: "50", executedAt: new Date("2024-01-10") }),
+      tx({ type: "transfer_out", quantity: "1", price: "0", executedAt: new Date("2025-01-10") }),
+    ];
+    // Buy: 100 EUR × 16000. Transfer out: 1 share at the 50 EUR average × 18000.
+    expect(boundaryFlowPoints(txns, "outside", "IDR", unused, [], fxAt)).toEqual([
+      { amount: -1_600_000, date: new Date("2024-01-10") },
+      { amount: 900_000, date: new Date("2025-01-10") },
+    ]);
+    expect(transferFlowPoints(txns, "outside", "IDR", unused, [], fxAt)).toEqual([
+      { amount: 900_000, date: new Date("2025-01-10") },
+    ]);
+  });
+});

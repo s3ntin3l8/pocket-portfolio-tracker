@@ -102,6 +102,7 @@ export {
   type ContributionInput,
   type ContributionStats,
   type BoundaryFlowPoint,
+  type FxAt,
 } from "./contributions.js";
 export {
   forecastSeries,

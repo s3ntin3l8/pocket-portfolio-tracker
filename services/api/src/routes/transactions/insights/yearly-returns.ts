@@ -1,12 +1,12 @@
 import { Decimal } from "decimal.js";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   chainIndex,
   computeYearlyReturns,
   type IndexPoint,
   type YearlyPortfolioFlow,
 } from "@portfolio/core";
-import { portfolios, transactions } from "@portfolio/db";
+import { portfolios } from "@portfolio/db";
 import { getMarketData } from "../../../services/market-data.js";
 import {
   benchmarkClosesInCurrency,
@@ -16,9 +16,8 @@ import {
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
 import { getFxRatesForDates } from "../../../services/fx.js";
-import { toCoreTxns } from "../../../services/tx-core.js";
-import { boundaryFlows } from "../shared/flows.js";
-import { corporateActionsFor } from "../shared/helpers.js";
+import { boundaryFlows, excludeFxMissingInstruments } from "../shared/flows.js";
+import { loadValuation } from "../shared/helpers.js";
 import type { FastifyInstance } from "fastify";
 
 export interface ComputeYearlyReturnsArgs {
@@ -180,6 +179,18 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
  * CONTRIBUTING.md) so the per-year XIRR is computed against the same cash-flow
  * source as `/contributions` and the rest of the insights cards.
  *
+ * Paired with the year-end net worths, so both sides must describe the same thing (#1020):
+ * - Each flow converts at its OWN date's FX rate, like each year-end NAV converts at its
+ *   snapshot date's rate. `/networth`'s all-time XIRR keeps today's rate, because its
+ *   terminal value is today's net worth at today's rate.
+ * - The instruments the valuation can't value for lack of an FX rate are dropped
+ *   (`excludeFxMissingInstruments`), exactly as `/networth` does; otherwise their buys
+ *   would stay in the flows with no value against them.
+ *
+ * Transactions come from the same `loadValuation` the hero XIRR uses (full rows through
+ * `toCoreTxns`, so `status` and `tax` are present — issue #736, audit B13), with each
+ * portfolio's own corporate actions (audit B9).
+ *
  * A caller whose portfolios don't all share one boundary (i.e. a mix of
  * `cashCounted` true/false) must call this once per boundary group and union the
  * results — see `registerInsightsRoutes`'s `insidePfIds`/`outsidePfIds` split,
@@ -194,37 +205,27 @@ export async function loadBoundaryFlowsForUser(
   boundary: "inside" | "outside",
 ): Promise<{ amount: string; date: Date }[]> {
   if (portfolioIds.length === 0) return [];
-  // Load FULL rows and map them through `toCoreTxns` — the same chokepoint the hero
-  // XIRR's `loadValuation` uses — rather than a hand-picked column subset. The subset
-  // used to omit `status` (archived/draft rows slipped past core's guards, issue #736)
-  // and then `tax` (audit B13: `cashFlow(sell)` nets the withheld tax, so without the
-  // column every taxed sale entered the per-year XIRR at its gross proceeds).
-  const rows = (
-    await app.db
-      .select({ tx: transactions })
-      .from(transactions)
-      .innerJoin(portfolios, eq(transactions.portfolioId, portfolios.id))
-      .where(and(inArray(transactions.portfolioId, portfolioIds), eq(portfolios.userId, userId)))
-      .orderBy(asc(transactions.executedAt))
-  ).map((r) => r.tx);
-  // One walk per portfolio, each with its own split/bonus actions (audit B9) — the
-  // average-cost pool behind transfer valuation is per depot, never shared across them.
-  const byPortfolio = new Map<string, typeof rows>();
-  for (const r of rows) {
-    const list = byPortfolio.get(r.portfolioId) ?? [];
-    list.push(r);
-    byPortfolio.set(r.portfolioId, list);
-  }
-  // One query for every instrument's actions, partitioned per portfolio client-side
-  // (global actions + that portfolio's own) — same scoping as `corporateActionsFor(…, pfId)`.
-  const allCas = await corporateActionsFor(
-    app,
-    rows.map((r) => r.instrumentId),
-  );
+  const owned = await app.db
+    .select({ id: portfolios.id })
+    .from(portfolios)
+    .where(and(inArray(portfolios.id, portfolioIds), eq(portfolios.userId, userId)));
   const perPortfolio = await Promise.all(
-    [...byPortfolio].map(([pfId, pfRows]) => {
-      const cas = allCas.filter((ca) => ca.portfolioId == null || ca.portfolioId === pfId);
-      return boundaryFlows(app, toCoreTxns(pfRows), boundary, displayCurrency, cas);
+    owned.map(async ({ id }) => {
+      const { coreTxns, summary, corporateActions } = await loadValuation(
+        app,
+        id,
+        displayCurrency,
+        undefined,
+        boundary === "inside",
+      );
+      return boundaryFlows(
+        app,
+        excludeFxMissingInstruments(coreTxns, summary),
+        boundary,
+        displayCurrency,
+        corporateActions,
+        "flowDate",
+      );
     }),
   );
   return perPortfolio
