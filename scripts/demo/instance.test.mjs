@@ -29,13 +29,18 @@ const groupAlive = (pid) => {
 // the ports are module-level constants, so both are set before the import.
 const ENV_KEYS = ["TMPDIR", "DEMO_API_PORT", "DEMO_WEB_PORT", "DEMO_HEALTH_TIMEOUT_MS"];
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
-const scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
+// Created in beforeAll, not at import: a file that fails to collect runs no
+// afterAll, so a module-level mkdtemp would leak the directory.
+let scratchRoot;
 let startDemo;
 let strayPids;
 let waitForHttp;
 let healthTimeoutMs;
+let parsePsRows;
+let descendantGroups;
 
 beforeAll(async () => {
+  scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
   process.env.TMPDIR = scratchRoot;
   process.env.DEMO_API_PORT = await freePort();
   // Each probe listener closes before the next binds, so the OS may hand back the same one.
@@ -44,7 +49,8 @@ beforeAll(async () => {
     if (process.env.DEMO_WEB_PORT !== process.env.DEMO_API_PORT) break;
     if (attempt >= 10) throw new Error("could not get two distinct free ports");
   }
-  ({ startDemo, healthTimeoutMs, strayPids, waitForHttp } = await import("./instance.mjs"));
+  ({ startDemo, healthTimeoutMs, strayPids, waitForHttp, parsePsRows, descendantGroups } =
+    await import("./instance.mjs"));
 });
 
 // Tests set it per case; never let a failed assertion leak it into the next one.
@@ -57,7 +63,7 @@ afterAll(() => {
   for (const [key, value] of Object.entries(saved))
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
-  rmSync(scratchRoot, { recursive: true, force: true });
+  if (scratchRoot) rmSync(scratchRoot, { recursive: true, force: true });
 });
 
 describe("startDemo startup failure", () => {
@@ -187,18 +193,22 @@ describe("startDemo startup failure", () => {
  * step forks a grandchild, as turbo does, and both keep recreating a file under the
  * scratch dir, so either one outliving the delete brings the dir back. Neither carries
  * the scratch HOME, so the /proc HOME sweep cannot find them: only explicit tracking can.
+ * `taskGroup` puts the grandchild in a process group of its own, as turbo does with
+ * each task, so killing the step's group does not reach it.
  */
-function bootWithLongStep({ ignoreTerm = "none" } = {}) {
-  const keepTouching = (ignore) => `
+function bootWithLongStep({ ignoreTerm = "none", taskGroup = false, driverEnv = {} } = {}) {
+  // Each process recreates its own marker dir, so ready() can wait for both: a
+  // marker only appears once that process has installed its SIGTERM handler.
+  const keepTouching = (ignore, marker) => `
     const fs = require("fs"), path = require("path");
     ${ignore ? 'process.on("SIGTERM", () => {});' : ""}
-    setInterval(() => fs.mkdirSync(path.join(process.env.DEMO_DIR, "home/step"), { recursive: true }), 50);`;
-  const grandchildCode = keepTouching(ignoreTerm !== "none");
+    setInterval(() => fs.mkdirSync(path.join(process.env.DEMO_DIR, "home", "${marker}"), { recursive: true }), 50);`;
+  const grandchildCode = keepTouching(ignoreTerm !== "none", "grandchild");
   const step = `
     const { spawn } = require("child_process");
-    const grandchild = spawn(process.execPath, ["-e", ${JSON.stringify(grandchildCode)}], { stdio: "ignore" });
+    const grandchild = spawn(process.execPath, ["-e", ${JSON.stringify(grandchildCode)}], { stdio: "ignore", detached: ${taskGroup} });
     console.log("PIDS " + process.pid + " " + grandchild.pid);
-    ${keepTouching(ignoreTerm === "both")}`;
+    ${keepTouching(ignoreTerm === "both", "step")}`;
   const driver = `
     const { startDemo } = await import(${JSON.stringify(new URL("./instance.mjs", import.meta.url).href)});
     await startDemo({
@@ -211,7 +221,7 @@ function bootWithLongStep({ ignoreTerm = "none" } = {}) {
       },
     });`;
   const proc = spawn(process.execPath, ["--input-type=module", "-e", driver], {
-    env: { ...process.env },
+    env: { ...process.env, ...driverEnv },
     stdio: ["ignore", "pipe", "inherit"],
   });
   let out = "";
@@ -222,7 +232,8 @@ function bootWithLongStep({ ignoreTerm = "none" } = {}) {
     for (let i = 0; i < 600; i++) {
       const dir = /DEMO_DIR (\S+)/.exec(out)?.[1];
       const pids = /PIDS (\d+) (\d+)/.exec(out)?.slice(1).map(Number);
-      if (dir && pids && existsSync(path.join(dir, "home/step"))) return { demoDir: dir, pids };
+      const markers = ["home/step", "home/grandchild"].map((m) => path.join(dir ?? "", m));
+      if (dir && pids && markers.every((m) => existsSync(m))) return { demoDir: dir, pids };
       await new Promise((r) => setTimeout(r, 50));
     }
     throw new Error(`long step never started; driver output: ${out}`);
@@ -304,6 +315,184 @@ describe("startDemo stop during a build/seed step", () => {
       for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
     }
   }, 60_000);
+});
+
+// turbo runs each task in a process group of its own. If turbo is SIGKILLed while
+// its tasks still run, they would outlive it; neither carries the scratch HOME here,
+// so only the process-tree walk before the SIGKILL can find them (#1035).
+describe("startDemo stop during a build step whose subprocess has its own group", () => {
+  it("the SIGKILL after the grace period also kills the step's descendant groups", async () => {
+    const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: "both", taskGroup: true });
+    let pids = [];
+    try {
+      const started = await ready();
+      pids = started.pids;
+      const [stepPid, taskPid] = pids;
+      expect(groupAlive(taskPid)).toBe(true);
+      expect(taskPid).not.toBe(stepPid);
+      proc.kill("SIGTERM");
+      expect(await exited).toBe(0);
+      expect(pids.some(pidAlive)).toBe(false);
+      expect(existsSync(started.demoDir)).toBe(false);
+      await new Promise((r) => setTimeout(r, 300));
+      expect(existsSync(started.demoDir)).toBe(false);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+    }
+  }, 60_000);
+
+  it("a second signal also hard-kills the step's descendant groups", async () => {
+    const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: "both", taskGroup: true });
+    let pids = [];
+    try {
+      const started = await ready();
+      pids = started.pids;
+      proc.kill("SIGTERM");
+      await new Promise((r) => setTimeout(r, 300));
+      proc.kill("SIGINT");
+      expect(await exited).toBe(130);
+      expect(pids.some(pidAlive)).toBe(false);
+      expect(existsSync(started.demoDir)).toBe(false);
+      await new Promise((r) => setTimeout(r, 300));
+      expect(existsSync(started.demoDir)).toBe(false);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+    }
+  }, 60_000);
+  // Fails soft: without `ps` the walk finds nothing, and the step's own group is
+  // still killed as before.
+  it("without a usable ps, still hard-kills the step's own group", async () => {
+    const noPs = mkdtempSync(path.join(scratchRoot, "no-ps-"));
+    const { proc, exited, ready } = bootWithLongStep({
+      ignoreTerm: "both",
+      driverEnv: { PATH: noPs },
+    });
+    let pids = [];
+    try {
+      const started = await ready();
+      pids = started.pids;
+      proc.kill("SIGTERM");
+      await new Promise((r) => setTimeout(r, 300));
+      proc.kill("SIGINT");
+      expect(await exited).toBe(130);
+      expect(pids.some(pidAlive)).toBe(false);
+      expect(existsSync(started.demoDir)).toBe(false);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+      rmSync(noPs, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
+// Fixture `ps -A -o pid=,ppid=,pgid=` output: ps right-aligns its columns.
+const PS_FIXTURE = `
+    1     0     1
+  500     1   500
+  600   500   600
+  100   600   100
+  101   100   100
+  102   101   100
+  200   100   200
+  201   200   200
+  300   100   300
+  310   300   310
+  311   310   311
+  320   300   300
+  400   102   102
+  700     1   700
+  701   700   700
+  702   700   702
+  800     1     0
+  801   102     0
+ ps: something went wrong
+  abc   100   100
+  900   100
+  901   100   901   extra
+  902  -100   902
+ 1e3   100   100
+  903   102   600
+`;
+
+describe("parsePsRows", () => {
+  it("parses right-aligned rows and skips malformed lines", () => {
+    const rows = parsePsRows(PS_FIXTURE);
+    expect(rows).toContainEqual({ pid: 1, ppid: 0, pgid: 1 });
+    expect(rows).toContainEqual({ pid: 102, ppid: 101, pgid: 100 });
+    for (const pid of [900, 901, 902, 1000])
+      expect(rows.some((row) => row.pid === pid)).toBe(false);
+    expect(rows.some((row) => Number.isNaN(row.pid))).toBe(false);
+    // 19 well-formed rows; the 6 malformed lines are gone.
+    expect(rows).toHaveLength(19);
+  });
+
+  it("returns nothing for empty or unparsable output", () => {
+    expect(parsePsRows("")).toEqual([]);
+    expect(parsePsRows("ps: illegal option -- A\nusage: ps ...\n")).toEqual([]);
+  });
+});
+
+describe("descendantGroups", () => {
+  // The demo node (600) runs in its parent's group 600; the step it spawned is
+  // turbo (100, own group 100), whose tasks run in groups 200 and 300, and task 300
+  // forks a nested group 310 (which forks 311). 400 joined group 102, which has no
+  // leader in the tree. 700's family is unrelated; 800/801 sit in pgid 0.
+  let rows;
+  beforeAll(() => {
+    rows = parsePsRows(PS_FIXTURE);
+  });
+  const sorted = (list) => [...list].sort((a, b) => a - b);
+
+  it("collects every group descending from the root group, nested ones included", () => {
+    expect(sorted(descendantGroups(rows, [100], 600))).toEqual([102, 200, 300, 310, 311]);
+  });
+
+  it("never returns the root, the caller's own group, init's or pgid 0", () => {
+    const groups = descendantGroups(rows, [100], 600);
+    // 903 is a descendant (child of 102) in the caller's own group 600; 801 in pgid 0.
+    for (const pgid of [0, 1, 100, 600]) expect(groups).not.toContain(pgid);
+  });
+
+  it("leaves unrelated process families alone", () => {
+    const groups = descendantGroups(rows, [100], 600);
+    for (const pgid of [500, 700, 702]) expect(groups).not.toContain(pgid);
+    expect(sorted(descendantGroups(rows, [700], 600))).toEqual([702]);
+  });
+
+  it("walks several roots at once and dedupes", () => {
+    expect(sorted(descendantGroups(rows, [100, 300], 600))).toEqual([102, 200, 310, 311]);
+  });
+
+  // Real `ps` output has self-parented entries (pid 0, kernel threads) and, with pid
+  // reuse between rows, can even show a parent loop. The walk must still end.
+  it("terminates on self-parented entries and parent cycles", () => {
+    const cyclic = parsePsRows(`
+      0     0     0
+      1     0     1
+      2     2     0
+    100   600   100
+    200   100   200
+    201   201   201
+    300   400   300
+    400   300   400
+    500   100   500
+    501   500   501
+    500   501   500
+    `);
+    // 300 and 400 are each other's parent: a loop, but not under root 100.
+    expect(sorted(descendantGroups(cyclic, [100], 600))).toEqual([200, 500, 501]);
+    // Rooted inside the loop: both groups once, nothing else, no hang.
+    expect(sorted(descendantGroups(cyclic, [300], 600))).toEqual([400]);
+    // A root of 0 or 1 is refused outright rather than walking the whole table.
+    expect(descendantGroups(cyclic, [0, 1], 600)).toEqual([]);
+  });
+
+  it("finds nothing for a root group that is gone, or without rows", () => {
+    expect(descendantGroups(rows, [4242], 600)).toEqual([]);
+    expect(descendantGroups([], [100], 600)).toEqual([]);
+  });
 });
 
 describe("waitForHttp", () => {
