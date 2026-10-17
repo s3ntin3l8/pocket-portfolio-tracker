@@ -11,12 +11,39 @@ import { migrationsDir } from "@portfolio/db";
 declare module "vitest" {
   export interface ProvidedContext {
     /** This run's pre-migrated PGlite template; test/setup.ts copies it per file. */
-    pgliteTemplateDir: string;
+    /** Optional: setup.ts falls back to a from-scratch DB when it is missing. */
+    pgliteTemplateDir?: string;
   }
 }
 
 /** Prefix of each run's template dir (mkdtemp appends a unique suffix). */
 export const PGLITE_TEMPLATE_PREFIX = path.join(os.tmpdir(), "portfolio-vitest-pglite-template-");
+
+/** Far longer than any run, so a concurrent run's template is never swept. */
+export const STALE_TEMPLATE_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Remove template dirs left by runs that never reached teardown (cancelled or
+ * killed), which a per-run path no longer overwrites. Only dirs older than
+ * STALE_TEMPLATE_MS go, so a run still in progress elsewhere keeps its own.
+ */
+export function sweepStaleTemplates(now = Date.now()): string[] {
+  const dir = path.dirname(PGLITE_TEMPLATE_PREFIX);
+  const base = path.basename(PGLITE_TEMPLATE_PREFIX);
+  const swept: string[] = [];
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.startsWith(base)) continue;
+    const full = path.join(dir, name);
+    try {
+      if (now - fs.statSync(full).mtimeMs < STALE_TEMPLATE_MS) continue;
+      fs.rmSync(full, { recursive: true, force: true });
+      swept.push(full);
+    } catch {
+      // Gone already, or not ours to remove.
+    }
+  }
+  return swept;
+}
 
 /**
  * Runs once per `services/api` project run, in Vitest's main process, before any test
@@ -32,9 +59,11 @@ export const PGLITE_TEMPLATE_PREFIX = path.join(os.tmpdir(), "portfolio-vitest-p
  * and each run's setup would delete and rebuild it under the others' feet.
  */
 export default async function setup(project: TestProject): Promise<() => void> {
+  sweepStaleTemplates();
   const templateDir = fs.mkdtempSync(PGLITE_TEMPLATE_PREFIX);
+  let client: PGlite | undefined;
   try {
-    const client = new PGlite(templateDir, { extensions: { pg_trgm } });
+    client = new PGlite(templateDir, { extensions: { pg_trgm } });
     const db = drizzle(client, {});
     await migrate(db, { migrationsFolder: migrationsDir });
     // Must close cleanly before any file copies from this directory, or the snapshot on
@@ -42,6 +71,8 @@ export default async function setup(project: TestProject): Promise<() => void> {
     await client.close();
   } catch (err) {
     // A failed setup runs no teardown; do not leave the half-built template behind.
+    // Close best-effort first, so a cleanup failure cannot mask the original error.
+    await client?.close().catch(() => {});
     fs.rmSync(templateDir, { recursive: true, force: true });
     throw err;
   }
