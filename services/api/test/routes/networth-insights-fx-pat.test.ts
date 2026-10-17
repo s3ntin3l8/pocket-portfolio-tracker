@@ -182,7 +182,11 @@ describe("FX provider for a read-scoped PAT on /networth/history, /insights and 
     );
   });
 
-  // [path, whether a session back-fills benchmark prices on it]
+  // [path incl. its query, whether a session back-fills benchmark prices on exactly that
+  // request]. For /networth/history the range decides: only the daily series is enriched
+  // with the benchmark — the intraday ranges return before that block — so a new intraday
+  // row gets `false`. `/portfolios/:id/performance` has no benchmark enrichment at all;
+  // its `false` guards against one being added without the read-PAT skip.
   it.each([
     ["/networth/history?range=all", true],
     ["/networth/history?range=7d", false],
