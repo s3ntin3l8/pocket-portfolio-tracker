@@ -1,6 +1,6 @@
 "use client";
 
-import { CHART_AXIS_TICK, CHART_SERIES_DASH } from "@/lib/chart-style";
+import { CHART_AXIS_TICK, CHART_BAR_CURSOR, CHART_SERIES_DASH } from "@/lib/chart-style";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useTranslations } from "next-intl";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
@@ -122,10 +122,7 @@ export function EpsActualEstimateChart({
             minTickGap={8}
           />
           <YAxis hide />
-          <Tooltip
-            cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
-            content={<ChartTooltip t={t} />}
-          />
+          <Tooltip cursor={CHART_BAR_CURSOR} content={<ChartTooltip t={t} />} />
           <Bar
             isAnimationActive={!reducedMotion}
             dataKey="estimate"

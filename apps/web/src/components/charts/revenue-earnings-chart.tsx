@@ -1,6 +1,6 @@
 "use client";
 
-import { CHART_AXIS_TICK } from "@/lib/chart-style";
+import { CHART_AXIS_TICK, CHART_BAR_CURSOR } from "@/lib/chart-style";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useLocale, useTranslations } from "next-intl";
 import { formatMoneyCompact } from "@/lib/utils";
@@ -75,10 +75,7 @@ export function RevenueEarningsChart({
             minTickGap={8}
           />
           <YAxis hide />
-          <Tooltip
-            cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
-            content={<ChartTooltip money={money} t={t} />}
-          />
+          <Tooltip cursor={CHART_BAR_CURSOR} content={<ChartTooltip money={money} t={t} />} />
           <Bar
             isAnimationActive={!reducedMotion}
             dataKey="revenue"

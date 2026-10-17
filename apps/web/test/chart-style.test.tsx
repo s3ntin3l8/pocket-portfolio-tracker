@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import {
   CHART_AXIS_TICK,
+  CHART_BAR_CURSOR,
   CHART_CURSOR,
   CHART_GRID,
   CHART_SERIES_DASH,
@@ -10,7 +11,7 @@ import { ChartTooltipPanel } from "../src/components/ui/chart-tooltip-panel";
 
 describe("chart style constants", () => {
   it("uses theme tokens only, never hex", () => {
-    const all = JSON.stringify([CHART_AXIS_TICK, CHART_CURSOR, CHART_GRID]);
+    const all = JSON.stringify([CHART_AXIS_TICK, CHART_BAR_CURSOR, CHART_CURSOR, CHART_GRID]);
     expect(all).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(all).toContain("var(--color-");
   });
