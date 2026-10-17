@@ -51,6 +51,9 @@ export async function withDerivationCache<T>(
   compute: () => Promise<T>,
   now: number = Date.now(),
 ): Promise<T> {
+  // Deliberately for every store, FX-dependent or not: one central rule rather than a
+  // per-cache judgement call. The cost is a duplicate entry under read-PAT traffic for
+  // FX-independent derivations (instruments, documents, imports, …), bounded by the TTL.
   key += cachedOnlyKeySuffix();
   // Amortized eviction: drop up to 5 expired entries per call to bound growth without
   // a background timer. Expired keys that are never accessed again will linger until a
