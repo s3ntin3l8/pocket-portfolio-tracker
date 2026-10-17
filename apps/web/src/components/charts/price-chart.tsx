@@ -87,7 +87,7 @@ export function PriceChart({
                   tick={CHART_AXIS_TICK}
                   tickLine={false}
                   axisLine={false}
-                  width={72}
+                  width="auto"
                   tickFormatter={formatValue}
                 />
               )}
