@@ -1,38 +1,44 @@
+/**
+ * Every region bucket uses one vocabulary: the names `COUNTRY_TO_REGION` returns
+ * ("North America", "Europe", "Asia", ...). Markets (listing venue) and cash currencies map
+ * straight to those names, so an ETF's country weights, the listing-venue fallback and cash
+ * all land in the same slice (#1025). Anything unmapped (and gold, `XAU`) is "Other".
+ */
 const MARKET_TO_REGION: Record<string, string> = {
-  IDX: "ID",
-  BEI: "ID",
-  XETRA: "EU",
-  XFRA: "EU",
-  FSX: "EU",
-  AMS: "EU",
-  NYSE: "US",
-  NASDAQ: "US",
-  US: "US",
-  NASDAQ_GS: "US",
-  NASDAQ_GM: "US",
-  XAU: "Commodity",
-  AMEX: "US",
-  TSX: "CA",
-  ASX: "AU",
-  SGX: "SG",
-  HKG: "HK",
-  TYO: "JP",
+  IDX: "Asia",
+  BEI: "Asia",
+  XETRA: "Europe",
+  XFRA: "Europe",
+  FSX: "Europe",
+  AMS: "Europe",
+  NYSE: "North America",
+  NASDAQ: "North America",
+  US: "North America",
+  NASDAQ_GS: "North America",
+  NASDAQ_GM: "North America",
+  XAU: "Other",
+  AMEX: "North America",
+  TSX: "North America",
+  ASX: "Asia",
+  SGX: "Asia",
+  HKG: "Asia",
+  TYO: "Asia",
 };
 
 const CURRENCY_TO_REGION: Record<string, string> = {
-  IDR: "ID",
-  EUR: "EU",
-  USD: "US",
-  GBP: "EU",
-  CHF: "EU",
-  NOK: "EU",
-  SEK: "EU",
-  DKK: "EU",
-  CAD: "CA",
-  AUD: "AU",
-  SGD: "SG",
-  HKD: "HK",
-  JPY: "JP",
+  IDR: "Asia",
+  EUR: "Europe",
+  USD: "North America",
+  GBP: "Europe",
+  CHF: "Europe",
+  NOK: "Europe",
+  SEK: "Europe",
+  DKK: "Europe",
+  CAD: "North America",
+  AUD: "Asia",
+  SGD: "Asia",
+  HKD: "Asia",
+  JPY: "Asia",
   CNY: "Asia",
 };
 
@@ -93,6 +99,16 @@ const SECTOR_ALIAS_MAP: Record<string, string> = {
   Healthcare: "Health Care",
   "Health Care": "Health Care",
 };
+
+/** Every region name a slice key can take: what the maps above emit, plus the "Other" fallback. */
+export const REGION_NAMES: readonly string[] = [
+  ...new Set([
+    ...Object.values(MARKET_TO_REGION),
+    ...Object.values(CURRENCY_TO_REGION),
+    ...Object.values(COUNTRY_TO_REGION),
+    "Other",
+  ]),
+];
 
 export function marketToRegion(market: string): string {
   return MARKET_TO_REGION[market.toUpperCase()] ?? "Other";

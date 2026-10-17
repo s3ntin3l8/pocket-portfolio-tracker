@@ -11,6 +11,7 @@ import {
   type PortfolioSummary,
   type TopHolding,
 } from "../src/index.js";
+import { currencyToRegion } from "../src/allocation/maps.js";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -253,25 +254,137 @@ describe("allocationBreakdown — byAssetClass", () => {
 // ---------------------------------------------------------------------------
 
 describe("allocationBreakdown — byRegion", () => {
-  it("IDX and BEI (+ IDR cash) → ID region ≈ 6 450 000 IDR", () => {
+  it("IDX and BEI (+ IDR cash) → Asia ≈ 6 450 000 IDR", () => {
     // BBCA 950000 + BOND 5000000 + IDR cash 500000 = 6 450 000
-    const id = allocationBreakdown(makeSummary(), instruments).byRegion.find((s) => s.key === "ID");
+    const id = allocationBreakdown(makeSummary(), instruments).byRegion.find(
+      (s) => s.key === "Asia",
+    );
     expect(id).toBeDefined();
     expect(Math.abs(Number(id!.value) - 6_450_000)).toBeLessThan(TOLERANCE_IDR);
   });
 
-  it("XETRA → EU region ≈ 17 600 000 IDR", () => {
-    const eu = allocationBreakdown(makeSummary(), instruments).byRegion.find((s) => s.key === "EU");
+  it("XETRA → Europe ≈ 17 600 000 IDR", () => {
+    const eu = allocationBreakdown(makeSummary(), instruments).byRegion.find(
+      (s) => s.key === "Europe",
+    );
     expect(eu).toBeDefined();
     expect(Math.abs(Number(eu!.value) - 17_600_000)).toBeLessThan(TOLERANCE_IDR);
   });
 
-  it("XAU → Commodity region ≈ 5 500 000 IDR", () => {
+  it("XAU → Other ≈ 5 500 000 IDR", () => {
     const commodity = allocationBreakdown(makeSummary(), instruments).byRegion.find(
-      (s) => s.key === "Commodity",
+      (s) => s.key === "Other",
     );
     expect(commodity).toBeDefined();
     expect(Math.abs(Number(commodity!.value) - 5_500_000)).toBeLessThan(TOLERANCE_IDR);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// allocationBreakdown — one region vocabulary (#1025)
+// ---------------------------------------------------------------------------
+
+describe("allocationBreakdown — one region vocabulary", () => {
+  const NYSE = "inst-nyse"; // US listing, USD
+  const TSX = "inst-tsx"; // Canadian listing, CAD
+  const CW = "inst-cw"; // ETF with partial countryWeights
+
+  /** USD display currency with every rate 1:1 so values are easy to read. */
+  function usdSummary(
+    txns: CoreTransaction[],
+    prices: Record<string, { price: string; currency: string }>,
+  ) {
+    return summarizePortfolio({
+      transactions: txns,
+      prices,
+      displayCurrency: "USD",
+      cashCounted: true,
+      fx: () => "1",
+    });
+  }
+
+  const naSlices = (r: ReturnType<typeof allocationBreakdown>) =>
+    r.byRegion.filter((s) => s.key === "North America");
+
+  it("a US and a Canadian listing produce one North America slice", () => {
+    const summary = usdSummary(
+      [
+        tx({ instrumentId: null, type: "deposit", price: "100", currency: "USD" }),
+        tx({ instrumentId: null, type: "deposit", price: "50", currency: "CAD" }),
+        tx({ instrumentId: NYSE, price: "100", currency: "USD" }),
+        tx({ instrumentId: TSX, price: "50", currency: "CAD" }),
+      ],
+      { [NYSE]: { price: "100", currency: "USD" }, [TSX]: { price: "50", currency: "CAD" } },
+    );
+    const result = allocationBreakdown(summary, {
+      [NYSE]: { assetClass: "equity", market: "NYSE" },
+      [TSX]: { assetClass: "equity", market: "TSX" },
+    });
+    expect(result.byRegion.map((s) => s.key)).toEqual(["North America"]);
+    expect(naSlices(result)).toHaveLength(1);
+    expect(Number(naSlices(result)[0]!.value)).toBe(150);
+  });
+
+  it("countryWeights and the listing-venue remainder merge into one bucket", () => {
+    const summary = usdSummary(
+      [
+        tx({ instrumentId: null, type: "deposit", price: "100", currency: "USD" }),
+        tx({ instrumentId: CW, price: "100", currency: "USD" }),
+      ],
+      { [CW]: { price: "100", currency: "USD" } },
+    );
+    const result = allocationBreakdown(summary, {
+      // 70% via countryWeights ("North America"), 30% via the NYSE listing venue.
+      [CW]: { assetClass: "etf", market: "NYSE", countryWeights: { "United States": 0.7 } },
+    });
+    expect(result.byRegion.map((s) => s.key)).toEqual(["North America"]);
+    expect(Math.abs(Number(naSlices(result)[0]!.value) - 100)).toBeLessThan(1e-9);
+  });
+
+  it("cash by currency merges with holdings by market", () => {
+    const summary = usdSummary(
+      [
+        tx({ instrumentId: null, type: "deposit", price: "150", currency: "USD" }),
+        tx({ instrumentId: NYSE, price: "100", currency: "USD" }),
+        tx({ instrumentId: null, type: "deposit", price: "20", currency: "CAD" }),
+        tx({ instrumentId: null, type: "deposit", price: "30", currency: "GBP" }),
+        tx({ instrumentId: XETR, price: "10", currency: "EUR" }),
+        tx({ instrumentId: null, type: "deposit", price: "10", currency: "EUR" }),
+      ],
+      { [NYSE]: { price: "100", currency: "USD" }, [XETR]: { price: "10", currency: "EUR" } },
+    );
+    const result = allocationBreakdown(summary, {
+      [NYSE]: { assetClass: "equity", market: "NYSE" },
+      [XETR]: { assetClass: "equity", market: "XETRA" },
+    });
+    // NYSE 100 + USD cash 50 + CAD cash 20; XETRA 10 + GBP cash 30.
+    expect(result.byRegion.map((s) => [s.key, Number(s.value)])).toEqual([
+      ["North America", 170],
+      ["Europe", 40],
+    ]);
+  });
+
+  it("maps every market and currency to a region name, never a code", () => {
+    const names = new Set(["North America", "Latin America", "Europe", "Africa & ME", "Asia"]);
+    for (const m of [
+      "IDX",
+      "BEI",
+      "XETRA",
+      "AMS",
+      "NYSE",
+      "NASDAQ",
+      "TSX",
+      "ASX",
+      "SGX",
+      "HKG",
+      "TYO",
+    ]) {
+      expect(names.has(marketToRegion(m))).toBe(true);
+    }
+    for (const c of ["IDR", "EUR", "USD", "GBP", "CHF", "CAD", "AUD", "SGD", "HKD", "JPY", "CNY"]) {
+      expect(names.has(currencyToRegion(c))).toBe(true);
+    }
+    expect(marketToRegion("XAU")).toBe("Other");
   });
 });
 
@@ -610,12 +723,12 @@ describe("countryToRegion", () => {
 // ---------------------------------------------------------------------------
 
 describe("marketToRegion", () => {
-  it("maps IDX to ID", () => {
-    expect(marketToRegion("IDX")).toBe("ID");
+  it("maps IDX to Asia", () => {
+    expect(marketToRegion("IDX")).toBe("Asia");
   });
 
   it("is case-insensitive", () => {
-    expect(marketToRegion("xetra")).toBe("EU");
+    expect(marketToRegion("xetra")).toBe("Europe");
   });
 
   it("maps unknown market to Other", () => {
@@ -669,14 +782,15 @@ describe("allocationBreakdown — ETF countryWeights look-through", () => {
     };
     const result = allocationBreakdown(makeEtfCwSummary(), inst);
 
-    // US → North America: 6000, Germany → Europe: 2000, Japan → Asia: 1000
+    // US → North America: 6000, Germany → Europe: 2000, Japan → Asia: 1000; the 10%
+    // remainder goes to the XETRA listing venue, which is also Europe: 2000 + 1000.
     const na = result.byRegion.find((s) => s.key === "North America");
     expect(na).toBeDefined();
     expect(Math.abs(Number(na!.value) - 6000)).toBeLessThan(1);
 
     const eu = result.byRegion.find((s) => s.key === "Europe");
     expect(eu).toBeDefined();
-    expect(Math.abs(Number(eu!.value) - 2000)).toBeLessThan(1);
+    expect(Math.abs(Number(eu!.value) - 3000)).toBeLessThan(1);
 
     const asia = result.byRegion.find((s) => s.key === "Asia");
     expect(asia).toBeDefined();
@@ -693,12 +807,12 @@ describe("allocationBreakdown — ETF countryWeights look-through", () => {
     };
     const result = allocationBreakdown(makeEtfCwSummary(), inst);
 
-    // 70% US → North America = 7000, 30% remainder → EU (XETRA listing venue)
+    // 70% US → North America = 7000, 30% remainder → Europe (XETRA listing venue)
     const na = result.byRegion.find((s) => s.key === "North America");
     expect(na).toBeDefined();
     expect(Math.abs(Number(na!.value) - 7000)).toBeLessThan(1);
 
-    const eu = result.byRegion.find((s) => s.key === "EU");
+    const eu = result.byRegion.find((s) => s.key === "Europe");
     expect(eu).toBeDefined();
     expect(Math.abs(Number(eu!.value) - 3000)).toBeLessThan(1);
   });
@@ -725,7 +839,7 @@ describe("allocationBreakdown — ETF countryWeights look-through", () => {
       },
     };
     const result = allocationBreakdown(makeEtfCwSummary(), inst);
-    const eu = result.byRegion.find((s) => s.key === "EU");
+    const eu = result.byRegion.find((s) => s.key === "Europe");
     expect(eu).toBeDefined();
     expect(Math.abs(Number(eu!.value) - 10000)).toBeLessThan(1);
   });

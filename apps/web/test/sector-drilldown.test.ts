@@ -219,7 +219,7 @@ describe("getDrillDownInstruments — region", () => {
         marketValueDisplay: "500",
       }),
     ];
-    const result = getDrillDownInstruments(holdings, "region", "ID");
+    const result = getDrillDownInstruments(holdings, "region", "Asia");
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ key: "goto", name: "GOTO", value: 500 });
   });
@@ -243,7 +243,7 @@ describe("getDrillDownInstruments — region", () => {
         marketValueDisplay: "1000",
       }),
     ];
-    expect(getDrillDownInstruments(holdings, "region", "ID")).toEqual([]);
+    expect(getDrillDownInstruments(holdings, "region", "Asia")).toEqual([]);
   });
 
   it("includes ETF by its listing market region", () => {
@@ -266,12 +266,12 @@ describe("getDrillDownInstruments — region", () => {
         marketValueDisplay: "10000",
       }),
     ];
-    const result = getDrillDownInstruments(holdings, "region", "EU");
+    const result = getDrillDownInstruments(holdings, "region", "Europe");
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ key: "vwce", name: "VWCE", value: 10000 });
   });
 
-  it("maps NASDAQ to US region", () => {
+  it("maps NASDAQ to North America", () => {
     const holdings = [
       makeHolding({
         instrumentId: "aapl",
@@ -291,7 +291,7 @@ describe("getDrillDownInstruments — region", () => {
         marketValueDisplay: "5000",
       }),
     ];
-    const result = getDrillDownInstruments(holdings, "region", "US");
+    const result = getDrillDownInstruments(holdings, "region", "North America");
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ key: "aapl", name: "AAPL", value: 5000 });
   });
@@ -531,8 +531,8 @@ describe("getDrillDownInstruments — region with countryWeights", () => {
         marketValueDisplay: "10000",
       }),
     ];
-    // 80% US → North America; remainder (20%) attributed to listing venue (EU)
-    const euResult = getDrillDownInstruments(holdings, "region", "EU");
+    // 80% US → North America; remainder (20%) attributed to listing venue (Europe)
+    const euResult = getDrillDownInstruments(holdings, "region", "Europe");
     expect(euResult).toHaveLength(1);
     // remainder = 1 - 0.8 = 0.2, so contribution = 10000 * 0.2 = 2000
     expect(euResult[0].value).toBeCloseTo(2000);
@@ -541,6 +541,32 @@ describe("getDrillDownInstruments — region with countryWeights", () => {
     const naResult = getDrillDownInstruments(holdings, "region", "North America");
     expect(naResult).toHaveLength(1);
     expect(naResult[0].value).toBeCloseTo(8000);
+  });
+
+  it("adds the listing-venue remainder to the same region as matching country weights", () => {
+    const holdings = [
+      makeHolding({
+        instrumentId: "dax",
+        instrument: {
+          symbol: "EXS1",
+          name: "DAX ETF",
+          displayName: null,
+          assetClass: "etf",
+          unit: "shares",
+          market: "XETRA",
+          sector: null,
+          sectorWeights: null,
+          countryWeights: { Germany: 0.7 },
+          country: null,
+          industry: null,
+        },
+        marketValueDisplay: "10000",
+      }),
+    ];
+    // 70% Germany → Europe plus the 30% XETRA remainder → Europe: one row, full value.
+    const result = getDrillDownInstruments(holdings, "region", "Europe");
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toBeCloseTo(10000);
   });
 
   it("returns empty when countryWeights has no countries in selected region", () => {
@@ -586,7 +612,7 @@ describe("getDrillDownInstruments — region with countryWeights", () => {
         marketValueDisplay: "10000",
       }),
     ];
-    const result = getDrillDownInstruments(holdings, "region", "EU");
+    const result = getDrillDownInstruments(holdings, "region", "Europe");
     expect(result).toHaveLength(1);
     expect(result[0].value).toBe(10000);
   });
