@@ -22,8 +22,10 @@ import type { FxProvider } from "../../src/services/fx.js";
 import { valuePortfolio } from "../../src/services/valuation.js";
 import { recordDailySnapshots } from "../../src/services/snapshots.js";
 import {
+  benchmarkClosesInCurrency,
   clearBenchmarkFetchCache,
   earliestUnsatisfiedBenchmarkDate,
+  getBenchmarkPrices,
 } from "../../src/services/benchmark.js";
 import { buildApp } from "../../src/app.js";
 
@@ -342,6 +344,19 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
     // Plausible S&P 500 levels: about 3,300 at the start, about 6,500 today.
     expect(Number(closes[0]!.close)).toBeCloseTo(3300, 0);
     expect(Number(closes.at(-1)!.close)).toBeCloseTo(6500, 0);
+
+    // Every snapshot day survives the USD→IDR conversion the card applies, which silently
+    // drops a day without a rate, so the correlation above is over the full pair set.
+    const converted = await benchmarkClosesInCurrency(
+      db,
+      await getBenchmarkPrices(db, user.id, "^GSPC", dates),
+      dates,
+      "USD",
+      "IDR",
+      { cachedFxOnly: true },
+    );
+    expect(converted.fxMissingDates).toBe(0);
+    expect(converted.closes).toHaveLength(dates.length);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
