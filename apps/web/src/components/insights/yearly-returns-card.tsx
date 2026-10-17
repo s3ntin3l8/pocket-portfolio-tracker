@@ -1,6 +1,6 @@
 "use client";
 
-import { CHART_AXIS_TICK, CHART_GRID } from "@/lib/chart-style";
+import { CHART_AXIS_TICK, CHART_BAR_CURSOR, CHART_GRID } from "@/lib/chart-style";
 import { signToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
@@ -100,7 +100,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
               width={32}
             />
             <Tooltip
-              cursor={{ fill: "var(--color-accent)", opacity: 0.4 }}
+              cursor={CHART_BAR_CURSOR}
               content={({ active, payload, label }) => {
                 if (!active || !payload || payload.length === 0) return null;
                 const tooltipRows: ChartTooltipRow[] = [];

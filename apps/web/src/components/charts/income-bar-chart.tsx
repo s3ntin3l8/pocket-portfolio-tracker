@@ -1,6 +1,6 @@
 "use client";
 
-import { CHART_AXIS_TICK, CHART_SERIES_DASH } from "@/lib/chart-style";
+import { CHART_AXIS_TICK, CHART_BAR_CURSOR, CHART_SERIES_DASH } from "@/lib/chart-style";
 import {
   BarChart,
   Bar,
@@ -165,10 +165,7 @@ export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency
             minTickGap={8}
           />
           <YAxis hide />
-          <Tooltip
-            cursor={{ fill: "var(--color-muted)", opacity: 0.3 }}
-            content={<ChartTooltip money={money} t={t} />}
-          />
+          <Tooltip cursor={CHART_BAR_CURSOR} content={<ChartTooltip money={money} t={t} />} />
           <Bar
             isAnimationActive={!reducedMotion}
             dataKey="value"

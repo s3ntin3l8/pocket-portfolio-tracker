@@ -19,5 +19,8 @@ export const CHART_CURSOR = {
   strokeDasharray: "4 4",
 } as const;
 
+/** The hover band behind a bar chart's hovered category. */
+export const CHART_BAR_CURSOR = { fill: "var(--color-muted)", opacity: 0.3 } as const;
+
 /** Dash pattern for a secondary or projected series (benchmark, contributed, forecast). */
 export const CHART_SERIES_DASH = "4 3";
