@@ -320,7 +320,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     for (const dir of ["home", "tmp", "run"])
       await mkdir(path.join(demoDir, dir), { recursive: true });
 
-    const seedEnv = demoEnv(demoDir, { DATABASE_URL: databaseUrl, ...local });
+    const seedEnv = demoEnv(demoDir, { DATABASE_URL: databaseUrl, FX_PROVIDER: "none", ...local });
     const apiEnv = demoEnv(demoDir, {
       NODE_ENV: "development",
       DATABASE_URL: databaseUrl,

@@ -1684,8 +1684,20 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     });
   }
 
-  // One row per calendar day, linearly interpolated between anchors (flat after the last
-  // one, so today's row is the end-of-series rate). A date more than FX_MAX_CARRY_FORWARD_DAYS
+  // End the series on today at the trend's end value, so the last partial quarter keeps moving
+  // instead of holding flat from the latest quarter start.
+  const todayStart = new Date(Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth(), NOW.getUTCDate()));
+  if (anchors[anchors.length - 1]!.date < todayStart) {
+    anchors.push({
+      date: todayStart,
+      eurIdr: 15200 + 2250 + pseudoRandom(13) * 300,
+      usdIdr: 13600 + 2500 + pseudoRandom(17) * 250,
+      cadIdr: 10500 + 1400 + pseudoRandom(29) * 200,
+    });
+  }
+
+  // One row per calendar day, linearly interpolated between anchors (today's row is the
+  // final anchor). A date more than FX_MAX_CARRY_FORWARD_DAYS
   // from a row would make getFxRatesForDates fetch live rates and splice them over the seeded
   // walk — a step in the aggregate history — so the table must have no such gaps.
   const DAY_MS = 86_400_000;
