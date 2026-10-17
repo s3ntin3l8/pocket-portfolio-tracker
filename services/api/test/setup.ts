@@ -2,8 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
-import { afterAll } from "vitest";
-import { PGLITE_TEMPLATE_DIR } from "./global-setup.js";
+import { afterAll, inject } from "vitest";
 
 // Give every test file an isolated, file-backed PGlite database so close/reopen
 // within a file preserves data and parallel workers never contend. Tests that
@@ -19,8 +18,9 @@ const tmpDir = path.join(
 // against an already-migrated dir that's a no-op, so this is transparent to callers.
 // Falls back to today's from-scratch path if the template is missing for any reason
 // (e.g. global-setup didn't run), so this degrades safely rather than breaking tests.
-if (fs.existsSync(PGLITE_TEMPLATE_DIR)) {
-  fs.cpSync(PGLITE_TEMPLATE_DIR, tmpDir, { recursive: true });
+const templateDir = inject("pgliteTemplateDir");
+if (templateDir && fs.existsSync(templateDir)) {
+  fs.cpSync(templateDir, tmpDir, { recursive: true });
 }
 
 process.env.DATABASE_URL = `pglite://${tmpDir}`;
