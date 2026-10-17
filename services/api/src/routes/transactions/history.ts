@@ -110,10 +110,10 @@ export function registerHistoryRoutes(app: FastifyInstance) {
           const dates = [...new Set(snapRows.map((r) => r.date))];
           const ratesByDate = await getFxRatesForDates(app.db, currencies, base, dates, fxProvider);
           // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported
-          // as fxMissingCurrencies. Rates carry forward (and back, for leading gaps) at most
-          // FX_MAX_CARRY_FORWARD_DAYS, so a currency with no rate at all drops out as a whole
-          // leg; on a sparse rate grid (e.g. cached-only, provider down) single days can also
-          // drop, along with any effectiveFlow booked on them.
+          // as fxMissingCurrencies. `getFxRatesForDates` carries a currency's known rates
+          // forward (and its earliest back) over every wanted date, so exclusion is
+          // all-or-nothing per currency: a pre-switch currency without any rate drops out as
+          // a whole leg, never as single days.
           const rows: {
             date: string;
             netWorth: string;

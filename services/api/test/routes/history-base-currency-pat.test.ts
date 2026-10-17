@@ -1,6 +1,23 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { portfolioIntradaySnapshots } from "@portfolio/db";
+import { portfolioIntradaySnapshots, portfolioSnapshots } from "@portfolio/db";
+import type * as FxModule from "../../src/services/fx.js";
+
+// The daily series loads rates via getFxRatesForDates. The HTTP provider configured below
+// has no rate history, so record the provider argument the route passes instead: `null`
+// means cached-only.
+const ratesForDates = vi.hoisted(() => ({ providers: [] as unknown[] }));
+vi.mock("../../src/services/fx.js", async (importOriginal) => {
+  const mod = await importOriginal<typeof FxModule>();
+  return {
+    ...mod,
+    getFxRatesForDates: (...args: Parameters<typeof mod.getFxRatesForDates>) => {
+      ratesForDates.providers.push(args.length >= 5 ? args[4] : "default");
+      return mod.getFxRatesForDates(...args);
+    },
+  };
+});
+
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 
@@ -102,5 +119,27 @@ describe("per-portfolio history FX conversion for a read-scoped PAT (#1031)", ()
     expect(rw.statusCode).toBe(200);
     expect(fxFetches()).toBe(1);
     expect(rw.json().map((p: { netWorth: string }) => Number(p.netWorth))).toEqual([17_000_000]);
+
+    // Daily series: the read PAT's rate load is cached-only (provider `null`); a session's
+    // uses the configured provider (argument left to its default).
+    await app.db.insert(portfolioSnapshots).values({
+      portfolioId: pf,
+      date: "2026-02-02",
+      netWorth: "1000",
+      marketValue: "1000",
+      effectiveFlow: "0",
+      currency: "EUR",
+    });
+    const daily = `/portfolios/${pf}/history?range=all`;
+    ratesForDates.providers.length = 0;
+    expect(
+      (await app.inject({ method: "GET", url: daily, headers: auth(readPat) })).statusCode,
+    ).toBe(200);
+    expect(ratesForDates.providers).toEqual([null]);
+    ratesForDates.providers.length = 0;
+    expect((await app.inject({ method: "GET", url: daily, headers: auth(owner) })).statusCode).toBe(
+      200,
+    );
+    expect(ratesForDates.providers).toEqual([undefined]);
   });
 });
