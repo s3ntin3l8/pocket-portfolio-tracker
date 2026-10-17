@@ -224,6 +224,31 @@ describe("NetWorthHistoryChart", () => {
       { at: "2026-06-01T03:00:00.000Z", netWorth: "1050", marketValue: "0" },
     ];
 
+    it("plots netWorth even when marketValue is non-zero (the line always matches the headline)", async () => {
+      getPortfolioHistory.mockResolvedValueOnce([
+        { at: "2026-06-01T02:00:00.000Z", netWorth: "1000", marketValue: "900" },
+        { at: "2026-06-01T03:00:00.000Z", netWorth: "1050", marketValue: "950" },
+      ] as IntradayPoint[]);
+      const onSeriesChange = vi.fn();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <NetWorthHistoryChart
+            initial={initial}
+            currency="EUR"
+            variant="hero"
+            selectedId="p-loan"
+            onSeriesChange={onSeriesChange}
+          />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(screen.getByRole("radio", { name: "1D" }));
+      await waitFor(() => {
+        const lastCall = onSeriesChange.mock.calls.at(-1);
+        expect(lastCall?.[1]).toBe("1d");
+        expect(lastCall?.[0].points.map((p: { close: number }) => p.close)).toEqual([1000, 1050]);
+      });
+    });
+
     it("plots netWorth, not the zero marketValue, on the hero's intraday line", async () => {
       getPortfolioHistory.mockResolvedValueOnce(cashOnly);
       const onSeriesChange = vi.fn();

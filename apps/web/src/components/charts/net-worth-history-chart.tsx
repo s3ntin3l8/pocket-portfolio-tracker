@@ -148,8 +148,6 @@ export function NetWorthHistoryChart({
   }
 
   const intraday = isIntradayRange(range);
-  // Value lines plot `netWorth` — the same quantity as the headline — never `marketValue`, which is
-  // 0 for a cash-only portfolio. The TWR (`pct`/`index`) is chained on `marketValue` server-side.
   // No TWR pct/index on intraday points — the Performance toggle only applies to
   // the day-grained ranges, so intraday always renders as a Value chart. The hero
   // variant has no mode toggle at all — it always shows the raw value sparkline.
@@ -160,6 +158,8 @@ export function NetWorthHistoryChart({
     range === "1d" ? { hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "short" },
   );
 
+  // Value lines plot `netWorth` — the same quantity as the headline — never `marketValue`, which is
+  // 0 for a cash-only portfolio. The TWR (`pct`/`index`) is chained on `marketValue` server-side.
   const chartData = intraday
     ? data.filter(isIntradayPoint).map((p) => ({
         date: intradayLabelFmt.format(new Date(p.at)),
