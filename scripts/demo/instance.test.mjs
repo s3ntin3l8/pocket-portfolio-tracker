@@ -188,16 +188,17 @@ describe("startDemo startup failure", () => {
  * scratch dir, so either one outliving the delete brings the dir back. Neither carries
  * the scratch HOME, so the /proc HOME sweep cannot find them: only explicit tracking can.
  */
-function bootWithLongStep({ ignoreTerm = false } = {}) {
-  const keepTouching = `
+function bootWithLongStep({ ignoreTerm = "none" } = {}) {
+  const keepTouching = (ignore) => `
     const fs = require("fs"), path = require("path");
-    ${ignoreTerm ? 'process.on("SIGTERM", () => {});' : ""}
+    ${ignore ? 'process.on("SIGTERM", () => {});' : ""}
     setInterval(() => fs.mkdirSync(path.join(process.env.DEMO_DIR, "home/step"), { recursive: true }), 50);`;
+  const grandchildCode = keepTouching(ignoreTerm !== "none");
   const step = `
     const { spawn } = require("child_process");
-    const grandchild = spawn(process.execPath, ["-e", ${JSON.stringify(keepTouching)}], { stdio: "ignore" });
+    const grandchild = spawn(process.execPath, ["-e", ${JSON.stringify(grandchildCode)}], { stdio: "ignore" });
     console.log("PIDS " + process.pid + " " + grandchild.pid);
-    ${keepTouching}`;
+    ${keepTouching(ignoreTerm === "both")}`;
   const driver = `
     const { startDemo } = await import(${JSON.stringify(new URL("./instance.mjs", import.meta.url).href)});
     await startDemo({
@@ -260,7 +261,7 @@ describe("startDemo stop during a build/seed step", () => {
   }, 60_000);
 
   it("a second signal hard-kills a step that ignores SIGTERM, without waiting out the grace period", async () => {
-    const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: true });
+    const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: "both" });
     let pids = [];
     try {
       const started = await ready();
@@ -273,6 +274,30 @@ describe("startDemo stop during a build/seed step", () => {
       // Well inside killGroup's 5 s grace: the second signal did not wait for it.
       expect(Date.now() - second).toBeLessThan(4_500);
       expect(pids.some(pidAlive)).toBe(false);
+      expect(existsSync(started.demoDir)).toBe(false);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+    }
+  }, 60_000);
+
+  // The step's direct child exits on SIGTERM, but a subprocess in its group ignores
+  // it: the group must stay tracked, so the second signal still hard-kills it.
+  it("a second signal hard-kills a step subprocess that outlived the step itself", async () => {
+    const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: "grandchild" });
+    let pids = [];
+    try {
+      const started = await ready();
+      pids = started.pids;
+      const [stepPid, grandchildPid] = pids;
+      proc.kill("SIGTERM");
+      for (let i = 0; i < 100 && pidAlive(stepPid); i++)
+        await new Promise((r) => setTimeout(r, 50));
+      expect(pidAlive(stepPid)).toBe(false);
+      expect(pidAlive(grandchildPid)).toBe(true);
+      proc.kill("SIGINT");
+      expect(await exited).toBe(130);
+      expect(pidAlive(grandchildPid)).toBe(false);
       expect(existsSync(started.demoDir)).toBe(false);
     } finally {
       proc.kill("SIGKILL");

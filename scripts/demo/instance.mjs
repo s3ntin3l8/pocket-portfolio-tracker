@@ -138,6 +138,16 @@ export function strayPids(home) {
   return pids;
 }
 
+/** Whether any process in the child's process group is still alive (signal 0 only probes). */
+const groupAlive = (child) => {
+  try {
+    process.kill(-child.pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const signalPid = (pid, sig) => {
   try {
     process.kill(pid, sig);
@@ -259,10 +269,13 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
 
   /** Every server process group started so far; teardown kills them all. */
   const children = [];
-  /** The build/seed step running right now (its own process group), if any. */
-  let step = null;
-  /** Servers plus the in-flight step: every group a stop has to take down. */
-  const groups = () => (step ? [...children, step] : children);
+  /**
+   * Build/seed steps (each its own process group) whose group is still alive: the
+   * running one, plus any whose direct child exited while a subprocess lingers.
+   */
+  const steps = new Set();
+  /** Servers plus live step groups: every group a stop has to take down. */
+  const groups = () => [...children, ...steps];
   const home = path.join(demoDir, "home");
   let stopping;
   const hardKill = (targets) => {
@@ -303,23 +316,15 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
   // grace period skips it and SIGKILLs the groups instead of leaving them behind.
   function onSignal() {
     if (stopping) {
-      // Snapshot: the step is untracked as soon as its direct child exits, but
-      // its group (turbo's subprocesses) must still be waited for.
+      // Snapshot, so the wait below covers every group signalled here.
       const targets = groups();
       hardKill(targets);
       // Give the killed groups a moment to exit, or a dying next dev worker
       // recreates its config store under HOME right after the delete.
-      const gone = (child) => {
-        try {
-          return (process.kill(-child.pid, 0), false);
-        } catch {
-          return true;
-        }
-      };
       const deadline = Date.now() + 2_000;
       let attempts = 0;
       const finish = () => {
-        if (!targets.every(gone) && Date.now() < deadline) return setTimeout(finish, 50);
+        if (targets.some(groupAlive) && Date.now() < deadline) return setTimeout(finish, 50);
         if (keep) process.exit(130);
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
@@ -347,16 +352,18 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
   };
 
   /**
-   * run() with the step tracked while it runs, so a stop kills its group; refuses
-   * once stopping. Untracked on exit: a finished step's group id could be reused.
+   * run() with the step's group tracked, so a stop kills it; refuses once stopping.
+   * Untracked once the whole group is gone (only then can its id be reused), so a
+   * subprocess that outlives the direct child is still hard-killed by a second
+   * Ctrl-C.
    */
   const runStep = async (cmd, args, opts) => {
     if (stopping) throw new Error("demo is stopping; not starting more steps");
     let child;
     try {
-      await run(cmd, args, opts, (spawned) => (step = child = spawned));
+      await run(cmd, args, opts, (spawned) => steps.add((child = spawned)));
     } finally {
-      if (step === child) step = null;
+      if (child && !groupAlive(child)) steps.delete(child);
     }
   };
 
