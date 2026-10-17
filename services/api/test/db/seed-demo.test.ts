@@ -36,7 +36,7 @@ import { buildApp } from "../../src/app.js";
  */
 process.env.SEED_DEMO_EMAIL = "seed-demo-admin-test@example.com";
 process.env.SEED_DEMO_PASSWORD = "bootstrap-password"; // pragma: allowlist secret
-const { seedDemo, demoSnapshotWalk } = await import("../../src/db/seed-demo.js");
+const { seedDemo, demoSnapshotWalk, demoBenchmarkWalk } = await import("../../src/db/seed-demo.js");
 
 describe("seedDemo — admin bootstrap", () => {
   afterEach(async () => {
@@ -237,7 +237,12 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
   let dir: string;
   let app: Awaited<ReturnType<typeof buildApp>>;
   let insights: {
-    yearlyReturns: { year: number; portfolioTwr: string | null; portfolioXirr: string | null }[];
+    yearlyReturns: {
+      year: number;
+      portfolioTwr: string | null;
+      portfolioXirr: string | null;
+      benchmarks: { symbol: string; twr: string | null }[];
+    }[];
     benchmark: { symbol: string; activeReturn: string; correlation: string } | null;
   };
   // Any network call (a live benchmark or FX fetch) is recorded here. `ensureBenchmarkPrices`
@@ -306,6 +311,19 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  // The walks load on the index's yearly regime, not just its daily shocks: with only the
+  // shocks shared, the portfolio's best year was the index's −19% year, and the yearly
+  // table contradicted the daily correlation above.
+  it("gives the portfolio its weakest year where the index has its weakest", () => {
+    const rows = insights.yearlyReturns.filter((r) => r.benchmarks[0]?.twr != null);
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+    const weakest = (pick: (r: (typeof rows)[number]) => number) =>
+      rows.reduce((min, r) => (pick(r) < pick(min) ? r : min)).year;
+    const bmWeakest = weakest((r) => Number(r.benchmarks[0]!.twr));
+    expect(Number(rows.find((r) => r.year === bmWeakest)!.benchmarks[0]!.twr)).toBeLessThan(0);
+    expect(weakest((r) => Number(r.portfolioTwr))).toBe(bmWeakest);
+  });
+
   it("covers every snapshot date with seeded USD closes, so nothing is fetched", async () => {
     const db = getDb();
     const [user] = await db
@@ -341,9 +359,11 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
     // makes ensureBenchmarkPrices fetch.
     const span = (Date.parse(closes.at(-1)!.date) - Date.parse(closes[0]!.date)) / 86_400_000;
     expect(closes).toHaveLength(span + 1);
-    // Plausible S&P 500 levels: about 3,300 at the start, about 6,500 today.
-    expect(Number(closes[0]!.close)).toBeCloseTo(3300, 0);
-    expect(Number(closes.at(-1)!.close)).toBeCloseTo(6500, 0);
+    // Plausible S&P 500 levels: between the real 2019 and 2025 year-ends at the start,
+    // about the real level (7,800) today.
+    expect(Number(closes[0]!.close)).toBeGreaterThan(3200);
+    expect(Number(closes[0]!.close)).toBeLessThan(6900);
+    expect(Number(closes.at(-1)!.close)).toBeCloseTo(7800, 0);
 
     // Every snapshot day survives the USD→IDR conversion the card applies, which silently
     // drops a day without a rate, so the correlation above is over the full pair set.
@@ -358,6 +378,39 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
     expect(converted.fxMissingDates).toBe(0);
     expect(converted.closes).toHaveLength(dates.length);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // The seeded ^GSPC used to drift straight from its start to today's close on a year's
+  // worth of pseudo-random shocks, so 2022 came out about +50% where the real index lost
+  // 19%. Each seeded calendar year now ends on the real index's year-end level.
+  it("gives each seeded year about the real ^GSPC price return (USD)", async () => {
+    const realReturns: Record<number, number> = {
+      2021: 0.27,
+      2022: -0.19,
+      2023: 0.24,
+      2024: 0.23,
+      2025: 0.16,
+    };
+    const db = getDb();
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, "seed-demo-admin-test@example.com"));
+    const closes = await db
+      .select({ date: benchmarkPrices.date, close: benchmarkPrices.close })
+      .from(benchmarkPrices)
+      .where(and(eq(benchmarkPrices.userId, user.id), eq(benchmarkPrices.symbol, "^GSPC")));
+    const byDate = new Map(closes.map((c) => [c.date, Number(c.close)]));
+    let checked = 0;
+    for (const [year, real] of Object.entries(realReturns)) {
+      const open = byDate.get(`${Number(year) - 1}-12-31`);
+      const close = byDate.get(`${year}-12-31`);
+      if (open === undefined || close === undefined) continue; // outside the seeded range
+      const seeded = close / open - 1;
+      expect(Math.abs(seeded - real), `${year}: seeded ${seeded}, real ${real}`).toBeLessThan(0.03);
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -426,6 +479,66 @@ describe("demoSnapshotWalk (#1020)", () => {
         label: "test",
       }),
     ).toThrow(/no drift/);
+  });
+});
+
+describe("demoBenchmarkWalk", () => {
+  const noise = (daysAgo: number) => 0.01 * Math.sin(daysAgo * 1.7);
+
+  it("passes through every in-range year-end and today's close, one row per day", () => {
+    const walk = demoBenchmarkWalk({
+      start: "2020-10-01",
+      today: "2023-06-30",
+      // 2019 and 2023 lie outside the range: 2019 only shapes the opening level.
+      yearEnds: { 2019: 3000, 2020: 4000, 2021: 5000, 2022: 4000, 2023: 9999 },
+      todayClose: 4500,
+      noise,
+    });
+    const byDate = new Map(walk.map((p) => [p.date, p]));
+    expect(walk[0]!.date).toBe("2020-10-01");
+    expect(walk.at(-1)!.date).toBe("2023-06-30");
+    expect(walk).toHaveLength(1003);
+    expect(byDate.get("2020-12-31")!.close).toBeCloseTo(4000, 6);
+    expect(byDate.get("2021-12-31")!.close).toBeCloseTo(5000, 6);
+    expect(byDate.get("2022-12-31")!.close).toBeCloseTo(4000, 6);
+    expect(walk.at(-1)!.close).toBeCloseTo(4500, 6);
+    // Opens on the log-linear interpolation between the 2019 and 2020 year-ends.
+    const f = 275 / 366;
+    expect(walk[0]!.close).toBeCloseTo(3000 * (4000 / 3000) ** f, 6);
+  });
+
+  it("keeps the daily noise, plus one constant drift per segment", () => {
+    const walk = demoBenchmarkWalk({
+      start: "2021-06-01",
+      today: "2022-06-01",
+      yearEnds: { 2021: 5000 },
+      todayClose: 4000,
+      noise,
+    });
+    const days = walk.length - 1;
+    expect(walk[0]!.drift).toBe(0);
+    for (let i = 1; i <= days; i++) {
+      const ratio = walk[i]!.close / walk[i - 1]!.close;
+      expect(ratio).toBeCloseTo((1 + noise(days - i)) * Math.exp(walk[i]!.drift), 10);
+    }
+    const yearEnd = walk.findIndex((p) => p.date === "2021-12-31");
+    expect(walk[1]!.drift).toBeCloseTo(walk[yearEnd]!.drift, 12);
+    expect(walk[yearEnd + 1]!.drift).toBeCloseTo(walk[days]!.drift, 12);
+    expect(walk[yearEnd + 1]!.drift).not.toBeCloseTo(walk[yearEnd]!.drift, 6);
+    // Before every anchor, the series opens on the nearest year-end's level.
+    expect(walk[0]!.close).toBeCloseTo(5000, 6);
+  });
+
+  it("refuses a start on or after today", () => {
+    expect(() =>
+      demoBenchmarkWalk({
+        start: "2025-01-02",
+        today: "2025-01-02",
+        yearEnds: { 2024: 100 },
+        todayClose: 100,
+        noise,
+      }),
+    ).toThrow(/needs a start before/);
   });
 });
 
