@@ -9,6 +9,7 @@ import {
   portfolios,
   prices,
   transactions,
+  userBenchmarkSymbols,
   users,
 } from "@portfolio/db";
 import { eq, sql } from "drizzle-orm";
@@ -1021,6 +1022,45 @@ describe("GET /insights", () => {
       expect(Number(body.benchmark.activeReturn)).toBeCloseTo(pf - bm, 6);
       // 1300/1000 − 130·14000/(100·10000) = 0.3 − 0.82.
       expect(Number(body.benchmark.activeReturn)).toBeCloseTo(-0.52, 6);
+    });
+
+    it("converts a second benchmark in another currency (outside the card's FX load)", async () => {
+      const { t } = await seed("insights-bm-fx-two-user");
+      const [u] = await app.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.authSub, "insights-bm-fx-two-user"))
+        .limit(1);
+      await app.db.insert(userBenchmarkSymbols).values([
+        { userId: u!.id, symbol: "^GSPC", displayName: "S&P 500", displayOrder: 0 },
+        { userId: u!.id, symbol: "^GDAXI", displayName: "DAX", displayOrder: 1 },
+      ]);
+      const EUR_FX = ["15000", "15500", "16000", "16500", "17000"];
+      await app.db
+        .insert(fxRates)
+        .values(DATES.map((date, i) => ({ base: "EUR", quote: "IDR", rate: EUR_FX[i]!, date })))
+        .onConflictDoUpdate({
+          target: [fxRates.base, fxRates.quote, fxRates.date],
+          set: { rate: sql`excluded.rate` },
+        });
+      await app.db.insert(benchmarkPrices).values(
+        DATES.map((date) => ({
+          userId: u!.id,
+          symbol: "^GDAXI",
+          date,
+          close: "1000",
+          currency: "EUR",
+          source: "test",
+        })),
+      );
+      const res = await app.inject({ method: "GET", url: "/insights?range=all", headers: auth(t) });
+      expect(res.statusCode).toBe(200);
+      type Row = { year: number; benchmarks: { symbol: string; twr: string | null }[] };
+      const row = (res.json().yearlyReturns as Row[]).find((r) => r.year === 2014)!;
+      const twr = (sym: string) => Number(row.benchmarks.find((b) => b.symbol === sym)!.twr);
+      // A flat EUR index is pure FX in IDR: 16000 / 15000 − 1.
+      expect(twr("^GDAXI")).toBeCloseTo(16000 / 15000 - 1, 6);
+      expect(twr("^GSPC")).toBeCloseTo(idr(2) / idr(0) - 1, 6);
     });
 
     it("measures the hero and per-portfolio history benchmark in IDR", async () => {

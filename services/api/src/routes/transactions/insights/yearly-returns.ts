@@ -26,6 +26,12 @@ export interface ComputeYearlyReturnsArgs {
   userId: string;
   /** The currency every series here is measured in; each benchmark is converted into it. */
   displayCurrency: string;
+  /**
+   * Per-date FX the caller already loaded into `displayCurrency` over the same date grid,
+   * and the currencies it covers. Reused when it covers every selected benchmark's
+   * currency; otherwise one load here covers them all.
+   */
+  fx?: { ratesByDate: Map<string, Record<string, string>>; currencies: string[] };
   /** Per-portfolio display-currency flows (marketValue + effectiveFlow) — already aggregated by the caller. */
   aggregatedFlows: { date: string; marketValue: string; effectiveFlow: string }[];
   /**
@@ -70,6 +76,7 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
     app,
     userId,
     displayCurrency,
+    fx,
     aggregatedFlows,
     perPortfolio,
     boundaryFlows: bflows,
@@ -117,13 +124,13 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   }
 
   const priceMap = await getBenchmarkPricesMulti(db, userId, symbolNames, allDates);
-  // One per-date FX load for every selected benchmark's currency, shared by all symbols.
-  const ratesByDate = await getFxRatesForDates(
-    db,
-    [...new Set(benchmarkSymbols.map((b) => b.currency ?? "USD"))],
-    displayCurrency,
-    allDates,
-  );
+  // One per-date FX map for every selected benchmark's currency, shared by all symbols:
+  // the caller's when it covers them (the usual single-benchmark case), else one load.
+  const bmCurrencies = [...new Set(benchmarkSymbols.map((b) => b.currency ?? "USD"))];
+  const ratesByDate =
+    fx && bmCurrencies.every((c) => c === displayCurrency || fx.currencies.includes(c))
+      ? fx.ratesByDate
+      : await getFxRatesForDates(db, bmCurrencies, displayCurrency, allDates);
 
   const benchmarkInputs: {
     symbol: string;

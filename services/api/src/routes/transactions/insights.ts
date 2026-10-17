@@ -178,6 +178,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
           app,
           userId: id,
           displayCurrency: display,
+          fx: { ratesByDate, currencies },
           aggregatedFlows: aggregated,
           perPortfolio: perPortfolioForYearly,
           boundaryFlows: boundaryFlowsForYearly,
