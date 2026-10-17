@@ -182,30 +182,33 @@ describe("FX provider for a read-scoped PAT on /networth/history, /insights and 
     );
   });
 
+  // [path, whether a session back-fills benchmark prices on it]
   it.each([
-    ["/networth/history?range=all"],
-    ["/networth/history?range=7d"],
-    ["/networth/history?range=1d"],
-    ["/insights?range=all"],
-    ["/portfolios/:pf/performance"],
-  ])("%s: a read PAT loads every rate cached-only and back-fills no benchmark", async (path) => {
-    const url = path.replace(":pf", pfIds[0]!);
-    reset();
-    const ro = await app.inject({ method: "GET", url, headers: auth(readPat) });
-    expect(ro.statusCode).toBe(200);
-    expect(calls.fx.length).toBeGreaterThan(0);
-    expect(calls.fx.filter((c) => c.provider !== null)).toEqual([]);
-    expect(calls.ensure).toBe(0);
+    ["/networth/history?range=all", true],
+    ["/networth/history?range=7d", false],
+    ["/networth/history?range=1d", false],
+    ["/insights?range=all", true],
+    ["/portfolios/:pf/performance", false],
+  ] as const)(
+    "%s: a read PAT loads every rate cached-only and back-fills no benchmark",
+    async (path, sessionBackfills) => {
+      const url = path.replace(":pf", pfIds[0]!);
+      reset();
+      const ro = await app.inject({ method: "GET", url, headers: auth(readPat) });
+      expect(ro.statusCode).toBe(200);
+      expect(calls.fx.length).toBeGreaterThan(0);
+      expect(calls.fx.filter((c) => c.provider !== null)).toEqual([]);
+      expect(calls.ensure).toBe(0);
 
-    // A session uses the configured provider (argument left to its default). It runs after
-    // the read PAT, so it also proves the read PAT's result is cached under its own key.
-    reset();
-    const rw = await app.inject({ method: "GET", url, headers: auth(owner) });
-    expect(rw.statusCode).toBe(200);
-    expect(calls.fx.length).toBeGreaterThan(0);
-    expect(calls.fx.some((c) => c.provider === null)).toBe(false);
-    if (url.includes("range=all")) {
-      expect(calls.ensure).toBeGreaterThan(0);
-    }
-  });
+      // A session uses the configured provider (argument left to its default). It runs after
+      // the read PAT, so it also proves the read PAT's result is cached under its own key.
+      reset();
+      const rw = await app.inject({ method: "GET", url, headers: auth(owner) });
+      expect(rw.statusCode).toBe(200);
+      expect(calls.fx.length).toBeGreaterThan(0);
+      expect(calls.fx.some((c) => c.provider === null)).toBe(false);
+      if (sessionBackfills) expect(calls.ensure).toBeGreaterThan(0);
+      else expect(calls.ensure).toBe(0);
+    },
+  );
 });
