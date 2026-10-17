@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.2...v0.2.3) (2026-10-17)
+
+
+### Features
+
+* isolated demo instance and landing capture profile ([#988](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/988)) ([c572c05](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c572c057b6046d3f18b732fa6b2bbed24a37c34f))
+* **web:** calm data-first design tokens and primitives ([#992](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/992)) ([8a541cb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8a541cbdb4b2b6ca35cab93ff1c341b852539abd))
+* **web:** neutral Holdings hero and consistent rail cards ([#995](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/995)) ([38bc438](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/38bc438098b3eac2f31913348a01a605c60834e5))
+* **web:** one back button, one title size and a calmer sidebar ([#997](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/997)) ([7c27b4e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7c27b4e712863f842a3e618a3535b922a27cba6e))
+* **web:** one card system across Reports, Insights, Tax and Savings ([#996](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/996)) ([d697e49](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d697e499d37ac170e6e19bb5bd93ba4f1e254b0f))
+* **web:** one chart style and a token-based tooltip ([#1001](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1001)) ([3dfa0b7](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3dfa0b75f098a93376237dbd3fdcea2513305e08))
+* **web:** shared error, empty and field components and dialog chrome ([#1000](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1000)) ([b215d72](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b215d72e363f93b77795b6590c980fac403cc1b4))
+* **web:** sticky table headers and one mobile table breakpoint ([#1010](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1010)) ([27c4117](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/27c411705baf8b5ff8080c2d005ccbfbcdbb2e43))
+* **web:** uniform table density and a numeric cell variant ([#999](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/999)) ([dc8529b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/dc8529b3cacc2c89d139aa41ee20f00f5d0a924b))
+
+
+### Bug Fixes
+
+* **demo:** tear down when startup fails ([#1015](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1015)) ([8de29be](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8de29be86c5182d133210e9783327968ef07309f))
+* **screenshots:** wait for rendered charts and refresh README captures ([#1013](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1013)) ([acc67ca](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/acc67caf4d28ef0ecbc99a3bc8fa5a432b7841ab))
+* **seed:** anchor demo snapshot history to the live valuation ([#1007](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1007)) ([7c208e0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7c208e0e43b09f20bba718cd2a72ebaf75cc2ac3))
+* **web:** AA contrast for brand green, destructive fill and tints ([#1009](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1009)) ([9dfbb46](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9dfbb46b0dbc7d9dae8ab9156b8f8031319294c5))
+* **web:** AA text colours in the light theme and remove dead brand tokens ([#1003](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1003)) ([e67eef5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/e67eef51ee18b8e0d2f0403b152cd20464488450))
+* **web:** give async test utilities headroom under load ([#1004](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1004)) ([eb05e0e](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/eb05e0ef5006f2d7d1d0c4a617c66f542b72eaaf))
+* **web:** show the Activity amount next to the transaction ([#1005](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1005)) ([764928f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/764928f4a57e2ace797079e25ea0527757df2fc7))
+
 ## [0.2.2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.1...v0.2.2) (2026-10-15)
 
 
