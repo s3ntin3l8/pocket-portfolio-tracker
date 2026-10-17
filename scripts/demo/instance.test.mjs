@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -30,13 +31,14 @@ const ENV_KEYS = ["TMPDIR", "DEMO_API_PORT", "DEMO_WEB_PORT", "DEMO_HEALTH_TIMEO
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 const scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
 let startDemo;
+let strayPids;
 let healthTimeoutMs;
 
 beforeAll(async () => {
   process.env.TMPDIR = scratchRoot;
   process.env.DEMO_API_PORT = await freePort();
   process.env.DEMO_WEB_PORT = await freePort();
-  ({ startDemo, healthTimeoutMs } = await import("./instance.mjs"));
+  ({ startDemo, healthTimeoutMs, strayPids } = await import("./instance.mjs"));
 });
 
 afterAll(() => {
@@ -83,6 +85,48 @@ describe("startDemo startup failure", () => {
     expect(readdirSync(scratchRoot)).toEqual([]);
     expect(process.listenerCount("SIGINT")).toBe(listeners);
   }, 20_000);
+
+  // Like Next's telemetry flush: spawned `detached` (its own group, so killGroup
+  // misses it) with the scratch HOME, and it keeps recreating HOME/.config.
+  it.skipIf(process.platform !== "linux")(
+    "kills an escaped process still using the scratch HOME before deleting",
+    async () => {
+      let demoDir;
+      let stray;
+      try {
+        await expect(
+          startDemo({
+            quiet: true,
+            boot: async (ctx) => {
+              demoDir = ctx.demoDir;
+              stray = spawn(
+                process.execPath,
+                [
+                  "-e",
+                  `const fs = require("fs"), p = require("path");
+                   setInterval(() => fs.mkdirSync(p.join(process.env.HOME, ".config/nextjs-nodejs"), { recursive: true }), 50);`,
+                ],
+                { detached: true, stdio: "ignore", env: ctx.webEnv },
+              );
+              await new Promise((r) => setTimeout(r, 300));
+              expect(existsSync(path.join(demoDir, "home/.config/nextjs-nodejs"))).toBe(true);
+              expect(strayPids(path.join(demoDir, "home"))).toContain(stray.pid);
+              throw new Error("boot failed");
+            },
+          }),
+        ).rejects.toThrow("boot failed");
+
+        expect(existsSync(demoDir)).toBe(false);
+        expect(groupAlive(stray.pid)).toBe(false);
+        // Stays gone: nothing is left to recreate it.
+        await new Promise((r) => setTimeout(r, 300));
+        expect(existsSync(demoDir)).toBe(false);
+      } finally {
+        if (stray && groupAlive(stray.pid)) process.kill(-stray.pid, "SIGKILL");
+      }
+    },
+    20_000,
+  );
 
   it("refuses a bad DEMO_HEALTH_TIMEOUT_MS before creating anything", async () => {
     process.env.DEMO_HEALTH_TIMEOUT_MS = "soon";

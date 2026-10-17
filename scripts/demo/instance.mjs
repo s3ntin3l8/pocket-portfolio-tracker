@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -91,6 +91,53 @@ async function killGroup(child, graceMs = 5_000) {
   if (!signal("SIGKILL")) return;
   // Let the killed group actually exit, so the scratch-dir delete does not race it.
   await waitGone(2_000);
+}
+
+/**
+ * Processes that escaped their process group but still run with this demo's
+ * scratch HOME (unique per run), found via /proc on Linux. `next dev` spawns its
+ * telemetry flush `detached` on exit, even with NEXT_TELEMETRY_DISABLED, and that
+ * process recreates HOME/.config/nextjs-nodejs after the scratch dir is deleted.
+ */
+export function strayPids(home) {
+  if (process.platform !== "linux") return [];
+  const marker = `\0HOME=${home}\0`;
+  const pids = [];
+  for (const entry of readdirSync("/proc")) {
+    if (!/^\d+$/.test(entry) || Number(entry) === process.pid) continue;
+    try {
+      if (`\0${readFileSync(`/proc/${entry}/environ`, "latin1")}`.includes(marker))
+        pids.push(Number(entry));
+    } catch {
+      // Gone already, or not ours to read.
+    }
+  }
+  return pids;
+}
+
+const signalPid = (pid, sig) => {
+  try {
+    process.kill(pid, sig);
+    return true;
+  } catch {
+    return false; // Already gone.
+  }
+};
+
+/** SIGTERM the strays, wait for them to go, SIGKILL whatever is left. */
+async function killStrays(home, graceMs = 2_000) {
+  const pids = strayPids(home);
+  if (pids.length === 0) return;
+  console.log(`[demo] stopping ${pids.length} process(es) left outside the server groups`);
+  for (const pid of pids) signalPid(pid, "SIGTERM");
+  const waitGone = async (ms) => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline && pids.some((pid) => signalPid(pid, 0)))
+      await new Promise((r) => setTimeout(r, 50));
+  };
+  await waitGone(graceMs);
+  for (const pid of pids) signalPid(pid, "SIGKILL");
+  await waitGone(1_000);
 }
 
 async function waitForHttp(url, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS) {
@@ -183,6 +230,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
 
   /** Every server process group started so far; teardown kills them all. */
   const children = [];
+  const home = path.join(demoDir, "home");
   let stopping;
   const hardKill = () => {
     for (const child of children)
@@ -196,6 +244,8 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     // Wait for every process to exit first: dying next dev workers otherwise
     // recreate files under the scratch HOME after it was deleted.
     await Promise.all(children.map((child) => killGroup(child)));
+    // Then anything they spawned outside their groups (Next's telemetry flush).
+    await killStrays(home);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     if (keep) return console.log(`[demo] kept ${demoDir}`);
@@ -234,6 +284,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
         if (keep) process.exit(130);
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
+        for (const pid of strayPids(home)) signalPid(pid, "SIGKILL");
         rmSync(demoDir, { recursive: true, force: true });
         // Re-check after a beat; exit as soon as the directory stays gone.
         if (++attempts < 5)
