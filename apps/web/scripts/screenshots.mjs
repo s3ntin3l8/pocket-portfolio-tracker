@@ -39,7 +39,9 @@ const PROFILE = process.env.SCREENSHOTS_PROFILE ?? "readme";
 // leaf under the Reports tab, not a top-level nav item, but is rich enough (FSA
 // allowance, realized gains, harvest suggestions) to be worth its own capture.
 const SCREENS = [
-  { slug: "holdings", path: "/en/holdings" },
+  // `minCharts`: the hero chart is a `next/dynamic` chunk that can mount after
+  // `networkidle`; settle() waits until at least this many charts have drawn.
+  { slug: "holdings", path: "/en/holdings", minCharts: 1 },
   { slug: "activity", path: "/en/transactions" },
   { slug: "insights", path: "/en/insights" },
   { slug: "reports", path: "/en/reports" },
@@ -91,24 +93,29 @@ async function newContext(browser, cookie, secure, theme, options) {
   return context;
 }
 
-async function settle(page) {
+async function settle(page, minCharts = 0) {
   // next/font uses display:"swap" (see layout.tsx) — text paints in a fallback
   // system font first, then swaps once Plus Jakarta Sans/DM Mono finish loading.
   // Without this, captures can race that swap and ship with the wrong font.
   await page.evaluate(() => document.fonts.ready);
   // `networkidle` can fire while the dev server is still compiling a route or a
   // query is in flight, which on a loaded host shipped a hero with no chart.
-  // Wait until nothing is busy, every recharts chart has drawn, and Next's dev
-  // indicator has stopped compiling; throw rather than capture an empty state.
+  // Wait until nothing is busy (chart skeletons and loading charts set aria-busy),
+  // the screen's expected charts have mounted and drawn, and Next's dev indicator
+  // has stopped compiling; throw rather than capture an empty state.
   await page.waitForFunction(
-    () => {
+    (min) => {
       if (document.querySelector('[aria-busy="true"]')) return false;
       const charts = [...document.querySelectorAll(".recharts-wrapper")];
+      if (charts.length < min) return false;
       if (charts.some((c) => !c.querySelector(".recharts-surface path[d]"))) return false;
+      // Couples to the Next dev overlay's private markup (`<nextjs-portal>` shadow
+      // root and its "Compiling"/"Building" label). If Next renames either, this
+      // check turns vacuous rather than hanging, and the other checks still apply.
       const portal = document.querySelector("nextjs-portal")?.shadowRoot;
-      return !portal?.textContent?.includes("Compiling");
+      return !/Compiling|Building/.test(portal?.textContent ?? "");
     },
-    null,
+    minCharts,
     { timeout: 60_000, polling: 250 },
   );
   // Let charts/animations settle (recharts entrance transitions).
@@ -117,6 +124,21 @@ async function settle(page) {
 
 async function captureReadme(browser, cookie, secure) {
   await mkdir(README_DIR, { recursive: true });
+  // Capture the whole set into a staging dir and move it in only once every shot
+  // succeeded, so an aborted run (e.g. a settle() timeout) can't leave a mix of
+  // refreshed and stale screenshots behind.
+  const staging = await mkdtemp(path.join(README_DIR, ".staging-"));
+  try {
+    const entries = await captureReadmeInto(browser, cookie, secure, staging);
+    for (const { filename } of entries)
+      await rename(path.join(staging, filename), path.join(README_DIR, filename));
+    return entries;
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
+}
+
+async function captureReadmeInto(browser, cookie, secure, outDir) {
   const manifestEntries = [];
   for (const factor of FACTORS) {
     for (const theme of THEMES) {
@@ -127,9 +149,9 @@ async function captureReadme(browser, cookie, secure) {
       const page = await context.newPage();
       for (const screen of SCREENS) {
         await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
-        await settle(page);
+        await settle(page, screen.minCharts);
         const filename = `${screen.slug}-${theme}-${factor.name}.png`;
-        await page.screenshot({ path: path.join(README_DIR, filename), fullPage: false });
+        await page.screenshot({ path: path.join(outDir, filename), fullPage: false });
         console.log(`captured ${filename}`);
         manifestEntries.push({
           filename,
@@ -170,7 +192,7 @@ async function recordLoop(browser, cookie, secure, outDir) {
   const started = Date.now();
   const page = await context.newPage();
   await page.goto(`${WEB_URL}/en/holdings`, { waitUntil: "networkidle" });
-  await settle(page);
+  await settle(page, 1);
   const offset = (Date.now() - started) / 1000;
   for (const range of LANDING_RANGES) {
     const chip = page
@@ -235,7 +257,7 @@ async function captureLanding(browser, cookie, secure) {
     const page = await context.newPage();
     for (const screen of SCREENS) {
       await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
-      await settle(page);
+      await settle(page, screen.minCharts);
       const filename = `${screen.slug}-${factor.name}.png`;
       // Write-then-rename so a crashed run never leaves a half-written file.
       const tmp = path.join(outDir, `.${filename}`);
