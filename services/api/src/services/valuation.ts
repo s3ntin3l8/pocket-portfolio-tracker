@@ -20,6 +20,7 @@ import { getFxRates, makeFxRateFn, recordFxMissing, type FxProvider } from "./fx
 import { materializeManualPriceRow } from "./instruments.js";
 import { toCoreTxns } from "./tx-core.js";
 import { logTiming } from "../lib/timing.js";
+import { cachedOnlyKeySuffix, isFxCachedOnly } from "../lib/fx-cached-only.js";
 import type { FastifyBaseLogger } from "fastify";
 
 /** Presentation metadata so the web app renders names without a second round-trip. */
@@ -297,7 +298,9 @@ export function derivationCacheKey(
 ): string {
   const mode =
     costBasisMode === undefined || costBasisMode === "purchase_price" ? "" : costBasisMode;
-  return `${portfolioId}|${displayCurrency}|${mode}|${cashCounted}`;
+  // A read-scoped PAT's valuation loads FX cached-only (lib/fx-cached-only.ts); key it apart
+  // so it is never served to a session — this key also fronts the FIFO trade-log cache.
+  return `${portfolioId}|${displayCurrency}|${mode}|${cashCounted}${cachedOnlyKeySuffix()}`;
 }
 
 /**
@@ -324,9 +327,11 @@ export async function valuePortfolioCached(
    *  key, so a read-scoped PAT's possibly-degraded result is never served to a session. */
   fxProvider?: FxProvider | null,
 ): Promise<Valuation> {
+  // `derivationCacheKey` already keys a read-scoped PAT's request apart; an explicit `null`
+  // provider outside such a request gets the same suffix.
   const key =
     derivationCacheKey(portfolioId, displayCurrency, costBasisMode, cashCounted) +
-    (fxProvider === null ? "|ro" : "");
+    (fxProvider === null && !isFxCachedOnly() ? ":ro" : "");
   const hit = derivationCache.get(key);
   if (hit && hit.expiresAt > now) {
     logTiming(undefined, "valuePortfolioCached HIT", 0, { key, ttlRemaining: hit.expiresAt - now });

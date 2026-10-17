@@ -15,6 +15,7 @@
  */
 
 import { captureFxMissing, recordFxMissing } from "./fx-missing.js";
+import { cachedOnlyKeySuffix } from "./fx-cached-only.js";
 
 const DERIVATION_CACHE_TTL_MS = 60_000;
 
@@ -38,7 +39,9 @@ export function createStore<T>(): Map<string, CacheEntry<T>> {
  * Retrieve a cached computation, or compute + cache it if missing / expired.
  *
  * @param cache  The store to use (created by {@link createStore}).
- * @param key    Unique key within the store (e.g. `"${portfolioId}"` or `"${userId}"`).
+ * @param key    Unique key within the store (e.g. `"${portfolioId}"` or `"${userId}"`). A
+ *               read-scoped PAT's request (cached FX rates only, lib/fx-cached-only.ts) gets
+ *               its own entry, so its possibly-degraded result is never served to a session.
  * @param compute  Factory for the async computation (only called on cache miss).
  * @param now   Injectable clock for deterministic TTL tests (defaults to `Date.now()`).
  */
@@ -48,6 +51,10 @@ export async function withDerivationCache<T>(
   compute: () => Promise<T>,
   now: number = Date.now(),
 ): Promise<T> {
+  // Deliberately for every store, FX-dependent or not: one central rule rather than a
+  // per-cache judgement call. The cost is a duplicate entry under read-PAT traffic for
+  // FX-independent derivations (instruments, documents, imports, …), bounded by the TTL.
+  key += cachedOnlyKeySuffix();
   // Amortized eviction: drop up to 5 expired entries per call to bound growth without
   // a background timer. Expired keys that are never accessed again will linger until a
   // write clears the whole store, but the cleanup keeps the total within 5 × requests/s

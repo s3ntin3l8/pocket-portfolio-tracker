@@ -181,6 +181,13 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   snapshot jobs and the backfill skip a portfolio rather than persist a partial value (#816).
   `convert()` still throws `FxRateMissingError` as a last resort — reaching it is a bug (logged).
   Never add a `?? "1"` fallback.
+  **A read-scoped PAT loads FX from cached rates only** (audit A7): no provider fetch, no
+  persisted `fx_rates` row. That is the request-scoped default (`lib/fx-cached-only.ts`):
+  `defaultFxProvider()` is `null` inside such a request and is every FX loader's default
+  provider, so a route that passes none is covered. `withDerivationCache` and
+  `derivationCacheKey` key that request's results apart (`:ro`), so a possibly-degraded
+  result is never served to a session. A loader that needs "the configured provider"
+  regardless of the request calls `getFxProvider()`; don't use it as a default.
 - **A holding with no usable market price is valued at cost basis, not skipped/zero.**
   Nothing economic happened on the day a price feed goes silent, so treating it as worth 0
   understates net worth by the whole cost basis, not by the (unknown) gain/loss since purchase.

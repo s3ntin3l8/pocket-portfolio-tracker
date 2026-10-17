@@ -71,12 +71,10 @@ export function registerInsightsRoutes(app: FastifyInstance) {
 
       // A read-scoped PAT never triggers a provider fetch/persist (audit A7, #1039): FX from
       // cached rates only, no benchmark price back-fill. Its possibly-degraded result is
-      // cached under its own key so it can't be served to a session.
+      // cached under its own key (withDerivationCache) so it can't be served to a session.
       const readOnlyPat = isReadOnlyPat(request);
       const fxProvider = readOnlyPat ? null : undefined;
-      const ck =
-        cacheKey("insights", id, range, holderId ?? "", portfolioId ?? "") +
-        (readOnlyPat ? ":ro" : "");
+      const ck = cacheKey("insights", id, range, holderId ?? "", portfolioId ?? "");
       const result = await withDerivationCache(insightsCache, ck, async () => {
         // ── Portfolio history (TWR index) ──────────────────────────────
         const start = rangeStart(range);

@@ -4,7 +4,7 @@ import { chainIndex, convert, fxAvailable, type DailyValueFlow } from "@portfoli
 import { MarketDataError, type MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { chunk } from "../lib/chunk.js";
-import { getFxProvider, getFxRatesForDates, makeFxRateFn, type FxProvider } from "./fx.js";
+import { defaultFxProvider, getFxRatesForDates, makeFxRateFn, type FxProvider } from "./fx.js";
 
 export interface BenchmarkIndexPoint {
   date: string;
@@ -350,7 +350,7 @@ export async function benchmarkClosesInCurrency(
   if (quoteCurrency === targetCurrency) {
     return { closes: wanted.map((d) => ({ date: d, close: closes.get(d)! })), fxMissingDates: 0 };
   }
-  const provider = opts.cachedFxOnly ? null : (opts.fxProvider ?? getFxProvider());
+  const provider = opts.cachedFxOnly ? null : (opts.fxProvider ?? defaultFxProvider());
   const rates =
     opts.ratesByDate ??
     (await getFxRatesForDates(db, [quoteCurrency], targetCurrency, wanted, provider));
