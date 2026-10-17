@@ -271,6 +271,22 @@ describe("a read-scoped PAT loads FX from cached rates only on every read route 
     expect(resolved.providers.filter((p) => p !== null)).toEqual([]);
   });
 
+  // No cache flush between the two requests: the session must not be served the read PAT's
+  // cached-only valuation (derivationCacheKey keys it apart), so it loads — and fetches —
+  // the rate itself. /summary's only FX load is the valuation's.
+  it("a session after a read PAT gets its own valuation, not the cached-only one", async () => {
+    await resetFx();
+    const url = `/portfolios/${pfIds[0]}/summary`;
+    const ro = await app.inject({ method: "GET", url, headers: auth(readPat) });
+    expect(ro.statusCode).toBe(200);
+    const fetchesBefore = fxFetches();
+    const rw = await app.inject({ method: "GET", url, headers: auth(owner) });
+    expect(rw.statusCode).toBe(200);
+    expect(fxFetches()).toBeGreaterThan(fetchesBefore);
+    expect(ro.headers["x-fx-missing-currencies"]).toBe("USD");
+    expect(rw.headers["x-fx-missing-currencies"]).toBeUndefined();
+  });
+
   // The stub is live: a session on the same data does fetch and cache the rate.
   it("a session on the same data fetches and caches the rate (the probe is live)", async () => {
     await resetFx();
