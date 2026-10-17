@@ -146,7 +146,9 @@ function snapshotDescendantGroups(roots) {
     const out = execFileSync("ps", ["-A", "-o", "pid=,ppid=,pgid="], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
-      timeout: 2_000,
+      // It runs inside the second-Ctrl-C handler, ahead of every SIGKILL: a wedged
+      // ps must not hold those up for long. 1 s still leaves a loaded host room.
+      timeout: 1_000,
     });
     return descendantGroups(parsePsRows(out), roots);
   } catch {
@@ -154,7 +156,13 @@ function snapshotDescendantGroups(roots) {
   }
 }
 
-const signalGroup = (pgid, sig) => {
+/**
+ * Signal a whole process group. Refuses pgid <= 1 (and anything not a number):
+ * `kill(-1)` reaches every process this user may signal, `kill(-0)` the caller's
+ * own group, so the guard sits here rather than only in the callers.
+ */
+export const signalGroup = (pgid, sig) => {
+  if (!(Number.isSafeInteger(pgid) && pgid > 1)) return false;
   try {
     process.kill(-pgid, sig);
     return true;

@@ -38,6 +38,7 @@ let waitForHttp;
 let healthTimeoutMs;
 let parsePsRows;
 let descendantGroups;
+let signalGroup;
 
 beforeAll(async () => {
   scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
@@ -49,8 +50,15 @@ beforeAll(async () => {
     if (process.env.DEMO_WEB_PORT !== process.env.DEMO_API_PORT) break;
     if (attempt >= 10) throw new Error("could not get two distinct free ports");
   }
-  ({ startDemo, healthTimeoutMs, strayPids, waitForHttp, parsePsRows, descendantGroups } =
-    await import("./instance.mjs"));
+  ({
+    startDemo,
+    healthTimeoutMs,
+    strayPids,
+    waitForHttp,
+    parsePsRows,
+    descendantGroups,
+    signalGroup,
+  } = await import("./instance.mjs"));
 });
 
 // Tests set it per case; never let a failed assertion leak it into the next one.
@@ -385,6 +393,27 @@ describe("startDemo stop during a build step whose subprocess has its own group"
       rmSync(noPs, { recursive: true, force: true });
     }
   }, 60_000);
+});
+
+describe("signalGroup", () => {
+  // Probing with signal 0 is harmless, and kill(-1, 0) would succeed for any user,
+  // so a pass means the guard refused before reaching kill().
+  it.each([1, 0, -1, -4242, Number.NaN, 1.5, undefined])("refuses pgid %s", (pgid) => {
+    expect(signalGroup(pgid, 0)).toBe(false);
+  });
+
+  it("signals a real group, and reports one that is gone", () => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      detached: true,
+      stdio: "ignore",
+    });
+    try {
+      expect(signalGroup(child.pid, 0)).toBe(true);
+    } finally {
+      process.kill(-child.pid, "SIGKILL");
+    }
+    expect(signalGroup(4_194_000, 0)).toBe(false);
+  });
 });
 
 // Fixture `ps -A -o pid=,ppid=,pgid=` output: ps right-aligns its columns.
