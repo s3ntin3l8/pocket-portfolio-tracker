@@ -97,7 +97,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-              width={32}
+              width="auto"
             />
             <Tooltip
               cursor={CHART_BAR_CURSOR}
