@@ -148,6 +148,8 @@ export function NetWorthHistoryChart({
   }
 
   const intraday = isIntradayRange(range);
+  // Value lines plot `netWorth` — the same quantity as the headline — never `marketValue`, which is
+  // 0 for a cash-only portfolio. The TWR (`pct`/`index`) is chained on `marketValue` server-side.
   // No TWR pct/index on intraday points — the Performance toggle only applies to
   // the day-grained ranges, so intraday always renders as a Value chart. The hero
   // variant has no mode toggle at all — it always shows the raw value sparkline.
@@ -161,15 +163,11 @@ export function NetWorthHistoryChart({
   const chartData = intraday
     ? data.filter(isIntradayPoint).map((p) => ({
         date: intradayLabelFmt.format(new Date(p.at)),
-        close: selectedId ? (p.marketValue ?? p.netWorth) : p.netWorth,
+        close: p.netWorth,
       }))
     : effectiveMode === "performance"
       ? data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.pct ?? "0" }))
-      : selectedId
-        ? data
-            .filter(isDailyPoint)
-            .map((p) => ({ date: p.date, close: p.marketValue ?? p.netWorth }))
-        : data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.netWorth }));
+      : data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.netWorth }));
 
   // Hero variant input. Intraday ranges emit absolute currency values for the
   // portfolio line and `null` for benchmark (no benchmark intraday data); day-
@@ -179,7 +177,7 @@ export function NetWorthHistoryChart({
     ? intraday
       ? data.filter(isIntradayPoint).map((p) => ({
           date: intradayLabelFmt.format(new Date(p.at)),
-          portfolio: Number(selectedId ? (p.marketValue ?? p.netWorth) : p.netWorth),
+          portfolio: Number(p.netWorth),
           benchmark: null,
         }))
       : data.filter(isDailyPoint).map((p) => ({
