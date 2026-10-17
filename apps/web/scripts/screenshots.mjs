@@ -39,11 +39,12 @@ const PROFILE = process.env.SCREENSHOTS_PROFILE ?? "readme";
 // leaf under the Reports tab, not a top-level nav item, but is rich enough (FSA
 // allowance, realized gains, harvest suggestions) to be worth its own capture.
 const SCREENS = [
-  // `minCharts`: the hero chart is a `next/dynamic` chunk that can mount after
-  // `networkidle`; settle() waits until at least this many charts have drawn.
-  { slug: "holdings", path: "/en/holdings", minCharts: 1 },
+  // `minCharts`: charts are `next/dynamic` chunks that can mount after
+  // `networkidle`; settle() waits until at least this many have drawn. Holdings:
+  // hero + allocation donut; insights: composition donut + yearly returns.
+  { slug: "holdings", path: "/en/holdings", minCharts: 2 },
   { slug: "activity", path: "/en/transactions" },
-  { slug: "insights", path: "/en/insights", minCharts: 1 },
+  { slug: "insights", path: "/en/insights", minCharts: 2 },
   { slug: "reports", path: "/en/reports" },
   { slug: "tax", path: "/en/tax" },
 ];
@@ -152,8 +153,13 @@ async function captureReadme(browser, cookie, secure) {
   const staging = await mkdtemp(path.join(tmpdir(), "pocket-readme-shots-"));
   try {
     const entries = await captureReadmeInto(browser, cookie, secure, staging);
-    for (const { filename } of entries)
-      await copyFile(path.join(staging, filename), path.join(README_DIR, filename));
+    for (const { filename } of entries) {
+      // Copy to a temp name beside the target, then rename: a kill mid-copy can't
+      // leave a truncated PNG under the real name.
+      const tmp = path.join(README_DIR, `.${filename}.tmp`);
+      await copyFile(path.join(staging, filename), tmp);
+      await rename(tmp, path.join(README_DIR, filename));
+    }
     return entries;
   } finally {
     await rm(staging, { recursive: true, force: true });
