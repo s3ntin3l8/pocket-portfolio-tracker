@@ -1039,6 +1039,29 @@ describe("GET /insights", () => {
         expect(Number(body.at(-1)!.benchmarkPct)).toBeCloseTo(total, 6);
       }
     });
+
+    // A read-scoped PAT takes the cached-FX-only path (no provider fetch/persist); with
+    // the rates cached it gets the same IDR series, not the native-USD one.
+    it("converts the benchmark for a read-scoped PAT from cached rates", async () => {
+      const { t, portfolioId } = await seed("history-bm-fx-ro-user");
+      const minted = await app.inject({
+        method: "POST",
+        url: "/me/tokens",
+        headers: auth(t),
+        payload: { name: "ro", scope: "read" },
+      });
+      const pat = minted.json().token as string;
+      const total = (idr(4) / idr(0) - 1) * 100;
+      for (const url of [
+        "/networth/history?range=all",
+        `/portfolios/${portfolioId}/history?range=all`,
+      ]) {
+        const res = await app.inject({ method: "GET", url, headers: auth(pat) });
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as { benchmarkPct?: string }[];
+        expect(Number(body.at(-1)!.benchmarkPct)).toBeCloseTo(total, 6);
+      }
+    });
   });
 });
 

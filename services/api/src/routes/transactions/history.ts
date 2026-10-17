@@ -120,15 +120,21 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
             if (refreshedBm.size >= 1) {
               // A read-scoped PAT converts with cached rates only (no provider fetch/persist),
-              // like the benchmark prices above.
-              const { closes: bmPrices } = await benchmarkClosesInCurrency(
+              // like the benchmark prices above. Days without a rate drop out (never 1:1).
+              const { closes: bmPrices, fxMissingDates } = await benchmarkClosesInCurrency(
                 app.db,
                 refreshedBm,
                 bmDates,
                 bmConfig.currency,
                 request.portfolio!.baseCurrency,
-                isReadOnlyPat(request) ? { fxProvider: null } : {},
+                { cachedFxOnly: isReadOnlyPat(request) },
               );
+              if (fxMissingDates > 0) {
+                request.log.warn(
+                  { portfolioId, symbol: bmConfig.symbol, missingDates: fxMissingDates },
+                  "history: benchmark FX rate missing for some dates — those days dropped",
+                );
+              }
               const bmIndex = computeBenchmarkIndex(bmPrices);
               const bmById = new Map(bmIndex.map((p) => [p.date, p]));
               carryForwardBenchmark(
@@ -326,8 +332,9 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         .orderBy(asc(portfolioSnapshots.date));
 
       // The benchmark's currency rides along so its closes convert at the same per-date
-      // rates as the snapshots (#1020) — except for a read-scoped PAT, whose benchmark
-      // conversion below uses cached rates only (no provider fetch/persist).
+      // rates as the snapshots (#1020) — except for a read-scoped PAT: its benchmark
+      // conversion below uses cached rates only, like its benchmark prices. (The snapshot
+      // currencies' own FX load predates this and is not part of that guard.)
       const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
       const currencies = [
         ...new Set([
@@ -402,14 +409,20 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         if (refreshedBm.size >= 1) {
           // In the display currency, at each date's FX rate — the same series the
           // Insights card and per-year table compare against (#1020).
-          const { closes: bmPrices } = await benchmarkClosesInCurrency(
+          const { closes: bmPrices, fxMissingDates } = await benchmarkClosesInCurrency(
             app.db,
             refreshedBm,
             bmDates,
             bmConfig.currency,
             display,
-            readOnlyPat ? { fxProvider: null } : { ratesByDate },
+            readOnlyPat ? { cachedFxOnly: true } : { ratesByDate },
           );
+          if (fxMissingDates > 0) {
+            request.log.warn(
+              { symbol: bmConfig.symbol, display, missingDates: fxMissingDates },
+              "networth history: benchmark FX rate missing for some dates — those days dropped",
+            );
+          }
           const bmIndex = computeBenchmarkIndex(bmPrices);
           const bmById = new Map(bmIndex.map((p) => [p.date, p]));
           carryForwardBenchmark(

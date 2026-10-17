@@ -505,16 +505,18 @@ describe("benchmarkClosesInCurrency (#1020)", () => {
 });
 
 describe("benchmarkClosesInCurrency — FX provider plumbing", () => {
-  it("backfills through the given provider, and a null provider reads cached rows only", async () => {
+  it("cachedFxOnly never reaches the provider; otherwise the provider backfills", async () => {
     const app = await buildApp({ authKey: TEST_KEY });
     try {
       const closes = new Map([["2010-05-03", "100"]]);
       const getRateHistory = vi.fn(async () => ({ "2010-05-03": 15000 }));
       const provider = { getRate: vi.fn(async () => null), getRateHistory };
-      const none = await benchmarkClosesInCurrency(app.db, closes, ["2010-05-03"], "CAD", "IDR", {
-        fxProvider: null,
+      const cached = await benchmarkClosesInCurrency(app.db, closes, ["2010-05-03"], "CAD", "IDR", {
+        cachedFxOnly: true,
+        fxProvider: provider,
       });
-      expect(none).toEqual({ closes: [], fxMissingDates: 1 });
+      expect(getRateHistory).not.toHaveBeenCalled();
+      expect(cached).toEqual({ closes: [], fxMissingDates: 1 });
       const got = await benchmarkClosesInCurrency(app.db, closes, ["2010-05-03"], "CAD", "IDR", {
         fxProvider: provider,
       });
