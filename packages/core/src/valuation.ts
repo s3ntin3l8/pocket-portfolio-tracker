@@ -82,6 +82,12 @@ export interface PortfolioSummary {
    * would be a phantom negative artifact of buys). Lets the UI show "not tracked" vs a real 0.
    */
   cashTracked: boolean;
+  /**
+   * The same cash balances converted into `displayCurrency`, keyed by the balance's own
+   * currency — what net worth actually sums for cash. A currency with no FX rate is absent
+   * here (it stays in `cash`, natively, and is listed in `fxMissingCurrencies`); never 1:1.
+   */
+  cashDisplay: Record<string, string>;
   netWorth: string;
   totalCost: string;
   totalMarketValue: string;
@@ -401,9 +407,12 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     canConvert,
   });
   // Cash in an unconvertible currency stays in `cash` (native amounts) but is left
-  // out of exposure and net worth (audit B2).
+  // out of `cashDisplay`, exposure and net worth (audit B2).
+  const cashDisplay: Record<string, string> = {};
   for (const [ccy, amount] of Object.entries(convertibleCash)) {
-    addExposure(ccy, convert(amount, ccy, input.displayCurrency, fx));
+    const converted = convert(amount, ccy, input.displayCurrency, fx);
+    cashDisplay[ccy] = converted;
+    addExposure(ccy, converted);
   }
   const fxMissingIds = new Set(valuations.filter((v) => v.fxMissing).map((v) => v.instrumentId));
   const nw = netWorth({
@@ -430,6 +439,7 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     holdings: valuations,
     cash,
     cashTracked,
+    cashDisplay,
     netWorth: nw,
     totalCost: totalCost.toString(),
     totalMarketValue: totalMarketValue.toString(),
@@ -456,6 +466,7 @@ export function aggregatePortfolios(
 ): PortfolioSummary {
   const holdings = new Map<string, HoldingValuation>();
   const cash: Record<string, string> = {};
+  const cashDisplay: Record<string, string> = {};
   const exposure: Record<string, string> = {};
   const fxMissingCurrencies = new Set<string>();
   let totalCost = new Decimal(0);
@@ -484,6 +495,10 @@ export function aggregatePortfolios(
 
     for (const [currency, amount] of Object.entries(s.cash)) {
       cash[currency] = new Decimal(cash[currency] ?? "0").add(amount).toString();
+    }
+    // Already in `displayCurrency`, so summing across portfolios is valid.
+    for (const [currency, amount] of Object.entries(s.cashDisplay ?? {})) {
+      cashDisplay[currency] = new Decimal(cashDisplay[currency] ?? "0").add(amount).toString();
     }
 
     for (const [currency, amount] of Object.entries(s.exposureByCurrency)) {
@@ -545,6 +560,7 @@ export function aggregatePortfolios(
     // The aggregate cash figure is meaningful as long as at least one portfolio tracks
     // cash; untracked portfolios contribute an empty cash map, so they don't distort it.
     cashTracked: summaries.some((s) => s.cashTracked),
+    cashDisplay,
     netWorth: netWorth.toString(),
     totalCost: totalCost.toString(),
     totalMarketValue: totalMarketValue.toString(),

@@ -97,7 +97,10 @@ export default async function HoldingsPage({
   const currency = result.status === "ok" ? result.displayCurrency : "IDR";
 
   // Cash for cash-inclusive portfolios (cashTracked = cashCounted && hasCashMovement).
+  // `cash` is native per currency; `cashDisplay` is the same balances converted into the
+  // display currency by the API (a currency with no FX rate is absent from it).
   const cash = result.status === "ok" ? result.cash : {};
+  const cashDisplay = result.status === "ok" ? result.cashDisplay : {};
   const cashTracked = result.status === "ok" ? result.cashTracked : false;
   const hasCash = cashTracked && Object.values(cash).some((v) => Number(v) !== 0);
 
@@ -129,10 +132,24 @@ export default async function HoldingsPage({
       h.unrealizedPnLDisplay ?? "",
       currency,
     ]),
-    // Cash rows for cash-inclusive portfolios (one row per currency).
+    // Cash rows for cash-inclusive portfolios (one row per currency). Like the holdings
+    // rows, MarketValue is in the display currency (empty when the currency has no FX
+    // rate); the native balance is the row's quantity, in PriceCurrency.
     ...Object.entries(cash)
       .filter(([, v]) => Number(v) !== 0)
-      .map(([ccy, balance]) => ["Cash", t("cash"), "cash", "", "", "", "", ccy, balance, "", ccy]),
+      .map(([ccy, balance]) => [
+        "Cash",
+        t("cash"),
+        "cash",
+        balance,
+        "",
+        "",
+        "",
+        ccy,
+        cashDisplay[ccy] ?? "",
+        "",
+        currency,
+      ]),
   ];
 
   // Export moved out of the heading into the positions toolbar (it exports the table, so
@@ -211,10 +228,7 @@ export default async function HoldingsPage({
   const summary = netWorthResult.status === "ok" ? netWorthResult.data : null;
 
   // Currencies with no FX rate (audit B2): their holdings are left out of the totals.
-  const fxMissing = collectFxMissing(
-    summary,
-    result.status === "ok" ? (result as { fxMissingCurrencies?: string[] }) : null,
-  );
+  const fxMissing = collectFxMissing(summary, result.status === "ok" ? result : null);
 
   return (
     <div className="space-y-5">
@@ -245,6 +259,7 @@ export default async function HoldingsPage({
             rows={holdings}
             currency={currency}
             cash={hasCash ? cash : undefined}
+            cashDisplay={cashDisplay}
             classTabs={visibleClassTabs}
             actions={exportButton}
             initialAtCostOnly={filterParam === "at-cost"}

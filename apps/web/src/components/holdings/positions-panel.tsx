@@ -27,6 +27,7 @@ export function PositionsPanel({
   rows,
   currency,
   cash,
+  cashDisplay,
   classTabs,
   actions,
   initialAtCostOnly = false,
@@ -37,6 +38,8 @@ export function PositionsPanel({
    *  (the page already resolves this via `hasCash`; this component doesn't need to know
    *  why, only whether there's a balance to show and filter). */
   cash?: Record<string, string>;
+  /** `cash` converted into `currency` by the API; a currency with no FX rate is absent. */
+  cashDisplay?: Record<string, string>;
   /** Server-computed visible asset-class tabs (incl. "all"). Stays a prop rather than
    *  being recomputed here: `page.tsx` also needs it for its loading/empty states, and —
    *  more importantly — whether the "cash" tab shows depends on `cashTracked`, which
@@ -165,7 +168,12 @@ export function PositionsPanel({
                 {noResults ? (
                   <EmptyState compact icon={SearchX} title={t("noResults")} />
                 ) : (
-                  <HoldingsTable rows={classRows} currency={currency} cash={tabCash} />
+                  <HoldingsTable
+                    rows={classRows}
+                    currency={currency}
+                    cash={tabCash}
+                    cashDisplay={cashDisplay}
+                  />
                 )}
               </Card>
             </TabsContent>

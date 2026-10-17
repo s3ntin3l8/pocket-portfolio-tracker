@@ -58,14 +58,26 @@ function computeRowValues(h: HoldingValuation, currency: string, locale: string)
 export interface HoldingsTableProps {
   rows: HoldingValuation[];
   currency: string;
-  /** Per-currency cash balances for cash-inclusive portfolios. When provided, a pinned
-   *  Cash row is rendered after the security rows (one row per currency). Cash is
-   *  included in the footer total, assuming cash currency == display currency (true for
-   *  virtually all cash-counted portfolios; no FX conversion is applied). */
+  /** Native per-currency cash balances for cash-inclusive portfolios. When provided, a
+   *  pinned Cash row is rendered after the security rows (one row per currency). */
   cash?: Record<string, string>;
+  /** The same balances converted into `currency` by the API (`cashDisplay` on
+   *  `/networth` and `/portfolios/:id/summary`). Each Cash row's Value and its share of
+   *  the footer total come from here — never from the native amount, unless the balance
+   *  is already in `currency`. A currency absent here has no FX rate: its row shows the
+   *  "No FX rate" badge and is left out of the total, like an fxMissing holding. */
+  cashDisplay?: Record<string, string>;
 }
 
-export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
+interface CashRow {
+  ccy: string;
+  /** Native balance, in `ccy`. */
+  balance: number;
+  /** Balance in the display currency; `null` when no FX rate is available. */
+  value: number | null;
+}
+
+export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTableProps) {
   const t = useTranslations("Holdings");
   const locale = useLocale();
   // Both layouts are mounted (CSS-hidden); a transition name must be unique, so only the
@@ -75,8 +87,20 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
 
   const sorted = sort(rows);
 
-  // Non-zero cash entries to render as pinned rows (one per currency).
-  const cashEntries = Object.entries(cash ?? {}).filter(([, v]) => Number(v) !== 0);
+  // Non-zero cash entries to render as pinned rows (one per currency), each valued in the
+  // display currency. A balance already in the display currency needs no rate; any other
+  // currency must come converted from the API — there is no 1:1 fallback (audit B2).
+  const cashRows: CashRow[] = Object.entries(cash ?? {})
+    .filter(([, v]) => Number(v) !== 0)
+    .map(([ccy, balance]) => {
+      const converted = cashDisplay?.[ccy] ?? (ccy === currency ? balance : undefined);
+      return {
+        ccy,
+        balance: Number(balance),
+        value: converted === undefined ? null : Number(converted),
+      };
+    });
+  const fxMissingCash = cashRows.filter((c) => c.value === null).map((c) => c.ccy);
 
   // Holdings with no market price at all are valued at cost basis rather than skipped
   // (issue #744) — marketValueDisplay is non-null for these too, so they already flow
@@ -91,9 +115,9 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
   // P&L sum every holding that has a value at all — priced or valued at cost; a holding
   // with neither (no price AND no cost basis) still has marketValueDisplay === null and
   // is skipped. The total P&L % is taken against summed cost basis so it stays
-  // consistent with the rows. Cash is included in the value total (assumes cash
-  // currency == display currency, true for virtually all cash-counted portfolios; no
-  // FX conversion is applied).
+  // consistent with the rows. Cash adds its display-currency value (so EUR cash in an
+  // IDR view counts at its IDR value, matching net worth); cash without an FX rate is
+  // left out, like an fxMissing holding.
   const totals = rows.reduce(
     (acc, h) => {
       if (h.marketValueDisplay !== null) acc.value += Number(h.marketValueDisplay);
@@ -102,7 +126,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
       return acc;
     },
     {
-      value: cashEntries.reduce((s, [, v]) => s + Number(v), 0),
+      value: cashRows.reduce((s, c) => s + (c.value ?? 0), 0),
       pnl: 0,
       cost: 0,
     },
@@ -251,7 +275,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                 </TableRow>
               );
             })}
-            {cashEntries.map(([ccy, balance]) => (
+            {cashRows.map(({ ccy, balance, value }) => (
               <TableRow key={`cash-${ccy}`}>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -266,7 +290,18 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
                 <TableCell className={cn(TABLE_VALUE, "text-text-mute")}>—</TableCell>
                 <TableCell className={cn(TABLE_VALUE, "text-text-mute")}>—</TableCell>
                 <TableCell className={TABLE_VALUE_STRONG}>
-                  {formatMoney(Number(balance), ccy, locale)}
+                  {value !== null ? money(value) : "—"}
+                  {value === null && (
+                    <InfoTip label={t("fxMissingTooltip")} focusable>
+                      <span className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                        {t("fxMissingBadge")}
+                      </span>
+                    </InfoTip>
+                  )}
+                  {/* The native balance, when it differs from the display currency. */}
+                  {(value === null || ccy !== currency) && (
+                    <div className={TABLE_SUBVALUE}>{formatMoney(balance, ccy, locale)}</div>
+                  )}
                 </TableCell>
                 <TableCell className={cn(TABLE_VALUE, "text-text-mute")}>—</TableCell>
               </TableRow>
@@ -295,6 +330,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
         {fxMissingCount > 0 && (
           <p className="mt-2 text-micro font-medium text-text-mute">
             {t("fxMissingFooterNote", { count: fxMissingCount })}
+          </p>
+        )}
+        {fxMissingCash.length > 0 && (
+          <p className="mt-2 text-micro font-medium text-text-mute">
+            {t("fxMissingCashFooterNote", { currencies: fxMissingCash.join(", ") })}
           </p>
         )}
       </div>
@@ -363,7 +403,7 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
           );
         })}
 
-        {cashEntries.map(([ccy, balance], ci) => (
+        {cashRows.map(({ ccy, balance, value }, ci) => (
           <div
             key={`cash-${ccy}`}
             className={cn(
@@ -376,8 +416,22 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
               <span className="text-body font-bold">{t("cash")}</span>
               <div className="truncate text-xs font-medium text-text-2">{ccy}</div>
             </div>
-            <div className="shrink-0 text-right tabular text-sm font-bold">
-              {formatMoney(Number(balance), ccy, locale)}
+            <div className="shrink-0 text-right tabular">
+              <div className="text-sm font-bold">
+                {value !== null ? money(value) : "—"}
+                {value === null && (
+                  <InfoTip label={t("fxMissingTooltip")} focusable>
+                    <span className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                      {t("fxMissingBadge")}
+                    </span>
+                  </InfoTip>
+                )}
+              </div>
+              {(value === null || ccy !== currency) && (
+                <div className="text-xs font-medium text-text-2">
+                  {formatMoney(balance, ccy, locale)}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -400,6 +454,11 @@ export function HoldingsTable({ rows, currency, cash }: HoldingsTableProps) {
         {fxMissingCount > 0 && (
           <p className="px-4 py-2 text-micro font-medium text-text-mute">
             {t("fxMissingFooterNote", { count: fxMissingCount })}
+          </p>
+        )}
+        {fxMissingCash.length > 0 && (
+          <p className="px-4 py-2 text-micro font-medium text-text-mute">
+            {t("fxMissingCashFooterNote", { currencies: fxMissingCash.join(", ") })}
           </p>
         )}
       </div>

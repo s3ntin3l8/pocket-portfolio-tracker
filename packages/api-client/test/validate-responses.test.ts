@@ -26,6 +26,7 @@ const valuation = {
   holdings: [holding],
   cash: {},
   cashTracked: false,
+  cashDisplay: {},
   netWorth: "1100",
   totalCost: "1000",
   totalMarketValue: "1100",

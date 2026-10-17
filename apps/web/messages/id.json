@@ -1413,6 +1413,7 @@
     "fxMissingBadge": "Tanpa kurs",
     "fxMissingTooltip": "Tidak ada kurs; tidak dihitung dalam total",
     "fxMissingFooterNote": "Tidak termasuk {count, plural, other {# kepemilikan}} tanpa kurs yang tersedia.",
+    "fxMissingCashFooterNote": "Tidak termasuk kas dalam {currencies} (kurs tidak tersedia).",
     "hero": {
       "label": "Total nilai portofolio",
       "periodPast": "{range} terakhir",

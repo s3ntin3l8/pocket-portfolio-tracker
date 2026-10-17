@@ -220,8 +220,13 @@ export interface HoldingsView {
   retryAfter?: number | null;
   holdings: HoldingValuation[];
   displayCurrency: string;
+  /** Native cash balances by currency. */
   cash: Record<string, string>;
+  /** `cash` converted into `displayCurrency`; a currency with no FX rate is absent. */
+  cashDisplay: Record<string, string>;
   cashTracked: boolean;
+  /** Currencies with no FX rate into `displayCurrency` (audit B2). */
+  fxMissingCurrencies: string[];
 }
 
 export type PortfolioResult<T> =
@@ -367,7 +372,9 @@ export async function loadHoldings(
       holdings: [],
       displayCurrency: "IDR",
       cash: {},
+      cashDisplay: {},
       cashTracked: false,
+      fxMissingCurrencies: [],
     };
   try {
     const portfolios = await listPortfoliosCached();
@@ -377,7 +384,9 @@ export async function loadHoldings(
         holdings: [],
         displayCurrency: "IDR",
         cash: {},
+        cashDisplay: {},
         cashTracked: false,
+        fxMissingCurrencies: [],
       };
     }
     const overrideId =
@@ -396,7 +405,9 @@ export async function loadHoldings(
       holdings: data.holdings,
       displayCurrency: data.displayCurrency,
       cash: data.cash,
+      cashDisplay: data.cashDisplay,
       cashTracked: data.cashTracked,
+      fxMissingCurrencies: data.fxMissingCurrencies ?? [],
     };
   } catch (err) {
     const failure = classifyFailure(err);
@@ -406,7 +417,9 @@ export async function loadHoldings(
       holdings: [],
       displayCurrency: "IDR",
       cash: {},
+      cashDisplay: {},
       cashTracked: false,
+      fxMissingCurrencies: [],
     };
   }
 }

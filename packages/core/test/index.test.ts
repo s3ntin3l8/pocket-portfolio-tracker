@@ -831,6 +831,7 @@ describe("aggregatePortfolios", () => {
         },
       ],
       cash: { IDR: "1000000" },
+      cashDisplay: { IDR: "1000000" },
       exposureByCurrency: { IDR: "1950000" },
       netWorth: "1950000",
       totalCost: "900000",
@@ -877,6 +878,7 @@ describe("aggregatePortfolios", () => {
         },
       ],
       cash: { IDR: "500000", USD: "100" },
+      cashDisplay: { IDR: "500000", USD: "1600000" },
       exposureByCurrency: { IDR: "7100000", USD: "100000" },
       netWorth: "7200000",
       totalCost: "5950000",
@@ -902,6 +904,8 @@ describe("aggregatePortfolios", () => {
     expect(out.holdings).toHaveLength(2); // i1 merged, i2 distinct
 
     expect(out.cash).toEqual({ IDR: "1500000", USD: "100" });
+    // Converted cash sums too (already in the display currency).
+    expect(out.cashDisplay).toEqual({ IDR: "1500000", USD: "1600000" });
     expect(out.exposureByCurrency).toEqual({ IDR: "9050000", USD: "100000" });
     expect(out.netWorth).toBe("9150000"); // 1,950,000 + 7,200,000
     expect(out.totalCost).toBe("6850000");
@@ -1135,6 +1139,32 @@ describe("summarizePortfolio — missing FX rate (audit B2)", () => {
     expect(s.totalIncome).toBe("0");
     // Native cash balances are still reported as-is.
     expect(s.cash.USD).toBe("505");
+    // …but the unconvertible currency has no display value (never 1:1).
+    expect(s.cashDisplay).toEqual({ IDR: "1000" });
+  });
+
+  it("converts each cash balance into the display currency (EUR cash, IDR display)", () => {
+    const s = summarizePortfolio({
+      transactions: [
+        tx({
+          instrumentId: null,
+          type: "deposit",
+          quantity: "1",
+          price: "8214.80",
+          currency: "EUR",
+        }),
+        tx({ instrumentId: null, type: "deposit", quantity: "1", price: "1000", currency: "IDR" }),
+      ],
+      prices: {},
+      displayCurrency: "IDR",
+      fx: (from, to) => (from === to ? "1" : from === "EUR" ? "17800" : null),
+      cashCounted: true,
+    });
+    expect(s.cash).toEqual({ EUR: "8214.8", IDR: "1000" });
+    // 8,214.80 × 17,800 — not the raw 8,214.80.
+    expect(s.cashDisplay).toEqual({ EUR: "146223440", IDR: "1000" });
+    expect(s.netWorth).toBe("146224440");
+    expect(s.fxMissingCurrencies).toEqual([]);
   });
 
   it("aggregatePortfolios unions fxMissingCurrencies and OR-merges the holding flag", () => {

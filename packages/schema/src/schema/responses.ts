@@ -125,6 +125,8 @@ const valuationShape = {
   holdings: z.array(holdingValuationResponseSchema),
   cash: z.record(z.string(), decimalOut),
   cashTracked: z.boolean(),
+  /** `cash` converted into `displayCurrency`; a currency with no FX rate is absent. */
+  cashDisplay: z.record(z.string(), decimalOut),
   netWorth: decimalOut,
   totalCost: decimalOut,
   totalMarketValue: decimalOut,
