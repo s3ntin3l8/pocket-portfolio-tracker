@@ -4,6 +4,7 @@ import { fxRates } from "@portfolio/db";
 import { FX_MAX_CARRY_FORWARD_DAYS, toDateKey, type FxRateFn } from "@portfolio/core";
 import type { DB } from "../db/client.js";
 import { recordFxMissing } from "../lib/fx-missing.js";
+import { isFxCachedOnly } from "../lib/fx-cached-only.js";
 import { chunk } from "../lib/chunk.js";
 
 export { recordFxMissing } from "../lib/fx-missing.js";
@@ -120,6 +121,15 @@ export function getFxProvider(): FxProvider | null {
   return provider;
 }
 
+/**
+ * The provider an FX loader uses when its caller passes none: the configured one, or `null`
+ * (cached rates only, no fetch or persist) inside a read-scoped PAT's request (audit A7,
+ * lib/fx-cached-only.ts). Evaluated per call, so every loader default honours the request.
+ */
+export function defaultFxProvider(): FxProvider | null {
+  return isFxCachedOnly() ? null : getFxProvider();
+}
+
 /** Stringify an FX rate without scientific notation (tiny rates → safe `numeric`). */
 function fmtRate(rate: number): string {
   return new Decimal(rate).toFixed();
@@ -194,7 +204,7 @@ export async function getFxRates(
   currencies: string[],
   base: string,
   now: Date = new Date(),
-  fxProvider: FxProvider | null = getFxProvider(),
+  fxProvider: FxProvider | null = defaultFxProvider(),
 ): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   const foreign = [...new Set(currencies)].filter((c) => c && c !== base);
@@ -259,7 +269,7 @@ export async function getFxRatesForDates(
   currencies: string[],
   base: string,
   dates: string[],
-  fxProvider: FxProvider | null = getFxProvider(),
+  fxProvider: FxProvider | null = defaultFxProvider(),
 ): Promise<Map<string, Record<string, string>>> {
   const wanted = [...new Set(dates)].sort();
   const result = new Map<string, Record<string, string>>(wanted.map((d) => [d, {}]));

@@ -123,9 +123,9 @@ export function registerHistoryRoutes(app: FastifyInstance) {
 
       const result = await withDerivationCache(
         historyCache,
-        // A read-scoped PAT gets a benchmark-less variant (no provider fetch/persist);
-        // keep it out of the shared entry so it can't serve a degraded series to others.
-        `${portfolioId}:${range}${readOnlyPat ? ":ro" : ""}`,
+        // A read-scoped PAT's benchmark-less, cached-FX-only variant gets its own entry
+        // (withDerivationCache keys it apart), so it can't serve a degraded series to others.
+        `${portfolioId}:${range}`,
         async () => {
           const start = rangeStart(range);
           const conds = [eq(portfolioSnapshots.portfolioId, portfolioId)];
@@ -237,12 +237,12 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const boundary = portfolio.cashCounted ? "inside" : "outside";
       const costBasisMode = await resolveCostBasisMode(app, request.userId);
       // A read-scoped PAT values and converts with cached FX rates only (audit A7); its
-      // possibly-degraded result is cached under its own key.
+      // possibly-degraded result is cached under its own key (withDerivationCache).
       const readOnlyPat = isReadOnlyPat(request);
       const fxProvider = readOnlyPat ? null : undefined;
       const cached = await withDerivationCache(
         performanceCache,
-        `${portfolioId}:${boundary}${readOnlyPat ? ":ro" : ""}`,
+        `${portfolioId}:${boundary}`,
         async () => {
           const { coreTxns, summary, corporateActions } = await loadValuation(
             app,
@@ -360,8 +360,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
     // A read-scoped PAT converts with cached rates only (no provider fetch/persist, audit
     // A7) — the snapshot, intraday and benchmark rates alike, as /portfolios/:id/history.
     const fxProvider = readOnlyPat ? null : undefined;
-    const ck =
-      cacheKey(id, range, holderId ?? "", includeParam, excludeParam) + (readOnlyPat ? ":ro" : "");
+    // A read PAT's result gets its own cache entry (withDerivationCache keys it apart).
+    const ck = cacheKey(id, range, holderId ?? "", includeParam, excludeParam);
     const cached = await withDerivationCache(historyCache, ck, async () => {
       // 1D/7D: aggregate the intraday (timestamped) table instead of the day-grained one.
       if (range === "1d" || range === "7d") {

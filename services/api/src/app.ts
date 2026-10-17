@@ -9,11 +9,12 @@ import multipart from "@fastify/multipart";
 import { ZodError } from "zod";
 import { FxRateMissingError } from "@portfolio/core";
 import { currentFxMissing, runInFxMissingScope } from "./lib/fx-missing.js";
+import { runInFxCachedOnlyScope } from "./lib/fx-cached-only.js";
 import { envPlugin } from "./plugins/env.js";
 import { loggingPlugin } from "./plugins/logging.js";
 import { securityPlugin } from "./plugins/security.js";
 import { dbPlugin } from "./plugins/db.js";
-import { authPlugin, type AuthPluginOptions } from "./plugins/auth.js";
+import { authPlugin, isReadOnlyPat, type AuthPluginOptions } from "./plugins/auth.js";
 import { rootRoute } from "./routes/root.js";
 import { healthRoute } from "./routes/health.js";
 import { meRoute } from "./routes/me.js";
@@ -243,8 +244,11 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   // (services/fx.ts); routes exclude the unconvertible rows, and this attaches the list to
   // any JSON object response as `fxMissingCurrencies` (and, for every response shape incl.
   // arrays, the `x-fx-missing-currencies` header). Absent when every rate resolved.
-  app.addHook("onRequest", (_request, _reply, done) => {
-    runInFxMissingScope(done);
+  // The same request scope carries the cached-only FX switch (audit A7): a read-scoped
+  // PAT never makes a GET fetch or persist FX rates (lib/fx-cached-only.ts). Lazy, because
+  // `request.user` is only set by the `authenticate` preHandler.
+  app.addHook("onRequest", (request, _reply, done) => {
+    runInFxMissingScope(() => runInFxCachedOnlyScope(() => isReadOnlyPat(request), done));
   });
   app.addHook("preSerialization", async (_request, reply, payload) => {
     const missing = currentFxMissing();
