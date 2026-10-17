@@ -242,7 +242,7 @@ export function NetWorthHistoryChart({
 
   if (isHero) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" aria-busy={loading}>
         {intraday && data.length < 2 ? (
           collectingNote
         ) : data.length > 1 ? (
