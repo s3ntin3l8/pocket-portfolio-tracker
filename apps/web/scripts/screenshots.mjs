@@ -97,7 +97,8 @@ async function newContext(browser, cookie, secure, theme, options) {
 /** Which readiness conditions are still unmet; evaluated in the page. */
 function pendingConditions(min) {
   const pending = [];
-  if (document.querySelector('[aria-busy="true"]')) pending.push("aria-busy element present");
+  if (document.querySelector('[aria-busy="true"], [data-chart-loading]'))
+    pending.push("chart or data still loading");
   const charts = [...document.querySelectorAll(".recharts-wrapper")];
   const drawn = charts.filter((c) => c.querySelector(".recharts-surface path[d]"));
   // At least `min` charts must have drawn. A chart that is mounted but has no path
@@ -118,9 +119,10 @@ async function settle(page, { slug, minCharts = 0 }) {
   await page.evaluate(() => document.fonts.ready);
   // `networkidle` can fire while the dev server is still compiling a route or a
   // query is in flight, which on a loaded host shipped a hero with no chart.
-  // Wait until nothing is busy (chart skeletons and loading charts set aria-busy),
-  // the screen's expected charts have mounted and drawn, and Next's dev indicator
-  // has stopped compiling; throw rather than capture an empty state.
+  // Wait until nothing is loading (loading charts set aria-busy, lazy-chunk
+  // skeletons data-chart-loading), the screen's expected charts have mounted and
+  // drawn, and Next's dev indicator has stopped compiling; throw rather than
+  // capture an empty state.
   const check = `(${pendingConditions.toString()})(${Number(minCharts)})`;
   try {
     await page.waitForFunction(`${check}.length === 0`, null, {
@@ -129,10 +131,17 @@ async function settle(page, { slug, minCharts = 0 }) {
     });
   } catch (err) {
     const pending = await page.evaluate(check).catch(() => ["page unavailable"]);
-    throw new Error(`${slug}: page did not settle within 60 s (${pending.join("; ")})`, {
-      cause: err,
-    });
+    // Some charts are data-gated (e.g. the holdings donut renders only with a
+    // positive-value asset class), so a missing chart usually means missing demo data.
+    throw new Error(
+      `${slug}: page did not settle within 60 s (${pending.join("; ")}); ` +
+        `if charts are missing, check that the demo seed populates every expected chart`,
+      { cause: err },
+    );
   }
+  // Let charts/animations settle (recharts entrance transitions).
+  await page.waitForTimeout(600);
+  // Evaluated after the settle so it describes the frame that gets captured.
   const empty = await page.evaluate(
     () =>
       [...document.querySelectorAll(".recharts-wrapper")].filter(
@@ -140,12 +149,14 @@ async function settle(page, { slug, minCharts = 0 }) {
       ).length,
   );
   if (empty > 0) console.warn(`${slug}: ${empty} chart(s) rendered without data`);
-  // Let charts/animations settle (recharts entrance transitions).
-  await page.waitForTimeout(600);
 }
 
 async function captureReadme(browser, cookie, secure) {
   await mkdir(README_DIR, { recursive: true });
+  // Sweep `.<name>.tmp` files a previously killed run may have left mid-flush.
+  for (const f of await readdir(README_DIR))
+    if (f.startsWith(".") && f.endsWith(".tmp"))
+      await rm(path.join(README_DIR, f), { force: true });
   // Capture the whole set into a staging dir outside the repo and copy it in only
   // once every shot succeeded, so an aborted run (e.g. a settle() timeout) can't
   // leave a mix of refreshed and stale screenshots behind, and a killed run can't
@@ -157,8 +168,12 @@ async function captureReadme(browser, cookie, secure) {
       // Copy to a temp name beside the target, then rename: a kill mid-copy can't
       // leave a truncated PNG under the real name.
       const tmp = path.join(README_DIR, `.${filename}.tmp`);
-      await copyFile(path.join(staging, filename), tmp);
-      await rename(tmp, path.join(README_DIR, filename));
+      try {
+        await copyFile(path.join(staging, filename), tmp);
+        await rename(tmp, path.join(README_DIR, filename));
+      } finally {
+        await rm(tmp, { force: true });
+      }
     }
     return entries;
   } finally {
