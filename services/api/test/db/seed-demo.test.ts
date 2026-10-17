@@ -291,12 +291,15 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
 
   // The benchmark is seeded from a walk that shares a market factor with the equity
   // walks' daily noise, so the card reads like a real equity portfolio against the S&P 500
-  // rather than the ≈0 of an independent walk against live closes.
+  // rather than the ≈0 of an independent walk against live closes. The floor sits above
+  // the 0.6 loading on purpose: with independent own-noise per walk the aggregate
+  // diversifies to ≈0.7, while walks sharing one own-series (the old `id.length` seed)
+  // would collapse to exactly the loading.
   it("correlates the portfolio with the seeded ^GSPC in a realistic band", () => {
     expect(insights.benchmark).not.toBeNull();
     expect(insights.benchmark!.symbol).toBe("^GSPC");
     const r = Number(insights.benchmark!.correlation);
-    expect(r, `correlation ${r}`).toBeGreaterThanOrEqual(0.5);
+    expect(r, `correlation ${r}`).toBeGreaterThanOrEqual(0.65);
     expect(r, `correlation ${r}`).toBeLessThanOrEqual(0.8);
     expect(fetchSpy).not.toHaveBeenCalled();
   });

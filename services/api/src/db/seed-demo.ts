@@ -1939,16 +1939,16 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // Without seeded closes the demo fetched live ^GSPC history, so the Insights benchmark
   // card needed the network, changed from run to run, and correlated ≈0 with the
   // deterministic walks above. The seeded series walks on the same `marketShock` the
-  // portfolio walks load on, plus nothing else: daily amplitude about 1% (an index's
-  // usual daily move), drift solved like a portfolio walk's so it runs from 3,300 a
-  // quarter before the first snapshot (late 2020 in this dataset) to 6,500 today, in USD
+  // portfolio walks load on, plus nothing else: up to ±1.5% a day (RMS about 0.9%, an
+  // index's usual daily move), drift solved like a portfolio walk's so it runs from 3,300
+  // a quarter before the first snapshot (late 2020 in this dataset) to 6,500 today, in USD
   // like the real index.
   //
-  // One row per calendar day, weekends included, from that start through today. `ensureBenchmarkPrices` then finds every snapshot date
-  // covered (it wants an exact row for today and yesterday, whatever the weekday) and
-  // never fetches. `computeActiveReturn` pairs portfolio and benchmark by exact date, and
-  // the walks move on weekends too, so weekday-only rows would set a three-day portfolio
-  // move against a one-day index move.
+  // One row per calendar day, weekends included, from that start through today.
+  // `ensureBenchmarkPrices` then finds every snapshot date covered (it wants an exact row
+  // for today and yesterday, whatever the weekday) and never fetches. `computeActiveReturn`
+  // pairs portfolio and benchmark by exact date, and the walks move on weekends too, so
+  // weekday-only rows would set a three-day portfolio move against a one-day index move.
   const BENCHMARK_NOISE = 0.03;
   const firstSnapshotMs = Date.parse(
     `${snapshotRows.reduce((min, r) => (r.date < min ? r.date : min), isoDate(NOW))}T00:00:00.000Z`,
