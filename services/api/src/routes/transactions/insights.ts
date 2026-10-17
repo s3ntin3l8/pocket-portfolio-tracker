@@ -27,6 +27,7 @@ import {
 import { rangeStart } from "../../services/snapshots.js";
 import { cacheKey } from "../helpers.js";
 import { insightsCache } from "./shared.js";
+import { isReadOnlyPat } from "../../plugins/auth.js";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
 import { emptyInsightsResponse } from "./insights/defaults.js";
 import { computeConcentrationSection } from "./insights/concentration.js";
@@ -68,7 +69,14 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         .limit(1);
       const display = u?.displayCurrency ?? "IDR";
 
-      const ck = cacheKey("insights", id, range, holderId ?? "", portfolioId ?? "");
+      // A read-scoped PAT never triggers a provider fetch/persist (audit A7, #1039): FX from
+      // cached rates only, no benchmark price back-fill. Its possibly-degraded result is
+      // cached under its own key so it can't be served to a session.
+      const readOnlyPat = isReadOnlyPat(request);
+      const fxProvider = readOnlyPat ? null : undefined;
+      const ck =
+        cacheKey("insights", id, range, holderId ?? "", portfolioId ?? "") +
+        (readOnlyPat ? ":ro" : "");
       const result = await withDerivationCache(insightsCache, ck, async () => {
         // ── Portfolio history (TWR index) ──────────────────────────────
         const start = rangeStart(range);
@@ -93,7 +101,13 @@ export function registerInsightsRoutes(app: FastifyInstance) {
 
         const currencies = [...new Set([...snapshots.map((r) => r.currency), bmConfig.currency])];
         const dates = [...new Set(snapshots.map((r) => r.date))];
-        const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates);
+        const ratesByDate = await getFxRatesForDates(
+          app.db,
+          currencies,
+          display,
+          dates,
+          fxProvider,
+        );
         // Snapshot rows whose currency has no rate are left out (never 1:1, audit B2) and
         // reported as fxMissingCurrencies; rates carry over the whole date grid, so this
         // drops a portfolio leg consistently rather than single days.
@@ -170,8 +184,8 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         const insidePfIds = pfs.filter((p) => p.cashCounted).map((p) => p.id);
         const outsidePfIds = pfs.filter((p) => !p.cashCounted).map((p) => p.id);
         const [insideFlows, outsideFlows] = await Promise.all([
-          loadBoundaryFlowsForUser(app, id, insidePfIds, display, "inside"),
-          loadBoundaryFlowsForUser(app, id, outsidePfIds, display, "outside"),
+          loadBoundaryFlowsForUser(app, id, insidePfIds, display, "inside", fxProvider),
+          loadBoundaryFlowsForUser(app, id, outsidePfIds, display, "outside", fxProvider),
         ]);
         const boundaryFlowsForYearly = [...insideFlows, ...outsideFlows];
         const yearlyReturns = await computeInsightsYearlyReturns({
@@ -182,6 +196,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
           aggregatedFlows: aggregated,
           perPortfolio: perPortfolioForYearly,
           boundaryFlows: boundaryFlowsForYearly,
+          readOnly: readOnlyPat,
         });
 
         // ── Drawdown ───────────────────────────────────────────────────
@@ -224,7 +239,9 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         } | null = null;
         if (indexed.length > 0) {
           const bmDates = indexed.map((p) => p.date);
-          await ensureBenchmarkPrices(app.db, getMarketData, id, bmConfig.symbol, bmDates);
+          if (!readOnlyPat) {
+            await ensureBenchmarkPrices(app.db, getMarketData, id, bmConfig.symbol, bmDates);
+          }
           const refreshedBm = await getBenchmarkPrices(app.db, id, bmConfig.symbol, bmDates);
           if (refreshedBm.size > 1) {
             // Benchmark days with no FX rate are dropped (never 1:1, audit B2) and the
@@ -268,6 +285,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
             pfs.map((p) => p.id),
             dates,
             display,
+            fxProvider,
           );
 
         return {

@@ -184,12 +184,17 @@ describe("per-portfolio history after a baseCurrency change (#1031)", () => {
   });
 
   it("converts the intraday (1D/7D) series into the current base too", async () => {
-    const today = toDateKey(new Date());
+    const now = Date.now();
+    // Each intraday point converts at its capture date's rate (#1038); the older point can
+    // fall on yesterday's UTC date shortly after midnight, so both dates carry the rate.
     await app.db
       .insert(fxRates)
-      .values({ base: "EUR", quote: "IDR", rate: "17500", date: today })
+      .values(
+        [...new Set([toDateKey(new Date(now)), toDateKey(new Date(now - 3_600_000))])].map(
+          (date) => ({ base: "EUR", quote: "IDR", rate: "17500", date }),
+        ),
+      )
       .onConflictDoNothing();
-    const now = Date.now();
     await app.db.insert(portfolioIntradaySnapshots).values([
       {
         portfolioId: pf,
