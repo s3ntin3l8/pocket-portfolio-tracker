@@ -405,7 +405,9 @@ export async function loadHoldings(
       holdings: data.holdings,
       displayCurrency: data.displayCurrency,
       cash: data.cash,
-      cashDisplay: data.cashDisplay,
+      // Defaulted like fxMissingCurrencies: response validation is off in production, so an
+      // API that predates the field must degrade (rows flagged "No FX rate"), not throw.
+      cashDisplay: data.cashDisplay ?? {},
       cashTracked: data.cashTracked,
       fxMissingCurrencies: data.fxMissingCurrencies ?? [],
     };

@@ -133,8 +133,10 @@ export default async function HoldingsPage({
       currency,
     ]),
     // Cash rows for cash-inclusive portfolios (one row per currency). Like the holdings
-    // rows, MarketValue is in the display currency (empty when the currency has no FX
-    // rate); the native balance is the row's quantity, in PriceCurrency.
+    // rows, MarketValue/Currency are in the display currency — empty when the cash
+    // currency has no FX rate, exactly like an fxMissing holding (writing the native
+    // amount there would label it with the wrong currency). For cash, Quantity is the
+    // native balance (an amount, not a share count) and PriceCurrency names its currency.
     ...Object.entries(cash)
       .filter(([, v]) => Number(v) !== 0)
       .map(([ccy, balance]) => [

@@ -213,12 +213,14 @@ describe("HoldingsTable", () => {
     expect(screen.queryByText("No FX rate")).not.toBeInTheDocument();
   });
 
-  it("omits the native sub-amount when the cash is already in the display currency", () => {
-    const { container } = renderTable({ cash: { IDR: "4000" }, cashDisplay: { IDR: "4000" } });
+  it("takes the cash value from cashDisplay, with no native sub-amount in the display currency", () => {
+    // Deliberately different numbers, so the test pins which one is rendered.
+    const { container } = renderTable({ cash: { IDR: "4000" }, cashDisplay: { IDR: "9999" } });
     const cashRow = [...container.querySelectorAll("tbody tr")].find((tr) =>
       tr.textContent?.includes("Cash"),
     )!;
-    expect(cashRow.textContent?.match(/4,000/g)).toHaveLength(1);
+    expect(cashRow.textContent).toMatch(/9,999/);
+    expect(cashRow.textContent).not.toMatch(/4,000/);
   });
 
   it("leaves cash without an FX rate out of the total and flags it, never 1:1", () => {
