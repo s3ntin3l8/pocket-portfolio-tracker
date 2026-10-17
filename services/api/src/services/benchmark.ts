@@ -4,7 +4,7 @@ import { chainIndex, convert, fxAvailable, type DailyValueFlow } from "@portfoli
 import { MarketDataError, type MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { chunk } from "../lib/chunk.js";
-import { getFxRatesForDates, makeFxRateFn } from "./fx.js";
+import { getFxRatesForDates, makeFxRateFn, type FxProvider } from "./fx.js";
 
 export interface BenchmarkIndexPoint {
   date: string;
@@ -328,8 +328,10 @@ export async function getBenchmarkPricesMulti(
  * `closes` is the already-loaded `date → close` map (single- or multi-symbol loaders);
  * dates without a close are skipped. Pass `ratesByDate` when the caller already loaded
  * `getFxRatesForDates` with the benchmark's currency among its currencies; otherwise
- * it is loaded here. A day with no rate is dropped (never 1:1, audit B2) — `makeFxRateFn`
- * records the currency for `fxMissingCurrencies` — and counted in `fxMissingDates`.
+ * it is loaded here, through `fxProvider` when given (`null`: cached rates only, no
+ * provider fetch or persist — for read-scoped PATs). A day with no rate is dropped
+ * (never 1:1, audit B2) — `makeFxRateFn` records the currency for `fxMissingCurrencies`
+ * — and counted in `fxMissingDates`.
  */
 export async function benchmarkClosesInCurrency(
   db: DB,
@@ -337,14 +339,20 @@ export async function benchmarkClosesInCurrency(
   dates: string[],
   quoteCurrency: string,
   targetCurrency: string,
-  ratesByDate?: Map<string, Record<string, string>>,
+  opts: {
+    ratesByDate?: Map<string, Record<string, string>>;
+    fxProvider?: FxProvider | null;
+  } = {},
 ): Promise<{ closes: { date: string; close: string }[]; fxMissingDates: number }> {
   const wanted = [...new Set(dates)].filter((d) => closes.has(d)).sort();
   if (quoteCurrency === targetCurrency) {
     return { closes: wanted.map((d) => ({ date: d, close: closes.get(d)! })), fxMissingDates: 0 };
   }
   const rates =
-    ratesByDate ?? (await getFxRatesForDates(db, [quoteCurrency], targetCurrency, wanted));
+    opts.ratesByDate ??
+    (opts.fxProvider === undefined
+      ? await getFxRatesForDates(db, [quoteCurrency], targetCurrency, wanted)
+      : await getFxRatesForDates(db, [quoteCurrency], targetCurrency, wanted, opts.fxProvider));
   let fxMissingDates = 0;
   const out: { date: string; close: string }[] = [];
   for (const d of wanted) {

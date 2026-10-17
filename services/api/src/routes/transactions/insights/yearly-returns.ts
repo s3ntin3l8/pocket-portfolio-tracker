@@ -15,6 +15,7 @@ import {
   getBenchmarkPricesMulti,
   getUserBenchmarkSymbols,
 } from "../../../services/benchmark.js";
+import { getFxRatesForDates } from "../../../services/fx.js";
 import { toCoreTxns } from "../../../services/tx-core.js";
 import { boundaryFlows } from "../shared/flows.js";
 import { corporateActionsFor } from "../shared/helpers.js";
@@ -116,6 +117,13 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
   }
 
   const priceMap = await getBenchmarkPricesMulti(db, userId, symbolNames, allDates);
+  // One per-date FX load for every selected benchmark's currency, shared by all symbols.
+  const ratesByDate = await getFxRatesForDates(
+    db,
+    [...new Set(benchmarkSymbols.map((b) => b.currency ?? "USD"))],
+    displayCurrency,
+    allDates,
+  );
 
   const benchmarkInputs: {
     symbol: string;
@@ -137,6 +145,7 @@ export async function computeInsightsYearlyReturns(args: ComputeYearlyReturnsArg
       allDates,
       nativeCurrency,
       displayCurrency,
+      { ratesByDate },
     );
     const idx = computeBenchmarkIndex(closes);
     if (idx.length === 0) continue;

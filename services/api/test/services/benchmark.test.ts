@@ -430,7 +430,7 @@ describe("benchmarkClosesInCurrency (#1020)", () => {
       ["2011-03-03", "2011-03-01", "2011-03-02", "2011-03-04"],
       "USD",
       "IDR",
-      ratesByDate,
+      { ratesByDate },
     );
     expect(got.fxMissingDates).toBe(0);
     expect(got.closes).toEqual([
@@ -451,7 +451,7 @@ describe("benchmarkClosesInCurrency (#1020)", () => {
       ["2011-03-01", "2011-03-02", "2011-03-03"],
       "USD",
       "IDR",
-      ratesByDate,
+      { ratesByDate },
     );
     expect(got.fxMissingDates).toBe(1);
     expect(got.closes.map((c) => c.date)).toEqual(["2011-03-01", "2011-03-03"]);
@@ -498,6 +498,28 @@ describe("benchmarkClosesInCurrency (#1020)", () => {
         { date: "2011-03-02", close: "1100000" },
         { date: "2011-03-03", close: "1440000" },
       ]);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("benchmarkClosesInCurrency — FX provider plumbing", () => {
+  it("backfills through the given provider, and a null provider reads cached rows only", async () => {
+    const app = await buildApp({ authKey: TEST_KEY });
+    try {
+      const closes = new Map([["2010-05-03", "100"]]);
+      const getRateHistory = vi.fn(async () => ({ "2010-05-03": 15000 }));
+      const provider = { getRate: vi.fn(async () => null), getRateHistory };
+      const none = await benchmarkClosesInCurrency(app.db, closes, ["2010-05-03"], "CAD", "IDR", {
+        fxProvider: null,
+      });
+      expect(none).toEqual({ closes: [], fxMissingDates: 1 });
+      const got = await benchmarkClosesInCurrency(app.db, closes, ["2010-05-03"], "CAD", "IDR", {
+        fxProvider: provider,
+      });
+      expect(getRateHistory).toHaveBeenCalledOnce();
+      expect(got.closes).toEqual([{ date: "2010-05-03", close: "1500000" }]);
     } finally {
       await app.close();
     }

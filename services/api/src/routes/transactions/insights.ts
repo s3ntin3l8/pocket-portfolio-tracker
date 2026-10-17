@@ -235,7 +235,7 @@ export function registerInsightsRoutes(app: FastifyInstance) {
                 bmDates,
                 bmConfig.currency,
                 display,
-                ratesByDate,
+                { ratesByDate },
               );
             if (bmFxMissingDates > 0) {
               app.log.warn(

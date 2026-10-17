@@ -119,12 +119,15 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             }
             const refreshedBm = await getBenchmarkPrices(app.db, userId, bmConfig.symbol, bmDates);
             if (refreshedBm.size >= 1) {
+              // A read-scoped PAT converts with cached rates only (no provider fetch/persist),
+              // like the benchmark prices above.
               const { closes: bmPrices } = await benchmarkClosesInCurrency(
                 app.db,
                 refreshedBm,
                 bmDates,
                 bmConfig.currency,
-                rows[0]!.currency,
+                request.portfolio!.baseCurrency,
+                isReadOnlyPat(request) ? { fxProvider: null } : {},
               );
               const bmIndex = computeBenchmarkIndex(bmPrices);
               const bmById = new Map(bmIndex.map((p) => [p.date, p]));
@@ -323,9 +326,15 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         .orderBy(asc(portfolioSnapshots.date));
 
       // The benchmark's currency rides along so its closes convert at the same per-date
-      // rates as the snapshots (#1020).
+      // rates as the snapshots (#1020) — except for a read-scoped PAT, whose benchmark
+      // conversion below uses cached rates only (no provider fetch/persist).
       const bmConfig = await getUserBenchmarkConfig(app.db, id, display);
-      const currencies = [...new Set([...snapRows.map((r) => r.currency), bmConfig.currency])];
+      const currencies = [
+        ...new Set([
+          ...snapRows.map((r) => r.currency),
+          ...(readOnlyPat ? [] : [bmConfig.currency]),
+        ]),
+      ];
       const dates = [...new Set(snapRows.map((r) => r.date))];
       const ratesByDate = await getFxRatesForDates(app.db, currencies, display, dates);
       // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported as
@@ -399,7 +408,7 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             bmDates,
             bmConfig.currency,
             display,
-            ratesByDate,
+            readOnlyPat ? { fxProvider: null } : { ratesByDate },
           );
           const bmIndex = computeBenchmarkIndex(bmPrices);
           const bmById = new Map(bmIndex.map((p) => [p.date, p]));
