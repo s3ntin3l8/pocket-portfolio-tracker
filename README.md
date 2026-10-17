@@ -138,7 +138,9 @@ On a slow or heavily loaded host, raise `DEMO_HEALTH_TIMEOUT_MS` (default `90000
 each readiness probe (API `/health`, then the web app) may take, e.g.
 `DEMO_HEALTH_TIMEOUT_MS=240000 make demo`. If startup fails at any step, the demo runs the
 same teardown as Ctrl-C (kills the servers it started, deletes the scratch directory) and
-exits non-zero.
+exits non-zero. On Linux, teardown also stops any process still running with the scratch
+`HOME` that left the servers' process groups (e.g. Next's detached telemetry flush) before
+deleting; elsewhere only the process groups are covered.
 
 **Isolation is enforced, not assumed** (`scripts/demo/env.mjs`, tested in
 `scripts/demo/env.test.mjs`): every demo process gets a clean environment with nothing

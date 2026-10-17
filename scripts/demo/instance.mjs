@@ -33,13 +33,17 @@ export const DEMO_API_PORT = process.env.DEMO_API_PORT ?? "3910";
 export const DEMO_WEB_PORT = process.env.DEMO_WEB_PORT ?? "3915";
 
 const DEFAULT_HEALTH_TIMEOUT_MS = 90_000;
+// Node timers (and AbortSignal.timeout) overflow above this and fire at once.
+const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /** DEMO_HEALTH_TIMEOUT_MS, validated: how long each readiness probe may take. */
 export function healthTimeoutMs(value = process.env.DEMO_HEALTH_TIMEOUT_MS) {
   if (value === undefined || value === "") return DEFAULT_HEALTH_TIMEOUT_MS;
   const ms = Number(value);
-  if (!Number.isSafeInteger(ms) || ms <= 0)
-    throw new Error(`DEMO_HEALTH_TIMEOUT_MS must be a positive integer (ms), got "${value}"`);
+  if (!Number.isSafeInteger(ms) || ms <= 0 || ms > MAX_TIMER_MS)
+    throw new Error(
+      `DEMO_HEALTH_TIMEOUT_MS must be a positive integer (ms) up to ${MAX_TIMER_MS}, got "${value}"`,
+    );
   return ms;
 }
 
@@ -140,7 +144,7 @@ async function killStrays(home, graceMs = 2_000) {
   await waitGone(1_000);
 }
 
-async function waitForHttp(url, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS) {
+export async function waitForHttp(url, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS) {
   const start = Date.now();
   let lastError;
   while (Date.now() - start < timeoutMs) {
@@ -153,7 +157,8 @@ async function waitForHttp(url, timeoutMs = DEFAULT_HEALTH_TIMEOUT_MS) {
     } catch (err) {
       lastError = err;
     }
-    await new Promise((r) => setTimeout(r, 500));
+    const left = timeoutMs - (Date.now() - start);
+    if (left > 0) await new Promise((r) => setTimeout(r, Math.min(500, left)));
   }
   throw new Error(`Timed out waiting for ${url}${lastError ? `: ${lastError}` : ""}`);
 }
@@ -360,6 +365,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       quiet,
       timeoutMs,
       spawnServer: startServer,
+      stop,
     });
   } catch (err) {
     console.error(`[demo] startup failed, tearing down: ${err?.message ?? err}`);

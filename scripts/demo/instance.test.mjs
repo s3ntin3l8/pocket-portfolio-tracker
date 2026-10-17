@@ -32,13 +32,14 @@ const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
 const scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
 let startDemo;
 let strayPids;
+let waitForHttp;
 let healthTimeoutMs;
 
 beforeAll(async () => {
   process.env.TMPDIR = scratchRoot;
   process.env.DEMO_API_PORT = await freePort();
   process.env.DEMO_WEB_PORT = await freePort();
-  ({ startDemo, healthTimeoutMs, strayPids } = await import("./instance.mjs"));
+  ({ startDemo, healthTimeoutMs, strayPids, waitForHttp } = await import("./instance.mjs"));
 });
 
 afterAll(() => {
@@ -86,6 +87,29 @@ describe("startDemo startup failure", () => {
     expect(process.listenerCount("SIGINT")).toBe(listeners);
   }, 20_000);
 
+  it("refuses to start a server once a stop is in progress", async () => {
+    let demoDir;
+    await expect(
+      startDemo({
+        quiet: true,
+        boot: async (ctx) => {
+          demoDir = ctx.demoDir;
+          // As if a SIGTERM arrived during the build: teardown has begun.
+          const stopping = ctx.stop();
+          expect(() =>
+            ctx.spawnServer("api", process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+              cwd: ctx.runDir,
+              env: ctx.apiEnv,
+            }),
+          ).toThrow(/stopping/);
+          await stopping;
+          throw new Error("build interrupted");
+        },
+      }),
+    ).rejects.toThrow("build interrupted");
+    expect(existsSync(demoDir)).toBe(false);
+  }, 20_000);
+
   // Like Next's telemetry flush: spawned `detached` (its own group, so killGroup
   // misses it) with the scratch HOME, and it keeps recreating HOME/.config.
   it.skipIf(process.platform !== "linux")(
@@ -108,8 +132,11 @@ describe("startDemo startup failure", () => {
                 ],
                 { detached: true, stdio: "ignore", env: ctx.webEnv },
               );
-              await new Promise((r) => setTimeout(r, 300));
-              expect(existsSync(path.join(demoDir, "home/.config/nextjs-nodejs"))).toBe(true);
+              // Wait (bounded) for it to start writing; node startup is slow under load.
+              const config = path.join(demoDir, "home/.config/nextjs-nodejs");
+              for (let i = 0; i < 100 && !existsSync(config); i++)
+                await new Promise((r) => setTimeout(r, 50));
+              expect(existsSync(config)).toBe(true);
               expect(strayPids(path.join(demoDir, "home"))).toContain(stray.pid);
               throw new Error("boot failed");
             },
@@ -139,6 +166,24 @@ describe("startDemo startup failure", () => {
   });
 });
 
+describe("waitForHttp", () => {
+  it("gives up at the deadline even if the server accepts but never answers", async () => {
+    const sockets = new Set();
+    const server = net.createServer((s) => sockets.add(s));
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    const start = Date.now();
+    try {
+      await expect(
+        waitForHttp(`http://127.0.0.1:${server.address().port}/health`, 600),
+      ).rejects.toThrow(/Timed out waiting/);
+      expect(Date.now() - start).toBeLessThan(3_000);
+    } finally {
+      for (const s of sockets) s.destroy();
+      server.close();
+    }
+  });
+});
+
 describe("healthTimeoutMs", () => {
   it("defaults to 90 s and accepts a positive integer", () => {
     expect(healthTimeoutMs(undefined)).toBe(90_000);
@@ -146,7 +191,7 @@ describe("healthTimeoutMs", () => {
     expect(healthTimeoutMs("240000")).toBe(240_000);
   });
 
-  it.each(["0", "-5", "1.5", "abc", "1e400"])("rejects %s", (value) => {
+  it.each(["0", "-5", "1.5", "abc", "1e400", String(2 ** 31)])("rejects %s", (value) => {
     expect(() => healthTimeoutMs(value)).toThrow(/positive integer/);
   });
 });
