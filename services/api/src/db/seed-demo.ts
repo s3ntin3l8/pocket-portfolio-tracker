@@ -171,7 +171,11 @@ export const DEMO_GSPC_YEAR_END_CLOSES: Readonly<Record<number, number>> = {
   2025: 6845.5,
 };
 
-/** The demo benchmark's close today: about the real index's level in October 2026. */
+/**
+ * The demo benchmark's close today: about the real index's level in October 2026. Refresh it
+ * together with the table above each January: the seed-demo test fails once the newest
+ * year-end is more than a year (plus a month's grace) old.
+ */
 export const DEMO_GSPC_TODAY_CLOSE = 7800;
 
 /**
@@ -206,6 +210,7 @@ export function demoBenchmarkWalk(args: {
   const anchors = Object.entries(args.yearEnds)
     .map(([year, close]) => ({ day: dayOf(`${year}-12-31`), logClose: Math.log(close) }))
     .sort((a, b) => a.day - b.day);
+  if (anchors.length === 0) throw new Error("seed-demo: ^GSPC needs at least one year-end close");
   // Log-linear between the year-ends around `start`; the nearest one's level outside them.
   const before = anchors.filter((a) => a.day <= 0).at(-1);
   const after = anchors.find((a) => a.day > 0);

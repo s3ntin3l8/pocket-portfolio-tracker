@@ -36,7 +36,8 @@ import { buildApp } from "../../src/app.js";
  */
 process.env.SEED_DEMO_EMAIL = "seed-demo-admin-test@example.com";
 process.env.SEED_DEMO_PASSWORD = "bootstrap-password"; // pragma: allowlist secret
-const { seedDemo, demoSnapshotWalk, demoBenchmarkWalk } = await import("../../src/db/seed-demo.js");
+const { seedDemo, demoSnapshotWalk, demoBenchmarkWalk, DEMO_GSPC_YEAR_END_CLOSES } =
+  await import("../../src/db/seed-demo.js");
 
 describe("seedDemo — admin bootstrap", () => {
   afterEach(async () => {
@@ -527,6 +528,29 @@ describe("demoBenchmarkWalk", () => {
     expect(walk[yearEnd + 1]!.drift).not.toBeCloseTo(walk[yearEnd]!.drift, 6);
     // Before every anchor, the series opens on the nearest year-end's level.
     expect(walk[0]!.close).toBeCloseTo(5000, 6);
+  });
+
+  // The newest leg (last year-end → today) is unanchored: once a calendar year closes
+  // without its real close in the table, that year's seeded return is drift again.
+  it("has the real close of every completed year (one month's grace)", () => {
+    const newest = Math.max(...Object.keys(DEMO_GSPC_YEAR_END_CLOSES).map(Number));
+    const staleFrom = Date.UTC(newest + 1, 11, 31) + 31 * 86_400_000;
+    expect(
+      Date.now() < staleFrom,
+      `add the real ${newest + 1} ^GSPC year-end close to DEMO_GSPC_YEAR_END_CLOSES and refresh DEMO_GSPC_TODAY_CLOSE`,
+    ).toBe(true);
+  });
+
+  it("refuses an empty anchor table", () => {
+    expect(() =>
+      demoBenchmarkWalk({
+        start: "2025-01-01",
+        today: "2025-01-02",
+        yearEnds: {},
+        todayClose: 100,
+        noise,
+      }),
+    ).toThrow(/at least one year-end close/);
   });
 
   it("refuses a start on or after today", () => {
