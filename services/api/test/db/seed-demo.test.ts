@@ -36,8 +36,13 @@ import { buildApp } from "../../src/app.js";
  */
 process.env.SEED_DEMO_EMAIL = "seed-demo-admin-test@example.com";
 process.env.SEED_DEMO_PASSWORD = "bootstrap-password"; // pragma: allowlist secret
-const { seedDemo, demoSnapshotWalk, demoBenchmarkWalk, DEMO_GSPC_YEAR_END_CLOSES } =
-  await import("../../src/db/seed-demo.js");
+const {
+  seedDemo,
+  demoSnapshotWalk,
+  demoBenchmarkWalk,
+  DEMO_GSPC_YEAR_END_CLOSES,
+  DEMO_GSPC_TODAY_AS_OF,
+} = await import("../../src/db/seed-demo.js");
 
 describe("seedDemo — admin bootstrap", () => {
   afterEach(async () => {
@@ -538,6 +543,11 @@ describe("demoBenchmarkWalk", () => {
     expect(
       Date.now() < staleFrom,
       `add the real ${newest + 1} ^GSPC year-end close to DEMO_GSPC_YEAR_END_CLOSES and refresh DEMO_GSPC_TODAY_CLOSE`,
+    ).toBe(true);
+    // A year-end added without refreshing today's level would bridge toward a stale close.
+    expect(
+      DEMO_GSPC_TODAY_AS_OF > `${newest}-12-31`,
+      `refresh DEMO_GSPC_TODAY_CLOSE/DEMO_GSPC_TODAY_AS_OF to a level after ${newest}-12-31`,
     ).toBe(true);
   });
 

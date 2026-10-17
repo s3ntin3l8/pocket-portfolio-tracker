@@ -172,11 +172,14 @@ export const DEMO_GSPC_YEAR_END_CLOSES: Readonly<Record<number, number>> = {
 };
 
 /**
- * The demo benchmark's close today: about the real index's level in October 2026. Refresh it
- * together with the table above each January: the seed-demo test fails once the newest
- * year-end is more than a year (plus a month's grace) old.
+ * The demo benchmark's close today: about the real index's level on
+ * {@link DEMO_GSPC_TODAY_AS_OF}. Refresh both with the table above each January: the
+ * seed-demo test fails once the newest year-end is more than a year (plus a month's grace)
+ * old, or when the table has a year-end newer than this level's date.
  */
 export const DEMO_GSPC_TODAY_CLOSE = 7800;
+/** When {@link DEMO_GSPC_TODAY_CLOSE} was the real level (the 6 Oct 2026 close was 7,819). */
+export const DEMO_GSPC_TODAY_AS_OF = "2026-10-06";
 
 /**
  * The demo's ^GSPC closes, one per calendar day from `start` through `today` (#1029):
