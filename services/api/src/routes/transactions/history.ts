@@ -109,21 +109,25 @@ export function registerHistoryRoutes(app: FastifyInstance) {
           const currencies = [...new Set([...snapRows.map((r) => r.currency), bmConfig.currency])];
           const dates = [...new Set(snapRows.map((r) => r.date))];
           const ratesByDate = await getFxRatesForDates(app.db, currencies, base, dates, fxProvider);
-          const fxOn = (date: string) => makeFxRateFn(ratesByDate.get(date) ?? {}, base);
           // Rows whose currency has no rate are left out (never 1:1, audit B2) and reported
           // as fxMissingCurrencies. Rates carry forward/back over the whole date grid, so a
           // pre-switch currency drops out as a whole leg, never as single days.
-          const rows = snapRows
-            .filter((r) => fxAvailable(r.currency, base, fxOn(r.date)))
-            .map((r) => {
-              const fx = fxOn(r.date);
-              return {
-                date: r.date,
-                netWorth: convert(r.netWorth, r.currency, base, fx),
-                marketValue: convert(r.marketValue ?? "0", r.currency, base, fx),
-                effectiveFlow: convert(r.effectiveFlow ?? "0", r.currency, base, fx),
-              };
+          const rows: {
+            date: string;
+            netWorth: string;
+            marketValue: string;
+            effectiveFlow: string;
+          }[] = [];
+          for (const r of snapRows) {
+            const fx = makeFxRateFn(ratesByDate.get(r.date) ?? {}, base);
+            if (!fxAvailable(r.currency, base, fx)) continue;
+            rows.push({
+              date: r.date,
+              netWorth: convert(r.netWorth, r.currency, base, fx),
+              marketValue: convert(r.marketValue ?? "0", r.currency, base, fx),
+              effectiveFlow: convert(r.effectiveFlow ?? "0", r.currency, base, fx),
             });
+          }
 
           // Compute TWR chain from the converted (marketValue, effectiveFlow) pairs.
           const indexed = chainIndex(rows);
