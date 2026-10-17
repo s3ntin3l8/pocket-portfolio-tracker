@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
  * Standard shape for a table's filter/search/actions row (Activity, Trades, Income,
  * Holdings): filter chips left, search + actions right of them, flipping from a stacked
  * mobile layout to one row at `md:`. `md:` is deliberate, not a leftover from Activity's
- * mobile filter Sheet — it's the same mobile/desktop boundary `PageTitle` (`md:hidden`)
- * and the desktop topbar (`md:flex`) already use.
+ * mobile filter Sheet — it's the same mobile/desktop boundary `PageHeader`'s heading
+ * (`md:sr-only`) and the desktop topbar (`md:flex`) already use.
  */
 export function TableToolbar({
   filters,

@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
@@ -15,34 +16,7 @@ export default function Loading() {
         <Skeleton className="size-5 rounded" />
         <Skeleton className="h-6 w-1/3" />
       </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
-        <Card>
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-10 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-          </div>
-        </Card>
-        <Card>
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </div>
-        </Card>
-        <Card>
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </div>
-        </Card>
-        <Card>
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-7 w-1/2" />
-          </div>
-        </Card>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <PageWithRail>
         <div className="space-y-4">
           <Card>
             <div className="space-y-3 p-6">
@@ -86,7 +60,34 @@ export default function Loading() {
             </div>
           </div>
         </Card>
-      </div>
+        <PageRail className="space-y-2.5 sm:space-y-4">
+          <Card>
+            <div className="space-y-3 p-6">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-10 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </Card>
+          <Card>
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-7 w-1/2" />
+            </div>
+          </Card>
+          <Card>
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-7 w-1/2" />
+            </div>
+          </Card>
+          <Card>
+            <div className="space-y-2 p-6">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-7 w-1/2" />
+            </div>
+          </Card>
+        </PageRail>
+      </PageWithRail>
       <Skeleton className="h-3 w-3/4" />
     </div>
   );

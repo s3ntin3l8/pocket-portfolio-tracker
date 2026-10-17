@@ -448,7 +448,7 @@ export function TransactionsTable({
         (the sidebar is DOM-first but has no mobile order override). On @xl+, the grid
         places the main column left and the sidebar right via @xl:order-last, so the
         order utility has no effect. */}
-        <div className="space-y-3 min-w-0 max-md:order-first">
+        <div className="space-y-3 min-w-0 order-first @xl:order-none">
           <div data-testid="transactions-alerts" className="space-y-3">
             {!bannerDismissed && (
               <AnomalyBanner

@@ -3,8 +3,7 @@ import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { ReportHeader } from "@/components/report-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,6 +26,7 @@ import type { TaxSummaryHolderWithCarryForward } from "@/lib/server-api/_shared"
 import { harvestSummary } from "@portfolio/core";
 import { TaxHolderDetailDE, TaxHolderSectionId } from "./tax-detail-section";
 import { tint } from "@/lib/tint";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -68,8 +68,8 @@ export default async function TaxPage({
 
   const Heading = (
     <>
-      <PageHeaderSetter title={t("title")} backHref="/reports" />
-      <ReportHeader
+      <PageHeader
+        backHref="/reports"
         title={t("title")}
         subtitle={
           <>
@@ -207,7 +207,7 @@ function TaxHolderOverviewDe({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+      <PageWithRail>
         {/* ── Main column: hero + detailed cards ── */}
         <div className="space-y-5">
           <EstimatedTaxHero
@@ -321,7 +321,7 @@ function TaxHolderOverviewDe({
         </div>
 
         {/* ── Sidebar: KPI stat cards (sticky on wide containers) ── */}
-        <div className="order-first min-w-0 space-y-2.5 @xl:order-last @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] sm:space-y-4">
+        <PageRail className="space-y-2.5 sm:space-y-4">
           <StatCard
             label={t("hero.fsaUsed")}
             value={money(u.usedYtd)}
@@ -342,8 +342,8 @@ function TaxHolderOverviewDe({
             value={money(u.taxSavingAvailable)}
             delta={t("taxSavingAvailableDesc", { remaining: money(u.remaining) })}
           />
-        </div>
-      </div>
+        </PageRail>
+      </PageWithRail>
     </>
   );
 }

@@ -1,7 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminStorageForm } from "@/components/admin-storage-form";
-import { SectionHeader } from "@/components/section-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
 import { requireAdmin, loadAdminStorageProviders } from "@/lib/server-api";
 
@@ -21,8 +20,7 @@ export default async function AdminStoragePage({
 
   return (
     <>
-      <PageHeaderSetter title={t("storage")} backHref="/admin" />
-      <SectionHeader title={t("storage")} backHref="/admin" />
+      <PageHeader title={t("storage")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("storageHint")}</p>
       {result.status === "ok" ? (
         <AdminStorageForm initial={result.storage} />

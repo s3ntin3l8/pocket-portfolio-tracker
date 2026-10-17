@@ -59,7 +59,7 @@ export function SettingsShell({
    *  aren't a plain link, such as the PWA install button. */
   railExtra?: React.ReactNode;
   /** The page's `<h1>` at the bare index route (sr-only; the visible landing title is
-   *  plain text). Sub-routes get theirs from `SectionHeader`. */
+   *  plain text). Sub-routes get theirs from `PageHeader`. */
   title: string;
   landingTop?: React.ReactNode;
   /** Rendered at the bottom of the mobile landing (the rail's `railBottom` is desktop-only). */

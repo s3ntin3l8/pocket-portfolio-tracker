@@ -6,6 +6,7 @@ import { RegionCurrencyCard } from "@/components/holdings/region-currency-card";
 import { GainExplainer } from "@/components/gain-explainer";
 import { toneOf } from "@/lib/tone";
 import { formatNetWorth, formatPercent, formatSignedMoney } from "@/lib/utils";
+import { PageRail } from "@/components/page-with-rail";
 
 /**
  * Value stats + allocation donut + region/currency rail for Holdings. Allocation is the
@@ -40,7 +41,7 @@ export async function HoldingsSidebar({ summary, locale }: { summary: NetWorth; 
   const dayBase = Number(summary.totalMarketValue) - Number(summary.totalDayChange);
 
   return (
-    <div className="space-y-3.5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
+    <PageRail className="space-y-3.5">
       <PortfolioValueCard
         totalLabel={t("allocation.totalLabel")}
         totalValueFormatted={formatNetWorth(summary.netWorth, summary.displayCurrency, locale)}
@@ -98,6 +99,6 @@ export async function HoldingsSidebar({ summary, locale }: { summary: NetWorth; 
           .filter((s) => Number(s.value) > 0)
           .map((s) => ({ key: s.key, label: s.key, pct: s.pct }))}
       />
-    </div>
+    </PageRail>
   );
 }

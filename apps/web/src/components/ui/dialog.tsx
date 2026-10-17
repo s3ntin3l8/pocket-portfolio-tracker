@@ -108,7 +108,7 @@ function DialogContent({
    *  `confirm-action-dialog.tsx`. */
   fullScreenOnMobile?: boolean;
   /** Back-chevron + title row shown only in the mobile full-screen state, replacing the
-   *  floating X there (matches `SectionHeader`'s look, reused by every full-page form).
+   *  floating X there (matches `PageHeader`'s look, reused by every full-page form).
    *  Desktop still gets the floating X (or nothing, if `hideClose`). No effect when
    *  `fullScreenOnMobile` is false. */
   mobileHeader?: { title: React.ReactNode };

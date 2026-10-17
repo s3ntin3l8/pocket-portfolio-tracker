@@ -30,7 +30,7 @@ vi.mock("@/components/scope-link", () => ({
 }));
 
 import { SettingsShell, type ShellNavItem } from "../src/components/settings-shell";
-import { SectionHeader } from "../src/components/section-header";
+import { PageHeader } from "../src/components/page-header";
 import { tint } from "../src/lib/tint";
 
 const NAV_ITEMS: ShellNavItem[] = [
@@ -126,7 +126,7 @@ describe("SettingsShell", () => {
       render(
         <NextIntlClientProvider locale="en" messages={messages}>
           <SettingsShell title="Settings" navItems={NAV_ITEMS} indexHref="/settings">
-            <SectionHeader title="Account" backHref="/settings" />
+            <PageHeader title="Account" backHref="/settings" />
           </SettingsShell>
         </NextIntlClientProvider>,
       );

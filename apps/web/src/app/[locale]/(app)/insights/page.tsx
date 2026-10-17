@@ -25,7 +25,8 @@ import { cn, formatPercent } from "@/lib/utils";
 import { signToneClass } from "@/lib/tone";
 import { Card, CardLabel } from "@/components/ui/card";
 import { isIntradayPoint } from "@portfolio/api-client";
-import { PageTitle } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -73,9 +74,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
   if (result.status !== "ok") {
     return (
       <div className="space-y-5">
-        <header className="space-y-1">
-          <PageTitle>{t("title")}</PageTitle>
-        </header>
+        <PageHeader title={t("title")} />
         <DataState
           status={result.status}
           retryAfter={retryAfterOf(result)}
@@ -115,9 +114,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
 
   return (
     <div className="space-y-5">
-      <header className="space-y-1">
-        <PageTitle>{t("title")}</PageTitle>
-      </header>
+      <PageHeader title={t("title")} />
 
       <Card className="p-6">
         <CardLabel>{t("xirr.label")}</CardLabel>
@@ -139,12 +136,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
           )}
       </Card>
 
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
-        {/* ── Sidebar: overview metrics. DOM-first so overview metrics render near
-        the top on mobile (matching the pre-sidebar position after the XIRR hero);
-        @xl:order-last visually moves it right on desktop. Overflow capped so the
-        rail doesn't eat the entire viewport when stacked deep. ── */}
-        <div className="space-y-3.5 @xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last @xl:max-h-[calc(100vh-100px)] @xl:overflow-y-auto">
+      <PageWithRail>
+        {/* ── Sidebar: overview metrics. `railFirstOnMobile` keeps them near the top on
+        mobile (right after the XIRR hero); `PageRail` moves them right on desktop and
+        caps their height so the rail doesn't eat the viewport. ── */}
+        <PageRail railFirstOnMobile className="space-y-3.5">
           {allocation && (
             <div className="grid grid-cols-2 gap-3">
               <Card className="p-4">
@@ -257,7 +253,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
               />
             </>
           )}
-        </div>
+        </PageRail>
 
         {/* ── Main column: detailed analysis ── */}
         <div className="space-y-5">
@@ -291,7 +287,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
             <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
           )}
         </div>
-      </div>
+      </PageWithRail>
     </div>
   );
 }

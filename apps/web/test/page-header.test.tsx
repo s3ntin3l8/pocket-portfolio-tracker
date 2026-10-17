@@ -1,6 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "../messages/en.json";
 import {
+  PageHeader,
   PageHeaderProvider,
   PageHeaderSetter,
   PageTitle,
@@ -16,6 +19,14 @@ function HeaderProbe() {
     </div>
   );
 }
+
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 describe("PageHeaderContext", () => {
   it("renders empty state when no setter is mounted", () => {
@@ -121,3 +132,70 @@ describe("usePageHeader outside a provider", () => {
 // `act` is required when state updates triggered by useEffect should be observable
 // synchronously (cleanup on unmount clears the provider's state).
 void act;
+
+describe("PageHeader", () => {
+  const wrapIntl = (ui: React.ReactNode) => (
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <PageHeaderProvider>{ui}</PageHeaderProvider>
+    </NextIntlClientProvider>
+  );
+
+  it("renders the h1, a back link and sets the topbar title and back href", () => {
+    render(
+      wrapIntl(
+        <>
+          <PageHeader title="Investing" backHref="/settings" />
+          <HeaderProbe />
+        </>,
+      ),
+    );
+    expect(screen.getByRole("heading", { level: 1, name: "Investing" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Back")).toHaveAttribute("href", "/settings");
+    expect(screen.getByTestId("title")).toHaveTextContent("Investing");
+    expect(screen.getByTestId("back")).toHaveTextContent("/settings");
+  });
+
+  it("renders no back link for a top-level page and keeps the title in the topbar", () => {
+    render(
+      wrapIntl(
+        <>
+          <PageHeader title="Holdings" />
+          <HeaderProbe />
+        </>,
+      ),
+    );
+    expect(screen.queryByLabelText("Back")).not.toBeInTheDocument();
+    expect(screen.getByTestId("title")).toHaveTextContent("Holdings");
+  });
+
+  it("desktopBack={false} keeps the mobile link but sets no topbar back href", () => {
+    render(
+      wrapIntl(
+        <>
+          <PageHeader title="Account" backHref="/settings" desktopBack={false} />
+          <HeaderProbe />
+        </>,
+      ),
+    );
+    expect(screen.getByLabelText("Back")).toBeInTheDocument();
+    expect(screen.getByTestId("back")).toHaveTextContent("");
+  });
+
+  it("renders subtitle and action, and keeps the desktop margin only when they exist", () => {
+    const { container, rerender } = render(
+      wrapIntl(<PageHeader title="Income" subtitle="Dividends" action={<button>Export</button>} />),
+    );
+    expect(screen.getByText("Dividends")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
+    expect(container.querySelector("div.mb-6")).not.toBeNull();
+    rerender(wrapIntl(<PageHeader title="Income" />));
+    expect(container.querySelector("div.mb-6")).toBeNull();
+    expect(container.querySelector("div.md\\:mb-0")).not.toBeNull();
+  });
+
+  it("shows the short title on narrow screens and the full title from sm up", () => {
+    render(wrapIntl(<PageHeader title="Holdings overview" mobileTitle="Holdings" />));
+    expect(screen.getByText("Holdings")).toHaveClass("sm:hidden");
+    expect(screen.getByText("Holdings overview")).toHaveClass("hidden", "sm:inline");
+  });
+});

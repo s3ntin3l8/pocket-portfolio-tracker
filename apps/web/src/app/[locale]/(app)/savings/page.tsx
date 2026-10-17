@@ -9,14 +9,14 @@ import { StatCard } from "@/components/stat-card";
 import { LazyContributionsChart as ContributionsChart } from "@/components/charts/lazy";
 import { ForecastPanel } from "@/components/savings/forecast-panel";
 import { SparplanSection } from "@/components/savings/sparplan-section";
-import { ReportHeader } from "@/components/report-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { CashOnHandCard } from "@/components/savings/cash-on-hand-card";
 import { loadContributions, loadSparplan, loadHoldings, loadNetWorth } from "@/lib/server-api";
 import { GainFigure } from "@/components/gain-figure";
 import { toneOf } from "@/lib/tone";
 import { GainExplainer } from "@/components/gain-explainer";
 import { formatMoney, formatPercent, formatSignedMoney } from "@/lib/utils";
+import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
 
@@ -50,8 +50,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
 
   const heading = (
     <>
-      <PageHeaderSetter title={t("title")} backHref="/reports" />
-      <ReportHeader title={t("title")} subtitle={t("subtitle")} />
+      <PageHeader backHref="/reports" title={t("title")} subtitle={t("subtitle")} />
     </>
   );
 
@@ -85,7 +84,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
     <div className="space-y-5">
       {heading}
 
-      <div className="grid grid-cols-1 gap-5 @xl:grid-cols-[1fr_320px] @xl:items-start">
+      <PageWithRail>
         {/* ── Main column: chart + plans + forecast + cash ── */}
         <div className="space-y-5">
           <Card>
@@ -158,7 +157,7 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
         </div>
 
         {/* ── Sidebar: stat cards (sticky on wide containers) ── */}
-        <div className="@xl:sticky @xl:top-[calc(var(--topbar-h)+0.5rem)] @xl:order-last">
+        <PageRail>
           <div className="grid grid-cols-1 space-y-2.5 sm:space-y-4">
             <StatCard label={t("totalContributed")} value={m(Number(c.netContributed))} />
             <StatCard
@@ -202,8 +201,8 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
               deltaTone="neutral"
             />
           </div>
-        </div>
-      </div>
+        </PageRail>
+      </PageWithRail>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminProviders } from "@/components/admin-providers";
-import { SectionHeader } from "@/components/section-header";
-import { PageHeaderSetter } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
 import { requireAdmin, loadAdminProviders } from "@/lib/server-api";
 
@@ -23,8 +22,7 @@ export default async function AdminPage({ params }: { params: Promise<{ locale: 
 
   return (
     <>
-      <PageHeaderSetter title={t("providers")} />
-      <SectionHeader title={t("providers")} backHref="/admin" />
+      <PageHeader desktopBack={false} title={t("providers")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("providersHint")}</p>
       {result.status === "ok" ? (
         <AdminProviders

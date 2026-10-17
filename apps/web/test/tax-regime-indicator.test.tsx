@@ -4,7 +4,7 @@ import { NextIntlClientProvider, useTranslations } from "next-intl";
 import messages from "../messages/en.json";
 import idMessages from "../messages/id.json";
 import { RegimeIndicator } from "../src/components/tax/regime-indicator";
-import { ReportHeader } from "../src/components/report-header";
+import { PageHeader } from "../src/components/page-header";
 
 vi.mock("@/i18n/navigation", () => ({
   Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
@@ -22,7 +22,7 @@ function Indicator({ regime }: { regime: "DE" | "ID" }) {
 function renderIndicator(regime: "DE" | "ID", msgs: typeof messages = messages, locale = "en") {
   return render(
     <NextIntlClientProvider locale={locale} messages={msgs}>
-      <ReportHeader title="Tax" subtitle={<Indicator regime={regime} />} />
+      <PageHeader title="Tax" subtitle={<Indicator regime={regime} />} />
     </NextIntlClientProvider>,
   );
 }

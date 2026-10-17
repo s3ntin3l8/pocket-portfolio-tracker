@@ -19,7 +19,7 @@ import { tint } from "@/lib/tint";
  * Shared master-detail layout for every `/admin/*` route — the same `SettingsShell`
  * pattern as `/settings/*`. Desktop rail links to the 6 real admin sub-routes with a
  * "‹ Profile" exit above the list; mobile shows the grouped landing menu at the bare
- * `/admin` index, or the section's own content (with its own `SectionHeader` back-link)
+ * `/admin` index, or the section's own content (with its own `PageHeader` back-link)
  * on any sub-route. The admin gate lives here (DRY) — each sub-page also re-checks
  * via `requireAdmin()` as a belt-and-suspenders guard. A failed `me` lookup renders
  * `<AdminGateFailure>` (DataState + retry), never a 404; only a successful non-admin
