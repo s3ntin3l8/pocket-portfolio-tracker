@@ -14,6 +14,7 @@ import {
   portfolioSnapshots,
   allocationTargets,
   corporateActions,
+  benchmarkPrices,
 } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
@@ -72,6 +73,23 @@ function pseudoRandom(seed: number): number {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
   return x - Math.floor(x);
 }
+
+/**
+ * The demo's shared daily market shock in [−0.5, 0.5), keyed by days before `NOW` like
+ * the walks' noise (#1029). The seeded ^GSPC closes move with it, and every noisy
+ * portfolio walk loads on it with {@link MARKET_LOADING}, so the Insights correlation
+ * lands where a real equity portfolio against a broad index would, instead of the ≈0 of
+ * two independent series. The offset keeps it clear of the walks' own seeds.
+ */
+function marketShock(daysAgoN: number): number {
+  return pseudoRandom(daysAgoN + 50_000) - 0.5;
+}
+
+/**
+ * Share of a walk's noise that is the market shock; the rest, `√(1 − β²)`, is the
+ * walk's own, so the noise keeps its variance whatever β is.
+ */
+const MARKET_LOADING = 0.6;
 
 /**
  * One portfolio's demo value path (#1020), daily from its first boundary flow to `today`:
@@ -1804,7 +1822,8 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   //
   //   V_t = V_{t−1} · (1 + r_t) + F_t,   r_t = drift + noise_t
   //
-  // with F_t the day's net contribution and a deterministic noise term. `drift` is solved
+  // with F_t the day's net contribution and a deterministic noise term (partly the
+  // `marketShock` the seeded ^GSPC closes below walk on, #1029). `drift` is solved
   // by bisection so today's V equals the live valuation. Because the flows are the XIRR's
   // flows and the values are their consequence, each year's XIRR and TWR describe the same
   // path; a synthetic contribution schedule (the old "10 units, then 1 every 30 days")
@@ -1845,17 +1864,21 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // stamped at `NOW` a moment ago, so any generous TTL keeps them fresh.
   const ANCHOR_TTL_MS = 24 * 60 * 60 * 1000;
 
-  /** Daily noise amplitude around the solved drift (0: a smooth savings-account path). */
-  const walkParams: { portfolio: typeof portfolios.$inferSelect; noise: number }[] = [
-    { portfolio: idPortfolio, noise: 0.012 },
-    { portfolio: trPortfolio, noise: 0.01 },
-    { portfolio: goldPortfolio, noise: 0.008 },
-    { portfolio: mfPortfolio, noise: 0.004 },
-    { portfolio: cashPortfolio, noise: 0 },
+  /**
+   * Daily noise amplitude around the solved drift (0: a smooth savings-account path), and
+   * the seed of the walk's own share of it (the rest is the shared `marketShock`, #1029).
+   */
+  const walkParams: { portfolio: typeof portfolios.$inferSelect; noise: number; seed: number }[] = [
+    { portfolio: idPortfolio, noise: 0.012, seed: 10_000 },
+    { portfolio: trPortfolio, noise: 0.01, seed: 20_000 },
+    { portfolio: goldPortfolio, noise: 0.008, seed: 30_000 },
+    { portfolio: mfPortfolio, noise: 0.004, seed: 40_000 },
+    { portfolio: cashPortfolio, noise: 0, seed: 0 },
   ];
+  const ownLoading = Math.sqrt(1 - MARKET_LOADING ** 2);
 
   const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
-  for (const { portfolio, noise } of walkParams) {
+  for (const { portfolio, noise, seed } of walkParams) {
     const { summary, coreTxns, corporateActions } = await valuePortfolio(
       db,
       offlineQuotes,
@@ -1883,7 +1906,10 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       ),
       today: isoDate(NOW),
       target: Number(summary.netWorth),
-      noise: (daysAgoN) => (pseudoRandom(daysAgoN + portfolio.id.length) - 0.5) * noise,
+      noise: (daysAgoN) =>
+        noise *
+        (MARKET_LOADING * marketShock(daysAgoN) +
+          ownLoading * (pseudoRandom(daysAgoN + seed) - 0.5)),
       label: portfolio.name,
     });
     const netWorth = Number(summary.netWorth);
@@ -1907,6 +1933,44 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   const CHUNK = 500;
   for (let i = 0; i < snapshotRows.length; i += CHUNK) {
     await db.insert(portfolioSnapshots).values(snapshotRows.slice(i, i + CHUNK));
+  }
+
+  // --- Benchmark closes (^GSPC, the default reference index) (#1029). ---
+  // Without seeded closes the demo fetched live ^GSPC history, so the Insights benchmark
+  // card needed the network, changed from run to run, and correlated ≈0 with the
+  // deterministic walks above. The seeded series walks on the same `marketShock` the
+  // portfolio walks load on, plus nothing else: up to ±1.5% a day (RMS about 0.9%, an
+  // index's usual daily move), drift solved like a portfolio walk's so it runs from 3,300
+  // a quarter before the first snapshot (late 2020 in this dataset) to 6,500 today, in USD
+  // like the real index.
+  //
+  // One row per calendar day, weekends included, from that start through today.
+  // `ensureBenchmarkPrices` then finds every snapshot date covered and never fetches: it
+  // wants an exact row for today and yesterday whatever the weekday, so weekday-only rows
+  // would fetch whenever the demo is seeded on a weekend. `computeActiveReturn` pairs the
+  // two series by exact date, so daily rows also give the card every snapshot day
+  // (about 2,100 pairs instead of about 1,500).
+  const BENCHMARK_NOISE = 0.03;
+  const firstSnapshotMs = Date.parse(
+    `${snapshotRows.reduce((min, r) => (r.date < min ? r.date : min), isoDate(NOW))}T00:00:00.000Z`,
+  );
+  const benchmarkWalk = demoSnapshotWalk({
+    flows: [{ amount: -3300, date: new Date(firstSnapshotMs - 92 * DAY_MS) }],
+    today: isoDate(NOW),
+    target: 6500,
+    noise: (daysAgoN) => BENCHMARK_NOISE * marketShock(daysAgoN),
+    label: "^GSPC",
+  });
+  const benchmarkRows: (typeof benchmarkPrices.$inferInsert)[] = benchmarkWalk.map((p) => ({
+    userId: user.id,
+    symbol: "^GSPC",
+    date: p.date,
+    close: dec(p.value),
+    currency: "USD",
+    source: "demo",
+  }));
+  for (let i = 0; i < benchmarkRows.length; i += CHUNK) {
+    await db.insert(benchmarkPrices).values(benchmarkRows.slice(i, i + CHUNK));
   }
 
   // --- Allocation targets (aggregate asset-class mix → dashboard drift hint). ---
