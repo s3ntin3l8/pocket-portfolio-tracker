@@ -50,6 +50,11 @@ import {
  * read-scoped PAT (cached rates only, audit A7). A currency without any rate yields `null`
  * from the rate function (never 1:1), which `fxAvailable` turns into an exclusion reported
  * as fxMissingCurrencies.
+ *
+ * Carry-forward follows the daily series, not `getFxRates`: `getFxRatesForDates` carries a
+ * currency's newest cached rate to every later date with no `FX_MAX_CARRY_FORWARD_DAYS`
+ * bound (that bound only gates its back-fill), so a currency whose newest rate is older
+ * than 14 days still converts here, exactly as the same day does in the daily series.
  */
 async function intradayFxAt(
   app: FastifyInstance,
