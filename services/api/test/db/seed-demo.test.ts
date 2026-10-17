@@ -334,6 +334,11 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
     expect(closes.every((c) => c.currency === "USD")).toBe(true);
     expect(closes[0]!.date <= dates[0]!).toBe(true);
     expect(closes.at(-1)!.date).toBe(dates.at(-1));
+    // One close per calendar day, weekends included: carry-forward would hide weekday-only
+    // rows above, except on a weekend, when the exact-row rule for today and yesterday
+    // makes ensureBenchmarkPrices fetch.
+    const span = (Date.parse(closes.at(-1)!.date) - Date.parse(closes[0]!.date)) / 86_400_000;
+    expect(closes).toHaveLength(span + 1);
     // Plausible S&P 500 levels: about 3,300 at the start, about 6,500 today.
     expect(Number(closes[0]!.close)).toBeCloseTo(3300, 0);
     expect(Number(closes.at(-1)!.close)).toBeCloseTo(6500, 0);

@@ -1945,10 +1945,11 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // like the real index.
   //
   // One row per calendar day, weekends included, from that start through today.
-  // `ensureBenchmarkPrices` then finds every snapshot date covered (it wants an exact row
-  // for today and yesterday, whatever the weekday) and never fetches. `computeActiveReturn`
-  // pairs portfolio and benchmark by exact date, and the walks move on weekends too, so
-  // weekday-only rows would set a three-day portfolio move against a one-day index move.
+  // `ensureBenchmarkPrices` then finds every snapshot date covered and never fetches: it
+  // wants an exact row for today and yesterday whatever the weekday, so weekday-only rows
+  // would fetch whenever the demo is seeded on a weekend. `computeActiveReturn` pairs the
+  // two series by exact date, so daily rows also give the card every snapshot day
+  // (about 2,100 pairs instead of about 1,500).
   const BENCHMARK_NOISE = 0.03;
   const firstSnapshotMs = Date.parse(
     `${snapshotRows.reduce((min, r) => (r.date < min ? r.date : min), isoDate(NOW))}T00:00:00.000Z`,
