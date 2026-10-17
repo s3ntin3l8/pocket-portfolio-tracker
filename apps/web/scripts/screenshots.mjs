@@ -101,8 +101,9 @@ function pendingConditions(min) {
     pending.push("chart or data still loading");
   const charts = [...document.querySelectorAll(".recharts-wrapper")];
   const drawn = charts.filter((c) => c.querySelector(".recharts-surface path[d]"));
-  // At least `min` charts must have drawn. A chart that is mounted but has no path
-  // can be legitimately empty (no series), so it only warns after the wait.
+  // At least `min` charts must have drawn; fewer is fatal by design (timeout +
+  // throw), even if the missing ones are mounted but empty. Path-less charts beyond
+  // the expected count are legitimately empty (no series) and only warn.
   if (drawn.length < min) pending.push(`${drawn.length}/${min} expected charts drawn`);
   // Couples to the Next dev overlay's private markup (`<nextjs-portal>` shadow root
   // and its "Compiling"/"Building" label). If Next renames either, this check turns
