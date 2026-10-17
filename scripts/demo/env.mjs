@@ -110,6 +110,10 @@ export function assertDemoEnv(
   // dir like every other *_PATH, checked above.)
   if (api && env.STORAGE_PROVIDER !== "folder")
     problems.push("the API must use STORAGE_PROVIDER=folder (inside the demo dir)");
+  // The seeded FX table is complete (one row per day); a live lookup would splice real
+  // rates over it and put a step in the aggregate history.
+  if (api && env.FX_PROVIDER !== "none")
+    problems.push("the API must use FX_PROVIDER=none (seeded rates only, no live lookups)");
   for (const key of ["HOME", "TMPDIR"])
     if (!env[key] || !inside(demoDir, env[key]))
       problems.push(`${key} must be inside the demo dir`);

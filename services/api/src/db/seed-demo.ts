@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
+import { Decimal } from "decimal.js";
 import {
   users,
   apiTokens,
@@ -1643,12 +1644,10 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     { instrumentId: rdSaham.id, price: "1850", previousClose: "1842", currency: "IDR", asOf },
   ]);
 
-  // --- FX rates — quarterly history 2020-today for every currency pair the
+  // --- FX rates — daily history 2020-today for every currency pair the
   // seeded holdings actually need. See fx.ts: rows are (base=from, quote=to,
   // date), read for `quote = displayCurrency`. IDR is the default aggregate
   // display currency; EUR/USD/CAD are the foreign currencies any holding has.
-
-  const today = isoDate(NOW);
 
   // Scope cleanup to only the pairs this seed owns — the table is global
   // reference data shared with other users/devs on a shared dev DB, so
@@ -1664,58 +1663,73 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     await db.delete(fxRates).where(and(eq(fxRates.base, base), eq(fxRates.quote, quote)));
   }
 
-  const fxRows: (typeof fxRates.$inferInsert)[] = [];
-  // Generate quarterly FX rates from Jan 2020 to today
+  // Quarterly anchors for the three IDR legs only; every other rate is derived, so all
+  // conversion paths agree (USD→EUR × EUR→IDR == USD→IDR, same for CAD).
   const fxStartDate = new Date(Date.UTC(2020, 0, 1));
   const quartersSinceStart = (NOW.getUTCFullYear() - 2020) * 4 + Math.floor(NOW.getUTCMonth() / 3);
-
-  // Track the latest end-of-series rate per pair so we can stamp today's row
-  // even when today doesn't fall on a quarter start (getFxRates does
-  // eq(date, today) — a quarter-start-only seed would leave the live path
-  // with no cached rate on the ~110 non-quarter-start days/year and fall
-  // back to a live provider fetch).
-  const latestByPair = new Map<string, string>();
-
+  const anchors: { date: Date; eurIdr: number; usdIdr: number; cadIdr: number }[] = [];
   for (let q = 0; q <= quartersSinceStart; q++) {
     const date = new Date(fxStartDate);
     date.setUTCMonth(date.getUTCMonth() + q * 3);
     if (date > NOW) break;
-    const dateStr = isoDate(date);
     const t = q / quartersSinceStart; // 0 at 2020-01, 1 at now
-    // EUR/IDR: 15200 → 17450 (gradual rise)
-    const eurIdr = 15200 + t * 2250 + pseudoRandom(q * 13) * 300;
-    // USD/IDR: 13600 → 16100
-    const usdIdr = 13600 + t * 2500 + pseudoRandom(q * 17) * 250;
-    // USD/EUR: 0.89 → 0.923
-    const usdEur = 0.89 + t * 0.033 + (pseudoRandom(q * 23) - 0.5) * 0.02;
-    // CAD/IDR: 10500 → 11900
-    const cadIdr = 10500 + t * 1400 + pseudoRandom(q * 29) * 200;
-    // CAD/EUR: 0.65 → 0.68
-    const cadEur = 0.65 + t * 0.03 + (pseudoRandom(q * 31) - 0.5) * 0.015;
-    const row = (base: string, quote: string, rate: string) => {
-      const key = `${base}:${quote}`;
-      latestByPair.set(key, rate);
-      return { base, quote, rate, date: dateStr };
-    };
-    fxRows.push(
-      row("EUR", "IDR", dec(eurIdr, 0)),
-      row("USD", "IDR", dec(usdIdr, 0)),
-      row("USD", "EUR", dec(usdEur, 3)),
-      row("CAD", "IDR", dec(cadIdr, 0)),
-      row("CAD", "EUR", dec(cadEur, 3)),
-    );
+    anchors.push({
+      date,
+      // EUR/IDR: 15200 → 17450 (gradual rise)
+      eurIdr: 15200 + t * 2250 + pseudoRandom(q * 13) * 300,
+      // USD/IDR: 13600 → 16100
+      usdIdr: 13600 + t * 2500 + pseudoRandom(q * 17) * 250,
+      // CAD/IDR: 10500 → 11900
+      cadIdr: 10500 + t * 1400 + pseudoRandom(q * 29) * 200,
+    });
   }
 
-  // Stamp today's row for every pair using the end-of-series rate, so the
-  // live path's eq(date, today) lookup hits on any day, not just quarter starts.
-  for (const { base, quote } of seededPairs) {
-    const key = `${base}:${quote}`;
-    const rate = latestByPair.get(key);
-    if (rate && !fxRows.some((r) => r.base === base && r.quote === quote && r.date === today)) {
-      fxRows.push({ base, quote, rate, date: today });
-    }
+  // End the series on today at the trend's end value, so the last partial quarter keeps moving
+  // instead of holding flat from the latest quarter start.
+  const todayStart = new Date(Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth(), NOW.getUTCDate()));
+  if (anchors[anchors.length - 1]!.date < todayStart) {
+    anchors.push({
+      date: todayStart,
+      eurIdr: 15200 + 2250 + pseudoRandom(13) * 300,
+      usdIdr: 13600 + 2500 + pseudoRandom(17) * 250,
+      cadIdr: 10500 + 1400 + pseudoRandom(29) * 200,
+    });
   }
-  await db.insert(fxRates).values(fxRows);
+
+  // One row per calendar day, linearly interpolated between anchors (today's row is the
+  // final anchor). A date more than FX_MAX_CARRY_FORWARD_DAYS
+  // from a row would make getFxRatesForDates fetch live rates and splice them over the seeded
+  // walk — a step in the aggregate history — so the table must have no such gaps.
+  const DAY_MS = 86_400_000;
+  const fxRows: (typeof fxRates.$inferInsert)[] = [];
+  let seg = 0;
+  for (let ms = fxStartDate.getTime(); ms <= NOW.getTime(); ms += DAY_MS) {
+    while (seg < anchors.length - 1 && anchors[seg + 1]!.date.getTime() <= ms) seg++;
+    const lo = anchors[seg]!;
+    const hi = anchors[seg + 1];
+    const f = hi ? (ms - lo.date.getTime()) / (hi.date.getTime() - lo.date.getTime()) : 0;
+    const at = (a: number, b: number | undefined) => (b === undefined ? a : a + (b - a) * f);
+    const eurIdr = new Decimal(at(lo.eurIdr, hi?.eurIdr).toFixed(0));
+    const usdIdr = new Decimal(at(lo.usdIdr, hi?.usdIdr).toFixed(0));
+    const cadIdr = new Decimal(at(lo.cadIdr, hi?.cadIdr).toFixed(0));
+    const dateStr = isoDate(new Date(ms));
+    const row = (base: string, quote: string, rate: Decimal) => ({
+      base,
+      quote,
+      rate: rate.toDecimalPlaces(10).toFixed(),
+      date: dateStr,
+    });
+    fxRows.push(
+      row("EUR", "IDR", eurIdr),
+      row("USD", "IDR", usdIdr),
+      row("USD", "EUR", usdIdr.div(eurIdr)),
+      row("CAD", "IDR", cadIdr),
+      row("CAD", "EUR", cadIdr.div(eurIdr)),
+    );
+  }
+  for (let i = 0; i < fxRows.length; i += 1000) {
+    await db.insert(fxRates).values(fxRows.slice(i, i + 1000));
+  }
 
   // --- Portfolio snapshots (daily net-worth history → dashboard/savings charts). ---
   // A deterministic walk per portfolio: an opening deposit plus monthly contributions,
