@@ -155,6 +155,103 @@ export function demoSnapshotWalk(args: {
   return out;
 }
 
+/**
+ * Real ^GSPC year-end closes (USD, price index), the demo benchmark's yearly anchors: each
+ * seeded calendar year returns what the real index did (2021 +27%, 2022 −19%, 2023 +24%,
+ * 2024 +23%, 2025 +16%) instead of whatever a year of pseudo-random shocks sums to.
+ * Keyed by year; the anchor is that year's 31 December.
+ */
+export const DEMO_GSPC_YEAR_END_CLOSES: Readonly<Record<number, number>> = {
+  2019: 3230.78,
+  2020: 3756.07,
+  2021: 4766.18,
+  2022: 3839.5,
+  2023: 4769.83,
+  2024: 5881.63,
+  2025: 6845.5,
+};
+
+/**
+ * The demo benchmark's close today: about the real index's level (`close`) on a dated real
+ * session (`asOf`, ISO; the 6 Oct 2026 close was 7,819). One record, so the level and its
+ * date are edited together. Refresh it with the table above each January: the seed-demo
+ * test fails once the newest year-end is more than a year (plus a month's grace) old, or
+ * when the table has a year-end on or after `asOf`.
+ */
+export const DEMO_GSPC_TODAY: Readonly<{ asOf: string; close: number }> = {
+  asOf: "2026-10-06",
+  close: 7800,
+};
+
+/**
+ * The demo's ^GSPC closes, one per calendar day from `start` through `today` (#1029):
+ * the shared-shock daily noise, bridged so the path passes exactly through each pin —
+ * every year-end close in `yearEnds` strictly inside the range, plus `todayClose` today.
+ * The opening close is the year-end anchors' log-linear interpolation at `start`, so
+ * the series opens on a plausible level whatever date the demo is seeded on.
+ *
+ * In log space, `L_t = N_t + B_t`: `N_t` is the cumulative log of `1 + noise`, and `B_t`
+ * interpolates `log(pin) − N` linearly between consecutive pins. Within a segment that is
+ * a constant extra daily drift, so the day-to-day noise (and the correlation it carries)
+ * is untouched while each year ends on its anchor. Each point carries that day's `drift`
+ * (the bridge's log increment, 0 on the first day): the market regime the portfolio
+ * walks load on too, so a year the index fell is a weaker year for them as well.
+ */
+export function demoBenchmarkWalk(args: {
+  start: string;
+  today: string;
+  yearEnds: Readonly<Record<number, number>>;
+  todayClose: number;
+  /** Daily return noise, keyed by days before `today`. */
+  noise: (daysAgo: number) => number;
+}): { date: string; close: number; drift: number }[] {
+  const DAY_MS = 86_400_000;
+  const startMs = Date.parse(`${args.start}T00:00:00.000Z`);
+  const days = Math.round((Date.parse(`${args.today}T00:00:00.000Z`) - startMs) / DAY_MS);
+  if (days < 1) throw new Error(`seed-demo: ^GSPC needs a start before ${args.today}`);
+  const dayOf = (date: string) =>
+    Math.round((Date.parse(`${date}T00:00:00.000Z`) - startMs) / DAY_MS);
+
+  const anchors = Object.entries(args.yearEnds)
+    .map(([year, close]) => ({ day: dayOf(`${year}-12-31`), logClose: Math.log(close) }))
+    .sort((a, b) => a.day - b.day);
+  if (anchors.length === 0) throw new Error("seed-demo: ^GSPC needs at least one year-end close");
+  // Log-linear between the year-ends around `start`; the nearest one's level outside them.
+  const before = anchors.filter((a) => a.day <= 0).at(-1);
+  const after = anchors.find((a) => a.day > 0);
+  const startLog =
+    before && after
+      ? before.logClose +
+        ((after.logClose - before.logClose) * -before.day) / (after.day - before.day)
+      : (before ?? after)!.logClose;
+  const pins = [
+    { day: 0, logClose: startLog },
+    ...anchors.filter((a) => a.day > 0 && a.day < days),
+    { day: days, logClose: Math.log(args.todayClose) },
+  ];
+
+  const cum: number[] = [0];
+  for (let i = 1; i <= days; i++) cum.push(cum[i - 1]! + Math.log(1 + args.noise(days - i)));
+  const out: { date: string; close: number; drift: number }[] = [];
+  let seg = 0;
+  let prevBridge = 0;
+  for (let i = 0; i <= days; i++) {
+    while (seg < pins.length - 2 && pins[seg + 1]!.day <= i) seg++;
+    const a = pins[seg]!;
+    const b = pins[seg + 1]!;
+    const gapA = a.logClose - cum[a.day]!;
+    const gapB = b.logClose - cum[b.day]!;
+    const bridge = gapA + ((gapB - gapA) * (i - a.day)) / (b.day - a.day);
+    out.push({
+      date: toDateKey(new Date(startMs + i * DAY_MS)),
+      close: Math.exp(cum[i]! + bridge),
+      drift: i === 0 ? 0 : bridge - prevBridge,
+    });
+    prevBridge = bridge;
+  }
+  return out;
+}
+
 // --- seed ------------------------------------------------------------------
 
 export async function seedDemo(patOutPath?: string): Promise<void> {
@@ -1823,7 +1920,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   //   V_t = V_{t−1} · (1 + r_t) + F_t,   r_t = drift + noise_t
   //
   // with F_t the day's net contribution and a deterministic noise term (partly the
-  // `marketShock` the seeded ^GSPC closes below walk on, #1029). `drift` is solved
+  // `marketShock` and yearly regime of the seeded ^GSPC closes below, #1029). `drift` is solved
   // by bisection so today's V equals the live valuation. Because the flows are the XIRR's
   // flows and the values are their consequence, each year's XIRR and TWR describe the same
   // path; a synthetic contribution schedule (the old "10 units, then 1 every 30 days")
@@ -1876,9 +1973,18 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     { portfolio: cashPortfolio, noise: 0, seed: 0 },
   ];
   const ownLoading = Math.sqrt(1 - MARKET_LOADING ** 2);
+  // Chunk the inserts — PGlite/postgres both handle a few thousand rows fine in one
+  // call, but batching keeps this robust if the portfolio/day count grows later.
+  const CHUNK = 500;
 
-  const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
-  for (const { portfolio, noise, seed } of walkParams) {
+  // Each portfolio's live valuation and real boundary flows, first: the benchmark below
+  // starts a quarter before the earliest flow, and the walks then load on its regime.
+  const valued: ((typeof walkParams)[number] & {
+    summary: Awaited<ReturnType<typeof valuePortfolio>>["summary"];
+    flows: ReturnType<typeof boundaryFlowsAt>;
+  })[] = [];
+  for (const params of walkParams) {
+    const { portfolio } = params;
     const { summary, coreTxns, corporateActions } = await valuePortfolio(
       db,
       offlineQuotes,
@@ -1896,20 +2002,72 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         `seed-demo: no FX rate for ${summary.fxMissingCurrencies.join(", ")} → ${portfolio.baseCurrency}`,
       );
     }
+    const flows = boundaryFlowsAt(
+      coreTxns,
+      portfolio.cashCounted ? "inside" : "outside",
+      portfolio.baseCurrency,
+      await fxAtFlowDates(db, coreTxns, portfolio.baseCurrency),
+      corporateActions,
+    );
+    valued.push({ ...params, summary, flows });
+  }
+
+  // --- Benchmark closes (^GSPC, the default reference index) (#1029). ---
+  // Without seeded closes the demo fetched live ^GSPC history, so the Insights benchmark
+  // card needed the network, changed from run to run, and correlated ≈0 with the
+  // deterministic walks below. The seeded series walks on the same `marketShock` the
+  // portfolio walks load on: up to ±1.5% a day (RMS about 0.9%, an index's usual daily
+  // move), in USD like the real index, from a quarter before the first snapshot (late 2020
+  // in this dataset) to about the real level today. `demoBenchmarkWalk` bridges it through
+  // the real index's year-end closes, so each calendar year returns what the S&P 500 did;
+  // left to the shocks alone, a year came out anywhere from −4% to +51% (2022, a −19% year).
+  //
+  // One row per calendar day, weekends included, from that start through today.
+  // `ensureBenchmarkPrices` then finds every snapshot date covered and never fetches: it
+  // wants an exact row for today and yesterday whatever the weekday, so weekday-only rows
+  // would fetch whenever the demo is seeded on a weekend. `computeActiveReturn` pairs the
+  // two series by exact date, so daily rows also give the card every snapshot day
+  // (about 2,100 pairs instead of about 1,500).
+  const BENCHMARK_NOISE = 0.03;
+  const firstFlowKey = valued
+    .flatMap((v) => v.flows.map((f) => toDateKey(f.date)))
+    .reduce((min, d) => (d < min ? d : min), isoDate(NOW));
+  const benchmarkWalk = demoBenchmarkWalk({
+    start: isoDate(new Date(Date.parse(`${firstFlowKey}T00:00:00.000Z`) - 92 * DAY_MS)),
+    today: isoDate(NOW),
+    yearEnds: DEMO_GSPC_YEAR_END_CLOSES,
+    todayClose: DEMO_GSPC_TODAY.close,
+    noise: (daysAgoN) => BENCHMARK_NOISE * marketShock(daysAgoN),
+  });
+  const benchmarkRows: (typeof benchmarkPrices.$inferInsert)[] = benchmarkWalk.map((p) => ({
+    userId: user.id,
+    symbol: "^GSPC",
+    date: p.date,
+    close: dec(p.close),
+    currency: "USD",
+    source: "demo",
+  }));
+  for (let i = 0; i < benchmarkRows.length; i += CHUNK) {
+    await db.insert(benchmarkPrices).values(benchmarkRows.slice(i, i + CHUNK));
+  }
+  /** The benchmark's bridge drift (its yearly regime), keyed by days before `NOW`. */
+  const marketRegime = (daysAgoN: number) =>
+    benchmarkWalk[benchmarkWalk.length - 1 - daysAgoN]?.drift ?? 0;
+
+  const snapshotRows: (typeof portfolioSnapshots.$inferInsert)[] = [];
+  for (const { portfolio, noise, seed, summary, flows } of valued) {
     const walk = demoSnapshotWalk({
-      flows: boundaryFlowsAt(
-        coreTxns,
-        portfolio.cashCounted ? "inside" : "outside",
-        portfolio.baseCurrency,
-        await fxAtFlowDates(db, coreTxns, portfolio.baseCurrency),
-        corporateActions,
-      ),
+      flows,
       today: isoDate(NOW),
       target: Number(summary.netWorth),
+      // The regime at the shock's own relative loading: a walk with a tenth of the index's
+      // shock exposure also takes a tenth of its yearly drift, so a year the index fell is
+      // a weaker year here too, and the Tagesgeld (noise 0) stays smooth.
       noise: (daysAgoN) =>
         noise *
         (MARKET_LOADING * marketShock(daysAgoN) +
-          ownLoading * (pseudoRandom(daysAgoN + seed) - 0.5)),
+          ownLoading * (pseudoRandom(daysAgoN + seed) - 0.5) +
+          (MARKET_LOADING / BENCHMARK_NOISE) * marketRegime(daysAgoN)),
       label: portfolio.name,
     });
     const netWorth = Number(summary.netWorth);
@@ -1928,49 +2086,8 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       });
     }
   }
-  // Chunk the insert — PGlite/postgres both handle a few thousand rows fine in one
-  // call, but batching keeps this robust if the portfolio/day count grows later.
-  const CHUNK = 500;
   for (let i = 0; i < snapshotRows.length; i += CHUNK) {
     await db.insert(portfolioSnapshots).values(snapshotRows.slice(i, i + CHUNK));
-  }
-
-  // --- Benchmark closes (^GSPC, the default reference index) (#1029). ---
-  // Without seeded closes the demo fetched live ^GSPC history, so the Insights benchmark
-  // card needed the network, changed from run to run, and correlated ≈0 with the
-  // deterministic walks above. The seeded series walks on the same `marketShock` the
-  // portfolio walks load on, plus nothing else: up to ±1.5% a day (RMS about 0.9%, an
-  // index's usual daily move), drift solved like a portfolio walk's so it runs from 3,300
-  // a quarter before the first snapshot (late 2020 in this dataset) to 6,500 today, in USD
-  // like the real index.
-  //
-  // One row per calendar day, weekends included, from that start through today.
-  // `ensureBenchmarkPrices` then finds every snapshot date covered and never fetches: it
-  // wants an exact row for today and yesterday whatever the weekday, so weekday-only rows
-  // would fetch whenever the demo is seeded on a weekend. `computeActiveReturn` pairs the
-  // two series by exact date, so daily rows also give the card every snapshot day
-  // (about 2,100 pairs instead of about 1,500).
-  const BENCHMARK_NOISE = 0.03;
-  const firstSnapshotMs = Date.parse(
-    `${snapshotRows.reduce((min, r) => (r.date < min ? r.date : min), isoDate(NOW))}T00:00:00.000Z`,
-  );
-  const benchmarkWalk = demoSnapshotWalk({
-    flows: [{ amount: -3300, date: new Date(firstSnapshotMs - 92 * DAY_MS) }],
-    today: isoDate(NOW),
-    target: 6500,
-    noise: (daysAgoN) => BENCHMARK_NOISE * marketShock(daysAgoN),
-    label: "^GSPC",
-  });
-  const benchmarkRows: (typeof benchmarkPrices.$inferInsert)[] = benchmarkWalk.map((p) => ({
-    userId: user.id,
-    symbol: "^GSPC",
-    date: p.date,
-    close: dec(p.value),
-    currency: "USD",
-    source: "demo",
-  }));
-  for (let i = 0; i < benchmarkRows.length; i += CHUNK) {
-    await db.insert(benchmarkPrices).values(benchmarkRows.slice(i, i + CHUNK));
   }
 
   // --- Allocation targets (aggregate asset-class mix → dashboard drift hint). ---
