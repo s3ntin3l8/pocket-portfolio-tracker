@@ -97,6 +97,18 @@ const baseInput = {
   country: null,
 };
 
+/**
+ * Queries scoped to the account-holder <select>. The form also renders the country select
+ * (#1057, ~250 options), and an unscoped `findByRole("option")` computes the role and
+ * accessible name of every one of them on each poll — ~1.4 s per call idle, 15 s+ (the
+ * test timeout) on a loaded host. The holder select has a handful of options.
+ */
+async function holderOptions() {
+  // findBy, not getBy: keeps the retry the unscoped findByRole had, should the form ever mount
+  // after the trigger click rather than with it.
+  return within(await screen.findByLabelText(m.accountHolder));
+}
+
 function renderCreate() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -193,7 +205,7 @@ describe("PortfolioFormDialog", () => {
     renderCreate();
     fireEvent.click(screen.getByRole("button", { name: m.new }));
     // Wait for the picker to be populated from listAccountHolders.
-    await screen.findByRole("option", { name: /Emma/ });
+    await (await holderOptions()).findByRole("option", { name: /Emma/ });
 
     fireEvent.change(screen.getByLabelText(m.name), { target: { value: "Kids Savings" } });
     fireEvent.change(screen.getByLabelText(m.accountHolder), { target: { value: "h1" } });
@@ -590,7 +602,7 @@ describe("PortfolioFormDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: m.new }));
 
     // Wait for holders to load (from open), then select the holder.
-    await screen.findByRole("option", { name: /FSA Holder/ });
+    await (await holderOptions()).findByRole("option", { name: /FSA Holder/ });
     fireEvent.change(screen.getByLabelText(m.accountHolder), { target: { value: "h-fsa" } });
 
     // Helper text should show the sibling allocation vs. cap.
@@ -638,7 +650,7 @@ describe("PortfolioFormDialog", () => {
     renderCreate();
     fireEvent.click(screen.getByRole("button", { name: m.new }));
 
-    await screen.findByRole("option", { name: /Over Holder/ });
+    await (await holderOptions()).findByRole("option", { name: /Over Holder/ });
     fireEvent.change(screen.getByLabelText(m.accountHolder), { target: { value: "h-fsa2" } });
 
     // Wait for sibling portfolios to resolve (the helper appears first).
