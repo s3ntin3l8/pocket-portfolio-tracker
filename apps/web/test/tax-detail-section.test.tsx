@@ -137,6 +137,9 @@ describe("pinned first column in a totals row", () => {
     const start = css.indexOf("@utility sticky-first-col");
     const rule = css.slice(start, css.indexOf("\n}\n", start) + 2);
     expect(rule).toMatch(/tfoot :is\(th, td\):first-child \{\s*background-color: var\(--card-2\)/);
+    // Row hover only applies in the body, so a hovered totals row stays one tone.
+    expect(rule).toContain("& tbody tr:hover > :is(th, td):first-child");
+    expect(rule).not.toMatch(/^\s*& tr:hover/m);
   });
 });
 
@@ -150,5 +153,23 @@ describe("DE forecast tiles on a phone", () => {
     );
     // Queried on the forecast card itself, which sits beside the rail, not on <main>.
     expect(page).toContain('<CardContent className="@container space-y-4">');
+  });
+});
+
+describe("totals row hover", () => {
+  it("doesn't highlight a footer row, so its pinned cell stays the same tone", async () => {
+    const { Table, TableFooter, TableRow, TableCell } = await import("../src/components/ui/table");
+    const { container } = render(
+      <Table edgeAffordance>
+        <TableFooter>
+          <TableRow>
+            <TableCell>Total</TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>,
+    );
+    expect(container.querySelector("tfoot")!.getAttribute("class")).toContain(
+      "[&_tr]:hover:bg-transparent",
+    );
   });
 });

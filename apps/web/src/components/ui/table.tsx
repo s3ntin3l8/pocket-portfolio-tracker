@@ -60,7 +60,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       className={cn(
-        "border-t-2 border-line bg-card-2 text-body-sm font-bold [&_tr]:border-0",
+        "border-t-2 border-line bg-card-2 text-body-sm font-bold [&_tr]:border-0 [&_tr]:hover:bg-transparent",
         className,
       )}
       {...props}
