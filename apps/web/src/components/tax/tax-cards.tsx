@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardLabel, CardTitle } from "@/component
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import type { TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
-import { formatMoneyWhole } from "@/lib/utils";
+import { cn, formatMoneyWhole } from "@/lib/utils";
 
 /** The currency German tax amounts (Sparerpauschbetrag, FSA slices) are denominated in. */
 const DE_TAX_AMOUNT_CURRENCY = "EUR";
@@ -19,13 +19,16 @@ export function EstimatedTaxHero({
   label,
   value,
   description,
+  className,
 }: {
   label: string;
   value: string;
   description: string;
+  /** Grid placement (e.g. a full row on a phone). */
+  className?: string;
 }) {
   return (
-    <Card className="min-w-0 p-5">
+    <Card className={cn("min-w-0 p-5", className)}>
       <CardLabel className="truncate">{label}</CardLabel>
       <p className="tabular mt-1 truncate text-lg font-bold sm:text-2xl lg:text-display">{value}</p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">{description}</p>

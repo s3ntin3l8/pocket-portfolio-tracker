@@ -239,7 +239,9 @@ function TaxHolderOverviewDe({
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-xs text-muted-foreground">{t("forecast.disclaimer")}</p>
-                <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+                {/* Full amounts in the display currency (e.g. "IDR 14,910,312") don't fit three
+                    to a phone row: two, then the third on its own, 3-up once there's room. */}
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @2xl:grid-cols-3">
                   <StatCard
                     label={t("forecast.label")}
                     value={money(u.forecastIncomeRestOfYear)}
@@ -251,6 +253,7 @@ function TaxHolderOverviewDe({
                     delta={t("forecast.projectedUsedDesc")}
                   />
                   <StatCard
+                    className="col-span-2 @2xl:col-span-1"
                     label={t("forecast.projectedRemaining")}
                     value={money(u.projectedRemaining)}
                     delta={`${t("forecast.projectedTaxSaving")}: ${money(u.projectedTaxSavingAvailable)}`}

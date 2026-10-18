@@ -26,7 +26,9 @@ export function TaxHolderDetailDE({
   if (!detail) return null;
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* grid-cols-1 (minmax(0, 1fr)), not an implicit auto track: an auto track grows to a
+          wide table's min-width on a phone instead of letting it scroll inside its card. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DisposalTable
           rows={detail.disposals}
           totalProceeds={detail.totalProceeds}
@@ -80,8 +82,12 @@ export function TaxHolderSectionId({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+      {/* Three IDR figures don't fit side by side on a phone: the headline takes its own row
+          there (full label and amount), the two smaller tiles share the next; 3-up once the
+          page column has room. */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @2xl:grid-cols-3">
         <EstimatedTaxHero
+          className="col-span-2 @2xl:col-span-1"
           label={t("id.hero.estimatedTax", { year })}
           value={moneyCompact(idTax.estimatedTax)}
           description={t("id.hero.estimatedTaxDesc", {
@@ -101,26 +107,26 @@ export function TaxHolderSectionId({
         />
       </div>
 
-      {/* Stacked: the income table's five columns don't fit a half-width card. */}
-      <div className="grid gap-4">
-        <IdSalesTable
-          rows={idTax.disposals}
-          totalProceeds={idTax.totalProceeds}
-          totalSalesTax={idTax.totalSalesTax}
-          currency={currency}
-          locale={locale}
-          year={year}
-        />
-        <IdIncomeTable
-          rows={domesticIncome}
-          totalIncomeGross={idTax.totalIncomeGross}
-          totalIncomeTax={idTax.totalIncomeTax}
-          totalIncomeNet={idTax.totalIncomeNet}
-          currency={currency}
-          locale={locale}
-          year={year}
-        />
-      </div>
+      {/* Stacked full-width (the income table's five columns don't fit a half-width card),
+          as plain blocks: a grid item would grow to the table's min-width on a phone instead
+          of letting the table scroll inside its card. */}
+      <IdSalesTable
+        rows={idTax.disposals}
+        totalProceeds={idTax.totalProceeds}
+        totalSalesTax={idTax.totalSalesTax}
+        currency={currency}
+        locale={locale}
+        year={year}
+      />
+      <IdIncomeTable
+        rows={domesticIncome}
+        totalIncomeGross={idTax.totalIncomeGross}
+        totalIncomeTax={idTax.totalIncomeTax}
+        totalIncomeNet={idTax.totalIncomeNet}
+        currency={currency}
+        locale={locale}
+        year={year}
+      />
 
       <IdForeignIncomeTable
         rows={foreignIncome}

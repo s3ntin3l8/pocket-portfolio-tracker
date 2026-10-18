@@ -737,3 +737,23 @@ describe("IdByYearTable", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe("IdIncomeTable totals row", () => {
+  it("keeps the pinned first column one column wide (no colSpan on Total)", () => {
+    const { container } = wrapClient(
+      <IdIncomeTable
+        rows={[incomeRow({ symbol: "BBCA", category: "domestic_dividend", gross: "100" })]}
+        totalIncomeGross="100"
+        totalIncomeTax="10"
+        totalIncomeNet="90"
+        currency={CURRENCY}
+        locale={LOCALE}
+        year={2026}
+      />,
+    );
+    const cells = container.querySelectorAll("tfoot td");
+    expect(cells).toHaveLength(5);
+    expect(cells[0]).toHaveTextContent("Total");
+    expect(cells[0]!.getAttribute("colspan")).toBeNull();
+  });
+});

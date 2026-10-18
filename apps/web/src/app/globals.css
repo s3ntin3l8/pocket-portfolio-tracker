@@ -378,6 +378,11 @@
   & tr:hover > :is(th, td):first-child {
     background-color: var(--row-hover);
   }
+  /* The totals row sits on `bg-card-2` (TableFooter): match it, or the pinned "Total" cell
+     reads as a separate block. (The hover rule above is more specific and still wins.) */
+  & tfoot :is(th, td):first-child {
+    background-color: var(--card-2);
+  }
 }
 
 /* Hide scrollbar but keep scroll functional — used by the income calendar's
