@@ -24,7 +24,7 @@ import { mintSessionCookie } from "./mint-session.mjs";
  *
  * Writes: screens with `settings` (the tax shots) switch that user's display currency and
  * tax regime for their capture and restore them afterwards, so this refuses a non-local
- * SCREENSHOTS_WEB_URL unless SCREENSHOTS_ALLOW_REMOTE=1 (see assertLocalWebUrl).
+ * SCREENSHOTS_WEB_URL unless SCREENSHOTS_ALLOW_REMOTE names its host (assertLocalWebUrl).
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,7 +76,8 @@ async function backend(request, method, apiPath, data) {
 async function setSetting(request, key, value) {
   const endpoint = SETTING_ENDPOINTS[key];
   const updated = await backend(request, endpoint.method, endpoint.path, { [key]: value });
-  if (updated[key] !== value)
+  // String compare: the API may echo a coerced form (preferences return numbers/booleans).
+  if (String(updated[key]) !== String(value))
     throw new Error(`setting ${key} to ${value} did not stick (API answered ${updated[key]})`);
 }
 
@@ -122,9 +123,9 @@ async function applySettings(request, settings) {
  * Runs `capture` with the screen's `settings` applied to the demo user, restoring the
  * recorded originals afterwards (also when the capture throws), so later screens and the
  * run order are unaffected. A setting that can't be applied fails the run rather than
- * shipping a capture in the wrong currency/regime. A capture error wins over a restore
- * failure (which is then only logged); a restore failure after a good capture fails the run,
- * since every later screen would render with the wrong settings.
+ * shipping a capture in the wrong currency/regime. A failed restore always fails the run
+ * (every later screen would render with the wrong settings); after a failed capture the
+ * error names both, with the capture's error as its cause.
  */
 export async function withSettings(page, settings, capture) {
   if (!settings) return capture();
@@ -133,8 +134,11 @@ export async function withSettings(page, settings, capture) {
   try {
     result = await capture();
   } catch (err) {
-    for (const warning of await restoreSettings(page.request, originals)) console.warn(warning);
-    throw err;
+    const failures = await restoreSettings(page.request, originals);
+    if (failures.length === 0) throw err;
+    // Both, loudly: the instance is left on the temporary settings, and a later capture
+    // against it would take them for the originals.
+    throw new Error(`${err.message}; and then ${failures.join("; ")}`, { cause: err });
   }
   const failures = await restoreSettings(page.request, originals);
   if (failures.length > 0) throw new Error(failures.join("; "));
@@ -143,15 +147,16 @@ export async function withSettings(page, settings, capture) {
 
 /**
  * The capture switches the signed-in user's settings (see withSettings), so it only runs
- * against the local demo instance unless SCREENSHOTS_ALLOW_REMOTE=1 says otherwise.
+ * against the local demo instance unless SCREENSHOTS_ALLOW_REMOTE names that exact host: a
+ * stray generic flag in a shell or CI env must not open every deployment.
  */
 export function assertLocalWebUrl(url, env) {
   const host = new URL(url).hostname;
   if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return;
-  if (env.SCREENSHOTS_ALLOW_REMOTE === "1") return;
+  if (env.SCREENSHOTS_ALLOW_REMOTE === host) return;
   throw new Error(
     `refusing to capture against ${host}: the script switches the signed-in user's display ` +
-      `currency and tax regime; set SCREENSHOTS_ALLOW_REMOTE=1 to override`,
+      `currency and tax regime; set SCREENSHOTS_ALLOW_REMOTE=${host} to override`,
   );
 }
 
@@ -159,9 +164,19 @@ export function assertLocalWebUrl(url, env) {
  * Headless Chromium on Linux hints glyphs by default, snapping their advances to the pixel
  * grid. At the narrow (2x) captures' small text sizes that reads as gaps inside words
  * ("Estimat ed", "Pocke t", "YT D") and swallowed word spaces; unhinted glyphs keep the
- * font's own spacing, as a phone renders it.
+ * font's own spacing, as a phone renders it. The switch is FreeType's, so Linux-only:
+ * elsewhere Chromium ignores it (see hintingWarning).
  */
 export const CHROMIUM_ARGS = ["--font-render-hinting=none"];
+
+/** A warning when the hinting switch can't take effect on this platform, else null. */
+export function hintingWarning(platform) {
+  if (platform === "linux") return null;
+  return (
+    `--font-render-hinting=none only applies on Linux (this is ${platform}); the committed ` +
+    `captures are made on Linux, so text spacing here may differ from them`
+  );
+}
 
 const THEMES = ["light", "dark"];
 
@@ -471,6 +486,8 @@ async function captureLanding(browser, cookie, secure) {
 
 async function main() {
   assertLocalWebUrl(WEB_URL, process.env);
+  const hinting = hintingWarning(process.platform);
+  if (hinting) console.warn(hinting);
   if (!PAT_FILE) throw new Error("SCREENSHOTS_PAT_FILE env var is required");
   if (!AUTH_SECRET) throw new Error("AUTH_SECRET env var is required");
   if (!["readme", "landing"].includes(PROFILE))

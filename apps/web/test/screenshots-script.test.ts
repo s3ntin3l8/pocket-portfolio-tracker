@@ -8,6 +8,7 @@ import {
   withSettings,
   CHROMIUM_ARGS,
   assertLocalWebUrl,
+  hintingWarning,
 } from "../scripts/screenshots.mjs";
 
 describe("screenshots script — dev indicator", () => {
@@ -216,7 +217,7 @@ describe("screenshots script — per-screen settings", () => {
     expect(state.taxRegime).toBe("ID");
   });
 
-  it("withSettings reports the capture's own error, not a restore failure", async () => {
+  it("withSettings reports the capture's error and a failed restore together", async () => {
     let restoring = false;
     const state = { displayCurrency: "IDR", taxRegime: "DE" };
     const request = {
@@ -238,9 +239,26 @@ describe("screenshots script — per-screen settings", () => {
         restoring = true;
         throw new Error("tax: page did not settle");
       }),
-    ).rejects.toThrow(/tax: page did not settle/);
-    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/could not restore displayCurrency/));
+    ).rejects.toThrow(
+      // Both, loudly: the instance is left on the temporary settings, so a later capture
+      // against it must not treat them as the originals.
+      /tax: page did not settle.*could not restore displayCurrency to IDR/s,
+    );
     warn.mockRestore();
+  });
+
+  it("withSettings accepts an echo the API coerced (e.g. a number for a numeric string)", async () => {
+    const state: Record<string, unknown> = { taxRegime: "DE" };
+    const request = {
+      fetch: vi.fn(
+        async (_url: string, opts: { method: string; data?: Record<string, string> }) => {
+          if (opts.data) Object.assign(state, opts.data);
+          // Echo a coerced form, as /me/preferences does for numeric fields.
+          return { ok: () => true, status: () => 200, json: async () => ({ taxRegime: 1 }) };
+        },
+      ),
+    };
+    await expect(withSettings({ request }, { taxRegime: "1" }, async () => 7)).resolves.toBe(7);
   });
 
   it("withSettings rejects an unknown setting instead of silently capturing without it", async () => {
@@ -263,6 +281,12 @@ describe("screenshots script — text rendering", () => {
     // sizes the snapped advances read as gaps inside words ("Estimat ed", "Pocke t", "YT D").
     expect(CHROMIUM_ARGS).toContain("--font-render-hinting=none");
   });
+
+  it("warns that the flag only takes effect on Linux", () => {
+    expect(hintingWarning("linux")).toBeNull();
+    expect(hintingWarning("darwin")).toMatch(/only applies on Linux/);
+    expect(hintingWarning("win32")).toMatch(/only applies on Linux/);
+  });
 });
 
 describe("screenshots script — target guard", () => {
@@ -277,9 +301,16 @@ describe("screenshots script — target guard", () => {
     );
   });
 
-  it("allows a remote host only with an explicit override", () => {
+  it("allows a remote host only when the override names that exact host", () => {
     expect(() =>
-      assertLocalWebUrl("https://pocket.example.com", { SCREENSHOTS_ALLOW_REMOTE: "1" }),
+      assertLocalWebUrl("https://pocket.example.com", {
+        SCREENSHOTS_ALLOW_REMOTE: "pocket.example.com",
+      }),
     ).not.toThrow();
+    // A stray generic flag (or another host's) must not open every deployment.
+    for (const flag of ["1", "true", "staging.example.com"])
+      expect(() =>
+        assertLocalWebUrl("https://pocket.example.com", { SCREENSHOTS_ALLOW_REMOTE: flag }),
+      ).toThrow(/refusing to capture against pocket\.example\.com/);
   });
 });
