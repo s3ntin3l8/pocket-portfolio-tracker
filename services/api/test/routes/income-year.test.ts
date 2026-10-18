@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { instruments, transactions } from "@portfolio/db";
+import { incomeYearResponseSchema } from "@portfolio/schema";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 
@@ -100,10 +101,8 @@ describe("GET /portfolios/:id/income-year", () => {
       headers: auth(t),
     });
     expect(res.statusCode, res.body).toBe(200);
-    const rows = res.json() as {
-      type: string;
-      instrument: { symbol: string; name: string } | null;
-    }[];
+    // The contract the api-client's `IncomeYearRow` mirrors; `instrument` is required in it.
+    const rows = incomeYearResponseSchema.parse(res.json());
     expect(rows).toHaveLength(2);
     const dividend = rows.find((r) => r.type === "dividend");
     expect(dividend?.instrument).toMatchObject({ symbol: "INCY", name: "Income Year AG" });

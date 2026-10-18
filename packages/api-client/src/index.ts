@@ -1007,6 +1007,10 @@ export interface Transaction {
   displayCurrency?: string;
 }
 
+/** A row of `GET /portfolios/:id/income-year` (`incomeYearResponseSchema`): a transaction with
+ *  its instrument, but none of the list routes' sources/document enrichment. */
+export type IncomeYearRow = Omit<Transaction, "hasDocument" | "hasFullTaxDetail" | "sources">;
+
 /** Result of a read-only merge simulation (`previewMergeTransactions`). `ok: false` means the
  *  guardrails blocked it (different instrument, incompatible type, loan-linked leg, or the
  *  transaction wasn't found) — `blockedReason` is a `cannot_merge_<reason>`-style key for i18n. */
@@ -2984,9 +2988,10 @@ export function createApiClient(config: ApiClientConfig) {
         "GET",
         `/networth/transactions?${new URLSearchParams({ ids: ids.join(",") })}`,
       ),
-    /** List income-only rows for a portfolio in the given tax year (lightweight, no instrument/sources enrichment). */
+    /** List income-only rows for a portfolio in the given tax year, each with its `instrument`
+     *  (lightweight: no sources/document enrichment, see `IncomeYearRow`). */
     listIncomeByYear: (portfolioId: string, year: number) =>
-      request<Transaction[]>("GET", `/portfolios/${portfolioId}/income-year?year=${year}`),
+      request<IncomeYearRow[]>("GET", `/portfolios/${portfolioId}/income-year?year=${year}`),
     /** Look up a single FX rate for a given currency pair and date. Returns null when no
      *  rate is available for that pair/date (caller falls back to 1:1). */
     getFxRate: (from: string, to: string, date: string) =>
