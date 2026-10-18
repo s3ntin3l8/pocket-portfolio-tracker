@@ -1,6 +1,12 @@
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { benchmarkPrices, userBenchmarkSymbols } from "@portfolio/db";
-import { chainIndex, convert, fxAvailable, type DailyValueFlow } from "@portfolio/core";
+import {
+  chainIndex,
+  convert,
+  fxAvailable,
+  periodsPerYear,
+  type DailyValueFlow,
+} from "@portfolio/core";
 import { MarketDataError, type MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../db/client.js";
 import { chunk } from "../lib/chunk.js";
@@ -408,18 +414,32 @@ export function carryForwardBenchmark(
 export function computeActiveReturn(
   portfolioIndex: { date: string; pct: string }[],
   benchmarkIndex: { date: string; pct: string }[],
-): { activeReturn: string; trackingError: string; correlation: string } | null {
+): {
+  activeReturn: string;
+  /** Null when the series' sampling frequency can't be measured (no positive date span). */
+  trackingError: string | null;
+  correlation: string;
+  /** First date both series cover — the start of the window every figure measures. */
+  since: string;
+} | null {
   if (portfolioIndex.length === 0 || benchmarkIndex.length === 0) return null;
 
   const bmByDate = new Map(benchmarkIndex.map((p) => [p.date, Number(p.pct)]));
-  const raw: { pf: number; bm: number }[] = [];
+  const raw: { date: string; pf: number; bm: number }[] = [];
   for (const p of portfolioIndex) {
     const bmPct = bmByDate.get(p.date);
     if (bmPct !== undefined) {
-      raw.push({ pf: Number(p.pct), bm: bmPct });
+      raw.push({ date: p.date, pf: Number(p.pct), bm: bmPct });
     }
   }
   if (raw.length < 2) return null;
+  // The common series is sampled on its own calendar (calendar-daily snapshots, minus the
+  // days the benchmark has no close), so annualize with its own frequency, the same way
+  // /insights annualizes volatility, not with the trading-day constant 252 (audit B13).
+  // Only tracking error needs it; a null frequency blanks that one figure, not the card.
+  // `periodsPerYear` needs ISO (Date.parse-able) dates and a positive span — the route's
+  // snapshot dates always are; a non-ISO caller would get trackingError: null.
+  const ppy = periodsPerYear(raw.map((r) => ({ date: r.date, index: String(1 + r.pf / 100) })));
 
   // `portfolioIndex`/`benchmarkIndex` are each chained from their OWN first element
   // (chainIndex's base), which don't necessarily coincide with the first date they
@@ -461,7 +481,10 @@ export function computeActiveReturn(
 
   const meanDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
   const variance = diffs.reduce((acc, d) => acc + (d - meanDiff) ** 2, 0) / (diffs.length - 1);
-  const trackingError = Math.sqrt(variance) * Math.sqrt(252);
+  // Each spread is between consecutive COMMON dates, annualized with the series' average
+  // sampling frequency — a gap (e.g. missing benchmark history) counts as one period. Same
+  // approximation /insights makes for volatility.
+  const trackingError = ppy === null ? null : Math.sqrt(variance) * Math.sqrt(ppy);
 
   // Correlation = Pearson's r between portfolio and benchmark daily returns
   const pfRets: number[] = [];
@@ -493,7 +516,8 @@ export function computeActiveReturn(
   // r and is scale-invariant, so it's returned as-is.
   return {
     activeReturn: String(activeReturn / 100),
-    trackingError: String(trackingError / 100),
+    trackingError: trackingError === null ? null : String(trackingError / 100),
     correlation: String(correlation),
+    since: raw[0].date,
   };
 }

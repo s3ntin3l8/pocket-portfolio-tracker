@@ -232,8 +232,9 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         let benchmark: {
           symbol: string;
           activeReturn: string;
-          trackingError: string;
+          trackingError: string | null;
           correlation: string;
+          since: string;
         } | null = null;
         if (indexed.length > 0) {
           const bmDates = indexed.map((p) => p.date);

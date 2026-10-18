@@ -48,8 +48,44 @@ describe("computeActiveReturn", () => {
     const diffs = [-15, -25 / 7];
     const mean = diffs.reduce((a, b) => a + b, 0) / diffs.length;
     const variance = diffs.reduce((acc, d) => acc + (d - mean) ** 2, 0) / (diffs.length - 1);
-    const expectedTrackingError = (Math.sqrt(variance) * Math.sqrt(252)) / 100;
+    // The series is calendar-daily (3 points over 2 days → 365.25 periods/year), so it is
+    // annualized with its own sampling frequency, not the trading-day constant 252 (audit B13).
+    const expectedTrackingError = (Math.sqrt(variance) * Math.sqrt(365.25)) / 100;
     expect(Number(result!.trackingError)).toBeCloseTo(expectedTrackingError, 6);
+    // The window the figures cover starts at the first common date.
+    expect(result!.since).toBe("2026-01-01");
+  });
+
+  it("blanks only tracking error when the sampling frequency can't be measured", () => {
+    // Two points on the same date: no positive span, so no periods-per-year.
+    const r = computeActiveReturn(
+      [
+        { date: "2026-01-01", pct: "0" },
+        { date: "2026-01-01", pct: "5" },
+        { date: "2026-01-01", pct: "7" },
+      ],
+      [
+        { date: "2026-01-01", pct: "0" },
+        { date: "2026-01-01", pct: "2" },
+      ],
+    );
+    expect(r).not.toBeNull();
+    expect(r!.trackingError).toBeNull();
+    expect(r!.since).toBe("2026-01-01");
+  });
+
+  it("annualizes tracking error with the series' own frequency (weekly ≠ daily)", () => {
+    // Same per-period spreads, sampled daily vs weekly: the weekly series must annualize
+    // with ~52.18 periods/year, so its tracking error is √(365.25/52.18)=√7 smaller.
+    const pcts = { pf: ["0", "5", "10"], bm: ["0", "20", "30"] };
+    const at = (dates: string[], xs: string[]) => xs.map((pct, i) => ({ date: dates[i], pct }));
+    const daily = ["2026-01-01", "2026-01-02", "2026-01-03"];
+    const weekly = ["2026-01-01", "2026-01-08", "2026-01-15"];
+    const d = computeActiveReturn(at(daily, pcts.pf), at(daily, pcts.bm))!;
+    const w = computeActiveReturn(at(weekly, pcts.pf), at(weekly, pcts.bm))!;
+    expect(Number(d.trackingError) / Number(w.trackingError)).toBeCloseTo(Math.sqrt(7), 6);
+    // Active return is a cumulative difference — the sampling frequency doesn't touch it.
+    expect(d.activeReturn).toBe(w.activeReturn);
   });
 
   it("leaves correlation unscaled (dimensionless, scale-invariant)", () => {
@@ -95,12 +131,13 @@ describe("computeActiveReturn", () => {
       // (0%/day) from the same start — a constant ~1pp/day active spread throughout.
       let pfIndex = 100 * (1 + startPct / 100);
       const bmIndex = 100 * (1 + startPct / 100);
-      const pf = [{ date: "d0", pct: (pfIndex / 100 - 1) * 100 }];
-      const bm = [{ date: "d0", pct: (bmIndex / 100 - 1) * 100 }];
+      const day = (d: number) => `2026-01-${String(d + 1).padStart(2, "0")}`;
+      const pf = [{ date: day(0), pct: (pfIndex / 100 - 1) * 100 }];
+      const bm = [{ date: day(0), pct: (bmIndex / 100 - 1) * 100 }];
       for (let d = 1; d <= days; d++) {
         pfIndex *= 1.01;
-        pf.push({ date: `d${d}`, pct: (pfIndex / 100 - 1) * 100 });
-        bm.push({ date: `d${d}`, pct: (bmIndex / 100 - 1) * 100 });
+        pf.push({ date: day(d), pct: (pfIndex / 100 - 1) * 100 });
+        bm.push({ date: day(d), pct: (bmIndex / 100 - 1) * 100 });
       }
       return { pf, bm };
     };
@@ -148,6 +185,8 @@ describe("computeActiveReturn", () => {
 
     const result = computeActiveReturn(portfolioIndex, benchmarkIndex);
     expect(result).not.toBeNull();
+    // The window starts at the first COMMON date, not the portfolio's own first date.
+    expect(result!.since).toBe("2026-01-05");
 
     // Rebased to 2026-01-05: portfolio index there is 105 (pct 5 relative to its own
     // base), rising to 108 by 01-06 → true return over the common window is

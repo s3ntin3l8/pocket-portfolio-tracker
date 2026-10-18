@@ -1071,6 +1071,8 @@ describe("GET /insights", () => {
       expect(Number(body.benchmark.activeReturn)).toBeCloseTo(pf - bm, 6);
       // 1300/1000 − 130·14000/(100·10000) = 0.3 − 0.82.
       expect(Number(body.benchmark.activeReturn)).toBeCloseTo(-0.52, 6);
+      // …measured from the first date both series cover, which the card names.
+      expect(body.benchmark.since).toBe(DATES[0]);
     });
 
     it("converts a second benchmark in another currency (outside the card's FX load)", async () => {

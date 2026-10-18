@@ -12,7 +12,13 @@ import { TradesTable } from "@/components/trades-table";
 import { TradeMethodToggle } from "@/components/trade-method-toggle";
 import { TradesPageCommands } from "@/components/trades-page-commands";
 import { loadTrades, loadPreferences } from "@/lib/server-api";
-import { formatMoney, formatPercent, formatSignedMoney, cn } from "@/lib/utils";
+import {
+  formatMoney,
+  formatPercent,
+  formatPercentUnsigned,
+  formatSignedMoney,
+  cn,
+} from "@/lib/utils";
 import { PageRail, PageWithRail } from "@/components/page-with-rail";
 
 type Method = "average" | "fifo";
@@ -253,7 +259,7 @@ export default async function TradesPage({
             <Card className="px-5 py-4">
               <p className="text-xs font-semibold text-muted-foreground">{t("winLossTitle")}</p>
               <p className="tabular mt-1 text-2xl font-bold">
-                {log.winRate === null ? "—" : formatPercent(log.winRate, locale).replace("+", "")}
+                {log.winRate === null ? "—" : formatPercentUnsigned(log.winRate, locale)}
               </p>
               <p className="mt-0.5 text-micro font-medium text-text-2">
                 {t("winLossSubtitle", { winners: winners.length, total: closedTrades.length })}

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isRowAnomaly, rowAnomalyCounts, bannerAnomalies } from "@/lib/utils";
+import {
+  isRowAnomaly,
+  rowAnomalyCounts,
+  bannerAnomalies,
+  formatPercent,
+  formatPercentUnsigned,
+} from "@/lib/utils";
 import type { Anomaly } from "@portfolio/api-client";
 
 // Minimal anomaly builder — only the fields these helpers read.
@@ -81,5 +87,18 @@ describe("bannerAnomalies", () => {
     expect(rows.length + banners.length).toBe(anomalies.length);
     expect(rows).toHaveLength(1);
     expect(banners).toHaveLength(3);
+  });
+});
+
+describe("formatPercentUnsigned", () => {
+  it("formats a magnitude with no sign, unlike the signed formatPercent", () => {
+    expect(formatPercent(0.1128, "en")).toBe("+11.28%");
+    expect(formatPercentUnsigned(0.1128, "en")).toBe("11.28%");
+    expect(formatPercentUnsigned(0.75, "en")).toBe("75.00%");
+    expect(formatPercentUnsigned(0, "en")).toBe("0.00%");
+  });
+
+  it("follows the locale's separators", () => {
+    expect(formatPercentUnsigned(0.1128, "id")).toMatch(/^11,28\s?%$/);
   });
 });

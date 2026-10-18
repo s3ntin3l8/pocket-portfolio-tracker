@@ -22,7 +22,10 @@ describe("VolatilityCard", () => {
     expect(screen.getByText("1.20")).toBeInTheDocument();
     expect(screen.getByText("1.60")).toBeInTheDocument();
     // Explanatory note (the "Info" box) explaining how the figures are computed.
-    expect(screen.getByText(/√252/)).toBeInTheDocument();
+    // It must describe what the API does: annualize with the series' own frequency
+    // (calendar-daily → ~365), not the trading-day constant √252 (audit B13).
+    expect(screen.getByText(/√365/)).toBeInTheDocument();
+    expect(screen.queryByText(/daily returns × √252/)).not.toBeInTheDocument();
   });
 
   it("renders a dash when there is not enough data for volatility", () => {
