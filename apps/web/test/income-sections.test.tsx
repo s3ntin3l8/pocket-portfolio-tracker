@@ -1,9 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-vi.mock("next-intl/server", () => ({
-  getTranslations: async () => (key: string) => key,
-}));
+// Echoes keys (the assertions below match on them), but only for keys that exist in BOTH
+// catalogues — a label missing from en/id fails here instead of rendering its raw key.
+vi.mock("next-intl/server", async () => {
+  const en = (await import("../messages/en.json")).default as Record<string, unknown>;
+  const id = (await import("../messages/id.json")).default as Record<string, unknown>;
+  const resolve = (bag: unknown, key: string) =>
+    key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], bag);
+  return {
+    getTranslations: async (ns: string) => (key: string) => {
+      for (const [name, cat] of [
+        ["en", en],
+        ["id", id],
+      ] as const) {
+        if (typeof resolve(cat[ns], key) !== "string")
+          throw new Error(`missing message ${ns}.${key} in ${name}.json`);
+      }
+      return key;
+    },
+  };
+});
 
 const data = vi.hoisted(() => ({ incomeStatsOnce: vi.fn() }));
 vi.mock("@/components/income/income-data", () => data);

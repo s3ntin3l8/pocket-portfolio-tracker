@@ -172,9 +172,15 @@ describe("Reports cards", () => {
       expect(hero.dividendsYtdDesc).not.toContain("{allowance}");
     }
     expect(messages.Tax.hero.dividendsYtd).toMatch(/investment income/i);
-    // The By-year column holds the same figure (current year: incomeYtd; past years: all
-    // capital income incl. interest), so it carries the same name.
+    // The By-year column holds the same kind of income (dividends, coupons, interest), so
+    // it carries the same name — but not one basis: the selected year is the Tf-adjusted
+    // incomeYtd, earlier years are gross. The table says so in `byYear.note`.
     expect(messages.Tax.byYear.dividends).toMatch(/investment income/i);
+    expect(messages.Tax.byYear.note).toMatch(/Teilfreistellung/);
+    expect(idMessages.Tax.byYear.note).toMatch(/Teilfreistellung/);
+    // /trades shows the same all-income series.
+    expect(messages.Trades.dividendsByYear).toMatch(/investment income/i);
+    expect(idMessages.Trades.dividendsByYear).toMatch(/pendapatan investasi/i);
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
     // The ID-regime by-year column is fed the same `dividendsByYear` (dividends, coupons
     // and interest), so it is renamed too — in both locales.
@@ -235,6 +241,21 @@ describe("Reports cards", () => {
   it("documents card is always present, even with no documents", async () => {
     wrap(await DocumentsCard());
     expect(screen.getByTestId("card")).toHaveAttribute("href", "/reports/documents");
+  });
+});
+
+describe("TradesCard win rate", () => {
+  it("renders the win rate unsigned (a share, not a change)", async () => {
+    data.tradesReport.mockResolvedValue(
+      ok({
+        trades: [{ status: "closed", totalReturn: "120", avgHoldingDays: 30 }],
+        realizedByYear: [],
+        winRate: 0.75,
+      }),
+    );
+    const el = (await TradesCard({ locale: "en" }))!;
+    expect(el.props.trend.label).toContain('"pct":"75.00%"');
+    expect(el.props.trend.label).not.toContain("+");
   });
 });
 

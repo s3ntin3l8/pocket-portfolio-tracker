@@ -19,6 +19,7 @@ import {
   formatMoney,
   formatMoneyCompact,
   formatPercent,
+  formatPercentUnsigned,
   formatQuantity,
   formatSignedMoney,
 } from "@/lib/utils";
@@ -174,7 +175,7 @@ export async function TradesCard({ locale }: CardProps) {
         log.winRate !== null
           ? {
               label: t("trades.trend", {
-                pct: formatPercent(log.winRate, locale).replace("+", ""),
+                pct: formatPercentUnsigned(log.winRate, locale),
               }),
               tone: log.winRate >= 0.5 ? "up" : "down",
             }

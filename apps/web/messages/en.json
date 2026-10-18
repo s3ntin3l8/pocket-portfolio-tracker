@@ -1977,11 +1977,11 @@
     "winners": "Winners",
     "losers": "Losers",
     "realizedByYear": "Realized gains by year",
-    "dividendsByYear": "Dividends by year",
+    "dividendsByYear": "Investment income by year",
     "bonusesByYear": "Bonuses by year",
     "bonusesNote": "Broker-credited rewards (Kindergeld, saveback, free shares). Not counted in total return.",
     "noRealized": "No realized gains yet.",
-    "noDividends": "No dividends received yet.",
+    "noDividends": "No investment income received yet.",
     "year": "Year",
     "received": "Received",
     "withholding": "Tax withheld",
@@ -2150,7 +2150,8 @@
       "realized": "Realized gains",
       "dividends": "Investment income",
       "fsaUsed": "FSA used",
-      "tax": "Abgeltungsteuer"
+      "tax": "Abgeltungsteuer",
+      "note": "The selected year comes from the allowance calculation: income after the Teilfreistellung, gains after loss netting. Earlier years are rough estimates on gross figures, without the Teilfreistellung and with today's allowance."
     },
     "footnote": "Germany taxes investment income at a flat {rate}% (Abgeltungsteuer + Solidaritätszuschlag). Your {allowance} Sparer-Pauschbetrag is applied first, then losses offset gains within the same year. Estimate only, not tax advice.",
     "regime": {
