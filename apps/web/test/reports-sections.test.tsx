@@ -177,9 +177,10 @@ describe("Reports cards", () => {
     // incomeYtd, earlier years are gross. The table says so in `byYear.note`.
     expect(messages.Tax.byYear.dividends).toMatch(/investment income/i);
     expect(messages.Tax.byYear.note).toMatch(/Teilfreistellung/);
-    expect(idMessages.Tax.byYear.note).toMatch(
-      /pendapatan dan keuntungan setelah Teilfreistellung/,
-    );
+    // Pin the clause that changed (the netting lands in FSA used / the tax, not in the
+    // gains column) — the older ID note already had the Teilfreistellung clause.
+    expect(idMessages.Tax.byYear.note).toMatch(/dengan rugi digabungkan dalam FSA terpakai/);
+    expect(messages.Tax.byYear.note).toMatch(/with losses netted in FSA used/);
     // /trades shows the same all-income series.
     expect(messages.Trades.dividendsByYear).toMatch(/investment income/i);
     expect(idMessages.Trades.dividendsByYear).toMatch(/pendapatan investasi/i);
@@ -198,6 +199,20 @@ describe("Reports cards", () => {
       expect(msgs.Tax.dividendsTable.title).toMatch(income);
       expect(msgs.Trades.dividends).toMatch(held);
       expect(msgs.Trades.totalDividends).toMatch(held);
+      expect(msgs.Tax.id.hero.dividendTax).toMatch(income);
+      expect(msgs.Tax.dividendsTable.empty).toMatch(income);
+      expect(msgs.Tax.id.dividendsTable.empty).toMatch(income);
+    }
+    // Sweep of the remaining labels whose population includes interest.
+    expect(messages.Trades.detail.dividendsCollected).toMatch(/^income collected$/i);
+    expect(idMessages.Trades.detail.dividendsCollected).toMatch(/^pendapatan diterima$/i);
+    for (const [msgs, interest] of [
+      [messages, /interest/i],
+      [idMessages, /bunga/i],
+    ] as const) {
+      expect(msgs.Income.subtitle).toMatch(interest);
+      expect(msgs.Income.emptyBody).toMatch(interest);
+      expect(msgs.Savings.totalReturnHint).toMatch(interest);
     }
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
     // The ID-regime by-year column is fed the same `dividendsByYear` (dividends, coupons

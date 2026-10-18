@@ -461,7 +461,7 @@
   },
   "Income": {
     "title": "Income",
-    "subtitle": "Dividends, coupons & distributions",
+    "subtitle": "Dividends, coupons, distributions & interest",
     "date": "Date",
     "type": "Type",
     "instrument": "Instrument",
@@ -487,7 +487,7 @@
     "assumptionsGrowth": "Per-share amounts grown at each holding's YoY rate.",
     "assumptionsContributions": "Assumes savings-plan purchases continue at their recent rate.",
     "emptyTitle": "No income yet",
-    "emptyBody": "Dividends and coupons appear here once you record them as transactions.",
+    "emptyBody": "Dividends, coupons and interest appear here once you record them as transactions.",
     "cashInterest": "Cash interest",
     "thisYear": "This year",
     "thisYearEstimate": "This year (received + forecast)",
@@ -566,7 +566,7 @@
     "currentValue": "Current value",
     "simpleGain": "gain",
     "totalReturn": "Total return vs gross contributed",
-    "totalReturnHint": "Incl. dividends, coupons & realized gains",
+    "totalReturnHint": "Incl. dividends, coupons, interest & realized gains",
     "xirr": "Annualised return",
     "xirrYoungHint": "* annualised from under a year — may overstate",
     "contributionsOverTime": "Contributions over time",
@@ -2009,7 +2009,7 @@
       "holdingPeriod": "Holding period",
       "return": "Return",
       "incomeWhileHeld": "Income while held",
-      "dividendsCollected": "Dividends collected",
+      "dividendsCollected": "Income collected",
       "totalReturnIncome": "Total return incl. income"
     }
   },
@@ -2136,7 +2136,7 @@
       "tax": "Tax",
       "net": "Net",
       "total": "Total",
-      "empty": "No dividend/interest income in {year}."
+      "empty": "No investment income in {year}."
     },
     "allowanceBoxes": {
       "left": "Allowance left",
@@ -2167,7 +2167,7 @@
         "estimatedTaxDesc": "Withheld at source — nothing to file",
         "salesTax": "Sales tax · 0.1%",
         "salesTaxDesc": "on {amount} of share sales",
-        "dividendTax": "Dividend tax · 10%",
+        "dividendTax": "Investment income tax · 10%",
         "dividendTaxDesc": "on {amount} of income"
       },
       "sales": {
@@ -2185,7 +2185,7 @@
         "tax": "Tax",
         "net": "Net",
         "total": "Total",
-        "empty": "No dividend/coupon income in {year}."
+        "empty": "No investment income in {year}."
       },
       "byYear": {
         "title": "By year",

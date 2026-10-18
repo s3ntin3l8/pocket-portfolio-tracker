@@ -67,7 +67,13 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
   }
 
   const s = result.data;
-  const hasIncome = s.events.length > 0 || s.yields.length > 0 || s.upcoming.length > 0;
+  // Cash interest counts too: an interest-only scope must reach the page (its sidebar
+  // shows the interest line), not the "nothing recorded yet" empty state.
+  const hasIncome =
+    s.events.length > 0 ||
+    s.yields.length > 0 ||
+    s.upcoming.length > 0 ||
+    Number(s.interest.lifetime) > 0;
 
   if (!hasIncome) {
     return (

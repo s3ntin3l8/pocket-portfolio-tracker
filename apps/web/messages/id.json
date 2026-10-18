@@ -461,7 +461,7 @@
   },
   "Income": {
     "title": "Pendapatan",
-    "subtitle": "Dividen, kupon & distribusi",
+    "subtitle": "Dividen, kupon, distribusi & bunga",
     "date": "Tanggal",
     "type": "Jenis",
     "instrument": "Instrumen",
@@ -487,7 +487,7 @@
     "assumptionsGrowth": "Jumlah per lembar ditingkatkan sesuai tingkat pertumbuhan YoY masing-masing.",
     "assumptionsContributions": "Asumsi pembelian rencana tabungan berlanjut sesuai tren terakhir.",
     "emptyTitle": "Belum ada pendapatan",
-    "emptyBody": "Dividen dan kupon muncul di sini setelah Anda mencatatnya sebagai transaksi.",
+    "emptyBody": "Dividen, kupon, dan bunga muncul di sini setelah Anda mencatatnya sebagai transaksi.",
     "cashInterest": "Bunga tunai",
     "thisYear": "Tahun ini",
     "thisYearEstimate": "Tahun ini (diterima + perkiraan)",
@@ -566,7 +566,7 @@
     "currentValue": "Nilai saat ini",
     "simpleGain": "keuntungan",
     "totalReturn": "Total imbal hasil vs total setoran kotor",
-    "totalReturnHint": "Termasuk dividen, kupon & keuntungan terealisasi",
+    "totalReturnHint": "Termasuk dividen, kupon, bunga & keuntungan terealisasi",
     "xirr": "Imbal hasil tahunan",
     "xirrYoungHint": "* disetahunkan dari data di bawah setahun — bisa berlebih",
     "contributionsOverTime": "Setoran dari waktu ke waktu",
@@ -2009,7 +2009,7 @@
       "holdingPeriod": "Periode kepemilikan",
       "return": "Imbal hasil",
       "incomeWhileHeld": "Pendapatan selama ditahan",
-      "dividendsCollected": "Dividen diterima",
+      "dividendsCollected": "Pendapatan diterima",
       "totalReturnIncome": "Total imbal hasil termasuk pendapatan"
     }
   },
@@ -2136,7 +2136,7 @@
       "tax": "Pajak",
       "net": "Bersih",
       "total": "Total",
-      "empty": "Tidak ada pendapatan dividen/bunga di {year}."
+      "empty": "Tidak ada pendapatan investasi di {year}."
     },
     "allowanceBoxes": {
       "left": "Sisa batas bebas pajak",
@@ -2167,7 +2167,7 @@
         "estimatedTaxDesc": "Dipotong di sumber — tidak perlu dilaporkan",
         "salesTax": "Pajak penjualan · 0,1%",
         "salesTaxDesc": "atas {amount} penjualan saham",
-        "dividendTax": "Pajak dividen · 10%",
+        "dividendTax": "Pajak pendapatan investasi · 10%",
         "dividendTaxDesc": "atas {amount} penghasilan"
       },
       "sales": {
@@ -2185,7 +2185,7 @@
         "tax": "Pajak",
         "net": "Neto",
         "total": "Total",
-        "empty": "Tidak ada penghasilan dividen/kupon di {year}."
+        "empty": "Tidak ada pendapatan investasi di {year}."
       },
       "byYear": {
         "title": "Per tahun",
