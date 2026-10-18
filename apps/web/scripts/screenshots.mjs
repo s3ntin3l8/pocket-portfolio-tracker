@@ -113,6 +113,19 @@ function pendingConditions(min) {
   return pending;
 }
 
+/**
+ * Hide the Next.js dev-tools indicator (the round "N" badge in the bottom-left
+ * corner, rendered inside `<nextjs-portal>`). The demo runs `next dev`, so without
+ * this every capture ships the badge — on narrow it sits on top of the bottom
+ * nav's Holdings tab. Called after the settle checks, which still read the portal's
+ * "Compiling"/"Building" label; `display: none` keeps the element in the DOM.
+ */
+export const DEV_INDICATOR_HIDE_CSS = "nextjs-portal { display: none !important; }";
+
+export async function hideDevIndicator(page) {
+  await page.addStyleTag({ content: DEV_INDICATOR_HIDE_CSS });
+}
+
 async function settle(page, { slug, minCharts = 0 }) {
   // next/font uses display:"swap" (see layout.tsx) — text paints in a fallback
   // system font first, then swaps once Plus Jakarta Sans/DM Mono finish loading.
@@ -150,6 +163,7 @@ async function settle(page, { slug, minCharts = 0 }) {
       ).length,
   );
   if (empty > 0) console.warn(`${slug}: ${empty} chart(s) rendered without data`);
+  await hideDevIndicator(page);
 }
 
 async function captureReadme(browser, cookie, secure) {
