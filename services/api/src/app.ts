@@ -217,6 +217,14 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     if (error instanceof ZodError) {
       return reply.code(400).send({ error: "validation_error", issues: error.issues });
     }
+    // A value the column type can't parse — an id that isn't a UUID (`?holderId=x`), a
+    // non-numeric amount that slipped past validation — reaches Postgres as an invalid cast:
+    // SQLSTATE 22P02, raised directly or wrapped as a DrizzleQueryError's cause. That is a
+    // malformed request, not a server error; the driver text is not echoed.
+    if (isInvalidTextRepresentation(error)) {
+      app.log.warn({ err: error }, "malformed value in request (22P02)");
+      return reply.code(400).send({ error: "invalid_input" });
+    }
     // Routes exclude what they can't convert and report `fxMissingCurrencies` (audit B2);
     // reaching here means a conversion path forgot to — a bug, logged distinctly.
     if (error instanceof FxRateMissingError) {
@@ -384,4 +392,13 @@ declare module "fastify" {
     ibkrFlex: IbkrFlexClient;
     storage: StorageProvider;
   }
+}
+
+/** True for Postgres SQLSTATE 22P02 (invalid text representation), on the error or its cause. */
+function isInvalidTextRepresentation(error: unknown): boolean {
+  for (let e: unknown = error, depth = 0; e && depth < 3; depth++) {
+    if ((e as { code?: unknown }).code === "22P02") return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
 }
