@@ -42,14 +42,21 @@ export function useCorporateActionForm({
   // Market-data discovery results (not yet in the local DB).
   const [discovered, setDiscovered] = useState<InstrumentSearchResult[]>([]);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // A discovery lookup still debouncing when the form goes away must not fire: it
-  // would hit the network and set state on an unmounted component.
-  useEffect(
-    () => () => {
+  // A discovery lookup still debouncing when the form goes away must not fire, and a
+  // search or lookup already in flight must not set state on the unmounted form.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       if (lookupTimer.current) clearTimeout(lookupTimer.current);
-    },
-    [],
-  );
+    };
+  }, []);
+  const ifMounted =
+    <T>(set: (value: T) => void) =>
+    (value: T) => {
+      if (mounted.current) set(value);
+    };
   const [selected, setSelected] = useState<Instrument | null>(null);
   const [ratio, setRatio] = useState("");
   const [exDate, setExDate] = useState("");
@@ -83,14 +90,14 @@ export function useCorporateActionForm({
     // Local reference data is fast; query it immediately.
     void client
       .searchInstruments(trimmed)
-      .then(setResults)
-      .catch(() => setResults([]));
+      .then(ifMounted(setResults))
+      .catch(() => ifMounted(setResults)([]));
     // Market-data discovery hits the network — debounce it.
     lookupTimer.current = setTimeout(() => {
       void client
         .lookupInstruments(trimmed)
-        .then(setDiscovered)
-        .catch(() => setDiscovered([]));
+        .then(ifMounted(setDiscovered))
+        .catch(() => ifMounted(setDiscovered)([]));
     }, 300);
   }
 
