@@ -220,6 +220,12 @@ export const networthTransactionRowResponseSchema = z.looseObject({
   portfolioName: z.string(),
 });
 
+/** `GET /portfolios/:id/income-year`: bare income rows plus their `instrument` (the tax page
+ *  labels rows by its symbol), without the list routes' sources/document enrichment. */
+const { sources: _sources, ...incomeYearRowShape } = transactionRowBase;
+export const incomeYearRowResponseSchema = z.looseObject(incomeYearRowShape);
+export const incomeYearResponseSchema = z.array(incomeYearRowResponseSchema);
+
 /** Activity header totals. `fxMissingCurrencies` is only present when non-empty. */
 export const transactionSummaryResponseSchema = z.looseObject({
   totalInvested: decimalOut,
@@ -251,6 +257,7 @@ export const paginatedNetworthTransactionsResponseSchema = paginated(
 export type NetWorthResponse = z.infer<typeof netWorthResponseSchema>;
 export type PortfolioSummaryResponse = z.infer<typeof portfolioSummaryResponseSchema>;
 export type PaginatedTransactionsResponse = z.infer<typeof paginatedTransactionsResponseSchema>;
+export type IncomeYearResponse = z.infer<typeof incomeYearResponseSchema>;
 export type PaginatedNetworthTransactionsResponse = z.infer<
   typeof paginatedNetworthTransactionsResponseSchema
 >;
