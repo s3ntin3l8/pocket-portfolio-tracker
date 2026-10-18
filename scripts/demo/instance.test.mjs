@@ -393,6 +393,38 @@ describe("startDemo stop during a build step whose subprocess has its own group"
       rmSync(noPs, { recursive: true, force: true });
     }
   }, 60_000);
+
+  // The other half of the fail-soft contract: without `ps` there is no tree to walk,
+  // so a task group of its own is left behind by design (the old behaviour), and
+  // only the step's own group is killed.
+  it("without a usable ps, leaves a separate task group alone", async () => {
+    const noPs = mkdtempSync(path.join(scratchRoot, "no-ps-"));
+    const { proc, exited, ready } = bootWithLongStep({
+      ignoreTerm: "both",
+      taskGroup: true,
+      driverEnv: { PATH: noPs },
+    });
+    let pids = [];
+    let demoDir;
+    try {
+      const started = await ready();
+      ({ pids, demoDir } = started);
+      const [stepPid, taskPid] = pids;
+      proc.kill("SIGTERM");
+      await new Promise((r) => setTimeout(r, 300));
+      proc.kill("SIGINT");
+      expect(await exited).toBe(130);
+      expect(pidAlive(stepPid)).toBe(false);
+      expect(pidAlive(taskPid)).toBe(true);
+    } finally {
+      proc.kill("SIGKILL");
+      for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+      for (let i = 0; i < 40 && pids.some(pidAlive); i++)
+        await new Promise((r) => setTimeout(r, 50));
+      if (demoDir) rmSync(demoDir, { recursive: true, force: true });
+      rmSync(noPs, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 describe("signalGroup", () => {
