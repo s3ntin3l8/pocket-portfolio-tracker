@@ -53,7 +53,9 @@ import {
   restOfYearForecastGross,
   buildTfRates,
   computeIndonesianFinalTaxFromTradeLog,
+  loadIdDepositFx,
 } from "./tax-helpers.js";
+import { isReadOnlyPat } from "../../plugins/auth.js";
 
 export function registerTaxRoutes(app: FastifyInstance) {
   /**
@@ -199,9 +201,16 @@ export function registerTaxRoutes(app: FastifyInstance) {
       // uses. Computed BEFORE the German forecast / tf-rates / allowance work below — those
       // are wasted cycles for ID.
       if (regime === "ID") {
+        const incomeSources = [{ coreTxns, portfolioCountry: portfolio.country }];
         const idTax = computeIndonesianFinalTaxFromTradeLog({
           tradeLog,
-          incomeSources: [{ coreTxns, portfolioCountry: portfolio.country }],
+          incomeSources,
+          // Cached FX only for a read-scoped PAT (audit A7), like the history routes.
+          depositFxAt: await loadIdDepositFx(
+            app,
+            incomeSources,
+            isReadOnlyPat(request) ? null : undefined,
+          ),
           year,
           metaById,
           displayCurrency: portfolio.baseCurrency,
@@ -492,13 +501,21 @@ export function registerTaxRoutes(app: FastifyInstance) {
             for (const { rateByCcy } of perPortfolio) {
               for (const [k, v] of Object.entries(rateByCcy ?? {})) displayRates.set(k, Number(v));
             }
+            // Per portfolio: cash interest is classified by its own portfolio's country, and
+            // its Rp7.5M exemption judged by its own portfolio's balance (one portfolio =
+            // one bank).
+            const incomeSources = perPortfolio.map((p) => ({
+              coreTxns: p.coreTxns,
+              portfolioCountry: p.portfolioCountry,
+            }));
             const idTax = computeIndonesianFinalTaxFromTradeLog({
               tradeLog: mergedLog,
-              // Per portfolio: cash interest is classified by its own portfolio's country.
-              incomeSources: perPortfolio.map((p) => ({
-                coreTxns: p.coreTxns,
-                portfolioCountry: p.portfolioCountry,
-              })),
+              incomeSources,
+              depositFxAt: await loadIdDepositFx(
+                app,
+                incomeSources,
+                isReadOnlyPat(request) ? null : undefined,
+              ),
               year,
               metaById: meta,
               displayCurrency: display,

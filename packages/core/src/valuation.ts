@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js";
 import { computeHoldings, marketValue } from "./holdings.js";
-import { cashBalances, cashFlow } from "./cash.js";
+import { cashBalances, cashFlow, isCashAccountMovement } from "./cash.js";
 import { netWorth, convert, fxAvailable, type FxRateFn } from "./networth.js";
 import { financingByInstrument, liabilityBalances } from "./loans.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
@@ -174,16 +174,9 @@ export interface NetWorthInputs {
 export function netWorthInputs(args: NetWorthInputsArgs): NetWorthInputs {
   const canConvert =
     args.canConvert ?? ((ccy: string) => fxAvailable(ccy, args.displayCurrency, args.fx));
-  const hasCashMovement = args.transactions.some(
-    (tx) =>
-      tx.type === "deposit" ||
-      tx.type === "withdrawal" ||
-      tx.type === "loan_drawdown" ||
-      tx.type === "loan_repayment" ||
-      // A manual cash true-up is itself an explicit cash-account movement — it should
-      // switch on cash tracking the same as a deposit/withdrawal would.
-      tx.type === "adjustment",
-  );
+  // A manual cash true-up (`adjustment`) switches on cash tracking the same as a
+  // deposit/withdrawal would: it is itself an explicit cash-account movement.
+  const hasCashMovement = args.transactions.some(isCashAccountMovement);
   const cashTracked = args.cashCounted && hasCashMovement;
   const cash = cashTracked ? cashBalances(args.transactions) : {};
   const convertibleCash: Record<string, string> = {};

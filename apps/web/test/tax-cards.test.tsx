@@ -560,6 +560,7 @@ const incomeRow = (o: Partial<IdIncomeTax> & Pick<IdIncomeTax, "symbol" | "categ
   ({
     currency: "IDR",
     rate: "0.10",
+    exemption: null,
     gross: "0",
     tax: "0",
     net: "0",
@@ -645,8 +646,61 @@ describe("IdIncomeTable", () => {
     expect(messages.Tax.id.notes.domestic_dividend).toMatch(/reinvest.*3 years/);
     expect(screen.getByText(messages.Tax.id.notes.deposit_interest)).toBeInTheDocument();
     expect(messages.Tax.id.notes.deposit_interest).toMatch(/Rp7\.5 million/);
+    expect(messages.Tax.id.notes.deposit_interest).toMatch(/one portfolio as one bank/);
+    expect(messages.Tax.id.notes.deposit_interest).not.toMatch(/isn't applied/);
     expect(screen.getByText(messages.Tax.id.notes.bond_interest)).toBeInTheDocument();
     expect(screen.getByText(messages.Tax.id.notes.fund_distribution)).toBeInTheDocument();
+  });
+
+  it("shows exempt bank interest as exempt, in the gross but with no tax", () => {
+    wrapClient(
+      <IdIncomeTable
+        rows={[
+          incomeRow({
+            symbol: "Cash interest · IDR",
+            cashSource: { type: "interest", currency: "IDR" },
+            category: "deposit_interest",
+            rate: "0",
+            exemption: "small_balance",
+            gross: "60000",
+            tax: "0.00",
+            net: "60000.00",
+            withheldAtSource: true,
+            taxBasis: null,
+          }),
+          incomeRow({
+            symbol: "Cash interest · IDR",
+            cashSource: { type: "interest", currency: "IDR" },
+            category: "deposit_interest",
+            rate: "0.20",
+            gross: "40000",
+            tax: "8000.00",
+            net: "32000.00",
+            withheldAtSource: true,
+          }),
+        ]}
+        totalIncomeGross="100000"
+        totalIncomeTax="8000.00"
+        totalIncomeNet="92000.00"
+        currency={CURRENCY}
+        locale={LOCALE}
+        year={2026}
+      />,
+    );
+    expect(screen.getByText("Bank interest · exempt (balance ≤ Rp7.5M)")).toBeInTheDocument();
+    expect(screen.getByText("Bank interest · 20%")).toBeInTheDocument();
+    // Nothing is withheld on exempt interest; only the taxed row says "withheld".
+    expect(screen.getByText("exempt")).toBeInTheDocument();
+    expect(screen.getAllByText("withheld at source")).toHaveLength(1);
+    // The exempt gross is in the total; the tax total is the taxed row's only.
+    expect(screen.getByText("IDR 100,000")).toBeInTheDocument();
+    expect(screen.getAllByText("IDR 8,000").length).toBeGreaterThan(0);
+  });
+
+  it("labels exempt bank interest in Indonesian too", () => {
+    expect(idMessages.Tax.id.exemption.small_balance).toBe("dikecualikan (saldo ≤ Rp7,5 juta)");
+    expect(idMessages.Tax.id.incomeTable.exempt).toBe("dikecualikan");
+    expect(idMessages.Tax.id.notes.deposit_interest).toMatch(/satu portofolio sebagai satu bank/);
   });
 
   it("only lists the notes of the categories present", () => {

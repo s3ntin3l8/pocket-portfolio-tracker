@@ -779,3 +779,197 @@ describe("Indonesian income tax — cash interest follows the portfolio's countr
     expect(entry!.indonesianFinalTax.foreignIncomeGross).toBe("500000.00");
   });
 });
+
+describe("Indonesian income tax — the Rp7.5M small-balance exemption for bank interest", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  type Row = {
+    category: string;
+    exemption: string | null;
+    rate: string | null;
+    gross: string;
+    tax: string | null;
+  };
+  type IdTax = {
+    income: Row[];
+    incomeByCategory: { category: string; gross: string; exemptGross: string; tax: string }[];
+    totalIncomeGross: string;
+    estimatedTax: string;
+  };
+
+  /**
+   * One holder, two Indonesian bank portfolios:
+   * - "Small": Rp7,490,000 deposited; interest of 10,000 (balance before it 7,490,000) and
+   *   20,000 (7,500,000 — exactly the threshold) is exempt, 30,000 (7,520,000) is taxed.
+   * - "FX": Rp7,000,000 + USD 50 (Rp800,000 at 16,000): 7,800,000, so its interest is taxed
+   *   although the rupiah balance alone would be exempt.
+   */
+  async function seed(sub: string) {
+    const t = await token(sub);
+    await setTaxRegime(t, "ID");
+    for (const date of ["2025-01-01", toDateKey(new Date())]) {
+      await app.db
+        .insert(fxRates)
+        .values({ base: "USD", quote: "IDR", rate: "16000", date })
+        .onConflictDoNothing();
+    }
+    const holderId = await createHolder(t, { name: "Exemption Holder" });
+    const cash = (portfolioId: string, type: string, price: string, currency: string, at: string) =>
+      seedTransaction(app, portfolioId, auth(t), {
+        type,
+        quantity: "0",
+        price,
+        currency,
+        executedAt: `${at}T00:00:00.000Z`,
+      });
+    const small = await createPortfolio(t, {
+      name: "Small",
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+      country: "ID",
+    });
+    await cash(small, "deposit", "7490000", "IDR", "2025-01-02");
+    await cash(small, "interest", "10000", "IDR", "2025-01-31");
+    await cash(small, "interest", "20000", "IDR", "2025-02-28");
+    await cash(small, "interest", "30000", "IDR", "2025-03-31");
+    const fx = await createPortfolio(t, {
+      name: "FX",
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+      country: "ID",
+    });
+    await cash(fx, "deposit", "7000000", "IDR", "2025-01-02");
+    await cash(fx, "deposit", "50", "USD", "2025-01-03");
+    await cash(fx, "interest", "5000", "IDR", "2025-01-31");
+    return { t, small, fx };
+  }
+
+  const portfolioTax = async (headers: Record<string, string>, portfolioId: string) => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers,
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().indonesianFinalTax as IdTax;
+  };
+
+  it("exempts interest on a balance up to Rp7.5M, taxes it above, and shows both", async () => {
+    const { t, small } = await seed("tax-id-exempt-1");
+    const id = await portfolioTax(auth(t), small);
+    // Exempt and taxed payments of one source are two rows, each with its own rate.
+    expect(id.income).toHaveLength(2);
+    expect(id.income).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "deposit_interest",
+          exemption: "small_balance",
+          rate: "0",
+          gross: "30000.00",
+          tax: "0.00",
+        }),
+        expect.objectContaining({
+          category: "deposit_interest",
+          exemption: null,
+          rate: "0.20",
+          gross: "30000.00",
+          tax: "6000.00",
+        }),
+      ]),
+    );
+    // Exempt interest stays in the gross, but adds nothing to the estimate.
+    expect(id.totalIncomeGross).toBe("60000.00");
+    expect(id.estimatedTax).toBe("6000.00");
+    expect(id.incomeByCategory).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        gross: "60000.00",
+        exemptGross: "30000.00",
+        tax: "6000.00",
+      }),
+    ]);
+  });
+
+  it("counts a foreign-currency balance, converted to IDR, toward the threshold", async () => {
+    const { t, fx } = await seed("tax-id-exempt-2");
+    const id = await portfolioTax(auth(t), fx);
+    expect(id.income).toEqual([
+      expect.objectContaining({ exemption: null, gross: "5000.00", tax: "1000.00" }),
+    ]);
+  });
+
+  it("judges each portfolio by its own balance on /networth/tax", async () => {
+    const { t } = await seed("tax-id-exempt-3");
+    const res = await app.inject({
+      method: "GET",
+      url: "/networth/tax?year=2025",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const [entry] = res.json() as { indonesianFinalTax: IdTax }[];
+    expect(entry!.indonesianFinalTax.incomeByCategory).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        gross: "65000.00",
+        exemptGross: "30000.00",
+        tax: "7000.00",
+      }),
+    ]);
+    expect(entry!.indonesianFinalTax.estimatedTax).toBe("7000.00");
+  });
+
+  it("taxes interest at 20% when a balance currency has no rate into IDR, and says so", async () => {
+    const t = await token("tax-id-exempt-5");
+    await setTaxRegime(t, "ID");
+    const pf = await createPortfolio(t, { name: "No rate", baseCurrency: "IDR", country: "ID" });
+    const cash = (type: string, price: string, currency: string, at: string) =>
+      seedTransaction(app, pf, auth(t), {
+        type,
+        quantity: "0",
+        price,
+        currency,
+        executedAt: `${at}T00:00:00.000Z`,
+      });
+    // Rp1M is small, but the CHF balance can't be converted: the total is unknown.
+    await cash("deposit", "1000000", "IDR", "2025-01-02");
+    await cash("deposit", "100", "CHF", "2025-01-03");
+    await cash("interest", "5000", "IDR", "2025-01-31");
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { indonesianFinalTax: IdTax; fxMissingCurrencies?: string[] };
+    expect(body.indonesianFinalTax.income).toEqual([
+      expect.objectContaining({ exemption: null, gross: "5000.00", tax: "1000.00" }),
+    ]);
+    expect(body.fxMissingCurrencies).toContain("CHF");
+  });
+
+  it("applies the exemption for a read-scoped token from cached FX rates", async () => {
+    const { t, small, fx } = await seed("tax-id-exempt-4");
+    const minted = await app.inject({
+      method: "POST",
+      url: "/me/tokens",
+      headers: auth(t),
+      payload: { name: "ro", scope: "read" },
+    });
+    expect(minted.statusCode).toBe(201);
+    const pat = { authorization: `Bearer ${minted.json().token as string}` };
+    expect((await portfolioTax(pat, small)).estimatedTax).toBe("6000.00");
+    expect((await portfolioTax(pat, fx)).estimatedTax).toBe("1000.00");
+  });
+});

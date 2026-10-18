@@ -448,6 +448,79 @@ describe("seedDemo — GET /insights on the seeded history (#1020, #1029)", () =
   });
 });
 
+describe("seedDemo — Indonesian bank interest and the Rp7.5M exemption", () => {
+  let dir: string;
+  let app: Awaited<ReturnType<typeof buildApp>>;
+  type Row = { category: string; exemption: string | null; gross: string; tax: string | null };
+  /** Every bank-interest row of the seeded years, per holder name. */
+  const rowsByHolder = new Map<string, Row[]>();
+
+  beforeAll(async () => {
+    process.env.RATE_LIMIT_MAX = "10000";
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no network in the demo"));
+    await ensureDb();
+    dir = await mkdtemp(join(tmpdir(), "seed-demo-id-interest-"));
+    await seedDemo(join(dir, "pat"));
+    app = await buildApp({ authKey: (await generateKeyPair("ES256")).publicKey });
+    const headers = {
+      authorization: `Bearer ${(await readFile(join(dir, "pat"), "utf8")).trim()}`,
+    };
+    const prefs = await app.inject({
+      method: "PUT",
+      url: "/me/preferences",
+      headers,
+      payload: { taxRegime: "ID" },
+    });
+    expect(prefs.statusCode).toBe(200);
+    // The interest is seeded 90–270 days ago, which can span two calendar years.
+    const year = new Date().getUTCFullYear();
+    for (const y of [year - 1, year]) {
+      const res = await app.inject({ method: "GET", url: `/networth/tax?year=${y}`, headers });
+      expect(res.statusCode).toBe(200);
+      for (const entry of res.json() as {
+        holder: { name: string };
+        indonesianFinalTax: { income: Row[] };
+      }[]) {
+        const rows = entry.indonesianFinalTax.income.filter(
+          (r) => r.category === "deposit_interest",
+        );
+        rowsByHolder.set(entry.holder.name, [
+          ...(rowsByHolder.get(entry.holder.name) ?? []),
+          ...rows,
+        ]);
+      }
+    }
+  }, 120_000);
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    await getDb().delete(users).where(eq(users.email, "seed-demo-admin-test@example.com"));
+    await app.close();
+    await closeDb();
+    await rm(dir, { recursive: true, force: true });
+    delete process.env.RATE_LIMIT_MAX;
+  });
+
+  const total = (rows: Row[], field: "gross" | "tax") =>
+    rows.reduce((s, r) => s.add(r[field] ?? "0"), new Decimal(0)).toFixed(2);
+
+  it("exempts the child's small Bibit balance: in the gross, no tax", () => {
+    const rows = rowsByHolder.get("Sample Child") ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.exemption === "small_balance")).toBe(true);
+    expect(total(rows, "gross")).toBe("20700.00");
+    expect(total(rows, "tax")).toBe("0.00");
+  });
+
+  it("taxes the Stockbit RDN interest above the threshold at 20%", () => {
+    const rows = rowsByHolder.get("Sample Investor") ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.exemption === null)).toBe(true);
+    expect(total(rows, "gross")).toBe("188400.00");
+    expect(total(rows, "tax")).toBe("37680.00");
+  });
+});
+
 describe("demoSnapshotWalk (#1020)", () => {
   const at = (date: string) => new Date(`${date}T10:00:00.000Z`);
 

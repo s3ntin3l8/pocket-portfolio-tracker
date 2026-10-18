@@ -257,14 +257,14 @@ Final taxes for a **resident individual**, with no annual allowance, no loss-net
 dependency on when a gain was locked in. They tax _proceeds and gross income_, not gains,
 and the rate depends on the type and the source of the income:
 
-| Event (category)                                                        | Rate     | Base                                  | Who pays                                     | Rule                                                                                           |
-| ----------------------------------------------------------------------- | -------- | ------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Sale of IDX-listed shares                                               | **0.1%** | Gross sale proceeds (not gain)        | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                       |
-| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374 |
-| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before)                                               |
-| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018                                     |
-| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                            |
-| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                           |
+| Event (category)                                                        | Rate     | Base                                  | Who pays                                     | Rule                                                                                                |
+| ----------------------------------------------------------------------- | -------- | ------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Sale of IDX-listed shares                                               | **0.1%** | Gross sale proceeds (not gain)        | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                            |
+| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374      |
+| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before)                                                    |
+| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below) |
+| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                 |
+| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                |
 
 `estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
 `taxWithheldAtSource` (sales, bond and bank interest: the payer already withheld it) and
@@ -276,17 +276,81 @@ income row "withheld at source" or "you pay", so withheld tax doesn't read as ta
 - **Dividends reinvested in Indonesia for at least 3 tax years are exempt** (Art. 4(3)(f);
   the investment is due by the end of March of the following year, PMK 18/2021 Art. 36).
   Pocket can't tell whether the user reinvested, so the 10% is shown with that note.
-- **Bank interest is exempt when the deposit and savings balance is at most Rp7,500,000**
-  (PMK 212/2018 Art. 7(a); PP 131/2000 Art. 3(1)(a) excludes balances split to stay under
-  it). Pocket doesn't apply it: the test is the balance held at the bank when the interest
-  accrues, a portfolio isn't a bank (several portfolios can be one bank, and the brokerage
-  is free text), and Pocket's cash figure is a point-in-time derivation that is only
-  complete for cash-inside portfolios. A recorded withholding can't signal the exemption
-  either (a recorded 0 looks the same as none recorded), so the note explains it instead
-  of guessing. An individual whose total annual income is at or below PTKP can also
-  reclaim the tax (PMK 212 Art. 2(3)–(4)).
 - **Foreign dividends reinvested in Indonesia** can be exempt to the amount reinvested
   (PMK 18/2021). Foreign income stays out of the estimate either way.
+
+### The Rp7.5M bank-interest exemption (approximated)
+
+**The rule, verified in the texts** (checked October 2026):
+
+- PMK 212/PMK.03/2018 **Art. 7(a)**: the 20% final withholding of Art. 2(1) is not made on
+  "bunga Deposito dan Tabungan serta Diskonto SBI, untuk jumlah Deposito dan Tabungan serta
+  SBI yang tidak melebihi Rp7.500.000,00" — interest on deposits and savings whose amount
+  does **not exceed** Rp7,500,000. So exactly Rp7,500,000 is exempt and Rp7,500,001 is not.
+  (Article 7, letter a, is the right reference; Art. 5(1)(c) sets the 20% and Art. 4 brings
+  current-account (giro) interest under the savings rules.)
+- PMK 212/2018 **Art. 1(1)**: a "Deposito" is one "baik dalam mata uang Rupiah maupun dalam
+  mata uang asing" — in rupiah or a foreign currency. A foreign-currency deposit at an
+  Indonesian bank therefore counts toward the amount.
+- PP 131/2000 **Art. 3(1)(a)** (the regulation PMK 212 implements; PP 123/2015 changed only
+  the export-proceeds rates): the same Rp7,500,000 ceiling, with the condition that it is
+  "bukan merupakan jumlah yang dipecah-pecah" — not an amount split up to stay under it. Its
+  elucidation names the purpose: to protect small depositors and savers.
+- PMK 212 **Art. 9** leaves the procedure of the exemption to a regulation of the Director
+  General of Taxes; no such regulation saying how the amount is measured was found.
+
+**Not in the primary texts.** That the amount is the customer's total at **one bank**, and
+that it is judged **when the interest is paid or credited**, is how banks apply the rule and
+how secondary sources describe it, but neither PMK 212 nor PP 131 says so in those words.
+Neither says which rate converts a foreign-currency balance. Pocket follows that common
+reading and uses the payment date's rate.
+
+**How Pocket applies it.** For every Indonesian bank-interest payment (cash interest, no
+paying instrument, classified `deposit_interest` — a portfolio with country `ID`, or IDR
+interest with no country), `loadIdDepositFx` (`services/api/src/routes/transactions/tax-helpers.ts`)
+and `computeIndonesianFinalTaxFromTradeLog` take the paying **portfolio's** cash balance
+when the payment is credited and convert it to IDR:
+
+1. `idCashBalancesBefore` (core): `cashBalances` — the same per-currency cash ledger the
+   holdings and net-worth views derive — over the portfolio's other transactions executed at
+   or before the payment. Rows at the payment's own instant count (a sum doesn't depend on
+   their order; a date-only import books a same-day deposit at the same midnight), which errs
+   toward the larger balance; the payment itself and later rows don't. Per portfolio this is
+   one sorted walk over the ledger for all its payments (`idCashBalancesAtPayments`).
+2. `idDepositBalanceIdr` (core): every non-zero currency converted to IDR at the payment
+   date's rate and summed. `loadIdDepositFx` loads those rates once per account holder over
+   all of their portfolios' payment dates (`getFxRatesForDates`, carried forward/back like the history
+   routes; cached rates only for a read-scoped PAT).
+3. `idDepositInterestExempt` (core): exempt when that total is between 0 and
+   Rp7,500,000 inclusive. Zero counts as small: the balance is only known once explicit
+   cash movements are recorded, and an account spent down to 0 (an RDN whose cash all went
+   into a purchase) really holds nothing at the bank.
+
+An exempt payment is taxed at 0: its row carries `exemption: "small_balance"` and
+`rate: "0"`, it stays in `totalIncomeGross` and the by-year income, and adds nothing to
+`estimatedTax`. Exempt and taxed payments of one source are separate rows (each row has one
+rate); `incomeByCategory[].exemptGross` is the exempt part of a category. The Tax page labels
+the row "Bank interest · exempt (balance ≤ Rp7.5M)". Securities income (bond coupons,
+dividends, ETF and reksa dana distributions) is never affected.
+
+**The approximation and its limits:**
+
+- **One portfolio is treated as one bank.** Two portfolios at the same bank are judged
+  separately (each may be under the ceiling when their sum is not), and one portfolio that
+  mixes banks is judged as one. Pocket can't detect an amount split across banks or accounts
+  (PP 131 Art. 3(1)(a)) either.
+- **The balance must be knowable.** Before the portfolio's first explicit cash-account
+  movement (deposit, withdrawal, loan leg or manual adjustment — `isCashAccountMovement`, the
+  predicate `netWorthInputs` uses for `cashTracked`) the derived cash is only the sum of
+  imported trades, so the balance is unknown and the full 20% applies. A negative total is a
+  data gap (missing deposits), not a small balance: also 20%. A currency with no rate into IDR
+  makes the total unknown too (20%, and the currency is reported in `fxMissingCurrencies`).
+  Unlike net worth this does not depend on `cashCounted`: cash outside the performance
+  boundary still sits at the bank and earns interest.
+- **A recorded withholding wins.** When the transaction records tax withheld, that amount is
+  the tax: the bank knew the customer's whole balance.
+- An individual whose total annual income is at or below PTKP can also reclaim the tax
+  (PMK 212 Art. 2(3)–(4)); Pocket doesn't model that.
 
 ### How a row is classified (`classifyIdIncome`)
 
@@ -384,9 +448,14 @@ regime only" caveat. **Keep that text in sync with this document** when the rule
 - `packages/core/src/tax-id.ts` — Indonesian final-tax logic.
 - Indonesian sources (checked October 2026; the government JDIH sites were not reachable,
   so the PP texts are DDTC's reproductions):
-  - PMK 212/PMK.03/2018 (deposit interest, Rp7.5M):
+  - PMK 212/PMK.03/2018 (deposit interest; Art. 1(1) foreign-currency deposits, Art. 5(1)(c)
+    20%, Art. 7(a) the Rp7.5M exemption — read in the official text):
     https://www.pajak.go.id/sites/default/files/2019-06/212_PMK.03_2018Per.pdf
-  - PP 131/2000: https://perpajakan.ddtc.co.id/sumber-hukum/peraturan-pusat/peraturan-pemerintah-131-tahun-2000
+  - PP 131/2000 (Art. 3(1)(a) and its elucidation):
+    https://perpajakan.ddtc.co.id/sumber-hukum/peraturan-pusat/peraturan-pemerintah-131-tahun-2000
+  - Secondary, quoting Art. 7 PMK 212/2018 for the Rp7.5M rule:
+    https://news.ddtc.co.id/berita/nasional/1809863/nabung-di-bank-dapat-bunga-terus-kena-pajak-begini-ketentuannya
+    and https://ortax.org/pph-final-atas-bunga-deposito-dan-tabungan
   - PP 91/2021 (bond interest 10%):
     https://perpajakan.ddtc.co.id/sumber-hukum/peraturan-pusat/peraturan-pemerintah-91-tahun-2021
   - Domestic dividends, reinvestment and self-payment (PMK 18/2021, PMK 81/2024):

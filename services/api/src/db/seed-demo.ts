@@ -16,7 +16,7 @@ import {
   corporateActions,
   benchmarkPrices,
 } from "@portfolio/db";
-import { toDateKey } from "@portfolio/core";
+import { cashFlow, toDateKey } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
 import { PAT_PREFIX, hashToken, hashPassword } from "../plugins/auth.js";
 import { normalizeEmail } from "../routes/auth.js";
@@ -1528,17 +1528,34 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // =========================================================================
   for (let i = 0; i < 36; i++) {
     const monthsAgo = 36 - i;
-    txRows.push({
-      portfolioId: mfPortfolio.id,
-      instrumentId: rdSaham.id,
-      type: "savings_plan",
-      quantity: dec(300 + pseudoRandom(i * 3) * 300, 2),
-      price: dec(1350 + pseudoRandom(i * 11) * 200, 2),
-      fees: "0",
-      currency: "IDR",
-      executedAt: daysAgo(monthsAgo * 30),
-      savingsPlanId: "rdsaham-sparplan",
-    });
+    const quantity = dec(300 + pseudoRandom(i * 3) * 300, 2);
+    const price = dec(1350 + pseudoRandom(i * 11) * 200, 2);
+    txRows.push(
+      // The monthly top-up of the Bibit cash account: the plan's amount plus Rp100,000 that
+      // stays behind, so the account holds a small balance (under Rp4M with its distributions) — its
+      // interest (below) is exempt under the Rp7.5M rule.
+      {
+        portfolioId: mfPortfolio.id,
+        instrumentId: null,
+        type: "deposit",
+        quantity: "0",
+        price: new Decimal(quantity).mul(price).add(100_000).toFixed(2),
+        fees: "0",
+        currency: "IDR",
+        executedAt: daysAgo(monthsAgo * 30, 9),
+      },
+      {
+        portfolioId: mfPortfolio.id,
+        instrumentId: rdSaham.id,
+        type: "savings_plan",
+        quantity,
+        price,
+        fees: "0",
+        currency: "IDR",
+        executedAt: daysAgo(monthsAgo * 30),
+        savingsPlanId: "rdsaham-sparplan",
+      },
+    );
   }
   // Reksa dana dividends (annual distributions)
   txRows.push(
@@ -1790,6 +1807,67 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       executedAt: daysAgo(150),
     },
   );
+
+  // =========================================================================
+  // RDN cash interest (Indonesian bank interest: 20% final, exempt while the balance is at
+  // most Rp7.5M — docs/tax.md). Stockbit's RDN gets one funding deposit that keeps it
+  // Rp25M above everything its trades ever drew, so its interest is taxed; the child's
+  // Bibit account only holds the Rp100,000 left over from each monthly top-up (above), so
+  // its interest is exempt. Quarterly, in the last year.
+  // =========================================================================
+  {
+    // Lowest running cash of Stockbit's trades, in the same ledger the app derives.
+    let running = new Decimal(0);
+    let lowest = new Decimal(0);
+    const stockbitRows = txRows
+      .filter((r) => r.portfolioId === idPortfolio.id)
+      .sort((a, b) => a.executedAt!.getTime() - b.executedAt!.getTime());
+    for (const r of stockbitRows) {
+      running = running.add(
+        cashFlow({
+          instrumentId: r.instrumentId ?? null,
+          type: r.type,
+          quantity: r.quantity ?? "0",
+          price: r.price ?? "0",
+          fees: r.fees ?? "0",
+          currency: r.currency,
+          executedAt: r.executedAt!,
+          kind: r.kind ?? null,
+          tax: r.tax ?? null,
+        }),
+      );
+      if (running.lt(lowest)) lowest = running;
+    }
+    const funding = lowest.neg().div(1_000_000).ceil().mul(1_000_000).add(25_000_000);
+    const firstTrade = stockbitRows[0]!.executedAt!;
+    txRows.push({
+      portfolioId: idPortfolio.id,
+      instrumentId: null,
+      type: "deposit",
+      quantity: "0",
+      price: funding.toFixed(2),
+      fees: "0",
+      currency: "IDR",
+      executedAt: new Date(firstTrade.getTime() - 86_400_000),
+    });
+    const interest = (portfolioId: string, price: string, days: number) => ({
+      portfolioId,
+      instrumentId: null,
+      type: "interest" as const,
+      quantity: "0",
+      price,
+      fees: "0",
+      currency: "IDR",
+      executedAt: daysAgo(days),
+    });
+    for (const [days, stockbit, bibit] of [
+      [270, "61500", "6200"],
+      [180, "62800", "6900"],
+      [90, "64100", "7600"],
+    ] as const) {
+      txRows.push(interest(idPortfolio.id, stockbit, days), interest(mfPortfolio.id, bibit, days));
+    }
+  }
 
   await db.insert(transactions).values(txRows);
 

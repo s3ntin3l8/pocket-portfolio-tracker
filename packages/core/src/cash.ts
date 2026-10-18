@@ -79,6 +79,23 @@ export function cashFlow(tx: CoreTransaction): Decimal {
   }
 }
 
+/**
+ * Whether a transaction is an explicit cash-account movement: an external deposit or
+ * withdrawal, a financing leg (loan drawdown/repayment), or a manual cash true-up
+ * (`adjustment`). Cash derived from transactions is only a real balance once at least one
+ * of these exists; before that it is just the sum of imported buys/sells, typically a
+ * phantom negative (see `netWorthInputs`'s `cashTracked`).
+ */
+export function isCashAccountMovement(tx: CoreTransaction): boolean {
+  return (
+    tx.type === "deposit" ||
+    tx.type === "withdrawal" ||
+    tx.type === "loan_drawdown" ||
+    tx.type === "loan_repayment" ||
+    tx.type === "adjustment"
+  );
+}
+
 /** Uninvested cash balance per currency, derived from all transactions. */
 export function cashBalances(transactions: CoreTransaction[]): Record<string, string> {
   const totals = new Map<string, Decimal>();
