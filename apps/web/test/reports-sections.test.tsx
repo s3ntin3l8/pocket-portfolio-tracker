@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
+import idMessages from "../messages/id.json";
 
 vi.mock("next-intl/server", () => ({
   getTranslations: async (ns: string) => {
-    const bag = (messages as unknown as Record<string, Record<string, string>>)[ns] ?? {};
+    const bag = (messages as unknown as Record<string, unknown>)[ns] ?? {};
     return (key: string, vals?: Record<string, unknown>) => {
-      const v = bag[key] ?? key;
+      // Resolve dotted keys ("income.caption") through the nested namespace.
+      const found = key
+        .split(".")
+        .reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], bag);
+      const v = typeof found === "string" ? found : key;
       return vals ? `${v}${JSON.stringify(vals)}` : v;
     };
   },
@@ -90,6 +95,78 @@ describe("Reports cards", () => {
     wrap(await IncomeCard({ locale: "en" }));
     expect(screen.getByTestId("card")).toHaveAttribute("href", "/income");
     expect(screen.getByTestId("card").textContent).toContain("100");
+  });
+
+  it("income card names what it counts and that its trend compares a full-year estimate", async () => {
+    data.incomeReport.mockResolvedValue(
+      ok({
+        thisYear: "50",
+        lastYear: "100",
+        forecastFullYear: "200",
+        ttm: "1",
+        lifetimeTotal: "1",
+      }),
+    );
+    const el = (await IncomeCard({ locale: "en" }))!;
+    // Interest is not in this figure (the /income page shows it as its own line).
+    expect(el.props.caption).toMatch(/dividends & coupons/i);
+    // +100% = 200 (estimated full year) vs 100 last year — not the 50 received so far (−50%).
+    expect(el.props.trend.label).toMatch(/est/i);
+    expect(el.props.trend.label).toContain("+100");
+  });
+
+  it("savings card labels total return with its basis and never swaps in another basis", async () => {
+    const base = {
+      netContributed: "100",
+      currentValue: "127.89",
+      monthlyAverage: "10",
+      simpleGainPct: 0.2789,
+      xirr: 0.07,
+    };
+    data.contributionsReport.mockResolvedValue(ok({ ...base, totalReturnPct: 0.2816 }));
+    const withTotal = (await SavingsCard({ locale: "en" }))!;
+    const ret = withTotal.props.metrics.find((m: { value: string }) => m.value.includes("28.16"));
+    expect(ret.label).not.toBe("Total return");
+    expect(ret.label).toMatch(/incl\. income/i);
+
+    // No total return (cash-inside scope, whose headline gain already is total return):
+    // the metric is omitted, not filled with simpleGainPct under the "Total return" label.
+    data.contributionsReport.mockResolvedValue(ok({ ...base, totalReturnPct: null }));
+    const without = (await SavingsCard({ locale: "en" }))!;
+    expect(without.props.metrics.some((m: { value: string }) => m.value.includes("27.89"))).toBe(
+      false,
+    );
+    expect(without.props.metrics).toHaveLength(1);
+  });
+
+  it("DE tax card calls its income figure investment income, not dividends", async () => {
+    data.taxReport.mockResolvedValue({
+      status: "ok",
+      holders: [
+        {
+          currency: "EUR",
+          allowanceUsage: {
+            usedYtd: "300",
+            allowanceAnnual: "1000",
+            realizedGainsAdjusted: "10",
+            incomeYtd: "5",
+          },
+        },
+      ],
+    });
+    const el = (await TaxCard({ locale: "en" }))!;
+    const labels = el.props.metrics.map((m: { label: string }) => m.label);
+    expect(labels).toContain("Investment income YTD");
+    expect(labels.join(" ")).not.toMatch(/dividends/i);
+  });
+
+  it("tax hero labels its income figure as all capital income before the allowance", () => {
+    for (const msgs of [messages, idMessages]) {
+      const hero = (msgs as unknown as { Tax: { hero: Record<string, string> } }).Tax.hero;
+      expect(hero.dividendsYtdDesc).not.toContain("{allowance}");
+    }
+    expect(messages.Tax.hero.dividendsYtd).toMatch(/investment income/i);
+    expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
   });
 
   it("DE tax card uses the allowance usage sums", async () => {
