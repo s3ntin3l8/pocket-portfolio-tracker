@@ -113,8 +113,9 @@ export function DistributionCard({
   // The cap and the per-depot FSA slices are euro amounts (the Sparerpauschbetrag is set in
   // law in EUR), so they are shown in their own currency — not the page's display currency,
   // which would label €1,000 as e.g. "IDR 1,000".
-  // Whole euros (the usual case: €1,000, €801) drop the ".00" — three tiles share a row on a
-  // phone, and "€1,000.00" did not fit and truncated to "€1,000.…". Cents still show.
+  // Whole euros (the usual case: €1,000, €801) drop the ".00" — "€1,000.00" truncated to
+  // "€1,000.…" in a tight tile (two per row on a phone; three in the 584-607px band below,
+  // at the phone figure size). Cents still show.
   const money = (n: string | number) =>
     formatMoneyWhole(Number(n), d.currency ?? DE_TAX_AMOUNT_CURRENCY, locale);
   const allocPct =
@@ -133,11 +134,14 @@ export function DistributionCard({
       {/* StatCard's figure size is viewport-keyed (small below `sm`), the room is not: beside
           the rail this card is narrower than on a phone, at the larger `sm:` size, and three
           tiles crushed "€1,000" to "€1,…". So the card is its own @container. Phone (small
-          figures, whole euros via formatMoneyWhole): 3-up once it has 320px. Otherwise 3-up
-          from 512px (room at the 28px `lg:` size). Stacked in between. */}
+          figures): 1+2 once it has 320px, the cap spanning its own row (the mirror of the ID
+          tiles' 2+1); 3-up there crushed the labels ("Sparer-pausch-betrag" over three lines).
+          Otherwise 3-up from 512px (room at the 28px `lg:` size), where the cap's span is reset:
+          a 584-607px window is still `max-sm` with a 3-up card. Stacked in between. */}
       <CardContent className="@container space-y-3">
-        <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-3 sm:gap-4 @lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-2 sm:gap-4 @lg:grid-cols-3">
           <StatCard
+            className="max-sm:@xs:col-span-2 @lg:col-span-1"
             label={t("distribution.cap")}
             value={money(d.holderAllowanceCap)}
             delta={t("distribution.capDesc")}
