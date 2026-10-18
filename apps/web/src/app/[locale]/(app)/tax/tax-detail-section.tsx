@@ -3,7 +3,8 @@ import { EstimatedTaxHero, type TaxTranslator } from "@/components/tax/tax-cards
 import {
   DividendsTable,
   ByYearTable,
-  IdDividendsTable,
+  IdIncomeTable,
+  IdForeignIncomeTable,
   IdByYearTable,
 } from "@/components/tax/tax-tables";
 import { DisposalTable, IdSalesTable } from "@/components/tax/disposal-table";
@@ -78,13 +79,19 @@ export function TaxHolderSectionId({
     );
   }
 
+  const domesticIncome = idTax.income.filter((r) => r.category !== "foreign");
+  const foreignIncome = idTax.income.filter((r) => r.category === "foreign");
+
   return (
     <>
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <EstimatedTaxHero
           label={t("id.hero.estimatedTax", { year })}
           value={moneyCompact(idTax.estimatedTax)}
-          description={t("id.hero.estimatedTaxDesc")}
+          description={t("id.hero.estimatedTaxDesc", {
+            withheld: moneyCompact(idTax.taxWithheldAtSource),
+            selfPay: moneyCompact(idTax.taxToSelfPay),
+          })}
         />
         <StatCard
           label={t("id.hero.salesTax")}
@@ -93,8 +100,8 @@ export function TaxHolderSectionId({
         />
         <StatCard
           label={t("id.hero.dividendTax")}
-          value={money(idTax.totalDividendTax)}
-          delta={t("id.hero.dividendTaxDesc", { amount: money(idTax.totalDividendGross) })}
+          value={money(idTax.totalIncomeTax)}
+          delta={t("id.hero.dividendTaxDesc", { amount: money(idTax.totalIncomeGross) })}
         />
       </div>
 
@@ -107,16 +114,24 @@ export function TaxHolderSectionId({
           locale={locale}
           year={year}
         />
-        <IdDividendsTable
-          rows={idTax.dividends}
-          totalDividendGross={idTax.totalDividendGross}
-          totalDividendTax={idTax.totalDividendTax}
-          totalDividendNet={idTax.totalDividendNet}
+        <IdIncomeTable
+          rows={domesticIncome}
+          totalIncomeGross={idTax.totalIncomeGross}
+          totalIncomeTax={idTax.totalIncomeTax}
+          totalIncomeNet={idTax.totalIncomeNet}
           currency={currency}
           locale={locale}
           year={year}
         />
       </div>
+
+      <IdForeignIncomeTable
+        rows={foreignIncome}
+        foreignIncomeGross={idTax.foreignIncomeGross}
+        foreignTaxWithheld={idTax.foreignTaxWithheld}
+        currency={currency}
+        locale={locale}
+      />
 
       <IdByYearTable rows={idTax.byYear} currency={currency} locale={locale} />
 

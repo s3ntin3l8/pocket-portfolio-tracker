@@ -16,12 +16,14 @@ import {
 import {
   DividendsTable,
   ByYearTable,
-  IdDividendsTable,
+  IdIncomeTable,
+  IdForeignIncomeTable,
   IdByYearTable,
 } from "../src/components/tax/tax-tables";
 import type { HarvestSuggestion, TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
+import type { IdIncomeTax } from "@portfolio/core";
 
-// The four table components (DividendsTable, ByYearTable, IdDividendsTable,
+// The four table components (DividendsTable, ByYearTable, IdIncomeTable,
 // IdByYearTable) are now client components in ./tax-tables.tsx — they call
 // `useTranslations("Tax")` internally, so render them inside the real next-intl
 // provider. The non-table components here still take `t` as a directly-injected prop
@@ -527,41 +529,160 @@ describe("HarvestSummaryNote", () => {
 // IdSalesTable now lives in ./disposal-table.tsx alongside its German counterpart
 // DisposalTable — see disposal-table.test.tsx for both.
 
-describe("IdDividendsTable", () => {
-  it("renders gross/tax(10%)/net per source plus a total row", () => {
+const incomeRow = (o: Partial<IdIncomeTax> & Pick<IdIncomeTax, "symbol" | "category">) =>
+  ({
+    currency: "IDR",
+    rate: "0.10",
+    gross: "0",
+    tax: "0",
+    net: "0",
+    withheldAtSource: false,
+    taxBasis: "estimated",
+    foreignTaxWithheld: null,
+    ...o,
+  }) satisfies IdIncomeTax;
+
+describe("IdIncomeTable", () => {
+  it("shows each income type with its own rate and marks withheld tax", () => {
     wrapClient(
-      <IdDividendsTable
+      <IdIncomeTable
         rows={[
-          { symbol: "BBCA", currency: "IDR", gross: "420000", tax: "42000.00", net: "378000.00" },
+          incomeRow({
+            symbol: "BBCA",
+            category: "domestic_dividend",
+            gross: "420000",
+            tax: "42000.00",
+            net: "378000.00",
+          }),
+          incomeRow({
+            symbol: "ORI023",
+            category: "bond_interest",
+            gross: "300000",
+            tax: "30000.00",
+            net: "270000.00",
+            withheldAtSource: true,
+          }),
+          incomeRow({
+            symbol: "interest",
+            category: "deposit_interest",
+            rate: "0.20",
+            gross: "250000",
+            tax: "40000.00",
+            net: "210000.00",
+            withheldAtSource: true,
+            taxBasis: "recorded",
+          }),
+          incomeRow({
+            symbol: "RDSAHAM",
+            category: "fund_distribution",
+            rate: "0",
+            gross: "50000",
+            tax: "0.00",
+            net: "50000.00",
+            taxBasis: null,
+          }),
         ]}
-        totalDividendGross="420000"
-        totalDividendTax="42000.00"
-        totalDividendNet="378000.00"
+        totalIncomeGross="1020000"
+        totalIncomeTax="112000.00"
+        totalIncomeNet="908000.00"
         currency={CURRENCY}
         locale={LOCALE}
         year={2026}
       />,
     );
-    expect(screen.getByText("BBCA")).toBeInTheDocument();
-    expect(screen.getAllByText("IDR 420,000").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("IDR 42,000").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("IDR 378,000").length).toBeGreaterThan(0);
-    expect(screen.getByText("Investment income · 10% final")).toBeInTheDocument();
+    expect(screen.getByText("Investment income · final tax by type")).toBeInTheDocument();
+    expect(screen.queryByText(/10% final$/)).toBeNull();
+    expect(screen.getByText("Dividend · 10%")).toBeInTheDocument();
+    expect(screen.getByText("Bond interest · 10%")).toBeInTheDocument();
+    expect(screen.getByText("Bank interest · 20%")).toBeInTheDocument();
+    expect(screen.getByText("Fund distribution · 0%")).toBeInTheDocument();
+    // Withheld tax doesn't read as tax still to pay; a dividend's does.
+    expect(screen.getByText("withheld at source")).toBeInTheDocument();
+    expect(screen.getByText("withheld (as recorded)")).toBeInTheDocument();
+    expect(screen.getByText("you pay")).toBeInTheDocument();
+    expect(screen.getByText("not taxed")).toBeInTheDocument();
+    expect(screen.getAllByText("IDR 112,000").length).toBeGreaterThan(0);
+    // One note per category present, including the reinvestment and Rp7.5M rules.
+    expect(screen.getByText(messages.Tax.id.notes.domestic_dividend)).toBeInTheDocument();
+    expect(messages.Tax.id.notes.domestic_dividend).toMatch(/reinvest.*3 years/);
+    expect(screen.getByText(messages.Tax.id.notes.deposit_interest)).toBeInTheDocument();
+    expect(messages.Tax.id.notes.deposit_interest).toMatch(/Rp7\.5 million/);
+    expect(screen.getByText(messages.Tax.id.notes.bond_interest)).toBeInTheDocument();
+    expect(screen.getByText(messages.Tax.id.notes.fund_distribution)).toBeInTheDocument();
+  });
+
+  it("only lists the notes of the categories present", () => {
+    wrapClient(
+      <IdIncomeTable
+        rows={[incomeRow({ symbol: "BBCA", category: "domestic_dividend", gross: "100" })]}
+        totalIncomeGross="100"
+        totalIncomeTax="10"
+        totalIncomeNet="90"
+        currency={CURRENCY}
+        locale={LOCALE}
+        year={2026}
+      />,
+    );
+    expect(screen.getByText(messages.Tax.id.notes.domestic_dividend)).toBeInTheDocument();
+    expect(screen.queryByText(messages.Tax.id.notes.deposit_interest)).toBeNull();
   });
 
   it("renders the empty state when there's no investment income (ID)", () => {
     wrapClient(
-      <IdDividendsTable
+      <IdIncomeTable
         rows={[]}
-        totalDividendGross="0"
-        totalDividendTax="0"
-        totalDividendNet="0"
+        totalIncomeGross="0"
+        totalIncomeTax="0"
+        totalIncomeNet="0"
         currency={CURRENCY}
         locale={LOCALE}
         year={2026}
       />,
     );
-    expect(screen.getByText(/No investment income/)).toBeInTheDocument();
+    expect(screen.getByText(/No Indonesian investment income/)).toBeInTheDocument();
+  });
+});
+
+describe("IdForeignIncomeTable", () => {
+  it("lists foreign income with the foreign tax withheld, outside the estimate", () => {
+    wrapClient(
+      <IdForeignIncomeTable
+        rows={[
+          incomeRow({
+            symbol: "AAPL",
+            category: "foreign",
+            rate: null,
+            gross: "1840000",
+            tax: null,
+            net: null,
+            taxBasis: null,
+            foreignTaxWithheld: "240000",
+          }),
+        ]}
+        foreignIncomeGross="1840000"
+        foreignTaxWithheld="240000"
+        currency={CURRENCY}
+        locale={LOCALE}
+      />,
+    );
+    expect(screen.getByText("Foreign income · not in the estimate")).toBeInTheDocument();
+    expect(screen.getByText("AAPL")).toBeInTheDocument();
+    expect(screen.getAllByText("IDR 1,840,000").length).toBe(2);
+    expect(screen.getAllByText("IDR 240,000").length).toBe(2);
+    expect(screen.getByText(/marginal rate \(5–35%\).*credit for foreign tax/)).toBeInTheDocument();
+  });
+
+  it("renders nothing without foreign income", () => {
+    const { container } = wrapClient(
+      <IdForeignIncomeTable
+        rows={[]}
+        foreignIncomeGross="0"
+        foreignTaxWithheld="0"
+        currency={CURRENCY}
+        locale={LOCALE}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
@@ -570,8 +691,20 @@ describe("IdByYearTable", () => {
     wrapClient(
       <IdByYearTable
         rows={[
-          { year: 2026, realized: "324000", dividends: "1284000", tax: "128724.00" },
-          { year: 2025, realized: "1940000", dividends: "2110000", tax: "212940.00" },
+          {
+            year: 2026,
+            realized: "324000",
+            income: "1284000",
+            foreignIncome: "0",
+            tax: "128724.00",
+          },
+          {
+            year: 2025,
+            realized: "1940000",
+            income: "2110000",
+            foreignIncome: "555000",
+            tax: "212940.00",
+          },
         ]}
         currency={CURRENCY}
         locale={LOCALE}
@@ -581,6 +714,9 @@ describe("IdByYearTable", () => {
     expect(years).toEqual(["2026", "2025"]);
     expect(screen.getByText("IDR 128,724")).toBeInTheDocument();
     expect(screen.getByText("IDR 212,940")).toBeInTheDocument();
+    // Foreign income has its own column and is not part of Est. tax.
+    expect(screen.getByText("Foreign income")).toBeInTheDocument();
+    expect(screen.getByText("IDR 555,000")).toBeInTheDocument();
   });
 
   it("renders nothing when there are no years", () => {

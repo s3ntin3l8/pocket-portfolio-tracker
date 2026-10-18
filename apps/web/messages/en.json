@@ -130,10 +130,10 @@
       "metricIncome": "Investment income YTD",
       "tooltipUsed": "Used",
       "tooltipAllowance": "Allowance",
-      "idTrend": "Withheld at source",
+      "idTrend": "Final tax",
       "idCaption": "Estimated final tax this year",
       "idMetricSales": "Share sales YTD",
-      "idMetricDividends": "Investment income YTD"
+      "idMetricDividends": "Indonesian investment income YTD"
     },
     "documents": {
       "title": "Tax reports",
@@ -1364,7 +1364,7 @@
     "taxCodeGermany": "Germany",
     "taxCodeIndonesia": "Indonesia",
     "investingTaxNoteDe": "Sparerpauschbetrag allowance tracking, Abgeltungsteuer estimates and harvest suggestions on the Tax screen.",
-    "investingTaxNoteId": "Flat 0.1% tax on share sales and 10% on dividends, both withheld at source — see the Tax screen.",
+    "investingTaxNoteId": "Final tax: 0.1% on share sales, 10% on Indonesian dividends and bond interest, 20% on bank interest — see the Tax screen.",
     "retirementLabel": "Retirement",
     "retirementAge": "Target retirement age",
     "retirementAgeHint": "Used to calculate years to retirement in the forecast panel.",
@@ -2164,11 +2164,11 @@
       "subtitle": "Indonesian final tax · {year}",
       "hero": {
         "estimatedTax": "Estimated tax · {year}",
-        "estimatedTaxDesc": "Withheld at source — nothing to file",
+        "estimatedTaxDesc": "{withheld} withheld at source · {selfPay} to pay yourself",
         "salesTax": "Sales tax · 0.1%",
         "salesTaxDesc": "on {amount} of share sales",
-        "dividendTax": "Investment income tax · 10%",
-        "dividendTaxDesc": "on {amount} of income"
+        "dividendTax": "Investment income tax · rate by type",
+        "dividendTaxDesc": "on {amount} of Indonesian income"
       },
       "sales": {
         "title": "Share sales · 0.1% final",
@@ -2178,23 +2178,50 @@
         "total": "Total",
         "empty": "No disposals in {year}."
       },
-      "dividendsTable": {
-        "title": "Investment income · 10% final",
+      "incomeTable": {
+        "title": "Investment income · final tax by type",
         "source": "Source",
+        "type": "Type",
         "gross": "Gross",
         "tax": "Tax",
         "net": "Net",
         "total": "Total",
-        "empty": "No investment income in {year}."
+        "empty": "No Indonesian investment income in {year}.",
+        "withheld": "withheld at source",
+        "withheldRecorded": "withheld (as recorded)",
+        "selfPay": "you pay",
+        "notTaxed": "not taxed"
+      },
+      "category": {
+        "domestic_dividend": "Dividend",
+        "bond_interest": "Bond interest",
+        "deposit_interest": "Bank interest",
+        "fund_distribution": "Fund distribution",
+        "foreign": "Foreign income"
+      },
+      "notes": {
+        "domestic_dividend": "Dividends from Indonesian companies: 10% final, which you pay yourself by the 15th of the following month. Exempt if you reinvest them in Indonesia for at least 3 years.",
+        "bond_interest": "Bond interest, including ORI and SBR: 10% final, withheld by the issuer or custodian.",
+        "deposit_interest": "Bank interest in IDR: 20% final, withheld by the bank. Interest is exempt while your deposit and savings balance is at most Rp7.5 million; Pocket can't see that balance, so the exemption isn't applied. Where a withholding is recorded on the transaction, that amount is used.",
+        "fund_distribution": "Reksa dana and ETF distributions aren't taxable for unit holders."
+      },
+      "foreignTable": {
+        "title": "Foreign income · not in the estimate",
+        "source": "Source",
+        "gross": "Gross",
+        "foreignTax": "Foreign tax withheld",
+        "total": "Total",
+        "note": "Taxed at your marginal rate (5–35%) in your annual tax return, with a credit for foreign tax withheld. Foreign dividends you reinvest in Indonesia can be exempt. Interest in a currency other than IDR is listed here even when it comes from an Indonesian bank, where it would be 20% final."
       },
       "byYear": {
         "title": "By year",
         "year": "Year",
         "realized": "Realized gains",
-        "dividends": "Investment income",
+        "income": "Indonesian investment income",
+        "foreignIncome": "Foreign income",
         "tax": "Est. tax"
       },
-      "footnote": "Indonesia applies a final 0.1% tax on listed-share sales and 10% on dividends, both withheld at source — so there's nothing extra to file, and no losses to harvest. This is an estimate, not tax advice.",
+      "footnote": "Indonesia taxes listed-share sales at a final 0.1% and investment income at a final rate per type. Sales tax and interest tax are withheld at source; tax on dividends you pay yourself unless you reinvest them. Foreign income isn't final-taxed and isn't in this estimate. There are no losses to harvest. This is an estimate, not tax advice.",
       "unavailable": "Indonesian tax breakdown is unavailable."
     },
     "vorabpauschale": {
@@ -2357,7 +2384,7 @@
         "headline": "Tax logic that fits where you live.",
         "sub": "Germany or Indonesia — Pocket applies the right rules automatically.",
         "bulletDe": "Sparerpauschbetrag tracking + Abgeltungsteuer harvest suggestions",
-        "bulletId": "0.1% on sales, 10% on dividends — withheld at source",
+        "bulletId": "0.1% on sales, 10–20% on income by type",
         "bulletChange": "Change this anytime in Settings"
       },
       "portfolio": {
@@ -2428,7 +2455,7 @@
       },
       "id": {
         "name": "Indonesia",
-        "desc": "Final tax on realized gains and interest income."
+        "desc": "Final tax on share-sale proceeds and on investment income, at a rate per income type."
       }
     },
     "portfolio": {

@@ -124,7 +124,8 @@ export function regimeCaveat(regime: "DE" | "ID" | null): string | null {
   if (regime === "ID") {
     return (
       "This applies to the German tax regime only. Your portfolios use the Indonesian final-tax regime, " +
-      "a flat rate on gross proceeds and income with no allowance or loss-netting, so none of this applies " +
+      "fixed final rates on gross sale proceeds and on each type of investment income, with no allowance or " +
+      "loss-netting, so none of this applies " +
       "to your own numbers; explain it only as background."
     );
   }

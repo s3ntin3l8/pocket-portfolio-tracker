@@ -296,13 +296,13 @@ export async function TaxCard({ locale }: CardProps) {
     const mc = (n: number) => formatMoneyCompact(n, currency, locale);
     let totalTax = 0;
     let totalProceeds = 0;
-    let totalDividendGross = 0;
+    let totalIncomeGross = 0;
     for (const entry of taxHolders) {
       const detail = idDetailByHolder.get(entry.holder.id);
       if (!detail?.indonesianFinalTax) continue;
       totalTax += Number(detail.indonesianFinalTax.estimatedTax);
       totalProceeds += Number(detail.indonesianFinalTax.totalProceeds);
-      totalDividendGross += Number(detail.indonesianFinalTax.totalDividendGross);
+      totalIncomeGross += Number(detail.indonesianFinalTax.totalIncomeGross);
     }
 
     return (
@@ -315,7 +315,7 @@ export async function TaxCard({ locale }: CardProps) {
         caption={t("tax.idCaption")}
         metrics={[
           { label: t("tax.idMetricSales"), value: mc(totalProceeds) },
-          { label: t("tax.idMetricDividends"), value: mc(totalDividendGross) },
+          { label: t("tax.idMetricDividends"), value: mc(totalIncomeGross) },
         ]}
         href="/tax"
         openLabel={openLabel}

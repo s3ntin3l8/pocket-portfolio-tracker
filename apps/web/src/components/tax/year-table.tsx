@@ -125,13 +125,15 @@ export function ByYearTable({
 const ID_BY_YEAR_COLS: ColDef<IdYearTax>[] = [
   { key: "year", get: (r) => r.year, type: "numeric" },
   { key: "realized", get: (r) => Number(r.realized), type: "numeric" },
-  { key: "dividends", get: (r) => Number(r.dividends), type: "numeric" },
+  { key: "income", get: (r) => Number(r.income), type: "numeric" },
+  { key: "foreignIncome", get: (r) => Number(r.foreignIncome), type: "numeric" },
   { key: "tax", get: (r) => Number(r.tax), type: "numeric" },
 ];
 
 /** "By year" table for the Indonesian view — Est. tax is real for every year (proceeds
- *  × 0.1% + dividend gross × 10%), unlike the German table which only has a precise
- *  figure for the selected year (see `loadTaxYearDetail`'s idByYear rollup). */
+ *  × 0.1% + each year's Indonesian income at its category's final rate, at today's rates),
+ *  unlike the German table which only has a precise figure for the selected year. Foreign
+ *  income is shown in its own column and is not in Est. tax. */
 export function IdByYearTable({
   rows,
   currency,
@@ -153,7 +155,7 @@ export function IdByYearTable({
         <CardTitle className="text-base">{t("id.byYear.title")}</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pt-0">
-        <Table edgeAffordance className="min-w-[560px]">
+        <Table edgeAffordance className="min-w-[680px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead
@@ -174,13 +176,22 @@ export function IdByYearTable({
                 {t("id.byYear.realized")}
               </SortableTableHead>
               <SortableTableHead
-                colKey="dividends"
+                colKey="income"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onToggle={toggle}
                 align="right"
               >
-                {t("id.byYear.dividends")}
+                {t("id.byYear.income")}
+              </SortableTableHead>
+              <SortableTableHead
+                colKey="foreignIncome"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggle}
+                align="right"
+              >
+                {t("id.byYear.foreignIncome")}
               </SortableTableHead>
               <SortableTableHead
                 colKey="tax"
@@ -201,7 +212,10 @@ export function IdByYearTable({
                   {fmt(y.realized)}
                 </TableCell>
                 <TableCell numeric className="text-muted-foreground">
-                  {fmt(y.dividends)}
+                  {fmt(y.income)}
+                </TableCell>
+                <TableCell numeric className="text-muted-foreground">
+                  {fmt(y.foreignIncome)}
                 </TableCell>
                 <TableCell numeric className="font-semibold">
                   {fmt(y.tax)}

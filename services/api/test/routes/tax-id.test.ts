@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { instruments } from "@portfolio/db";
+import { fxRates, instruments } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 
@@ -106,9 +107,11 @@ describe("GET /portfolios/:id/tax — Indonesian taxRegime", () => {
     expect(body.indonesianFinalTax).toBeDefined();
     expect(body.indonesianFinalTax.totalProceeds).toBe("0.00");
     expect(body.indonesianFinalTax.totalSalesTax).toBe("0.00");
-    expect(body.indonesianFinalTax.totalDividendGross).toBe("0.00");
-    expect(body.indonesianFinalTax.totalDividendTax).toBe("0.00");
-    expect(body.indonesianFinalTax.totalDividendNet).toBe("0.00");
+    expect(body.indonesianFinalTax.totalIncomeGross).toBe("0.00");
+    expect(body.indonesianFinalTax.totalIncomeTax).toBe("0.00");
+    expect(body.indonesianFinalTax.totalIncomeNet).toBe("0.00");
+    expect(body.indonesianFinalTax.income).toEqual([]);
+    expect(body.indonesianFinalTax.incomeByCategory).toEqual([]);
     expect(body.indonesianFinalTax.estimatedTax).toBe("0.00");
     expect(body.indonesianFinalTax.byYear).toEqual([]);
     expect(body.harvestSuggestions).toEqual([]);
@@ -169,12 +172,22 @@ describe("GET /portfolios/:id/tax — Indonesian taxRegime", () => {
     // Proceeds = 10 × 150 = 1500; 0.1% sales tax = 1.50
     expect(id.totalProceeds).toBe("1500.00");
     expect(id.totalSalesTax).toBe("1.50");
-    // Dividend recorded as a lump-sum (qty=0): price=200 is the gross dividend.
-    // ID's 10% dividend tax is calculated on gross (the function ignores whatever the
-    // broker recorded as `tax` — see tax-id.ts' design-fidelity note).
-    expect(id.totalDividendGross).toBe("200.00");
-    expect(id.totalDividendTax).toBe("20.00");
-    expect(id.totalDividendNet).toBe("180.00");
+    // Dividend recorded as a lump-sum (qty=0): price=200 is the gross dividend of an IDX
+    // stock — a domestic dividend, 10% of gross, paid by the investor (not withheld).
+    expect(id.totalIncomeGross).toBe("200.00");
+    expect(id.totalIncomeTax).toBe("20.00");
+    expect(id.totalIncomeNet).toBe("180.00");
+    expect(id.income).toEqual([
+      expect.objectContaining({
+        symbol: "IDX-AUDIT",
+        category: "domestic_dividend",
+        rate: "0.10",
+        tax: "20.00",
+        withheldAtSource: false,
+      }),
+    ]);
+    expect(id.taxToSelfPay).toBe("20.00");
+    expect(id.taxWithheldAtSource).toBe("1.50");
     // Estimated = salesTax + dividendTax = 1.50 + 20.00 = 21.50
     expect(id.estimatedTax).toBe("21.50");
     // At least one byYear row for the 2025 tax year.
@@ -274,8 +287,8 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
       indonesianFinalTax?: {
         totalProceeds: string;
         totalSalesTax: string;
-        totalDividendGross: string;
-        totalDividendTax: string;
+        totalIncomeGross: string;
+        totalIncomeTax: string;
         estimatedTax: string;
       };
     }>;
@@ -414,5 +427,217 @@ describe("GET /networth/tax — Indonesian taxRegime (W2: surfaces ID payload re
     expect(id.totalSalesTax).toBe("2.00");
     const yearRow = id.byYear.find((r: { year: number }) => r.year === 2025);
     expect(yearRow.tax).toBe("2.00");
+  });
+});
+
+describe("Indonesian income tax — a rate per income type, foreign income kept apart", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  type Category = {
+    category: string;
+    rate: string | null;
+    gross: string;
+    tax: string | null;
+    withheldAtSource: boolean;
+  };
+  type IncomeRow = {
+    symbol: string;
+    category: string;
+    rate: string | null;
+    gross: string;
+    tax: string | null;
+    withheldAtSource: boolean;
+    taxBasis: string | null;
+    foreignTaxWithheld: string | null;
+  };
+
+  /** One IDR portfolio with a mixed 2025: an IDX dividend, two IDR bond coupons (one with
+   *  a recorded withholding), IDR cash interest, an IDX reksa dana distribution, a US
+   *  dividend (with US withholding) and EUR interest at a foreign bank. */
+  async function seedMixedYear(sub: string) {
+    const t = await token(sub);
+    await setTaxRegime(t, "ID");
+    const today = toDateKey(new Date());
+    await app.db
+      .insert(fxRates)
+      .values([
+        { base: "USD", quote: "IDR", rate: "16000", date: today },
+        { base: "EUR", quote: "IDR", rate: "17000", date: today },
+      ])
+      .onConflictDoNothing();
+    const mk = async (symbol: string, market: string, assetClass: string, currency: string) => {
+      const [row] = await app.db
+        .insert(instruments)
+        .values({
+          symbol,
+          market,
+          assetClass: assetClass as "equity",
+          currency,
+          name: symbol,
+        })
+        .returning();
+      return row!;
+    };
+    const idxStock = await mk(`${sub}-BBCA`, "IDX", "equity", "IDR");
+    const idrBond = await mk(`${sub}-ORI`, "IDX", "bond", "IDR");
+    const reksaDana = await mk(`${sub}-RD`, "IDX", "mutual_fund", "IDR");
+    const usStock = await mk(`${sub}-AAPL`, "US", "equity", "USD");
+    const holderId = await createHolder(t, { name: "Mixed Holder" });
+    const portfolioId = await createPortfolio(t, {
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+    });
+    const income = (payload: Record<string, unknown>) =>
+      seedTransaction(app, portfolioId, auth(t), { quantity: "0", ...payload });
+    // Domestic dividend: 10% of gross, self-paid (no withholding for residents).
+    await income({
+      type: "dividend",
+      instrumentId: idxStock.id,
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2025-04-10T00:00:00.000Z",
+    });
+    // Bond coupons: 10% final, withheld. One without a recorded withholding (estimated),
+    // one net 425,000 with 75,000 recorded (the recorded figure wins over 10%).
+    await income({
+      type: "coupon",
+      instrumentId: idrBond.id,
+      price: "500000",
+      currency: "IDR",
+      executedAt: "2025-03-15T00:00:00.000Z",
+    });
+    await income({
+      type: "coupon",
+      instrumentId: idrBond.id,
+      price: "425000",
+      tax: "75000",
+      currency: "IDR",
+      executedAt: "2025-09-15T00:00:00.000Z",
+    });
+    // IDR cash interest: 20% final, withheld by the bank.
+    await income({
+      type: "interest",
+      price: "200000",
+      currency: "IDR",
+      executedAt: "2025-06-30T00:00:00.000Z",
+    });
+    // Reksa dana distribution: not an income-tax object for the unit holder.
+    await income({
+      type: "dividend",
+      instrumentId: reksaDana.id,
+      price: "300000",
+      currency: "IDR",
+      executedAt: "2025-07-01T00:00:00.000Z",
+    });
+    // Foreign: US dividend net 100 USD + 15 USD US withholding; EUR interest 10 EUR.
+    await income({
+      type: "dividend",
+      instrumentId: usStock.id,
+      price: "100",
+      tax: "15",
+      currency: "USD",
+      executedAt: "2025-05-15T00:00:00.000Z",
+    });
+    await income({
+      type: "interest",
+      price: "10",
+      currency: "EUR",
+      executedAt: "2025-12-31T00:00:00.000Z",
+    });
+    return { t, portfolioId };
+  }
+
+  function expectMixedYear(id: {
+    income: IncomeRow[];
+    incomeByCategory: Category[];
+    totalIncomeGross: string;
+    totalIncomeTax: string;
+    foreignIncomeGross: string;
+    foreignTaxWithheld: string;
+    estimatedTax: string;
+    taxWithheldAtSource: string;
+    taxToSelfPay: string;
+    byYear: { year: number; income: string; foreignIncome: string; tax: string }[];
+  }) {
+    const cat = (c: string) => id.incomeByCategory.find((x) => x.category === c);
+    expect(cat("domestic_dividend")).toMatchObject({
+      rate: "0.10",
+      gross: "1000000.00",
+      tax: "100000.00",
+      withheldAtSource: false,
+    });
+    expect(cat("bond_interest")).toMatchObject({
+      rate: "0.10",
+      gross: "1000000.00",
+      // 50,000 (10% of the unrecorded coupon) + 75,000 recorded.
+      tax: "125000.00",
+      withheldAtSource: true,
+    });
+    expect(cat("deposit_interest")).toMatchObject({
+      rate: "0.20",
+      gross: "200000.00",
+      tax: "40000.00",
+      withheldAtSource: true,
+    });
+    expect(cat("fund_distribution")).toMatchObject({
+      rate: "0",
+      gross: "300000.00",
+      tax: "0.00",
+    });
+    // Foreign income: gross in IDR (115 USD × 16,000 + 10 EUR × 17,000), no final tax.
+    expect(cat("foreign")).toMatchObject({ rate: null, gross: "2010000.00", tax: null });
+    expect(id.foreignIncomeGross).toBe("2010000.00");
+    expect(id.foreignTaxWithheld).toBe("240000.00");
+    const us = id.income.find((r) => r.symbol.endsWith("-AAPL"))!;
+    expect(us).toMatchObject({ category: "foreign", tax: null, foreignTaxWithheld: "240000.00" });
+    const bond = id.income.find((r) => r.category === "bond_interest")!;
+    expect(bond.taxBasis).toBe("mixed");
+    // Totals: only Indonesian income is in the final-tax estimate.
+    expect(id.totalIncomeGross).toBe("2500000.00");
+    expect(id.totalIncomeTax).toBe("265000.00");
+    expect(id.estimatedTax).toBe("265000.00");
+    expect(id.taxWithheldAtSource).toBe("165000.00");
+    expect(id.taxToSelfPay).toBe("100000.00");
+    const y2025 = id.byYear.find((y) => y.year === 2025)!;
+    expect(y2025).toMatchObject({
+      income: "2500000.00",
+      foreignIncome: "2010000.00",
+      tax: "265000.00",
+    });
+  }
+
+  it("applies each income type's rate on /portfolios/:id/tax", async () => {
+    const { t, portfolioId } = await seedMixedYear("tax-id-mix-1");
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    expectMixedYear(res.json().indonesianFinalTax);
+  });
+
+  it("applies the same rates on /networth/tax (display currency IDR)", async () => {
+    const { t } = await seedMixedYear("tax-id-mix-2");
+    const res = await app.inject({
+      method: "GET",
+      url: "/networth/tax?year=2025",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const [entry] = res.json() as { indonesianFinalTax: Parameters<typeof expectMixedYear>[0] }[];
+    expectMixedYear(entry!.indonesianFinalTax);
   });
 });

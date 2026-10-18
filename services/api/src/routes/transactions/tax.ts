@@ -190,13 +190,14 @@ export function registerTaxRoutes(app: FastifyInstance) {
               )
             ).toString();
 
-      // Indonesian final-tax is flat, withheld-at-source: 0.1% of SALE PROCEEDS + 10% of
-      // dividend/coupon GROSS. No Sparerpauschbetrag, no harvesting, no realized-gain
-      // computation — so the entire German-shape response (`allowanceUsage`,
-      // `harvestSuggestions`, `tfRatesByInstrument`, `holderDistribution`,
-      // `carryForwardApplied`) is replaced by a single `indonesianFinalTax` block sourced
-      // from the same trade log the German branch uses. Computed BEFORE the German
-      // forecast / tf-rates / allowance work below — those are wasted cycles for ID.
+      // Indonesian final tax: 0.1% of SALE PROCEEDS + a final rate per income type on the
+      // income GROSS (`classifyIdIncome`; foreign income kept apart). No
+      // Sparerpauschbetrag, no harvesting, no realized-gain computation — so the entire
+      // German-shape response (`allowanceUsage`, `harvestSuggestions`,
+      // `tfRatesByInstrument`, `holderDistribution`, `carryForwardApplied`) is replaced by a
+      // single `indonesianFinalTax` block sourced from the same trade log the German branch
+      // uses. Computed BEFORE the German forecast / tf-rates / allowance work below — those
+      // are wasted cycles for ID.
       if (regime === "ID") {
         const idTax = computeIndonesianFinalTaxFromTradeLog({
           tradeLog,
@@ -472,12 +473,13 @@ export function registerTaxRoutes(app: FastifyInstance) {
           }
           const mergedLog = mergeTradeLogs(logs, display, "fifo");
 
-          // Indonesian final-tax (flat, withheld-at-source): 0.1% of SALE PROCEEDS + 10% of
-          // dividend/coupon GROSS. No Sparerpauschbetrag / harvesting / realized-gain
-          // computation. Computed against the holder's MERGED trade log across all their
-          // portfolios, so the per-holder ID total includes proceeds from every depot.
-          // (W2: previously /networth/tax filtered out holders with no FSA allocation,
-          // which silently zeroed the ID payload for ID users — now it surfaces directly.)
+          // Indonesian final tax: 0.1% of SALE PROCEEDS + a final rate per income type on
+          // the income GROSS (`classifyIdIncome`; foreign income kept apart). No
+          // Sparerpauschbetrag / harvesting / realized-gain computation. Computed against the
+          // holder's MERGED trade log across all their portfolios, so the per-holder ID total
+          // includes proceeds from every depot. (W2: previously /networth/tax filtered out
+          // holders with no FSA allocation, which silently zeroed the ID payload for ID users
+          // — now it surfaces directly.)
           if (regime === "ID") {
             const allCoreTxns = perPortfolio.flatMap((p) => p.coreTxns);
             // The per-portfolio loadValuation returned fxRates for each portfolio's display

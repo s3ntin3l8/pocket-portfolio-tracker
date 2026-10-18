@@ -202,13 +202,13 @@ describe("Reports cards", () => {
       [idMessages, /pendapatan investasi/i, /selama dimiliki/i],
     ] as const) {
       expect(msgs.Reports.tax.idMetricDividends).toMatch(income);
-      expect(msgs.Tax.id.dividendsTable.title).toMatch(income);
+      expect(msgs.Tax.id.incomeTable.title).toMatch(income);
       expect(msgs.Tax.dividendsTable.title).toMatch(income);
       expect(msgs.Trades.dividends).toMatch(held);
       expect(msgs.Trades.totalDividends).toMatch(held);
       expect(msgs.Tax.id.hero.dividendTax).toMatch(income);
       expect(msgs.Tax.dividendsTable.empty).toMatch(income);
-      expect(msgs.Tax.id.dividendsTable.empty).toMatch(income);
+      expect(msgs.Tax.id.incomeTable.empty).toMatch(income);
     }
     // Sweep of the remaining labels whose population includes interest.
     expect(messages.Trades.detail.dividendsCollected).toMatch(/^income collected$/i);
@@ -222,10 +222,10 @@ describe("Reports cards", () => {
       expect(msgs.Savings.totalReturnHint).toMatch(interest);
     }
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
-    // The ID-regime by-year column is fed the same `dividendsByYear` (dividends, coupons
-    // and interest), so it is renamed too — in both locales.
-    expect(messages.Tax.id.byYear.dividends).toMatch(/investment income/i);
-    expect(idMessages.Tax.id.byYear.dividends).toMatch(/pendapatan investasi/i);
+    // The ID-regime by-year column sums dividends, coupons and interest (the Indonesian
+    // part), so it carries the same name — in both locales.
+    expect(messages.Tax.id.byYear.income).toMatch(/investment income/i);
+    expect(idMessages.Tax.id.byYear.income).toMatch(/pendapatan investasi/i);
     expect(idMessages.Tax.byYear.dividends).toMatch(/pendapatan investasi/i);
   });
 
@@ -268,7 +268,7 @@ describe("Reports cards", () => {
             indonesianFinalTax: {
               estimatedTax: "1000",
               totalProceeds: "2000",
-              totalDividendGross: "3000",
+              totalIncomeGross: "3000",
             },
           },
         ],

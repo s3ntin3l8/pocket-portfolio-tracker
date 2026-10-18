@@ -333,6 +333,14 @@ describe("ai-tools", () => {
     },
   );
 
+  it("get_tax_summary explains the Indonesian per-type rates and what is already withheld", () => {
+    const d = byName("get_tax_summary").description;
+    expect(d).toMatch(/dividends 10%.*bond interest 10%.*bank interest 20%/);
+    expect(d).toMatch(/taxWithheldAtSource/);
+    expect(d).toMatch(/taxToSelfPay/);
+    expect(d).toMatch(/foreignIncomeGross.*not in `estimatedTax`/);
+  });
+
   it("explain_tax_concept is static text, with a caveat only for non-DE users", async () => {
     const t = byName("explain_tax_concept");
     const de = (await t.handler({ concept: "teilfreistellung" })) as Record<string, unknown>;

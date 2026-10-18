@@ -489,18 +489,67 @@ export interface IndonesianFinalTax {
   }[];
   totalProceeds: string;
   totalSalesTax: string;
-  dividends: {
-    symbol: string;
-    currency: string;
-    gross: string;
-    tax: string;
-    net: string;
-  }[];
-  totalDividendGross: string;
-  totalDividendTax: string;
-  totalDividendNet: string;
+  /** The year's investment income, one row per (instrument, category). */
+  income: IdIncomeRow[];
+  /** The same income per category (only categories with income), in display order. */
+  incomeByCategory: IdIncomeCategoryTotal[];
+  /** Gross Indonesian investment income (foreign income excluded). */
+  totalIncomeGross: string;
+  /** Final tax on the Indonesian investment income. */
+  totalIncomeTax: string;
+  totalIncomeNet: string;
+  /** Gross foreign-source income: taxed at the marginal rate, NOT in `estimatedTax`. */
+  foreignIncomeGross: string;
+  /** Foreign tax recorded as withheld on that income (creditable). */
+  foreignTaxWithheld: string;
+  /** Sales tax + final tax on the Indonesian income. */
   estimatedTax: string;
-  byYear: { year: number; realized: string; dividends: string; tax: string }[];
+  /** The part of `estimatedTax` the payer withholds (sales, bond and bank interest). */
+  taxWithheldAtSource: string;
+  /** The part the investor pays (domestic dividends, unless reinvested ≥3 years). */
+  taxToSelfPay: string;
+  byYear: {
+    year: number;
+    realized: string;
+    /** Gross Indonesian investment income. */
+    income: string;
+    /** Gross foreign-source income (not in `tax`). */
+    foreignIncome: string;
+    tax: string;
+  }[];
+}
+
+/** How an income row is taxed under the Indonesian regime (see `classifyIdIncome`). */
+export type IdIncomeCategory =
+  "domestic_dividend" | "bond_interest" | "deposit_interest" | "fund_distribution" | "foreign";
+
+/** One row of {@link IndonesianFinalTax.income}. */
+export interface IdIncomeRow {
+  instrumentId?: string | null;
+  symbol: string;
+  currency: string;
+  category: IdIncomeCategory;
+  /** The category's final rate (decimal string, "0.10"); null for foreign income. */
+  rate: string | null;
+  gross: string;
+  /** Indonesian final tax; null for foreign income. */
+  tax: string | null;
+  net: string | null;
+  /** True when the payer withholds the tax (bond and bank interest). */
+  withheldAtSource: boolean;
+  /** Recorded withholding, the rate applied, or both across the grouped transactions. */
+  taxBasis: "recorded" | "estimated" | "mixed" | null;
+  /** Foreign income only: foreign tax recorded as withheld. */
+  foreignTaxWithheld: string | null;
+}
+
+/** One row of {@link IndonesianFinalTax.incomeByCategory}. */
+export interface IdIncomeCategoryTotal {
+  category: IdIncomeCategory;
+  rate: string | null;
+  gross: string;
+  tax: string | null;
+  withheldAtSource: boolean;
 }
 
 /** One holder's entry in the GET /networth/tax response. */

@@ -341,7 +341,13 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     title: "Tax summary",
     description:
       "Tax summary for a tax year (German regime: Sparerpauschbetrag/FSA; Indonesian final tax under the ID regime). Fails if a depot has no FSA allocation configured. Covers realized gains, Freistellungsauftrag (FSA) usage and headroom, " +
-      "loss pots and estimated tax. One portfolio, or all grouped by holder. Not tax advice.",
+      "loss pots and estimated tax. One portfolio, or all grouped by holder. Not tax advice. " +
+      "Under the ID regime `indonesianFinalTax` taxes each income row at its own final rate (`income[].category`): " +
+      "Indonesian dividends 10% (paid by the user, exempt if reinvested in Indonesia for 3 years), bond interest 10% and " +
+      "IDR bank interest 20% (both withheld at source), reksa dana/ETF distributions 0%. `taxWithheldAtSource` is already " +
+      "withheld and `taxToSelfPay` is what the user pays; never present the whole `estimatedTax` as still owed. Foreign income " +
+      "(`foreignIncomeGross`) is not in `estimatedTax`: it is taxed at the user's marginal rate (5–35%) with a credit for " +
+      "`foreignTaxWithheld`, which Pocket cannot compute.",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       year: z.number().int().min(2000).max(2100).optional(),

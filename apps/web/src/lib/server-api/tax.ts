@@ -1,7 +1,7 @@
 import { Decimal } from "decimal.js";
 import { collectFxMissing } from "@/lib/fx-missing";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
-import type { IdYearInput } from "@portfolio/core";
+import { mergeIndonesianFinalTax, type IndonesianFinalTax } from "@portfolio/core";
 import {
   getServerApi,
   listPortfoliosCached,
@@ -239,7 +239,6 @@ export async function loadTaxYearDetail(
             dividendRows: [],
             dividendTotalsByCurrency: [],
             byYear: [],
-            idByYear: [],
             indonesianFinalTax: entry.indonesianFinalTax as IndonesianFinalTaxLike,
           });
         }
@@ -269,61 +268,17 @@ export async function loadTaxYearDetail(
         const apiIdTax: IndonesianFinalTaxLike | undefined = selected
           ? (idTaxByPortfolio?.indonesianFinalTax as IndonesianFinalTaxLike | undefined)
           : (() => {
-              if (!idTaxByHolder?.length) return undefined;
               // In the no-selection scope holderId is the "__id_all_portfolios__"
-              // sentinel — never a real holder id. Aggregate every holder's ID tax
-              // payload into one combined object. Use Decimal throughout to avoid
-              // float drift on monetary sums.
-              let totalProceeds = new Decimal(0);
-              let totalTax = new Decimal(0);
-              let totalDivGross = new Decimal(0);
-              let totalDivTax = new Decimal(0);
-              let totalDivNet = new Decimal(0);
-              const byYearMap = new Map<
-                number,
-                { realized: Decimal; dividends: Decimal; tax: Decimal }
-              >();
-              for (const h of idTaxByHolder) {
-                const ift = h.indonesianFinalTax;
-                if (!ift) continue;
-                totalProceeds = totalProceeds.add(ift.totalProceeds || "0");
-                totalTax = totalTax.add(ift.totalSalesTax || "0");
-                totalDivGross = totalDivGross.add(ift.totalDividendGross || "0");
-                totalDivTax = totalDivTax.add(ift.totalDividendTax || "0");
-                totalDivNet = totalDivNet.add(ift.totalDividendNet || "0");
-                for (const y of ift.byYear) {
-                  const existing = byYearMap.get(y.year);
-                  if (existing) {
-                    existing.realized = existing.realized.add(y.realized || "0");
-                    existing.dividends = existing.dividends.add(y.dividends || "0");
-                    existing.tax = existing.tax.add(y.tax || "0");
-                  } else {
-                    byYearMap.set(y.year, {
-                      realized: new Decimal(y.realized || "0"),
-                      dividends: new Decimal(y.dividends || "0"),
-                      tax: new Decimal(y.tax || "0"),
-                    });
-                  }
-                }
-              }
-              return {
-                disposals: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.disposals ?? []),
-                totalProceeds: totalProceeds.toString(),
-                totalSalesTax: totalTax.toString(),
-                dividends: idTaxByHolder.flatMap((h) => h.indonesianFinalTax?.dividends ?? []),
-                totalDividendGross: totalDivGross.toString(),
-                totalDividendTax: totalDivTax.toString(),
-                totalDividendNet: totalDivNet.toString(),
-                estimatedTax: totalTax.add(totalDivTax).toString(),
-                byYear: [...byYearMap.entries()]
-                  .sort((a, b) => b[0] - a[0])
-                  .map(([year, v]) => ({
-                    year,
-                    realized: v.realized.toString(),
-                    dividends: v.dividends.toString(),
-                    tax: v.tax.toString(),
-                  })),
-              };
+              // sentinel — never a real holder id. Combine every holder's ID tax payload
+              // into one (same display currency); the core re-derives every total from the
+              // rows, so no field can be dropped here.
+              const parts = (idTaxByHolder ?? []).flatMap((h) =>
+                h.indonesianFinalTax ? [h.indonesianFinalTax] : [],
+              );
+              if (parts.length === 0) return undefined;
+              return mergeIndonesianFinalTax(
+                parts as unknown as IndonesianFinalTax[],
+              ) as unknown as IndonesianFinalTaxLike;
             })();
 
         const disposalGroups = new Map<
@@ -494,32 +449,6 @@ export async function loadTaxYearDetail(
             }) as Array<TaxYearRow | null>
         ).filter((r): r is TaxYearRow => r !== null);
 
-        const proceedsByYearMap = new Map<number, Decimal>();
-        for (const t of tradeLog.trades) {
-          for (const l of t.legs) {
-            const prev = proceedsByYearMap.get(l.taxYear) ?? new Decimal(0);
-            proceedsByYearMap.set(l.taxYear, prev.add(l.proceeds));
-          }
-        }
-        const idYears = new Set<number>([
-          ...proceedsByYearMap.keys(),
-          ...tradeLog.dividendsByYear.map((d) => d.year),
-          ...tradeLog.realizedByYear.map((r) => r.year),
-        ]);
-        const idByYear: IdYearInput[] = [...idYears].map((y) => {
-          const divEntry = tradeLog.dividendsByYear.find((d) => d.year === y);
-          const dividendGross = divEntry
-            ? new Decimal(divEntry.amount).add(divEntry.tax)
-            : new Decimal(0);
-          const realized = tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0";
-          return {
-            year: y,
-            proceeds: (proceedsByYearMap.get(y) ?? new Decimal(0)).toFixed(2),
-            dividendGross: dividendGross.toFixed(2),
-            realized,
-          };
-        });
-
         result.set(holderId, {
           currency: tradeLog.displayCurrency,
           // Every payload this detail is built from — under ID the final-tax figures come
@@ -536,7 +465,6 @@ export async function loadTaxYearDetail(
           dividendRows,
           dividendTotalsByCurrency,
           byYear,
-          idByYear,
           indonesianFinalTax: apiIdTax,
         });
       } catch {
