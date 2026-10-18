@@ -157,10 +157,16 @@ describe("DE forecast tiles on a phone", () => {
 });
 
 describe("totals row hover", () => {
-  it("doesn't highlight a footer row, so its pinned cell stays the same tone", async () => {
-    const { Table, TableFooter, TableRow, TableCell } = await import("../src/components/ui/table");
+  it("doesn't highlight header or footer rows, so their pinned cells stay one tone", async () => {
+    const { Table, TableHeader, TableHead, TableFooter, TableRow, TableCell } =
+      await import("../src/components/ui/table");
     const { container } = render(
       <Table edgeAffordance>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Source</TableHead>
+          </TableRow>
+        </TableHeader>
         <TableFooter>
           <TableRow>
             <TableCell>Total</TableCell>
@@ -169,6 +175,9 @@ describe("totals row hover", () => {
       </Table>,
     );
     expect(container.querySelector("tfoot")!.getAttribute("class")).toContain(
+      "[&_tr]:hover:bg-transparent",
+    );
+    expect(container.querySelector("thead")!.getAttribute("class")).toContain(
       "[&_tr]:hover:bg-transparent",
     );
   });

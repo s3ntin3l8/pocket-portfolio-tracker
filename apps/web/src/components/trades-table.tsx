@@ -196,7 +196,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
                 ))}
               </TableBody>
               <TableFooter>
-                <TableRow className="hover:bg-transparent">
+                <TableRow>
                   <TableCell colSpan={4}>{t("totalRealized")}</TableCell>
                   <TableCell numeric className={cn("text-body-sm", signToneClass(closedTotal))}>
                     {signed(closedTotal)}

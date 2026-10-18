@@ -308,7 +308,7 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
             ))}
           </TableBody>
           <TableFooter>
-            <TableRow className="hover:bg-transparent">
+            <TableRow>
               {/* The span sits after "Total", not on it: the first column is pinned while the
                   table scrolls, and a four-column pinned cell would cover the figures. */}
               <TableCell>{t("total")}</TableCell>

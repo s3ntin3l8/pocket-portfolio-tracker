@@ -49,7 +49,11 @@ function Table({
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
-  return <thead className={cn("[&_tr]:border-b", className)} {...props} />;
+  // No row hover in the header (nor the footer): only body rows are interactive, and a
+  // highlighted header row would leave its pinned `sticky-first-col` cell a second tone.
+  return (
+    <thead className={cn("[&_tr]:border-b [&_tr]:hover:bg-transparent", className)} {...props} />
+  );
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
