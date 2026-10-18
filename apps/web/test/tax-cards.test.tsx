@@ -21,7 +21,7 @@ import {
   IdByYearTable,
 } from "../src/components/tax/tax-tables";
 import type { HarvestSuggestion, TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
-import type { IdIncomeTax } from "@portfolio/core";
+import { ID_CASH_INCOME_TYPES, type IdIncomeTax } from "@portfolio/core";
 
 // The four table components (DividendsTable, ByYearTable, IdIncomeTable,
 // IdByYearTable) are now client components in ./tax-tables.tsx — they call
@@ -770,6 +770,15 @@ describe("IdByYearTable", () => {
 // ---------------------------------------------------------------------------
 
 describe("cash income labels", () => {
+  it("has a label for every cash income type, in en and id", () => {
+    for (const type of ID_CASH_INCOME_TYPES) {
+      for (const m of [messages, idMessages]) {
+        const label = (m.Tax.cashSource as Record<string, string>)[type];
+        expect(label, type).toMatch(/\{currency\}/);
+      }
+    }
+  });
+
   const cashRow = (currency: string, o: Partial<IdIncomeTax> = {}) =>
     incomeRow({
       // What the API sent before it labelled cash rows: the bare type key.

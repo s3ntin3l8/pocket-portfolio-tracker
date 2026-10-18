@@ -1,7 +1,11 @@
 import { Decimal } from "decimal.js";
 import { collectFxMissing } from "@/lib/fx-missing";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
-import { mergeIndonesianFinalTax, type IdCashIncomeSource } from "@portfolio/core";
+import {
+  ID_CASH_INCOME_TYPES,
+  mergeIndonesianFinalTax,
+  type IdCashIncomeSource,
+} from "@portfolio/core";
 import {
   getServerApi,
   listPortfoliosCached,
@@ -343,15 +347,15 @@ export async function loadTaxYearDetail(
         const totalProceeds = legs.reduce((s, l) => s.add(l.proceeds), new Decimal(0));
         const totalGain = legs.reduce((s, l) => s.add(l.gain), new Decimal(0));
 
-        const incomeTxns = incomeLists
-          .flat()
-          .filter(
-            (t): t is typeof t & { type: IdCashIncomeSource["type"] } =>
-              (t.type === "dividend" || t.type === "coupon" || t.type === "interest") &&
-              t.status !== "archived" &&
-              t.status !== "draft" &&
-              new Date(t.executedAt).getUTCFullYear() === targetYear,
-          );
+        const incomeTxns = incomeLists.flat().filter(
+          // One list for the filter and the type: core's ID_CASH_INCOME_TYPES (each has a
+          // `Tax.cashSource.<type>` label; tax-cards.test.tsx checks the catalog).
+          (t): t is typeof t & { type: IdCashIncomeSource["type"] } =>
+            (ID_CASH_INCOME_TYPES as readonly string[]).includes(t.type) &&
+            t.status !== "archived" &&
+            t.status !== "draft" &&
+            new Date(t.executedAt).getUTCFullYear() === targetYear,
+        );
         const byInstrument = new Map<
           string,
           {

@@ -200,6 +200,7 @@ export {
   ID_DEPOSIT_INTEREST_TAX_RATE,
   ID_FUND_DISTRIBUTION_TAX_RATE,
   ID_DEPOSIT_EXEMPT_BALANCE_IDR,
+  ID_CASH_INCOME_TYPES,
   type IndonesianFinalTax,
   type IndonesianFinalTaxInput,
   type IdDisposalInput,

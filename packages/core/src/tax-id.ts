@@ -188,8 +188,11 @@ export function classifyIdIncome(input: IdIncomeClassifyInput): IdIncomeCategory
  *  was and the currency it was paid in. The report's `currency` is the display currency,
  *  so this is the only place a cash row's own currency survives — the UI labels the row
  *  with it ("Cash interest · EUR") instead of an internal type key. */
+/** The income transaction types (each can be paid with no instrument: cash income). */
+export const ID_CASH_INCOME_TYPES = ["dividend", "coupon", "interest"] as const;
+
 export interface IdCashIncomeSource {
-  type: "dividend" | "coupon" | "interest";
+  type: (typeof ID_CASH_INCOME_TYPES)[number];
   /** The transaction's own currency (ISO 4217). */
   currency: string;
 }

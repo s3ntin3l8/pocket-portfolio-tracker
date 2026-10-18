@@ -8,6 +8,7 @@ import type {
   IncomeEntry,
   TradeLog,
   IndonesianFinalTax,
+  IdCashIncomeSource,
   IdDisposalInput,
   IdIncomeInput,
   IdYearInput,
@@ -26,12 +27,13 @@ import {
 import { getFxRates, makeFxRateFn, recordFxMissing } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 
-/** English label of income with no paying instrument, for the ID payload's `symbol`. */
-const CASH_INCOME_LABEL = {
+/** English label of income with no paying instrument, for the ID payload's `symbol`. Keyed by
+ *  core's cash income types, so a type added there fails to compile until it has a label. */
+const CASH_INCOME_LABEL: Record<IdCashIncomeSource["type"], string> = {
   dividend: "Cash dividend",
   coupon: "Cash coupon",
   interest: "Cash interest",
-} as const;
+};
 
 /**
  * German tax amounts the user enters — the Sparerpauschbetrag / Freistellungsauftrag
