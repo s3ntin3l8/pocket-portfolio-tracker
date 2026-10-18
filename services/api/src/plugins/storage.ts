@@ -3,6 +3,13 @@ import type { FastifyInstance } from "fastify";
 import type { StorageProvider, StorageStats } from "../storage/types.js";
 import { getStorageProvider, S3Provider } from "../storage/index.js";
 
+/** Whether the plugin probes (and creates) the S3 bucket at boot: only in development.
+ *  Production backends are provisioned; under test the env defaults (no endpoint) would
+ *  send that probe to AWS S3 from every test that builds an app. */
+export function ensuresBucketAtBoot(nodeEnv: string): boolean {
+  return nodeEnv === "development";
+}
+
 /**
  * Registers `app.storage` — a stable facade that delegates to the lazily-resolved,
  * DB-backed storage provider. The active backend (S3 or folder) is read from the
@@ -12,8 +19,9 @@ import { getStorageProvider, S3Provider } from "../storage/index.js";
  * Works against MinIO (local dev), AWS S3, Supabase Storage (/storage/v1/s3),
  * Cloudflare R2, Hetzner Object Storage, or a local filesystem folder.
  *
- * On non-production environments the plugin attempts to create the S3 bucket if it
- * doesn't already exist (best-effort — failure logs a warning and doesn't abort boot).
+ * In development the plugin attempts to create the S3 bucket if it doesn't already
+ * exist (best-effort — failure logs a warning and doesn't abort boot); see
+ * {@link ensuresBucketAtBoot}.
  */
 export const storagePlugin = fp(async (app: FastifyInstance) => {
   // Build the facade — every method resolves the cached backend on each call
@@ -52,9 +60,10 @@ export const storagePlugin = fp(async (app: FastifyInstance) => {
 
   app.decorate("storage", facade);
 
-  // On non-production, eagerly resolve the backend once to trigger the bucket-ensure
-  // side-effect (best-effort — errors are logged, never fatal).
-  if (app.config.NODE_ENV !== "production") {
+  // In development, eagerly resolve the backend once to trigger the bucket-ensure
+  // side-effect (best-effort — errors are logged, never fatal). Never under test: the
+  // suite must stay hermetic (no request to AWS from every buildApp()).
+  if (ensuresBucketAtBoot(app.config.NODE_ENV)) {
     getStorageProvider(app)
       .then(async (provider) => {
         if (provider instanceof S3Provider) {
