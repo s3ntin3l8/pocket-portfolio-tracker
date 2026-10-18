@@ -260,7 +260,8 @@ export interface TaxDisposalRow {
 }
 
 export interface TaxDividendRow {
-  /** Instrument symbol, else the transaction description, else the raw type (see `cashType`). */
+  /** Instrument symbol, else the transaction description, else the instrument id's first 8
+   *  characters (an instrument without a loaded symbol), else the raw type (see `cashType`). */
   symbol: string;
   /** Set on cash income with neither an instrument nor a description, whose `symbol` is only
    *  the type key: the table shows a translated label instead. */
