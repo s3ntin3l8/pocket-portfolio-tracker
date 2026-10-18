@@ -525,7 +525,7 @@ describe("IdDividendsTable", () => {
     expect(screen.getAllByText("IDR 420,000").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IDR 42,000").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IDR 378,000").length).toBeGreaterThan(0);
-    expect(screen.getByText("Dividends & coupons · 10% final")).toBeInTheDocument();
+    expect(screen.getByText("Investment income · 10% final")).toBeInTheDocument();
   });
 
   it("renders the empty state when there's no dividend/coupon income", () => {

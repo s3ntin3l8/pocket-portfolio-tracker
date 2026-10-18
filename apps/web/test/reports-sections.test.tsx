@@ -177,7 +177,9 @@ describe("Reports cards", () => {
     // incomeYtd, earlier years are gross. The table says so in `byYear.note`.
     expect(messages.Tax.byYear.dividends).toMatch(/investment income/i);
     expect(messages.Tax.byYear.note).toMatch(/Teilfreistellung/);
-    expect(idMessages.Tax.byYear.note).toMatch(/Teilfreistellung/);
+    expect(idMessages.Tax.byYear.note).toMatch(
+      /pendapatan dan keuntungan setelah Teilfreistellung/,
+    );
     // /trades shows the same all-income series.
     expect(messages.Trades.dividendsByYear).toMatch(/investment income/i);
     expect(idMessages.Trades.dividendsByYear).toMatch(/pendapatan investasi/i);
@@ -185,6 +187,18 @@ describe("Reports cards", () => {
     // trade's holding window), so it gets its own name rather than plain "Dividends".
     expect(messages.Trades.totalDividends).toMatch(/while held/i);
     expect(messages.Tax.byYear.note).toMatch(/income and gains after the Teilfreistellung/);
+    // Every other label over a dividend+coupon+interest population uses the same name, in
+    // both regimes; the per-trade figure (income inside the holding window) has its own.
+    for (const [msgs, income, held] of [
+      [messages, /investment income/i, /while held/i],
+      [idMessages, /pendapatan investasi/i, /selama dimiliki/i],
+    ] as const) {
+      expect(msgs.Reports.tax.idMetricDividends).toMatch(income);
+      expect(msgs.Tax.id.dividendsTable.title).toMatch(income);
+      expect(msgs.Tax.dividendsTable.title).toMatch(income);
+      expect(msgs.Trades.dividends).toMatch(held);
+      expect(msgs.Trades.totalDividends).toMatch(held);
+    }
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
     // The ID-regime by-year column is fed the same `dividendsByYear` (dividends, coupons
     // and interest), so it is renamed too — in both locales.
