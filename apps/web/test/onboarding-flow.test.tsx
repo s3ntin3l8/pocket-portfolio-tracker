@@ -171,6 +171,13 @@ describe("OnboardingFlow", () => {
       fireEvent.focus(input);
       act(() => vi.advanceTimersByTime(200));
       expect(toggle).toHaveAttribute("aria-expanded", "true");
+      // Same for the chevron: a double-click inside the window (close, reopen) must not be
+      // undone by the close the blur armed.
+      fireEvent.blur(input);
+      fireEvent.click(toggle);
+      fireEvent.click(toggle);
+      act(() => vi.advanceTimersByTime(200));
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
       // A blur that isn't followed by focus still closes it.
       fireEvent.blur(input);
       act(() => vi.advanceTimersByTime(120));

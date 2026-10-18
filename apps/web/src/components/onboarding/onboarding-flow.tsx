@@ -475,7 +475,10 @@ export function OnboardingFlow() {
                         closeBrokerage.cancel();
                         setBrokerageOpen(true);
                       }}
-                      onBrokerageToggle={() => setBrokerageOpen((o) => !o)}
+                      onBrokerageToggle={() => {
+                        closeBrokerage.cancel();
+                        setBrokerageOpen((o) => !o);
+                      }}
                       onBrokerageBlur={() =>
                         closeBrokerage.schedule(() => setBrokerageOpen(false), 120)
                       }
