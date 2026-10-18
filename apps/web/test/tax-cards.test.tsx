@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
+import idMessages from "../messages/id.json";
 import {
   EstimatedTaxHero,
   AllowanceSummaryBoxes,
@@ -347,13 +348,33 @@ describe("DistributionCard", () => {
       <DistributionCard distribution={{ ...distribution, currency: "EUR" }} locale="en" t={t} />,
     );
     expect(screen.getByText("FSA distribution across depots")).toBeInTheDocument();
-    expect(screen.getAllByText("€1,000.00").length).toBe(2); // cap + allocated
+    expect(screen.getAllByText("€1,000").length).toBe(2); // cap + allocated (whole euros)
     expect(screen.queryByText(/IDR|Rp/)).not.toBeInTheDocument();
   });
 
   it("defaults to EUR for a response that predates the currency field", () => {
     render(<DistributionCard distribution={distribution} locale="en" t={t} />);
-    expect(screen.getAllByText("€1,000.00").length).toBe(2);
+    expect(screen.getAllByText("€1,000").length).toBe(2);
+  });
+
+  it("keeps cents on a non-whole euro amount", () => {
+    render(
+      <DistributionCard
+        distribution={{ ...distribution, totalAllocated: "800.5", remainingToDistribute: "199.5" }}
+        locale="en"
+        t={t}
+      />,
+    );
+    expect(screen.getByText("€800.50")).toBeInTheDocument();
+    expect(screen.getByText("€199.50")).toBeInTheDocument();
+  });
+
+  it("lets the long German label hyphenate on a narrow tile (soft hyphens)", () => {
+    for (const msgs of [messages, idMessages]) {
+      const desc = (msgs as unknown as { Tax: { distribution: { capDesc: string } } }).Tax
+        .distribution.capDesc;
+      expect(desc).toContain("Sparer\u00adpausch\u00adbetrag");
+    }
   });
 
   it("flags over-allocation with a warning banner", () => {

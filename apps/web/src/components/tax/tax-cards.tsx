@@ -110,8 +110,17 @@ export function DistributionCard({
   // The cap and the per-depot FSA slices are euro amounts (the Sparerpauschbetrag is set in
   // law in EUR), so they are shown in their own currency — not the page's display currency,
   // which would label €1,000 as e.g. "IDR 1,000".
-  const money = (n: string | number) =>
-    formatMoney(Number(n), d.currency ?? DE_TAX_AMOUNT_CURRENCY, locale);
+  // Whole euros (the usual case: €1,000, €801) drop the ".00" — three tiles share a row on a
+  // phone, and "€1,000.00" did not fit and truncated to "€1,000.…". Cents still show.
+  const money = (n: string | number) => {
+    const v = Number(n);
+    return formatMoney(
+      v,
+      d.currency ?? DE_TAX_AMOUNT_CURRENCY,
+      locale,
+      Number.isInteger(v) ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {},
+    );
+  };
   const allocPct =
     Number(d.holderAllowanceCap) > 0
       ? Math.round((Number(d.totalAllocated) / Number(d.holderAllowanceCap)) * 100)
