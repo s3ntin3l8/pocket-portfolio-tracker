@@ -110,5 +110,8 @@ describe("formatMoneyWhole", () => {
     expect(formatMoneyWhole(13.33, "EUR", "en")).toBe("€13.33");
     expect(formatMoneyWhole(13.3, "EUR", "en")).toBe("€13.30");
     expect(formatMoneyWhole(0, "EUR", "en")).toBe("€0");
+    // Whole at cent precision, even when float arithmetic left a tail.
+    expect(formatMoneyWhole(199.99999999999997, "EUR", "en")).toBe("€200");
+    expect(formatMoneyWhole(1000 - 800.5, "EUR", "en")).toBe("€199.50");
   });
 });
