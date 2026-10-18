@@ -1969,7 +1969,7 @@
     "viewTransactions": "Lihat transaksi",
     "showTradeDetail": "Tampilkan detail transaksi",
     "totalRealized": "Laba/rugi terealisasi",
-    "totalDividends": "Dividen",
+    "totalDividends": "Pendapatan selama dimiliki",
     "winRate": "Tingkat menang",
     "realizedByYearChartTitle": "Untung/rugi terealisasi per tahun",
     "winLossTitle": "Menang / kalah",
@@ -2151,7 +2151,7 @@
       "dividends": "Pendapatan investasi",
       "fsaUsed": "FSA terpakai",
       "tax": "Abgeltungsteuer",
-      "note": "Tahun yang dipilih berasal dari perhitungan tunjangan: pendapatan setelah Teilfreistellung, keuntungan setelah penggabungan rugi. Tahun-tahun sebelumnya adalah estimasi kasar berdasarkan angka bruto, tanpa Teilfreistellung dan dengan tunjangan saat ini."
+      "note": "Tahun yang dipilih berasal dari perhitungan tunjangan: pendapatan dan keuntungan setelah Teilfreistellung, keuntungan setelah penggabungan rugi. Tahun-tahun sebelumnya adalah estimasi kasar berdasarkan angka bruto, tanpa Teilfreistellung dan dengan tunjangan saat ini."
     },
     "footnote": "Jerman mengenakan pajak penghasilan investasi sebesar {rate}% flat (Abgeltungsteuer + Solidaritätszuschlag). Sparer-Pauschbetrag {allowance} Anda diterapkan lebih dulu, lalu kerugian mengimbangi keuntungan dalam tahun yang sama. Hanya perkiraan, bukan nasihat pajak.",
     "regime": {

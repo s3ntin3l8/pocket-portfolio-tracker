@@ -181,6 +181,10 @@ describe("Reports cards", () => {
     // /trades shows the same all-income series.
     expect(messages.Trades.dividendsByYear).toMatch(/investment income/i);
     expect(idMessages.Trades.dividendsByYear).toMatch(/pendapatan investasi/i);
+    // The /trades summary card is a narrower figure (dividends + coupons inside each
+    // trade's holding window), so it gets its own name rather than plain "Dividends".
+    expect(messages.Trades.totalDividends).toMatch(/while held/i);
+    expect(messages.Tax.byYear.note).toMatch(/income and gains after the Teilfreistellung/);
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
     // The ID-regime by-year column is fed the same `dividendsByYear` (dividends, coupons
     // and interest), so it is renamed too — in both locales.

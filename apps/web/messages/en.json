@@ -1969,7 +1969,7 @@
     "viewTransactions": "View transactions",
     "showTradeDetail": "Show trade detail",
     "totalRealized": "Realized P&L",
-    "totalDividends": "Dividends",
+    "totalDividends": "Income while held",
     "winRate": "Win rate",
     "realizedByYearChartTitle": "Realized P&L per year",
     "winLossTitle": "Win / loss",
@@ -2151,7 +2151,7 @@
       "dividends": "Investment income",
       "fsaUsed": "FSA used",
       "tax": "Abgeltungsteuer",
-      "note": "The selected year comes from the allowance calculation: income after the Teilfreistellung, gains after loss netting. Earlier years are rough estimates on gross figures, without the Teilfreistellung and with today's allowance."
+      "note": "The selected year comes from the allowance calculation: income and gains after the Teilfreistellung, gains after loss netting. Earlier years are rough estimates on gross figures, without the Teilfreistellung and with today's allowance."
     },
     "footnote": "Germany taxes investment income at a flat {rate}% (Abgeltungsteuer + Solidaritätszuschlag). Your {allowance} Sparer-Pauschbetrag is applied first, then losses offset gains within the same year. Estimate only, not tax advice.",
     "regime": {
