@@ -25,6 +25,7 @@ const BASE = {
   allowNegativeCash: false,
   documentRetention: false,
   taxAllowanceAnnual: null,
+  country: null,
 };
 
 function renderDialog(transactionCount?: number) {

@@ -149,6 +149,9 @@ export interface IdIncomeClassifyInput {
     assetClass: string;
     isin?: string | null;
   } | null;
+  /** The country (ISO 3166-1 alpha-2) of the portfolio the transaction belongs to — where
+   *  the account is held. Decides income without an instrument; null/empty when unset. */
+  portfolioCountry?: string | null;
 }
 
 /**
@@ -158,16 +161,20 @@ export interface IdIncomeClassifyInput {
  * transaction currency: an instrument is domestic when it is on the IDX market (the same
  * predicate the 0.1% sales tax uses; Indonesian government retail bonds are booked there
  * too) or its ISIN carries Indonesia's country prefix `ID`. Cash interest has no
- * instrument, and the portfolio's brokerage is free text, so the only signal left is the
- * currency: IDR interest is treated as interest from an Indonesian bank (20% final);
- * interest in any other currency as foreign. A foreign-currency deposit at an Indonesian
- * bank is therefore reported as foreign although it is also 20% final (docs/tax.md).
+ * instrument, so it is decided by the portfolio's country (where the account is held):
+ * `ID` is an Indonesian bank, 20% final in any currency (a USD deposit at an Indonesian
+ * bank included, PMK 212/2018); any other country is foreign income in any currency. With
+ * no country set, the currency is the fallback: IDR interest is treated as Indonesian,
+ * interest in any other currency as foreign (docs/tax.md).
  */
 export function classifyIdIncome(input: IdIncomeClassifyInput): IdIncomeCategory {
   const inst = input.instrument ?? null;
+  const country = input.portfolioCountry?.trim().toUpperCase() || null;
   const domestic = inst
     ? inst.market.toUpperCase() === "IDX" || /^ID/i.test(inst.isin ?? "")
-    : input.currency.toUpperCase() === "IDR";
+    : country !== null
+      ? country === "ID"
+      : input.currency.toUpperCase() === "IDR";
   if (!domestic) return "foreign";
   if (inst && (inst.assetClass === "mutual_fund" || inst.assetClass === "etf")) {
     return "fund_distribution";

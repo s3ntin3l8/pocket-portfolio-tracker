@@ -709,6 +709,9 @@
     "iban": "IBAN",
     "ibanPlaceholder": "e.g. DE78 1203 0000 1066 5053 87",
     "currency": "Base currency",
+    "country": "Country",
+    "countryNone": "Not set",
+    "countryHint": "Where the account is held. Under the Indonesian tax regime, interest from an account in Indonesia is taxed as Indonesian bank interest in any currency; interest from an account elsewhere is foreign income. When not set, IDR interest counts as Indonesian.",
     "birthYear": "Birth year",
     "birthYearPlaceholder": "e.g. 2017",
     "birthYearHint": "Used for the savings forecast.",
@@ -2202,7 +2205,7 @@
       "notes": {
         "domestic_dividend": "Dividends from Indonesian companies: 10% final, which you pay yourself by the 15th of the following month. Exempt if you reinvest them in Indonesia for at least 3 years.",
         "bond_interest": "Bond interest, including ORI and SBR: 10% final, withheld by the issuer or custodian.",
-        "deposit_interest": "Bank interest in IDR: 20% final, withheld by the bank. Interest is exempt while your deposit and savings balance is at most Rp7.5 million; Pocket can't see that balance, so the exemption isn't applied. Where a withholding is recorded on the transaction, that amount is used.",
+        "deposit_interest": "Interest from a bank in Indonesia, in any currency: 20% final, withheld by the bank. A portfolio counts as Indonesian when its country is set to Indonesia, or, with no country set, when the interest is in IDR. Interest is exempt while your deposit and savings balance is at most Rp7.5 million; Pocket can't see that balance, so the exemption isn't applied. Where a withholding is recorded on the transaction, that amount is used.",
         "fund_distribution": "Reksa dana and ETF distributions aren't taxable for unit holders."
       },
       "foreignTable": {
@@ -2211,7 +2214,7 @@
         "gross": "Gross",
         "foreignTax": "Foreign tax withheld",
         "total": "Total",
-        "note": "Taxed at your marginal rate (5–35%) in your annual tax return, with a credit for foreign tax withheld. Foreign dividends you reinvest in Indonesia can be exempt. Interest in a currency other than IDR is listed here even when it comes from an Indonesian bank, where it would be 20% final."
+        "note": "Taxed at your marginal rate (5–35%) in your annual tax return, with a credit for foreign tax withheld. Foreign dividends you reinvest in Indonesia can be exempt. Interest is listed here when its portfolio's country is outside Indonesia or, with no country set, when it isn't in IDR. Set the country in the portfolio's settings so a foreign-currency deposit at an Indonesian bank counts as 20% final bank interest."
       },
       "byYear": {
         "title": "By year",

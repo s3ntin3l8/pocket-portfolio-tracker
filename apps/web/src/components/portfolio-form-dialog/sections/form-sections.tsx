@@ -12,6 +12,7 @@ import { HolderTypeChips } from "@/components/holder-type-chips";
 import { KNOWN_BROKERAGES } from "@/lib/brokerages";
 import { CURRENCIES, NEW_HOLDER } from "../constants";
 import { AccountingSection } from "./accounting-section";
+import { CountrySelect } from "./country-select";
 
 export function PortfolioFormSections({
   // Basics
@@ -29,6 +30,7 @@ export function PortfolioFormSections({
   accountNumber,
   iban,
   currency,
+  country,
   taxAllowanceAnnual,
   showFsaHelper,
   fsaOverAllocated,
@@ -50,6 +52,7 @@ export function PortfolioFormSections({
   onAccountNumberChange,
   onIbanChange,
   onCurrencyChange,
+  onCountryChange,
   onTaxAllowanceChange,
   onCashCountedChange,
   onAllowNegativeCashChange,
@@ -68,6 +71,7 @@ export function PortfolioFormSections({
   accountNumber: string;
   iban: string;
   currency: string;
+  country: string;
   taxAllowanceAnnual: string;
   showFsaHelper: boolean;
   fsaOverAllocated: boolean;
@@ -87,6 +91,7 @@ export function PortfolioFormSections({
   onAccountNumberChange: (v: string) => void;
   onIbanChange: (v: string) => void;
   onCurrencyChange: (v: string) => void;
+  onCountryChange: (v: string) => void;
   onTaxAllowanceChange: (v: string) => void;
   onCashCountedChange: (v: boolean) => void;
   onAllowNegativeCashChange: (v: boolean) => void;
@@ -229,6 +234,8 @@ export function PortfolioFormSections({
           />
         </div>
       </div>
+
+      <CountrySelect id={`${uid}-country`} value={country} onChange={onCountryChange} />
 
       <div className="space-y-1.5">
         <Label htmlFor={`${uid}-fsa`}>{t("taxAllowanceAnnual")}</Label>

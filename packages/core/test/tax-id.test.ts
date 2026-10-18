@@ -132,6 +132,73 @@ describe("classifyIdIncome", () => {
     expect(classifyIdIncome({ type: "dividend", currency: "IDR" })).toBe("domestic_dividend");
     expect(classifyIdIncome({ type: "coupon", currency: "IDR" })).toBe("bond_interest");
   });
+
+  describe("cash interest by the portfolio's country", () => {
+    it("is bank interest in any currency when the portfolio is in Indonesia", () => {
+      // A USD deposit at an Indonesian bank: 20% final like an IDR one (PMK 212/2018).
+      expect(
+        classifyIdIncome({
+          type: "interest",
+          currency: "USD",
+          instrument: null,
+          portfolioCountry: "ID",
+        }),
+      ).toBe("deposit_interest");
+      expect(classifyIdIncome({ type: "interest", currency: "IDR", portfolioCountry: "ID" })).toBe(
+        "deposit_interest",
+      );
+      expect(classifyIdIncome({ type: "interest", currency: "EUR", portfolioCountry: "id" })).toBe(
+        "deposit_interest",
+      );
+    });
+
+    it("is foreign in any currency when the portfolio is in another country", () => {
+      // IDR held at a German bank is still foreign-source interest.
+      expect(
+        classifyIdIncome({
+          type: "interest",
+          currency: "IDR",
+          instrument: null,
+          portfolioCountry: "DE",
+        }),
+      ).toBe("foreign");
+      expect(classifyIdIncome({ type: "interest", currency: "USD", portfolioCountry: "SG" })).toBe(
+        "foreign",
+      );
+    });
+
+    it("falls back to the currency when the country is unset", () => {
+      for (const portfolioCountry of [null, undefined, ""]) {
+        expect(classifyIdIncome({ type: "interest", currency: "IDR", portfolioCountry })).toBe(
+          "deposit_interest",
+        );
+        expect(classifyIdIncome({ type: "interest", currency: "USD", portfolioCountry })).toBe(
+          "foreign",
+        );
+      }
+    });
+
+    it("does not change how an instrument's income is classified", () => {
+      // An IDX stock held through a German depot is still an Indonesian dividend...
+      expect(
+        classifyIdIncome({
+          type: "dividend",
+          currency: "IDR",
+          instrument: idx("equity"),
+          portfolioCountry: "DE",
+        }),
+      ).toBe("domestic_dividend");
+      // ...and a US stock held at an Indonesian broker is still foreign.
+      expect(
+        classifyIdIncome({
+          type: "dividend",
+          currency: "USD",
+          instrument: { market: "US", assetClass: "equity", isin: "US0378331005" },
+          portfolioCountry: "ID",
+        }),
+      ).toBe("foreign");
+    });
+  });
 });
 
 describe("indonesianFinalTax", () => {

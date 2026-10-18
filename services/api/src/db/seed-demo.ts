@@ -349,6 +349,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         baseCurrency: "IDR",
         accountHolderId: self.id,
         brokerage: "Stockbit",
+        country: "ID",
         cashCounted: false,
       },
       {
@@ -357,6 +358,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         baseCurrency: "EUR",
         accountHolderId: self.id,
         brokerage: "Trade Republic",
+        country: "DE",
         cashCounted: false,
         // Per-depot FSA allocation, within the holder's €1,000 cap above.
         taxAllowanceAnnual: "1000",
@@ -367,6 +369,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         baseCurrency: "IDR",
         accountHolderId: self.id,
         brokerage: "Pegadaian",
+        country: "ID",
         cashCounted: false,
       },
       {
@@ -375,6 +378,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         baseCurrency: "IDR",
         accountHolderId: child.id,
         brokerage: "Bibit",
+        country: "ID",
         cashCounted: false,
       },
       {
@@ -383,6 +387,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         baseCurrency: "EUR",
         accountHolderId: self.id,
         brokerage: "DKB",
+        country: "DE",
         // Cash-inside boundary: a savings account, not a mixed checking account.
         cashCounted: true,
       },

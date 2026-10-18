@@ -641,3 +641,128 @@ describe("Indonesian income tax — a rate per income type, foreign income kept 
     expectMixedYear(entry!.indonesianFinalTax);
   });
 });
+
+describe("Indonesian income tax — cash interest follows the portfolio's country", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  type Cat = { category: string; gross: string; tax: string | null };
+
+  /** One holder, three IDR portfolios: an Indonesian bank paying USD interest, a German
+   *  bank paying IDR interest, and one with no country paying IDR interest. */
+  async function seedCountries(sub: string) {
+    const t = await token(sub);
+    await setTaxRegime(t, "ID");
+    await app.db
+      .insert(fxRates)
+      .values({ base: "USD", quote: "IDR", rate: "16000", date: toDateKey(new Date()) })
+      .onConflictDoNothing();
+    const holderId = await createHolder(t, { name: "Country Holder" });
+    const interest = async (portfolioId: string, price: string, currency: string) =>
+      seedTransaction(app, portfolioId, auth(t), {
+        type: "interest",
+        quantity: "0",
+        price,
+        currency,
+        executedAt: "2025-06-30T00:00:00.000Z",
+      });
+    const idBank = await createPortfolio(t, {
+      name: "ID bank",
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+      country: "ID",
+    });
+    const deBank = await createPortfolio(t, {
+      name: "DE bank",
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+      country: "DE",
+    });
+    const unset = await createPortfolio(t, {
+      name: "No country",
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+    });
+    await interest(idBank, "100", "USD"); // 1,600,000 IDR
+    await interest(deBank, "500000", "IDR");
+    await interest(unset, "100000", "IDR");
+    return { t, idBank, deBank, unset };
+  }
+
+  const portfolioTax = async (t: string, portfolioId: string) => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().indonesianFinalTax as { incomeByCategory: Cat[] };
+  };
+
+  it("taxes USD interest at an Indonesian bank as 20% final bank interest", async () => {
+    const { t, idBank } = await seedCountries("tax-id-country-1");
+    const id = await portfolioTax(t, idBank);
+    expect(id.incomeByCategory).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        gross: "1600000.00",
+        tax: "320000.00",
+      }),
+    ]);
+  });
+
+  it("reports IDR interest at a bank outside Indonesia as foreign income", async () => {
+    const { t, deBank } = await seedCountries("tax-id-country-2");
+    const id = await portfolioTax(t, deBank);
+    expect(id.incomeByCategory).toEqual([
+      expect.objectContaining({ category: "foreign", gross: "500000.00", tax: null }),
+    ]);
+  });
+
+  it("falls back to the currency when the portfolio has no country", async () => {
+    const { t, unset } = await seedCountries("tax-id-country-3");
+    const id = await portfolioTax(t, unset);
+    expect(id.incomeByCategory).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        gross: "100000.00",
+        tax: "20000.00",
+      }),
+    ]);
+  });
+
+  it("classifies each portfolio's interest by its own country on /networth/tax", async () => {
+    const { t } = await seedCountries("tax-id-country-4");
+    const res = await app.inject({
+      method: "GET",
+      url: "/networth/tax?year=2025",
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const [entry] = res.json() as {
+      indonesianFinalTax: { incomeByCategory: Cat[]; foreignIncomeGross: string };
+    }[];
+    const cats = entry!.indonesianFinalTax.incomeByCategory;
+    // ID bank (USD) + no country (IDR) are Indonesian; the DE bank's IDR interest is foreign.
+    expect(cats).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        gross: "1700000.00",
+        tax: "340000.00",
+      }),
+      expect.objectContaining({ category: "foreign", gross: "500000.00", tax: null }),
+    ]);
+    expect(entry!.indonesianFinalTax.foreignIncomeGross).toBe("500000.00");
+  });
+});

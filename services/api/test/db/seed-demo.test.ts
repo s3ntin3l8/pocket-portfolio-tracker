@@ -71,6 +71,27 @@ describe("seedDemo — admin bootstrap", () => {
     // The demo user owns a full dataset, so it must not be gated into onboarding.
     expect(row.onboardingCompletedAt).not.toBeNull();
   }, 30_000);
+
+  it("sets each demo portfolio's country, so cash interest is classified by it", async () => {
+    await ensureDb();
+    await seedDemo();
+    const db = getDb();
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, "seed-demo-admin-test@example.com"));
+    const pfs = await db
+      .select({ brokerage: portfolios.brokerage, country: portfolios.country })
+      .from(portfolios)
+      .where(eq(portfolios.userId, user.id));
+    expect(Object.fromEntries(pfs.map((p) => [p.brokerage, p.country]))).toEqual({
+      Stockbit: "ID",
+      Pegadaian: "ID",
+      Bibit: "ID",
+      "Trade Republic": "DE",
+      DKB: "DE",
+    });
+  }, 30_000);
 });
 
 describe("seedDemo — snapshot history anchored to the live valuation (#989)", () => {

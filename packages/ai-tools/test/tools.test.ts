@@ -94,6 +94,7 @@ const client = {
       portfolioType: "standard",
       cashCounted: false,
       taxAllowanceAnnual: "600",
+      country: "DE",
       ...leaky,
     },
     {
@@ -106,6 +107,7 @@ const client = {
       portfolioType: "standard",
       cashCounted: true,
       taxAllowanceAnnual: null,
+      country: null,
       ...leaky,
     },
   ]),
@@ -296,6 +298,11 @@ describe("ai-tools", () => {
     expect(out[0]!.name).toBe("Depot [iban]");
   });
 
+  it("list_portfolios exposes the country the account is held in", async () => {
+    const out = (await byName("list_portfolios").handler({})) as Record<string, unknown>[];
+    expect(out.map((p) => p.country)).toEqual(["DE", null]);
+  });
+
   it("tax summary across holders keeps tax parameters but drops the holder name", async () => {
     const out = (await byName("get_tax_summary").handler({ year: 2025 })) as {
       holder: Record<string, unknown>;
@@ -336,6 +343,7 @@ describe("ai-tools", () => {
   it("get_tax_summary explains the Indonesian per-type rates and what is already withheld", () => {
     const d = byName("get_tax_summary").description;
     expect(d).toMatch(/dividends 10%.*bond interest 10%.*bank interest 20%/);
+    expect(d).toMatch(/portfolio's `country`/);
     expect(d).toMatch(/taxWithheldAtSource/);
     expect(d).toMatch(/taxToSelfPay/);
     expect(d).toMatch(/foreignIncomeGross.*not in `estimatedTax`/);

@@ -300,13 +300,16 @@ export function buildTfRates(
  * - Every dividend/coupon/interest transaction becomes one income row with gross = net +
  *   recorded withholding (`cashFlow` computes net = qty × price − fees for income rows) and
  *   a category from `classifyIdIncome` (domestic dividend, bond interest, bank interest,
- *   reksa dana distribution, or foreign income) — each category has its own rate.
+ *   reksa dana distribution, or foreign income) — each category has its own rate. Income
+ *   without an instrument is classified by the country of the portfolio it was booked in,
+ *   so the transactions come grouped per portfolio (`incomeSources`).
  * - `byYear` rolls proceeds and income across every year so prior tax years still get a
  *   real Est. tax figure under ID.
  */
 export function computeIndonesianFinalTaxFromTradeLog(input: {
   tradeLog: TradeLog;
-  coreTxns: CoreTransaction[];
+  /** Each portfolio's transactions with that portfolio's country (null when unset). */
+  incomeSources: { coreTxns: CoreTransaction[]; portfolioCountry: string | null }[];
   year: number;
   metaById: Map<string, InstrumentMeta>;
   /** User's display currency. Dividends are converted from their native currency to
@@ -317,7 +320,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
    *  Obtained from `getFxRates(app.db, ccys, display)` in the calling route. */
   fxRates: Map<string, number>;
 }): IndonesianFinalTax {
-  const { tradeLog, coreTxns, year, metaById, displayCurrency, fxRates } = input;
+  const { tradeLog, incomeSources, year, metaById, displayCurrency, fxRates } = input;
   const ZERO = "0";
 
   // Native-currency → display-currency. A source currency with no registered rate is
@@ -391,32 +394,35 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   // decides each row's rate from its category (and the recorded withholding), then groups the
   // selected year's rows for display and rolls all years up for `byYear`.
   const income: IdIncomeInput[] = [];
-  for (const t of coreTxns) {
-    if (t.type !== "dividend" && t.type !== "coupon" && t.type !== "interest") continue;
-    const instrumentId = t.instrumentId ?? null;
-    const meta = instrumentId ? metaById.get(instrumentId) : undefined;
-    const category = classifyIdIncome({
-      type: t.type,
-      currency: t.currency,
-      instrument: instrumentId
-        ? // An instrument with no metadata row can't be shown to be Indonesian: foreign.
-          (meta ?? { market: "", assetClass: "", isin: null })
-        : null,
-    });
-    // cashFlow computes net = (qty>0 ? qty*price : price) − fees for income rows; gross is
-    // net + the withholding recorded on the row. Both are converted to the display currency
-    // so the sums don't mix native-currency figures under the response's display label.
-    const net = fxTo(new Decimal(cashFlow(t).toString()), t.currency);
-    const recordedTax = fxTo(new Decimal(t.tax ?? "0"), t.currency);
-    income.push({
-      instrumentId,
-      symbol: meta?.symbol ?? (instrumentId ? instrumentId.slice(0, 8) : t.type),
-      currency: displayCurrency,
-      category,
-      year: t.executedAt.getUTCFullYear(),
-      gross: net.add(recordedTax).toFixed(2),
-      recordedTax: recordedTax.toFixed(2),
-    });
+  for (const { coreTxns, portfolioCountry } of incomeSources) {
+    for (const t of coreTxns) {
+      if (t.type !== "dividend" && t.type !== "coupon" && t.type !== "interest") continue;
+      const instrumentId = t.instrumentId ?? null;
+      const meta = instrumentId ? metaById.get(instrumentId) : undefined;
+      const category = classifyIdIncome({
+        type: t.type,
+        currency: t.currency,
+        instrument: instrumentId
+          ? // An instrument with no metadata row can't be shown to be Indonesian: foreign.
+            (meta ?? { market: "", assetClass: "", isin: null })
+          : null,
+        portfolioCountry,
+      });
+      // cashFlow computes net = (qty>0 ? qty*price : price) − fees for income rows; gross is
+      // net + the withholding recorded on the row. Both are converted to the display currency
+      // so the sums don't mix native-currency figures under the response's display label.
+      const net = fxTo(new Decimal(cashFlow(t).toString()), t.currency);
+      const recordedTax = fxTo(new Decimal(t.tax ?? "0"), t.currency);
+      income.push({
+        instrumentId,
+        symbol: meta?.symbol ?? (instrumentId ? instrumentId.slice(0, 8) : t.type),
+        currency: displayCurrency,
+        category,
+        year: t.executedAt.getUTCFullYear(),
+        gross: net.add(recordedTax).toFixed(2),
+        recordedTax: recordedTax.toFixed(2),
+      });
+    }
   }
 
   // Per-year proceeds from the trade log legs (across ALL years, for the byYear table).
