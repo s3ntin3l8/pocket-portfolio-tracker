@@ -853,13 +853,14 @@ describe("cash income labels", () => {
           {
             symbol: "interest",
             cashType: "interest",
-            currency: "EUR",
+            // Stored lower-case: the label still reads "EUR", as the ID tables do.
+            currency: "eur",
             gross: "12",
             tax: "3",
             net: "9",
           },
         ]}
-        totalsByCurrency={[{ currency: "EUR", gross: "12", tax: "3", net: "9" }]}
+        totalsByCurrency={[{ currency: "eur", gross: "12", tax: "3", net: "9" }]}
         locale="en"
         year={2026}
       />,

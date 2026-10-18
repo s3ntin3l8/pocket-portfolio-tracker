@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { createApiClient } from "@portfolio/api-client";
+import type { IdCashIncomeSource } from "@portfolio/core";
 import type {
   ApiClient,
   Portfolio,
@@ -263,7 +264,7 @@ export interface TaxDividendRow {
   symbol: string;
   /** Set on cash income with neither an instrument nor a description, whose `symbol` is only
    *  the type key: the table shows a translated label instead. */
-  cashType?: "dividend" | "coupon" | "interest";
+  cashType?: IdCashIncomeSource["type"];
   currency: string;
   gross: string;
   tax: string;

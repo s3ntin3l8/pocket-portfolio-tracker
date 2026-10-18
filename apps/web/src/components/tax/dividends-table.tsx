@@ -51,7 +51,7 @@ export function DividendsTable({
     totalsByCurrency.map((tc) => fmt(tc[field], tc.currency)).join(" · ");
   // Cash income with nothing to name it by reads "Cash interest · EUR", not the type key.
   const sourceLabel = (r: TaxDividendRow) =>
-    r.cashType ? t(`cashSource.${r.cashType}`, { currency: r.currency }) : r.symbol;
+    r.cashType ? t(`cashSource.${r.cashType}`, { currency: r.currency.toUpperCase() }) : r.symbol;
   const { sortKey, sortDir, toggle, sort } = useTableSort<TaxDividendRow>(
     dividendCols(sourceLabel),
   );

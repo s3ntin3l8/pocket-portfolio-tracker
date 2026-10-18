@@ -1,7 +1,7 @@
 import { Decimal } from "decimal.js";
 import { collectFxMissing } from "@/lib/fx-missing";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
-import { mergeIndonesianFinalTax } from "@portfolio/core";
+import { mergeIndonesianFinalTax, type IdCashIncomeSource } from "@portfolio/core";
 import {
   getServerApi,
   listPortfoliosCached,
@@ -346,7 +346,7 @@ export async function loadTaxYearDetail(
         const incomeTxns = incomeLists
           .flat()
           .filter(
-            (t) =>
+            (t): t is typeof t & { type: IdCashIncomeSource["type"] } =>
               (t.type === "dividend" || t.type === "coupon" || t.type === "interest") &&
               t.status !== "archived" &&
               t.status !== "draft" &&
@@ -370,9 +370,7 @@ export async function loadTaxYearDetail(
             t.instrument?.symbol ?? t.description ?? t.instrumentId?.slice(0, 8) ?? t.type;
           const bucket = byInstrument.get(key) ?? {
             symbol,
-            ...(!t.instrumentId && !t.description
-              ? { cashType: t.type as NonNullable<TaxDividendRow["cashType"]> }
-              : {}),
+            ...(!t.instrumentId && !t.description ? { cashType: t.type } : {}),
             currency: t.currency,
             net: new Decimal(0),
             tax: new Decimal(0),
