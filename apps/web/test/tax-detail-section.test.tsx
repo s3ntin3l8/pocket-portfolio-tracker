@@ -99,7 +99,9 @@ describe("ID tax tables on a phone", () => {
       expect(card, title).not.toBeNull();
       // A grid item's min-width is its content's (the table's min-w), which widens the
       // track past the viewport; a block child is capped at the column width.
-      expect(card!.parentElement!.tagName, title).toBe("SECTION");
+      expect(card!.parentElement!.getAttribute("class") ?? "", title).not.toMatch(
+        /(^|\s)grid(\s|$)/,
+      );
     }
   });
 });
@@ -121,7 +123,9 @@ describe("DE tax tables on a phone", () => {
     for (const title of [messages.Tax.disposals.title, messages.Tax.dividendsTable.title]) {
       const card = screen.getByText(title).closest(".bg-card");
       expect(card, title).not.toBeNull();
-      expect(card!.parentElement!.tagName, title).toBe("SECTION");
+      expect(card!.parentElement!.getAttribute("class") ?? "", title).not.toMatch(
+        /(^|\s)grid(\s|$)/,
+      );
     }
   });
 });
@@ -142,7 +146,7 @@ describe("DE forecast tiles on a phone", () => {
     const page = readFileSync(resolve(__dirname, "../src/app/[locale]/(app)/tax/page.tsx"), "utf8");
     expect(page).not.toMatch(/className="grid grid-cols-3\b/);
     expect(page).toContain(
-      "grid grid-cols-1 gap-2.5 max-sm:grid-cols-2 sm:gap-4 @lg:grid-cols-2 @3xl:grid-cols-3",
+      "grid grid-cols-1 gap-2.5 max-sm:@2xs:grid-cols-2 sm:gap-4 @lg:grid-cols-2 @3xl:grid-cols-3",
     );
     // Queried on the forecast card itself, which sits beside the rail, not on <main>.
     expect(page).toContain('<CardContent className="@container space-y-4">');
