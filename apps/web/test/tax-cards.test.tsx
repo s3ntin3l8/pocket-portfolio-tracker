@@ -354,6 +354,19 @@ describe("DistributionCard", () => {
     expect(screen.queryByText(/IDR|Rp/)).not.toBeInTheDocument();
   });
 
+  it("sizes its tiles by its own width: stacked when narrow, 3-up from 320px", () => {
+    // Beside the rail the card is narrower than on a phone; a viewport breakpoint can't
+    // tell, so the card is the container the grid queries.
+    render(<DistributionCard distribution={distribution} locale="en" t={t} />);
+    const tile = screen.getByText(t("distribution.cap")).closest(".bg-card")!;
+    const grid = tile.parentElement!;
+    const classes = (grid.getAttribute("class") ?? "").split(/\s+/);
+    expect(classes).toContain("grid-cols-1");
+    expect(classes).toContain("@xs:grid-cols-3");
+    expect(classes).not.toContain("grid-cols-3");
+    expect(grid.parentElement!.getAttribute("class")).toMatch(/(^|\s)@container(\s|$)/);
+  });
+
   it("defaults to EUR for a response that predates the currency field", () => {
     render(<DistributionCard distribution={distribution} locale="en" t={t} />);
     expect(screen.getAllByText("€1,000").length).toBe(2);

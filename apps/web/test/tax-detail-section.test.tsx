@@ -85,9 +85,9 @@ describe("ID tax summary tiles on a phone", () => {
     const grid = hero!.parentElement!;
     expect(hasClass(grid, "grid-cols-3")).toBe(false);
     expect(hasClass(grid, "grid-cols-2")).toBe(true);
-    expect(hasClass(grid, "@2xl:grid-cols-3")).toBe(true);
+    expect(hasClass(grid, "@3xl:grid-cols-3")).toBe(true);
     expect(hasClass(hero, "col-span-2")).toBe(true);
-    expect(hasClass(hero, "@2xl:col-span-1")).toBe(true);
+    expect(hasClass(hero, "@3xl:col-span-1")).toBe(true);
   });
 });
 
@@ -105,27 +105,33 @@ describe("ID tax tables on a phone", () => {
 });
 
 describe("DE tax tables on a phone", () => {
-  it("sizes the disposal/dividend grid with minmax(0, 1fr) columns", () => {
-    const { container } = render(
+  it("stacks the disposal and dividend cards as blocks, not grid items", () => {
+    render(
       <NextIntlClientProvider locale="en" messages={messages}>
-        <TaxHolderDetailDE
-          detail={{ ...idDetail, indonesianFinalTax: undefined }}
-          currency="EUR"
-          locale="en"
-          year={2026}
-        />
+        <section>
+          <TaxHolderDetailDE
+            detail={{ ...idDetail, indonesianFinalTax: undefined }}
+            currency="EUR"
+            locale="en"
+            year={2026}
+          />
+        </section>
       </NextIntlClientProvider>,
     );
-    const grid = container.firstElementChild;
-    expect(hasClass(grid, "grid")).toBe(true);
-    expect(hasClass(grid, "grid-cols-1")).toBe(true);
+    for (const title of [messages.Tax.disposals.title, messages.Tax.dividendsTable.title]) {
+      const card = screen.getByText(title).closest(".bg-card");
+      expect(card, title).not.toBeNull();
+      expect(card!.parentElement!.tagName, title).toBe("SECTION");
+    }
   });
 });
 
 describe("pinned first column in a totals row", () => {
   it("matches the footer's background", () => {
     const css = readFileSync(resolve(__dirname, "../src/app/globals.css"), "utf8");
-    const rule = css.slice(css.indexOf("@utility sticky-first-col"));
+    // Just that utility's block: from its opening to the next top-level closing brace.
+    const start = css.indexOf("@utility sticky-first-col");
+    const rule = css.slice(start, css.indexOf("\n}\n", start) + 2);
     expect(rule).toMatch(/tfoot :is\(th, td\):first-child \{\s*background-color: var\(--card-2\)/);
   });
 });
@@ -135,6 +141,8 @@ describe("DE forecast tiles on a phone", () => {
     // The page is an async server component; pin its source instead of rendering it.
     const page = readFileSync(resolve(__dirname, "../src/app/[locale]/(app)/tax/page.tsx"), "utf8");
     expect(page).not.toMatch(/className="grid grid-cols-3\b/);
-    expect(page).toContain("grid grid-cols-2 gap-2.5 sm:gap-4 @2xl:grid-cols-3");
+    expect(page).toContain("grid grid-cols-1 gap-2.5 sm:gap-4 @xs:grid-cols-2 @xl:grid-cols-3");
+    // Queried on the forecast card itself, which sits beside the rail, not on <main>.
+    expect(page).toContain('<CardContent className="@container space-y-4">');
   });
 });

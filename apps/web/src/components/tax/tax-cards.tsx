@@ -130,8 +130,11 @@ export function DistributionCard({
           {t("distribution.title")}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+      {/* Its own @container: beside the rail (a ~960px window) this card is narrower than
+          on a phone while StatCard's figures are already at their larger `sm:` size, so
+          three tiles crushed "€1,000" to "€1,…". Below 320px of card it stacks. */}
+      <CardContent className="@container space-y-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:gap-4 @xs:grid-cols-3">
           <StatCard
             label={t("distribution.cap")}
             value={money(d.holderAllowanceCap)}
