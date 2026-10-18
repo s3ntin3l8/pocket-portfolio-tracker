@@ -243,8 +243,9 @@ function TaxHolderOverviewDe({
                 <p className="text-xs text-muted-foreground">{t("forecast.disclaimer")}</p>
                 {/* Full amounts in the display currency (e.g. "IDR 14,910,312") at StatCard's
                     viewport-keyed figure size: 2+1 on a phone (small figures); otherwise by
-                    this card's width — stacked, 2+1 from 384px, 3-up from 768px. */}
-                <div className="grid grid-cols-1 gap-2.5 max-sm:grid-cols-2 sm:gap-4 @sm:grid-cols-2 @3xl:grid-cols-3">
+                    this card's width — stacked, 2+1 from 512px (room for a full amount at the
+                    28px `lg:` size), 3-up from 768px. */}
+                <div className="grid grid-cols-1 gap-2.5 max-sm:grid-cols-2 sm:gap-4 @lg:grid-cols-2 @3xl:grid-cols-3">
                   <StatCard
                     label={t("forecast.label")}
                     value={money(u.forecastIncomeRestOfYear)}
@@ -256,7 +257,7 @@ function TaxHolderOverviewDe({
                     delta={t("forecast.projectedUsedDesc")}
                   />
                   <StatCard
-                    className="max-sm:col-span-2 @sm:col-span-2 @3xl:col-span-1"
+                    className="max-sm:col-span-2 @lg:col-span-2 @3xl:col-span-1"
                     label={t("forecast.projectedRemaining")}
                     value={money(u.projectedRemaining)}
                     delta={`${t("forecast.projectedTaxSaving")}: ${money(u.projectedTaxSavingAvailable)}`}

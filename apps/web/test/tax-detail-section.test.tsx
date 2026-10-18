@@ -142,7 +142,7 @@ describe("DE forecast tiles on a phone", () => {
     const page = readFileSync(resolve(__dirname, "../src/app/[locale]/(app)/tax/page.tsx"), "utf8");
     expect(page).not.toMatch(/className="grid grid-cols-3\b/);
     expect(page).toContain(
-      "grid grid-cols-1 gap-2.5 max-sm:grid-cols-2 sm:gap-4 @sm:grid-cols-2 @3xl:grid-cols-3",
+      "grid grid-cols-1 gap-2.5 max-sm:grid-cols-2 sm:gap-4 @lg:grid-cols-2 @3xl:grid-cols-3",
     );
     // Queried on the forecast card itself, which sits beside the rail, not on <main>.
     expect(page).toContain('<CardContent className="@container space-y-4">');
