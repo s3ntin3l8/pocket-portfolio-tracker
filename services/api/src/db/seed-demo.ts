@@ -1910,13 +1910,16 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
   // --- FX rates — daily history 2020-today for every currency pair the
   // seeded holdings actually need. See fx.ts: rows are (base=from, quote=to,
   // date), read for `quote = displayCurrency`. IDR is the default aggregate
-  // display currency; EUR/USD/CAD are the foreign currencies any holding has.
+  // display currency; EUR/USD/CAD are the foreign currencies any holding has. EUR is
+  // seeded as a display currency too (IDR→EUR, plus the USD/CAD→EUR legs): the DE tax
+  // screenshots render in euros, and with FX_PROVIDER=none nothing else fills the pair.
 
   // Scope cleanup to only the pairs this seed owns — the table is global
   // reference data shared with other users/devs on a shared dev DB, so
   // `delete(fxRates)` would nuke everyone else's cache.
   const seededPairs = [
     { base: "EUR", quote: "IDR" },
+    { base: "IDR", quote: "EUR" },
     { base: "USD", quote: "IDR" },
     { base: "USD", quote: "EUR" },
     { base: "CAD", quote: "IDR" },
@@ -1976,14 +1979,17 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     const usdIdr = new Decimal(at(lo.usdIdr, hi?.usdIdr).toFixed(0));
     const cadIdr = new Decimal(at(lo.cadIdr, hi?.cadIdr).toFixed(0));
     const dateStr = isoDate(new Date(ms));
+    // Significant digits, not decimal places: IDR→EUR (~0.00006) would keep only ~6 at 10 dp.
     const row = (base: string, quote: string, rate: Decimal) => ({
       base,
       quote,
-      rate: rate.toDecimalPlaces(10).toFixed(),
+      rate: rate.toSignificantDigits(20).toFixed(),
       date: dateStr,
     });
     fxRows.push(
       row("EUR", "IDR", eurIdr),
+      // The inverse (to 20 significant digits), so IDR→EUR→IDR round-trips.
+      row("IDR", "EUR", new Decimal(1).div(eurIdr)),
       row("USD", "IDR", usdIdr),
       row("USD", "EUR", usdIdr.div(eurIdr)),
       row("CAD", "IDR", cadIdr),

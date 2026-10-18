@@ -4,6 +4,8 @@ import {
   settle,
   devOverlayHasIssues,
   DEV_INDICATOR_HIDE_CSS,
+  SCREENS,
+  withSettings,
 } from "../scripts/screenshots.mjs";
 
 describe("screenshots script — dev indicator", () => {
@@ -99,5 +101,104 @@ describe("screenshots script — dev indicator", () => {
     expect(devOverlayHasIssues()).toBe(true);
     portal.remove();
     expect(devOverlayHasIssues()).toBe(false);
+  });
+});
+
+describe("screenshots script — per-screen settings", () => {
+  /** A stub Playwright APIRequestContext over an in-memory user + preferences row. */
+  function stubRequest(state = { displayCurrency: "IDR", taxRegime: "DE" }, failOn?: string) {
+    const calls: string[] = [];
+    const request = {
+      fetch: vi.fn(async (url: string, opts: { method: string; data?: Record<string, string> }) => {
+        const route = new URL(url).pathname;
+        calls.push(`${opts.method} ${route}`);
+        const status = failOn === `${opts.method} ${route}` ? 500 : 200;
+        if (status === 200 && opts.data) Object.assign(state, opts.data);
+        const body =
+          route === "/api/backend/me"
+            ? { displayCurrency: state.displayCurrency }
+            : { taxRegime: state.taxRegime };
+        return { ok: () => status === 200, status: () => status, json: async () => body };
+      }),
+    };
+    return { request, state, calls };
+  }
+
+  it("captures the tax screen in the DE regime with EUR as the display currency", () => {
+    const tax = SCREENS.find((s: { slug: string }) => s.slug === "tax");
+    expect(tax?.settings).toEqual({ taxRegime: "DE", displayCurrency: "EUR" });
+    // Every other screen stays in the demo user's own (IDR) display currency.
+    for (const s of SCREENS.filter((s: { slug: string }) => s.slug !== "tax"))
+      expect(s.settings).toBeUndefined();
+  });
+
+  it("withSettings applies the settings for the capture, then restores the previous ones", async () => {
+    const { request, state, calls } = stubRequest();
+    let during: unknown;
+    await withSettings({ request }, { taxRegime: "DE", displayCurrency: "EUR" }, async () => {
+      during = { ...state };
+    });
+    expect(during).toEqual({ displayCurrency: "EUR", taxRegime: "DE" });
+    expect(state).toEqual({ displayCurrency: "IDR", taxRegime: "DE" });
+    // Through the same-origin proxy the app's own settings controls use.
+    expect(calls).toContain("PATCH /api/backend/me");
+    expect(calls).toContain("PUT /api/backend/me/preferences");
+  });
+
+  it("withSettings restores the previous settings even when the capture fails", async () => {
+    const { request, state } = stubRequest();
+    await expect(
+      withSettings({ request }, { displayCurrency: "EUR" }, async () => {
+        throw new Error("tax: page did not settle");
+      }),
+    ).rejects.toThrow(/did not settle/);
+    expect(state.displayCurrency).toBe("IDR");
+  });
+
+  it("withSettings fails the run when a setting can't be applied", async () => {
+    const { request } = stubRequest(undefined, "PATCH /api/backend/me");
+    const capture = vi.fn();
+    await expect(withSettings({ request }, { displayCurrency: "EUR" }, capture)).rejects.toThrow(
+      /PATCH \/api\/backend\/me .*500/,
+    );
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("withSettings puts back the settings it already applied when a later one fails", async () => {
+    const { request, state } = stubRequest(
+      { displayCurrency: "IDR", taxRegime: "ID" },
+      "PATCH /api/backend/me",
+    );
+    const capture = vi.fn();
+    await expect(
+      withSettings({ request }, { taxRegime: "DE", displayCurrency: "EUR" }, capture),
+    ).rejects.toThrow(/PATCH \/api\/backend\/me .*500/);
+    expect(capture).not.toHaveBeenCalled();
+    expect(state).toEqual({ displayCurrency: "IDR", taxRegime: "ID" });
+  });
+
+  it("withSettings fails the run when the API doesn't echo the new value back", async () => {
+    const { request } = stubRequest();
+    request.fetch.mockImplementation(async () => ({
+      ok: () => true,
+      status: () => 200,
+      json: async () => ({ displayCurrency: "IDR" }),
+    }));
+    await expect(withSettings({ request }, { displayCurrency: "EUR" }, vi.fn())).rejects.toThrow(
+      /displayCurrency to EUR did not stick \(API answered IDR\)/,
+    );
+  });
+
+  it("withSettings rejects an unknown setting instead of silently capturing without it", async () => {
+    const { request } = stubRequest();
+    await expect(withSettings({ request }, { locale: "de" }, vi.fn())).rejects.toThrow(
+      /unknown screen setting "locale"/,
+    );
+  });
+
+  it("withSettings is a plain pass-through for a screen without settings", async () => {
+    const { request, calls } = stubRequest();
+    expect(await withSettings({ request }, undefined, async () => 42)).toBe(42);
+    expect(calls).toEqual([]);
   });
 });

@@ -46,8 +46,76 @@ const SCREENS = [
   { slug: "activity", path: "/en/transactions" },
   { slug: "insights", path: "/en/insights", minCharts: 2 },
   { slug: "reports", path: "/en/reports" },
-  { slug: "tax", path: "/en/tax" },
+  // `settings`: user settings switched for this capture only, then restored (see
+  // withSettings). The German regime reads naturally in euros (the €1,000 allowance,
+  // Vorabpauschale), so the tax shots pin DE explicitly rather than relying on the API
+  // default, and show EUR while every other screen keeps the demo user's IDR.
+  { slug: "tax", path: "/en/tax", settings: { taxRegime: "DE", displayCurrency: "EUR" } },
 ];
+
+/**
+ * Where each per-screen setting lives: the same endpoints the app's own settings controls
+ * write (DisplayCurrency → PATCH /me, the regime toggle → PUT /me/preferences), reached
+ * through the same-origin backend proxy with the context's session cookie.
+ */
+const SETTING_ENDPOINTS = {
+  displayCurrency: { method: "PATCH", path: "/api/backend/me" },
+  taxRegime: { method: "PUT", path: "/api/backend/me/preferences" },
+};
+
+async function backend(request, method, apiPath, data) {
+  const res = await request.fetch(`${WEB_URL}${apiPath}`, { method, ...(data && { data }) });
+  if (!res.ok()) throw new Error(`${method} ${apiPath} failed with HTTP ${res.status()}`);
+  return res.json();
+}
+
+async function setSetting(request, key, value) {
+  const endpoint = SETTING_ENDPOINTS[key];
+  const updated = await backend(request, endpoint.method, endpoint.path, { [key]: value });
+  if (updated[key] !== value)
+    throw new Error(`setting ${key} to ${value} did not stick (API answered ${updated[key]})`);
+}
+
+/**
+ * Sets each setting, checking the API echoes it back; returns the values it replaced. If
+ * one fails, the ones already applied are put back before the error propagates.
+ */
+async function applySettings(request, settings) {
+  for (const key of Object.keys(settings))
+    if (!SETTING_ENDPOINTS[key]) throw new Error(`unknown screen setting "${key}"`);
+  const previous = {};
+  try {
+    for (const [key, value] of Object.entries(settings)) {
+      // Recorded before the write: a write that failed half-way is put back too.
+      previous[key] = (await backend(request, "GET", SETTING_ENDPOINTS[key].path))[key];
+      await setSetting(request, key, value);
+    }
+  } catch (err) {
+    // Best effort: the original failure is the one worth reporting.
+    for (const [key, value] of Object.entries(previous))
+      await setSetting(request, key, value).catch((e) =>
+        console.warn(`could not restore ${key} to ${value}: ${e.message}`),
+      );
+    throw err;
+  }
+  return previous;
+}
+
+/**
+ * Runs `capture` with the screen's `settings` applied to the demo user, restoring the
+ * previous values afterwards (also when the capture throws), so later screens and the
+ * run order are unaffected. A setting that can't be applied fails the run rather than
+ * shipping a capture in the wrong currency/regime.
+ */
+export async function withSettings(page, settings, capture) {
+  if (!settings) return capture();
+  const previous = await applySettings(page.request, settings);
+  try {
+    return await capture();
+  } finally {
+    await applySettings(page.request, previous);
+  }
+}
 
 const THEMES = ["light", "dark"];
 
@@ -227,10 +295,12 @@ async function captureReadmeInto(browser, cookie, secure, outDir) {
       });
       const page = await context.newPage();
       for (const screen of SCREENS) {
-        await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
-        await settle(page, screen);
         const filename = `${screen.slug}-${theme}-${factor.name}.png`;
-        await page.screenshot({ path: path.join(outDir, filename), fullPage: false });
+        await withSettings(page, screen.settings, async () => {
+          await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
+          await settle(page, screen);
+          await page.screenshot({ path: path.join(outDir, filename), fullPage: false });
+        });
         console.log(`captured ${filename}`);
         manifestEntries.push({
           filename,
@@ -335,12 +405,14 @@ async function captureLanding(browser, cookie, secure) {
     });
     const page = await context.newPage();
     for (const screen of SCREENS) {
-      await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
-      await settle(page, screen);
       const filename = `${screen.slug}-${factor.name}.png`;
       // Write-then-rename so a crashed run never leaves a half-written file.
       const tmp = path.join(outDir, `.${filename}`);
-      await page.screenshot({ path: tmp, fullPage: false });
+      await withSettings(page, screen.settings, async () => {
+        await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
+        await settle(page, screen);
+        await page.screenshot({ path: tmp, fullPage: false });
+      });
       await rename(tmp, path.join(outDir, filename));
       written.push(filename);
       console.log(`captured ${filename}`);
