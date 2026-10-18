@@ -565,7 +565,7 @@
     "monthsElapsed": "{count, plural, one {# month since start} other {# months since start}}",
     "currentValue": "Current value",
     "simpleGain": "gain",
-    "totalReturn": "Total return",
+    "totalReturn": "Total return vs gross contributed",
     "totalReturnHint": "Incl. dividends, coupons & realized gains",
     "xirr": "Annualised return",
     "xirrYoungHint": "* annualised from under a year — may overstate",
@@ -2190,7 +2190,7 @@
         "title": "By year",
         "year": "Year",
         "realized": "Realized gains",
-        "dividends": "Dividends",
+        "dividends": "Investment income",
         "tax": "Est. tax"
       },
       "footnote": "Indonesia applies a final 0.1% tax on listed-share sales and 10% on dividends, both withheld at source — so there's nothing extra to file, and no losses to harvest. This is an estimate, not tax advice.",

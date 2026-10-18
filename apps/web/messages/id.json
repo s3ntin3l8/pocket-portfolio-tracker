@@ -565,7 +565,7 @@
     "monthsElapsed": "{count, plural, other {# bulan sejak awal}}",
     "currentValue": "Nilai saat ini",
     "simpleGain": "keuntungan",
-    "totalReturn": "Total imbal hasil",
+    "totalReturn": "Total imbal hasil vs total setoran kotor",
     "totalReturnHint": "Termasuk dividen, kupon & keuntungan terealisasi",
     "xirr": "Imbal hasil tahunan",
     "xirrYoungHint": "* disetahunkan dari data di bawah setahun — bisa berlebih",
@@ -2190,7 +2190,7 @@
         "title": "Per tahun",
         "year": "Tahun",
         "realized": "Keuntungan terealisasi",
-        "dividends": "Dividen",
+        "dividends": "Pendapatan investasi",
         "tax": "Est. pajak"
       },
       "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan 10% atas dividen, keduanya dipotong di sumber — jadi tidak ada yang perlu dilaporkan lagi, dan tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",

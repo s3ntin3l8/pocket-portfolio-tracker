@@ -184,7 +184,10 @@ export default async function SavingsPage({ params }: { params: Promise<{ locale
                 )}
               </CardContent>
             </Card>
-            {c.totalReturnPct !== null && (
+            {/* Gross-contributed basis (see reports-cards.tsx), named in the label. `typeof`
+                rather than `!== null`: an API without the field must hide the card, not
+                format "NaN%". */}
+            {typeof c.totalReturnPct === "number" && (
               <StatCard
                 label={t("totalReturn")}
                 value={formatPercent(c.totalReturnPct, locale)}

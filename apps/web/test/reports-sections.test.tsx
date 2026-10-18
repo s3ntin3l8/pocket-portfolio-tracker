@@ -176,6 +176,16 @@ describe("Reports cards", () => {
     // capital income incl. interest), so it carries the same name.
     expect(messages.Tax.byYear.dividends).toMatch(/investment income/i);
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
+    // The ID-regime by-year column is fed the same `dividendsByYear` (dividends, coupons
+    // and interest), so it is renamed too — in both locales.
+    expect(messages.Tax.id.byYear.dividends).toMatch(/investment income/i);
+    expect(idMessages.Tax.id.byYear.dividends).toMatch(/pendapatan investasi/i);
+    expect(idMessages.Tax.byYear.dividends).toMatch(/pendapatan investasi/i);
+  });
+
+  it("names the gross-contributed basis of totalReturnPct on Savings as well as Reports", () => {
+    expect(messages.Savings.totalReturn).toMatch(/gross contributed/i);
+    expect(idMessages.Savings.totalReturn).toMatch(/setoran kotor/i);
   });
 
   it("DE tax card uses the allowance usage sums", async () => {
