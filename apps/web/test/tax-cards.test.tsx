@@ -205,6 +205,19 @@ describe("VorabpauschaleRow", () => {
     expect(screen.getByText("Rp 2.93")).toBeInTheDocument();
     expect(screen.getByText("Rp 1.1")).toBeInTheDocument();
   });
+
+  it("pairs its tiles by its own width, not the viewport's", () => {
+    const { container } = render(
+      <VorabpauschaleRow allowanceUsage={makeAllowanceUsage({})} money={money} t={t} />,
+    );
+    const outer = container.firstElementChild!;
+    expect(outer.getAttribute("class")).toBe("@container");
+    const classes = (outer.firstElementChild!.getAttribute("class") ?? "").split(/\s+/);
+    expect(classes).toContain("grid-cols-1");
+    expect(classes).toContain("max-sm:@2xs:grid-cols-2");
+    expect(classes).toContain("@lg:grid-cols-2");
+    expect(classes).not.toContain("grid-cols-2");
+  });
 });
 
 describe("VorabpauschaleRow estimate flag", () => {

@@ -174,18 +174,22 @@ export function VorabpauschaleRow({
   t: TaxTranslator;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
-      <StatCard
-        label={t("vorabpauschale.accrued")}
-        value={money(u.vorabpauschaleAccrued)}
-        delta={t("vorabpauschale.accruedDesc")}
-        basis={u.vorabpauschaleEstimated ? t("vorabpauschale.estimatedBasis") : undefined}
-      />
-      <StatCard
-        label={t("vorabpauschale.credited")}
-        value={money(u.vorabpauschaleCredited)}
-        delta={t("vorabpauschale.creditedDesc")}
-      />
+    // Its own @container, like the FSA and forecast tiles: beside the rail the main column
+    // is narrower than a phone while the figures are at their larger `sm:`/`lg:` sizes.
+    <div className="@container">
+      <div className="grid grid-cols-1 gap-2.5 max-sm:@2xs:grid-cols-2 sm:gap-4 @lg:grid-cols-2">
+        <StatCard
+          label={t("vorabpauschale.accrued")}
+          value={money(u.vorabpauschaleAccrued)}
+          delta={t("vorabpauschale.accruedDesc")}
+          basis={u.vorabpauschaleEstimated ? t("vorabpauschale.estimatedBasis") : undefined}
+        />
+        <StatCard
+          label={t("vorabpauschale.credited")}
+          value={money(u.vorabpauschaleCredited)}
+          delta={t("vorabpauschale.creditedDesc")}
+        />
+      </div>
     </div>
   );
 }
