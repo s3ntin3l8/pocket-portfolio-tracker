@@ -174,7 +174,16 @@ export function registerIncomeRoutes(app: FastifyInstance) {
         )
         .orderBy(desc(transactions.executedAt));
 
-      return rows;
+      // The api-client's Transaction shape: the tax page labels each income row by
+      // `instrument.symbol`, and without it fell back to a truncated instrument id.
+      const meta = await instrumentMeta(
+        app,
+        rows.map((r) => r.instrumentId),
+      );
+      return rows.map((r) => ({
+        ...r,
+        instrument: r.instrumentId ? (meta.get(r.instrumentId) ?? null) : null,
+      }));
     },
   );
 }
