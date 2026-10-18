@@ -22,6 +22,7 @@ import {
 } from "../../services/vorab-estimate.js";
 import { mapPool } from "../../lib/promise-pool.js";
 import { toDecimalSafe } from "../../lib/decimal-safe.js";
+import { currentFxMissing } from "../../lib/fx-missing.js";
 
 /**
  * Coerce Drizzle's `fxRates: Record<string, string>` (returned by loadValuation) into the
@@ -410,6 +411,9 @@ export function registerTaxRoutes(app: FastifyInstance) {
             )
           : null;
 
+      // Euro tax amounts → `display`: one FX lookup for the whole request (DE only).
+      const toLog = regime === "DE" ? await eurTaxAmountsIn(app, display, now) : null;
+
       // Phase 3: per-holder trade logs (with the shared estimates) and tax figures.
       const perHolderResults = await mapPool(
         holderPlans,
@@ -528,7 +532,6 @@ export function registerTaxRoutes(app: FastifyInstance) {
           );
           const overAllocated = totalAllocated.gt(holderAllowanceCap);
 
-          const toLog = await eurTaxAmountsIn(app, display, now);
           const allowanceAnnual = toLog
             ? new Decimal(toLog(holderAllowanceCap.toString())).toFixed(2)
             : "0";
@@ -582,7 +585,13 @@ export function registerTaxRoutes(app: FastifyInstance) {
           };
         },
       );
-      const result = perHolderResults.filter((r): r is NonNullable<typeof r> => r != null);
+      // The response is an array, so the `fxMissingCurrencies` the hook adds to object
+      // bodies never reaches it — carry the request's list on each entry for the web's FX
+      // banner (e.g. "EUR" when the allowance could not be converted).
+      const fxMissingCurrencies = currentFxMissing();
+      const result = perHolderResults
+        .filter((r): r is NonNullable<typeof r> => r != null)
+        .map((r) => ({ ...r, fxMissingCurrencies }));
 
       request.timingName = "GET /networth/tax";
       request.timingMeta = {

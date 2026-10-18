@@ -24,7 +24,12 @@ import {
 } from "@portfolio/core";
 import { loadEstimatedVorabRows } from "../../services/vorab-estimate.js";
 import { cacheKey } from "../helpers.js";
-import { buildTfRates, eurTaxAmountsIn } from "./tax-helpers.js";
+import {
+  buildTfRates,
+  convertLossCarryForward,
+  eurTaxAmountsIn,
+  lossCarryForwardFor,
+} from "./tax-helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
   loadValuation,
@@ -226,12 +231,30 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       const toLog = await eurTaxAmountsIn(app, portfolio.baseCurrency);
       const allowanceAnnual = toLog ? toLog(portfolio.taxAllowanceAnnual) : "0";
       const taxRate = effectiveCapitalGainsTaxRate(holderProfile ?? {});
+      // Same carry-forward rule as `GET /portfolios/:id/tax`: the holder's Verlustvortrag
+      // (a euro amount, converted like the FSA slice) applies only when the holder has
+      // exactly one depot — so this sell cap never exceeds the Tax page's remaining
+      // allowance.
+      let lossCarryForward: { stock?: string; general?: string } | undefined;
+      if (holderId) {
+        const depots = await app.db
+          .select({ id: portfolios.id })
+          .from(portfolios)
+          .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holderId)));
+        if (depots.length <= 1) {
+          lossCarryForward = convertLossCarryForward(
+            await lossCarryForwardFor(app, holderId, new Date().getUTCFullYear()),
+            toLog,
+          );
+        }
+      }
       const usage = allowanceUsageYTD({
         tradeLog,
         tfRates,
         allowanceAnnual,
         taxRate,
         assetClasses,
+        lossCarryForward,
       });
       const suggestions = harvestSuggestions({
         tradeLog,

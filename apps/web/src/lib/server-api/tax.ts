@@ -175,6 +175,7 @@ async function fetchNetworthTax(
         accountHolderId: selected.accountHolderId ?? null,
         distribution: result.holderDistribution,
         tfRatesByInstrument: result.tfRatesByInstrument,
+        ...(result.fxMissingCurrencies ? { fxMissingCurrencies: result.fxMissingCurrencies } : {}),
       };
       return [holderEntry];
     }

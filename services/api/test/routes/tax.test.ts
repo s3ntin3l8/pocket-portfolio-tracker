@@ -795,6 +795,28 @@ describe("tax routes", () => {
         totalAllocated: "1000.00",
       });
       expect(res.headers["x-fx-missing-currencies"]).toBeUndefined();
+      expect(entry.fxMissingCurrencies).toEqual([]);
+    });
+
+    it("/networth/tax reports EUR on each entry when the allowance has no rate", async () => {
+      const { t } = await holderWithIncome("tax-fx-chf-nw", "CHF");
+      await app.inject({
+        method: "PATCH",
+        url: "/me",
+        headers: auth(t),
+        payload: { displayCurrency: "CHF" },
+      });
+      const res = await app.inject({
+        method: "GET",
+        url: `/networth/tax?year=${year}`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const [entry] = res.json();
+      expect(entry.currency).toBe("CHF");
+      expect(entry.allowanceUsage.allowanceAnnual).toBe("0.00");
+      // The array body can't carry the top-level field, so each entry does (web FX banner).
+      expect(entry.fxMissingCurrencies).toContain("EUR");
     });
 
     it("/portfolios/:id/tax converts the FSA slice into the base currency", async () => {

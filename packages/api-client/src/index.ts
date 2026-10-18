@@ -441,6 +441,9 @@ export interface TaxDistribution {
 /** Response from GET /portfolios/:id/tax */
 export interface PortfolioTaxSummary {
   year: number;
+  /** Currencies with no FX rate in this request (audit B2) — e.g. "EUR" when the euro
+   *  FSA slice could not be converted into `currency`. */
+  fxMissingCurrencies?: string[];
   /** "DE" | "ID" — mirrors userPreferences.taxRegime, default "DE". Set on every response
    *  so the web tier can branch on it without a second round-trip. */
   regime?: "DE" | "ID";
@@ -502,6 +505,10 @@ export interface IndonesianFinalTax {
 
 /** One holder's entry in the GET /networth/tax response. */
 export interface TaxSummaryHolder {
+  /** Currencies with no FX rate in this request (audit B2) — e.g. "EUR" when the euro
+   *  allowance could not be converted into `currency` (it is then 0). Carried per entry
+   *  because `/networth/tax` answers with an array. Absent on older responses. */
+  fxMissingCurrencies?: string[];
   holder: {
     id: string;
     name: string;

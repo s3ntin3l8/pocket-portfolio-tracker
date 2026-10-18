@@ -166,6 +166,16 @@ describe("ReportsStatus", () => {
     expect(banner).toHaveTextContent("CHF, USD");
   });
 
+  it("includes the tax payload's missing currencies (EUR allowance without a rate)", async () => {
+    allOk();
+    data.taxReport.mockResolvedValue({
+      status: "ok",
+      holders: [{ fxMissingCurrencies: ["EUR"] }],
+    });
+    wrap(await ReportsStatus());
+    expect(screen.getByRole("status")).toHaveTextContent("EUR");
+  });
+
   it("surfaces the first failed loader as a DataState instead of silent partial data", async () => {
     allOk();
     data.tradesReport.mockResolvedValue({ status: "rate_limited", retryAfter: 30 });

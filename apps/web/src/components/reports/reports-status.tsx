@@ -40,6 +40,8 @@ export async function ReportsStatus() {
     trades.status === "ok" ? trades.data : null,
     contributions.status === "ok" ? contributions.data : null,
     gold.status === "ok" ? gold.data : null,
+    // The tax payload is one entry per holder (e.g. "EUR" when the allowance had no rate).
+    ...(taxResult.status === "ok" ? taxResult.holders : []),
   );
 
   return (
