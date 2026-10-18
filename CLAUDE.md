@@ -223,6 +223,10 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   same `GainExplainer` dialog. A row valued at cost or without an FX rate has no measured gain:
   its P&L cells render "—" (neutral), never a green "+0.00". Headline net worth is formatted
   by `formatNetWorth` everywhere (hero, rail, sidebar) so no surface rounds differently.
+- **Long German labels carry soft hyphens.** `Tax.distribution.capDesc` (en/id) writes
+  "Sparer\u00adpausch\u00adbetrag" with U+00AD so a narrow phone tile breaks it between syllables.
+  The character is invisible in diffs and editors, so keep it when rewriting the message
+  (`tax-cards.test.tsx` guards it).
 - **The URL is the view state (web).** Scope is `?scope=all|p:<id>|h:<id>`: the proxy
   (`apps/web/src/proxy.ts`) copies a valid value into the `x-pocket-scope` request header and
   `getRawScope` (`lib/server-api/_shared.ts`) prefers it over the `pf` cookie (default for

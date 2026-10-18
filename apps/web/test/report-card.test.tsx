@@ -154,7 +154,7 @@ describe("ReportCard", () => {
     );
     const title = screen.getByText("Income");
     // The title never shrinks under the chip (it stays on one line); the header row wraps.
-    expect(title).toHaveClass("whitespace-nowrap", "flex-none");
+    expect(title).toHaveClass("flex-none", "max-w-full", "break-words");
     // flex-1's 0% basis would let the row "fit" by crushing the title instead of wrapping.
     expect(title).not.toHaveClass("flex-1");
     expect(title.parentElement).toHaveClass("flex-wrap");

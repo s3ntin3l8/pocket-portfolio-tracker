@@ -5,6 +5,7 @@ import {
   bannerAnomalies,
   formatPercent,
   formatPercentUnsigned,
+  formatMoneyWhole,
 } from "@/lib/utils";
 import type { Anomaly } from "@portfolio/api-client";
 
@@ -100,5 +101,14 @@ describe("formatPercentUnsigned", () => {
 
   it("follows the locale's separators", () => {
     expect(formatPercentUnsigned(0.1128, "id")).toMatch(/^11,28\s?%$/);
+  });
+});
+
+describe("formatMoneyWhole", () => {
+  it("drops the .00 on a whole amount and keeps real cents", () => {
+    expect(formatMoneyWhole(1000, "EUR", "en")).toBe("€1,000");
+    expect(formatMoneyWhole(13.33, "EUR", "en")).toBe("€13.33");
+    expect(formatMoneyWhole(13.3, "EUR", "en")).toBe("€13.30");
+    expect(formatMoneyWhole(0, "EUR", "en")).toBe("€0");
   });
 });

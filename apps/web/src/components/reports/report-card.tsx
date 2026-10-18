@@ -50,13 +50,14 @@ export function ReportCard({
         {/* flex-wrap: on a phone a long trend label ("+118.79% full-year est. vs last
             year") moves to its own line instead of squeezing the title against it. The
             title must keep its content width (`flex-none`, not `flex-1`, whose 0% basis
-            would let the row "fit" by crushing the title), and the chip right-aligns via
-            `ml-auto` on either line. */}
+            would let the row "fit" by crushing the title); `max-w-full` + `break-words` let a
+            title longer than the whole row still wrap rather than overflow. The chip
+            right-aligns via `ml-auto` on either line. */}
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
             <Icon className="size-[18px]" strokeWidth={1.9} />
           </span>
-          <span className="flex-none whitespace-nowrap text-body font-semibold">{title}</span>
+          <span className="max-w-full flex-none break-words text-body font-semibold">{title}</span>
           {trend && (
             <span className="ml-auto min-w-0 max-w-full">
               <TrendChip label={trend.label} tone={trend.tone} arrow={trend.arrow} />
