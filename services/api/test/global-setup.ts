@@ -10,22 +10,41 @@ import { migrationsDir } from "@portfolio/db";
 
 declare module "vitest" {
   export interface ProvidedContext {
-    /** This run's pre-migrated PGlite template; test/setup.ts copies it per file. */
-    /** Optional: setup.ts falls back to a from-scratch DB when it is missing. */
+    /**
+     * This run's pre-migrated PGlite template; test/setup.ts copies it per file.
+     * Optional: setup.ts falls back to a from-scratch DB when it is missing.
+     */
     pgliteTemplateDir?: string;
   }
 }
 
-/** Prefix of each run's template dir (mkdtemp appends a unique suffix). */
+/**
+ * Prefix of each run's template dir. The owning process's pid follows, then the
+ * unique mkdtemp suffix: `<prefix><pid>-XXXXXX`.
+ */
 export const PGLITE_TEMPLATE_PREFIX = path.join(os.tmpdir(), "portfolio-vitest-pglite-template-");
 
 /** Far longer than any run, so a concurrent run's template is never swept. */
 export const STALE_TEMPLATE_MS = 12 * 60 * 60 * 1000;
 
+/** Whether the pid that owns a template dir (from its name) is still running. */
+function ownerAlive(name: string, base: string): boolean {
+  const pid = Number(/^(\d+)-/.exec(name.slice(base.length))?.[1]);
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: alive, just not ours to signal.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 /**
  * Remove template dirs left by runs that never reached teardown (cancelled or
- * killed), which a per-run path no longer overwrites. Only dirs older than
- * STALE_TEMPLATE_MS go, so a run still in progress elsewhere keeps its own.
+ * killed), which a per-run path no longer overwrites. A dir goes only when it is
+ * older than STALE_TEMPLATE_MS and its owning process is gone: the mtime freezes
+ * once the template is built, so age alone would sweep a long watch session's.
  */
 export function sweepStaleTemplates(now = Date.now()): string[] {
   const dir = path.dirname(PGLITE_TEMPLATE_PREFIX);
@@ -36,6 +55,7 @@ export function sweepStaleTemplates(now = Date.now()): string[] {
     const full = path.join(dir, name);
     try {
       if (now - fs.statSync(full).mtimeMs < STALE_TEMPLATE_MS) continue;
+      if (ownerAlive(name, base)) continue;
       fs.rmSync(full, { recursive: true, force: true });
       swept.push(full);
     } catch {
@@ -60,7 +80,7 @@ export function sweepStaleTemplates(now = Date.now()): string[] {
  */
 export default async function setup(project: TestProject): Promise<() => void> {
   sweepStaleTemplates();
-  const templateDir = fs.mkdtempSync(PGLITE_TEMPLATE_PREFIX);
+  const templateDir = fs.mkdtempSync(`${PGLITE_TEMPLATE_PREFIX}${process.pid}-`);
   let client: PGlite | undefined;
   try {
     client = new PGlite(templateDir, { extensions: { pg_trgm } });

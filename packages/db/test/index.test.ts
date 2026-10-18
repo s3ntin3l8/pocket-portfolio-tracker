@@ -11,20 +11,24 @@ const migrationsFolder = path.resolve(import.meta.dirname, "../drizzle");
 
 let client: PGlite;
 let db: ReturnType<typeof drizzle<typeof schema>>;
-// Set once the migrate finished. If beforeAll timed out, the migrate is still running:
-// closing the client under it left the worker spinning in PGlite's WASM for good.
-let migrated = false;
+// Set once the migrate has settled (finished or threw). If beforeAll timed out, the
+// migrate is still running: closing the client under it left the worker spinning in
+// PGlite's WASM for good, so the close is skipped only in that case.
+let settled = false;
 
 describe("@portfolio/db schema", () => {
   beforeAll(async () => {
     client = new PGlite({ extensions: { pg_trgm } });
     db = drizzle(client, { schema });
-    await migrate(db, { migrationsFolder });
-    migrated = true;
+    try {
+      await migrate(db, { migrationsFolder });
+    } finally {
+      settled = true;
+    }
   });
 
   afterAll(async () => {
-    if (migrated) await client.close();
+    if (settled) await client.close();
   });
 
   it("applies the migration and round-trips an equity transaction", async () => {
