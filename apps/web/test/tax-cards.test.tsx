@@ -214,7 +214,7 @@ describe("VorabpauschaleRow", () => {
     expect(outer.getAttribute("class")).toBe("@container");
     const classes = (outer.firstElementChild!.getAttribute("class") ?? "").split(/\s+/);
     expect(classes).toContain("grid-cols-1");
-    expect(classes).toContain("max-sm:@2xs:grid-cols-2");
+    expect(classes).toContain("max-sm:@xs:grid-cols-2");
     expect(classes).toContain("@lg:grid-cols-2");
     expect(classes).not.toContain("grid-cols-2");
   });
@@ -375,7 +375,7 @@ describe("DistributionCard", () => {
     const grid = tile.parentElement!;
     const classes = (grid.getAttribute("class") ?? "").split(/\s+/);
     expect(classes).toContain("grid-cols-1");
-    expect(classes).toContain("max-sm:@2xs:grid-cols-3");
+    expect(classes).toContain("max-sm:@xs:grid-cols-3");
     expect(classes).toContain("@lg:grid-cols-3");
     expect(classes).not.toContain("grid-cols-3");
     expect(grid.parentElement!.getAttribute("class")).toMatch(/(^|\s)@container(\s|$)/);

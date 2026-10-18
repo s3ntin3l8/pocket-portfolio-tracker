@@ -133,10 +133,10 @@ export function DistributionCard({
       {/* StatCard's figure size is viewport-keyed (small below `sm`), the room is not: beside
           the rail this card is narrower than on a phone, at the larger `sm:` size, and three
           tiles crushed "€1,000" to "€1,…". So the card is its own @container. Phone (small
-          figures): 3-up once it has 288px, as #1052 tuned. Otherwise 3-up from 512px (room
+          figures): 3-up once it has 320px, as #1052 tuned. Otherwise 3-up from 512px (room
           at the 28px `lg:` size). Stacked in between. */}
       <CardContent className="@container space-y-3">
-        <div className="grid grid-cols-1 gap-2.5 max-sm:@2xs:grid-cols-3 sm:gap-4 @lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-3 sm:gap-4 @lg:grid-cols-3">
           <StatCard
             label={t("distribution.cap")}
             value={money(d.holderAllowanceCap)}
@@ -177,7 +177,7 @@ export function VorabpauschaleRow({
     // Its own @container, like the FSA and forecast tiles: beside the rail the main column
     // is narrower than a phone while the figures are at their larger `sm:`/`lg:` sizes.
     <div className="@container">
-      <div className="grid grid-cols-1 gap-2.5 max-sm:@2xs:grid-cols-2 sm:gap-4 @lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-2 sm:gap-4 @lg:grid-cols-2">
         <StatCard
           label={t("vorabpauschale.accrued")}
           value={money(u.vorabpauschaleAccrued)}
