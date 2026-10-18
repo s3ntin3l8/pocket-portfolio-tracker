@@ -235,6 +235,31 @@ describe("seedDemo — FX rates (#989, #1006)", () => {
     }
   }, 60_000);
 
+  it("also covers EUR as the display currency (the DE tax screenshots), inverse of EUR→IDR", async () => {
+    await ensureDb();
+    await seedDemo();
+    const db = getDb();
+    const provider = {
+      getRate: vi.fn(async () => null),
+      getRateHistory: vi.fn(async () => ({})),
+    } satisfies FxProvider;
+    const dates = Array.from({ length: 400 }, (_, i) =>
+      toDateKey(new Date(Date.now() - i * 864e5)),
+    );
+    // Without IDR→EUR rows the IDR holdings drop out of every EUR total (the "Exchange rate
+    // missing" banner), since FX_PROVIDER=none leaves no live source to fill the pair.
+    const toEur = await getFxRatesForDates(db, ["IDR", "USD", "CAD"], "EUR", dates, provider);
+    const toIdr = await getFxRatesForDates(db, ["EUR"], "IDR", dates, provider);
+    expect(provider.getRate).not.toHaveBeenCalled();
+    expect(provider.getRateHistory).not.toHaveBeenCalled();
+    for (const d of dates) {
+      for (const ccy of ["IDR", "USD", "CAD"])
+        expect(toEur.get(d)?.[ccy], `${ccy}→EUR ${d}`).toBeTruthy();
+      const product = new Decimal(toEur.get(d)!.IDR!).mul(toIdr.get(d)!.EUR!);
+      expect(rel(product, 1).lt("1e-9"), `IDR→EUR × EUR→IDR ${d}`).toBe(true);
+    }
+  }, 60_000);
+
   it("is triangularly consistent: USD→EUR × EUR→IDR == USD→IDR (same for CAD)", async () => {
     await ensureDb();
     await seedDemo();

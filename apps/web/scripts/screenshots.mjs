@@ -21,6 +21,10 @@ import { mintSessionCookie } from "./mint-session.mjs";
  *
  * Auth: mints a forged Auth.js session cookie from the seeded personal-access token
  * (see `mint-session.mjs` for why this is safe and how it works); no real login.
+ *
+ * Writes: screens with `settings` (the tax shots) switch that user's display currency and
+ * tax regime for their capture and restore them afterwards, so this refuses a non-local
+ * SCREENSHOTS_WEB_URL unless SCREENSHOTS_ALLOW_REMOTE names its host (assertLocalWebUrl).
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,8 +50,133 @@ const SCREENS = [
   { slug: "activity", path: "/en/transactions" },
   { slug: "insights", path: "/en/insights", minCharts: 2 },
   { slug: "reports", path: "/en/reports" },
-  { slug: "tax", path: "/en/tax" },
+  // `settings`: user settings switched for this capture only, then restored (see
+  // withSettings). The German regime reads naturally in euros (the €1,000 allowance,
+  // Vorabpauschale), so the tax shots pin DE explicitly rather than relying on the API
+  // default, and show EUR while every other screen keeps the demo user's IDR.
+  { slug: "tax", path: "/en/tax", settings: { taxRegime: "DE", displayCurrency: "EUR" } },
 ];
+
+/**
+ * Where each per-screen setting lives: the same endpoints the app's own settings controls
+ * write (DisplayCurrency → PATCH /me, the regime toggle → PUT /me/preferences), reached
+ * through the same-origin backend proxy with the context's session cookie.
+ */
+const SETTING_ENDPOINTS = {
+  displayCurrency: { method: "PATCH", path: "/api/backend/me" },
+  taxRegime: { method: "PUT", path: "/api/backend/me/preferences" },
+};
+
+async function backend(request, method, apiPath, data) {
+  const res = await request.fetch(`${WEB_URL}${apiPath}`, { method, ...(data && { data }) });
+  if (!res.ok()) throw new Error(`${method} ${apiPath} failed with HTTP ${res.status()}`);
+  return res.json();
+}
+
+async function setSetting(request, key, value) {
+  const endpoint = SETTING_ENDPOINTS[key];
+  const updated = await backend(request, endpoint.method, endpoint.path, { [key]: value });
+  // String compare: the API may echo a coerced form (preferences return numbers/booleans).
+  if (String(updated[key]) !== String(value))
+    throw new Error(`setting ${key} to ${value} did not stick (API answered ${updated[key]})`);
+}
+
+/**
+ * Writes each recorded original back, every key even if one fails; returns the failures.
+ * Never re-reads: by now the current values are the temporary ones.
+ */
+async function restoreSettings(request, originals) {
+  const failures = [];
+  for (const [key, value] of Object.entries(originals)) {
+    try {
+      await setSetting(request, key, value);
+    } catch (err) {
+      failures.push(`could not restore ${key} to ${value}: ${err.message}`);
+    }
+  }
+  return failures;
+}
+
+/**
+ * Sets each setting, checking the API echoes it back; returns the values it replaced. If
+ * one fails, the ones already applied are put back before the error propagates.
+ */
+async function applySettings(request, settings) {
+  for (const key of Object.keys(settings))
+    if (!SETTING_ENDPOINTS[key]) throw new Error(`unknown screen setting "${key}"`);
+  const previous = {};
+  try {
+    for (const [key, value] of Object.entries(settings)) {
+      // Recorded before the write: a write that failed half-way is put back too.
+      previous[key] = (await backend(request, "GET", SETTING_ENDPOINTS[key].path))[key];
+      await setSetting(request, key, value);
+    }
+  } catch (err) {
+    // Best effort: the original failure is the one worth reporting.
+    for (const warning of await restoreSettings(request, previous)) console.warn(warning);
+    throw err;
+  }
+  return previous;
+}
+
+/**
+ * Runs `capture` with the screen's `settings` applied to the demo user, restoring the
+ * recorded originals afterwards (also when the capture throws), so later screens and the
+ * run order are unaffected. A setting that can't be applied fails the run rather than
+ * shipping a capture in the wrong currency/regime. A failed restore always fails the run
+ * (every later screen would render with the wrong settings); after a failed capture the
+ * error names both, with the capture's error as its cause.
+ */
+export async function withSettings(page, settings, capture) {
+  if (!settings) return capture();
+  const originals = await applySettings(page.request, settings);
+  let result;
+  try {
+    result = await capture();
+  } catch (err) {
+    const failures = await restoreSettings(page.request, originals);
+    if (failures.length === 0) throw err;
+    // Both, loudly: the instance is left on the temporary settings, and a later capture
+    // against it would take them for the originals.
+    throw new Error(`${err.message}; and then ${failures.join("; ")}`, { cause: err });
+  }
+  const failures = await restoreSettings(page.request, originals);
+  if (failures.length > 0) throw new Error(failures.join("; "));
+  return result;
+}
+
+/**
+ * The capture switches the signed-in user's settings (see withSettings), so it only runs
+ * against the local demo instance unless SCREENSHOTS_ALLOW_REMOTE names that exact host: a
+ * stray generic flag in a shell or CI env must not open every deployment.
+ */
+export function assertLocalWebUrl(url, env) {
+  const host = new URL(url).hostname;
+  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return;
+  if (env.SCREENSHOTS_ALLOW_REMOTE === host) return;
+  throw new Error(
+    `refusing to capture against ${host}: the script switches the signed-in user's display ` +
+      `currency and tax regime; set SCREENSHOTS_ALLOW_REMOTE=${host} to override`,
+  );
+}
+
+/**
+ * Headless Chromium on Linux hints glyphs by default, snapping their advances to the pixel
+ * grid. At the narrow (2x) captures' small text sizes that reads as gaps inside words
+ * ("Estimat ed", "Pocke t", "YT D") and swallowed word spaces; unhinted glyphs keep the
+ * font's own spacing, as a phone renders it. The switch is FreeType's, so Linux-only:
+ * elsewhere Chromium ignores it (see hintingWarning).
+ */
+export const CHROMIUM_ARGS = ["--font-render-hinting=none"];
+
+/** A warning when the hinting switch can't take effect on this platform, else null. */
+export function hintingWarning(platform) {
+  if (platform === "linux") return null;
+  return (
+    `--font-render-hinting=none only applies on Linux (this is ${platform}); the committed ` +
+    `captures are made on Linux, so text spacing here may differ from them`
+  );
+}
 
 const THEMES = ["light", "dark"];
 
@@ -227,10 +356,12 @@ async function captureReadmeInto(browser, cookie, secure, outDir) {
       });
       const page = await context.newPage();
       for (const screen of SCREENS) {
-        await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
-        await settle(page, screen);
         const filename = `${screen.slug}-${theme}-${factor.name}.png`;
-        await page.screenshot({ path: path.join(outDir, filename), fullPage: false });
+        await withSettings(page, screen.settings, async () => {
+          await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
+          await settle(page, screen);
+          await page.screenshot({ path: path.join(outDir, filename), fullPage: false });
+        });
         console.log(`captured ${filename}`);
         manifestEntries.push({
           filename,
@@ -335,12 +466,14 @@ async function captureLanding(browser, cookie, secure) {
     });
     const page = await context.newPage();
     for (const screen of SCREENS) {
-      await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
-      await settle(page, screen);
       const filename = `${screen.slug}-${factor.name}.png`;
       // Write-then-rename so a crashed run never leaves a half-written file.
       const tmp = path.join(outDir, `.${filename}`);
-      await page.screenshot({ path: tmp, fullPage: false });
+      await withSettings(page, screen.settings, async () => {
+        await page.goto(`${WEB_URL}${screen.path}`, { waitUntil: "networkidle" });
+        await settle(page, screen);
+        await page.screenshot({ path: tmp, fullPage: false });
+      });
       await rename(tmp, path.join(outDir, filename));
       written.push(filename);
       console.log(`captured ${filename}`);
@@ -352,6 +485,9 @@ async function captureLanding(browser, cookie, secure) {
 }
 
 async function main() {
+  assertLocalWebUrl(WEB_URL, process.env);
+  const hinting = hintingWarning(process.platform);
+  if (hinting) console.warn(hinting);
   if (!PAT_FILE) throw new Error("SCREENSHOTS_PAT_FILE env var is required");
   if (!AUTH_SECRET) throw new Error("AUTH_SECRET env var is required");
   if (!["readme", "landing"].includes(PROFILE))
@@ -366,7 +502,7 @@ async function main() {
     secure,
   });
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: CHROMIUM_ARGS });
   try {
     return PROFILE === "landing"
       ? await captureLanding(browser, cookie, secure)
