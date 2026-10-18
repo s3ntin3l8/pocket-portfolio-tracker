@@ -45,17 +45,23 @@ function ownerAlive(name: string, base: string): boolean {
  * killed), which a per-run path no longer overwrites. A dir goes only when it is
  * older than STALE_TEMPLATE_MS and its owning process is gone: the mtime freezes
  * once the template is built, so age alone would sweep a long watch session's.
+ * The fixed path older versions used (no pid) goes on age alone; a live older run
+ * rebuilds it at setup, which refreshes the mtime. `root` is for tests.
  */
-export function sweepStaleTemplates(now = Date.now()): string[] {
-  const dir = path.dirname(PGLITE_TEMPLATE_PREFIX);
+export function sweepStaleTemplates({
+  root = path.dirname(PGLITE_TEMPLATE_PREFIX),
+  now = Date.now(),
+}: { root?: string; now?: number } = {}): string[] {
   const base = path.basename(PGLITE_TEMPLATE_PREFIX);
+  const legacy = base.replace(/-$/, "");
   const swept: string[] = [];
-  for (const name of fs.readdirSync(dir)) {
-    if (!name.startsWith(base)) continue;
-    const full = path.join(dir, name);
+  for (const name of fs.readdirSync(root)) {
+    const isLegacy = name === legacy;
+    if (!isLegacy && !name.startsWith(base)) continue;
+    const full = path.join(root, name);
     try {
       if (now - fs.statSync(full).mtimeMs < STALE_TEMPLATE_MS) continue;
-      if (ownerAlive(name, base)) continue;
+      if (!isLegacy && ownerAlive(name, base)) continue;
       fs.rmSync(full, { recursive: true, force: true });
       swept.push(full);
     } catch {

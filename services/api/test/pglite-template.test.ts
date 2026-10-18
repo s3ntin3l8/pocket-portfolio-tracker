@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,24 +22,37 @@ it("seeds this file's database from the template", () => {
 });
 
 it("sweeps only stale template dirs whose owning run is gone", () => {
-  // A pid that is certainly not running: a child that has already exited.
-  const deadPid = spawnSync(process.execPath, ["-e", ""]).pid!;
-  const stale = fs.mkdtempSync(`${PGLITE_TEMPLATE_PREFIX}${deadPid}-`);
+  // A private root: the real tmpdir is shared with concurrent runs, whose own sweep
+  // could remove these fixtures first.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pglite-sweep-test-"));
+  const base = path.basename(PGLITE_TEMPLATE_PREFIX);
+  // Above Linux's maximum pid_max (2^22) and any macOS pid: never a live process.
+  const deadPid = 4_194_305;
+  const dir = (name: string) => {
+    const full = path.join(root, name);
+    fs.mkdirSync(full);
+    return full;
+  };
+  const stale = dir(`${base}${deadPid}-aaaaaa`);
   // Old, but owned by a live process (a long watch session): kept.
-  const watching = fs.mkdtempSync(`${PGLITE_TEMPLATE_PREFIX}${process.pid}-`);
-  const fresh = fs.mkdtempSync(`${PGLITE_TEMPLATE_PREFIX}${deadPid}-`);
+  const watching = dir(`${base}${process.pid}-bbbbbb`);
+  const fresh = dir(`${base}${deadPid}-cccccc`);
+  // The fixed path older versions used: no pid, so age alone decides.
+  const legacy = dir(base.replace(/-$/, ""));
+  const unrelated = dir("something-else");
   try {
     const old = (Date.now() - STALE_TEMPLATE_MS - 60_000) / 1000;
-    fs.utimesSync(stale, old, old);
-    fs.utimesSync(watching, old, old);
-    const swept = sweepStaleTemplates();
-    expect(swept).toContain(stale);
-    expect(fs.existsSync(stale)).toBe(false);
+    for (const d of [stale, watching, legacy, unrelated]) fs.utimesSync(d, old, old);
+    expect(sweepStaleTemplates({ root }).sort()).toEqual([legacy, stale].sort());
     expect(fs.existsSync(watching)).toBe(true);
     expect(fs.existsSync(fresh)).toBe(true);
-    // This run's own template is fresh, so it survives too.
-    expect(fs.existsSync(inject("pgliteTemplateDir")!)).toBe(true);
+    expect(fs.existsSync(unrelated)).toBe(true);
   } finally {
-    for (const dir of [stale, watching, fresh]) fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+it("never sweeps this run's own template", () => {
+  sweepStaleTemplates();
+  expect(fs.existsSync(inject("pgliteTemplateDir")!)).toBe(true);
 });

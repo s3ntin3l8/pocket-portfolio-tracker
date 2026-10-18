@@ -25,6 +25,17 @@ if (templateDir && fs.existsSync(templateDir)) {
 
 process.env.DATABASE_URL = `pglite://${tmpDir}`;
 
-afterAll(() => {
+afterAll(async () => {
+  // Close a database the file left open first: deleting the data dir under a live
+  // PGlite makes its pending I/O fail with ENOENT (errno 44) as an unhandled rejection
+  // that fails the whole run. Imported lazily, so files that never touch the DB don't
+  // load the client.
+  // Best-effort: some files mock the client module, so closeDb may be absent or a stub.
+  try {
+    const client = await import("../src/db/client.js");
+    await client.closeDb?.();
+  } catch {
+    // Nothing open, or nothing closable: the delete below is all that is left.
+  }
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
