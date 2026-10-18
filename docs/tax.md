@@ -315,10 +315,11 @@ when the payment is credited and convert it to IDR:
    holdings and net-worth views derive — over the portfolio's other transactions executed at
    or before the payment. Rows at the payment's own instant count (a sum doesn't depend on
    their order; a date-only import books a same-day deposit at the same midnight), which errs
-   toward the larger balance; the payment itself and later rows don't.
+   toward the larger balance; the payment itself and later rows don't. Per portfolio this is
+   one sorted walk over the ledger for all its payments (`idCashBalancesAtPayments`).
 2. `idDepositBalanceIdr` (core): every non-zero currency converted to IDR at the payment
-   date's rate and summed. `loadIdDepositFx` loads those rates once per request over every
-   portfolio's payment dates (`getFxRatesForDates`, carried forward/back like the history
+   date's rate and summed. `loadIdDepositFx` loads those rates once per account holder over
+   all of their portfolios' payment dates (`getFxRatesForDates`, carried forward/back like the history
    routes; cached rates only for a read-scoped PAT).
 3. `idDepositInterestExempt` (core): exempt when that total is between 0 and
    Rp7,500,000 inclusive. Zero counts as small: the balance is only known once explicit

@@ -194,6 +194,7 @@ export {
   idIncomeTaxRate,
   idIncomeWithheldAtSource,
   idCashBalancesBefore,
+  idCashBalancesAtPayments,
   idDepositBalanceIdr,
   idDepositInterestExempt,
   ID_INCOME_CATEGORIES,

@@ -46,7 +46,7 @@
 import { Decimal } from "decimal.js";
 import { D } from "./decimal.js";
 import type { TAXED_INCOME_TYPES } from "./categorization.js";
-import { cashBalances, isCashAccountMovement } from "./cash.js";
+import { cashBalances, cashFlow, isCashAccountMovement } from "./cash.js";
 import { tryConvert, type FxRateFn } from "./networth.js";
 import type { CoreTransaction } from "./types.js";
 
@@ -342,7 +342,8 @@ const ZERO = new Decimal(0);
  * use, never a second one — over every other transaction executed at or before it. Rows
  * at the very same instant are included (a per-currency sum doesn't depend on their order),
  * so a deposit booked on the payment's date-only timestamp counts; that errs toward the
- * larger balance, i.e. toward taxing.
+ * larger balance, i.e. toward taxing. `payment` is excluded by identity: pass the element of
+ * `transactions` itself, not a rebuilt copy (which would count into its own balance).
  *
  * null when the balance can't be known: before the first explicit cash-account movement
  * ({@link isCashAccountMovement}) the derived cash is only the sum of imported trades, not
@@ -357,6 +358,51 @@ export function idCashBalancesBefore(
   const before = transactions.filter((t) => t !== payment && t.executedAt.getTime() <= at);
   if (!before.some(isCashAccountMovement)) return null;
   return cashBalances(before);
+}
+
+/**
+ * {@link idCashBalancesBefore} for many payments of one portfolio in a single sorted walk
+ * (O(n log n) instead of a full ledger pass per payment), keyed by the payment rows passed
+ * in. Same result, payment by payment — `tax-id.test.ts` pins the parity.
+ */
+export function idCashBalancesAtPayments(
+  transactions: CoreTransaction[],
+  payments: CoreTransaction[],
+): Map<CoreTransaction, Record<string, string> | null> {
+  const out = new Map<CoreTransaction, Record<string, string> | null>();
+  const wanted = new Set(payments);
+  if (wanted.size === 0) return out;
+  const sorted = [...transactions].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
+  const totals = new Map<string, Decimal>();
+  let tracked = false;
+  for (let i = 0; i < sorted.length;) {
+    // One instant at a time: every row at the payment's instant counts, except the payment.
+    const at = sorted[i]!.executedAt.getTime();
+    let j = i;
+    for (; j < sorted.length && sorted[j]!.executedAt.getTime() === at; j++) {
+      const t = sorted[j]!;
+      totals.set(t.currency, (totals.get(t.currency) ?? ZERO).add(cashFlow(t)));
+      if (isCashAccountMovement(t)) tracked = true;
+    }
+    for (let k = i; k < j; k++) {
+      const p = sorted[k]!;
+      if (!wanted.has(p)) continue;
+      // The payment's own row is never a cash-account movement, so `tracked` holds as is.
+      if (!tracked) {
+        out.set(p, null);
+        continue;
+      }
+      const balances: Record<string, string> = {};
+      for (const [currency, total] of totals) {
+        balances[currency] = (
+          currency === p.currency ? total.minus(cashFlow(p)) : total
+        ).toString();
+      }
+      out.set(p, balances);
+    }
+    i = j;
+  }
+  return out;
 }
 
 /**

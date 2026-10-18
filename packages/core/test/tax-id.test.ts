@@ -12,6 +12,7 @@ import {
   ID_FUND_DISTRIBUTION_TAX_RATE,
   ID_DEPOSIT_EXEMPT_BALANCE_IDR,
   idCashBalancesBefore,
+  idCashBalancesAtPayments,
   idDepositBalanceIdr,
   idDepositInterestExempt,
   type IdIncomeInput,
@@ -799,6 +800,30 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
       expect(idr).toBe("7800000");
       expect(idDepositInterestExempt(idr)).toBe(false);
       expect(idDepositInterestExempt(idDepositBalanceIdr({ IDR: "7000000" }, fx))).toBe(true);
+    });
+
+    it("gives every payment the same balance in one walk as one by one", () => {
+      const txns = [
+        tx("interest", "50", "IDR", "2025-12-31"), // before any cash movement: unknown
+        tx("deposit", "7000000", "IDR", "2026-01-02"),
+        tx("deposit", "50", "USD", "2026-01-31"),
+        tx("interest", "1000", "IDR", "2026-01-31"),
+        tx("interest", "2", "USD", "2026-01-31"),
+        tx("withdrawal", "300000", "IDR", "2026-02-10"),
+        tx("interest", "900", "IDR", "2026-02-28"),
+      ].reverse(); // unsorted input
+      const payments = txns.filter((t) => t.type === "interest");
+      const walked = idCashBalancesAtPayments(txns, payments);
+      expect(walked.size).toBe(payments.length);
+      for (const p of payments) {
+        const one = idCashBalancesBefore(txns, p);
+        const many = walked.get(p) ?? null;
+        expect(many === null ? null : idDepositBalanceIdr(many, fx)).toBe(
+          one === null ? null : idDepositBalanceIdr(one, fx),
+        );
+        expect(many === null).toBe(one === null);
+      }
+      expect(walked.get(txns.find((t) => t.price === "50" && t.type === "interest")!)).toBeNull();
     });
 
     it("is unknown when a currency has no rate into IDR, unless its balance is zero", () => {
