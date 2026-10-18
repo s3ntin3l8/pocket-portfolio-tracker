@@ -92,6 +92,9 @@ describe("screenshots script — dev indicator", () => {
     expect(devOverlayHasIssues()).toBe(false);
     root.innerHTML = '<div data-issues="true"><button>1 Issue</button></div>';
     expect(devOverlayHasIssues()).toBe(true);
+    // The selector, not the label, drives the verdict: the insights-only pill counts too.
+    root.innerHTML = '<div data-issues="true"><button>1 Insight</button></div>';
+    expect(devOverlayHasIssues()).toBe(true);
     root.innerHTML = "<div>Issues 2</div>";
     expect(devOverlayHasIssues()).toBe(true);
     portal.remove();

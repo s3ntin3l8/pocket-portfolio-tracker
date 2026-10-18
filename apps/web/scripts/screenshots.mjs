@@ -123,8 +123,10 @@ function pendingConditions(min) {
 export const DEV_INDICATOR_HIDE_CSS = "nextjs-portal { display: none !important; }";
 
 /**
- * Whether the Next dev overlay is reporting an issue (a runtime/build error on the
- * page). Evaluated in the page. Couples to the vendored next-devtools markup: the
+ * Whether the Next dev overlay is showing its issues pill — a runtime/build error on
+ * the page, or an "insight" (e.g. a vulnerability notice) folded into the same pill.
+ * Either way the capture would hide something the overlay wanted seen. Evaluated in
+ * the page. Couples to the vendored next-devtools markup: the
  * issues pill is a `[data-issues]` element (label "Issue"/"Issues" + count) inside
  * the `<nextjs-portal>` shadow root; "No issues" (lower-case) is not a hit. If Next
  * renames these, the check turns vacuous rather than failing captures.
@@ -179,7 +181,9 @@ export async function settle(page, { slug, minCharts = 0 }) {
   // Hiding the portal would also hide the overlay's error signal, so a page with a
   // dev error must fail the run here instead of shipping a clean-looking capture.
   if (await page.evaluate(devOverlayHasIssues))
-    throw new Error(`${slug}: the Next dev overlay reports an issue — fix the page error first`);
+    throw new Error(
+      `${slug}: the Next dev overlay reports an issue or insight — check it before capturing`,
+    );
   await hideDevIndicator(page);
 }
 
