@@ -288,6 +288,7 @@ export async function instrumentMeta(
         assetClass: i.assetClass,
         unit: i.unit,
         market: i.market,
+        isin: i.isin ?? null,
         sector: i.sector ?? null,
         sectorWeights: (i.sectorWeights as Record<string, number> | null) ?? null,
         countryWeights: (i.countryWeights as Record<string, number> | null) ?? null,

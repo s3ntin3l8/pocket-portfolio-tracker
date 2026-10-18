@@ -126,7 +126,7 @@ export function HarvestRow({
 }
 
 // ---------------------------------------------------------------------------
-// Indonesian final-tax tables (IdDividendsTable, IdByYearTable) live in
+// Indonesian final-tax tables (IdIncomeTable, IdForeignIncomeTable, IdByYearTable) live in
 // ./tax-tables.tsx alongside their German counterparts — both regimes' tables need
 // client-side sort state, so they share a "use client" module. This file stays a
 // server component for the non-table bits (hero card, allowance boxes, harvest

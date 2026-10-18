@@ -3,13 +3,13 @@ import { EstimatedTaxHero, type TaxTranslator } from "@/components/tax/tax-cards
 import {
   DividendsTable,
   ByYearTable,
-  IdDividendsTable,
+  IdIncomeTable,
+  IdForeignIncomeTable,
   IdByYearTable,
 } from "@/components/tax/tax-tables";
 import { DisposalTable, IdSalesTable } from "@/components/tax/disposal-table";
 import type { TaxYearDetail } from "@/lib/server-api";
 import { formatMoneyCompact } from "@/lib/utils";
-import type { IndonesianFinalTax } from "@portfolio/core";
 
 /** Per-holder DE detail tables (DisposalTable + DividendsTable + ByYearTable). */
 export function TaxHolderDetailDE({
@@ -63,13 +63,10 @@ export function TaxHolderSectionId({
   t: TaxTranslator;
 }) {
   const moneyCompact = (n: string | number) => formatMoneyCompact(Number(n), currency, locale);
-  // Indonesian final-tax breakdown is now computed server-side by /portfolios/:id/tax;
-  // consuming detail.indonesianFinalTax directly (no client-side recompute) keeps the
-  // API as the single source of truth. The cast bridges the api-client's structural
-  // shape (lots typed loosely as unknown[]) to the @portfolio/core type the ID tables
-  // accept.
-  const idTax = detail?.indonesianFinalTax as unknown as
-    (IndonesianFinalTax & { lots?: unknown }) | undefined;
+  // Indonesian final-tax breakdown, computed server-side by /portfolios/:id/tax and
+  // /networth/tax; consumed as-is (no client-side recompute), so the API stays the single
+  // source of truth.
+  const idTax = detail?.indonesianFinalTax;
   if (!idTax) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -78,13 +75,19 @@ export function TaxHolderSectionId({
     );
   }
 
+  const domesticIncome = idTax.income.filter((r) => r.category !== "foreign");
+  const foreignIncome = idTax.income.filter((r) => r.category === "foreign");
+
   return (
     <>
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <EstimatedTaxHero
           label={t("id.hero.estimatedTax", { year })}
           value={moneyCompact(idTax.estimatedTax)}
-          description={t("id.hero.estimatedTaxDesc")}
+          description={t("id.hero.estimatedTaxDesc", {
+            withheld: moneyCompact(idTax.taxWithheldAtSource),
+            selfPay: moneyCompact(idTax.taxToSelfPay),
+          })}
         />
         <StatCard
           label={t("id.hero.salesTax")}
@@ -93,12 +96,13 @@ export function TaxHolderSectionId({
         />
         <StatCard
           label={t("id.hero.dividendTax")}
-          value={money(idTax.totalDividendTax)}
-          delta={t("id.hero.dividendTaxDesc", { amount: money(idTax.totalDividendGross) })}
+          value={money(idTax.totalIncomeTax)}
+          delta={t("id.hero.dividendTaxDesc", { amount: money(idTax.totalIncomeGross) })}
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Stacked: the income table's five columns don't fit a half-width card. */}
+      <div className="grid gap-4">
         <IdSalesTable
           rows={idTax.disposals}
           totalProceeds={idTax.totalProceeds}
@@ -107,16 +111,24 @@ export function TaxHolderSectionId({
           locale={locale}
           year={year}
         />
-        <IdDividendsTable
-          rows={idTax.dividends}
-          totalDividendGross={idTax.totalDividendGross}
-          totalDividendTax={idTax.totalDividendTax}
-          totalDividendNet={idTax.totalDividendNet}
+        <IdIncomeTable
+          rows={domesticIncome}
+          totalIncomeGross={idTax.totalIncomeGross}
+          totalIncomeTax={idTax.totalIncomeTax}
+          totalIncomeNet={idTax.totalIncomeNet}
           currency={currency}
           locale={locale}
           year={year}
         />
       </div>
+
+      <IdForeignIncomeTable
+        rows={foreignIncome}
+        foreignIncomeGross={idTax.foreignIncomeGross}
+        foreignTaxWithheld={idTax.foreignTaxWithheld}
+        currency={currency}
+        locale={locale}
+      />
 
       <IdByYearTable rows={idTax.byYear} currency={currency} locale={locale} />
 

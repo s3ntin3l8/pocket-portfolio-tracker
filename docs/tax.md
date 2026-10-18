@@ -17,8 +17,8 @@ override.
 - **`"DE"`** — German Sparerpauschbetrag/Kapitalertragsteuer logic
   (`packages/core/src/tax.ts`), realization-based: tax depends on _closed_ gains,
   netted against a per-holder annual allowance.
-- **`"ID"`** — Indonesian final-tax logic (`packages/core/src/tax-id.ts`): a flat rate
-  applied to _gross proceeds/income_, withheld at source, with no allowance or
+- **`"ID"`** — Indonesian final-tax logic (`packages/core/src/tax-id.ts`): fixed final
+  rates on _gross proceeds_ and on each _type_ of investment income, with no allowance or
   loss-netting concept at all.
 
 **Ordering gotcha:** `GET /portfolios/:id/sparplan` (`services/api/src/routes/
@@ -253,36 +253,91 @@ coupons), falling back to the realized `remaining` otherwise.
 
 ## Indonesian final-tax regime (`packages/core/src/tax-id.ts`)
 
-A flat, **withheld-at-source** tax with no annual allowance, no loss-netting, and no
-realization dependency on when a gain was locked in — it taxes _proceeds and gross
-income_, not gains:
+Final taxes for a **resident individual**, with no annual allowance, no loss-netting and no
+dependency on when a gain was locked in. They tax _proceeds and gross income_, not gains,
+and the rate depends on the type and the source of the income:
 
-| Event                         | Rate     | Base                                                                     |
-| ----------------------------- | -------- | ------------------------------------------------------------------------ |
-| Disposal of IDX-listed shares | **0.1%** | Gross sale proceeds (not gain)                                           |
-| Dividend / coupon income      | **10%**  | Gross amount (net received + any withholding already on the transaction) |
+| Event (category)                                                        | Rate     | Base                                  | Who pays                                     | Rule                                                                                           |
+| ----------------------------------------------------------------------- | -------- | ------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Sale of IDX-listed shares                                               | **0.1%** | Gross sale proceeds (not gain)        | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                       |
+| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374 |
+| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before)                                               |
+| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018                                     |
+| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                            |
+| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                           |
 
-The 0.1% sales tax is scoped to `market === "IDX" && assetClass === "equity"`
-(`computeIndonesianFinalTaxFromTradeLog` in `services/api/src/routes/transactions/
-tax-helpers.ts`); gold, crypto, foreign-listed ETFs/stocks and bonds incur none, in both
-the per-disposal rows and the by-year rollup. Dividend rows are display-currency
-amounts and are labelled with the display currency (not the transaction's native one).
+`estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
+`taxWithheldAtSource` (sales, bond and bank interest: the payer already withheld it) and
+`taxToSelfPay` (domestic dividends). The Tax page shows both in the hero card and labels each
+income row "withheld at source" or "you pay", so withheld tax doesn't read as tax still owed.
 
-**Design-fidelity note (intentional):** dividend/coupon tax is always computed as
-`gross × 10%`, ignoring whatever a broker may have already withheld on the underlying
-transaction. This mirrors the flat-estimate framing used for the German path too ("an
-estimate, not a filed tax figure") — it is not meant to net against real withholding, so
-it isn't a bug to "fix" if the numbers don't match a real Indonesian tax bill.
+**Exemptions not modelled, stated as notes instead:**
 
-Realized gain (`IdYearInput.realized` / `IdDisposalLot.gain`) is carried through the
-output purely for display — it's informational, since ID final tax is never actually
-levied on gains.
+- **Dividends reinvested in Indonesia for at least 3 tax years are exempt** (Art. 4(3)(f);
+  the investment is due by the end of March of the following year, PMK 18/2021 Art. 36).
+  Pocket can't tell whether the user reinvested, so the 10% is shown with that note.
+- **Bank interest is exempt when the deposit and savings balance is at most Rp7,500,000**
+  (PMK 212/2018 Art. 7(a); PP 131/2000 Art. 3(1)(a) excludes balances split to stay under
+  it). Pocket doesn't apply it: the test is the balance held at the bank when the interest
+  accrues, a portfolio isn't a bank (several portfolios can be one bank, and the brokerage
+  is free text), and Pocket's cash figure is a point-in-time derivation that is only
+  complete for cash-inside portfolios. A recorded withholding can't signal the exemption
+  either (a recorded 0 looks the same as none recorded), so the note explains it instead
+  of guessing. An individual whose total annual income is at or below PTKP can also
+  reclaim the tax (PMK 212 Art. 2(3)–(4)).
+- **Foreign dividends reinvested in Indonesia** can be exempt to the amount reinvested
+  (PMK 18/2021). Foreign income stays out of the estimate either way.
 
-Unlike the DE path, this module has no dedicated API route. It's computed directly in
-the web app's server components (`apps/web/src/app/[locale]/(app)/tax/
-tax-detail-section.tsx`, `apps/web/src/app/[locale]/(app)/reports/page.tsx`) from a
-trade log that page already loaded, since the computation is a stateless roll-up with no
-allowance/carry-forward state to fetch.
+### How a row is classified (`classifyIdIncome`)
+
+"Domestic" is decided by the **paying instrument**, not the transaction currency: an
+instrument is Indonesian when its market is `IDX` (the predicate the 0.1% sales tax already
+uses; Indonesian government retail bonds are booked on that market) or its ISIN starts with
+`ID`. Currency would misfile an Indonesian issuer paying in USD or a US stock paying in IDR,
+and the portfolio's brokerage is free text. Then:
+
+1. not Indonesian → `foreign`;
+2. a `mutual_fund` or `etf` → `fund_distribution`;
+3. a `coupon`, or any income on a `bond` → `bond_interest`;
+4. a `dividend` → `domestic_dividend`;
+5. other interest → `deposit_interest`.
+
+**Cash interest** (no instrument) has only its currency to go on: IDR interest is treated as
+interest from an Indonesian bank (20%), interest in any other currency as foreign. A
+foreign-currency deposit at an Indonesian bank is also 20% final under PMK 212/2018, so it
+is under-counted here; the foreign-income note says so. An instrument with no metadata row
+is treated as foreign rather than guessed.
+
+### Recorded withholding
+
+For the two categories withheld at source (bond and bank interest) a withholding recorded on
+the transaction **is** the tax figure (`taxBasis: "recorded"`, or `"mixed"` when only some of
+a row's transactions carry one); the statutory rate applies only when none is recorded. That
+also covers coupons withheld at the old 15% before PP 91/2021. A domestic dividend is always
+`gross × 10%`: nothing is withheld for a resident individual, so a recorded tax there is not
+Indonesian tax. For foreign income the recorded withholding is reported as
+`foreignTaxWithheld` (the creditable amount). Gross is always net received + recorded
+withholding, converted to the report currency at today's rate.
+
+### By year
+
+`byYear` rolls up every year: proceeds × 0.1% plus each year's Indonesian income at its
+category's rate (`income`), with foreign income in its own column (`foreignIncome`) and not
+in `tax`. Prior years use today's rates and FX (the 15% → 10% bond change of 2021 is not
+replayed unless the withholding is recorded) — like the German table, it is an estimate.
+
+Realized gain (`IdYearInput.realized` / `IdDisposalLot.gain`) is carried through the output
+purely for display — it's informational, since ID final tax is never levied on gains.
+
+### Where it is computed
+
+`computeIndonesianFinalTaxFromTradeLog` (`services/api/src/routes/transactions/
+tax-helpers.ts`) builds the inputs from the trade log and the raw transactions:
+`/portfolios/:id/tax` per portfolio (base currency) and `/networth/tax` per holder (display
+currency). The web consumes that payload (`indonesianFinalTax`) and never recomputes it; the
+default all-portfolios view combines the holders with `mergeIndonesianFinalTax`. Both the
+0.1% sales tax scope (`market === "IDX" && assetClass === "equity"`) and the income
+classification apply to the per-row detail and the by-year rollup alike.
 
 ## `costBasisMode` — not a tax setting
 
@@ -312,6 +367,18 @@ regime only" caveat. **Keep that text in sync with this document** when the rule
 - `packages/core/src/tax.ts` — German Sparerpauschbetrag/Teilfreistellung/two-pot
   netting/Vorabpauschale/harvest logic.
 - `packages/core/src/tax-id.ts` — Indonesian final-tax logic.
+- Indonesian sources (checked October 2026; the government JDIH sites were not reachable,
+  so the PP texts are DDTC's reproductions):
+  - PMK 212/PMK.03/2018 (deposit interest, Rp7.5M):
+    https://www.pajak.go.id/sites/default/files/2019-06/212_PMK.03_2018Per.pdf
+  - PP 131/2000: https://perpajakan.ddtc.co.id/sumber-hukum/peraturan-pusat/peraturan-pemerintah-131-tahun-2000
+  - PP 91/2021 (bond interest 10%):
+    https://perpajakan.ddtc.co.id/sumber-hukum/peraturan-pusat/peraturan-pemerintah-91-tahun-2021
+  - Domestic dividends, reinvestment and self-payment (PMK 18/2021, PMK 81/2024):
+    https://news.ddtc.co.id/berita/nasional/1817070/dividen-tak-diinvestasikan-sesuai-aturan-harus-setor-pph-ini-caranya
+  - Foreign dividends: https://news.ddtc.co.id/berita/nasional/1802109/dividen-luar-negeri-juga-dikecualikan-dari-pph-begini-prosedurnya
+  - IDX sales tax reporting under PMK 81/2024:
+    https://news.ddtc.co.id/berita/nasional/1807703/pmk-812024-perinci-ketentuan-bukti-potong-pph-atas-penjualan-saham
 - `packages/core/src/trade-log.ts` — `Trade.vorabByYear` / `TradeLeg.vorabCredit`
   (Vorabpauschale share-accounting), FIFO/average trade-log construction.
 - `packages/core/src/valuation.ts` — `CostBasisMode`.

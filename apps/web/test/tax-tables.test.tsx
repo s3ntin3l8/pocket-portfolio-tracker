@@ -5,7 +5,7 @@ import messages from "../messages/en.json";
 import {
   DividendsTable,
   ByYearTable,
-  IdDividendsTable,
+  IdIncomeTable,
   IdByYearTable,
 } from "../src/components/tax/tax-tables";
 
@@ -64,17 +64,26 @@ describe("ByYearTable sorting", () => {
   });
 });
 
-describe("IdDividendsTable sorting", () => {
+describe("IdIncomeTable sorting", () => {
   it("sorts by Gross descending on click", () => {
+    const row = (symbol: string, gross: string, tax: string, net: string) => ({
+      symbol,
+      currency: "IDR",
+      category: "domestic_dividend" as const,
+      rate: "0.10",
+      gross,
+      tax,
+      net,
+      withheldAtSource: false,
+      taxBasis: "estimated" as const,
+      foreignTaxWithheld: null,
+    });
     wrap(
-      <IdDividendsTable
-        rows={[
-          { symbol: "BBCA", currency: "IDR", gross: "100000", tax: "10000", net: "90000" },
-          { symbol: "BMRI", currency: "IDR", gross: "500000", tax: "50000", net: "450000" },
-        ]}
-        totalDividendGross="600000"
-        totalDividendTax="60000"
-        totalDividendNet="540000"
+      <IdIncomeTable
+        rows={[row("BBCA", "100000", "10000", "90000"), row("BMRI", "500000", "50000", "450000")]}
+        totalIncomeGross="600000"
+        totalIncomeTax="60000"
+        totalIncomeNet="540000"
         currency={CURRENCY}
         locale={LOCALE}
         year={2026}
@@ -106,8 +115,20 @@ describe("IdByYearTable sorting", () => {
     wrap(
       <IdByYearTable
         rows={[
-          { year: 2025, realized: "1940000", dividends: "2110000", tax: "212940" },
-          { year: 2026, realized: "324000", dividends: "1284000", tax: "128724" },
+          {
+            year: 2025,
+            realized: "1940000",
+            income: "2110000",
+            foreignIncome: "0",
+            tax: "212940",
+          },
+          {
+            year: 2026,
+            realized: "324000",
+            income: "1284000",
+            foreignIncome: "0",
+            tax: "128724",
+          },
         ]}
         currency={CURRENCY}
         locale={LOCALE}

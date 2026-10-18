@@ -1220,71 +1220,93 @@ describe("loadTaxYearDetail", () => {
     expect((await api.loadTaxYearDetail(holders, 2026)).size).toBe(0);
   });
 
-  it("populates idByYear with per-year PROCEEDS (not just gain) across every year the trade log covers, not just the selected year", async () => {
-    h.client.listPortfolios = async () => PF;
-    h.cookies = { pf: "p1" };
-    h.client.getTrades = async () => ({
+  it("ID aggregate scope: merges every holder's final-tax payload, foreign income kept apart", async () => {
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "IDR", accountHolderId: "h1" },
+      { id: "p2", name: "B", baseCurrency: "IDR", accountHolderId: "h2" },
+    ];
+    h.cookies = {};
+    h.client.getPreferences = async () => ({ taxRegime: "ID" });
+    const getNetWorthTrades = vi.fn(async () => ({
       displayCurrency: "IDR",
-      trades: [
-        {
-          instrumentId: "i1",
-          instrument: { symbol: "BBNI", name: "BBNI", assetClass: "equity", market: "IDX" },
-          legs: [
-            {
-              acqDate: "2025-01-01",
-              sellDate: "2026-05-18",
-              quantity: "10",
-              cost: "1000",
-              proceeds: "1640",
-              gain: "640",
-              holdingDays: 100,
-              longTerm: false,
-              taxYear: 2026,
-            },
-            {
-              acqDate: "2024-01-01",
-              sellDate: "2025-06-01",
-              quantity: "5",
-              cost: "400",
-              proceeds: "500",
-              gain: "100",
-              holdingDays: 200,
-              longTerm: true,
-              taxYear: 2025,
-            },
-          ],
-        },
-      ],
-      realizedByYear: [
-        { year: 2025, amount: "100" },
-        { year: 2026, amount: "640" },
-      ],
-      dividendsByYear: [
-        { year: 2025, amount: "180", tax: "20" },
-        { year: 2026, amount: "133", tax: "15" },
-      ],
-    });
+      trades: [],
+      realizedByYear: [],
+      dividendsByYear: [],
+    }));
+    h.client.getNetWorthTrades = getNetWorthTrades;
     h.client.listIncomeByYear = async () => [];
+    const row = (o: Record<string, unknown>) => ({
+      symbol: "X",
+      currency: "IDR",
+      rate: "0.10",
+      net: null,
+      withheldAtSource: false,
+      taxBasis: "estimated",
+      foreignTaxWithheld: null,
+      ...o,
+    });
+    // Each holder's payload as the API computes it (core `indonesianFinalTax`).
+    const payload = (income: Record<string, unknown>[], salesTax: string) => ({
+      disposals: [],
+      totalProceeds: "0",
+      totalSalesTax: salesTax,
+      income,
+      byYear: [],
+    });
+    h.client.getNetworthTax = async () => [
+      {
+        holder: { id: "h1" },
+        currency: "IDR",
+        indonesianFinalTax: payload(
+          [
+            row({ symbol: "BBCA", category: "domestic_dividend", gross: "1000", tax: "100" }),
+            row({
+              symbol: "AAPL",
+              category: "foreign",
+              rate: null,
+              gross: "500",
+              tax: null,
+              foreignTaxWithheld: "75",
+            }),
+          ],
+          "10",
+        ),
+      },
+      {
+        holder: { id: "h2" },
+        currency: "IDR",
+        indonesianFinalTax: payload(
+          [
+            row({
+              symbol: "interest",
+              category: "deposit_interest",
+              rate: "0.20",
+              gross: "200",
+              tax: "40",
+              withheldAtSource: true,
+            }),
+          ],
+          "0",
+        ),
+      },
+    ];
 
     const holders = [
-      {
-        holder: { id: "p1" },
-        year: 2026,
-        allowanceUsage: baseUsage,
-        harvestSuggestions: [],
-        distribution: {},
-      },
+      { holder: { id: "__id_all_portfolios__" }, year: 2026, harvestSuggestions: [] },
     ] as unknown as TaxSummaryHolder[];
-
-    const detail = (await api.loadTaxYearDetail(holders, 2026)).get("p1")!;
-    expect(detail.idByYear).toEqual(
-      expect.arrayContaining([
-        // 2025's proceeds (500) come from the leg OUTSIDE the selected year — proof
-        // this is a real across-year rollup, not just the selected year's disposals.
-        { year: 2025, proceeds: "500.00", dividendGross: "200.00", realized: "100" },
-        { year: 2026, proceeds: "1640.00", dividendGross: "148.00", realized: "640" },
-      ]),
-    );
+    const detail = (await api.loadTaxYearDetail(holders, 2026)).get("__id_all_portfolios__")!;
+    const id = detail.indonesianFinalTax!;
+    expect(id.income.map((r) => r.symbol)).toEqual(["BBCA", "AAPL", "interest"]);
+    expect(id.totalIncomeGross).toBe("1200.00");
+    expect(id.totalIncomeTax).toBe("140.00");
+    expect(id.foreignIncomeGross).toBe("500.00");
+    expect(id.foreignTaxWithheld).toBe("75.00");
+    expect(id.estimatedTax).toBe("150.00");
+    expect(id.taxWithheldAtSource).toBe("50.00");
+    expect(id.taxToSelfPay).toBe("100.00");
+    // The sentinel is never sent to the API as a holder id (it 500'd there and blanked the
+    // whole ID detail).
+    expect(getNetWorthTrades).toHaveBeenCalledWith("fifo", undefined, undefined);
   });
 
   it("ID_ALL_PORTFOLIOS aggregate sentinel resolves to every portfolio in scope (not grouped by account holder)", async () => {

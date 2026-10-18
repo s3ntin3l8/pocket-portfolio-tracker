@@ -130,10 +130,10 @@
       "metricIncome": "Pendapatan investasi YTD",
       "tooltipUsed": "Terpakai",
       "tooltipAllowance": "Batas",
-      "idTrend": "Dipotong di sumber",
+      "idTrend": "Pajak final",
       "idCaption": "Estimasi pajak final tahun ini",
       "idMetricSales": "Penjualan saham YTD",
-      "idMetricDividends": "Pendapatan investasi YTD"
+      "idMetricDividends": "Pendapatan investasi dalam negeri YTD"
     },
     "documents": {
       "title": "Laporan pajak",
@@ -1364,7 +1364,7 @@
     "taxCodeGermany": "Jerman",
     "taxCodeIndonesia": "Indonesia",
     "investingTaxNoteDe": "Pelacakan keringanan Sparerpauschbetrag, estimasi Abgeltungsteuer, dan saran panen rugi di layar Pajak.",
-    "investingTaxNoteId": "Pajak final 0,1% atas penjualan saham dan 10% atas dividen, keduanya dipotong di sumber — lihat layar Pajak.",
+    "investingTaxNoteId": "Pajak final: 0,1% atas penjualan saham, 10% atas dividen dalam negeri dan bunga obligasi, 20% atas bunga bank — lihat layar Pajak.",
     "retirementLabel": "Pensiun",
     "retirementAge": "Target usia pensiun",
     "retirementAgeHint": "Digunakan untuk menghitung tahun menuju pensiun di panel proyeksi.",
@@ -2164,11 +2164,11 @@
       "subtitle": "Pajak final Indonesia · {year}",
       "hero": {
         "estimatedTax": "Estimasi pajak · {year}",
-        "estimatedTaxDesc": "Dipotong di sumber — tidak perlu dilaporkan",
+        "estimatedTaxDesc": "{withheld} dipotong di sumber · {selfPay} disetor sendiri",
         "salesTax": "Pajak penjualan · 0,1%",
         "salesTaxDesc": "atas {amount} penjualan saham",
-        "dividendTax": "Pajak pendapatan investasi · 10%",
-        "dividendTaxDesc": "atas {amount} penghasilan"
+        "dividendTax": "Pajak pendapatan investasi · tarif per jenis",
+        "dividendTaxDesc": "atas {amount} penghasilan dalam negeri"
       },
       "sales": {
         "title": "Penjualan saham · final 0,1%",
@@ -2178,23 +2178,50 @@
         "total": "Total",
         "empty": "Tidak ada penjualan di {year}."
       },
-      "dividendsTable": {
-        "title": "Pendapatan investasi · final 10%",
+      "incomeTable": {
+        "title": "Pendapatan investasi · pajak final per jenis",
         "source": "Sumber",
+        "type": "Jenis",
         "gross": "Bruto",
         "tax": "Pajak",
         "net": "Neto",
         "total": "Total",
-        "empty": "Tidak ada pendapatan investasi di {year}."
+        "empty": "Tidak ada pendapatan investasi dalam negeri di {year}.",
+        "withheld": "dipotong di sumber",
+        "withheldRecorded": "dipotong (sesuai catatan)",
+        "withheldMixed": "dipotong (sebagian sesuai catatan)",
+        "selfPay": "setor sendiri",
+        "notTaxed": "bukan objek pajak"
+      },
+      "category": {
+        "domestic_dividend": "Dividen",
+        "bond_interest": "Bunga obligasi",
+        "deposit_interest": "Bunga bank",
+        "fund_distribution": "Pembagian reksa dana"
+      },
+      "notes": {
+        "domestic_dividend": "Dividen dari perusahaan Indonesia: final 10%, disetor sendiri paling lambat tanggal 15 bulan berikutnya. Dikecualikan jika diinvestasikan kembali di Indonesia paling sedikit 3 tahun.",
+        "bond_interest": "Bunga obligasi, termasuk ORI dan SBR: final 10%, dipotong oleh penerbit atau kustodian.",
+        "deposit_interest": "Bunga bank dalam rupiah: final 20%, dipotong oleh bank. Bunga dikecualikan selama saldo deposito dan tabungan paling banyak Rp7,5 juta; Pocket tidak dapat melihat saldo itu, jadi pengecualian ini tidak diterapkan. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
+        "fund_distribution": "Pembagian hasil reksa dana dan ETF bukan objek pajak bagi pemegang unit."
+      },
+      "foreignTable": {
+        "title": "Penghasilan luar negeri · tidak termasuk estimasi",
+        "source": "Sumber",
+        "gross": "Bruto",
+        "foreignTax": "Pajak luar negeri dipotong",
+        "total": "Total",
+        "note": "Dikenakan tarif progresif Anda (5–35%) dalam SPT Tahunan, dengan kredit atas pajak luar negeri yang dipotong. Dividen luar negeri yang diinvestasikan kembali di Indonesia dapat dikecualikan. Bunga dalam mata uang selain rupiah dicantumkan di sini meskipun berasal dari bank di Indonesia, yang seharusnya final 20%."
       },
       "byYear": {
         "title": "Per tahun",
         "year": "Tahun",
         "realized": "Keuntungan terealisasi",
-        "dividends": "Pendapatan investasi",
+        "income": "Pendapatan investasi dalam negeri",
+        "foreignIncome": "Penghasilan luar negeri",
         "tax": "Est. pajak"
       },
-      "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan 10% atas dividen, keduanya dipotong di sumber — jadi tidak ada yang perlu dilaporkan lagi, dan tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",
+      "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan pajak final per jenis atas pendapatan investasi. Pajak penjualan dan pajak bunga dipotong di sumber; pajak dividen disetor sendiri kecuali diinvestasikan kembali. Penghasilan luar negeri tidak dikenakan pajak final dan tidak termasuk estimasi ini. Tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",
       "unavailable": "Rincian pajak Indonesia tidak tersedia."
     },
     "vorabpauschale": {
@@ -2357,7 +2384,7 @@
         "headline": "Logika pajak yang sesuai tempat tinggal Anda.",
         "sub": "Jerman atau Indonesia — Pocket menerapkan aturan yang tepat secara otomatis.",
         "bulletDe": "Pelacakan Sparerpauschbetrag + saran harvesting Abgeltungsteuer",
-        "bulletId": "0,1% atas penjualan, 10% atas dividen — dipotong di sumber",
+        "bulletId": "0,1% atas penjualan, 10–20% atas pendapatan per jenis",
         "bulletChange": "Ubah ini kapan saja di Pengaturan"
       },
       "portfolio": {
@@ -2428,7 +2455,7 @@
       },
       "id": {
         "name": "Indonesia",
-        "desc": "Pajak final atas keuntungan yang direalisasikan dan pendapatan bunga."
+        "desc": "Pajak final atas hasil penjualan saham dan atas pendapatan investasi, dengan tarif per jenis penghasilan."
       }
     },
     "portfolio": {
