@@ -441,6 +441,9 @@ describe("ai-tools", () => {
     const out = await byName("get_fsa_allocation").handler({});
     (client as unknown as Record<string, unknown>).getPortfolioTax = orig;
     expect(JSON.stringify(out)).not.toContain("Mustermann");
+    // The cap/allocations carry their unit (EUR), distinct from the depot's own currency.
+    const holders = (out as { holders: { holderDistribution: { currency?: string } }[] }).holders;
+    expect(holders[0]!.holderDistribution.currency).toBe("EUR");
   });
 
   it("get_fsa_allocation filters by holder and turns a failed depot into an error code", async () => {

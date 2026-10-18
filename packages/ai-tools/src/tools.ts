@@ -538,9 +538,16 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
         const hid = r.depot.holderId;
         if (hid && r.distribution && !holders.has(hid)) {
           // Pick the figures explicitly: a holder name must never ride along.
-          const { holderAllowanceCap, totalAllocated, remainingToDistribute, overAllocated } =
-            r.distribution;
+          const {
+            currency,
+            holderAllowanceCap,
+            totalAllocated,
+            remainingToDistribute,
+            overAllocated,
+          } = r.distribution;
           holders.set(hid, {
+            // The cap/allocations are euro amounts, unlike the depot's own figures.
+            currency: currency ?? "EUR",
             holderAllowanceCap,
             totalAllocated,
             remainingToDistribute,

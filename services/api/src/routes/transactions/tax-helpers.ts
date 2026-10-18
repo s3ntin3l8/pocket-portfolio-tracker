@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
 import { and, eq, inArray } from "drizzle-orm";
-import { dividendEvents, instruments, lossCarryforward } from "@portfolio/db";
+import { dividendEvents, instruments, lossCarryforward, portfolios } from "@portfolio/db";
 import type {
   CoreTransaction,
   PortfolioSummary,
@@ -25,6 +25,83 @@ import {
 import { getFxRates, makeFxRateFn, recordFxMissing } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 
+/**
+ * German tax amounts the user enters — the Sparerpauschbetrag / Freistellungsauftrag
+ * (`accountHolders.taxAllowanceAnnual`, `portfolios.taxAllowanceAnnual`) and the loss
+ * carry-forward from the tax certificate — are euro figures by law. The DE trade log they are
+ * netted against is in the display (or portfolio base) currency.
+ */
+export const DE_TAX_AMOUNT_CURRENCY = "EUR";
+/** The per-person Sparerpauschbetrag when a holder has none set (single assessment), in EUR. */
+export const DE_TAX_ALLOWANCE_DEFAULT_EUR = "1000";
+
+/** Converts a euro tax amount into the trade log's currency. */
+export type EurTaxAmountFn = (eur: string) => string;
+
+/**
+ * A converter from {@link DE_TAX_AMOUNT_CURRENCY} into `currency` (the DE trade log's
+ * currency), or `null` when EUR has no FX rate into it. Never 1:1 (audit B2): a missing rate
+ * is recorded in the request's `fxMissingCurrencies` (via `makeFxRateFn`), and the caller
+ * treats the euro amounts as unavailable — no allowance, no carry-forward — rather than
+ * netting €1,000 as if it were 1,000 of another currency. Uses the request's FX provider, so
+ * a read-scoped PAT stays on cached rates.
+ */
+export async function eurTaxAmountsIn(
+  app: FastifyInstance,
+  currency: string,
+  now: Date = new Date(),
+): Promise<EurTaxAmountFn | null> {
+  if (currency === DE_TAX_AMOUNT_CURRENCY) return (eur) => eur;
+  const rates = await getFxRates(app.db, [DE_TAX_AMOUNT_CURRENCY], currency, now);
+  const fx = makeFxRateFn(rates, currency);
+  if (fx(DE_TAX_AMOUNT_CURRENCY, currency) === null) return null;
+  return (eur) => convert(eur, DE_TAX_AMOUNT_CURRENCY, currency, fx);
+}
+
+/** {@link lossCarryForwardFor}'s euro figures in the trade log's currency (none without a rate). */
+export function convertLossCarryForward(
+  cf: { stock?: string; general?: string } | undefined,
+  toLog: EurTaxAmountFn | null,
+): { stock?: string; general?: string } | undefined {
+  if (!cf) return undefined;
+  if (!toLog) return {};
+  return {
+    ...(cf.stock !== undefined ? { stock: toLog(cf.stock) } : {}),
+    ...(cf.general !== undefined ? { general: toLog(cf.general) } : {}),
+  };
+}
+
+/**
+ * The holder's loss carry-forward applies to a single depot's tax view only when the holder has
+ * exactly one depot: one certificate figure can't be applied to each of several depots
+ * independently (see docs/tax.md). Shared by `/portfolios/:id/tax` and the Sparplan harvest cap
+ * so the two can't drift apart.
+ */
+export function carryForwardAppliesToDepot(holderDepotCount: number): boolean {
+  return holderDepotCount <= 1;
+}
+
+/**
+ * {@link lossCarryForwardFor} for one depot of `holderId`, or `undefined` when it doesn't apply
+ * ({@link carryForwardAppliesToDepot}) or nothing was recorded — the depot count is only queried
+ * when there is a carry-forward to apply.
+ */
+export async function depotLossCarryForward(
+  app: FastifyInstance,
+  userId: string,
+  holderId: string,
+  taxYear: number,
+): Promise<{ stock?: string; general?: string } | undefined> {
+  const cf = await lossCarryForwardFor(app, holderId, taxYear);
+  if (cf.stock === undefined && cf.general === undefined) return undefined;
+  const depots = await app.db
+    .select({ id: portfolios.id })
+    .from(portfolios)
+    .where(and(eq(portfolios.userId, userId), eq(portfolios.accountHolderId, holderId)));
+  return carryForwardAppliesToDepot(depots.length) ? cf : undefined;
+}
+
+/** Loss carry-forward amounts from the tax certificate, in {@link DE_TAX_AMOUNT_CURRENCY}. */
 export async function lossCarryForwardFor(
   app: FastifyInstance,
   holderId: string,

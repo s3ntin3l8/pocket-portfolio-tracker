@@ -91,6 +91,9 @@ describe("sparplan rebalancing (Phase B)", () => {
           "RB-PHD-VWCE1": "100.00",
           "RB-PHD-VWCE2": "100.00",
           "RB-PHD-EIMI2": "100.00",
+          // Phase D — loss carry-forward symbols.
+          "RB-PHD-LCF-VWCE": "100.00",
+          "RB-PHD-LCF-EIMI": "100.00",
           // Phase D — Indonesian regime symbols.
           "RB-PHD-ID-VWCE1": "100.00",
           "RB-PHD-ID-EIMI1": "100.00",
@@ -554,6 +557,102 @@ describe("sparplan rebalancing (Phase B)", () => {
     // drift and contributionSplit still present.
     expect(body.drift).toBeDefined();
     expect(body.contributionSplit).toBeDefined();
+  });
+
+  it("GET /portfolios/:id/sparplan?includeSales=true counts the holder's loss carry-forward like the Tax page", async () => {
+    const t = await token("rb-phd-lcf-1");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const holderId = (
+      await app.inject({
+        method: "POST",
+        url: "/account-holders",
+        headers: auth(t),
+        payload: { name: "LCF Holder", type: "self", taxAllowanceAnnual: "1000" },
+      })
+    ).json().id as string;
+    const pf = await createPortfolio(t, "PhaseD LCF");
+    await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${pf}`,
+      headers: auth(t),
+      payload: { accountHolderId: holderId, taxAllowanceAnnual: "50" },
+    });
+    const [vwce] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "RB-PHD-LCF-VWCE",
+        market: "XETRA",
+        assetClass: "etf",
+        currency: "EUR",
+        name: "LCF All-World",
+      })
+      .returning();
+    const [eimi] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "RB-PHD-LCF-EIMI",
+        market: "XETRA",
+        assetClass: "etf",
+        currency: "EUR",
+        name: "LCF EM IMI",
+      })
+      .returning();
+    for (const [inst, qty] of [
+      [vwce, "9"],
+      [eimi, "1"],
+    ] as const) {
+      await postTx(t, pf, {
+        type: "buy",
+        instrumentId: inst.id,
+        quantity: qty,
+        price: "80.00",
+        currency: "EUR",
+        executedAt: "2025-01-05",
+      });
+    }
+    // €50 of interest this year uses the whole €50 FSA slice …
+    const year = new Date().getUTCFullYear();
+    await postTx(t, pf, {
+      type: "interest",
+      quantity: "1",
+      price: "50",
+      currency: "EUR",
+      executedAt: `${year}-01-10`,
+    });
+    // … unless last year's general-pot loss carry-forward absorbs it (single depot → applies).
+    await app.inject({
+      method: "PUT",
+      url: `/account-holders/${holderId}/loss-carryforward`,
+      headers: auth(t),
+      payload: { taxYear: year, entries: [{ pot: "general", amount: "50" }] },
+    });
+    await app.inject({
+      method: "PUT",
+      url: `/portfolios/${pf}/targets`,
+      headers: auth(t),
+      payload: {
+        dimension: "instrument",
+        targets: [
+          { key: vwce.id, targetPct: 70 },
+          { key: eimi.id, targetPct: 30 },
+        ],
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/sparplan?includeSales=true`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    // Same remaining allowance as GET /portfolios/:id/tax: the carry-forward frees it.
+    expect(res.json().remainingAllowance).toBe("50.00");
+    const tax = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/tax`,
+      headers: auth(t),
+    });
+    expect(tax.json().allowanceUsage.remaining).toBe("50.00");
   });
 
   it("GET /portfolios/:id/sparplan?includeSales=true returns uncapped sells under the Indonesian regime with no FSA configured", async () => {

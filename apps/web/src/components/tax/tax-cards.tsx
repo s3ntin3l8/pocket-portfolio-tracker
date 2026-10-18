@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardLabel, CardTitle } from "@/component
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import type { TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
+import { formatMoney } from "@/lib/utils";
+
+/** The currency German tax amounts (Sparerpauschbetrag, FSA slices) are denominated in. */
+const DE_TAX_AMOUNT_CURRENCY = "EUR";
 
 /** Loosely-typed next-intl translator scoped to the `Tax` namespace — the same shape as
  *  `getTranslations("Tax")` (server) or `useTranslations("Tax")` (client), threaded down
@@ -96,13 +100,18 @@ export function AllowanceSummaryBoxes({
 
 export function DistributionCard({
   distribution: d,
-  money,
+  locale,
   t,
 }: {
   distribution: TaxDistribution;
-  money: (n: string | number) => string;
+  locale: string;
   t: TaxTranslator;
 }) {
+  // The cap and the per-depot FSA slices are euro amounts (the Sparerpauschbetrag is set in
+  // law in EUR), so they are shown in their own currency — not the page's display currency,
+  // which would label €1,000 as e.g. "IDR 1,000".
+  const money = (n: string | number) =>
+    formatMoney(Number(n), d.currency ?? DE_TAX_AMOUNT_CURRENCY, locale);
   const allocPct =
     Number(d.holderAllowanceCap) > 0
       ? Math.round((Number(d.totalAllocated) / Number(d.holderAllowanceCap)) * 100)

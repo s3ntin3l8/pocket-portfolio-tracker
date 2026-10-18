@@ -1,4 +1,6 @@
 import { DataState } from "@/components/data-state";
+import { FxMissingBanner } from "@/components/fx-missing-banner";
+import { collectFxMissing } from "@/lib/fx-missing";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt, TrendingUp, Landmark, CalendarClock } from "lucide-react";
@@ -118,6 +120,9 @@ export default async function TaxPage({
   return (
     <div className="space-y-5">
       {Heading}
+      {/* DE: e.g. "EUR" when the euro allowance had no rate into the display currency (on the
+          holder entries); ID: misses from the payloads the final-tax detail is built from. */}
+      <FxMissingBanner currencies={collectFxMissing(...holders, ...detailByHolder.values())} />
       <PeriodSelect
         label={tp("taxYear")}
         value={String(year ?? currentYear)}
@@ -193,7 +198,9 @@ function TaxHolderOverviewDe({
   // ID entries carry `indonesianFinalTax` instead of `allowanceUsage` — render nothing
   // here; the parent's `TaxHolderSectionId` branch will render the ID cards.
   if (!u) return null;
-  const pct = parseFloat(u.remaining) / parseFloat(u.allowanceAnnual);
+  // No allowance (e.g. it could not be converted without an EUR rate): nothing used, no NaN.
+  const allowance = parseFloat(u.allowanceAnnual);
+  const pct = allowance > 0 ? parseFloat(u.remaining) / allowance : 1;
   const usedPct = Math.round((1 - Math.max(0, Math.min(1, pct))) * 100);
   const hasForecast = Number(u.forecastIncomeRestOfYear) > 0;
 
@@ -218,7 +225,7 @@ function TaxHolderOverviewDe({
 
           <VorabpauschaleRow allowanceUsage={u} money={money} t={t} />
 
-          {distribution && <DistributionCard distribution={distribution} money={money} t={t} />}
+          {distribution && <DistributionCard distribution={distribution} locale={locale} t={t} />}
 
           {hasForecast && (
             <Card>
