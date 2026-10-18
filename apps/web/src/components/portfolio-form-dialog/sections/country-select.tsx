@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
 /**
- * Every ISO 3166-1 alpha-2 code with its name in `locale`, sorted by that name. A stored
- * code outside the list (written through the API before the list changed) stays selectable,
- * so saving the form never clears it silently.
+ * Every ISO 3166-1 alpha-2 code with its name in `locale`, sorted by that name.
+ *
+ * `current` is defensive only: the API rejects any code outside `COUNTRY_CODES`, so no write
+ * path produces one. A row written outside it (a manual DB edit, or a code later withdrawn
+ * from the list) stays selectable, appended last, so saving the form doesn't clear it.
  */
 export function countryOptions(locale: string, current: string): { code: string; name: string }[] {
   // An unusable locale tag throws (RangeError); fall back to bare codes in default order.
@@ -21,11 +23,19 @@ export function countryOptions(locale: string, current: string): { code: string;
   } catch {
     names = null;
   }
-  const codes: string[] = [...COUNTRY_CODES];
-  if (current && !codes.includes(current)) codes.push(current);
-  return codes
-    .map((code) => ({ code, name: names?.of(code) ?? code }))
-    .sort((a, b) => a.name.localeCompare(b.name, sortLocale));
+  const options = COUNTRY_CODES.map((code) => ({ code, name: names?.of(code) ?? code })).sort(
+    (a, b) => a.name.localeCompare(b.name, sortLocale),
+  );
+  return withCurrent(options, current);
+}
+
+/** `options` plus `current` at the end when it is set and not already listed. */
+function withCurrent(
+  options: { code: string; name: string }[],
+  current: string,
+): { code: string; name: string }[] {
+  if (!current || options.some((o) => o.code === current)) return options;
+  return [...options, { code: current, name: current }];
 }
 
 /** The portfolio's country: where the account is held, or "" for not set. */
@@ -40,7 +50,9 @@ export function CountrySelect({
 }) {
   const t = useTranslations("PortfolioForm");
   const locale = useLocale();
-  const options = useMemo(() => countryOptions(locale, value), [locale, value]);
+  // Localize and sort once per locale; a selection only re-checks the out-of-list case.
+  const localized = useMemo(() => countryOptions(locale, ""), [locale]);
+  const options = withCurrent(localized, value);
   const hintId = `${id}-hint`;
 
   return (

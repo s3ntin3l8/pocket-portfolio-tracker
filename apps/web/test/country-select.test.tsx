@@ -21,7 +21,7 @@ describe("countryOptions", () => {
   it("keeps a stored code that isn't in the list selectable", () => {
     const opts = countryOptions("en", "XK");
     expect(opts).toHaveLength(250);
-    expect(opts.some((o) => o.code === "XK")).toBe(true);
+    expect(opts.at(-1)).toEqual({ code: "XK", name: "XK" });
   });
 
   it("falls back to the code when the locale can't name regions", () => {
@@ -44,6 +44,17 @@ describe("CountrySelect", () => {
     expect(screen.getByRole("option", { name: "Indonesia" })).toHaveValue("ID");
     fireEvent.change(select, { target: { value: "ID" } });
     expect(onChange).toHaveBeenCalledWith("ID");
+  });
+
+  it("shows a stored code outside the list as selected", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <CountrySelect id="c" value="XK" onChange={() => {}} />
+      </NextIntlClientProvider>,
+    );
+    const select = screen.getByLabelText(en.PortfolioForm.country) as HTMLSelectElement;
+    expect(select.value).toBe("XK");
+    expect(select.options).toHaveLength(251);
   });
 
   it("describes the select with the tax hint", () => {
