@@ -120,8 +120,9 @@ export default async function TaxPage({
   return (
     <div className="space-y-5">
       {Heading}
-      {/* e.g. "EUR" when the euro allowance had no rate into the display currency. */}
-      <FxMissingBanner currencies={collectFxMissing(...holders)} />
+      {/* DE: e.g. "EUR" when the euro allowance had no rate into the display currency (on the
+          holder entries); ID: misses from the payloads the final-tax detail is built from. */}
+      <FxMissingBanner currencies={collectFxMissing(...holders, ...detailByHolder.values())} />
       <PeriodSelect
         label={tp("taxYear")}
         value={String(year ?? currentYear)}

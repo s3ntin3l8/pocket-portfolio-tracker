@@ -318,6 +318,8 @@ export interface IndonesianFinalTaxLike {
 
 export interface TaxYearDetail {
   currency: string;
+  /** Currencies with no FX rate in the payloads this detail was built from (audit B2). */
+  fxMissingCurrencies?: string[];
   disposals: TaxDisposalRow[];
   totalProceeds: string;
   totalGain: string;

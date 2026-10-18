@@ -1,4 +1,5 @@
 import { Decimal } from "decimal.js";
+import { collectFxMissing } from "@/lib/fx-missing";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
 import type { IdYearInput } from "@portfolio/core";
 import {
@@ -231,6 +232,7 @@ export async function loadTaxYearDetail(
         if (regime === "ID" && entry.indonesianFinalTax) {
           result.set(holderId, {
             currency: entry.currency,
+            fxMissingCurrencies: collectFxMissing(entry),
             disposals: [],
             totalProceeds: "0",
             totalGain: "0",
@@ -520,6 +522,14 @@ export async function loadTaxYearDetail(
 
         result.set(holderId, {
           currency: tradeLog.displayCurrency,
+          // Every payload this detail is built from — under ID the final-tax figures come
+          // from these calls, not from the (synthetic) holder entry, so the page's FX
+          // banner reads the misses here.
+          fxMissingCurrencies: collectFxMissing(
+            tradeLog,
+            idTaxByPortfolio,
+            ...(idTaxByHolder ?? []),
+          ),
           disposals: legs,
           totalProceeds: totalProceeds.toFixed(2),
           totalGain: totalGain.toFixed(2),

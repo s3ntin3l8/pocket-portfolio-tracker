@@ -27,8 +27,8 @@ import { cacheKey } from "../helpers.js";
 import {
   buildTfRates,
   convertLossCarryForward,
+  depotLossCarryForward,
   eurTaxAmountsIn,
-  lossCarryForwardFor,
 } from "./tax-helpers.js";
 import type { PortfolioParams } from "./shared.js";
 import {
@@ -235,19 +235,12 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       // (a euro amount, converted like the FSA slice) applies only when the holder has
       // exactly one depot — so this sell cap never exceeds the Tax page's remaining
       // allowance.
-      let lossCarryForward: { stock?: string; general?: string } | undefined;
-      if (holderId) {
-        const depots = await app.db
-          .select({ id: portfolios.id })
-          .from(portfolios)
-          .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holderId)));
-        if (depots.length <= 1) {
-          lossCarryForward = convertLossCarryForward(
-            await lossCarryForwardFor(app, holderId, new Date().getUTCFullYear()),
+      const lossCarryForward = holderId
+        ? convertLossCarryForward(
+            await depotLossCarryForward(app, id, holderId, new Date().getUTCFullYear()),
             toLog,
-          );
-        }
-      }
+          )
+        : undefined;
       const usage = allowanceUsageYTD({
         tradeLog,
         tfRates,

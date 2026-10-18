@@ -797,6 +797,31 @@ describe("loadTaxYearDetail", () => {
     expect(map.size).toBe(0);
   });
 
+  it("carries the source payloads' fxMissingCurrencies onto the detail (Tax page FX banner)", async () => {
+    h.client.listPortfolios = async () => PF;
+    h.cookies = { pf: "p1" };
+    h.client.getTrades = vi.fn(async () => ({
+      displayCurrency: "IDR",
+      trades: [],
+      realizedByYear: [],
+      dividendsByYear: [],
+      fxMissingCurrencies: ["USD"],
+    }));
+    h.client.listIncomeByYear = vi.fn(async () => []);
+    const holders = [
+      {
+        holder: { id: "p1" },
+        year: 2026,
+        currency: "IDR",
+        allowanceUsage: baseUsage,
+        harvestSuggestions: [],
+        distribution: {},
+      },
+    ] as unknown as TaxSummaryHolder[];
+    const detail = (await api.loadTaxYearDetail(holders, 2026)).get("p1");
+    expect(detail?.fxMissingCurrencies).toEqual(["USD"]);
+  });
+
   it("single-portfolio scope: fetches the FIFO trade log + transactions for that portfolio only", async () => {
     h.client.listPortfolios = async () => PF; // p1 (IDR), p2 (EUR)
     h.cookies = { pf: "p1" };

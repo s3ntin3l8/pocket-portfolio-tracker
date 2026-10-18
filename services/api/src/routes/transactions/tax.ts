@@ -46,6 +46,7 @@ import {
 import {
   DE_TAX_ALLOWANCE_DEFAULT_EUR,
   DE_TAX_AMOUNT_CURRENCY,
+  carryForwardAppliesToDepot,
   convertLossCarryForward,
   eurTaxAmountsIn,
   lossCarryForwardFor,
@@ -123,7 +124,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
           new Decimal(0),
         );
 
-        if (siblingRows.length <= 1) {
+        if (carryForwardAppliesToDepot(siblingRows.length)) {
           lossCarryForwardInput = lossCarryForwardResult;
           carryForwardApplied = true;
         }
@@ -587,7 +588,9 @@ export function registerTaxRoutes(app: FastifyInstance) {
       );
       // The response is an array, so the `fxMissingCurrencies` the hook adds to object
       // bodies never reaches it — carry the request's list on each entry for the web's FX
-      // banner (e.g. "EUR" when the allowance could not be converted).
+      // banner (e.g. "EUR" when the allowance could not be converted). NOTE: request-wide,
+      // not holder-specific (it includes every depot's valuation misses), and one shared
+      // array — fine for a page-level banner; don't read it as a per-holder figure.
       const fxMissingCurrencies = currentFxMissing();
       const result = perHolderResults
         .filter((r): r is NonNullable<typeof r> => r != null)
