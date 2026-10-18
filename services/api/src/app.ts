@@ -222,7 +222,9 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     // SQLSTATE 22P02, raised directly or wrapped as a DrizzleQueryError's cause. That is a
     // malformed request, not a server error; the driver text is not echoed.
     if (isInvalidTextRepresentation(error)) {
-      app.log.warn({ err: error }, "malformed value in request (22P02)");
+      // Logged at error, like any other failed query: the handler can't tell a malformed
+      // request value from a bad stored value cast in SQL, and the latter is a bug.
+      app.log.error({ err: error }, "invalid text representation (22P02), answered 400");
       return reply.code(400).send({ error: "invalid_input" });
     }
     // Routes exclude what they can't convert and report `fxMissingCurrencies` (audit B2);
