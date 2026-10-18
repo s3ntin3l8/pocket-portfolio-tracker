@@ -337,11 +337,12 @@ export interface IndonesianFinalTax {
 const ZERO = new Decimal(0);
 
 /**
- * The portfolio's cash balance per currency just before `at` (the moment an interest
- * payment is credited): {@link cashBalances} over the transactions executed strictly
- * earlier — the same ledger holdings and net worth use, never a second one. Rows at the
- * very same instant are left out (the order of same-timestamp rows is unknown), and so is
- * the interest row itself.
+ * The portfolio's cash balance per currency when an interest payment is credited, the
+ * payment itself left out: {@link cashBalances} — the same ledger holdings and net worth
+ * use, never a second one — over every other transaction executed at or before it. Rows
+ * at the very same instant are included (a per-currency sum doesn't depend on their order),
+ * so a deposit booked on the payment's date-only timestamp counts; that errs toward the
+ * larger balance, i.e. toward taxing.
  *
  * null when the balance can't be known: before the first explicit cash-account movement
  * ({@link isCashAccountMovement}) the derived cash is only the sum of imported trades, not
@@ -350,9 +351,10 @@ const ZERO = new Decimal(0);
  */
 export function idCashBalancesBefore(
   transactions: CoreTransaction[],
-  at: Date,
+  payment: CoreTransaction,
 ): Record<string, string> | null {
-  const before = transactions.filter((t) => t.executedAt.getTime() < at.getTime());
+  const at = payment.executedAt.getTime();
+  const before = transactions.filter((t) => t !== payment && t.executedAt.getTime() <= at);
   if (!before.some(isCashAccountMovement)) return null;
   return cashBalances(before);
 }
@@ -382,7 +384,10 @@ export function idDepositBalanceIdr(
 /**
  * Whether bank interest is exempt as a small balance: the balance is known and between 0
  * and {@link ID_DEPOSIT_EXEMPT_BALANCE_IDR} inclusive ("tidak melebihi", not more than). A
- * negative balance is a data gap (missing deposits), not a small balance: not exempt.
+ * negative balance is a data gap (missing deposits), not a small balance: not exempt. Zero
+ * is exempt: once explicit cash movements are recorded (otherwise the balance is unknown),
+ * an account spent down to 0 — an RDN whose cash all went into a purchase — really holds
+ * nothing at the bank.
  */
 export function idDepositInterestExempt(balanceIdr: string | null | undefined): boolean {
   if (balanceIdr === null || balanceIdr === undefined) return false;

@@ -307,18 +307,23 @@ reading and uses the payment date's rate.
 
 **How Pocket applies it.** For every Indonesian bank-interest payment (cash interest, no
 paying instrument, classified `deposit_interest` — a portfolio with country `ID`, or IDR
-interest with no country), `loadIdDepositBalances` (`services/api/src/routes/transactions/tax-helpers.ts`)
-takes the paying **portfolio's** cash balance just before the payment and converts it to IDR:
+interest with no country), `loadIdDepositFx` (`services/api/src/routes/transactions/tax-helpers.ts`)
+and `computeIndonesianFinalTaxFromTradeLog` take the paying **portfolio's** cash balance
+when the payment is credited and convert it to IDR:
 
 1. `idCashBalancesBefore` (core): `cashBalances` — the same per-currency cash ledger the
-   holdings and net-worth views derive — over the portfolio's transactions executed strictly
-   before the payment. The payment itself, later rows and rows at the very same timestamp are
-   left out (the order of same-timestamp rows is unknown).
+   holdings and net-worth views derive — over the portfolio's other transactions executed at
+   or before the payment. Rows at the payment's own instant count (a sum doesn't depend on
+   their order; a date-only import books a same-day deposit at the same midnight), which errs
+   toward the larger balance; the payment itself and later rows don't.
 2. `idDepositBalanceIdr` (core): every non-zero currency converted to IDR at the payment
-   date's rate (`getFxRatesForDates`, carried forward/back like the history routes; cached
-   rates only for a read-scoped PAT) and summed.
+   date's rate and summed. `loadIdDepositFx` loads those rates once per request over every
+   portfolio's payment dates (`getFxRatesForDates`, carried forward/back like the history
+   routes; cached rates only for a read-scoped PAT).
 3. `idDepositInterestExempt` (core): exempt when that total is between 0 and
-   Rp7,500,000 inclusive.
+   Rp7,500,000 inclusive. Zero counts as small: the balance is only known once explicit
+   cash movements are recorded, and an account spent down to 0 (an RDN whose cash all went
+   into a purchase) really holds nothing at the bank.
 
 An exempt payment is taxed at 0: its row carries `exemption: "small_balance"` and
 `rate: "0"`, it stays in `totalIncomeGross` and the by-year income, and adds nothing to

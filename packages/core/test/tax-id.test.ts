@@ -745,8 +745,20 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
         tx("deposit", "9000000", "IDR", "2026-02-15"),
         tx("interest", "2000", "IDR", "2026-02-28"),
       ];
-      expect(idCashBalancesBefore(txns, txns[1]!.executedAt)).toEqual({ IDR: "5000000" });
-      expect(idCashBalancesBefore(txns, txns[3]!.executedAt)).toEqual({ IDR: "14001000" });
+      expect(idCashBalancesBefore(txns, txns[1]!)).toEqual({ IDR: "5000000" });
+      expect(idCashBalancesBefore(txns, txns[3]!)).toEqual({ IDR: "14001000" });
+    });
+
+    it("includes other rows at the payment's own instant, but not the payment", () => {
+      // Date-only imports book a same-day deposit at the same midnight as the interest.
+      const txns = [
+        tx("deposit", "7000000", "IDR", "2026-01-02"),
+        tx("deposit", "600000", "IDR", "2026-01-31"),
+        tx("interest", "1000", "IDR", "2026-01-31"),
+      ];
+      const balances = idCashBalancesBefore(txns, txns[2]!);
+      expect(balances).toEqual({ IDR: "7600000" });
+      expect(idDepositInterestExempt(idDepositBalanceIdr(balances, fx))).toBe(false);
     });
 
     it("is unknown before the first explicit cash movement (imported trades only)", () => {
@@ -754,7 +766,7 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
         tx("interest", "1000", "IDR", "2026-01-31"),
         tx("interest", "1000", "IDR", "2026-02-28"),
       ];
-      expect(idCashBalancesBefore(txns, txns[1]!.executedAt)).toBeNull();
+      expect(idCashBalancesBefore(txns, txns[1]!)).toBeNull();
       expect(idDepositBalanceIdr(null, fx)).toBeNull();
     });
 
@@ -768,7 +780,7 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
         tx("deposit", "2000000", "IDR", "2026-01-02"),
         tx("interest", "800", "IDR", "2026-01-31"),
       ];
-      const balance = idDepositBalanceIdr(idCashBalancesBefore(txns, txns[1]!.executedAt), fx);
+      const balance = idDepositBalanceIdr(idCashBalancesBefore(txns, txns[1]!), fx);
       expect(balance).toBe("2000000");
       expect(idDepositInterestExempt(balance)).toBe(true);
     });
@@ -781,7 +793,7 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
         tx("deposit", "50", "USD", "2026-01-03"),
         tx("interest", "1000", "IDR", "2026-01-31"),
       ];
-      const balances = idCashBalancesBefore(txns, txns[2]!.executedAt);
+      const balances = idCashBalancesBefore(txns, txns[2]!);
       expect(balances).toEqual({ IDR: "7000000", USD: "50" });
       const idr = idDepositBalanceIdr(balances, fx);
       expect(idr).toBe("7800000");

@@ -930,6 +930,35 @@ describe("Indonesian income tax — the Rp7.5M small-balance exemption for bank 
     expect(entry!.indonesianFinalTax.estimatedTax).toBe("7000.00");
   });
 
+  it("taxes interest at 20% when a balance currency has no rate into IDR, and says so", async () => {
+    const t = await token("tax-id-exempt-5");
+    await setTaxRegime(t, "ID");
+    const pf = await createPortfolio(t, { name: "No rate", baseCurrency: "IDR", country: "ID" });
+    const cash = (type: string, price: string, currency: string, at: string) =>
+      seedTransaction(app, pf, auth(t), {
+        type,
+        quantity: "0",
+        price,
+        currency,
+        executedAt: `${at}T00:00:00.000Z`,
+      });
+    // Rp1M is small, but the CHF balance can't be converted: the total is unknown.
+    await cash("deposit", "1000000", "IDR", "2025-01-02");
+    await cash("deposit", "100", "CHF", "2025-01-03");
+    await cash("interest", "5000", "IDR", "2025-01-31");
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { indonesianFinalTax: IdTax; fxMissingCurrencies?: string[] };
+    expect(body.indonesianFinalTax.income).toEqual([
+      expect.objectContaining({ exemption: null, gross: "5000.00", tax: "1000.00" }),
+    ]);
+    expect(body.fxMissingCurrencies).toContain("CHF");
+  });
+
   it("applies the exemption for a read-scoped token from cached FX rates", async () => {
     const { t, small, fx } = await seed("tax-id-exempt-4");
     const minted = await app.inject({

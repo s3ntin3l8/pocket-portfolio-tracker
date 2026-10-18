@@ -53,7 +53,7 @@ import {
   restOfYearForecastGross,
   buildTfRates,
   computeIndonesianFinalTaxFromTradeLog,
-  loadIdDepositBalances,
+  loadIdDepositFx,
 } from "./tax-helpers.js";
 import { isReadOnlyPat } from "../../plugins/auth.js";
 
@@ -206,7 +206,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
           tradeLog,
           incomeSources,
           // Cached FX only for a read-scoped PAT (audit A7), like the history routes.
-          depositBalances: await loadIdDepositBalances(
+          depositFxAt: await loadIdDepositFx(
             app,
             incomeSources,
             isReadOnlyPat(request) ? null : undefined,
@@ -511,7 +511,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
             const idTax = computeIndonesianFinalTaxFromTradeLog({
               tradeLog: mergedLog,
               incomeSources,
-              depositBalances: await loadIdDepositBalances(
+              depositFxAt: await loadIdDepositFx(
                 app,
                 incomeSources,
                 isReadOnlyPat(request) ? null : undefined,
