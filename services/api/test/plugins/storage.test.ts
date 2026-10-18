@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import type { StorageProvider } from "../../src/storage/types.js";
-import { ensuresBucketAtBoot } from "../../src/plugins/storage.js";
 
 // A fake storage driver that records calls without touching real storage.
 function makeInertStorage(): StorageProvider & { puts: string[] } {
@@ -19,14 +18,6 @@ function makeInertStorage(): StorageProvider & { puts: string[] } {
     move: async () => {},
   };
 }
-
-describe("ensuresBucketAtBoot", () => {
-  it("probes the bucket in development only, never under test (it would reach AWS S3)", () => {
-    expect(ensuresBucketAtBoot("development")).toBe(true);
-    expect(ensuresBucketAtBoot("test")).toBe(false);
-    expect(ensuresBucketAtBoot("production")).toBe(false);
-  });
-});
 
 describe("storage plugin / buildApp injection seam", () => {
   describe("with an injected fake storage", () => {
@@ -65,7 +56,7 @@ describe("storage plugin / buildApp injection seam", () => {
 
     beforeAll(async () => {
       // No opts.storage — the real storagePlugin runs. We only assert that app.storage
-      // is defined and is an object; no object store is contacted (ensuresBucketAtBoot).
+      // is defined and is an object; no object store is contacted (see storage-boot-probe.test.ts).
       app = await buildApp();
     });
 

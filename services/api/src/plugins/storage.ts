@@ -3,11 +3,19 @@ import type { FastifyInstance } from "fastify";
 import type { StorageProvider, StorageStats } from "../storage/types.js";
 import { getStorageProvider, S3Provider } from "../storage/index.js";
 
-/** Whether the plugin probes (and creates) the S3 bucket at boot: only in development.
- *  Production backends are provisioned; under test the env defaults (no endpoint) would
- *  send that probe to AWS S3 from every test that builds an app. */
-export function ensuresBucketAtBoot(nodeEnv: string): boolean {
-  return nodeEnv === "development";
+/**
+ * Whether the plugin probes (and creates) the S3 bucket at boot: only in development, and
+ * only against an explicitly configured endpoint (a local MinIO, the case it exists for).
+ * Production backends are provisioned. Without an endpoint the AWS SDK targets AWS S3
+ * itself, which the env defaults (`STORAGE_PROVIDER=s3`, no `STORAGE_ENDPOINT`, path-style)
+ * turn into a 301 — that probe used to leave the machine from every test that builds an
+ * app, and from a dev machine with no MinIO.
+ */
+export function ensuresBucketAtBoot(
+  nodeEnv: "development" | "production" | "test",
+  provider: StorageProvider,
+): provider is S3Provider {
+  return nodeEnv === "development" && provider instanceof S3Provider && !!provider.endpoint;
 }
 
 /**
@@ -61,12 +69,12 @@ export const storagePlugin = fp(async (app: FastifyInstance) => {
   app.decorate("storage", facade);
 
   // In development, eagerly resolve the backend once to trigger the bucket-ensure
-  // side-effect (best-effort — errors are logged, never fatal). Never under test: the
-  // suite must stay hermetic (no request to AWS from every buildApp()).
-  if (ensuresBucketAtBoot(app.config.NODE_ENV)) {
+  // side-effect (best-effort — errors are logged, never fatal) — against a configured
+  // endpoint only, see ensuresBucketAtBoot. Never under test or in production.
+  if (app.config.NODE_ENV === "development") {
     getStorageProvider(app)
       .then(async (provider) => {
-        if (provider instanceof S3Provider) {
+        if (ensuresBucketAtBoot(app.config.NODE_ENV, provider)) {
           try {
             const created = await provider.ensureBucket();
             app.log.info({ created }, "storage bucket ready");
