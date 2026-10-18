@@ -423,6 +423,11 @@ export interface HarvestSuggestion {
 /** Distribution context returned by tax endpoints — shows how the per-person cap
  *  is being used across a holder's depots. */
 export interface TaxDistribution {
+  /** Currency of the three amounts below — always "EUR": the cap and the per-depot FSA
+   *  slices are legal euro amounts, compared with each other as such. (What is netted
+   *  against the trade log, `allowanceUsage.allowanceAnnual`, is converted into its
+   *  `currency` instead.) Optional only for responses that predate the field. */
+  currency?: string;
   /** The holder's per-person Sparerpauschbetrag cap (€1,000 single / €2,000 joint), decimal string. */
   holderAllowanceCap: string;
   /** Sum of all per-depot FSA allocations for this holder, decimal string. */

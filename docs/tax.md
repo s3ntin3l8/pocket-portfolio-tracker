@@ -57,6 +57,16 @@ only, not a DB constraint** — nothing stops you from over-allocating across po
 the tax computation for each portfolio still uses that portfolio's own
 `taxAllowanceAnnual` regardless.
 
+**Both columns — and the loss carry-forward below — are euro amounts** (the Sparerpauschbetrag
+is set in law in EUR; `DE_TAX_AMOUNT_CURRENCY` / `DE_TAX_ALLOWANCE_DEFAULT_EUR` in
+`services/api/src/routes/transactions/tax-helpers.ts`). The DE trade log they are netted against is
+in the display currency (`/networth/tax`) or the portfolio's base currency (`/portfolios/:id/tax`,
+the Sparplan harvest cap), so `eurTaxAmountsIn` converts them into that currency first: an IDR view
+nets a €1,000 allowance as ≈ IDR 17M, not IDR 1,000. A missing EUR rate is never 1:1 — the allowance
+and carry-forward are then unavailable (0, so all income counts as taxable) and `EUR` is reported in
+`fxMissingCurrencies`. The distribution helper (`holderDistribution` / `distribution`) compares
+euro with euro and says so with `currency: "EUR"`; the web formats it in EUR.
+
 A portfolio with no FSA configured (`taxAllowanceAnnual` is `null`) can't compute German
 tax at all — the route returns `422 tax_allowance_not_configured`, and the `/sparplan`
 route returns `taxUnavailable: true` instead of erroring.

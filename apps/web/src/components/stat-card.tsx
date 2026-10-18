@@ -30,14 +30,16 @@ export function StatCard({
   return (
     <Card className={className}>
       <CardContent className="px-3.5 py-3.5 sm:px-[18px] sm:py-4">
-        <p className="text-micro font-semibold text-text-2 sm:text-xs">{label}</p>
+        {/* break-words: a long single word (e.g. "Sparerpauschbetrag") must wrap inside a
+            narrow tile instead of spilling out of the card on a phone. */}
+        <p className="text-micro font-semibold text-text-2 break-words sm:text-xs">{label}</p>
         <p className="tabular mt-1 truncate min-w-0 text-body font-bold sm:text-xl lg:text-display">
           {value}
         </p>
         {delta && (
           <p
             className={cn(
-              "tabular mt-0.5 text-micro font-bold sm:text-xs",
+              "tabular mt-0.5 text-micro font-bold break-words sm:text-xs",
               deltaTone === "up" && "text-success",
               deltaTone === "down" && "text-destructive",
               deltaTone === "neutral" && "text-muted-foreground",
@@ -47,7 +49,9 @@ export function StatCard({
           </p>
         )}
         {basis && <BasisLabel>{basis}</BasisLabel>}
-        {caption && <p className="mt-1 text-micro text-muted-foreground sm:text-xs">{caption}</p>}
+        {caption && (
+          <p className="mt-1 text-micro text-muted-foreground break-words sm:text-xs">{caption}</p>
+        )}
       </CardContent>
     </Card>
   );

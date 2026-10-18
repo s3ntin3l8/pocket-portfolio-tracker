@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { eq } from "drizzle-orm";
-import { instruments, users } from "@portfolio/db";
+import { fxRates, instruments, users } from "@portfolio/db";
+import { toDateKey } from "@portfolio/core";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 
@@ -60,6 +61,18 @@ async function createHolder(t: string, opts: Record<string, unknown> = {}): Prom
     payload: { name: "Test Holder", type: "self", ...opts },
   });
   return res.json().id as string;
+}
+
+/** Show the user's books in EUR — the currency the German allowance is denominated in, so
+ *  no FX rate is needed (a missing EUR rate is never read 1:1, see the FX suite below). */
+async function useEurDisplay(t: string) {
+  await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+  await app.inject({
+    method: "PATCH",
+    url: "/me",
+    headers: auth(t),
+    payload: { displayCurrency: "EUR" },
+  });
 }
 
 describe("tax routes", () => {
@@ -269,6 +282,7 @@ describe("tax routes", () => {
 
     it("always applies loss carry-forward on the holder-aggregated /networth/tax view", async () => {
       const t = await token("tax-lcf-networth");
+      await useEurDisplay(t);
       const holderId = await createHolder(t, {
         name: "Networth LCF Holder",
         taxAllowanceAnnual: "1000",
@@ -603,6 +617,7 @@ describe("tax routes", () => {
 
     it("response shape has expected fields", async () => {
       const t = await token("tax-nw-shape");
+      await useEurDisplay(t);
       const holderId = await createHolder(t, {
         name: "Shape Holder",
         taxAllowanceAnnual: "1000",
@@ -647,6 +662,7 @@ describe("tax routes", () => {
 
     it("distribution field carries FSA allocation breakdown against the cap", async () => {
       const t = await token("tax-nw-dist");
+      await useEurDisplay(t);
       const holderId = await createHolder(t, {
         name: "Dist Holder",
         taxAllowanceAnnual: "1000",
@@ -712,6 +728,112 @@ describe("tax routes", () => {
   // ---------------------------------------------------------------------------
   // PATCH /account-holders/:id — tax profile fields round-trip
   // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // The Sparerpauschbetrag / FSA / loss carry-forward are EUR amounts; the trade log is in
+  // the display (or base) currency. They must be converted, never netted 1:1.
+  // ---------------------------------------------------------------------------
+  describe("EUR allowance in a non-EUR trade log", () => {
+    const year = new Date().getUTCFullYear();
+    beforeAll(async () => {
+      // EUR→IDR is rated; EUR→CHF is not (and there is no FX provider under test).
+      await app.db
+        .insert(fxRates)
+        .values({ base: "EUR", quote: "IDR", rate: "17000", date: toDateKey(new Date()) });
+    });
+
+    async function holderWithIncome(sub: string, baseCurrency: string) {
+      const t = await token(sub);
+      await app.inject({ method: "GET", url: "/me", headers: auth(t) }); // display: IDR
+      const holderId = await createHolder(t, {
+        name: "FX Holder",
+        taxAllowanceAnnual: "1000",
+        capitalGainsTaxRate: "0.25",
+      });
+      const portfolioId = await createPortfolio(t, {
+        accountHolderId: holderId,
+        baseCurrency,
+        taxAllowanceAnnual: "1000",
+      });
+      await app.inject({
+        method: "PUT",
+        url: `/account-holders/${holderId}/loss-carryforward`,
+        headers: auth(t),
+        payload: { taxYear: year, entries: [{ pot: "general", amount: "50" }] },
+      });
+      // 1,500,000 of interest: far above 1,000 but far below €1,000 ≈ IDR 17,000,000.
+      await seedTransaction(app, portfolioId, auth(t), {
+        type: "interest",
+        quantity: "1",
+        price: "1500000",
+        currency: baseCurrency,
+        executedAt: `${year}-01-15T00:00:00.000Z`,
+      });
+      return { t, portfolioId };
+    }
+
+    it("/networth/tax converts the allowance and carry-forward into IDR", async () => {
+      const { t } = await holderWithIncome("tax-fx-idr-nw", "IDR");
+      const res = await app.inject({
+        method: "GET",
+        url: `/networth/tax?year=${year}`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const [entry] = res.json();
+      expect(entry.currency).toBe("IDR");
+      // €1,000 × 17,000 — not 1,000 IDR.
+      expect(entry.allowanceUsage.allowanceAnnual).toBe("17000000.00");
+      expect(entry.allowanceUsage.generalPot.carryForwardApplied).toBe("850000.00");
+      expect(entry.allowanceUsage.taxableExcess).toBe("0.00");
+      // 1,500,000 income − €50 × 17,000 carry-forward, all inside the converted allowance.
+      expect(entry.allowanceUsage.usedYtd).toBe("650000.00");
+      // The distribution compares euro amounts and says so.
+      expect(entry.distribution).toMatchObject({
+        currency: "EUR",
+        holderAllowanceCap: "1000.00",
+        totalAllocated: "1000.00",
+      });
+      expect(res.headers["x-fx-missing-currencies"]).toBeUndefined();
+    });
+
+    it("/portfolios/:id/tax converts the FSA slice into the base currency", async () => {
+      const { t, portfolioId } = await holderWithIncome("tax-fx-idr-pf", "IDR");
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/tax?year=${year}`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.currency).toBe("IDR");
+      expect(body.allowanceUsage.allowanceAnnual).toBe("17000000.00");
+      expect(body.allowanceUsage.generalPot.carryForwardApplied).toBe("850000.00");
+      expect(body.allowanceUsage.taxableExcess).toBe("0.00");
+      expect(body.holderDistribution).toMatchObject({
+        currency: "EUR",
+        holderAllowanceCap: "1000.00",
+      });
+    });
+
+    it("without an EUR rate the allowance is unavailable and reported, never 1:1", async () => {
+      const { t, portfolioId } = await holderWithIncome("tax-fx-chf", "CHF");
+      const res = await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/tax?year=${year}`,
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.currency).toBe("CHF");
+      // Not CHF 1,000 (the euro figure read as francs): no allowance, all income taxable.
+      expect(body.allowanceUsage.allowanceAnnual).toBe("0.00");
+      expect(body.allowanceUsage.generalPot.carryForwardApplied).toBe("0.00");
+      expect(body.allowanceUsage.taxableExcess).toBe("1500000.00");
+      expect(body.fxMissingCurrencies ?? []).toContain("EUR");
+      expect(res.headers["x-fx-missing-currencies"]).toContain("EUR");
+    });
+  });
 
   describe("PATCH /account-holders/:id — tax profile", () => {
     it("persists tax profile fields and returns them", async () => {

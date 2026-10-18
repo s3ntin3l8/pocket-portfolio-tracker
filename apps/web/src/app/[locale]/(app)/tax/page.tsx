@@ -218,7 +218,7 @@ function TaxHolderOverviewDe({
 
           <VorabpauschaleRow allowanceUsage={u} money={money} t={t} />
 
-          {distribution && <DistributionCard distribution={distribution} money={money} t={t} />}
+          {distribution && <DistributionCard distribution={distribution} locale={locale} t={t} />}
 
           {hasForecast && (
             <Card>

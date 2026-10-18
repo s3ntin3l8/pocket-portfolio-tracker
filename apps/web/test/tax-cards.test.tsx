@@ -341,17 +341,26 @@ describe("DistributionCard", () => {
     overAllocated: false,
   };
 
-  it("renders the cap/allocated/remaining figures", () => {
-    render(<DistributionCard distribution={distribution} money={money} t={t} />);
+  it("renders the cap/allocated/remaining figures in EUR, not the display currency", () => {
+    // The page's display currency may be IDR; the Sparerpauschbetrag is still €1,000.
+    render(
+      <DistributionCard distribution={{ ...distribution, currency: "EUR" }} locale="en" t={t} />,
+    );
     expect(screen.getByText("FSA distribution across depots")).toBeInTheDocument();
-    expect(screen.getAllByText("Rp 1,000").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("€1,000.00").length).toBe(2); // cap + allocated
+    expect(screen.queryByText(/IDR|Rp/)).not.toBeInTheDocument();
+  });
+
+  it("defaults to EUR for a response that predates the currency field", () => {
+    render(<DistributionCard distribution={distribution} locale="en" t={t} />);
+    expect(screen.getAllByText("€1,000.00").length).toBe(2);
   });
 
   it("flags over-allocation with a warning banner", () => {
     render(
       <DistributionCard
         distribution={{ ...distribution, totalAllocated: "1200", overAllocated: true }}
-        money={money}
+        locale="en"
         t={t}
       />,
     );

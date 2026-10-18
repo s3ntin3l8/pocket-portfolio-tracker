@@ -43,6 +43,10 @@ import {
   type PortfolioParams,
 } from "./shared.js";
 import {
+  DE_TAX_ALLOWANCE_DEFAULT_EUR,
+  DE_TAX_AMOUNT_CURRENCY,
+  convertLossCarryForward,
+  eurTaxAmountsIn,
   lossCarryForwardFor,
   restOfYearForecastGross,
   buildTfRates,
@@ -124,7 +128,11 @@ export function registerTaxRoutes(app: FastifyInstance) {
         }
       }
 
-      const holderAllowanceCap = new Decimal(holderProfile?.taxAllowanceAnnual ?? 1000);
+      // The distribution helper compares euro amounts with euro amounts (cap vs per-depot
+      // FSA slices), so it stays in EUR — see `holderDistribution.currency`.
+      const holderAllowanceCap = new Decimal(
+        holderProfile?.taxAllowanceAnnual ?? DE_TAX_ALLOWANCE_DEFAULT_EUR,
+      );
       const remainingToDistribute = Decimal.max(
         new Decimal(0),
         holderAllowanceCap.minus(totalAllocatedForHolder),
@@ -212,8 +220,11 @@ export function registerTaxRoutes(app: FastifyInstance) {
       }
 
       // DE path — all the FSA/Harvest/Tf computations need `portfolio.taxAllowanceAnnual`
-      // to be set (guarded by the regime==="DE" 422 above).
-      const allowanceAnnual = portfolio.taxAllowanceAnnual as string;
+      // to be set (guarded by the regime==="DE" 422 above). The FSA slice and the
+      // carry-forward are euro amounts; the trade log is in the portfolio's base currency, so
+      // they are converted first (no rate → unavailable, reported as fxMissing, never 1:1).
+      const toLog = await eurTaxAmountsIn(app, portfolio.baseCurrency, now);
+      const allowanceAnnual = toLog ? toLog(portfolio.taxAllowanceAnnual as string) : "0";
       const taxRate = effectiveCapitalGainsTaxRate(holderProfile ?? {});
 
       const usage = allowanceUsageYTD({
@@ -224,7 +235,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         year,
         forecastIncomeRestOfYear,
         assetClasses,
-        lossCarryForward: lossCarryForwardInput,
+        lossCarryForward: convertLossCarryForward(lossCarryForwardInput, toLog),
       });
       const suggestions = harvestSuggestions({
         tradeLog,
@@ -248,6 +259,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
         tfRatesByInstrument: tfRates,
         carryForwardApplied,
         holderDistribution: {
+          currency: DE_TAX_AMOUNT_CURRENCY,
           holderAllowanceCap: holderAllowanceCap.toFixed(2),
           totalAllocated: totalAllocatedForHolder.toFixed(2),
           remainingToDistribute: remainingToDistribute.toFixed(2),
@@ -503,16 +515,24 @@ export function registerTaxRoutes(app: FastifyInstance) {
           const taxRate = effectiveCapitalGainsTaxRate(holder);
           const forecastIncomeRestOfYear =
             totalForecastGross > 0 ? totalForecastGross.toFixed(2) : "0";
-          const lossCarryForward = await lossCarryForwardFor(app, holder.id, year);
-
-          const holderAllowanceCap = new Decimal(holder.taxAllowanceAnnual ?? 1000);
+          // Euro amounts (cap, FSA slices, carry-forward): the distribution compares them
+          // in EUR; the trade log is in `display`, so what is netted against it is converted
+          // (no rate → unavailable, reported as fxMissing — never €1,000 read as 1,000 IDR).
+          const lossCarryForwardEur = await lossCarryForwardFor(app, holder.id, year);
+          const holderAllowanceCap = new Decimal(
+            holder.taxAllowanceAnnual ?? DE_TAX_ALLOWANCE_DEFAULT_EUR,
+          );
           const remainingToDistribute = Decimal.max(
             new Decimal(0),
             holderAllowanceCap.minus(totalAllocated),
           );
           const overAllocated = totalAllocated.gt(holderAllowanceCap);
 
-          const allowanceAnnual = holderAllowanceCap.toFixed(2);
+          const toLog = await eurTaxAmountsIn(app, display, now);
+          const allowanceAnnual = toLog
+            ? new Decimal(toLog(holderAllowanceCap.toString())).toFixed(2)
+            : "0";
+          const lossCarryForward = convertLossCarryForward(lossCarryForwardEur, toLog);
 
           const usage = allowanceUsageYTD({
             tradeLog: mergedLog,
@@ -553,6 +573,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
             tfRatesByInstrument: tfRates,
             carryForwardApplied: true,
             distribution: {
+              currency: DE_TAX_AMOUNT_CURRENCY,
               holderAllowanceCap: holderAllowanceCap.toFixed(2),
               totalAllocated: totalAllocated.toFixed(2),
               remainingToDistribute: remainingToDistribute.toFixed(2),

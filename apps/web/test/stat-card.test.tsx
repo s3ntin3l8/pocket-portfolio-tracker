@@ -18,6 +18,12 @@ describe("StatCard", () => {
     expect(screen.getByText("Dividends and coupons, before fees")).toBeInTheDocument();
   });
 
+  it("lets a long single word wrap inside a narrow tile instead of overflowing the card", () => {
+    render(<StatCard label="Allowance cap" value="€1,000" delta="Per-person Sparerpauschbetrag" />);
+    expect(screen.getByText("Per-person Sparerpauschbetrag")).toHaveClass("break-words");
+    expect(screen.getByText("Allowance cap")).toHaveClass("break-words");
+  });
+
   // Regression test for #483: an escape-hatch className lets a page span an odd trailing
   // tile across both mobile grid columns instead of leaving it alone in a half-width cell.
   it("forwards a className to the root card for grid-placement overrides", () => {
