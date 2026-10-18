@@ -242,7 +242,7 @@
       "annualized": "Annualized volatility",
       "sharpe": "Sharpe",
       "sortino": "Sortino",
-      "note": "Annualized volatility = standard deviation of daily returns × √252 trading days. Sharpe and Sortino measure excess return (over the risk-free rate) per unit of risk — Sortino counts only downside swings."
+      "note": "Annualized volatility = standard deviation of daily returns × √(observations per year) — about √365 for the calendar-daily value series. Tracking error is annualized the same way, over the days both the portfolio and the benchmark have a value (about √252 when the benchmark only has trading-day closes). Sharpe and Sortino measure excess return (over the risk-free rate) per unit of risk — Sortino counts only downside swings."
     },
     "streaks": {
       "title": "Streaks",
@@ -266,6 +266,7 @@
     },
     "benchmark": {
       "activeReturn": "Active return",
+      "activeReturnSince": "Active return · cumulative since {date}",
       "trackingError": "Tracking error",
       "correlation": "Correlation",
       "vs": "vs {symbol}",

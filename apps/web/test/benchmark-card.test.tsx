@@ -44,6 +44,59 @@ describe("BenchmarkCard", () => {
     expect(screen.queryByText(/210\.0/)).not.toBeInTheDocument();
   });
 
+  it("shows tracking error unsigned — it is a standard deviation, not a gain", () => {
+    renderCard({
+      symbol: "^GSPC",
+      activeReturn: "-0.5798",
+      trackingError: "0.1128",
+      correlation: "0.71",
+    });
+    expect(screen.getByText("11.28%")).toBeInTheDocument();
+    expect(screen.queryByText("+11.28%")).not.toBeInTheDocument();
+  });
+
+  it("names the active return's period and basis when the window start is known", () => {
+    renderCard({
+      symbol: "^GSPC",
+      activeReturn: "-0.5798",
+      trackingError: "0.1128",
+      correlation: "0.71",
+      since: "2021-01-04",
+    });
+    expect(screen.getByText("Active return · cumulative since Jan 2021")).toBeInTheDocument();
+  });
+
+  it("shows a dash when tracking error could not be measured", () => {
+    renderCard({ symbol: "^GSPC", activeReturn: "0.01", trackingError: null, correlation: "0.5" });
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("shows a dash, not NaN, when an older API omits tracking error", () => {
+    renderCard({
+      symbol: "^GSPC",
+      activeReturn: "0.01",
+      correlation: "0.5",
+    } as unknown as InsightsBenchmark);
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+  });
+
+  it("shows a measured zero tracking error as 0.00%, not as unmeasurable", () => {
+    renderCard({ symbol: "^GSPC", activeReturn: "0.01", trackingError: "0", correlation: "1" });
+    expect(screen.getByText("0.00%")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("keeps the plain label for a response without a window start", () => {
+    renderCard({
+      symbol: "^GSPC",
+      activeReturn: "0.01",
+      trackingError: "0.02",
+      correlation: "0.5",
+    });
+    expect(screen.getByText("Active return")).toBeInTheDocument();
+  });
+
   it("falls back to the raw ticker for an unrecognized benchmark symbol", () => {
     renderCard({
       symbol: "^WEIRD123",

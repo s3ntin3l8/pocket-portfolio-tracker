@@ -225,6 +225,19 @@ export function formatPercent(value: number, locale = "en") {
 }
 
 /**
+ * Locale-formatted percentage of a magnitude that has no direction — a rate, a share or a
+ * dispersion (win rate, tracking error). Unlike {@link formatPercent} it never prints a
+ * "+": a standard deviation of +11.28% reads as a gain.
+ */
+export function formatPercentUnsigned(value: number, locale = "en") {
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+/**
  * Locale-formatted percentage from a value already expressed in percent points
  * (`12.5` -> "12.5%" / "12,5 %"). Use instead of `x.toFixed(1) + "%"`, which hard-codes
  * the decimal separator and the sign/space convention.

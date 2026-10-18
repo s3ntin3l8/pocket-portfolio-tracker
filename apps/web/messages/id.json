@@ -242,7 +242,7 @@
       "annualized": "Volatilitas tahunan",
       "sharpe": "Sharpe",
       "sortino": "Sortino",
-      "note": "Volatilitas tahunan = deviasi standar imbal hasil harian × √252 hari perdagangan. Sharpe dan Sortino mengukur kelebihan imbal hasil (di atas suku bunga bebas risiko) per unit risiko — Sortino hanya menghitung fluktuasi negatif."
+      "note": "Volatilitas tahunan = deviasi standar imbal hasil harian × √(jumlah pengamatan per tahun) — sekitar √365 untuk seri nilai harian kalender. Error pelacakan disetahunkan dengan cara yang sama, atas hari-hari ketika portofolio dan benchmark sama-sama memiliki nilai (sekitar √252 bila benchmark hanya punya harga penutupan hari perdagangan). Sharpe dan Sortino mengukur kelebihan imbal hasil (di atas suku bunga bebas risiko) per unit risiko — Sortino hanya menghitung fluktuasi negatif."
     },
     "streaks": {
       "title": "Rentetan",
@@ -266,6 +266,7 @@
     },
     "benchmark": {
       "activeReturn": "Imbal hasil aktif",
+      "activeReturnSince": "Imbal hasil aktif · kumulatif sejak {date}",
       "trackingError": "Error pelacakan",
       "correlation": "Korelasi",
       "vs": "vs {symbol}",

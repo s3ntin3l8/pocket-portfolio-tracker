@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Pencil, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn, formatPercent } from "@/lib/utils";
+import { cn, formatPercent, formatPercentUnsigned } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import { EditBenchmarkDialog } from "./edit-benchmark-dialog";
 import type { BenchmarkSymbolEntry, InsightsBenchmark } from "@portfolio/api-client";
@@ -48,8 +48,17 @@ export function BenchmarkCard({
   }
 
   const activeReturn = Number(benchmark.activeReturn);
-  const trackingError = Number(benchmark.trackingError);
+  // null (or absent, from an older API) = not measurable ("—"); a measured 0 is a real 0.00%
+  // (an exactly-replicated index).
+  const trackingError = benchmark.trackingError == null ? null : Number(benchmark.trackingError);
   const correlation = Number(benchmark.correlation);
+  // Active return is cumulative portfolio return minus cumulative benchmark return over the
+  // whole window, not an annual figure — say so, next to the per-year table on the page.
+  const since = benchmark.since
+    ? new Intl.DateTimeFormat(locale, { month: "short", year: "numeric", timeZone: "UTC" }).format(
+        new Date(`${benchmark.since}T00:00:00Z`),
+      )
+    : null;
 
   return (
     <Card className="group relative rounded-lg bg-card p-4 shadow-card">
@@ -72,12 +81,14 @@ export function BenchmarkCard({
       >
         {formatPercent(activeReturn, locale)}
       </p>
-      <p className="mt-1 text-xs font-medium text-text-2">{t("activeReturn")}</p>
+      <p className="mt-1 text-xs font-medium text-text-2">
+        {since ? t("activeReturnSince", { date: since }) : t("activeReturn")}
+      </p>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-text-2">
         <span>
           {t("trackingError")}:{" "}
           <span className="font-semibold">
-            {trackingError > 0 ? formatPercent(trackingError, locale) : "—"}
+            {trackingError === null ? "—" : formatPercentUnsigned(trackingError, locale)}
           </span>
         </span>
         <span>

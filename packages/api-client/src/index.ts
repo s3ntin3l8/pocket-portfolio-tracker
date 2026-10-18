@@ -1288,9 +1288,15 @@ export interface InsightsStreaks {
 
 export interface InsightsBenchmark {
   symbol: string;
+  /** Cumulative portfolio return minus cumulative benchmark return over the window from
+   *  `since` to the last date both series cover (a fraction, not annualized). */
   activeReturn: string;
-  trackingError: string;
+  /** Annualized with the series' own sampling frequency (a fraction, unsigned); null when
+   *  that frequency can't be measured. */
+  trackingError: string | null;
   correlation: string;
+  /** First date both series cover (YYYY-MM-DD). Optional for responses that predate it. */
+  since?: string;
 }
 
 export interface ConcentrationPoint {
