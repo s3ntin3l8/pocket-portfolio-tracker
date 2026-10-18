@@ -1413,6 +1413,7 @@
     "fxMissingBadge": "No FX rate",
     "fxMissingTooltip": "No FX rate; excluded from totals",
     "fxMissingFooterNote": "Excludes {count, plural, one {1 holding} other {# holdings}} with no exchange rate available.",
+    "fxMissingCashFooterNote": "Excludes cash in {currencies} (no exchange rate available).",
     "hero": {
       "label": "Total portfolio value",
       "periodPast": "past {range}",

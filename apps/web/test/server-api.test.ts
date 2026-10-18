@@ -276,6 +276,34 @@ describe("loadHoldings", () => {
     expect(h.client.getNetWorth).not.toHaveBeenCalled();
   });
 
+  it("passes cashDisplay and fxMissingCurrencies through, defaulting them when absent", async () => {
+    h.client.listPortfolios = async () => PF;
+    h.cookies = { pf: "p1" };
+    h.client.getSummary = vi.fn(async () => ({
+      holdings: [],
+      displayCurrency: "IDR",
+      cash: { EUR: "10" },
+      cashDisplay: { EUR: "170000" },
+      cashTracked: true,
+      fxMissingCurrencies: ["USD"],
+    }));
+    const withFields = await api.loadHoldings();
+    expect(withFields.cashDisplay).toEqual({ EUR: "170000" });
+    expect(withFields.fxMissingCurrencies).toEqual(["USD"]);
+
+    // An API that predates the fields (validation is off in production) must not leave
+    // them undefined behind a non-optional type — the page indexes cashDisplay directly.
+    h.client.getSummary = vi.fn(async () => ({
+      holdings: [],
+      displayCurrency: "IDR",
+      cash: { EUR: "10" },
+      cashTracked: true,
+    }));
+    const legacy = await api.loadHoldings(undefined, "p2");
+    expect(legacy.cashDisplay).toEqual({});
+    expect(legacy.fxMissingCurrencies).toEqual([]);
+  });
+
   it("falls back to the cookie when portfolioOverride is stale/unknown", async () => {
     h.client.listPortfolios = async () => PF;
     h.cookies = { pf: "p1" };

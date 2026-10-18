@@ -51,6 +51,7 @@ const summary = {
     holding({ instrumentId: "i2", valuedAtCost: true, marketValueDisplay: "500" }),
   ],
   cash: { EUR: "50" },
+  cashDisplay: { EUR: "50" },
   cashTracked: true,
   netWorth: "1750",
   totalCost: "1500",

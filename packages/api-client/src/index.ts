@@ -1071,6 +1071,9 @@ export interface PortfolioSummary {
   /** Whether `cash` is meaningful (inside the boundary + funding recorded). When false,
    * `cash` is empty and excluded from net worth — UI shows "not tracked" vs a real 0. */
   cashTracked: boolean;
+  /** `cash` converted into `displayCurrency`, keyed by the balance's own currency — what
+   * net worth sums. A currency with no FX rate is absent (listed in `fxMissingCurrencies`). */
+  cashDisplay: Record<string, string>;
   netWorth: string;
   totalCost: string;
   totalMarketValue: string;
@@ -1115,6 +1118,9 @@ export interface NetWorth {
   /** Whether `cash` is meaningful (at least one portfolio tracks cash). When false,
    * `cash` is empty and excluded from net worth — UI shows "not tracked" vs a real 0. */
   cashTracked: boolean;
+  /** `cash` converted into `displayCurrency`, keyed by the balance's own currency — what
+   * net worth sums. A currency with no FX rate is absent (listed in `fxMissingCurrencies`). */
+  cashDisplay: Record<string, string>;
   netWorth: string;
   totalCost: string;
   totalMarketValue: string;

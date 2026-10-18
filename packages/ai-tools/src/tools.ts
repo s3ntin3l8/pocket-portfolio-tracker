@@ -84,6 +84,7 @@ function compactHeadline(s: PortfolioSummary | NetWorth) {
     totalDayChange: s.totalDayChange,
     cashTracked: s.cashTracked,
     cash: s.cash,
+    cashDisplay: s.cashDisplay,
     exposureByCurrency: s.exposureByCurrency,
     fxMissingCurrencies: s.fxMissingCurrencies ?? [],
     holdingCount: s.holdings.length,

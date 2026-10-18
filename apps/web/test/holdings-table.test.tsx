@@ -67,14 +67,24 @@ const ROWS: HoldingValuation[] = [
   makeHolding("BBCA", "100", "800"),
 ];
 
-function renderTable(opts: { cash?: Record<string, string>; rows?: typeof ROWS } = {}) {
+function renderTable(
+  opts: {
+    cash?: Record<string, string>;
+    cashDisplay?: Record<string, string>;
+    rows?: typeof ROWS;
+  } = {},
+) {
   const rows = opts.rows ?? ROWS;
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <HoldingsTable rows={rows} currency="IDR" cash={opts.cash} />
+      <HoldingsTable rows={rows} currency="IDR" cash={opts.cash} cashDisplay={opts.cashDisplay} />
     </NextIntlClientProvider>,
   );
 }
+
+/** Text of every "Total" row — the desktop footer and the mobile totals row. */
+const totalRowsText = () =>
+  screen.getAllByText("Total").map((el) => el.closest("tr, div.flex")?.textContent ?? "");
 
 describe("HoldingsTable", () => {
   it("renders all rows", () => {
@@ -179,6 +189,52 @@ describe("HoldingsTable", () => {
     expect(screen.getAllByText(/10,000,000/).length).toBeGreaterThan(0);
     // No security rows.
     expect(screen.queryByText("AAPL")).not.toBeInTheDocument();
+  });
+
+  it("values EUR cash in an IDR view at its converted IDR amount, in the rows and the total", () => {
+    // Securities total: 16,000. EUR 8,214.80 converts (API side) to IDR 146,223,440.
+    const { container } = renderTable({
+      cash: { EUR: "8214.80" },
+      cashDisplay: { EUR: "146223440" },
+    });
+    const totals = totalRowsText();
+    expect(totals).toHaveLength(2); // desktop footer + mobile totals row
+    for (const text of totals) {
+      // 16,000 + 146,223,440 — not 16,000 + 8,214.80 added as if it were IDR.
+      expect(text).toMatch(/146,239,440/);
+      expect(text).not.toMatch(/24,214/);
+    }
+    // The cash row's Value is in IDR, with the native EUR amount as secondary text.
+    const cashRow = [...container.querySelectorAll("tbody tr")].find((tr) =>
+      tr.textContent?.includes("Cash"),
+    )!;
+    expect(cashRow.textContent).toMatch(/IDR\s?146,223,440/);
+    expect(cashRow.textContent).toMatch(/€8,214\.80/);
+    expect(screen.queryByText("No FX rate")).not.toBeInTheDocument();
+  });
+
+  it("takes the cash value from cashDisplay, with no native sub-amount in the display currency", () => {
+    // Deliberately different numbers, so the test pins which one is rendered.
+    const { container } = renderTable({ cash: { IDR: "4000" }, cashDisplay: { IDR: "9999" } });
+    const cashRow = [...container.querySelectorAll("tbody tr")].find((tr) =>
+      tr.textContent?.includes("Cash"),
+    )!;
+    expect(cashRow.textContent).toMatch(/9,999/);
+    expect(cashRow.textContent).not.toMatch(/4,000/);
+  });
+
+  it("leaves cash without an FX rate out of the total and flags it, never 1:1", () => {
+    renderTable({ cash: { EUR: "100" }, cashDisplay: {} });
+    for (const text of totalRowsText()) {
+      expect(text).toMatch(/16,000/);
+      expect(text).not.toMatch(/16,100/);
+    }
+    expect(screen.getAllByText("No FX rate").length).toBeGreaterThan(0);
+    // The native balance is still shown, and the exclusion is disclosed.
+    expect(screen.getAllByText(/€100\.00/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Excludes cash in EUR (no exchange rate available).")).toHaveLength(
+      2,
+    );
   });
 
   it("skips zero-balance cash entries", () => {

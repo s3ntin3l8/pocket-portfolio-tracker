@@ -8,7 +8,7 @@ import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import { loadBoundaryFlowsForUser } from "../../src/routes/transactions/insights/yearly-returns.js";
 import { overrideMarketData, invalidateMarketData } from "../../src/services/market-data.js";
-import { netWorthResponseSchema } from "@portfolio/schema";
+import { netWorthResponseSchema, portfolioSummaryResponseSchema } from "@portfolio/schema";
 
 // Audit B2 contract: a currency with no FX rate is never converted 1:1 and never fails the
 // request — the affected rows/holdings are excluded from converted totals and the response
@@ -275,6 +275,69 @@ describe("missing QUOTE currency keeps contributions and value on one boundary (
     // Only the EUR stock's buy; before the fix the USD-quoted buy (no value against it on
     // the year-end NAV side) was a second −1,000.
     expect(flows.map((f) => Number(f.amount))).toEqual([-1000]);
+  });
+});
+
+describe("cash in a foreign currency is converted into the display currency", () => {
+  let t: string;
+  let pf: string;
+
+  beforeAll(async () => {
+    t = await token("fx-cash-user");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    pf = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        // Cash inside the boundary, so the balances count towards net worth.
+        payload: { name: "Cash book", baseCurrency: "IDR", cashCounted: true },
+      })
+    ).json().id as string;
+    const deposit = async (price: string, currency: string) => {
+      const res = await app.inject({
+        method: "POST",
+        url: `/portfolios/${pf}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "deposit",
+          quantity: "1",
+          price,
+          currency,
+          executedAt: "2025-02-01T00:00:00.000Z",
+        },
+      });
+      expect(res.statusCode).toBe(201);
+    };
+    // EUR→IDR is rated (17,000, seeded by the first suite); USD has no rate.
+    await deposit("8214.80", "EUR");
+    await deposit("100", "USD");
+  });
+
+  it("/networth reports cashDisplay in IDR, leaving the unrated currency out", async () => {
+    const res = await app.inject({ method: "GET", url: "/networth", headers: auth(t) });
+    expect(res.statusCode).toBe(200);
+    const body = netWorthResponseSchema.parse(res.json());
+    expect(body.displayCurrency).toBe("IDR");
+    expect(body.cash).toEqual({ EUR: "8214.8", USD: "100" });
+    // 8,214.80 × 17,000 — never the raw 8,214.80, and no USD at 1:1.
+    expect(body.cashDisplay).toEqual({ EUR: "139651600" });
+    expect(body.fxMissingCurrencies).toEqual(["USD"]);
+    // What the Holdings table sums for cash is exactly what net worth counts.
+    expect(Number(body.netWorth)).toBe(139_651_600);
+  });
+
+  it("/portfolios/:id/summary carries the same cashDisplay", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/summary`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = portfolioSummaryResponseSchema.parse(res.json());
+    expect(body.displayCurrency).toBe("IDR");
+    expect(body.cashDisplay).toEqual({ EUR: "139651600" });
+    expect(Number(body.netWorth)).toBe(139_651_600);
   });
 });
 
