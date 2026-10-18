@@ -88,6 +88,19 @@ describe("IdDividendsTable sorting", () => {
   });
 });
 
+describe("ByYearTable basis note", () => {
+  it("discloses that the selected year and earlier years use different bases", () => {
+    wrap(
+      <ByYearTable
+        rows={[{ year: 2026, realized: "0", dividends: "168", fsaUsed: "168", tax: "0" }]}
+        currency={CURRENCY}
+        locale={LOCALE}
+      />,
+    );
+    expect(screen.getByText(messages.Tax.byYear.note)).toBeInTheDocument();
+  });
+});
+
 describe("IdByYearTable sorting", () => {
   it("sorts by Tax descending on click", () => {
     wrap(

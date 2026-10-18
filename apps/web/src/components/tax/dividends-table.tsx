@@ -22,7 +22,7 @@ const DIVIDEND_COLS: ColDef<TaxDividendRow>[] = [
   { key: "net", get: (r) => Number(r.net), type: "numeric" },
 ];
 
-/** "Dividends · {rate}% withheld" table — per-instrument gross/tax/net for the tax year,
+/** "Investment income · tax withheld" table — per-instrument gross/tax/net for the tax year,
  *  aggregated from raw dividend/coupon/interest transactions (their `tax` field).
  *
  *  Unlike every other number on this screen, these amounts are NOT FX-converted (no rate

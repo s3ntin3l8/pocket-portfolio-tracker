@@ -265,7 +265,7 @@ describe("TradesTable", () => {
       fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
       const dialog = screen.getByRole("dialog");
       expect(within(dialog).queryByText("Income while held")).toBeNull();
-      expect(within(dialog).getByText("Dividends collected")).toBeInTheDocument();
+      expect(within(dialog).getByText("Income collected")).toBeInTheDocument();
     });
   });
 

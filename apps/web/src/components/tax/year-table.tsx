@@ -112,6 +112,11 @@ export function ByYearTable({
             ))}
           </TableBody>
         </Table>
+        {/* The selected year's row comes from the allowance calculation: income and
+            realized gains are Tf-adjusted, and loss netting lands in FSA used / the tax.
+            Earlier rows are gross estimates (see loadTaxYearDetail). Two bases in one
+            table — so say so rather than let the rows read as comparable. */}
+        <p className="px-4 pt-3 text-micro font-medium text-text-mute">{t("byYear.note")}</p>
       </CardContent>
     </Card>
   );

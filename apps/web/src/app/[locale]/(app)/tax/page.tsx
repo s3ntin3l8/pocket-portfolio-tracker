@@ -342,7 +342,7 @@ function TaxHolderOverviewDe({
           <StatCard
             label={t("hero.dividendsYtd")}
             value={money(u.incomeYtd)}
-            delta={t("hero.dividendsYtdDesc", { allowance: money(u.allowanceAnnual) })}
+            delta={t("hero.dividendsYtdDesc")}
           />
           <StatCard
             label={t("taxSavingAvailable")}

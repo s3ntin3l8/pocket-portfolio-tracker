@@ -91,8 +91,8 @@
     "income": {
       "title": "Income",
       "desc": "Dividends, coupons & distributions.",
-      "trendVsLastYear": "{pct} vs last year",
-      "caption": "Year to date",
+      "trendVsLastYear": "{pct} full-year est. vs last year",
+      "caption": "Dividends & coupons, year to date",
       "captionEstimated": "Estimated this year",
       "metricTtm": "TTM",
       "metricLifetime": "Lifetime",
@@ -117,7 +117,7 @@
       "trend": "{pct} XIRR",
       "caption": "Current value",
       "metricMonthly": "Monthly avg",
-      "metricReturn": "Total return",
+      "metricReturn": "Total return vs gross contributed",
       "tooltipContributed": "Contributed",
       "tooltipGain": "Gain"
     },
@@ -127,13 +127,13 @@
       "trend": "{pct}% allowance used",
       "caption": "Allowance used this year",
       "metricRealized": "Realized gains YTD",
-      "metricIncome": "Dividends YTD",
+      "metricIncome": "Investment income YTD",
       "tooltipUsed": "Used",
       "tooltipAllowance": "Allowance",
       "idTrend": "Withheld at source",
       "idCaption": "Estimated final tax this year",
       "idMetricSales": "Share sales YTD",
-      "idMetricDividends": "Dividends & coupons YTD"
+      "idMetricDividends": "Investment income YTD"
     },
     "documents": {
       "title": "Tax reports",
@@ -461,7 +461,7 @@
   },
   "Income": {
     "title": "Income",
-    "subtitle": "Dividends, coupons & distributions",
+    "subtitle": "Dividends, coupons, distributions & interest",
     "date": "Date",
     "type": "Type",
     "instrument": "Instrument",
@@ -487,9 +487,10 @@
     "assumptionsGrowth": "Per-share amounts grown at each holding's YoY rate.",
     "assumptionsContributions": "Assumes savings-plan purchases continue at their recent rate.",
     "emptyTitle": "No income yet",
-    "emptyBody": "Dividends and coupons appear here once you record them as transactions.",
+    "emptyBody": "Dividends, coupons and interest appear here once you record them as transactions.",
     "cashInterest": "Cash interest",
     "thisYear": "This year",
+    "thisYearEstimate": "This year (received + forecast)",
     "ttm": "Trailing 12 months",
     "forecast": "Forecast (next year)",
     "forecastNext12": "Next year",
@@ -564,8 +565,8 @@
     "monthsElapsed": "{count, plural, one {# month since start} other {# months since start}}",
     "currentValue": "Current value",
     "simpleGain": "gain",
-    "totalReturn": "Total return",
-    "totalReturnHint": "Incl. dividends, coupons & realized gains",
+    "totalReturn": "Total return vs gross contributed",
+    "totalReturnHint": "Incl. dividends, coupons, interest & realized gains",
     "xirr": "Annualised return",
     "xirrYoungHint": "* annualised from under a year — may overstate",
     "contributionsOverTime": "Contributions over time",
@@ -1955,7 +1956,7 @@
     "held": "Held",
     "invested": "Invested",
     "realized": "Realized",
-    "dividends": "Dividends",
+    "dividends": "Income while held",
     "totalReturn": "Total return",
     "annualized": "Annualized",
     "annualizedAbbr": "/yr",
@@ -1968,7 +1969,7 @@
     "viewTransactions": "View transactions",
     "showTradeDetail": "Show trade detail",
     "totalRealized": "Realized P&L",
-    "totalDividends": "Dividends",
+    "totalDividends": "Income while held",
     "winRate": "Win rate",
     "realizedByYearChartTitle": "Realized P&L per year",
     "winLossTitle": "Win / loss",
@@ -1976,11 +1977,11 @@
     "winners": "Winners",
     "losers": "Losers",
     "realizedByYear": "Realized gains by year",
-    "dividendsByYear": "Dividends by year",
+    "dividendsByYear": "Investment income by year",
     "bonusesByYear": "Bonuses by year",
     "bonusesNote": "Broker-credited rewards (Kindergeld, saveback, free shares). Not counted in total return.",
     "noRealized": "No realized gains yet.",
-    "noDividends": "No dividends received yet.",
+    "noDividends": "No investment income received yet.",
     "year": "Year",
     "received": "Received",
     "withholding": "Tax withheld",
@@ -2008,7 +2009,7 @@
       "holdingPeriod": "Holding period",
       "return": "Return",
       "incomeWhileHeld": "Income while held",
-      "dividendsCollected": "Dividends collected",
+      "dividendsCollected": "Income collected",
       "totalReturnIncome": "Total return incl. income"
     }
   },
@@ -2110,8 +2111,8 @@
       "estimatedTaxDesc": "Abgeltungsteuer {rate}% on {taxable}",
       "realizedGains": "Realized gains · YTD",
       "realizedGainsDesc": "{count} disposals · Tf-adjusted",
-      "dividendsYtd": "Dividends · YTD",
-      "dividendsYtdDesc": "gross · {allowance} allowance applied",
+      "dividendsYtd": "Investment income · YTD",
+      "dividendsYtdDesc": "gross · Tf-adjusted · before allowance",
       "fsaUsed": "FSA used",
       "fsaUsedDesc": "of {allowance} allowance"
     },
@@ -2129,13 +2130,13 @@
       "tfAdjusted": "→ {adjusted} after {pct}% TF"
     },
     "dividendsTable": {
-      "title": "Dividends withheld",
+      "title": "Investment income · tax withheld",
       "source": "Source",
       "gross": "Gross",
       "tax": "Tax",
       "net": "Net",
       "total": "Total",
-      "empty": "No dividend/interest income in {year}."
+      "empty": "No investment income in {year}."
     },
     "allowanceBoxes": {
       "left": "Allowance left",
@@ -2147,9 +2148,10 @@
       "title": "By year",
       "year": "Year",
       "realized": "Realized gains",
-      "dividends": "Dividends",
+      "dividends": "Investment income",
       "fsaUsed": "FSA used",
-      "tax": "Abgeltungsteuer"
+      "tax": "Abgeltungsteuer",
+      "note": "The selected year comes from the allowance calculation: income and gains after the Teilfreistellung, with losses netted in FSA used and the tax. Earlier years are rough estimates on gross figures, without the Teilfreistellung and with today's allowance."
     },
     "footnote": "Germany taxes investment income at a flat {rate}% (Abgeltungsteuer + Solidaritätszuschlag). Your {allowance} Sparer-Pauschbetrag is applied first, then losses offset gains within the same year. Estimate only, not tax advice.",
     "regime": {
@@ -2165,7 +2167,7 @@
         "estimatedTaxDesc": "Withheld at source — nothing to file",
         "salesTax": "Sales tax · 0.1%",
         "salesTaxDesc": "on {amount} of share sales",
-        "dividendTax": "Dividend tax · 10%",
+        "dividendTax": "Investment income tax · 10%",
         "dividendTaxDesc": "on {amount} of income"
       },
       "sales": {
@@ -2177,19 +2179,19 @@
         "empty": "No disposals in {year}."
       },
       "dividendsTable": {
-        "title": "Dividends & coupons · 10% final",
+        "title": "Investment income · 10% final",
         "source": "Source",
         "gross": "Gross",
         "tax": "Tax",
         "net": "Net",
         "total": "Total",
-        "empty": "No dividend/coupon income in {year}."
+        "empty": "No investment income in {year}."
       },
       "byYear": {
         "title": "By year",
         "year": "Year",
         "realized": "Realized gains",
-        "dividends": "Dividends",
+        "dividends": "Investment income",
         "tax": "Est. tax"
       },
       "footnote": "Indonesia applies a final 0.1% tax on listed-share sales and 10% on dividends, both withheld at source — so there's nothing extra to file, and no losses to harvest. This is an estimate, not tax advice.",

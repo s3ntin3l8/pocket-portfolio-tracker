@@ -1,9 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-vi.mock("next-intl/server", () => ({
-  getTranslations: async () => (key: string) => key,
-}));
+// Echoes keys (the assertions below match on them), but only for keys that exist in BOTH
+// catalogues — a label missing from en/id fails here instead of rendering its raw key.
+vi.mock("next-intl/server", async () => {
+  const en = (await import("../messages/en.json")).default as Record<string, unknown>;
+  const id = (await import("../messages/id.json")).default as Record<string, unknown>;
+  const resolve = (bag: unknown, key: string) =>
+    key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], bag);
+  return {
+    getTranslations: async (ns: string) => (key: string) => {
+      for (const [name, cat] of [
+        ["en", en],
+        ["id", id],
+      ] as const) {
+        if (typeof resolve(cat[ns], key) !== "string")
+          throw new Error(`missing message ${ns}.${key} in ${name}.json`);
+      }
+      return key;
+    },
+  };
+});
 
 const data = vi.hoisted(() => ({ incomeStatsOnce: vi.fn() }));
 vi.mock("@/components/income/income-data", () => data);
@@ -151,7 +168,9 @@ describe("Income sections", () => {
 
   it("stat cards show the full-year outlook, trailing figures and payment count", async () => {
     render(await IncomeStatsSection({ locale: "en" }));
-    expect(screen.getByText("thisYear")).toBeInTheDocument();
+    // The value is the full-year estimate (received + forecast), so the label says so.
+    expect(screen.getByText("thisYearEstimate")).toBeInTheDocument();
+    expect(screen.queryByText("thisYear")).not.toBeInTheDocument();
     expect(screen.getByText("payments")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
   });
@@ -162,6 +181,9 @@ describe("Income sections", () => {
     data.incomeStatsOnce.mockResolvedValue(
       stats({ interest: { ytd: "0", ttm: "0", lifetime: "0" } }),
     );
+    expect(await IncomeCashInterestSection({ locale: "en" })).toBeNull();
+    // An API without the field (validation is off in production) hides the line, no throw.
+    data.incomeStatsOnce.mockResolvedValue(stats({ interest: undefined }));
     expect(await IncomeCashInterestSection({ locale: "en" })).toBeNull();
   });
 

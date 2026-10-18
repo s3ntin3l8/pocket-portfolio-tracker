@@ -22,7 +22,7 @@ const ID_DIVIDEND_COLS: ColDef<IdDividendTax>[] = [
   { key: "net", get: (r) => Number(r.net), type: "numeric" },
 ];
 
-/** "Dividends & coupons · 10% final" table — tax/net computed as a flat 10% of gross
+/** "Investment income · 10% final" table — tax/net computed as a flat 10% of gross
  *  (not the broker-recorded withholding — see `indonesianFinalTax`'s doc comment). */
 export function IdDividendsTable({
   rows,

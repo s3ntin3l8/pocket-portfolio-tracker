@@ -91,8 +91,8 @@
     "income": {
       "title": "Pendapatan",
       "desc": "Dividen, kupon & distribusi.",
-      "trendVsLastYear": "{pct} dari tahun lalu",
-      "caption": "Tahun berjalan",
+      "trendVsLastYear": "{pct} perkiraan setahun vs tahun lalu",
+      "caption": "Dividen & kupon, tahun berjalan",
       "captionEstimated": "Perkiraan tahun ini",
       "metricTtm": "TTM",
       "metricLifetime": "Sepanjang masa",
@@ -117,7 +117,7 @@
       "trend": "{pct} XIRR",
       "caption": "Nilai saat ini",
       "metricMonthly": "Rata-rata bulanan",
-      "metricReturn": "Total imbal hasil",
+      "metricReturn": "Total imbal hasil vs total setoran kotor",
       "tooltipContributed": "Dikonstribusikan",
       "tooltipGain": "Keuntungan"
     },
@@ -127,13 +127,13 @@
       "trend": "{pct}% keringanan terpakai",
       "caption": "Keringanan terpakai tahun ini",
       "metricRealized": "Laba terealisasi YTD",
-      "metricIncome": "Dividen YTD",
+      "metricIncome": "Pendapatan investasi YTD",
       "tooltipUsed": "Terpakai",
       "tooltipAllowance": "Batas",
       "idTrend": "Dipotong di sumber",
       "idCaption": "Estimasi pajak final tahun ini",
       "idMetricSales": "Penjualan saham YTD",
-      "idMetricDividends": "Dividen & kupon YTD"
+      "idMetricDividends": "Pendapatan investasi YTD"
     },
     "documents": {
       "title": "Laporan pajak",
@@ -461,7 +461,7 @@
   },
   "Income": {
     "title": "Pendapatan",
-    "subtitle": "Dividen, kupon & distribusi",
+    "subtitle": "Dividen, kupon, distribusi & bunga",
     "date": "Tanggal",
     "type": "Jenis",
     "instrument": "Instrumen",
@@ -487,9 +487,10 @@
     "assumptionsGrowth": "Jumlah per lembar ditingkatkan sesuai tingkat pertumbuhan YoY masing-masing.",
     "assumptionsContributions": "Asumsi pembelian rencana tabungan berlanjut sesuai tren terakhir.",
     "emptyTitle": "Belum ada pendapatan",
-    "emptyBody": "Dividen dan kupon muncul di sini setelah Anda mencatatnya sebagai transaksi.",
+    "emptyBody": "Dividen, kupon, dan bunga muncul di sini setelah Anda mencatatnya sebagai transaksi.",
     "cashInterest": "Bunga tunai",
     "thisYear": "Tahun ini",
+    "thisYearEstimate": "Tahun ini (diterima + perkiraan)",
     "ttm": "12 bulan terakhir",
     "forecast": "Perkiraan (tahun depan)",
     "forecastNext12": "Tahun depan",
@@ -564,8 +565,8 @@
     "monthsElapsed": "{count, plural, other {# bulan sejak awal}}",
     "currentValue": "Nilai saat ini",
     "simpleGain": "keuntungan",
-    "totalReturn": "Total imbal hasil",
-    "totalReturnHint": "Termasuk dividen, kupon & keuntungan terealisasi",
+    "totalReturn": "Total imbal hasil vs total setoran kotor",
+    "totalReturnHint": "Termasuk dividen, kupon, bunga & keuntungan terealisasi",
     "xirr": "Imbal hasil tahunan",
     "xirrYoungHint": "* disetahunkan dari data di bawah setahun — bisa berlebih",
     "contributionsOverTime": "Setoran dari waktu ke waktu",
@@ -1955,7 +1956,7 @@
     "held": "Ditahan",
     "invested": "Diinvestasikan",
     "realized": "Terealisasi",
-    "dividends": "Dividen",
+    "dividends": "Pendapatan selama dimiliki",
     "totalReturn": "Total imbal hasil",
     "annualized": "Tahunan",
     "annualizedAbbr": "/thn",
@@ -1968,7 +1969,7 @@
     "viewTransactions": "Lihat transaksi",
     "showTradeDetail": "Tampilkan detail transaksi",
     "totalRealized": "Laba/rugi terealisasi",
-    "totalDividends": "Dividen",
+    "totalDividends": "Pendapatan selama dimiliki",
     "winRate": "Tingkat menang",
     "realizedByYearChartTitle": "Untung/rugi terealisasi per tahun",
     "winLossTitle": "Menang / kalah",
@@ -1976,11 +1977,11 @@
     "winners": "Menang",
     "losers": "Kalah",
     "realizedByYear": "Keuntungan terealisasi per tahun",
-    "dividendsByYear": "Dividen per tahun",
+    "dividendsByYear": "Pendapatan investasi per tahun",
     "bonusesByYear": "Bonus per tahun",
     "bonusesNote": "Reward dari broker (Kindergeld, saveback, saham gratis). Tidak termasuk dalam total return.",
     "noRealized": "Belum ada keuntungan terealisasi.",
-    "noDividends": "Belum ada dividen yang diterima.",
+    "noDividends": "Belum ada pendapatan investasi yang diterima.",
     "year": "Tahun",
     "received": "Diterima",
     "withholding": "Pajak dipotong",
@@ -2008,7 +2009,7 @@
       "holdingPeriod": "Periode kepemilikan",
       "return": "Imbal hasil",
       "incomeWhileHeld": "Pendapatan selama ditahan",
-      "dividendsCollected": "Dividen diterima",
+      "dividendsCollected": "Pendapatan diterima",
       "totalReturnIncome": "Total imbal hasil termasuk pendapatan"
     }
   },
@@ -2110,8 +2111,8 @@
       "estimatedTaxDesc": "Abgeltungsteuer {rate}% dari {taxable}",
       "realizedGains": "Keuntungan terealisasi · YTD",
       "realizedGainsDesc": "{count} pelepasan · disesuaikan Tf",
-      "dividendsYtd": "Dividen · YTD",
-      "dividendsYtdDesc": "kotor · batas {allowance} diterapkan",
+      "dividendsYtd": "Pendapatan investasi · YTD",
+      "dividendsYtdDesc": "kotor · disesuaikan Tf · sebelum batas",
       "fsaUsed": "FSA terpakai",
       "fsaUsedDesc": "dari batas {allowance}"
     },
@@ -2129,13 +2130,13 @@
       "tfAdjusted": "→ {adjusted} setelah TF {pct}%"
     },
     "dividendsTable": {
-      "title": "Dividen dipotong pajak",
+      "title": "Pendapatan investasi · pajak dipotong",
       "source": "Sumber",
       "gross": "Kotor",
       "tax": "Pajak",
       "net": "Bersih",
       "total": "Total",
-      "empty": "Tidak ada pendapatan dividen/bunga di {year}."
+      "empty": "Tidak ada pendapatan investasi di {year}."
     },
     "allowanceBoxes": {
       "left": "Sisa batas bebas pajak",
@@ -2147,9 +2148,10 @@
       "title": "Per tahun",
       "year": "Tahun",
       "realized": "Keuntungan terealisasi",
-      "dividends": "Dividen",
+      "dividends": "Pendapatan investasi",
       "fsaUsed": "FSA terpakai",
-      "tax": "Abgeltungsteuer"
+      "tax": "Abgeltungsteuer",
+      "note": "Tahun yang dipilih berasal dari perhitungan tunjangan: pendapatan dan keuntungan setelah Teilfreistellung, dengan rugi digabungkan dalam FSA terpakai dan pajak. Tahun-tahun sebelumnya adalah estimasi kasar berdasarkan angka bruto, tanpa Teilfreistellung dan dengan tunjangan saat ini."
     },
     "footnote": "Jerman mengenakan pajak penghasilan investasi sebesar {rate}% flat (Abgeltungsteuer + Solidaritätszuschlag). Sparer-Pauschbetrag {allowance} Anda diterapkan lebih dulu, lalu kerugian mengimbangi keuntungan dalam tahun yang sama. Hanya perkiraan, bukan nasihat pajak.",
     "regime": {
@@ -2165,7 +2167,7 @@
         "estimatedTaxDesc": "Dipotong di sumber — tidak perlu dilaporkan",
         "salesTax": "Pajak penjualan · 0,1%",
         "salesTaxDesc": "atas {amount} penjualan saham",
-        "dividendTax": "Pajak dividen · 10%",
+        "dividendTax": "Pajak pendapatan investasi · 10%",
         "dividendTaxDesc": "atas {amount} penghasilan"
       },
       "sales": {
@@ -2177,19 +2179,19 @@
         "empty": "Tidak ada penjualan di {year}."
       },
       "dividendsTable": {
-        "title": "Dividen & kupon · final 10%",
+        "title": "Pendapatan investasi · final 10%",
         "source": "Sumber",
         "gross": "Bruto",
         "tax": "Pajak",
         "net": "Neto",
         "total": "Total",
-        "empty": "Tidak ada penghasilan dividen/kupon di {year}."
+        "empty": "Tidak ada pendapatan investasi di {year}."
       },
       "byYear": {
         "title": "Per tahun",
         "year": "Tahun",
         "realized": "Keuntungan terealisasi",
-        "dividends": "Dividen",
+        "dividends": "Pendapatan investasi",
         "tax": "Est. pajak"
       },
       "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan 10% atas dividen, keduanya dipotong di sumber — jadi tidak ada yang perlu dilaporkan lagi, dan tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",

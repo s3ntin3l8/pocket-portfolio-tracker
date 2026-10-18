@@ -107,9 +107,9 @@ describe("DividendsTable", () => {
     expect(screen.getByText("€168.00 · $100.00")).toBeInTheDocument();
   });
 
-  it("renders the empty state when there's no dividend income", () => {
+  it("renders the empty state when there's no investment income", () => {
     wrapClient(<DividendsTable rows={[]} totalsByCurrency={[]} locale="en" year={2026} />);
-    expect(screen.getByText(/No dividend\/interest income/)).toBeInTheDocument();
+    expect(screen.getByText(/No investment income/)).toBeInTheDocument();
   });
 });
 
@@ -525,10 +525,10 @@ describe("IdDividendsTable", () => {
     expect(screen.getAllByText("IDR 420,000").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IDR 42,000").length).toBeGreaterThan(0);
     expect(screen.getAllByText("IDR 378,000").length).toBeGreaterThan(0);
-    expect(screen.getByText("Dividends & coupons · 10% final")).toBeInTheDocument();
+    expect(screen.getByText("Investment income · 10% final")).toBeInTheDocument();
   });
 
-  it("renders the empty state when there's no dividend/coupon income", () => {
+  it("renders the empty state when there's no investment income (ID)", () => {
     wrapClient(
       <IdDividendsTable
         rows={[]}
@@ -540,7 +540,7 @@ describe("IdDividendsTable", () => {
         year={2026}
       />,
     );
-    expect(screen.getByText(/No dividend\/coupon income/)).toBeInTheDocument();
+    expect(screen.getByText(/No investment income/)).toBeInTheDocument();
   });
 });
 

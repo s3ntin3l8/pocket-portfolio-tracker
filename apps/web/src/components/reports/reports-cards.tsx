@@ -19,6 +19,7 @@ import {
   formatMoney,
   formatMoneyCompact,
   formatPercent,
+  formatPercentUnsigned,
   formatQuantity,
   formatSignedMoney,
 } from "@/lib/utils";
@@ -54,7 +55,8 @@ export async function IncomeCard({ locale }: CardProps) {
   // full precision.
   const mc = (n: number) => formatMoneyCompact(n, currency, locale);
   // Full-year outlook (actuals-to-date + rest-of-year forecast) vs last year, not just
-  // actuals-to-date vs last year — matches the /income page's own headline delta.
+  // actuals-to-date vs last year — matches the /income page's own headline delta. The
+  // headline here is actuals-to-date, so the chip's label says it compares the estimate.
   const lastYearTotal = Number(s.lastYear);
   const fullYearDeltaAbs = Number(s.forecastFullYear) - lastYearTotal;
   const deltaPct = lastYearTotal > 0 ? fullYearDeltaAbs / lastYearTotal : null;
@@ -173,7 +175,7 @@ export async function TradesCard({ locale }: CardProps) {
         log.winRate !== null
           ? {
               label: t("trades.trend", {
-                pct: formatPercent(log.winRate, locale).replace("+", ""),
+                pct: formatPercentUnsigned(log.winRate, locale),
               }),
               tone: log.winRate >= 0.5 ? "up" : "down",
             }
@@ -227,7 +229,14 @@ export async function SavingsCard({ locale }: CardProps) {
           },
         ]
       : undefined;
-  const totalReturnPct = s.totalReturnPct ?? s.simpleGainPct;
+  // `totalReturnPct` is its own basis — (value + money paid back out − gross contributed)
+  // over gross contributed, i.e. income and realized gains included — so it carries its
+  // basis in the label (over gross, not net, contributed). It is null where the headline gain above already is the total
+  // return (a cash-inside scope); the metric is then omitted rather than filled with
+  // `simpleGainPct` under the same label, which would show one figure under two bases.
+  // `typeof` rather than `!== null`: an API that predates the field omits it, and that
+  // must read as "no figure", not format as "NaN%".
+  const totalReturnPct = typeof s.totalReturnPct === "number" ? s.totalReturnPct : null;
 
   return (
     <ReportCard
@@ -259,10 +268,9 @@ export async function SavingsCard({ locale }: CardProps) {
       }
       metrics={[
         { label: t("savings.metricMonthly"), value: mc(Number(s.monthlyAverage)) },
-        {
-          label: t("savings.metricReturn"),
-          value: totalReturnPct !== null ? formatPercent(totalReturnPct, locale) : "—",
-        },
+        ...(totalReturnPct !== null
+          ? [{ label: t("savings.metricReturn"), value: formatPercent(totalReturnPct, locale) }]
+          : []),
       ]}
       href="/savings"
       openLabel={openLabel}
