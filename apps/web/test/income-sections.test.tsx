@@ -182,6 +182,9 @@ describe("Income sections", () => {
       stats({ interest: { ytd: "0", ttm: "0", lifetime: "0" } }),
     );
     expect(await IncomeCashInterestSection({ locale: "en" })).toBeNull();
+    // An API without the field (validation is off in production) hides the line, no throw.
+    data.incomeStatsOnce.mockResolvedValue(stats({ interest: undefined }));
+    expect(await IncomeCashInterestSection({ locale: "en" })).toBeNull();
   });
 
   it("allocation donut lists asset classes; currency split needs more than one currency", async () => {

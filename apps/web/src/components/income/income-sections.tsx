@@ -223,7 +223,10 @@ export async function IncomeStatsSection({ locale }: SectionProps) {
 
 export async function IncomeCashInterestSection({ locale }: SectionProps) {
   const [t, s] = await Promise.all([getTranslations("Income"), load()]);
-  if (!s || !(Number(s.interest.lifetime) > 0)) return null;
+  // Guarded like the page's `hasIncome` gate (income/page.tsx): response validation is off
+  // in production, so an API without `interest` must hide this line, not throw.
+  const interest = s?.interest;
+  if (!s || !interest || !(Number(interest.lifetime) > 0)) return null;
   const m = (n: number) => formatMoney(n, s.displayCurrency, locale);
   return (
     <CashInterestLine
@@ -231,9 +234,9 @@ export async function IncomeCashInterestSection({ locale }: SectionProps) {
       ytdLabel={t("thisYear")}
       ttmLabel={t("ttm")}
       lifetimeLabel={t("lifetime")}
-      ytd={m(Number(s.interest.ytd))}
-      ttm={m(Number(s.interest.ttm))}
-      lifetime={m(Number(s.interest.lifetime))}
+      ytd={m(Number(interest.ytd))}
+      ttm={m(Number(interest.ttm))}
+      lifetime={m(Number(interest.lifetime))}
     />
   );
 }
