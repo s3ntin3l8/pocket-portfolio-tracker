@@ -105,7 +105,8 @@ export function TaxHolderSectionId({
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Stacked: the income table's five columns don't fit a half-width card. */}
+      <div className="grid gap-4">
         <IdSalesTable
           rows={idTax.disposals}
           totalProceeds={idTax.totalProceeds}

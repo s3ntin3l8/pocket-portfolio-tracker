@@ -1227,12 +1227,13 @@ describe("loadTaxYearDetail", () => {
     ];
     h.cookies = {};
     h.client.getPreferences = async () => ({ taxRegime: "ID" });
-    h.client.getNetWorthTrades = async () => ({
+    const getNetWorthTrades = vi.fn(async () => ({
       displayCurrency: "IDR",
       trades: [],
       realizedByYear: [],
       dividendsByYear: [],
-    });
+    }));
+    h.client.getNetWorthTrades = getNetWorthTrades;
     h.client.listIncomeByYear = async () => [];
     const row = (o: Record<string, unknown>) => ({
       symbol: "X",
@@ -1303,6 +1304,9 @@ describe("loadTaxYearDetail", () => {
     expect(id.estimatedTax).toBe("150.00");
     expect(id.taxWithheldAtSource).toBe("50.00");
     expect(id.taxToSelfPay).toBe("100.00");
+    // The sentinel is never sent to the API as a holder id (it 500'd there and blanked the
+    // whole ID detail).
+    expect(getNetWorthTrades).toHaveBeenCalledWith("fifo", undefined, undefined);
   });
 
   it("ID_ALL_PORTFOLIOS aggregate sentinel resolves to every portfolio in scope (not grouped by account holder)", async () => {

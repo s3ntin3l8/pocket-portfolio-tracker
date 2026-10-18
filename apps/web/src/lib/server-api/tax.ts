@@ -220,6 +220,8 @@ export async function loadTaxYearDetail(
   await Promise.all(
     holders.map(async (entry) => {
       const holderId = entry.holder.id;
+      // The "all portfolios" sentinel is not a holder id: API filters take `undefined` for it.
+      const apiHolderId = holderId === ID_ALL_PORTFOLIOS_ID ? undefined : holderId;
       const pfs = selected
         ? [selected]
         : holderId === ID_ALL_PORTFOLIOS_ID
@@ -249,7 +251,7 @@ export async function loadTaxYearDetail(
         const [tradeLog, incomeLists, idTaxByPortfolio, idTaxByHolder] = await Promise.all([
           selected
             ? api.getTrades(selected.id, "fifo")
-            : api.getNetWorthTrades("fifo", undefined, holderId),
+            : api.getNetWorthTrades("fifo", undefined, apiHolderId),
           Promise.all(pfs.map((p) => api.listIncomeByYear(p.id, targetYear))),
           regime === "ID" && selected
             ? api.getPortfolioTax(selected.id, targetYear)
@@ -259,10 +261,7 @@ export async function loadTaxYearDetail(
           // indonesianFinalTax already populated under ID. Without this, the ID detail
           // section silently zeroed for the most common view.
           regime === "ID" && !selected
-            ? api.getNetworthTax(
-                targetYear,
-                holderId === ID_ALL_PORTFOLIOS_ID ? undefined : holderId,
-              )
+            ? api.getNetworthTax(targetYear, apiHolderId)
             : Promise.resolve<TaxSummaryHolder[] | null>(null),
         ]);
         const apiIdTax: IndonesianFinalTaxLike | undefined = selected
