@@ -544,8 +544,13 @@ export interface IdIncomeRow {
   cashSource?: { type: "dividend" | "coupon" | "interest"; currency: string } | null;
   currency: string;
   category: IdIncomeCategory;
-  /** The category's final rate (decimal string, "0.10"); null for foreign income. */
+  /** The rate applied (decimal string, "0.10"): the category's final rate, "0" when
+   *  `exemption` is set; null for foreign income. */
   rate: string | null;
+  /** `"small_balance"`: Indonesian bank interest exempt because its portfolio's cash
+   *  balance (all currencies, in IDR) was at most Rp7,500,000 just before the payment —
+   *  one portfolio treated as one bank. Counts in the gross, adds no tax. null otherwise. */
+  exemption: "small_balance" | null;
   gross: string;
   /** Indonesian final tax; null for foreign income. */
   tax: string | null;
@@ -563,6 +568,8 @@ export interface IdIncomeCategoryTotal {
   category: IdIncomeCategory;
   rate: string | null;
   gross: string;
+  /** The part of `gross` that is exempt (rows with an `exemption`). */
+  exemptGross: string;
   tax: string | null;
   withheldAtSource: boolean;
 }

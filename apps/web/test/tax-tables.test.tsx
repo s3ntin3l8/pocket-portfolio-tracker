@@ -71,6 +71,7 @@ describe("IdIncomeTable sorting", () => {
       currency: "IDR",
       category: "domestic_dividend" as const,
       rate: "0.10",
+      exemption: null,
       gross,
       tax,
       net,

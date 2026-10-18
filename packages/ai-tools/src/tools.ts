@@ -349,7 +349,10 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       "bank interest 20% from a bank in Indonesia, in any currency (both withheld at source; cash interest follows the " +
       "portfolio's `country` from list_portfolios: ID is Indonesian, another country foreign, unset falls back to IDR = " +
       "Indonesian), " +
-      "reksa dana/ETF distributions 0%. `taxWithheldAtSource` is already " +
+      'reksa dana/ETF distributions 0%. Bank interest is exempt (`income[].exemption: "small_balance"`, `rate` "0", ' +
+      "tax 0; `incomeByCategory[].exemptGross`) when its portfolio's cash balance in all currencies, converted to IDR, " +
+      "was at most Rp7,500,000 just before the payment; this approximates the per-bank rule by treating one portfolio " +
+      "as one bank, so say so. `taxWithheldAtSource` is already " +
       "withheld and `taxToSelfPay` is what the user pays; never present the whole `estimatedTax` as still owed. Foreign income " +
       "(`foreignIncomeGross`) is not in `estimatedTax`: it is taxed at the user's marginal rate (5–35%) with a credit for " +
       "`foreignTaxWithheld`, which Pocket cannot compute. An income row with no instrument is cash income; its " +

@@ -349,6 +349,44 @@ describe("ai-tools", () => {
     expect(d).toMatch(/foreignIncomeGross.*not in `estimatedTax`/);
   });
 
+  it("get_tax_summary explains the Rp7.5M bank-interest exemption and its approximation", () => {
+    const d = byName("get_tax_summary").description;
+    expect(d).toMatch(/`income\[\]\.exemption: "small_balance"`/);
+    expect(d).toMatch(/exemptGross/);
+    expect(d).toMatch(/at most Rp7,500,000/);
+    expect(d).toMatch(/one portfolio as one bank/);
+  });
+
+  it("get_tax_summary passes an income row's exemption through", async () => {
+    const original = client.getNetworthTax;
+    const exemptRow = {
+      symbol: "Cash interest · IDR",
+      cashSource: { type: "interest", currency: "IDR" },
+      currency: "IDR",
+      category: "deposit_interest",
+      rate: "0",
+      exemption: "small_balance",
+      gross: "10000.00",
+      tax: "0.00",
+    };
+    (client as unknown as Record<string, unknown>).getNetworthTax = async () => [
+      {
+        holder: { id: "h1", name: "Max Mustermann", taxResidence: "ID" },
+        year: 2025,
+        regime: "ID",
+        indonesianFinalTax: { income: [exemptRow] },
+      },
+    ];
+    try {
+      const out = (await byName("get_tax_summary").handler({ year: 2025 })) as {
+        indonesianFinalTax: { income: unknown[] };
+      }[];
+      expect(out[0]!.indonesianFinalTax.income).toEqual([exemptRow]);
+    } finally {
+      (client as unknown as Record<string, unknown>).getNetworthTax = original;
+    }
+  });
+
   it("explain_tax_concept is static text, with a caveat only for non-DE users", async () => {
     const t = byName("explain_tax_concept");
     const de = (await t.handler({ concept: "teilfreistellung" })) as Record<string, unknown>;

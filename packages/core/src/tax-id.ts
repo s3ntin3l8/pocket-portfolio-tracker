@@ -19,9 +19,10 @@
  *                          custodian. PP 91/2021 Art. 2, from 30 Aug 2021 (15% before).
  *       deposit_interest   20% final of gross interest on deposits, savings and current
  *                          accounts, withheld by the bank. PP 131/2000 as amended by
- *                          PP 123/2015; PMK 212/PMK.03/2018. Exempt when the deposit and
- *                          savings balance is ≤ Rp7,500,000 (PMK 212 Art. 7(a)) — not applied
- *                          here, see docs/tax.md.
+ *                          PP 123/2015; PMK 212/PMK.03/2018. Not withheld when the deposit
+ *                          and savings amount does not exceed Rp7,500,000 (PMK 212 Art. 7(a),
+ *                          PP 131/2000 Art. 3(1)(a)). Approximated per portfolio, treating
+ *                          one portfolio as one bank: see {@link idDepositInterestExempt}.
  *       fund_distribution  0%: profit distributed by a collective investment contract
  *                          (reksa dana, IDX ETF, DIRE) is not an income-tax object for the
  *                          unit holder. UU PPh Art. 4(3)(i).
@@ -45,6 +46,9 @@
 import { Decimal } from "decimal.js";
 import { D } from "./decimal.js";
 import type { TAXED_INCOME_TYPES } from "./categorization.js";
+import { cashBalances, isCashAccountMovement } from "./cash.js";
+import { tryConvert, type FxRateFn } from "./networth.js";
+import type { CoreTransaction } from "./types.js";
 
 /** 0.1% of gross proceeds of IDX-listed shares (PP 41/1994 as amended by PP 14/1997). */
 export const ID_SALES_TAX_RATE = "0.001";
@@ -58,8 +62,8 @@ export const ID_BOND_INTEREST_TAX_RATE = "0.10";
 export const ID_DEPOSIT_INTEREST_TAX_RATE = "0.20";
 /** Reksa dana / ETF distributions to the unit holder: not a tax object (UU PPh 4(3)(i)). */
 export const ID_FUND_DISTRIBUTION_TAX_RATE = "0";
-/** Deposit + savings balance at or below which no tax is due (PMK 212/2018 Art. 7(a)).
- *  Informational: Pocket does not apply it (it can't see the balance at the bank). */
+/** Deposit + savings amount at or below which bank interest is not taxed ("tidak
+ *  melebihi Rp7.500.000,00", PMK 212/2018 Art. 7(a); PP 131/2000 Art. 3(1)(a)). */
 export const ID_DEPOSIT_EXEMPT_BALANCE_IDR = "7500000";
 
 // ---------------------------------------------------------------------------
@@ -195,6 +199,9 @@ export interface IdCashIncomeSource {
   currency: string;
 }
 
+/** Why a row of income carries no tax although its category has a rate. */
+export type IdIncomeExemption = "small_balance";
+
 /** One income transaction, already in the report's currency. */
 export interface IdIncomeInput {
   /** The paying instrument's id; rows are grouped per (instrument or cash source, category). */
@@ -211,6 +218,10 @@ export interface IdIncomeInput {
   gross: string;
   /** Withholding recorded on the transaction ("0" when none). */
   recordedTax: string;
+  /** Bank interest only: the paying portfolio's whole cash balance (every currency) in IDR
+   *  just before the interest was credited — see {@link idDepositBalanceIdr}. null or
+   *  absent when it can't be known; the interest is then taxed at the full rate. */
+  depositBalanceIdr?: string | null;
 }
 
 /** Where a row's tax figure comes from. */
@@ -223,8 +234,13 @@ export interface IdIncomeTax {
   cashSource?: IdCashIncomeSource | null;
   currency: string;
   category: IdIncomeCategory;
-  /** The category's final rate; null for foreign income. */
+  /** The rate applied: the category's final rate, "0" when {@link exemption} is set; null
+   *  for foreign income. */
   rate: string | null;
+  /** Set when the income is exempt although its category is taxed: `"small_balance"` is bank
+   *  interest on a balance ≤ {@link ID_DEPOSIT_EXEMPT_BALANCE_IDR}. Exempt rows count in the
+   *  gross totals but add nothing to the tax. null otherwise. */
+  exemption: IdIncomeExemption | null;
   gross: string;
   /** Indonesian final tax; null for foreign income (not part of the estimate). */
   tax: string | null;
@@ -241,8 +257,11 @@ export interface IdIncomeTax {
 
 export interface IdIncomeCategoryTotal {
   category: IdIncomeCategory;
+  /** The category's final rate (exempt rows included, see `exemptGross`). */
   rate: string | null;
   gross: string;
+  /** The part of `gross` that is exempt (rows with an `exemption`), "0.00" when none. */
+  exemptGross: string;
   /** null for foreign income. */
   tax: string | null;
   withheldAtSource: boolean;
@@ -317,18 +336,79 @@ export interface IndonesianFinalTax {
 
 const ZERO = new Decimal(0);
 
+/**
+ * The portfolio's cash balance per currency just before `at` (the moment an interest
+ * payment is credited): {@link cashBalances} over the transactions executed strictly
+ * earlier — the same ledger holdings and net worth use, never a second one. Rows at the
+ * very same instant are left out (the order of same-timestamp rows is unknown), and so is
+ * the interest row itself.
+ *
+ * null when the balance can't be known: before the first explicit cash-account movement
+ * ({@link isCashAccountMovement}) the derived cash is only the sum of imported trades, not
+ * a balance. Unlike net worth, this does not depend on the portfolio's `cashCounted`
+ * boundary: cash outside the performance boundary still sits at the bank and earns interest.
+ */
+export function idCashBalancesBefore(
+  transactions: CoreTransaction[],
+  at: Date,
+): Record<string, string> | null {
+  const before = transactions.filter((t) => t.executedAt.getTime() < at.getTime());
+  if (!before.some(isCashAccountMovement)) return null;
+  return cashBalances(before);
+}
+
+/**
+ * A per-currency cash balance in IDR, summed: the amount PMK 212/2018 Art. 7(a) compares
+ * with Rp7,500,000. Foreign-currency deposits count (a "Deposito" is in rupiah or a foreign
+ * currency, Art. 1(1)), converted with `fx` — the rates of the payment date. null when the
+ * balance is unknown or a non-zero currency has no rate into IDR (then it can't be
+ * totalled, and the interest is taxed at the full rate).
+ */
+export function idDepositBalanceIdr(
+  balances: Record<string, string> | null,
+  fx: FxRateFn,
+): string | null {
+  if (balances === null) return null;
+  let total = ZERO;
+  for (const [currency, amount] of Object.entries(balances)) {
+    if (D(amount).isZero()) continue;
+    const idr = tryConvert(amount, currency, "IDR", fx);
+    if (idr === null) return null;
+    total = total.plus(idr);
+  }
+  return total.toString();
+}
+
+/**
+ * Whether bank interest is exempt as a small balance: the balance is known and between 0
+ * and {@link ID_DEPOSIT_EXEMPT_BALANCE_IDR} inclusive ("tidak melebihi", not more than). A
+ * negative balance is a data gap (missing deposits), not a small balance: not exempt.
+ */
+export function idDepositInterestExempt(balanceIdr: string | null | undefined): boolean {
+  if (balanceIdr === null || balanceIdr === undefined) return false;
+  const balance = D(balanceIdr);
+  return balance.gte(0) && balance.lte(ID_DEPOSIT_EXEMPT_BALANCE_IDR);
+}
+
 /** The Indonesian final tax on one income row, or null for foreign income. */
-function incomeRowTax(
-  r: IdIncomeInput,
-): { tax: Decimal; basis: "recorded" | "estimated" | null } | null {
+function incomeRowTax(r: IdIncomeInput): {
+  tax: Decimal;
+  basis: "recorded" | "estimated" | null;
+  exemption: IdIncomeExemption | null;
+} | null {
   const rate = idIncomeTaxRate(r.category);
   if (rate === null) return null;
   const recorded = D(r.recordedTax);
+  // A withholding the bank recorded wins over the approximation: the bank knows the
+  // customer's whole balance with it, Pocket only this portfolio's.
   if (idIncomeWithheldAtSource(r.category) && recorded.gt(0)) {
-    return { tax: recorded, basis: "recorded" };
+    return { tax: recorded, basis: "recorded", exemption: null };
+  }
+  if (r.category === "deposit_interest" && idDepositInterestExempt(r.depositBalanceIdr)) {
+    return { tax: ZERO, basis: null, exemption: "small_balance" };
   }
   const tax = D(r.gross).times(rate);
-  return { tax, basis: tax.isZero() && D(rate).isZero() ? null : "estimated" };
+  return { tax, basis: tax.isZero() && D(rate).isZero() ? null : "estimated", exemption: null };
 }
 
 type IncomeAcc = {
@@ -337,6 +417,7 @@ type IncomeAcc = {
   cashSource?: IdCashIncomeSource | null;
   currency: string;
   category: IdIncomeCategory;
+  exemption: IdIncomeExemption | null;
   gross: Decimal;
   tax: Decimal;
   recorded: Decimal;
@@ -353,7 +434,8 @@ function finishIncomeRow(a: IncomeAcc): IdIncomeTax {
     ...(a.cashSource ? { cashSource: a.cashSource } : {}),
     currency: a.currency,
     category: a.category,
-    rate: idIncomeTaxRate(a.category),
+    rate: a.exemption ? "0" : idIncomeTaxRate(a.category),
+    exemption: a.exemption,
     gross: a.gross.toFixed(2),
     tax: foreign ? null : a.tax.toFixed(2),
     net: foreign ? null : a.gross.minus(a.tax).toFixed(2),
@@ -370,10 +452,12 @@ function categoryTotals(rows: IdIncomeTax[]): IdIncomeCategoryTotal[] {
     if (of.length === 0) continue;
     const gross = of.reduce((s, r) => s.plus(r.gross), ZERO);
     const tax = category === "foreign" ? null : of.reduce((s, r) => s.plus(r.tax ?? "0"), ZERO);
+    const exempt = of.filter((r) => r.exemption).reduce((s, r) => s.plus(r.gross), ZERO);
     out.push({
       category,
       rate: idIncomeTaxRate(category),
       gross: gross.toFixed(2),
+      exemptGross: exempt.toFixed(2),
       tax: tax === null ? null : tax.toFixed(2),
       withheldAtSource: idIncomeWithheldAtSource(category),
     });
@@ -462,19 +546,22 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     if (r.year !== input.year) continue;
 
     // Cash rows group per type and own currency: EUR and USD interest stay two rows even
-    // though both are reported in the display currency.
+    // though both are reported in the display currency. Exempt and taxed payments of one
+    // source stay apart too, so every row has a single rate.
     const source = r.instrumentId
       ? r.instrumentId
       : r.cashSource
         ? `cash:${r.cashSource.type}:${r.cashSource.currency}`
         : r.symbol;
-    const key = `${source}:${r.currency}:${r.category}`;
+    const exemption = rowTax?.exemption ?? null;
+    const key = `${source}:${r.currency}:${r.category}:${exemption ?? ""}`;
     const acc = groups.get(key) ?? {
       ...(r.instrumentId !== undefined ? { instrumentId: r.instrumentId } : {}),
       symbol: r.symbol,
       ...(r.cashSource ? { cashSource: r.cashSource } : {}),
       currency: r.currency,
       category: r.category,
+      exemption,
       gross: ZERO,
       tax: ZERO,
       recorded: ZERO,

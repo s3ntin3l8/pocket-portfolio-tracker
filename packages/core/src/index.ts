@@ -13,7 +13,7 @@ export {
   type HoldingsCursor,
   type ShareCheckpoint,
 } from "./holdings.js";
-export { cashFlow, cashBalances } from "./cash.js";
+export { cashFlow, cashBalances, isCashAccountMovement } from "./cash.js";
 export { xirr, type CashFlowPoint } from "./xirr.js";
 export {
   periodXirr,
@@ -193,6 +193,9 @@ export {
   classifyIdIncome,
   idIncomeTaxRate,
   idIncomeWithheldAtSource,
+  idCashBalancesBefore,
+  idDepositBalanceIdr,
+  idDepositInterestExempt,
   ID_INCOME_CATEGORIES,
   ID_SALES_TAX_RATE,
   ID_DOMESTIC_DIVIDEND_TAX_RATE,
@@ -209,6 +212,7 @@ export {
   type IdIncomeCategory,
   type IdIncomeCategoryTotal,
   type IdIncomeClassifyInput,
+  type IdIncomeExemption,
   type IdIncomeInput,
   type IdIncomeTax,
   type IdIncomeTaxBasis,

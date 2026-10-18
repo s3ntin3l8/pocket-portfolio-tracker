@@ -80,6 +80,8 @@ export function IdIncomeTable({
   );
 
   const taxNote = (r: IdIncomeTax): string | null => {
+    // Exempt bank interest has nothing withheld: don't call its 0 "withheld at source".
+    if (r.exemption) return t("id.incomeTable.exempt");
     if (r.withheldAtSource) {
       if (r.taxBasis === "recorded") return t("id.incomeTable.withheldRecorded");
       if (r.taxBasis === "mixed") return t("id.incomeTable.withheldMixed");
@@ -159,7 +161,9 @@ export function IdIncomeTable({
                       <TableCell className="font-medium">{sourceLabel(r)}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {t(`id.category.${r.category}`)}
-                        {r.rate !== null && ` · ${rateLabel(r.rate, locale)}`}
+                        {r.exemption
+                          ? ` · ${t(`id.exemption.${r.exemption}`)}`
+                          : r.rate !== null && ` · ${rateLabel(r.rate, locale)}`}
                       </TableCell>
                       <TableCell numeric className="text-muted-foreground">
                         {fmt(r.gross)}

@@ -2070,7 +2070,7 @@
     "distribution": {
       "title": "Distribusi FSA di seluruh depot",
       "cap": "Plafon tunjangan",
-      "capDesc": "Sparer\u00adpausch\u00adbetrag per orang",
+      "capDesc": "Sparer­pausch­betrag per orang",
       "allocated": "Dialokasikan",
       "remaining": "Belum didistribusikan",
       "remainingDesc": "Belum dialokasikan ke depot",
@@ -2199,7 +2199,8 @@
         "withheldRecorded": "dipotong (sesuai catatan)",
         "withheldMixed": "dipotong (sebagian sesuai catatan)",
         "selfPay": "setor sendiri",
-        "notTaxed": "bukan objek pajak"
+        "notTaxed": "bukan objek pajak",
+        "exempt": "dikecualikan"
       },
       "category": {
         "domestic_dividend": "Dividen",
@@ -2207,10 +2208,13 @@
         "deposit_interest": "Bunga bank",
         "fund_distribution": "Pembagian reksa dana"
       },
+      "exemption": {
+        "small_balance": "dikecualikan (saldo ≤ Rp7,5 juta)"
+      },
       "notes": {
         "domestic_dividend": "Dividen dari perusahaan Indonesia: final 10%, disetor sendiri paling lambat tanggal 15 bulan berikutnya. Dikecualikan jika diinvestasikan kembali di Indonesia paling sedikit 3 tahun.",
         "bond_interest": "Bunga obligasi, termasuk ORI dan SBR: final 10%, dipotong oleh penerbit atau kustodian.",
-        "deposit_interest": "Bunga dari bank di Indonesia, dalam mata uang apa pun: final 20%, dipotong oleh bank. Portofolio dianggap dari Indonesia jika negaranya diatur ke Indonesia, atau, jika negara belum diatur, jika bunganya dalam rupiah. Bunga dikecualikan selama saldo deposito dan tabungan paling banyak Rp7,5 juta; Pocket tidak dapat melihat saldo itu, jadi pengecualian ini tidak diterapkan. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
+        "deposit_interest": "Bunga dari bank di Indonesia, dalam mata uang apa pun: final 20%, dipotong oleh bank. Portofolio dianggap dari Indonesia jika negaranya diatur ke Indonesia, atau, jika negara belum diatur, jika bunganya dalam rupiah. Bunga dikecualikan selama saldo deposito dan tabungan di bank tersebut paling banyak Rp7,5 juta. Pocket memperkirakannya dengan menganggap satu portofolio sebagai satu bank: saldo kas portofolio tepat sebelum setiap pembayaran, dalam semua mata uang yang dikonversi ke rupiah. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
         "fund_distribution": "Pembagian hasil reksa dana dan ETF bukan objek pajak bagi pemegang unit."
       },
       "foreignTable": {

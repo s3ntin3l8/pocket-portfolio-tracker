@@ -23,8 +23,16 @@ import {
   classifyIdIncome,
   excludeMissingFx,
   defaultPartialExemptionRate,
+  idCashBalancesBefore,
+  idDepositBalanceIdr,
 } from "@portfolio/core";
-import { getFxRates, makeFxRateFn, recordFxMissing } from "../../services/fx.js";
+import {
+  getFxRates,
+  getFxRatesForDates,
+  makeFxRateFn,
+  recordFxMissing,
+  type FxProvider,
+} from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 
 /** English label of income with no paying instrument, for the ID payload's `symbol`. Keyed by
@@ -299,6 +307,67 @@ export function buildTfRates(
   return result;
 }
 
+/** One portfolio's income transactions and its country, the unit cash interest is judged by. */
+export interface IdIncomeSource {
+  coreTxns: CoreTransaction[];
+  /** The portfolio's country (ISO 3166-1 alpha-2); null when unset. */
+  portfolioCountry: string | null;
+}
+
+/** Bank interest is cash interest (no paying instrument) that classifies as Indonesian. */
+function isIdBankInterest(t: CoreTransaction, portfolioCountry: string | null): boolean {
+  return (
+    t.type === "interest" &&
+    !t.instrumentId &&
+    classifyIdIncome({ type: t.type, currency: t.currency, instrument: null, portfolioCountry }) ===
+      "deposit_interest"
+  );
+}
+
+/**
+ * The balance each Indonesian bank-interest payment is judged by for the Rp7.5M exemption
+ * (PMK 212/2018 Art. 7(a)), keyed by the interest transaction: its portfolio's whole cash
+ * balance just before the payment (`idCashBalancesBefore`, the holdings/net-worth cash
+ * ledger), every currency converted to IDR at the payment date's rate. One portfolio stands
+ * for one bank — an approximation, since the rule is per bank and Pocket doesn't know which
+ * portfolios share one. null = unknown (no explicit cash movement yet, or a currency with no
+ * IDR rate, which is then reported in the request's `fxMissingCurrencies`).
+ *
+ * `fxProvider` follows the history routes: `null` for a read-scoped PAT (cached rates only,
+ * audit A7), `undefined` for the request default.
+ */
+export async function loadIdDepositBalances(
+  app: FastifyInstance,
+  sources: IdIncomeSource[],
+  fxProvider?: FxProvider | null,
+): Promise<Map<CoreTransaction, string | null>> {
+  const out = new Map<CoreTransaction, string | null>();
+  await Promise.all(
+    sources.map(async ({ coreTxns, portfolioCountry }) => {
+      const payments = coreTxns.filter((t) => isIdBankInterest(t, portfolioCountry));
+      if (payments.length === 0) return;
+      const ratesByDate = await getFxRatesForDates(
+        app.db,
+        [...new Set(coreTxns.map((t) => t.currency))],
+        "IDR",
+        [...new Set(payments.map((t) => toDateKey(t.executedAt)))],
+        fxProvider,
+      );
+      for (const t of payments) {
+        const rates = ratesByDate.get(toDateKey(t.executedAt)) ?? {};
+        out.set(
+          t,
+          idDepositBalanceIdr(
+            idCashBalancesBefore(coreTxns, t.executedAt),
+            makeFxRateFn(rates, "IDR"),
+          ),
+        );
+      }
+    }),
+  );
+  return out;
+}
+
 /**
  * Build the Indonesian final-tax payload from a (single) portfolio's trade log + raw core
  * transactions. Mirrors the web tier's per-holder assembly in `loadTaxYearDetail` so the
@@ -311,14 +380,20 @@ export function buildTfRates(
  *   a category from `classifyIdIncome` (domestic dividend, bond interest, bank interest,
  *   reksa dana distribution, or foreign income) — each category has its own rate. Income
  *   without an instrument is classified by the country of the portfolio it was booked in,
- *   so the transactions come grouped per portfolio (`incomeSources`).
+ *   so the transactions come grouped per portfolio (`incomeSources`). Indonesian bank
+ *   interest is exempt when its portfolio's balance before the payment was at most
+ *   Rp7.5M (`depositBalances`, from {@link loadIdDepositBalances}).
  * - `byYear` rolls proceeds and income across every year so prior tax years still get a
  *   real Est. tax figure under ID.
  */
 export function computeIndonesianFinalTaxFromTradeLog(input: {
   tradeLog: TradeLog;
   /** Each portfolio's transactions with that portfolio's country (null when unset). */
-  incomeSources: { coreTxns: CoreTransaction[]; portfolioCountry: string | null }[];
+  incomeSources: IdIncomeSource[];
+  /** {@link loadIdDepositBalances} of the same sources: the balance in IDR before each bank
+   *  interest payment, which decides the Rp7.5M exemption. A payment missing from it is
+   *  taxed at the full 20%. */
+  depositBalances?: Map<CoreTransaction, string | null>;
   year: number;
   metaById: Map<string, InstrumentMeta>;
   /** User's display currency. Dividends are converted from their native currency to
@@ -330,6 +405,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   fxRates: Map<string, number>;
 }): IndonesianFinalTax {
   const { tradeLog, incomeSources, year, metaById, displayCurrency, fxRates } = input;
+  const depositBalances = input.depositBalances ?? new Map<CoreTransaction, string | null>();
   const ZERO = "0";
 
   // Native-currency → display-currency. A source currency with no registered rate is
@@ -437,6 +513,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
         year: t.executedAt.getUTCFullYear(),
         gross: net.add(recordedTax).toFixed(2),
         recordedTax: recordedTax.toFixed(2),
+        ...(depositBalances.has(t) ? { depositBalanceIdr: depositBalances.get(t) ?? null } : {}),
       });
     }
   }

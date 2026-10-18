@@ -11,8 +11,13 @@ import {
   ID_DEPOSIT_INTEREST_TAX_RATE,
   ID_FUND_DISTRIBUTION_TAX_RATE,
   ID_DEPOSIT_EXEMPT_BALANCE_IDR,
+  idCashBalancesBefore,
+  idDepositBalanceIdr,
+  idDepositInterestExempt,
   type IdIncomeInput,
 } from "../src/tax-id.js";
+import type { CoreTransaction } from "../src/types.js";
+import type { FxRateFn } from "../src/networth.js";
 
 /** One income row of 2026 in IDR, no recorded withholding unless given. */
 const row = (o: Partial<IdIncomeInput> & Pick<IdIncomeInput, "symbol" | "category" | "gross">) =>
@@ -383,10 +388,18 @@ describe("indonesianFinalTax", () => {
         category: "domestic_dividend",
         rate: "0.10",
         gross: "1000000.00",
+        exemptGross: "0.00",
         tax: "100000.00",
         withheldAtSource: false,
       },
-      { category: "foreign", rate: null, gross: "2010000.00", tax: null, withheldAtSource: false },
+      {
+        category: "foreign",
+        rate: null,
+        gross: "2010000.00",
+        exemptGross: "0.00",
+        tax: null,
+        withheldAtSource: false,
+      },
     ]);
   });
 
@@ -600,5 +613,185 @@ describe("mergeIndonesianFinalTax", () => {
     expect(m.estimatedTax).toBe("0.00");
     expect(m.income).toEqual([]);
     expect(m.byYear).toEqual([]);
+  });
+});
+
+describe("the Rp7.5M small-balance exemption for bank interest", () => {
+  /** A cash row of a portfolio: `price` carries the amount for deposits and interest. */
+  const tx = (
+    type: CoreTransaction["type"],
+    price: string,
+    currency: string,
+    date: string,
+  ): CoreTransaction => ({
+    instrumentId: null,
+    type,
+    quantity: "0",
+    price,
+    fees: "0",
+    currency,
+    executedAt: new Date(`${date}T00:00:00.000Z`),
+  });
+  /** USD → IDR at 16,000, nothing else. */
+  const fx: FxRateFn = (from, to) =>
+    from === to ? "1" : from === "USD" && to === "IDR" ? "16000" : null;
+  const interest = (o: Partial<IdIncomeInput>) =>
+    row({ symbol: "Cash interest · IDR", category: "deposit_interest", gross: "10000", ...o });
+
+  it("exempts a balance of exactly Rp7,500,000 and taxes Rp7,500,001", () => {
+    expect(idDepositInterestExempt("7500000")).toBe(true);
+    expect(idDepositInterestExempt("7500000.00")).toBe(true);
+    expect(idDepositInterestExempt("7500001")).toBe(false);
+    expect(idDepositInterestExempt("7500000.01")).toBe(false);
+    expect(idDepositInterestExempt("0")).toBe(true);
+  });
+
+  it("taxes interest whose balance is unknown or negative (a data gap, not a small balance)", () => {
+    expect(idDepositInterestExempt(null)).toBe(false);
+    expect(idDepositInterestExempt(undefined)).toBe(false);
+    expect(idDepositInterestExempt("-1")).toBe(false);
+  });
+
+  it("applies 0 tax to exempt interest, keeps it in the gross, and labels the row", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [
+        interest({ gross: "10000", depositBalanceIdr: "7500000" }),
+        interest({ gross: "40000", depositBalanceIdr: "7500001" }),
+      ],
+    });
+    expect(result.income).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        exemption: "small_balance",
+        rate: "0",
+        gross: "10000.00",
+        tax: "0.00",
+        net: "10000.00",
+        taxBasis: null,
+      }),
+      expect.objectContaining({
+        category: "deposit_interest",
+        exemption: null,
+        rate: "0.20",
+        gross: "40000.00",
+        tax: "8000.00",
+        taxBasis: "estimated",
+      }),
+    ]);
+    expect(result.totalIncomeGross).toBe("50000.00");
+    expect(result.totalIncomeTax).toBe("8000.00");
+    expect(result.estimatedTax).toBe("8000.00");
+    expect(result.incomeByCategory).toEqual([
+      {
+        category: "deposit_interest",
+        rate: "0.20",
+        gross: "50000.00",
+        exemptGross: "10000.00",
+        tax: "8000.00",
+        withheldAtSource: true,
+      },
+    ]);
+    expect(result.byYear).toEqual([
+      { year: 2026, realized: "0.00", income: "50000.00", foreignIncome: "0.00", tax: "8000.00" },
+    ]);
+  });
+
+  it("uses a withholding the bank recorded even when the balance looks small", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [interest({ gross: "10000", recordedTax: "2000", depositBalanceIdr: "100" })],
+    });
+    expect(result.income[0]).toMatchObject({ exemption: null, tax: "2000.00" });
+  });
+
+  it("never exempts securities income, whatever the balance", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [
+        row({
+          symbol: "BBCA",
+          category: "domestic_dividend",
+          gross: "100000",
+          depositBalanceIdr: "0",
+        }),
+        row({
+          symbol: "ORI023",
+          category: "bond_interest",
+          gross: "100000",
+          depositBalanceIdr: "0",
+        }),
+        row({
+          symbol: "RDPU",
+          category: "fund_distribution",
+          gross: "100000",
+          depositBalanceIdr: "0",
+        }),
+      ],
+    });
+    expect(result.income.map((r) => [r.symbol, r.exemption, r.tax])).toEqual([
+      ["BBCA", null, "10000.00"],
+      ["ORI023", null, "10000.00"],
+      ["RDPU", null, "0.00"],
+    ]);
+    expect(result.incomeByCategory.every((c) => c.exemptGross === "0.00")).toBe(true);
+  });
+
+  describe("the balance before a payment", () => {
+    it("is the cash of every earlier row, the payment itself and later rows left out", () => {
+      const txns = [
+        tx("deposit", "5000000", "IDR", "2026-01-02"),
+        tx("interest", "1000", "IDR", "2026-01-31"),
+        tx("deposit", "9000000", "IDR", "2026-02-15"),
+        tx("interest", "2000", "IDR", "2026-02-28"),
+      ];
+      expect(idCashBalancesBefore(txns, txns[1]!.executedAt)).toEqual({ IDR: "5000000" });
+      expect(idCashBalancesBefore(txns, txns[3]!.executedAt)).toEqual({ IDR: "14001000" });
+    });
+
+    it("is unknown before the first explicit cash movement (imported trades only)", () => {
+      const txns = [
+        tx("interest", "1000", "IDR", "2026-01-31"),
+        tx("interest", "1000", "IDR", "2026-02-28"),
+      ];
+      expect(idCashBalancesBefore(txns, txns[1]!.executedAt)).toBeNull();
+      expect(idDepositBalanceIdr(null, fx)).toBeNull();
+    });
+
+    it("counts IDR cash with no portfolio country the same way", () => {
+      // classifyIdIncome treats IDR cash interest without a country as Indonesian bank
+      // interest; the balance then decides the exemption like for an ID portfolio.
+      expect(classifyIdIncome({ type: "interest", currency: "IDR", portfolioCountry: null })).toBe(
+        "deposit_interest",
+      );
+      const txns = [
+        tx("deposit", "2000000", "IDR", "2026-01-02"),
+        tx("interest", "800", "IDR", "2026-01-31"),
+      ];
+      const balance = idDepositBalanceIdr(idCashBalancesBefore(txns, txns[1]!.executedAt), fx);
+      expect(balance).toBe("2000000");
+      expect(idDepositInterestExempt(balance)).toBe(true);
+    });
+
+    it("converts a foreign-currency balance to IDR, which can cross the threshold", () => {
+      // Rp7,000,000 on its own is exempt; USD 50 (Rp800,000) at the same bank takes the
+      // total to Rp7,800,000.
+      const txns = [
+        tx("deposit", "7000000", "IDR", "2026-01-02"),
+        tx("deposit", "50", "USD", "2026-01-03"),
+        tx("interest", "1000", "IDR", "2026-01-31"),
+      ];
+      const balances = idCashBalancesBefore(txns, txns[2]!.executedAt);
+      expect(balances).toEqual({ IDR: "7000000", USD: "50" });
+      const idr = idDepositBalanceIdr(balances, fx);
+      expect(idr).toBe("7800000");
+      expect(idDepositInterestExempt(idr)).toBe(false);
+      expect(idDepositInterestExempt(idDepositBalanceIdr({ IDR: "7000000" }, fx))).toBe(true);
+    });
+
+    it("is unknown when a currency has no rate into IDR, unless its balance is zero", () => {
+      expect(idDepositBalanceIdr({ IDR: "100", EUR: "5" }, fx)).toBeNull();
+      expect(idDepositBalanceIdr({ IDR: "100", EUR: "0" }, fx)).toBe("100");
+    });
   });
 });
