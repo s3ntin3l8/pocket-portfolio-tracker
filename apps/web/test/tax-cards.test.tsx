@@ -592,8 +592,8 @@ describe("IdIncomeTable", () => {
           }),
         ]}
         totalIncomeGross="1120000"
-        totalIncomeTax="112000.00"
-        totalIncomeNet="908000.00"
+        totalIncomeTax="124500.00"
+        totalIncomeNet="995500.00"
         currency={CURRENCY}
         locale={LOCALE}
         year={2026}
@@ -612,7 +612,7 @@ describe("IdIncomeTable", () => {
     expect(screen.getByText("withheld (partly as recorded)")).toBeInTheDocument();
     expect(screen.getByText("you pay")).toBeInTheDocument();
     expect(screen.getByText("not taxed")).toBeInTheDocument();
-    expect(screen.getAllByText("IDR 112,000").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("IDR 124,500").length).toBeGreaterThan(0);
     // One note per category present, including the reinvestment and Rp7.5M rules.
     expect(screen.getByText(messages.Tax.id.notes.domestic_dividend)).toBeInTheDocument();
     expect(messages.Tax.id.notes.domestic_dividend).toMatch(/reinvest.*3 years/);

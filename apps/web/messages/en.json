@@ -2062,7 +2062,7 @@
     "distribution": {
       "title": "FSA distribution across depots",
       "cap": "Allowance cap",
-      "capDesc": "Per-person Sparer­pausch­betrag",
+      "capDesc": "Per-person Sparer\u00adpausch\u00adbetrag",
       "allocated": "Allocated",
       "remaining": "Still to distribute",
       "remainingDesc": "Unallocated to a depot",
