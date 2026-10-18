@@ -27,24 +27,43 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
 
 const { buildApp } = await import("../../src/app.js");
 const { closeDb } = await import("../../src/db/client.js");
-const { invalidateStorage } = await import("../../src/storage/index.js");
+const { getStorageProvider, invalidateStorage } = await import("../../src/storage/index.js");
 
-const saved = { NODE_ENV: process.env.NODE_ENV, STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT };
+const saved = {
+  NODE_ENV: process.env.NODE_ENV,
+  STORAGE_PROVIDER: process.env.STORAGE_PROVIDER,
+  STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT,
+};
 
-/** Boot an app with the real storage plugin and let its fire-and-forget probe settle. */
-async function bootAndSettle(env: { NODE_ENV: string; STORAGE_ENDPOINT?: string }) {
+/**
+ * Boot an app with the real storage plugin and hand it to `check`. The storage env is set
+ * explicitly, never deleted: outside NODE_ENV=test the env plugin loads dotenv, and a key
+ * that is absent could come from a local `.env` (dotenv doesn't override a present one).
+ */
+async function boot(
+  env: { NODE_ENV: string; STORAGE_ENDPOINT?: string },
+  check: (app: Awaited<ReturnType<typeof buildApp>>) => Promise<void>,
+) {
   process.env.NODE_ENV = env.NODE_ENV;
-  if (env.STORAGE_ENDPOINT === undefined) delete process.env.STORAGE_ENDPOINT;
-  else process.env.STORAGE_ENDPOINT = env.STORAGE_ENDPOINT;
+  process.env.STORAGE_PROVIDER = "s3";
+  process.env.STORAGE_ENDPOINT = env.STORAGE_ENDPOINT ?? "";
   invalidateStorage();
   s3.constructed.length = 0;
   s3.sent.length = 0;
   const app = await buildApp();
   try {
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await check(app);
   } finally {
     await app.close();
   }
+}
+
+/** Let the plugin's fire-and-forget provider resolution finish: resolve the same provider
+ *  ourselves, then yield once more so its `.then` has run. A slow host can only delay this
+ *  (it never turns a "nothing sent" case red). */
+async function settle(app: Awaited<ReturnType<typeof buildApp>>) {
+  await getStorageProvider(app);
+  await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 describe("storage plugin — the boot-time bucket probe", () => {
@@ -61,19 +80,32 @@ describe("storage plugin — the boot-time bucket probe", () => {
   });
 
   it("sends nothing under test", async () => {
-    await bootAndSettle({ NODE_ENV: "test" });
+    await boot({ NODE_ENV: "test" }, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
     expect(s3.sent).toEqual([]);
     expect(s3.constructed).toEqual([]);
   });
 
+  it("sends nothing in production", async () => {
+    await boot({ NODE_ENV: "production", STORAGE_ENDPOINT: "http://127.0.0.1:9" }, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(s3.sent).toEqual([]);
+  });
+
   it("sends nothing in development without a configured endpoint (it would reach AWS S3)", async () => {
-    await bootAndSettle({ NODE_ENV: "development" });
+    await boot({ NODE_ENV: "development" }, settle);
     expect(s3.sent).toEqual([]);
   });
 
   it("probes the bucket in development against a configured endpoint (a local MinIO)", async () => {
-    await bootAndSettle({ NODE_ENV: "development", STORAGE_ENDPOINT: "http://127.0.0.1:9" });
+    await boot({ NODE_ENV: "development", STORAGE_ENDPOINT: "http://127.0.0.1:9" }, async () => {
+      // Waits for the probe itself rather than a fixed time.
+      await vi.waitFor(() => expect(s3.sent).toEqual(["HeadBucketCommand"]), {
+        timeout: 10_000,
+      });
+    });
     expect(s3.constructed).toEqual([expect.objectContaining({ endpoint: "http://127.0.0.1:9" })]);
-    expect(s3.sent).toEqual(["HeadBucketCommand"]);
   });
 });
