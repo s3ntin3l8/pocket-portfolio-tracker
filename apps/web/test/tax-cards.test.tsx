@@ -383,6 +383,9 @@ describe("DistributionCard", () => {
     expect(classes).not.toContain("grid-cols-3");
     const capClasses = (cap.getAttribute("class") ?? "").split(/\s+/);
     expect(capClasses).toContain("max-sm:@xs:col-span-2");
+    // A 584-639px window is still `max-sm` while the card is already 3-up (>=512px): the span
+    // must be reset there, or the cap takes 2 of 3 columns and the last tile wraps alone.
+    expect(capClasses).toContain("@lg:col-span-1");
     for (const key of ["distribution.allocated", "distribution.remaining"] as const) {
       const tile = screen.getByText(t(key)).closest(".bg-card")!;
       expect(tile.getAttribute("class") ?? "").not.toMatch(/col-span/);
