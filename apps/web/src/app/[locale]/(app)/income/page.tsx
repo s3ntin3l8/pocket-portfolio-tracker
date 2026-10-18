@@ -73,7 +73,7 @@ export default async function IncomePage({ params }: { params: Promise<{ locale:
     s.events.length > 0 ||
     s.yields.length > 0 ||
     s.upcoming.length > 0 ||
-    Number(s.interest.lifetime) > 0;
+    Number(s.interest?.lifetime ?? 0) > 0;
 
   if (!hasIncome) {
     return (

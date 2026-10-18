@@ -30,6 +30,12 @@ const data = vi.hoisted(() => ({
 }));
 vi.mock("@/components/reports/reports-data", () => data);
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+// Pass-through spy: lets the win-rate case pin WHICH formatter renders it (for a 0..1
+// share, `formatPercent(…).replace("+", "")` would print the same string).
+vi.mock("@/lib/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/lib/utils")>();
+  return { ...actual, formatPercentUnsigned: vi.fn(actual.formatPercentUnsigned) };
+});
 
 vi.mock("@/components/reports/report-card", () => ({
   ReportCard: (p: { title: string; value: string; href: string }) => (
@@ -48,6 +54,7 @@ import {
   DocumentsCard,
 } from "../src/components/reports/reports-cards";
 import { ReportsStatus } from "../src/components/reports/reports-status";
+import { formatPercentUnsigned } from "@/lib/utils";
 
 const wrap = (ui: React.ReactNode) =>
   render(
@@ -289,6 +296,7 @@ describe("TradesCard win rate", () => {
     const el = (await TradesCard({ locale: "en" }))!;
     expect(el.props.trend.label).toContain('"pct":"75.00%"');
     expect(el.props.trend.label).not.toContain("+");
+    expect(formatPercentUnsigned).toHaveBeenCalledWith(0.75, "en");
   });
 });
 
