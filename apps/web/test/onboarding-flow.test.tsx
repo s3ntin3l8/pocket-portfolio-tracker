@@ -150,6 +150,36 @@ describe("OnboardingFlow", () => {
     expect(screen.getByText(messages.Onboarding.steps.tax.title)).toBeInTheDocument();
   });
 
+  it("keeps the brokerage list open when focus returns within the blur-close delay", () => {
+    renderFlow();
+    fireEvent.click(screen.getByRole("button", { name: /Get started/ }));
+    fireEvent.change(screen.getByPlaceholderText(messages.Onboarding.holder.namePlaceholder), {
+      target: { value: "Björn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Continue/ })); // -> Tax
+    fireEvent.click(screen.getByRole("button", { name: /Continue/ })); // -> Portfolio
+    const label = messages.Onboarding.portfolio.brokerageLabel;
+    const input = screen.getByRole("textbox", { name: label });
+    const toggle = screen.getByRole("button", { name: label });
+    vi.useFakeTimers();
+    try {
+      fireEvent.focus(input);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      // Blur arms the 120 ms close; focusing again before it fires must cancel it.
+      fireEvent.blur(input);
+      act(() => vi.advanceTimersByTime(60));
+      fireEvent.focus(input);
+      act(() => vi.advanceTimersByTime(200));
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      // A blur that isn't followed by focus still closes it.
+      fireEvent.blur(input);
+      act(() => vi.advanceTimersByTime(120));
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("commits holder + preferences + portfolio on Create portfolio, in order, then advances to Add data", async () => {
     renderFlow();
     fireEvent.click(screen.getByRole("button", { name: /Get started/ }));

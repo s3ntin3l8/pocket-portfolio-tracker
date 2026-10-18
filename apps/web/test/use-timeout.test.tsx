@@ -55,11 +55,31 @@ describe("useTimeout", () => {
     expect(fn).not.toHaveBeenCalled();
   });
 
-  it("keeps schedule/cancel stable across renders (safe in effect deps)", () => {
+  it("ignores a schedule after unmount (an async continuation landing after navigation)", () => {
+    const fn = vi.fn();
+    const { result, unmount } = renderHook(() => useTimeout());
+    const { schedule } = result.current;
+    unmount();
+    schedule(fn, 5000);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(5000);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("keeps working after StrictMode's simulated unmount/remount", () => {
+    const fn = vi.fn();
+    const { result } = renderHook(() => useTimeout(), { reactStrictMode: true });
+    act(() => result.current.schedule(fn, 1000));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a stable object with stable members (safe in dep arrays and memo props)", () => {
     const { result, rerender } = renderHook(() => useTimeout());
-    const { schedule, cancel } = result.current;
+    const first = result.current;
     rerender();
-    expect(result.current.schedule).toBe(schedule);
-    expect(result.current.cancel).toBe(cancel);
+    expect(result.current).toBe(first);
+    expect(result.current.schedule).toBe(first.schedule);
+    expect(result.current.cancel).toBe(first.cancel);
   });
 });

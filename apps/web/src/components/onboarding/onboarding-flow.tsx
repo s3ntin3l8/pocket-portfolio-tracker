@@ -465,10 +465,16 @@ export function OnboardingFlow() {
                       brokerageValue={brokerageValue}
                       brokerageOpen={brokerageOpen}
                       onBrokerageChange={(v) => {
+                        // Typing re-opens the list: a close armed by an earlier blur must not
+                        // shut it again.
+                        closeBrokerage.cancel();
                         setBrokerageValue(v);
                         setBrokerageOpen(true);
                       }}
-                      onBrokerageFocus={() => setBrokerageOpen(true)}
+                      onBrokerageFocus={() => {
+                        closeBrokerage.cancel();
+                        setBrokerageOpen(true);
+                      }}
                       onBrokerageToggle={() => setBrokerageOpen((o) => !o)}
                       onBrokerageBlur={() =>
                         closeBrokerage.schedule(() => setBrokerageOpen(false), 120)
