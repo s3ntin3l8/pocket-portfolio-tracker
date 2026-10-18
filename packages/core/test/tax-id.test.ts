@@ -390,6 +390,47 @@ describe("indonesianFinalTax", () => {
     ]);
   });
 
+  it("keeps cash income apart per currency and passes its source through", () => {
+    // Both reported in IDR with the same label stem: only the cash source tells them apart.
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [
+        row({
+          symbol: "Cash interest",
+          cashSource: { type: "interest", currency: "EUR" },
+          category: "foreign",
+          gross: "170000",
+        }),
+        row({
+          symbol: "Cash interest",
+          cashSource: { type: "interest", currency: "USD" },
+          category: "foreign",
+          gross: "16000",
+        }),
+        row({
+          symbol: "Cash interest",
+          cashSource: { type: "interest", currency: "EUR" },
+          category: "foreign",
+          gross: "30000",
+        }),
+      ],
+    });
+    expect(result.income).toHaveLength(2);
+    expect(result.income.find((r) => r.cashSource?.currency === "EUR")).toMatchObject({
+      cashSource: { type: "interest", currency: "EUR" },
+      gross: "200000.00",
+    });
+    expect(result.income.find((r) => r.cashSource?.currency === "USD")?.gross).toBe("16000.00");
+  });
+
+  it("leaves cashSource off instrument rows", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [row({ symbol: "BBCA", category: "domestic_dividend", gross: "100" })],
+    });
+    expect(result.income[0]).not.toHaveProperty("cashSource");
+  });
+
   it("estimatedTax = sales tax + Indonesian income tax, split into withheld and self-paid", () => {
     const result = indonesianFinalTax({
       ...empty,

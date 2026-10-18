@@ -15,16 +15,29 @@ import { useTableSort, type ColDef } from "@/lib/table-sort";
 import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { ID_INCOME_CATEGORIES, type IdIncomeTax } from "@portfolio/core";
 
-const ID_INCOME_COLS: ColDef<IdIncomeTax>[] = [
-  { key: "source", get: (r) => r.symbol, type: "text" },
+type SourceLabel = (r: IdIncomeTax) => string;
+
+/** The Source cell's text: the instrument symbol, or for cash income (no instrument) its
+ *  translated type and own currency ("Cash interest · EUR") — never the API's fallback. */
+function useSourceLabel(): SourceLabel {
+  const t = useTranslations("Tax");
+  return (r) =>
+    r.cashSource
+      ? t(`cashSource.${r.cashSource.type}`, { currency: r.cashSource.currency })
+      : r.symbol;
+}
+
+// Sorting by Source follows the label the reader sees, so the columns take it as an argument.
+const idIncomeCols = (label: SourceLabel): ColDef<IdIncomeTax>[] => [
+  { key: "source", get: label, type: "text" },
   { key: "type", get: (r) => r.category, type: "text" },
   { key: "gross", get: (r) => Number(r.gross), type: "numeric" },
   { key: "tax", get: (r) => Number(r.tax ?? 0), type: "numeric" },
   { key: "net", get: (r) => Number(r.net ?? 0), type: "numeric" },
 ];
 
-const ID_FOREIGN_COLS: ColDef<IdIncomeTax>[] = [
-  { key: "source", get: (r) => r.symbol, type: "text" },
+const idForeignCols = (label: SourceLabel): ColDef<IdIncomeTax>[] => [
+  { key: "source", get: label, type: "text" },
   { key: "gross", get: (r) => Number(r.gross), type: "numeric" },
   { key: "foreignTax", get: (r) => Number(r.foreignTaxWithheld ?? 0), type: "numeric" },
 ];
@@ -58,7 +71,8 @@ export function IdIncomeTable({
 }) {
   const t = useTranslations("Tax");
   const fmt = (n: string | number) => formatMoney(Number(n), currency, locale);
-  const { sortKey, sortDir, toggle, sort } = useTableSort<IdIncomeTax>(ID_INCOME_COLS);
+  const sourceLabel = useSourceLabel();
+  const { sortKey, sortDir, toggle, sort } = useTableSort<IdIncomeTax>(idIncomeCols(sourceLabel));
   const sorted = sort(rows);
   // One note per category present, in the categories' display order.
   const notes = ID_INCOME_CATEGORIES.filter(
@@ -141,8 +155,8 @@ export function IdIncomeTable({
                   const note = taxNote(r);
                   return (
                     // Merged holder payloads can repeat an instrument: the index keeps keys unique.
-                    <TableRow key={`${r.instrumentId ?? r.symbol}:${r.category}:${i}`}>
-                      <TableCell className="font-medium">{r.symbol}</TableCell>
+                    <TableRow key={`${r.instrumentId ?? sourceLabel(r)}:${r.category}:${i}`}>
+                      <TableCell className="font-medium">{sourceLabel(r)}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {t(`id.category.${r.category}`)}
                         {r.rate !== null && ` · ${rateLabel(r.rate, locale)}`}
@@ -215,7 +229,8 @@ export function IdForeignIncomeTable({
 }) {
   const t = useTranslations("Tax");
   const fmt = (n: string | number) => formatMoney(Number(n), currency, locale);
-  const { sortKey, sortDir, toggle, sort } = useTableSort<IdIncomeTax>(ID_FOREIGN_COLS);
+  const sourceLabel = useSourceLabel();
+  const { sortKey, sortDir, toggle, sort } = useTableSort<IdIncomeTax>(idForeignCols(sourceLabel));
   if (rows.length === 0) return null;
   const sorted = sort(rows);
 
@@ -258,8 +273,8 @@ export function IdForeignIncomeTable({
           </TableHeader>
           <TableBody>
             {sorted.map((r, i) => (
-              <TableRow key={`${r.instrumentId ?? r.symbol}:${i}`}>
-                <TableCell className="font-medium">{r.symbol}</TableCell>
+              <TableRow key={`${r.instrumentId ?? sourceLabel(r)}:${i}`}>
+                <TableCell className="font-medium">{sourceLabel(r)}</TableCell>
                 <TableCell numeric>{fmt(r.gross)}</TableCell>
                 <TableCell numeric className="text-muted-foreground">
                   {fmt(r.foreignTaxWithheld ?? 0)}

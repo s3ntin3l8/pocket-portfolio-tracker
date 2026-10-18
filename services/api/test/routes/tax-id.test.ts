@@ -461,6 +461,7 @@ describe("Indonesian income tax — a rate per income type, foreign income kept 
     withheldAtSource: boolean;
     taxBasis: string | null;
     foreignTaxWithheld: string | null;
+    cashSource?: { type: string; currency: string };
   };
 
   /** One IDR portfolio with a mixed 2025: an IDX dividend, two IDR bond coupons (one with
@@ -604,6 +605,18 @@ describe("Indonesian income tax — a rate per income type, foreign income kept 
     expect(us).toMatchObject({ category: "foreign", tax: null, foreignTaxWithheld: "240000.00" });
     const bond = id.income.find((r) => r.category === "bond_interest")!;
     expect(bond.taxBasis).toBe("mixed");
+    // Cash interest (no instrument) is labelled by type and its own currency, never by
+    // the bare type key — this payload is what the MCP/assistant tools pass through.
+    expect(id.income.map((r) => r.symbol)).not.toContain("interest");
+    expect(id.income.find((r) => r.category === "deposit_interest")).toMatchObject({
+      symbol: "Cash interest · IDR",
+      cashSource: { type: "interest", currency: "IDR" },
+    });
+    expect(id.income.find((r) => r.cashSource?.currency === "EUR")).toMatchObject({
+      symbol: "Cash interest · EUR",
+      category: "foreign",
+      gross: "170000.00",
+    });
     // Totals: only Indonesian income is in the final-tax estimate.
     expect(id.totalIncomeGross).toBe("2500000.00");
     expect(id.totalIncomeTax).toBe("265000.00");

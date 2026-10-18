@@ -2055,6 +2055,11 @@
     "loadSalesError": "Could not load trade recommendations."
   },
   "Tax": {
+    "cashSource": {
+      "dividend": "Cash dividend · {currency}",
+      "coupon": "Cash coupon · {currency}",
+      "interest": "Cash interest · {currency}"
+    },
     "title": "Tax",
     "subtitle": "Capital gains & tax-free harvest suggestions",
     "defaultHolderName": "All portfolios",

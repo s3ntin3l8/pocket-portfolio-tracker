@@ -2055,6 +2055,11 @@
     "loadSalesError": "Gagal memuat rekomendasi transaksi."
   },
   "Tax": {
+    "cashSource": {
+      "dividend": "Dividen tunai · {currency}",
+      "coupon": "Kupon tunai · {currency}",
+      "interest": "Bunga tunai · {currency}"
+    },
     "title": "Pajak",
     "subtitle": "Keuntungan modal & saran panen bebas pajak",
     "defaultHolderName": "Semua portofolio",

@@ -822,6 +822,54 @@ describe("loadTaxYearDetail", () => {
     expect(detail?.fxMissingCurrencies).toEqual(["USD"]);
   });
 
+  it("marks cash income with nothing to name it by, so the table can label it", async () => {
+    h.client.listPortfolios = async () => PF;
+    h.cookies = { pf: "p1" };
+    h.client.getTrades = vi.fn(async () => ({
+      displayCurrency: "IDR",
+      trades: [],
+      realizedByYear: [],
+      dividendsByYear: [],
+    }));
+    const row = (o: Record<string, unknown>) => ({
+      instrumentId: null,
+      instrument: null,
+      quantity: "0",
+      price: "10",
+      fees: "0",
+      tax: "0",
+      currency: "EUR",
+      executedAt: "2026-06-30",
+      status: "normal",
+      ...o,
+    });
+    h.client.listIncomeByYear = vi.fn(async () => [
+      row({ id: "c1", type: "interest" }),
+      row({ id: "c2", type: "interest", description: "Zinsen Tagesgeld", price: "5" }),
+      row({ id: "c3", type: "dividend", instrumentId: "abcdef12-3456", price: "7" }),
+    ]);
+    const holders = [
+      {
+        holder: { id: "p1" },
+        year: 2026,
+        currency: "IDR",
+        allowanceUsage: baseUsage,
+        harvestSuggestions: [],
+        distribution: {},
+      },
+    ] as unknown as TaxSummaryHolder[];
+    const detail = (await api.loadTaxYearDetail(holders, 2026)).get("p1")!;
+    // No instrument, no description: only the type key, so it carries cashType.
+    expect(detail.dividendRows).toContainEqual(
+      expect.objectContaining({ symbol: "interest", cashType: "interest", gross: "10.00" }),
+    );
+    // A description names the row; an instrument without a loaded symbol shows its id prefix.
+    // Neither is cash income needing a label.
+    const named = detail.dividendRows.filter((r) => r.symbol !== "interest");
+    expect(named.map((r) => r.symbol).sort()).toEqual(["Zinsen Tagesgeld", "abcdef12"]);
+    for (const r of named) expect(r).not.toHaveProperty("cashType");
+  });
+
   it("single-portfolio scope: fetches the FIFO trade log + transactions for that portfolio only", async () => {
     h.client.listPortfolios = async () => PF; // p1 (IDR), p2 (EUR)
     h.cookies = { pf: "p1" };

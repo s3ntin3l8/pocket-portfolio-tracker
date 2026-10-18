@@ -352,7 +352,8 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       "reksa dana/ETF distributions 0%. `taxWithheldAtSource` is already " +
       "withheld and `taxToSelfPay` is what the user pays; never present the whole `estimatedTax` as still owed. Foreign income " +
       "(`foreignIncomeGross`) is not in `estimatedTax`: it is taxed at the user's marginal rate (5–35%) with a credit for " +
-      "`foreignTaxWithheld`, which Pocket cannot compute.",
+      "`foreignTaxWithheld`, which Pocket cannot compute. An income row with no instrument is cash income; its " +
+      "`cashSource` gives the type and the currency it was paid in.",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       year: z.number().int().min(2000).max(2100).optional(),
