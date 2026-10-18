@@ -633,6 +633,10 @@ export interface Portfolio {
    *  no FSA has been submitted for this depot. The holder's taxAllowanceAnnual cap must not
    *  be exceeded in aggregate across all the holder's portfolios. */
   taxAllowanceAnnual: string | null;
+  /** Where the account is held (ISO 3166-1 alpha-2, e.g. "ID"), or null when unset. Under the
+   *  Indonesian tax regime it decides whether cash interest is domestic (20% final) or foreign
+   *  income; unset falls back to the currency (IDR = domestic). */
+  country: string | null;
   /** Number of transactions in the portfolio. Populated only by the list endpoint
    *  (GET /portfolios) — used by the delete-confirm UI; omitted on create/edit responses. */
   transactionCount?: number;

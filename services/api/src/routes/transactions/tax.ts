@@ -201,7 +201,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
       if (regime === "ID") {
         const idTax = computeIndonesianFinalTaxFromTradeLog({
           tradeLog,
-          coreTxns,
+          incomeSources: [{ coreTxns, portfolioCountry: portfolio.country }],
           year,
           metaById,
           displayCurrency: portfolio.baseCurrency,
@@ -337,6 +337,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
                 id: portfolios.id,
                 cashCounted: portfolios.cashCounted,
                 taxAllowanceAnnual: portfolios.taxAllowanceAnnual,
+                country: portfolios.country,
               })
               .from(portfolios)
               .where(and(eq(portfolios.userId, id), isNull(portfolios.accountHolderId)))
@@ -373,6 +374,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
                   id: portfolios.id,
                   cashCounted: portfolios.cashCounted,
                   taxAllowanceAnnual: portfolios.taxAllowanceAnnual,
+                  country: portfolios.country,
                 })
                 .from(portfolios)
                 .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holder.id)));
@@ -454,6 +456,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
               log,
               metaById,
               coreTxns,
+              portfolioCountry: p.country,
               forecast: Number(forecast.toString()),
               rateByCcy: pFxRates as Record<string, string>,
             };
@@ -481,7 +484,6 @@ export function registerTaxRoutes(app: FastifyInstance) {
           // holders with no FSA allocation, which silently zeroed the ID payload for ID users
           // — now it surfaces directly.)
           if (regime === "ID") {
-            const allCoreTxns = perPortfolio.flatMap((p) => p.coreTxns);
             // The per-portfolio loadValuation returned fxRates for each portfolio's display
             // (its baseCurrency), not the networth-level `display`. Re-derive a display→
             // native→display map that covers every distinct native currency across all the
@@ -492,7 +494,11 @@ export function registerTaxRoutes(app: FastifyInstance) {
             }
             const idTax = computeIndonesianFinalTaxFromTradeLog({
               tradeLog: mergedLog,
-              coreTxns: allCoreTxns,
+              // Per portfolio: cash interest is classified by its own portfolio's country.
+              incomeSources: perPortfolio.map((p) => ({
+                coreTxns: p.coreTxns,
+                portfolioCountry: p.portfolioCountry,
+              })),
               year,
               metaById: meta,
               displayCurrency: display,

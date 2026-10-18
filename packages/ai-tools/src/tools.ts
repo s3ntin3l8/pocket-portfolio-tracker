@@ -150,8 +150,9 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     name: "list_portfolios",
     title: "List portfolios",
     description:
-      "List the user's portfolios (depots/accounts) with id, name, currency, brokerage, holder and " +
-      "whether cash is inside the investment boundary (cashCounted). Call this first to get ids.",
+      "List the user's portfolios (depots/accounts) with id, name, currency, brokerage, the country " +
+      "the account is held in (ISO code, null when unset), holder and whether cash is inside the " +
+      "investment boundary (cashCounted). Call this first to get ids.",
     inputSchema: z.object({}),
     handler: async () => {
       const list = await client.listPortfolios();
@@ -160,6 +161,7 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
         name: p.name,
         baseCurrency: p.baseCurrency,
         brokerage: p.brokerage,
+        country: p.country,
         accountHolderId: p.accountHolderId,
         portfolioType: p.portfolioType,
         cashCounted: p.cashCounted,
@@ -344,7 +346,10 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       "loss pots and estimated tax. One portfolio, or all grouped by holder. Not tax advice. " +
       "Under the ID regime `indonesianFinalTax` taxes each income row at its own final rate (`income[].category`): " +
       "Indonesian dividends 10% (paid by the user, exempt if reinvested in Indonesia for 3 years), bond interest 10% and " +
-      "IDR bank interest 20% (both withheld at source), reksa dana/ETF distributions 0%. `taxWithheldAtSource` is already " +
+      "bank interest 20% from a bank in Indonesia, in any currency (both withheld at source; cash interest follows the " +
+      "portfolio's `country` from list_portfolios: ID is Indonesian, another country foreign, unset falls back to IDR = " +
+      "Indonesian), " +
+      "reksa dana/ETF distributions 0%. `taxWithheldAtSource` is already " +
       "withheld and `taxToSelfPay` is what the user pays; never present the whole `estimatedTax` as still owed. Foreign income " +
       "(`foreignIncomeGross`) is not in `estimatedTax`: it is taxed at the user's marginal rate (5–35%) with a credit for " +
       "`foreignTaxWithheld`, which Pocket cannot compute.",

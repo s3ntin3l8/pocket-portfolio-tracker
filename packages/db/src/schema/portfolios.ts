@@ -21,6 +21,9 @@ export const portfolios = pgTable(
     allowNegativeCash: boolean("allow_negative_cash").notNull().default(false),
     documentRetention: boolean("document_retention").notNull().default(false),
     taxAllowanceAnnual: numeric("tax_allowance_annual"),
+    // Where the account is held (ISO 3166-1 alpha-2), or null when unset. The Indonesian
+    // tax estimate reads it to classify cash interest as domestic or foreign.
+    country: text("country"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("portfolios_user_id_idx").on(t.userId)],

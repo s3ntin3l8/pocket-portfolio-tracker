@@ -294,7 +294,8 @@ income row "withheld at source" or "you pay", so withheld tax doesn't read as ta
 instrument is Indonesian when its market is `IDX` (the predicate the 0.1% sales tax already
 uses; Indonesian government retail bonds are booked on that market) or its ISIN starts with
 `ID`. Currency would misfile an Indonesian issuer paying in USD or a US stock paying in IDR,
-and the portfolio's brokerage is free text. Then:
+and the portfolio's country (below) says where the account is held, not where a security was
+issued, so neither decides an instrument's income. Then:
 
 1. not Indonesian → `foreign`;
 2. a `mutual_fund` or `etf` → `fund_distribution`;
@@ -302,11 +303,20 @@ and the portfolio's brokerage is free text. Then:
 4. a `dividend` → `domestic_dividend`;
 5. other interest → `deposit_interest`.
 
-**Cash interest** (no instrument) has only its currency to go on: IDR interest is treated as
-interest from an Indonesian bank (20%), interest in any other currency as foreign. A
-foreign-currency deposit at an Indonesian bank is also 20% final under PMK 212/2018, so it
-is under-counted here; the foreign-income note says so. An instrument with no metadata row
-is treated as foreign rather than guessed.
+**Cash interest** (no instrument) is decided by the **portfolio's country**
+(`portfolios.country`, ISO 3166-1 alpha-2, set in the portfolio's settings; migration 0095) —
+where the account is held, which is what PMK 212/2018 looks at:
+
+| Portfolio country | Cash interest                                                         |
+| ----------------- | --------------------------------------------------------------------- |
+| `ID`              | `deposit_interest` (20% final) in **any** currency, a USD deposit too |
+| any other country | `foreign` in any currency, IDR interest at a German bank too          |
+| not set           | by currency: IDR → `deposit_interest`, anything else → `foreign`      |
+
+The country is a user setting rather than a guess from the brokerage (free text) or the bank's
+name, which were judged too unreliable. On `/networth/tax` each portfolio's interest is
+classified with its own portfolio's country before the holder's portfolios are summed. An
+instrument with no metadata row is treated as foreign rather than guessed.
 
 ### Recorded withholding
 

@@ -65,6 +65,7 @@ export async function portfoliosRoute(app: FastifyInstance) {
         allowNegativeCash: input.allowNegativeCash,
         documentRetention: input.documentRetention,
         taxAllowanceAnnual: input.taxAllowanceAnnual ?? null,
+        country: input.country ?? null,
       })
       .returning();
     reply.code(201);

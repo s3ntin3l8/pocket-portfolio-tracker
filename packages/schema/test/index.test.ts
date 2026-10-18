@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   decimalString,
   currencyCode,
+  countryCode,
+  COUNTRY_CODES,
+  portfolioPatchSchema,
   transactionInputSchema,
   parsedTransactionSchema,
   portfolioInputSchema,
@@ -34,6 +37,22 @@ describe("currencyCode", () => {
   });
 });
 
+describe("countryCode", () => {
+  it("normalises an ISO 3166-1 alpha-2 code to upper case", () => {
+    expect(countryCode.parse("id")).toBe("ID");
+    expect(countryCode.parse(" de ")).toBe("DE");
+  });
+  it("rejects anything that isn't an assigned alpha-2 code", () => {
+    for (const v of ["IDN", "I", "", "XX", "EU", "1D"]) {
+      expect(() => countryCode.parse(v)).toThrow();
+    }
+  });
+  it("lists every assigned code once", () => {
+    expect(COUNTRY_CODES).toHaveLength(249);
+    expect(new Set(COUNTRY_CODES).size).toBe(249);
+  });
+});
+
 describe("portfolioInputSchema", () => {
   it("defaults the currency to IDR and leaves the holder unset", () => {
     const parsed = portfolioInputSchema.parse({ name: "Main" });
@@ -58,6 +77,12 @@ describe("portfolioInputSchema", () => {
     expect(
       portfolioInputSchema.parse({ name: "X", brokerage: "  Trade Republic  " }).brokerage,
     ).toBe("Trade Republic");
+  });
+  it("takes an optional country, upper-cased, and allows clearing it with null", () => {
+    expect(portfolioInputSchema.parse({ name: "X" }).country).toBeUndefined();
+    expect(portfolioInputSchema.parse({ name: "X", country: "id" }).country).toBe("ID");
+    expect(portfolioPatchSchema.parse({ country: null }).country).toBeNull();
+    expect(() => portfolioPatchSchema.parse({ country: "IDN" })).toThrow();
   });
 });
 

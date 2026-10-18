@@ -41,6 +41,7 @@ const PORTFOLIO: EditablePortfolio = {
   allowNegativeCash: false,
   documentRetention: false,
   taxAllowanceAnnual: null,
+  country: null,
   transactionCount: 12,
 };
 
@@ -116,6 +117,47 @@ describe("PortfolioEditForm", () => {
     fireEvent.click(screen.getByRole("button", { name: t.confirmDelete }));
     await waitFor(() => expect(deletePortfolio).toHaveBeenCalledWith("p1"));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/settings/portfolios"));
+  });
+
+  it("shows the saved country and sends a changed one on save", async () => {
+    renderForm({ mode: "edit", portfolio: { ...PORTFOLIO, country: "ID" } });
+    const select = screen.getByLabelText(t.country) as HTMLSelectElement;
+    expect(select.value).toBe("ID");
+    expect(select.selectedOptions[0]!.textContent).toBe("Indonesia");
+    expect(select).toHaveAccessibleDescription(t.countryHint);
+
+    fireEvent.change(select, { target: { value: "DE" } });
+    fireEvent.click(screen.getByRole("button", { name: t.save }));
+    await waitFor(() =>
+      expect(updatePortfolio).toHaveBeenCalledWith(
+        "p1",
+        expect.objectContaining({ country: "DE" }),
+      ),
+    );
+  });
+
+  it("clears the country with the 'not set' option", async () => {
+    renderForm({ mode: "edit", portfolio: { ...PORTFOLIO, country: "DE" } });
+    fireEvent.change(screen.getByLabelText(t.country), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: t.save }));
+    await waitFor(() =>
+      expect(updatePortfolio).toHaveBeenCalledWith(
+        "p1",
+        expect.objectContaining({ country: null }),
+      ),
+    );
+  });
+
+  it("creates a portfolio with no country unless one is picked", async () => {
+    renderForm();
+    const select = screen.getByLabelText(t.country) as HTMLSelectElement;
+    expect(select.value).toBe("");
+    expect(select.selectedOptions[0]!.textContent).toBe(t.countryNone);
+    fireEvent.change(screen.getByLabelText(t.name), { target: { value: "Jago" } });
+    fireEvent.click(screen.getByRole("button", { name: t.create }));
+    await waitFor(() =>
+      expect(createPortfolio).toHaveBeenCalledWith(expect.objectContaining({ country: null })),
+    );
   });
 
   it("does not show a delete action in create mode", () => {

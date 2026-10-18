@@ -379,6 +379,82 @@ describe("auth + portfolios + transactions", () => {
     expect(cleared.json()).toMatchObject({ accountNumber: null, iban: null });
   });
 
+  it("persists, updates and clears the portfolio country", async () => {
+    const t = await token("country-user");
+    const created = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: auth(t),
+      payload: { name: "Bank Jago", baseCurrency: "USD", country: "id" },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().country).toBe("ID");
+    const portfolioId = created.json().id;
+
+    // Persisted, and listed with the rest of the portfolio.
+    const list = await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) });
+    expect(list.json()[0].country).toBe("ID");
+
+    // Omitted on create → unset.
+    const unset = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: auth(t),
+      payload: { name: "No country" },
+    });
+    expect(unset.json().country).toBeNull();
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { country: "DE" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().country).toBe("DE");
+
+    const cleared = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { country: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().country).toBeNull();
+  });
+
+  it("rejects a country that isn't an ISO 3166-1 alpha-2 code", async () => {
+    const t = await token("country-invalid-user");
+    for (const country of ["IDN", "XX", "Indonesia"]) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Bad", country },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("validation_error");
+    }
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Good", country: "ID" },
+      })
+    ).json().id;
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}`,
+      headers: auth(t),
+      payload: { country: "ZZ" },
+    });
+    expect(res.statusCode).toBe(400);
+    // The stored country is untouched by a rejected update.
+    const list = await app.inject({ method: "GET", url: "/portfolios", headers: auth(t) });
+    expect(list.json()[0].country).toBe("ID");
+  });
+
   it("validates portfolio input", async () => {
     const res = await app.inject({
       method: "POST",

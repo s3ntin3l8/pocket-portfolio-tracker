@@ -94,6 +94,7 @@ const baseInput = {
   allowNegativeCash: false,
   documentRetention: false,
   taxAllowanceAnnual: null,
+  country: null,
 };
 
 function renderCreate() {
@@ -118,6 +119,7 @@ function renderEdit(
     allowNegativeCash: false,
     documentRetention: false,
     taxAllowanceAnnual: null,
+    country: null,
   },
 ) {
   return render(
@@ -324,6 +326,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -350,6 +353,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
     await waitFor(() =>
@@ -380,6 +384,7 @@ describe("PortfolioFormDialog", () => {
     allowNegativeCash: false,
     documentRetention: false,
     taxAllowanceAnnual: null,
+    country: null,
   };
 
   it("collapses a connected broker to a compact row (last sync, Sync, ⋯ menu)", async () => {
@@ -434,6 +439,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -457,6 +463,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -484,6 +491,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -509,6 +517,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 
@@ -530,6 +539,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     // Dialog is closed on mount — the fetch must be gated on `open`.
     expect(getTrConnection).not.toHaveBeenCalled();
@@ -571,6 +581,7 @@ describe("PortfolioFormDialog", () => {
         allowNegativeCash: false,
         documentRetention: false,
         taxAllowanceAnnual: "600",
+        country: null,
         userId: "u1",
       } as unknown as Portfolio,
     ]);
@@ -619,6 +630,7 @@ describe("PortfolioFormDialog", () => {
         allowNegativeCash: false,
         documentRetention: false,
         taxAllowanceAnnual: "600",
+        country: null,
         userId: "u1",
       } as unknown as Portfolio,
     ]);
@@ -667,6 +679,7 @@ describe("PortfolioFormDialog", () => {
       allowNegativeCash: false,
       documentRetention: false,
       taxAllowanceAnnual: null,
+      country: null,
     });
     fireEvent.click(screen.getByRole("button", { name: m.edit }));
 

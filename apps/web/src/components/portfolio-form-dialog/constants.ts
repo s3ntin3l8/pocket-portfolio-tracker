@@ -16,6 +16,7 @@ export type EditablePortfolio = Pick<
   | "allowNegativeCash"
   | "documentRetention"
   | "taxAllowanceAnnual"
+  | "country"
   | "transactionCount"
 >;
 

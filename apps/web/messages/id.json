@@ -709,6 +709,9 @@
     "iban": "IBAN",
     "ibanPlaceholder": "mis. DE78 1203 0000 1066 5053 87",
     "currency": "Mata uang dasar",
+    "country": "Negara",
+    "countryNone": "Belum diatur",
+    "countryHint": "Negara tempat rekening ini berada. Dalam rezim pajak Indonesia, bunga dari rekening di Indonesia dikenai pajak sebagai bunga bank Indonesia dalam mata uang apa pun; bunga dari rekening di luar negeri adalah penghasilan luar negeri. Jika belum diatur, bunga dalam rupiah dianggap dari Indonesia.",
     "birthYear": "Tahun lahir",
     "birthYearPlaceholder": "mis. 2017",
     "birthYearHint": "Digunakan untuk proyeksi tabungan.",
@@ -2202,7 +2205,7 @@
       "notes": {
         "domestic_dividend": "Dividen dari perusahaan Indonesia: final 10%, disetor sendiri paling lambat tanggal 15 bulan berikutnya. Dikecualikan jika diinvestasikan kembali di Indonesia paling sedikit 3 tahun.",
         "bond_interest": "Bunga obligasi, termasuk ORI dan SBR: final 10%, dipotong oleh penerbit atau kustodian.",
-        "deposit_interest": "Bunga bank dalam rupiah: final 20%, dipotong oleh bank. Bunga dikecualikan selama saldo deposito dan tabungan paling banyak Rp7,5 juta; Pocket tidak dapat melihat saldo itu, jadi pengecualian ini tidak diterapkan. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
+        "deposit_interest": "Bunga dari bank di Indonesia, dalam mata uang apa pun: final 20%, dipotong oleh bank. Portofolio dianggap dari Indonesia jika negaranya diatur ke Indonesia, atau, jika negara belum diatur, jika bunganya dalam rupiah. Bunga dikecualikan selama saldo deposito dan tabungan paling banyak Rp7,5 juta; Pocket tidak dapat melihat saldo itu, jadi pengecualian ini tidak diterapkan. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
         "fund_distribution": "Pembagian hasil reksa dana dan ETF bukan objek pajak bagi pemegang unit."
       },
       "foreignTable": {
@@ -2211,7 +2214,7 @@
         "gross": "Bruto",
         "foreignTax": "Pajak luar negeri dipotong",
         "total": "Total",
-        "note": "Dikenakan tarif progresif Anda (5–35%) dalam SPT Tahunan, dengan kredit atas pajak luar negeri yang dipotong. Dividen luar negeri yang diinvestasikan kembali di Indonesia dapat dikecualikan. Bunga dalam mata uang selain rupiah dicantumkan di sini meskipun berasal dari bank di Indonesia, yang seharusnya final 20%."
+        "note": "Dikenakan tarif progresif Anda (5–35%) dalam SPT Tahunan, dengan kredit atas pajak luar negeri yang dipotong. Dividen luar negeri yang diinvestasikan kembali di Indonesia dapat dikecualikan. Bunga dicantumkan di sini jika negara portofolionya di luar Indonesia atau, jika negara belum diatur, jika bunganya bukan dalam rupiah. Atur negara di pengaturan portofolio agar deposito valas di bank Indonesia dihitung sebagai bunga bank final 20%."
       },
       "byYear": {
         "title": "Per tahun",

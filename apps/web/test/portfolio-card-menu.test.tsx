@@ -58,6 +58,7 @@ const PORTFOLIO = {
   allowNegativeCash: false,
   documentRetention: false,
   taxAllowanceAnnual: null,
+  country: null,
 };
 
 type MenuProps = ComponentProps<typeof PortfolioCardMenu>;
