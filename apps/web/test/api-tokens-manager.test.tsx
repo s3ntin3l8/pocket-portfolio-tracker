@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ApiToken } from "@portfolio/api-client";
 import { ApiTokensManager, type ApiTokensClient } from "../src/components/api-tokens-manager";
@@ -18,7 +18,7 @@ const existing: ApiToken = {
 };
 
 function renderManager(client: ApiTokensClient, initialTokens: ApiToken[] = []) {
-  render(
+  return render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <ApiTokensManager client={client} initialTokens={initialTokens} />
     </NextIntlClientProvider>,
@@ -85,6 +85,64 @@ describe("ApiTokensManager", () => {
     fireEvent.click(screen.getByRole("button", { name: m.tokensCopy }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("pt_copyme"));
     await screen.findByText(m.tokensCopied);
+  });
+
+  describe("copy confirmation timer", () => {
+    afterEach(() => {
+      // Spies first: the setTimeout spy wraps the fake timer, so restoring it after
+      // useRealTimers() would put the fake back.
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    });
+
+    /** Creates a token so its secret (and the Copy button) is on screen, then fakes timers. */
+    async function showSecret() {
+      const client: ApiTokensClient = {
+        listApiTokens: vi.fn(async () => []),
+        createApiToken: vi.fn(async () => ({ ...existing, token: "pt_copyme" })),
+        deleteApiToken: vi.fn(),
+      };
+      const view = renderManager(client);
+      const dialog = openCreateModal();
+      fireEvent.change(dialog.getByLabelText(m.tokensName), { target: { value: "c" } });
+      fireEvent.click(dialog.getByRole("button", { name: m.tokensCreate }));
+      await screen.findByText("pt_copyme");
+      vi.useFakeTimers();
+      return view;
+    }
+
+    async function copy(name: string) {
+      fireEvent.click(screen.getByRole("button", { name }));
+      // Let the async clipboard write resolve and the label update.
+      await act(async () => {});
+    }
+
+    it("keeps the confirmation for the full 2 s after a second copy", async () => {
+      await showSecret();
+      await copy(m.tokensCopy);
+      expect(screen.getByText(m.tokensCopied)).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1500));
+      await copy(m.tokensCopied);
+      // 2.1 s after the first copy, 0.6 s after the second: the first copy's timer must not
+      // revert the label the second copy just confirmed.
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.getByText(m.tokensCopied)).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1500));
+      expect(screen.getByText(m.tokensCopy)).toBeInTheDocument();
+    });
+
+    it("clears the pending revert on unmount, so no state update outlives the component", async () => {
+      const view = await showSecret();
+      const scheduled = vi.spyOn(globalThis, "setTimeout");
+      await copy(m.tokensCopy);
+      // The confirmation's own 2 s revert (other timers belong to the dialog and React).
+      const revert = scheduled.mock.calls.findIndex(([, ms]) => ms === 2000);
+      expect(revert).toBeGreaterThanOrEqual(0);
+      const id = scheduled.mock.results[revert]!.value;
+      const cleared = vi.spyOn(globalThis, "clearTimeout");
+      view.unmount();
+      expect(cleared).toHaveBeenCalledWith(id);
+    });
   });
 
   it("falls back to execCommand when the Clipboard API is unavailable (insecure context)", async () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import { McpConnectCard } from "@/components/mcp-connect-card";
@@ -42,5 +42,40 @@ describe("McpConnectCard", () => {
       expect(copy).toHaveBeenCalledWith(expect.stringContaining("claude mcp add")),
     );
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
+  });
+
+  describe("copy confirmation timer", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function copyFirst() {
+      // By position: once copied, the first button reads "Copied!" and no longer matches /copy/.
+      fireEvent.click(screen.getAllByRole("button")[0]!);
+      await act(async () => {});
+    }
+
+    it("keeps the confirmation for the full 1.5 s after a second copy", async () => {
+      renderCard();
+      vi.useFakeTimers();
+      await copyFirst();
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1000));
+      await copyFirst();
+      // 1.6 s after the first copy, 0.6 s after the second.
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(900));
+      expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
+    });
+
+    it("leaves no pending revert after unmount", async () => {
+      const view = renderCard();
+      vi.useFakeTimers();
+      await copyFirst();
+      expect(vi.getTimerCount()).toBe(1);
+      view.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
 import { copyToClipboard } from "@/lib/copy";
+import { useTimeout } from "@/lib/use-timeout";
 
 const URL_PLACEHOLDER = "<your-pocket-api-url>";
 const TOKEN_PLACEHOLDER = "<token>";
@@ -24,6 +25,8 @@ const CLAUDE_DESKTOP = JSON.stringify(
 function Snippet({ label, text }: { label: string; text: string }) {
   const t = useTranslations("Settings");
   const [copied, setCopied] = useState(false);
+  // Restarts on a repeat copy and is dropped on unmount (see useTimeout).
+  const revertCopied = useTimeout();
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
@@ -33,7 +36,7 @@ function Snippet({ label, text }: { label: string; text: string }) {
           onClick={async () => {
             if (await copyToClipboard(text)) {
               setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
+              revertCopied.schedule(() => setCopied(false), 1500);
             }
           }}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted"

@@ -18,6 +18,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { copyToClipboard } from "@/lib/copy";
+import { useTimeout } from "@/lib/use-timeout";
 import { cn } from "@/lib/utils";
 
 const EXPIRY_OPTIONS = [
@@ -60,6 +61,7 @@ export function ApiTokensManager({
   // user dismisses it. It is never re-fetchable.
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
+  const revertCopied = useTimeout();
 
   function openCreateModal() {
     setName("");
@@ -105,8 +107,9 @@ export function ApiTokensManager({
     if (!newSecret) return;
     const ok = await copyToClipboard(newSecret);
     setCopied(ok ? "ok" : "fail");
-    // Revert the button label after a moment so it reads as a confirmation, not a state.
-    setTimeout(() => setCopied("idle"), 2000);
+    // Revert the button label after a moment so it reads as a confirmation, not a state. A
+    // second copy restarts the full 2 s; a revert pending at unmount is dropped.
+    revertCopied.schedule(() => setCopied("idle"), 2000);
   }
 
   return (
