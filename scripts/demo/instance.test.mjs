@@ -415,7 +415,8 @@ describe("startDemo stop during a build step whose subprocess has its own group"
       proc.kill("SIGINT");
       expect(await exited).toBe(130);
       expect(pidAlive(stepPid)).toBe(false);
-      expect(pidAlive(taskPid)).toBe(true);
+      // The whole task group survives, not just its leader.
+      expect(groupAlive(taskPid)).toBe(true);
     } finally {
       proc.kill("SIGKILL");
       for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
