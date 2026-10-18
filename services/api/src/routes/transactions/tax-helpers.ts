@@ -355,7 +355,7 @@ export async function loadIdDepositFx(
     const payments = coreTxns.filter((t) => isIdBankInterest(t, portfolioCountry));
     if (payments.length === 0) continue;
     // Only currencies a balance can hold: rows at or before the last payment.
-    const last = Math.max(...payments.map((t) => t.executedAt.getTime()));
+    const last = payments.reduce((m, t) => Math.max(m, t.executedAt.getTime()), -Infinity);
     for (const t of coreTxns) if (t.executedAt.getTime() <= last) currencies.add(t.currency);
     for (const t of payments) dates.add(toDateKey(t.executedAt));
   }
