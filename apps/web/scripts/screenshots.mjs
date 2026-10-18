@@ -113,7 +113,35 @@ function pendingConditions(min) {
   return pending;
 }
 
-async function settle(page, { slug, minCharts = 0 }) {
+/**
+ * Hide the Next.js dev-tools indicator (the round "N" badge in the bottom-left
+ * corner, rendered inside `<nextjs-portal>`). The demo runs `next dev`, so without
+ * this every capture ships the badge — on narrow it sits on top of the bottom
+ * nav's Holdings tab. Called after the settle checks, which still read the portal's
+ * "Compiling"/"Building" label; `display: none` keeps the element in the DOM.
+ */
+export const DEV_INDICATOR_HIDE_CSS = "nextjs-portal { display: none !important; }";
+
+/**
+ * Whether the Next dev overlay is showing its issues pill — a runtime/build error on
+ * the page, or an "insight" (e.g. a vulnerability notice) folded into the same pill.
+ * Either way the capture would hide something the overlay wanted seen. Evaluated in
+ * the page. Couples to the vendored next-devtools markup: the
+ * issues pill is a `[data-issues]` element (label "Issue"/"Issues" + count) inside
+ * the `<nextjs-portal>` shadow root; "No issues" (lower-case) is not a hit. If Next
+ * renames these, the check turns vacuous rather than failing captures.
+ */
+export function devOverlayHasIssues() {
+  const root = document.querySelector("nextjs-portal")?.shadowRoot;
+  if (!root) return false;
+  return Boolean(root.querySelector("[data-issues]")) || /\bIssues?\b/.test(root.textContent ?? "");
+}
+
+export async function hideDevIndicator(page) {
+  await page.addStyleTag({ content: DEV_INDICATOR_HIDE_CSS });
+}
+
+export async function settle(page, { slug, minCharts = 0 }) {
   // next/font uses display:"swap" (see layout.tsx) — text paints in a fallback
   // system font first, then swaps once Plus Jakarta Sans/DM Mono finish loading.
   // Without this, captures can race that swap and ship with the wrong font.
@@ -150,6 +178,13 @@ async function settle(page, { slug, minCharts = 0 }) {
       ).length,
   );
   if (empty > 0) console.warn(`${slug}: ${empty} chart(s) rendered without data`);
+  // Hiding the portal would also hide the overlay's error signal, so a page with a
+  // dev error must fail the run here instead of shipping a clean-looking capture.
+  if (await page.evaluate(devOverlayHasIssues))
+    throw new Error(
+      `${slug}: the Next dev overlay reports an issue or insight — check it before capturing`,
+    );
+  await hideDevIndicator(page);
 }
 
 async function captureReadme(browser, cookie, secure) {
