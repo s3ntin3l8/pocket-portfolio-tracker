@@ -36,6 +36,26 @@ export function formatMoney(
 }
 
 /**
+ * {@link formatMoney}, but a whole amount drops its ".00" ("€1,000", while "€13.33" keeps its
+ * cents). For screens built from mostly-round figures (the tax page's allowance cap, FSA slices)
+ * where a trailing ".00" only costs width — on a phone three tiles share one row. Use it for the
+ * summary figures (tiles, sentences) on such a screen so one amount never shows at two
+ * precisions there; keep {@link formatMoney} inside numeric table columns, where mixed
+ * precision would break the column's alignment. "Whole" is judged at cent precision, so a
+ * float like 199.99999999999997 (a Decimal→Number round trip) still counts as €200.
+ */
+export function formatMoneyWhole(amount: number, currency = "IDR", locale = "en") {
+  return formatMoney(
+    amount,
+    currency,
+    locale,
+    Number.isInteger(Math.round(amount * 100) / 100)
+      ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+      : {},
+  );
+}
+
+/**
  * The ONE formatter for a scope's headline net-worth figure (hero, Holdings rail, sidebar).
  * Takes the API's Decimal string and always renders full precision for the currency, so no
  * surface can round differently from another ("€39,045.00" vs "€39,044.83", audit G2).

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardLabel, CardTitle } from "@/component
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import type { TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
-import { formatMoney } from "@/lib/utils";
+import { formatMoneyWhole } from "@/lib/utils";
 
 /** The currency German tax amounts (Sparerpauschbetrag, FSA slices) are denominated in. */
 const DE_TAX_AMOUNT_CURRENCY = "EUR";
@@ -110,8 +110,10 @@ export function DistributionCard({
   // The cap and the per-depot FSA slices are euro amounts (the Sparerpauschbetrag is set in
   // law in EUR), so they are shown in their own currency — not the page's display currency,
   // which would label €1,000 as e.g. "IDR 1,000".
+  // Whole euros (the usual case: €1,000, €801) drop the ".00" — three tiles share a row on a
+  // phone, and "€1,000.00" did not fit and truncated to "€1,000.…". Cents still show.
   const money = (n: string | number) =>
-    formatMoney(Number(n), d.currency ?? DE_TAX_AMOUNT_CURRENCY, locale);
+    formatMoneyWhole(Number(n), d.currency ?? DE_TAX_AMOUNT_CURRENCY, locale);
   const allocPct =
     Number(d.holderAllowanceCap) > 0
       ? Math.round((Number(d.totalAllocated) / Number(d.holderAllowanceCap)) * 100)

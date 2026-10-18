@@ -139,6 +139,28 @@ describe("TwoStatFooter", () => {
 });
 
 describe("ReportCard", () => {
+  it("lets a long trend label wrap below the title instead of squeezing it", () => {
+    wrap(
+      <ReportCard
+        icon={Coins}
+        title="Income"
+        trend={{ label: "+118.79% full-year est. vs last year", tone: "up", arrow: true }}
+        value="IDR 860,234"
+        caption="Dividends & coupons, year to date"
+        metrics={[{ label: "TTM", value: "IDR 1.81M" }]}
+        href="/income"
+        openLabel="Open"
+      />,
+    );
+    const title = screen.getByText("Income");
+    // The title never shrinks under the chip (it stays on one line); the header row wraps.
+    expect(title).toHaveClass("flex-none", "max-w-full", "break-words");
+    // flex-1's 0% basis would let the row "fit" by crushing the title instead of wrapping.
+    expect(title).not.toHaveClass("flex-1");
+    expect(title.parentElement).toHaveClass("flex-wrap");
+    expect(screen.getByText(/full-year est/).closest(".ml-auto")).not.toBeNull();
+  });
+
   it("renders as a single link with title, value, caption and metrics", () => {
     // Wrap in the i18n provider because the splitBar renders MiniSplitBar,
     // which uses `useTranslations("Chart")` (#478 review #3). Without the

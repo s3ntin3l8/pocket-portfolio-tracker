@@ -23,7 +23,7 @@ import { TaxPageCommands } from "@/components/tax/tax-page-commands";
 import { RegimeIndicator } from "@/components/tax/regime-indicator";
 import { LossCarryforwardEditor } from "@/components/tax/loss-carryforward-editor";
 import { loadNetworthTaxResult, loadPreferences, loadTaxYearDetail } from "@/lib/server-api";
-import { formatMoney, formatMoneyCompact } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact, formatMoneyWhole } from "@/lib/utils";
 import type { TaxSummaryHolderWithCarryForward } from "@/lib/server-api/_shared";
 import { harvestSummary } from "@portfolio/core";
 import { TaxHolderDetailDE, TaxHolderSectionId } from "./tax-detail-section";
@@ -192,7 +192,9 @@ function TaxHolderOverviewDe({
   children?: React.ReactNode;
 }) {
   const currency = entry.currency;
-  const money = (n: string | number) => formatMoney(Number(n), currency, locale);
+  // Same whole-amount formatting as the FSA distribution tiles (tax-cards.tsx), so the
+  // allowance never shows as "€1,000" in one tile and "€1,000.00" in the next.
+  const money = (n: string | number) => formatMoneyWhole(Number(n), currency, locale);
   const moneyCompact = (n: string | number) => formatMoneyCompact(Number(n), currency, locale);
   const { allowanceUsage: u, harvestSuggestions, distribution, accountHolderId } = entry;
   // ID entries carry `indonesianFinalTax` instead of `allowanceUsage` — render nothing
