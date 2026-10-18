@@ -318,6 +318,11 @@ name, which were judged too unreliable. On `/networth/tax` each portfolio's inte
 classified with its own portfolio's country before the holder's portfolios are summed. An
 instrument with no metadata row is treated as foreign rather than guessed.
 
+A cash row carries `cashSource: { type, currency }` — its own currency, since every amount is
+in the report currency — and is grouped per type and currency, so EUR and USD interest stay
+two rows. Its `symbol` is a readable English label (`"Cash interest · EUR"`) for API and MCP
+consumers; the web shows the translated label from `cashSource`.
+
 ### Recorded withholding
 
 For the two categories withheld at source (bond and bank interest) a withholding recorded on

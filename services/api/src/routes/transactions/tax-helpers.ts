@@ -26,6 +26,13 @@ import {
 import { getFxRates, makeFxRateFn, recordFxMissing } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
 
+/** English label of income with no paying instrument, for the ID payload's `symbol`. */
+const CASH_INCOME_LABEL = {
+  dividend: "Cash dividend",
+  coupon: "Cash coupon",
+  interest: "Cash interest",
+} as const;
+
 /**
  * German tax amounts the user enters — the Sparerpauschbetrag / Freistellungsauftrag
  * (`accountHolders.taxAllowanceAnnual`, `portfolios.taxAllowanceAnnual`) and the loss
@@ -413,9 +420,16 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
       // so the sums don't mix native-currency figures under the response's display label.
       const net = fxTo(new Decimal(cashFlow(t).toString()), t.currency);
       const recordedTax = fxTo(new Decimal(t.tax ?? "0"), t.currency);
+      // Cash income (no instrument) carries its type and own currency; its `symbol` is a
+      // readable English label for API/MCP consumers (the web localises from `cashSource`),
+      // never the bare type key ("interest").
+      const cashSource = instrumentId ? null : { type: t.type, currency: t.currency.toUpperCase() };
       income.push({
         instrumentId,
-        symbol: meta?.symbol ?? (instrumentId ? instrumentId.slice(0, 8) : t.type),
+        symbol: instrumentId
+          ? (meta?.symbol ?? instrumentId.slice(0, 8))
+          : `${CASH_INCOME_LABEL[t.type]} · ${t.currency.toUpperCase()}`,
+        ...(cashSource ? { cashSource } : {}),
         currency: displayCurrency,
         category,
         year: t.executedAt.getUTCFullYear(),

@@ -15,8 +15,8 @@ import { useTableSort, type ColDef } from "@/lib/table-sort";
 import { formatMoney } from "@/lib/utils";
 import type { TaxCurrencyTotal, TaxDividendRow } from "@/lib/server-api";
 
-const DIVIDEND_COLS: ColDef<TaxDividendRow>[] = [
-  { key: "source", get: (r) => r.symbol, type: "text" },
+const dividendCols = (label: (r: TaxDividendRow) => string): ColDef<TaxDividendRow>[] => [
+  { key: "source", get: label, type: "text" },
   { key: "gross", get: (r) => Number(r.gross), type: "numeric" },
   { key: "tax", get: (r) => Number(r.tax), type: "numeric" },
   { key: "net", get: (r) => Number(r.net), type: "numeric" },
@@ -49,7 +49,12 @@ export function DividendsTable({
   const fmt = (n: string | number, currency: string) => formatMoney(Number(n), currency, locale);
   const joinTotals = (field: "gross" | "tax" | "net") =>
     totalsByCurrency.map((tc) => fmt(tc[field], tc.currency)).join(" · ");
-  const { sortKey, sortDir, toggle, sort } = useTableSort<TaxDividendRow>(DIVIDEND_COLS);
+  // Cash income with nothing to name it by reads "Cash interest · EUR", not the type key.
+  const sourceLabel = (r: TaxDividendRow) =>
+    r.cashType ? t(`cashSource.${r.cashType}`, { currency: r.currency }) : r.symbol;
+  const { sortKey, sortDir, toggle, sort } = useTableSort<TaxDividendRow>(
+    dividendCols(sourceLabel),
+  );
   const sorted = sort(rows);
 
   return (
@@ -106,7 +111,7 @@ export function DividendsTable({
             <TableBody>
               {sorted.map((r, i) => (
                 <TableRow key={`${r.symbol}:${r.currency}:${i}`}>
-                  <TableCell className="font-medium">{r.symbol}</TableCell>
+                  <TableCell className="font-medium">{sourceLabel(r)}</TableCell>
                   <TableCell numeric className="text-muted-foreground">
                     {fmt(r.gross, r.currency)}
                   </TableCell>

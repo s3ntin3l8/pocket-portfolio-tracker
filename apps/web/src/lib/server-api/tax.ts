@@ -354,15 +354,25 @@ export async function loadTaxYearDetail(
           );
         const byInstrument = new Map<
           string,
-          { symbol: string; currency: string; net: Decimal; tax: Decimal }
+          {
+            symbol: string;
+            cashType?: TaxDividendRow["cashType"];
+            currency: string;
+            net: Decimal;
+            tax: Decimal;
+          }
         >();
         for (const t of incomeTxns) {
           const qty = new Decimal(t.quantity);
           const net = (qty.gt(0) ? qty.mul(t.price) : new Decimal(t.price)).sub(t.fees ?? "0");
           const key = `${t.instrumentId ?? t.description ?? t.type}:${t.currency}`;
-          const symbol = t.instrument?.symbol ?? t.description ?? t.type;
+          const symbol =
+            t.instrument?.symbol ?? t.description ?? t.instrumentId?.slice(0, 8) ?? t.type;
           const bucket = byInstrument.get(key) ?? {
             symbol,
+            ...(!t.instrumentId && !t.description
+              ? { cashType: t.type as NonNullable<TaxDividendRow["cashType"]> }
+              : {}),
             currency: t.currency,
             net: new Decimal(0),
             tax: new Decimal(0),
@@ -373,6 +383,7 @@ export async function loadTaxYearDetail(
         }
         const dividendRows: TaxDividendRow[] = [...byInstrument.values()].map((b) => ({
           symbol: b.symbol,
+          ...(b.cashType ? { cashType: b.cashType } : {}),
           currency: b.currency,
           gross: b.net.add(b.tax).toFixed(2),
           tax: b.tax.toFixed(2),

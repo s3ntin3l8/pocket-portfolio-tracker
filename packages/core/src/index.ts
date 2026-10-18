@@ -205,6 +205,7 @@ export {
   type IdDisposalInput,
   type IdDisposalTax,
   type IdDisposalLot,
+  type IdCashIncomeSource,
   type IdIncomeCategory,
   type IdIncomeCategoryTotal,
   type IdIncomeClassifyInput,

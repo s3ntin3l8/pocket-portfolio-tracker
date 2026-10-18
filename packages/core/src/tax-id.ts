@@ -184,11 +184,23 @@ export function classifyIdIncome(input: IdIncomeClassifyInput): IdIncomeCategory
   return "deposit_interest";
 }
 
+/** Income with no paying instrument (interest on a bank or broker cash balance): what it
+ *  was and the currency it was paid in. The report's `currency` is the display currency,
+ *  so this is the only place a cash row's own currency survives — the UI labels the row
+ *  with it ("Cash interest · EUR") instead of an internal type key. */
+export interface IdCashIncomeSource {
+  type: "dividend" | "coupon" | "interest";
+  /** The transaction's own currency (ISO 4217). */
+  currency: string;
+}
+
 /** One income transaction, already in the report's currency. */
 export interface IdIncomeInput {
-  /** The paying instrument's id; rows are grouped per (instrument or symbol, category). */
+  /** The paying instrument's id; rows are grouped per (instrument or cash source, category). */
   instrumentId?: string | null;
   symbol: string;
+  /** Set when there is no paying instrument; cash rows are grouped per type and currency. */
+  cashSource?: IdCashIncomeSource | null;
   /** The report currency the amounts are in. */
   currency: string;
   category: IdIncomeCategory;
@@ -206,6 +218,8 @@ export type IdIncomeTaxBasis = "recorded" | "estimated" | "mixed";
 export interface IdIncomeTax {
   instrumentId?: string | null;
   symbol: string;
+  /** Cash income only (no paying instrument): its type and own currency. */
+  cashSource?: IdCashIncomeSource | null;
   currency: string;
   category: IdIncomeCategory;
   /** The category's final rate; null for foreign income. */
@@ -319,6 +333,7 @@ function incomeRowTax(
 type IncomeAcc = {
   instrumentId?: string | null;
   symbol: string;
+  cashSource?: IdCashIncomeSource | null;
   currency: string;
   category: IdIncomeCategory;
   gross: Decimal;
@@ -334,6 +349,7 @@ function finishIncomeRow(a: IncomeAcc): IdIncomeTax {
   return {
     ...(a.instrumentId !== undefined ? { instrumentId: a.instrumentId } : {}),
     symbol: a.symbol,
+    ...(a.cashSource ? { cashSource: a.cashSource } : {}),
     currency: a.currency,
     category: a.category,
     rate: idIncomeTaxRate(a.category),
@@ -444,10 +460,18 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     incomeByYear.set(r.year, y);
     if (r.year !== input.year) continue;
 
-    const key = `${r.instrumentId ?? r.symbol}:${r.currency}:${r.category}`;
+    // Cash rows group per type and own currency: EUR and USD interest stay two rows even
+    // though both are reported in the display currency.
+    const source = r.instrumentId
+      ? r.instrumentId
+      : r.cashSource
+        ? `cash:${r.cashSource.type}:${r.cashSource.currency}`
+        : r.symbol;
+    const key = `${source}:${r.currency}:${r.category}`;
     const acc = groups.get(key) ?? {
       ...(r.instrumentId !== undefined ? { instrumentId: r.instrumentId } : {}),
       symbol: r.symbol,
+      ...(r.cashSource ? { cashSource: r.cashSource } : {}),
       currency: r.currency,
       category: r.category,
       gross: ZERO,

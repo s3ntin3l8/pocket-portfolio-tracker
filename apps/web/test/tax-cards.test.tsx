@@ -765,6 +765,110 @@ describe("IdByYearTable", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Cash income (no paying instrument) — a readable label, never the type key
+// ---------------------------------------------------------------------------
+
+describe("cash income labels", () => {
+  const cashRow = (currency: string, o: Partial<IdIncomeTax> = {}) =>
+    incomeRow({
+      // What the API sent before it labelled cash rows: the bare type key.
+      symbol: "interest",
+      cashSource: { type: "interest", currency },
+      ...o,
+    } as Partial<IdIncomeTax> & Pick<IdIncomeTax, "symbol" | "category">);
+
+  it("labels foreign cash interest by type and its own currency", () => {
+    wrapClient(
+      <IdForeignIncomeTable
+        rows={[
+          cashRow("EUR", {
+            category: "foreign",
+            rate: null,
+            gross: "676237",
+            tax: null,
+            net: null,
+            taxBasis: null,
+            foreignTaxWithheld: "0",
+          }),
+          cashRow("USD", {
+            category: "foreign",
+            rate: null,
+            gross: "1000",
+            tax: null,
+            net: null,
+            taxBasis: null,
+            foreignTaxWithheld: "0",
+          }),
+        ]}
+        foreignIncomeGross="677237"
+        foreignTaxWithheld="0"
+        currency={CURRENCY}
+        locale={LOCALE}
+      />,
+    );
+    expect(screen.getByText("Cash interest · EUR")).toBeInTheDocument();
+    expect(screen.getByText("Cash interest · USD")).toBeInTheDocument();
+    expect(screen.queryByText("interest")).toBeNull();
+  });
+
+  it("labels IDR cash interest in the domestic table, in Indonesian too", () => {
+    const rows = [
+      cashRow("IDR", {
+        category: "deposit_interest",
+        rate: "0.20",
+        gross: "250000",
+        tax: "50000.00",
+        net: "200000.00",
+        withheldAtSource: true,
+      }),
+    ];
+    const table = (
+      <IdIncomeTable
+        rows={rows}
+        totalIncomeGross="250000"
+        totalIncomeTax="50000"
+        totalIncomeNet="200000"
+        currency={CURRENCY}
+        locale={LOCALE}
+        year={2026}
+      />
+    );
+    const { unmount } = wrapClient(table);
+    expect(screen.getByText("Cash interest · IDR")).toBeInTheDocument();
+    expect(screen.queryByText("interest")).toBeNull();
+    unmount();
+    render(
+      <NextIntlClientProvider locale="id" messages={idMessages}>
+        {table}
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("Bunga tunai · IDR")).toBeInTheDocument();
+  });
+
+  it("labels German-table cash income that has no description", () => {
+    wrapClient(
+      <DividendsTable
+        rows={[
+          {
+            symbol: "interest",
+            cashType: "interest",
+            currency: "EUR",
+            gross: "12",
+            tax: "3",
+            net: "9",
+          },
+        ]}
+        totalsByCurrency={[{ currency: "EUR", gross: "12", tax: "3", net: "9" }]}
+        locale="en"
+        year={2026}
+      />,
+    );
+    expect(screen.getByText("Cash interest · EUR")).toBeInTheDocument();
+    expect(screen.queryByText("interest")).toBeNull();
+  });
+});
+
 describe("IdIncomeTable totals row", () => {
   it("keeps the pinned first column one column wide (no colSpan on Total)", () => {
     const { container } = wrapClient(

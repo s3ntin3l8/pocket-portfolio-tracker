@@ -538,7 +538,10 @@ export type IdIncomeCategory =
 /** One row of {@link IndonesianFinalTax.income}. */
 export interface IdIncomeRow {
   instrumentId?: string | null;
+  /** The instrument's symbol; for cash income a readable English label ("Cash interest · EUR"). */
   symbol: string;
+  /** Cash income only (no paying instrument): its type and the currency it was paid in. */
+  cashSource?: { type: "dividend" | "coupon" | "interest"; currency: string } | null;
   currency: string;
   category: IdIncomeCategory;
   /** The category's final rate (decimal string, "0.10"); null for foreign income. */
