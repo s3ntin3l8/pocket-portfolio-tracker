@@ -176,6 +176,15 @@ describe("HoldingsTable", () => {
     expect(screen.getAllByText(/5,000,000/).length).toBeGreaterThan(0);
   });
 
+  it("keeps the pinned first column of the totals row one column wide", () => {
+    // The table scrolls on narrow screens with its first column pinned; a spanning "Total"
+    // cell would pin four columns' width over the figures.
+    const { container } = renderTable();
+    const first = container.querySelector("tfoot td")!;
+    expect(first).toHaveTextContent("Total");
+    expect(first.getAttribute("colspan")).toBeNull();
+  });
+
   it("includes cash in the footer total", () => {
     // Securities total: 50*100 + 10*100 + 100*100 = 16,000
     // Cash: 4,000 → combined total: 20,000

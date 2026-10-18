@@ -167,9 +167,10 @@ export function IdIncomeTable({
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell className="font-semibold" colSpan={2}>
-                    {t("id.incomeTable.total")}
-                  </TableCell>
+                  {/* Not colSpan={2}: the first column is pinned while the table scrolls, and a
+                      two-column pinned cell would cover half a phone screen. */}
+                  <TableCell className="font-semibold">{t("id.incomeTable.total")}</TableCell>
+                  <TableCell />
                   <TableCell numeric className="font-semibold text-muted-foreground">
                     {fmt(totalIncomeGross)}
                   </TableCell>

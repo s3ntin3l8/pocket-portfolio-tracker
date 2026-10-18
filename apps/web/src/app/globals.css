@@ -375,8 +375,14 @@
     background-color: var(--card);
     box-shadow: 1px 0 0 var(--line);
   }
-  & tr:hover > :is(th, td):first-child {
+  & tbody tr:hover > :is(th, td):first-child {
     background-color: var(--row-hover);
+  }
+  /* The totals row sits on `bg-card-2` (TableFooter): match it, or the pinned "Total" cell
+     reads as a separate block. Header and footer rows don't hover (TableHeader/TableFooter
+     turn it off), which is why the hover rule above is scoped to tbody. */
+  & tfoot :is(th, td):first-child {
+    background-color: var(--card-2);
   }
 }
 

@@ -237,9 +237,15 @@ function TaxHolderOverviewDe({
                   {t("forecast.label")}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              {/* Its own @container: this card sits in the main column beside the rail, so
+                  <main>'s width says nothing about the room these tiles have. */}
+              <CardContent className="@container space-y-4">
                 <p className="text-xs text-muted-foreground">{t("forecast.disclaimer")}</p>
-                <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+                {/* Full amounts in the display currency (e.g. "IDR 14,910,312") at StatCard's
+                    viewport-keyed figure size. Phone (small figures): 2+1 once the card has
+                    320px. Otherwise by this card's width: stacked, 2+1 from 512px (room at the
+                    28px `lg:` size), 3-up from 768px. */}
+                <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-2 sm:gap-4 @lg:grid-cols-2 @3xl:grid-cols-3">
                   <StatCard
                     label={t("forecast.label")}
                     value={money(u.forecastIncomeRestOfYear)}
@@ -251,6 +257,7 @@ function TaxHolderOverviewDe({
                     delta={t("forecast.projectedUsedDesc")}
                   />
                   <StatCard
+                    className="max-sm:@xs:col-span-2 @lg:col-span-2 @3xl:col-span-1"
                     label={t("forecast.projectedRemaining")}
                     value={money(u.projectedRemaining)}
                     delta={`${t("forecast.projectedTaxSaving")}: ${money(u.projectedTaxSavingAvailable)}`}

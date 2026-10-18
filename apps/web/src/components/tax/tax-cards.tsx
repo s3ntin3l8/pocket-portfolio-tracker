@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardLabel, CardTitle } from "@/component
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import type { TaxDistribution, AllowanceUsage } from "@portfolio/api-client";
-import { formatMoneyWhole } from "@/lib/utils";
+import { cn, formatMoneyWhole } from "@/lib/utils";
 
 /** The currency German tax amounts (Sparerpauschbetrag, FSA slices) are denominated in. */
 const DE_TAX_AMOUNT_CURRENCY = "EUR";
@@ -19,13 +19,16 @@ export function EstimatedTaxHero({
   label,
   value,
   description,
+  className,
 }: {
   label: string;
   value: string;
   description: string;
+  /** Grid placement (e.g. a full row on a phone). */
+  className?: string;
 }) {
   return (
-    <Card className="min-w-0 p-5">
+    <Card className={cn("min-w-0 p-5", className)}>
       <CardLabel className="truncate">{label}</CardLabel>
       <p className="tabular mt-1 truncate text-lg font-bold sm:text-2xl lg:text-display">{value}</p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">{description}</p>
@@ -127,8 +130,13 @@ export function DistributionCard({
           {t("distribution.title")}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+      {/* StatCard's figure size is viewport-keyed (small below `sm`), the room is not: beside
+          the rail this card is narrower than on a phone, at the larger `sm:` size, and three
+          tiles crushed "€1,000" to "€1,…". So the card is its own @container. Phone (small
+          figures, whole euros via formatMoneyWhole): 3-up once it has 320px. Otherwise 3-up
+          from 512px (room at the 28px `lg:` size). Stacked in between. */}
+      <CardContent className="@container space-y-3">
+        <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-3 sm:gap-4 @lg:grid-cols-3">
           <StatCard
             label={t("distribution.cap")}
             value={money(d.holderAllowanceCap)}
@@ -166,18 +174,22 @@ export function VorabpauschaleRow({
   t: TaxTranslator;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
-      <StatCard
-        label={t("vorabpauschale.accrued")}
-        value={money(u.vorabpauschaleAccrued)}
-        delta={t("vorabpauschale.accruedDesc")}
-        basis={u.vorabpauschaleEstimated ? t("vorabpauschale.estimatedBasis") : undefined}
-      />
-      <StatCard
-        label={t("vorabpauschale.credited")}
-        value={money(u.vorabpauschaleCredited)}
-        delta={t("vorabpauschale.creditedDesc")}
-      />
+    // Its own @container, like the FSA and forecast tiles: beside the rail the main column
+    // is narrower than a phone while the figures are at their larger `sm:`/`lg:` sizes.
+    <div className="@container">
+      <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-2 sm:gap-4 @lg:grid-cols-2">
+        <StatCard
+          label={t("vorabpauschale.accrued")}
+          value={money(u.vorabpauschaleAccrued)}
+          delta={t("vorabpauschale.accruedDesc")}
+          basis={u.vorabpauschaleEstimated ? t("vorabpauschale.estimatedBasis") : undefined}
+        />
+        <StatCard
+          label={t("vorabpauschale.credited")}
+          value={money(u.vorabpauschaleCredited)}
+          delta={t("vorabpauschale.creditedDesc")}
+        />
+      </div>
     </div>
   );
 }

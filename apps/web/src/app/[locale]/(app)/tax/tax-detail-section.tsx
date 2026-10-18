@@ -26,22 +26,23 @@ export function TaxHolderDetailDE({
   if (!detail) return null;
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DisposalTable
-          rows={detail.disposals}
-          totalProceeds={detail.totalProceeds}
-          totalGain={detail.totalGain}
-          currency={currency}
-          locale={locale}
-          year={year}
-        />
-        <DividendsTable
-          rows={detail.dividendRows}
-          totalsByCurrency={detail.dividendTotalsByCurrency}
-          locale={locale}
-          year={year}
-        />
-      </div>
+      {/* Stacked, as plain blocks: the two tables (min 760px / 640px) never fit side by side
+          beside the rail, and a grid item would grow to its table's min-width on a phone
+          instead of letting the table scroll inside its card. */}
+      <DisposalTable
+        rows={detail.disposals}
+        totalProceeds={detail.totalProceeds}
+        totalGain={detail.totalGain}
+        currency={currency}
+        locale={locale}
+        year={year}
+      />
+      <DividendsTable
+        rows={detail.dividendRows}
+        totalsByCurrency={detail.dividendTotalsByCurrency}
+        locale={locale}
+        year={year}
+      />
       <ByYearTable rows={detail.byYear} currency={currency} locale={locale} />
     </>
   );
@@ -80,8 +81,13 @@ export function TaxHolderSectionId({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+      {/* Three IDR figures don't fit side by side on a phone: the headline takes its own row
+          there (full label and amount), the two smaller tiles share the next. 3-up from @3xl
+          (this grid spans <main>, the container queried): ~245px tiles, room for a full
+          amount at display size. */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @3xl:grid-cols-3">
         <EstimatedTaxHero
+          className="col-span-2 @3xl:col-span-1"
           label={t("id.hero.estimatedTax", { year })}
           value={moneyCompact(idTax.estimatedTax)}
           description={t("id.hero.estimatedTaxDesc", {
@@ -101,26 +107,26 @@ export function TaxHolderSectionId({
         />
       </div>
 
-      {/* Stacked: the income table's five columns don't fit a half-width card. */}
-      <div className="grid gap-4">
-        <IdSalesTable
-          rows={idTax.disposals}
-          totalProceeds={idTax.totalProceeds}
-          totalSalesTax={idTax.totalSalesTax}
-          currency={currency}
-          locale={locale}
-          year={year}
-        />
-        <IdIncomeTable
-          rows={domesticIncome}
-          totalIncomeGross={idTax.totalIncomeGross}
-          totalIncomeTax={idTax.totalIncomeTax}
-          totalIncomeNet={idTax.totalIncomeNet}
-          currency={currency}
-          locale={locale}
-          year={year}
-        />
-      </div>
+      {/* Stacked full-width (the income table's five columns don't fit a half-width card),
+          as plain blocks: a grid item would grow to the table's min-width on a phone instead
+          of letting the table scroll inside its card. */}
+      <IdSalesTable
+        rows={idTax.disposals}
+        totalProceeds={idTax.totalProceeds}
+        totalSalesTax={idTax.totalSalesTax}
+        currency={currency}
+        locale={locale}
+        year={year}
+      />
+      <IdIncomeTable
+        rows={domesticIncome}
+        totalIncomeGross={idTax.totalIncomeGross}
+        totalIncomeTax={idTax.totalIncomeTax}
+        totalIncomeNet={idTax.totalIncomeNet}
+        currency={currency}
+        locale={locale}
+        year={year}
+      />
 
       <IdForeignIncomeTable
         rows={foreignIncome}

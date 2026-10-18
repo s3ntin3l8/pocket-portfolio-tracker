@@ -205,6 +205,19 @@ describe("VorabpauschaleRow", () => {
     expect(screen.getByText("Rp 2.93")).toBeInTheDocument();
     expect(screen.getByText("Rp 1.1")).toBeInTheDocument();
   });
+
+  it("pairs its tiles by its own width, not the viewport's", () => {
+    const { container } = render(
+      <VorabpauschaleRow allowanceUsage={makeAllowanceUsage({})} money={money} t={t} />,
+    );
+    const outer = container.firstElementChild!;
+    expect(outer.getAttribute("class")).toBe("@container");
+    const classes = (outer.firstElementChild!.getAttribute("class") ?? "").split(/\s+/);
+    expect(classes).toContain("grid-cols-1");
+    expect(classes).toContain("max-sm:@xs:grid-cols-2");
+    expect(classes).toContain("@lg:grid-cols-2");
+    expect(classes).not.toContain("grid-cols-2");
+  });
 });
 
 describe("VorabpauschaleRow estimate flag", () => {
@@ -352,6 +365,20 @@ describe("DistributionCard", () => {
     expect(screen.getByText("FSA distribution across depots")).toBeInTheDocument();
     expect(screen.getAllByText("€1,000").length).toBe(2); // cap + allocated (whole euros)
     expect(screen.queryByText(/IDR|Rp/)).not.toBeInTheDocument();
+  });
+
+  it("sizes its tiles by its own width: 3-up on a phone or from 512px, else stacked", () => {
+    // Beside the rail the card is narrower than on a phone; a viewport breakpoint can't
+    // tell, so the card is the container the grid queries.
+    render(<DistributionCard distribution={distribution} locale="en" t={t} />);
+    const tile = screen.getByText(t("distribution.cap")).closest(".bg-card")!;
+    const grid = tile.parentElement!;
+    const classes = (grid.getAttribute("class") ?? "").split(/\s+/);
+    expect(classes).toContain("grid-cols-1");
+    expect(classes).toContain("max-sm:@xs:grid-cols-3");
+    expect(classes).toContain("@lg:grid-cols-3");
+    expect(classes).not.toContain("grid-cols-3");
+    expect(grid.parentElement!.getAttribute("class")).toMatch(/(^|\s)@container(\s|$)/);
   });
 
   it("defaults to EUR for a response that predates the currency field", () => {
@@ -735,5 +762,25 @@ describe("IdByYearTable", () => {
       <IdByYearTable rows={[]} currency={CURRENCY} locale={LOCALE} />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("IdIncomeTable totals row", () => {
+  it("keeps the pinned first column one column wide (no colSpan on Total)", () => {
+    const { container } = wrapClient(
+      <IdIncomeTable
+        rows={[incomeRow({ symbol: "BBCA", category: "domestic_dividend", gross: "100" })]}
+        totalIncomeGross="100"
+        totalIncomeTax="10"
+        totalIncomeNet="90"
+        currency={CURRENCY}
+        locale={LOCALE}
+        year={2026}
+      />,
+    );
+    const cells = container.querySelectorAll("tfoot td");
+    expect(cells).toHaveLength(5);
+    expect(cells[0]).toHaveTextContent("Total");
+    expect(cells[0]!.getAttribute("colspan")).toBeNull();
   });
 });
