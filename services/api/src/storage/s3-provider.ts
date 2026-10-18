@@ -35,9 +35,12 @@ export class S3Provider implements StorageProvider {
   private readonly client: S3Client;
   private readonly bucket: string;
   private readonly signedUrlTtl: number;
+  /** The configured endpoint; undefined means the AWS SDK's default (AWS S3 itself). */
+  readonly endpoint: string | undefined;
 
   constructor(config: S3ProviderConfig) {
     this.bucket = config.bucket;
+    this.endpoint = config.endpoint || undefined;
     this.signedUrlTtl = config.signedUrlTtl;
     this.client = new S3Client({
       ...(config.endpoint ? { endpoint: config.endpoint } : {}),

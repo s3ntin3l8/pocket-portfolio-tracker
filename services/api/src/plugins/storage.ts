@@ -4,6 +4,21 @@ import type { StorageProvider, StorageStats } from "../storage/types.js";
 import { getStorageProvider, S3Provider } from "../storage/index.js";
 
 /**
+ * Whether the plugin probes (and creates) the S3 bucket at boot: only in development, and
+ * only against an explicitly configured endpoint (a local MinIO, the case it exists for).
+ * Production backends are provisioned. Without an endpoint the AWS SDK targets AWS S3
+ * itself, which the env defaults (`STORAGE_PROVIDER=s3`, no `STORAGE_ENDPOINT`, path-style)
+ * turn into a 301 — that probe used to leave the machine from every test that builds an
+ * app, and from a dev machine with no MinIO.
+ */
+export function ensuresBucketAtBoot(
+  nodeEnv: "development" | "production" | "test",
+  provider: StorageProvider,
+): provider is S3Provider {
+  return nodeEnv === "development" && provider instanceof S3Provider && !!provider.endpoint;
+}
+
+/**
  * Registers `app.storage` — a stable facade that delegates to the lazily-resolved,
  * DB-backed storage provider. The active backend (S3 or folder) is read from the
  * `storage_settings` table on first use and cached; `invalidateStorage()` drops the
@@ -12,8 +27,9 @@ import { getStorageProvider, S3Provider } from "../storage/index.js";
  * Works against MinIO (local dev), AWS S3, Supabase Storage (/storage/v1/s3),
  * Cloudflare R2, Hetzner Object Storage, or a local filesystem folder.
  *
- * On non-production environments the plugin attempts to create the S3 bucket if it
- * doesn't already exist (best-effort — failure logs a warning and doesn't abort boot).
+ * In development the plugin attempts to create the S3 bucket if it doesn't already
+ * exist (best-effort — failure logs a warning and doesn't abort boot); see
+ * {@link ensuresBucketAtBoot}.
  */
 export const storagePlugin = fp(async (app: FastifyInstance) => {
   // Build the facade — every method resolves the cached backend on each call
@@ -52,12 +68,13 @@ export const storagePlugin = fp(async (app: FastifyInstance) => {
 
   app.decorate("storage", facade);
 
-  // On non-production, eagerly resolve the backend once to trigger the bucket-ensure
-  // side-effect (best-effort — errors are logged, never fatal).
-  if (app.config.NODE_ENV !== "production") {
+  // In development, eagerly resolve the backend once to trigger the bucket-ensure
+  // side-effect (best-effort — errors are logged, never fatal) — against a configured
+  // endpoint only, see ensuresBucketAtBoot. Never under test or in production.
+  if (app.config.NODE_ENV === "development") {
     getStorageProvider(app)
       .then(async (provider) => {
-        if (provider instanceof S3Provider) {
+        if (ensuresBucketAtBoot(app.config.NODE_ENV, provider)) {
           try {
             const created = await provider.ensureBucket();
             app.log.info({ created }, "storage bucket ready");

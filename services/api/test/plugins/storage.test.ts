@@ -55,9 +55,8 @@ describe("storage plugin / buildApp injection seam", () => {
     let app: Awaited<ReturnType<typeof buildApp>>;
 
     beforeAll(async () => {
-      // No opts.storage — the real storagePlugin runs. We don't need a live MinIO
-      // for this test: we only assert that app.storage is defined and is an object.
-      // The bucket ensure is best-effort and will fail silently against localhost:9000.
+      // No opts.storage — the real storagePlugin runs. We only assert that app.storage
+      // is defined and is an object; no object store is contacted (see storage-boot-probe.test.ts).
       app = await buildApp();
     });
 
