@@ -343,7 +343,9 @@ const ZERO = new Decimal(0);
  * at the very same instant are included (a per-currency sum doesn't depend on their order),
  * so a deposit booked on the payment's date-only timestamp counts; that errs toward the
  * larger balance, i.e. toward taxing. `payment` is excluded by identity: pass the element of
- * `transactions` itself, not a rebuilt copy (which would count into its own balance).
+ * `transactions` itself, not a rebuilt copy (which would count into its own balance). The
+ * reference definition: the tax report uses {@link idCashBalancesAtPayments}, which must
+ * stay equal to it (keep both; the tests compare them).
  *
  * null when the balance can't be known: before the first explicit cash-account movement
  * ({@link isCashAccountMovement}) the derived cash is only the sum of imported trades, not
@@ -363,7 +365,8 @@ export function idCashBalancesBefore(
 /**
  * {@link idCashBalancesBefore} for many payments of one portfolio in a single sorted walk
  * (O(n log n) instead of a full ledger pass per payment), keyed by the payment rows passed
- * in. Same result, payment by payment — `tax-id.test.ts` pins the parity.
+ * in. Same record, payment by payment — `tax-id.test.ts` pins the parity. Only payments that
+ * are elements of `transactions` get an entry; any other is absent (its balance unknown).
  */
 export function idCashBalancesAtPayments(
   transactions: CoreTransaction[],
@@ -374,6 +377,8 @@ export function idCashBalancesAtPayments(
   if (wanted.size === 0) return out;
   const sorted = [...transactions].sort((a, b) => a.executedAt.getTime() - b.executedAt.getTime());
   const totals = new Map<string, Decimal>();
+  // Rows per currency, so a currency only the payment itself uses isn't reported as "0".
+  const rows = new Map<string, number>();
   let tracked = false;
   for (let i = 0; i < sorted.length;) {
     // One instant at a time: every row at the payment's instant counts, except the payment.
@@ -382,6 +387,7 @@ export function idCashBalancesAtPayments(
     for (; j < sorted.length && sorted[j]!.executedAt.getTime() === at; j++) {
       const t = sorted[j]!;
       totals.set(t.currency, (totals.get(t.currency) ?? ZERO).add(cashFlow(t)));
+      rows.set(t.currency, (rows.get(t.currency) ?? 0) + 1);
       if (isCashAccountMovement(t)) tracked = true;
     }
     for (let k = i; k < j; k++) {
@@ -394,9 +400,8 @@ export function idCashBalancesAtPayments(
       }
       const balances: Record<string, string> = {};
       for (const [currency, total] of totals) {
-        balances[currency] = (
-          currency === p.currency ? total.minus(cashFlow(p)) : total
-        ).toString();
+        if (currency !== p.currency) balances[currency] = total.toString();
+        else if (rows.get(currency)! > 1) balances[currency] = total.minus(cashFlow(p)).toString();
       }
       out.set(p, balances);
     }

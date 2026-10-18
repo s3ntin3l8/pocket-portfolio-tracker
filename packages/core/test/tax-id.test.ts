@@ -816,14 +816,19 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
       const walked = idCashBalancesAtPayments(txns, payments);
       expect(walked.size).toBe(payments.length);
       for (const p of payments) {
-        const one = idCashBalancesBefore(txns, p);
-        const many = walked.get(p) ?? null;
-        expect(many === null ? null : idDepositBalanceIdr(many, fx)).toBe(
-          one === null ? null : idDepositBalanceIdr(one, fx),
-        );
-        expect(many === null).toBe(one === null);
+        // Record for record, every currency (not just the IDR total).
+        expect(walked.get(p)).toEqual(idCashBalancesBefore(txns, p));
       }
       expect(walked.get(txns.find((t) => t.price === "50" && t.type === "interest")!)).toBeNull();
+      // A payment only in its own currency (EUR here) adds no "0" entry; one outside the
+      // list has none at all.
+      const eur = tx("interest", "3", "EUR", "2026-03-31");
+      const withEur = [...txns, eur];
+      expect(idCashBalancesAtPayments(withEur, [eur]).get(eur)).toEqual(
+        idCashBalancesBefore(withEur, eur),
+      );
+      expect(idCashBalancesBefore(withEur, eur)).not.toHaveProperty("EUR");
+      expect(idCashBalancesAtPayments(txns, [eur]).has(eur)).toBe(false);
     });
 
     it("is unknown when a currency has no rate into IDR, unless its balance is zero", () => {
