@@ -235,7 +235,7 @@ describe("table layout switch", () => {
   it("the tax tables opt into the horizontal-scroll affordance", () => {
     for (const f of [
       "dividends-table",
-      "id-dividends-table",
+      "id-income-table",
       "disposals-table-de",
       "sales-table-id",
       "year-table",
