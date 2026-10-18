@@ -1,7 +1,7 @@
 "use client";
 
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 import type { DuplicateAnnotation, LikelyDuplicate } from "@portfolio/api-client";
 import { useApiClient } from "@/lib/api";
 import { useImportConfirm } from "@/lib/use-import-confirm";
+import { useTimeout } from "@/lib/use-timeout";
 import { classifyImportError } from "@/lib/import-errors";
 import { useRouter } from "@/i18n/navigation";
 
@@ -54,7 +55,7 @@ export function DraftReviewClient({
 
   // Transient "N transactions imported" banner after a partial confirm.
   const [importedCount, setImportedCount] = useState<number | null>(null);
-  const importedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideImported = useTimeout();
 
   // Portfolio selection: use the stored portfolioId if available, otherwise default to
   // the first portfolio in the list. The picker is only shown when there are multiple
@@ -86,8 +87,7 @@ export function DraftReviewClient({
     onFullSuccess: () => backToImport(),
     onPartialSuccess: (count) => {
       setImportedCount(count);
-      if (importedTimer.current) clearTimeout(importedTimer.current);
-      importedTimer.current = setTimeout(() => setImportedCount(null), 5000);
+      hideImported.schedule(() => setImportedCount(null), 5000);
       router.refresh();
     },
     getErrorMessage: (err) =>

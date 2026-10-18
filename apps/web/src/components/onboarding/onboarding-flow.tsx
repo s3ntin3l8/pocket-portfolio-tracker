@@ -29,6 +29,7 @@ import { PortfolioStep } from "./steps/portfolio-step";
 import { AddDataStep, type AddDataCardKey } from "./steps/add-data-step";
 import { AddDataTrConnect } from "./steps/add-data-tr";
 import { DoneStep } from "./steps/done-step";
+import { useTimeout } from "@/lib/use-timeout";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -61,6 +62,7 @@ export function OnboardingFlow() {
   const [cashCounted, setCashCounted] = useState(false);
   const [brokerageValue, setBrokerageValue] = useState("");
   const [brokerageOpen, setBrokerageOpen] = useState(false);
+  const closeBrokerage = useTimeout();
   const [mIntroDone, setMIntroDone] = useState(false);
   const [mSlide, setMSlide] = useState(0);
 
@@ -463,12 +465,23 @@ export function OnboardingFlow() {
                       brokerageValue={brokerageValue}
                       brokerageOpen={brokerageOpen}
                       onBrokerageChange={(v) => {
+                        // Typing re-opens the list: a close armed by an earlier blur must not
+                        // shut it again.
+                        closeBrokerage.cancel();
                         setBrokerageValue(v);
                         setBrokerageOpen(true);
                       }}
-                      onBrokerageFocus={() => setBrokerageOpen(true)}
-                      onBrokerageToggle={() => setBrokerageOpen((o) => !o)}
-                      onBrokerageBlur={() => setTimeout(() => setBrokerageOpen(false), 120)}
+                      onBrokerageFocus={() => {
+                        closeBrokerage.cancel();
+                        setBrokerageOpen(true);
+                      }}
+                      onBrokerageToggle={() => {
+                        closeBrokerage.cancel();
+                        setBrokerageOpen((o) => !o);
+                      }}
+                      onBrokerageBlur={() =>
+                        closeBrokerage.schedule(() => setBrokerageOpen(false), 120)
+                      }
                       onSelectBrokerage={(name) => {
                         setBrokerageValue(name);
                         setBrokerageOpen(false);
