@@ -44,6 +44,7 @@
 
 import { Decimal } from "decimal.js";
 import { D } from "./decimal.js";
+import type { TAXED_INCOME_TYPES } from "./categorization.js";
 
 /** 0.1% of gross proceeds of IDX-listed shares (PP 41/1994 as amended by PP 14/1997). */
 export const ID_SALES_TAX_RATE = "0.001";
@@ -188,11 +189,8 @@ export function classifyIdIncome(input: IdIncomeClassifyInput): IdIncomeCategory
  *  was and the currency it was paid in. The report's `currency` is the display currency,
  *  so this is the only place a cash row's own currency survives — the UI labels the row
  *  with it ("Cash interest · EUR") instead of an internal type key. */
-/** The income transaction types (each can be paid with no instrument: cash income). */
-export const ID_CASH_INCOME_TYPES = ["dividend", "coupon", "interest"] as const;
-
 export interface IdCashIncomeSource {
-  type: (typeof ID_CASH_INCOME_TYPES)[number];
+  type: (typeof TAXED_INCOME_TYPES)[number];
   /** The transaction's own currency (ISO 4217). */
   currency: string;
 }

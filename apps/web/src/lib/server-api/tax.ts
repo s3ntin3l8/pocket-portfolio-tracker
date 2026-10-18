@@ -2,7 +2,7 @@ import { Decimal } from "decimal.js";
 import { collectFxMissing } from "@/lib/fx-missing";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
 import {
-  ID_CASH_INCOME_TYPES,
+  TAXED_INCOME_TYPES,
   mergeIndonesianFinalTax,
   type IdCashIncomeSource,
 } from "@portfolio/core";
@@ -348,10 +348,11 @@ export async function loadTaxYearDetail(
         const totalGain = legs.reduce((s, l) => s.add(l.gain), new Decimal(0));
 
         const incomeTxns = incomeLists.flat().filter(
-          // One list for the filter and the type: core's ID_CASH_INCOME_TYPES (each has a
-          // `Tax.cashSource.<type>` label; tax-cards.test.tsx checks the catalog).
+          // Core's TAXED_INCOME_TYPES: the income types both tax views report, and the type of
+          // `IdCashIncomeSource` (each has a `Tax.cashSource.<type>` label; tax-cards.test.tsx
+          // checks the catalog).
           (t): t is typeof t & { type: IdCashIncomeSource["type"] } =>
-            (ID_CASH_INCOME_TYPES as readonly string[]).includes(t.type) &&
+            (TAXED_INCOME_TYPES as readonly string[]).includes(t.type) &&
             t.status !== "archived" &&
             t.status !== "draft" &&
             new Date(t.executedAt).getUTCFullYear() === targetYear,

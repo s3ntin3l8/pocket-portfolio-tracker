@@ -1,6 +1,10 @@
 export const ACQUISITION_TYPES = ["buy", "savings_plan"] as const;
 export const DISPOSAL_TYPES = ["sell"] as const;
 export const INCOME_TYPES = ["dividend", "coupon", "interest", "bonus_cash"] as const;
+/** The investment-income types the tax views report (both the German "Investment income"
+ *  table and the Indonesian final tax). `bonus_cash` is income for performance but a broker
+ *  bonus, not a dividend/coupon/interest payment, so it isn't in either tax table. */
+export const TAXED_INCOME_TYPES = ["dividend", "coupon", "interest"] as const;
 export const CASH_FLOW_TYPES = ["deposit", "withdrawal", "fee", "tax", "adjustment"] as const;
 export const SHARE_RECEIPT_TYPES = ["bonus", "split", "rights"] as const;
 export const TRANSFER_TYPES = ["transfer_in", "transfer_out"] as const;
