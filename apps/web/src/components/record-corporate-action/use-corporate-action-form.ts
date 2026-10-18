@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { ApiClient, Instrument, InstrumentSearchResult } from "@portfolio/api-client";
 import { normalizeDecimal } from "@/components/record-corporate-action/normalize-decimal";
@@ -42,6 +42,14 @@ export function useCorporateActionForm({
   // Market-data discovery results (not yet in the local DB).
   const [discovered, setDiscovered] = useState<InstrumentSearchResult[]>([]);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A discovery lookup still debouncing when the form goes away must not fire: it
+  // would hit the network and set state on an unmounted component.
+  useEffect(
+    () => () => {
+      if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    },
+    [],
+  );
   const [selected, setSelected] = useState<Instrument | null>(null);
   const [ratio, setRatio] = useState("");
   const [exDate, setExDate] = useState("");

@@ -100,6 +100,19 @@ describe("useCorporateActionForm", () => {
       expect(result.current.discovered).toEqual(found);
     });
 
+    // A pending discovery debounce must not outlive the form: it would hit the network
+    // and set state after unmount (in tests, after jsdom is torn down: "window is not
+    // defined" as an unhandled rejection).
+    it("cancels the pending discovery lookup on unmount", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { client, result, unmount } = setup({ isAdmin: true });
+      act(() => result.current.runSearch("aa"));
+      await waitFor(() => expect(result.current.results).toEqual([A]));
+      unmount();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(client.lookupInstruments).not.toHaveBeenCalled();
+    });
+
     it("clears results on empty query and swallows search errors", async () => {
       const client = makeClient({
         searchInstruments: vi.fn(async () => {
