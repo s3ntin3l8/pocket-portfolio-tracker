@@ -117,7 +117,7 @@
       "trend": "{pct} XIRR",
       "caption": "Nilai saat ini",
       "metricMonthly": "Rata-rata bulanan",
-      "metricReturn": "Total imbal hasil termasuk pendapatan",
+      "metricReturn": "Total imbal hasil vs total setoran kotor",
       "tooltipContributed": "Dikonstribusikan",
       "tooltipGain": "Keuntungan"
     },
@@ -490,6 +490,7 @@
     "emptyBody": "Dividen dan kupon muncul di sini setelah Anda mencatatnya sebagai transaksi.",
     "cashInterest": "Bunga tunai",
     "thisYear": "Tahun ini",
+    "thisYearEstimate": "Tahun ini (diterima + perkiraan)",
     "ttm": "12 bulan terakhir",
     "forecast": "Perkiraan (tahun depan)",
     "forecastNext12": "Tahun depan",
@@ -2147,7 +2148,7 @@
       "title": "Per tahun",
       "year": "Tahun",
       "realized": "Keuntungan terealisasi",
-      "dividends": "Dividen",
+      "dividends": "Pendapatan investasi",
       "fsaUsed": "FSA terpakai",
       "tax": "Abgeltungsteuer"
     },

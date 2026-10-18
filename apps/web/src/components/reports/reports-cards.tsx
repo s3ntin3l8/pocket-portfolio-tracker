@@ -230,10 +230,12 @@ export async function SavingsCard({ locale }: CardProps) {
       : undefined;
   // `totalReturnPct` is its own basis — (value + money paid back out − gross contributed)
   // over gross contributed, i.e. income and realized gains included — so it carries its
-  // basis in the label. It is null where the headline gain above already is the total
+  // basis in the label (over gross, not net, contributed). It is null where the headline gain above already is the total
   // return (a cash-inside scope); the metric is then omitted rather than filled with
   // `simpleGainPct` under the same label, which would show one figure under two bases.
-  const totalReturnPct = s.totalReturnPct;
+  // `typeof` rather than `!== null`: an API that predates the field omits it, and that
+  // must read as "no figure", not format as "NaN%".
+  const totalReturnPct = typeof s.totalReturnPct === "number" ? s.totalReturnPct : null;
 
   return (
     <ReportCard

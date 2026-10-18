@@ -127,7 +127,8 @@ describe("Reports cards", () => {
     const withTotal = (await SavingsCard({ locale: "en" }))!;
     const ret = withTotal.props.metrics.find((m: { value: string }) => m.value.includes("28.16"));
     expect(ret.label).not.toBe("Total return");
-    expect(ret.label).toMatch(/incl\. income/i);
+    // Its denominator is gross contributed, unlike the headline's net — the label names it.
+    expect(ret.label).toMatch(/gross contributed/i);
 
     // No total return (cash-inside scope, whose headline gain already is total return):
     // the metric is omitted, not filled with simpleGainPct under the "Total return" label.
@@ -137,6 +138,11 @@ describe("Reports cards", () => {
       false,
     );
     expect(without.props.metrics).toHaveLength(1);
+
+    // An absent field (an API predating it) is treated like null, never formatted as "NaN%".
+    data.contributionsReport.mockResolvedValue(ok({ ...base }));
+    const absent = (await SavingsCard({ locale: "en" }))!;
+    expect(absent.props.metrics).toHaveLength(1);
   });
 
   it("DE tax card calls its income figure investment income, not dividends", async () => {
@@ -166,6 +172,9 @@ describe("Reports cards", () => {
       expect(hero.dividendsYtdDesc).not.toContain("{allowance}");
     }
     expect(messages.Tax.hero.dividendsYtd).toMatch(/investment income/i);
+    // The By-year column holds the same figure (current year: incomeYtd; past years: all
+    // capital income incl. interest), so it carries the same name.
+    expect(messages.Tax.byYear.dividends).toMatch(/investment income/i);
     expect(messages.Tax.hero.dividendsYtdDesc).toMatch(/before/i);
   });
 

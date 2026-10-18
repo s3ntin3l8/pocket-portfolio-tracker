@@ -151,7 +151,9 @@ describe("Income sections", () => {
 
   it("stat cards show the full-year outlook, trailing figures and payment count", async () => {
     render(await IncomeStatsSection({ locale: "en" }));
-    expect(screen.getByText("thisYear")).toBeInTheDocument();
+    // The value is the full-year estimate (received + forecast), so the label says so.
+    expect(screen.getByText("thisYearEstimate")).toBeInTheDocument();
+    expect(screen.queryByText("thisYear")).not.toBeInTheDocument();
     expect(screen.getByText("payments")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
   });

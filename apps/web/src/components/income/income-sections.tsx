@@ -193,7 +193,9 @@ export async function IncomeStatsSection({ locale }: SectionProps) {
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:gap-4 @xl:grid-cols-1">
       <StatCard
-        label={t("thisYear")}
+        // The value is the full-year estimate (received so far + rest-of-year forecast),
+        // not actuals, so the label says so.
+        label={t("thisYearEstimate")}
         value={m(thisFullYear)}
         delta={
           deltaPct !== null

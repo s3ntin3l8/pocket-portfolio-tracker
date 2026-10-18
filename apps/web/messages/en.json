@@ -117,7 +117,7 @@
       "trend": "{pct} XIRR",
       "caption": "Current value",
       "metricMonthly": "Monthly avg",
-      "metricReturn": "Total return incl. income",
+      "metricReturn": "Total return vs gross contributed",
       "tooltipContributed": "Contributed",
       "tooltipGain": "Gain"
     },
@@ -490,6 +490,7 @@
     "emptyBody": "Dividends and coupons appear here once you record them as transactions.",
     "cashInterest": "Cash interest",
     "thisYear": "This year",
+    "thisYearEstimate": "This year (received + forecast)",
     "ttm": "Trailing 12 months",
     "forecast": "Forecast (next year)",
     "forecastNext12": "Next year",
@@ -2147,7 +2148,7 @@
       "title": "By year",
       "year": "Year",
       "realized": "Realized gains",
-      "dividends": "Dividends",
+      "dividends": "Investment income",
       "fsaUsed": "FSA used",
       "tax": "Abgeltungsteuer"
     },
