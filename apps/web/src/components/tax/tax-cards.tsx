@@ -133,11 +133,13 @@ export function DistributionCard({
       {/* StatCard's figure size is viewport-keyed (small below `sm`), the room is not: beside
           the rail this card is narrower than on a phone, at the larger `sm:` size, and three
           tiles crushed "€1,000" to "€1,…". So the card is its own @container. Phone (small
-          figures, whole euros via formatMoneyWhole): 3-up once it has 320px. Otherwise 3-up
-          from 512px (room at the 28px `lg:` size). Stacked in between. */}
+          figures): 1+2 once it has 320px, the cap on its own row like the ID tiles; 3-up there
+          crushed the labels ("Sparer-pausch-betrag" over three lines). Otherwise 3-up from
+          512px (room at the 28px `lg:` size). Stacked in between. */}
       <CardContent className="@container space-y-3">
-        <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-3 sm:gap-4 @lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 max-sm:@xs:grid-cols-2 sm:gap-4 @lg:grid-cols-3">
           <StatCard
+            className="max-sm:@xs:col-span-2"
             label={t("distribution.cap")}
             value={money(d.holderAllowanceCap)}
             delta={t("distribution.capDesc")}

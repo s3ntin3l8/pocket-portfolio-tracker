@@ -367,17 +367,26 @@ describe("DistributionCard", () => {
     expect(screen.queryByText(/IDR|Rp/)).not.toBeInTheDocument();
   });
 
-  it("sizes its tiles by its own width: 3-up on a phone or from 512px, else stacked", () => {
+  it("sizes its tiles by its own width: 1+2 on a phone, 3-up from 512px, else stacked", () => {
     // Beside the rail the card is narrower than on a phone; a viewport breakpoint can't
-    // tell, so the card is the container the grid queries.
+    // tell, so the card is the container the grid queries. On a phone (~330px of card) three
+    // tiles crushed their labels ("Sparer-pausch-betrag" over 3 lines), so the cap gets its
+    // own row there, as the ID tiles do, and the other two share the next.
     render(<DistributionCard distribution={distribution} locale="en" t={t} />);
-    const tile = screen.getByText(t("distribution.cap")).closest(".bg-card")!;
-    const grid = tile.parentElement!;
+    const cap = screen.getByText(t("distribution.cap")).closest(".bg-card")!;
+    const grid = cap.parentElement!;
     const classes = (grid.getAttribute("class") ?? "").split(/\s+/);
     expect(classes).toContain("grid-cols-1");
-    expect(classes).toContain("max-sm:@xs:grid-cols-3");
+    expect(classes).toContain("max-sm:@xs:grid-cols-2");
+    expect(classes).not.toContain("max-sm:@xs:grid-cols-3");
     expect(classes).toContain("@lg:grid-cols-3");
     expect(classes).not.toContain("grid-cols-3");
+    const capClasses = (cap.getAttribute("class") ?? "").split(/\s+/);
+    expect(capClasses).toContain("max-sm:@xs:col-span-2");
+    for (const key of ["distribution.allocated", "distribution.remaining"] as const) {
+      const tile = screen.getByText(t(key)).closest(".bg-card")!;
+      expect(tile.getAttribute("class") ?? "").not.toMatch(/col-span/);
+    }
     expect(grid.parentElement!.getAttribute("class")).toMatch(/(^|\s)@container(\s|$)/);
   });
 
