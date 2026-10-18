@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -21,7 +21,8 @@ import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
  * It never touches Docker, so the production compose project is out of reach.
  *
  * Any startup failure runs the same teardown as a normal stop before the error
- * propagates. A stop mid-build or mid-seed kills that step's process group first.
+ * propagates. A stop mid-build or mid-seed kills that step's process group first,
+ * and a SIGKILL also takes down the groups the step spawned (turbo's per-task groups).
  * DEMO_HEALTH_TIMEOUT_MS (default 90000) bounds each readiness probe.
  */
 
@@ -91,29 +92,119 @@ function spawnServer(name, cmd, args, opts, quiet) {
   return child;
 }
 
-/** SIGTERM the whole group, wait for it to go, SIGKILL whatever is left. */
+/** Parse `ps -A -o pid=,ppid=,pgid=` output; lines that are not three integers are skipped. */
+export function parsePsRows(text) {
+  const rows = [];
+  for (const line of text.split("\n")) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s*$/.exec(line);
+    if (match) rows.push({ pid: Number(match[1]), ppid: Number(match[2]), pgid: Number(match[3]) });
+  }
+  return rows;
+}
+
+/**
+ * The process groups that descend from the `roots` groups in a `ps` snapshot: the
+ * groups of every process reachable via parent links from a member of a root group.
+ * turbo runs each task (sh, then tsc) in a group of its own, so killing turbo's group
+ * misses them. Only finds what is still linked: a task whose parent already exited
+ * was reparented and is out of reach (on Linux the /proc HOME sweep covers that).
+ * Never returns a root, the caller's own group (`self`'s), or a pgid <= 1:
+ * `kill(-0)` would hit the caller's group and `kill(-1)` every process it may signal.
+ */
+export function descendantGroups(rows, roots, self = process.pid) {
+  const rootSet = new Set(roots.filter((pgid) => pgid > 1));
+  // pid 0 and init are never anyone's descendant, and a self-parented entry (the
+  // kernel's pid 0, some kernel threads) would be its own child. Cycles beyond that
+  // are cut by `seen` below: each pid is expanded at most once.
+  rows = rows.filter((row) => row.pid > 1 && row.pid !== row.ppid);
+  const children = new Map();
+  for (const row of rows) {
+    if (!children.has(row.ppid)) children.set(row.ppid, []);
+    children.get(row.ppid).push(row);
+  }
+  const ownGroup = rows.find((row) => row.pid === self)?.pgid;
+  const seen = new Set();
+  const queue = rows.filter((row) => rootSet.has(row.pgid));
+  const groups = new Set();
+  while (queue.length > 0) {
+    const row = queue.pop();
+    if (seen.has(row.pid)) continue;
+    seen.add(row.pid);
+    if (row.pgid > 1 && !rootSet.has(row.pgid) && row.pgid !== ownGroup) groups.add(row.pgid);
+    queue.push(...(children.get(row.pid) ?? []));
+  }
+  return [...groups];
+}
+
+/**
+ * Descendant groups of `roots` from a live `ps` snapshot. Portable (macOS has no
+ * /proc). Synchronous, since the second-Ctrl-C path runs in a signal handler. Fails
+ * soft: without a usable `ps`, there is nothing extra to kill.
+ */
+function snapshotDescendantGroups(roots) {
+  try {
+    const out = execFileSync("ps", ["-A", "-o", "pid=,ppid=,pgid="], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      // It runs inside the second-Ctrl-C handler, ahead of every SIGKILL: a wedged
+      // ps must not hold those up for long. 1 s still leaves a loaded host room.
+      timeout: 1_000,
+    });
+    return descendantGroups(parsePsRows(out), roots);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Signal a whole process group. Refuses pgid <= 1 (and anything not a number):
+ * `kill(-1)` reaches every process this user may signal, `kill(-0)` the caller's
+ * own group, so the guard sits here rather than only in the callers.
+ */
+export const signalGroup = (pgid, sig) => {
+  if (!(Number.isSafeInteger(pgid) && pgid > 1)) return false;
+  try {
+    process.kill(-pgid, sig);
+    return true;
+  } catch {
+    return false; // Group already gone.
+  }
+};
+
+/**
+ * SIGKILL the given groups plus every group descending from them. The snapshot
+ * comes first, while e.g. turbo is still alive and its tasks still list it as their
+ * parent. Returns the descendant groups, so the caller can wait for them too.
+ */
+function hardKillTree(pgids) {
+  const descendants = snapshotDescendantGroups(pgids);
+  for (const pgid of pgids) signalGroup(pgid, "SIGKILL");
+  for (const pgid of descendants) signalGroup(pgid, "SIGKILL");
+  if (descendants.length > 0)
+    console.log(`[demo] killed descendant process group(s) ${descendants.join(", ")}`);
+  return descendants;
+}
+
+/**
+ * SIGTERM the whole group, wait for it to go, SIGKILL whatever is left, together
+ * with the groups it spawned (turbo's per-task groups), which the SIGTERM may not
+ * have reached if turbo did not shut them down itself.
+ */
 async function killGroup(child, graceMs = 5_000) {
   if (!child) return;
-  const signal = (sig) => {
-    try {
-      process.kill(-child.pid, sig);
-      return true;
-    } catch {
-      return false; // Group already gone.
-    }
-  };
-  if (!signal("SIGTERM")) return;
+  if (!signalGroup(child.pid, "SIGTERM")) return;
   // Done when the direct child has exited and no process in its group remains
   // (signal 0 only probes). next dev writes its config store on the way out.
-  const alive = () => child.exitCode === null || signal(0);
-  const waitGone = async (ms) => {
+  const alive = () => child.exitCode === null || signalGroup(child.pid, 0);
+  const waitGone = async (ms, done) => {
     const deadline = Date.now() + ms;
-    while (Date.now() < deadline && alive()) await new Promise((r) => setTimeout(r, 100));
+    while (Date.now() < deadline && !done()) await new Promise((r) => setTimeout(r, 100));
   };
-  await waitGone(graceMs);
-  if (!signal("SIGKILL")) return;
-  // Let the killed group actually exit, so the scratch-dir delete does not race it.
-  await waitGone(2_000);
+  await waitGone(graceMs, () => !alive());
+  if (!alive()) return;
+  const descendants = hardKillTree([child.pid]);
+  // Let the killed groups actually exit, so the scratch-dir delete does not race them.
+  await waitGone(2_000, () => !alive() && !descendants.some((pgid) => signalGroup(pgid, 0)));
 }
 
 /**
@@ -139,14 +230,7 @@ export function strayPids(home) {
 }
 
 /** Whether any process in the child's process group is still alive (signal 0 only probes). */
-const groupAlive = (child) => {
-  try {
-    process.kill(-child.pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
+const groupAlive = (child) => signalGroup(child.pid, 0);
 
 const signalPid = (pid, sig) => {
   try {
@@ -278,14 +362,6 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
   const groups = () => [...children, ...steps];
   const home = path.join(demoDir, "home");
   let stopping;
-  const hardKill = (targets) => {
-    for (const child of targets)
-      try {
-        process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // Group already gone.
-      }
-  };
   const teardown = async () => {
     // Wait for every process to exit first: dying next dev workers otherwise
     // recreate files under the scratch HOME after it was deleted.
@@ -316,15 +392,17 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
   // grace period skips it and SIGKILLs the groups instead of leaving them behind.
   function onSignal() {
     if (stopping) {
-      // Snapshot, so the wait below covers every group signalled here.
-      const targets = groups();
-      hardKill(targets);
+      // Snapshot, so the wait below covers every group signalled here, including
+      // the groups they spawned (turbo's per-task groups).
+      const tracked = groups().map((child) => child.pid);
+      const targets = [...tracked, ...hardKillTree(tracked)];
       // Give the killed groups a moment to exit, or a dying next dev worker
       // recreates its config store under HOME right after the delete.
       const deadline = Date.now() + 2_000;
       let attempts = 0;
       const finish = () => {
-        if (targets.some(groupAlive) && Date.now() < deadline) return setTimeout(finish, 50);
+        if (targets.some((pgid) => signalGroup(pgid, 0)) && Date.now() < deadline)
+          return setTimeout(finish, 50);
         if (keep) process.exit(130);
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
