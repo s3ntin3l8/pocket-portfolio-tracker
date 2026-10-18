@@ -6,6 +6,8 @@ import {
   DEV_INDICATOR_HIDE_CSS,
   SCREENS,
   withSettings,
+  CHROMIUM_ARGS,
+  assertLocalWebUrl,
 } from "../scripts/screenshots.mjs";
 
 describe("screenshots script — dev indicator", () => {
@@ -189,6 +191,58 @@ describe("screenshots script — per-screen settings", () => {
     );
   });
 
+  it("withSettings restores every original even when restoring one of them fails", async () => {
+    // Restore must write the recorded originals, not re-read the (temporary) current values:
+    // otherwise a failed second restore leaves the first key on its temporary value too.
+    const state = { displayCurrency: "IDR", taxRegime: "ID" };
+    let restoring = false;
+    const request = {
+      fetch: vi.fn(async (url: string, opts: { method: string; data?: Record<string, string> }) => {
+        const route = new URL(url).pathname;
+        const fail = restoring && opts.method === "PATCH";
+        if (!fail && opts.data) Object.assign(state, opts.data);
+        const body =
+          route === "/api/backend/me"
+            ? { displayCurrency: state.displayCurrency }
+            : { taxRegime: state.taxRegime };
+        return { ok: () => !fail, status: () => (fail ? 500 : 200), json: async () => body };
+      }),
+    };
+    await expect(
+      withSettings({ request }, { taxRegime: "DE", displayCurrency: "EUR" }, async () => {
+        restoring = true;
+      }),
+    ).rejects.toThrow(/could not restore displayCurrency to IDR/);
+    expect(state.taxRegime).toBe("ID");
+  });
+
+  it("withSettings reports the capture's own error, not a restore failure", async () => {
+    let restoring = false;
+    const state = { displayCurrency: "IDR", taxRegime: "DE" };
+    const request = {
+      fetch: vi.fn(
+        async (_url: string, opts: { method: string; data?: Record<string, string> }) => {
+          const fail = restoring && opts.method !== "GET";
+          if (!fail && opts.data) Object.assign(state, opts.data);
+          return {
+            ok: () => !fail,
+            status: () => (fail ? 500 : 200),
+            json: async () => ({ displayCurrency: state.displayCurrency }),
+          };
+        },
+      ),
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      withSettings({ request }, { displayCurrency: "EUR" }, async () => {
+        restoring = true;
+        throw new Error("tax: page did not settle");
+      }),
+    ).rejects.toThrow(/tax: page did not settle/);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/could not restore displayCurrency/));
+    warn.mockRestore();
+  });
+
   it("withSettings rejects an unknown setting instead of silently capturing without it", async () => {
     const { request } = stubRequest();
     await expect(withSettings({ request }, { locale: "de" }, vi.fn())).rejects.toThrow(
@@ -200,5 +254,32 @@ describe("screenshots script — per-screen settings", () => {
     const { request, calls } = stubRequest();
     expect(await withSettings({ request }, undefined, async () => 42)).toBe(42);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("screenshots script — text rendering", () => {
+  it("launches Chromium without font hinting, so 2x captures don't break words apart", () => {
+    // Headless Chromium on Linux hints glyphs by default: at the narrow captures' small text
+    // sizes the snapped advances read as gaps inside words ("Estimat ed", "Pocke t", "YT D").
+    expect(CHROMIUM_ARGS).toContain("--font-render-hinting=none");
+  });
+});
+
+describe("screenshots script — target guard", () => {
+  it("accepts the local demo instance", () => {
+    expect(() => assertLocalWebUrl("http://localhost:3915", {})).not.toThrow();
+    expect(() => assertLocalWebUrl("http://127.0.0.1:3915", {})).not.toThrow();
+  });
+
+  it("refuses a remote host, since it switches the signed-in user's settings", () => {
+    expect(() => assertLocalWebUrl("https://pocket.example.com", {})).toThrow(
+      /refusing to capture against pocket\.example\.com/,
+    );
+  });
+
+  it("allows a remote host only with an explicit override", () => {
+    expect(() =>
+      assertLocalWebUrl("https://pocket.example.com", { SCREENSHOTS_ALLOW_REMOTE: "1" }),
+    ).not.toThrow();
   });
 });

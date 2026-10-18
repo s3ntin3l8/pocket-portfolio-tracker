@@ -21,6 +21,10 @@ import { mintSessionCookie } from "./mint-session.mjs";
  *
  * Auth: mints a forged Auth.js session cookie from the seeded personal-access token
  * (see `mint-session.mjs` for why this is safe and how it works); no real login.
+ *
+ * Writes: screens with `settings` (the tax shots) switch that user's display currency and
+ * tax regime for their capture and restore them afterwards, so this refuses a non-local
+ * SCREENSHOTS_WEB_URL unless SCREENSHOTS_ALLOW_REMOTE=1 (see assertLocalWebUrl).
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -77,6 +81,22 @@ async function setSetting(request, key, value) {
 }
 
 /**
+ * Writes each recorded original back, every key even if one fails; returns the failures.
+ * Never re-reads: by now the current values are the temporary ones.
+ */
+async function restoreSettings(request, originals) {
+  const failures = [];
+  for (const [key, value] of Object.entries(originals)) {
+    try {
+      await setSetting(request, key, value);
+    } catch (err) {
+      failures.push(`could not restore ${key} to ${value}: ${err.message}`);
+    }
+  }
+  return failures;
+}
+
+/**
  * Sets each setting, checking the API echoes it back; returns the values it replaced. If
  * one fails, the ones already applied are put back before the error propagates.
  */
@@ -92,10 +112,7 @@ async function applySettings(request, settings) {
     }
   } catch (err) {
     // Best effort: the original failure is the one worth reporting.
-    for (const [key, value] of Object.entries(previous))
-      await setSetting(request, key, value).catch((e) =>
-        console.warn(`could not restore ${key} to ${value}: ${e.message}`),
-      );
+    for (const warning of await restoreSettings(request, previous)) console.warn(warning);
     throw err;
   }
   return previous;
@@ -103,19 +120,48 @@ async function applySettings(request, settings) {
 
 /**
  * Runs `capture` with the screen's `settings` applied to the demo user, restoring the
- * previous values afterwards (also when the capture throws), so later screens and the
+ * recorded originals afterwards (also when the capture throws), so later screens and the
  * run order are unaffected. A setting that can't be applied fails the run rather than
- * shipping a capture in the wrong currency/regime.
+ * shipping a capture in the wrong currency/regime. A capture error wins over a restore
+ * failure (which is then only logged); a restore failure after a good capture fails the run,
+ * since every later screen would render with the wrong settings.
  */
 export async function withSettings(page, settings, capture) {
   if (!settings) return capture();
-  const previous = await applySettings(page.request, settings);
+  const originals = await applySettings(page.request, settings);
+  let result;
   try {
-    return await capture();
-  } finally {
-    await applySettings(page.request, previous);
+    result = await capture();
+  } catch (err) {
+    for (const warning of await restoreSettings(page.request, originals)) console.warn(warning);
+    throw err;
   }
+  const failures = await restoreSettings(page.request, originals);
+  if (failures.length > 0) throw new Error(failures.join("; "));
+  return result;
 }
+
+/**
+ * The capture switches the signed-in user's settings (see withSettings), so it only runs
+ * against the local demo instance unless SCREENSHOTS_ALLOW_REMOTE=1 says otherwise.
+ */
+export function assertLocalWebUrl(url, env) {
+  const host = new URL(url).hostname;
+  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return;
+  if (env.SCREENSHOTS_ALLOW_REMOTE === "1") return;
+  throw new Error(
+    `refusing to capture against ${host}: the script switches the signed-in user's display ` +
+      `currency and tax regime; set SCREENSHOTS_ALLOW_REMOTE=1 to override`,
+  );
+}
+
+/**
+ * Headless Chromium on Linux hints glyphs by default, snapping their advances to the pixel
+ * grid. At the narrow (2x) captures' small text sizes that reads as gaps inside words
+ * ("Estimat ed", "Pocke t", "YT D") and swallowed word spaces; unhinted glyphs keep the
+ * font's own spacing, as a phone renders it.
+ */
+export const CHROMIUM_ARGS = ["--font-render-hinting=none"];
 
 const THEMES = ["light", "dark"];
 
@@ -424,6 +470,7 @@ async function captureLanding(browser, cookie, secure) {
 }
 
 async function main() {
+  assertLocalWebUrl(WEB_URL, process.env);
   if (!PAT_FILE) throw new Error("SCREENSHOTS_PAT_FILE env var is required");
   if (!AUTH_SECRET) throw new Error("AUTH_SECRET env var is required");
   if (!["readme", "landing"].includes(PROFILE))
@@ -438,7 +485,7 @@ async function main() {
     secure,
   });
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: CHROMIUM_ARGS });
   try {
     return PROFILE === "landing"
       ? await captureLanding(browser, cookie, secure)
