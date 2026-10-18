@@ -39,8 +39,12 @@ describe("DisplayCurrency", () => {
     renderCurrency("IDR");
     fireEvent.click(screen.getByRole("radio", { name: "USD" }));
     await waitFor(() => expect(updateMe).toHaveBeenCalledWith({ displayCurrency: "USD" }));
+    // The selection only flips after updateMe resolves and React re-renders; under load
+    // that lands after the call itself is visible, so wait for it rather than assume it.
+    await waitFor(() =>
+      expect(screen.getByRole("radio", { name: "USD" })).toHaveAttribute("aria-checked", "true"),
+    );
     expect(refresh).toHaveBeenCalled();
-    expect(screen.getByRole("radio", { name: "USD" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("does nothing when the current currency is clicked again", () => {

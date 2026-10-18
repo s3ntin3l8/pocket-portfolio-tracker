@@ -1,9 +1,22 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { buildApp } from "../../src/app.js";
-import { closeDb } from "../../src/db/client.js";
+import { closeDb, ensureDb } from "../../src/db/client.js";
+
+// test/setup.ts points DATABASE_URL at this file's copy of the pre-migrated template.
+const FILE_DB_URL = process.env.DATABASE_URL;
 
 describe("env plugin", () => {
+  // These tests clear DATABASE_URL to check the config default, which would have
+  // buildApp replay every migration into a fresh in-memory PGlite. On a loaded host
+  // that outlasts avvio's plugin timeout, and the abandoned migrate then races the
+  // next test's ("type already exists"). Open this file's pre-migrated database
+  // first: buildApp's ensureDb reuses the open instance, and its migrate is a no-op.
+  beforeEach(async () => {
+    await ensureDb(FILE_DB_URL);
+  });
+
   afterEach(async () => {
+    await closeDb();
     delete process.env.PORT;
     delete process.env.LOG_LEVEL;
     delete process.env.DATABASE_URL;

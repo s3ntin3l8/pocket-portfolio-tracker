@@ -63,8 +63,11 @@ function makeRunner(spawn: SpawnFn, overrides = {}) {
     wafStrategy: "awswaf",
     enabled: true,
     spawn,
-    pairingTimeoutMs: 50,
-    exportTimeoutMs: 50,
+    // Generous: these only bound a hung test. 50 ms was exceeded by the file I/O and
+    // awaits inside a single happy-path test on a loaded host ("pairing timed out").
+    // The timeout tests pass their own short values.
+    pairingTimeoutMs: 10_000,
+    exportTimeoutMs: 10_000,
     ...overrides,
   });
 }
