@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+export interface UseTimeout {
+  /** Runs `fn` after `ms`, replacing any pending callback. A no-op after unmount. */
+  schedule: (fn: () => void, ms: number) => void;
+  /** Drops the pending callback, if any. */
+  cancel: () => void;
+}
+
 /**
  * A single restartable `setTimeout` owned by a component, for transient UI state ("Copied!"
  * labels, a banner that fades after a few seconds, a blur-close delay).
@@ -14,10 +21,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
  *
  * The returned object and both members are referentially stable across renders.
  */
-export function useTimeout(): {
-  schedule: (fn: () => void, ms: number) => void;
-  cancel: () => void;
-} {
+export function useTimeout(): UseTimeout {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
 
