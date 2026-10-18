@@ -13,7 +13,7 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort, type ColDef } from "@/lib/table-sort";
 import { formatMoney, formatPercentPoints } from "@/lib/utils";
-import type { IdIncomeCategory, IdIncomeTax } from "@portfolio/core";
+import { ID_INCOME_CATEGORIES, type IdIncomeTax } from "@portfolio/core";
 
 const ID_INCOME_COLS: ColDef<IdIncomeTax>[] = [
   { key: "source", get: (r) => r.symbol, type: "text" },
@@ -61,15 +61,15 @@ export function IdIncomeTable({
   const { sortKey, sortDir, toggle, sort } = useTableSort<IdIncomeTax>(ID_INCOME_COLS);
   const sorted = sort(rows);
   // One note per category present, in the categories' display order.
-  const notes = (
-    ["domestic_dividend", "bond_interest", "deposit_interest", "fund_distribution"] as const
-  ).filter((c) => rows.some((r) => r.category === c));
+  const notes = ID_INCOME_CATEGORIES.filter(
+    (c) => c !== "foreign" && rows.some((r) => r.category === c),
+  );
 
   const taxNote = (r: IdIncomeTax): string | null => {
     if (r.withheldAtSource) {
-      return r.taxBasis === "recorded"
-        ? t("id.incomeTable.withheldRecorded")
-        : t("id.incomeTable.withheld");
+      if (r.taxBasis === "recorded") return t("id.incomeTable.withheldRecorded");
+      if (r.taxBasis === "mixed") return t("id.incomeTable.withheldMixed");
+      return t("id.incomeTable.withheld");
     }
     if (r.category === "domestic_dividend") return t("id.incomeTable.selfPay");
     if (r.category === "fund_distribution") return t("id.incomeTable.notTaxed");
@@ -183,7 +183,7 @@ export function IdIncomeTable({
               </TableFooter>
             </Table>
             <ul className="mt-3 space-y-1 px-6 text-xs leading-relaxed text-muted-foreground">
-              {notes.map((c: IdIncomeCategory) => (
+              {notes.map((c) => (
                 <li key={c}>{t(`id.notes.${c}`)}</li>
               ))}
             </ul>

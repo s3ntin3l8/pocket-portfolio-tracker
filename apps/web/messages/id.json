@@ -2062,7 +2062,7 @@
     "distribution": {
       "title": "Distribusi FSA di seluruh depot",
       "cap": "Plafon tunjangan",
-      "capDesc": "Sparer\u00adpausch\u00adbetrag per orang",
+      "capDesc": "Sparer­pausch­betrag per orang",
       "allocated": "Dialokasikan",
       "remaining": "Belum didistribusikan",
       "remainingDesc": "Belum dialokasikan ke depot",
@@ -2189,6 +2189,7 @@
         "empty": "Tidak ada pendapatan investasi dalam negeri di {year}.",
         "withheld": "dipotong di sumber",
         "withheldRecorded": "dipotong (sesuai catatan)",
+        "withheldMixed": "dipotong (sebagian sesuai catatan)",
         "selfPay": "setor sendiri",
         "notTaxed": "bukan objek pajak"
       },
@@ -2196,8 +2197,7 @@
         "domestic_dividend": "Dividen",
         "bond_interest": "Bunga obligasi",
         "deposit_interest": "Bunga bank",
-        "fund_distribution": "Pembagian reksa dana",
-        "foreign": "Penghasilan luar negeri"
+        "fund_distribution": "Pembagian reksa dana"
       },
       "notes": {
         "domestic_dividend": "Dividen dari perusahaan Indonesia: final 10%, disetor sendiri paling lambat tanggal 15 bulan berikutnya. Dikecualikan jika diinvestasikan kembali di Indonesia paling sedikit 3 tahun.",

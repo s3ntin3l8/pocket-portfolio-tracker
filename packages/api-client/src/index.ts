@@ -485,7 +485,7 @@ export interface IndonesianFinalTax {
     quantity?: string;
     avgBuyPrice?: string;
     sellPrice?: string;
-    lots?: unknown[];
+    lots?: IdDisposalLot[];
   }[];
   totalProceeds: string;
   totalSalesTax: string;
@@ -517,6 +517,18 @@ export interface IndonesianFinalTax {
     foreignIncome: string;
     tax: string;
   }[];
+}
+
+/** One FIFO buy-lot consumed by an Indonesian-regime disposal (mirrors core's type). */
+export interface IdDisposalLot {
+  acqDate: string;
+  quantity: string;
+  buyPrice: string;
+  sellPrice: string;
+  proceeds: string;
+  gain: string;
+  holdingDays: number;
+  longTerm: boolean;
 }
 
 /** How an income row is taxed under the Indonesian regime (see `classifyIdIncome`). */

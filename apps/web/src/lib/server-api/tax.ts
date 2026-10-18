@@ -1,7 +1,7 @@
 import { Decimal } from "decimal.js";
 import { collectFxMissing } from "@/lib/fx-missing";
 import type { TaxSummaryHolder, PortfolioTaxSummary } from "@portfolio/api-client";
-import { mergeIndonesianFinalTax, type IndonesianFinalTax } from "@portfolio/core";
+import { mergeIndonesianFinalTax } from "@portfolio/core";
 import {
   getServerApi,
   listPortfoliosCached,
@@ -241,7 +241,7 @@ export async function loadTaxYearDetail(
             dividendRows: [],
             dividendTotalsByCurrency: [],
             byYear: [],
-            indonesianFinalTax: entry.indonesianFinalTax as IndonesianFinalTaxLike,
+            indonesianFinalTax: entry.indonesianFinalTax,
           });
         }
         return;
@@ -265,7 +265,7 @@ export async function loadTaxYearDetail(
             : Promise.resolve<TaxSummaryHolder[] | null>(null),
         ]);
         const apiIdTax: IndonesianFinalTaxLike | undefined = selected
-          ? (idTaxByPortfolio?.indonesianFinalTax as IndonesianFinalTaxLike | undefined)
+          ? idTaxByPortfolio?.indonesianFinalTax
           : (() => {
               // In the no-selection scope holderId is the "__id_all_portfolios__"
               // sentinel — never a real holder id. Combine every holder's ID tax payload
@@ -275,9 +275,7 @@ export async function loadTaxYearDetail(
                 h.indonesianFinalTax ? [h.indonesianFinalTax] : [],
               );
               if (parts.length === 0) return undefined;
-              return mergeIndonesianFinalTax(
-                parts as unknown as IndonesianFinalTax[],
-              ) as unknown as IndonesianFinalTaxLike;
+              return mergeIndonesianFinalTax(parts);
             })();
 
         const disposalGroups = new Map<

@@ -573,6 +573,15 @@ describe("IdIncomeTable", () => {
             taxBasis: "recorded",
           }),
           incomeRow({
+            symbol: "SBR012",
+            category: "bond_interest",
+            gross: "100000",
+            tax: "12500.00",
+            net: "87500.00",
+            withheldAtSource: true,
+            taxBasis: "mixed",
+          }),
+          incomeRow({
             symbol: "RDSAHAM",
             category: "fund_distribution",
             rate: "0",
@@ -582,7 +591,7 @@ describe("IdIncomeTable", () => {
             taxBasis: null,
           }),
         ]}
-        totalIncomeGross="1020000"
+        totalIncomeGross="1120000"
         totalIncomeTax="112000.00"
         totalIncomeNet="908000.00"
         currency={CURRENCY}
@@ -593,12 +602,14 @@ describe("IdIncomeTable", () => {
     expect(screen.getByText("Investment income · final tax by type")).toBeInTheDocument();
     expect(screen.queryByText(/10% final$/)).toBeNull();
     expect(screen.getByText("Dividend · 10%")).toBeInTheDocument();
-    expect(screen.getByText("Bond interest · 10%")).toBeInTheDocument();
+    expect(screen.getAllByText("Bond interest · 10%")).toHaveLength(2);
     expect(screen.getByText("Bank interest · 20%")).toBeInTheDocument();
     expect(screen.getByText("Fund distribution · 0%")).toBeInTheDocument();
     // Withheld tax doesn't read as tax still to pay; a dividend's does.
     expect(screen.getByText("withheld at source")).toBeInTheDocument();
     expect(screen.getByText("withheld (as recorded)")).toBeInTheDocument();
+    // Part recorded, part at the rate: not presented as entirely recorded.
+    expect(screen.getByText("withheld (partly as recorded)")).toBeInTheDocument();
     expect(screen.getByText("you pay")).toBeInTheDocument();
     expect(screen.getByText("not taxed")).toBeInTheDocument();
     expect(screen.getAllByText("IDR 112,000").length).toBeGreaterThan(0);

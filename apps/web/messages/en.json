@@ -2062,7 +2062,7 @@
     "distribution": {
       "title": "FSA distribution across depots",
       "cap": "Allowance cap",
-      "capDesc": "Per-person Sparer\u00adpausch\u00adbetrag",
+      "capDesc": "Per-person Sparer­pausch­betrag",
       "allocated": "Allocated",
       "remaining": "Still to distribute",
       "remainingDesc": "Unallocated to a depot",
@@ -2189,6 +2189,7 @@
         "empty": "No Indonesian investment income in {year}.",
         "withheld": "withheld at source",
         "withheldRecorded": "withheld (as recorded)",
+        "withheldMixed": "withheld (partly as recorded)",
         "selfPay": "you pay",
         "notTaxed": "not taxed"
       },
@@ -2196,8 +2197,7 @@
         "domestic_dividend": "Dividend",
         "bond_interest": "Bond interest",
         "deposit_interest": "Bank interest",
-        "fund_distribution": "Fund distribution",
-        "foreign": "Foreign income"
+        "fund_distribution": "Fund distribution"
       },
       "notes": {
         "domestic_dividend": "Dividends from Indonesian companies: 10% final, which you pay yourself by the 15th of the following month. Exempt if you reinvest them in Indonesia for at least 3 years.",
