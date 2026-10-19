@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrationsDir } from "@portfolio/db";
-import { initDb, warmPool, addsEnumValue } from "../../src/db/client.js";
+import { initDb, warmPool, addsEnumValue, closeDb } from "../../src/db/client.js";
+
+describe("initDb / closeDb lifecycle", () => {
+  it("closes cleanly after initDb without running any queries", async () => {
+    // Regression test for PGlite >=0.5.10 deadlock: initDb without subsequent
+    // queries must be fully settled so a subsequent closeDb does not deadlock
+    // against PGlite's internal #queryMutex.
+    await initDb();
+    await expect(closeDb()).resolves.toBeUndefined();
+  });
+});
 
 describe("warmPool", () => {
   it("is a no-op under PGlite (no real pool to warm) and never throws", async () => {
