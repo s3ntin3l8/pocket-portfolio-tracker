@@ -56,6 +56,12 @@ export async function initDb(databaseUrl?: string): Promise<DB> {
     const client = dataDir
       ? new PGlite(dataDir, { extensions: { pg_trgm } })
       : new PGlite({ extensions: { pg_trgm } });
+    try {
+      await client.waitReady;
+    } catch (err) {
+      await client.close().catch(() => {});
+      throw err;
+    }
     pglite = client;
     dbInstance = drizzlePglite(client, { schema }) as unknown as DB;
   } else {
