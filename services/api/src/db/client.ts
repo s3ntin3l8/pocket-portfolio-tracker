@@ -24,7 +24,7 @@ export function getEncryption(): EncryptionService {
 let dbInstance: DB | null = null;
 let sql: ReturnType<typeof postgres> | null = null;
 // PGlite (embedded Postgres) instance, used for tests / driverless local runs.
-let pglite: { close: () => Promise<void> } | null = null;
+let pglite: { waitReady: Promise<void>; close: () => Promise<void> } | null = null;
 
 const PGLITE_PREFIX = "pglite://";
 
@@ -56,6 +56,7 @@ export async function initDb(databaseUrl?: string): Promise<DB> {
     const client = dataDir
       ? new PGlite(dataDir, { extensions: { pg_trgm } })
       : new PGlite({ extensions: { pg_trgm } });
+    await client.waitReady;
     pglite = client;
     dbInstance = drizzlePglite(client, { schema }) as unknown as DB;
   } else {
@@ -180,7 +181,10 @@ export async function ensureDb(databaseUrl?: string): Promise<DB> {
 
 export async function closeDb(): Promise<void> {
   if (sql) await sql.end();
-  if (pglite) await pglite.close();
+  if (pglite) {
+    await pglite.waitReady.catch(() => {});
+    await pglite.close();
+  }
   sql = null;
   pglite = null;
   dbInstance = null;
