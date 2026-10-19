@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.2.4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.3...v0.2.4) (2026-10-19)
+
+
+### Features
+
+* **tax:** approximate the Indonesian Rp7.5M bank-interest exemption ([#1063](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1063)) ([64bdb9b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/64bdb9be22e0491ab99502a588fa365f0dcfb907))
+* **tax:** classify Indonesian cash interest by a per-portfolio country ([#1057](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1057)) ([239e256](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/239e25635924bd4703ab9c40e03ab4615c520c4a))
+
+
+### Bug Fixes
+
+* **allocation:** one region vocabulary ([#1027](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1027)) ([95f0108](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/95f0108552656f259683562ad60c6dd0b4bb8b69))
+* **api:** answer a malformed id with 400, not 500 ([#1054](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1054)) ([0fee794](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0fee794272d157997318ff7eba849d3c97731351))
+* **api:** attach the instrument to income-year rows ([#1061](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1061)) ([12b72ee](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/12b72ee36d8bca444c2cf6f6da9e87ead03f3349))
+* **api:** await PGlite readiness before returning DB and teardown ([#1069](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1069)) ([5f296b9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5f296b9a0aeb2bc57e9ee6b2ae66cbb84a23f65b))
+* **api:** keep the test suite from probing AWS S3 at every app boot ([#1064](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1064)) ([3b359bf](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3b359bf8a5a7c1db336321b57d545efd535553fb))
+* **demo:** reap turbo task groups on SIGKILL off Linux ([#1044](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1044)) ([7411ff0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7411ff0fe9a8043b101ab0638e312b9d60b36128))
+* **demo:** stop the in-flight build/seed child on teardown ([#1036](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1036)) ([0b0fbcc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0b0fbccc98db09d1dfa2d8bbf5cb491cb3e607b0))
+* **fx:** cached-only FX by default for a read-scoped PAT on every route ([#1042](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1042)) ([c433588](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c433588631f3b142d51daa58e29b9791b72079e1))
+* **history:** convert per-portfolio history into the current base currency ([#1034](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1034)) ([99da4fe](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/99da4fea99f91659f2afa027bdefd642bf56f5b1))
+* **history:** per-date FX for intraday points; cached-only FX for read PATs ([#1040](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1040)) ([f55305f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f55305f6d29770b171fd0f46956e916dd45ae52a))
+* **holdings:** convert cash rows into the display currency ([#1046](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1046)) ([7da895b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7da895b7f4f821df0002a5c56ddd4d315fcdb025))
+* **insights:** count regions in the diversification caption ([#1033](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1033)) ([1e25765](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1e2576581752d56d2383be3170dc9b2c394b5df8))
+* **insights:** measure the benchmark in the display currency ([#1026](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1026)) ([f68c2b4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f68c2b45a876da6b48781108057aaf80210e7cd2))
+* **insights:** per-year XIRR from consistent flows and values ([#1032](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1032)) ([a2d907b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a2d907b3102244a73605cc42388e9217ad6fc1c9))
+* **insights:** unsigned tracking error, calendar-daily annualization and a period label on active return ([#1048](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1048)) ([12c83d0](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/12c83d0c6ad1a4ec4a1f6a6c7fce9e565a6bca58))
+* **reports:** name the basis of every return and income figure ([#1047](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1047)) ([2082c2a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2082c2ae484c8dd684ca6a338d2ae86ec6bba0a5))
+* **screenshots:** hide the Next.js dev indicator in captures ([#1050](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1050)) ([80edf1f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/80edf1f6dc6d992c3a96085267f6f12faf1386bc))
+* **seed:** daily, triangularly consistent demo FX rates ([#1021](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1021)) ([7640441](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7640441105b884eaafbc834035a18ce2cebfc91c))
+* **tax:** convert the EUR Sparerpauschbetrag into the tax log's currency ([#1049](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1049)) ([5776f2a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5776f2a34188cc698b106b2f55d66b516e94585b))
+* **tax:** label cash income readably instead of by its type key ([#1060](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1060)) ([96c2033](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/96c2033ea22f92224952a0951d809574474b65fe))
+* **tax:** per-income-type rates in the Indonesian tax estimate ([#1053](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1053)) ([fe0ba20](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/fe0ba2078d5c45ab1b1658a97a94c2c0f1055b7f))
+* **web:** give the FSA allowance cap its own row on a phone ([#1066](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1066)) ([173231d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/173231d1b6b069d865cec18a7ee0f0d9dec37388))
+* **web:** one bar-chart hover cursor ([#1017](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1017)) ([bf50761](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bf50761c268659b3a4f7d69b8e0ef7e98b5deec8))
+* **web:** plot net worth on a selected portfolio's value line ([#1022](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1022)) ([0a6cbc6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0a6cbc62a9af3c1985a49a5d2ff07928178fa2d5))
+* **web:** restart transient UI timers and clear them on unmount ([#1062](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1062)) ([20c3f52](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/20c3f52409696a8c10840379adb82ae0576768ac))
+* **web:** size chart Y axes to their tick labels ([#1024](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1024)) ([4460cde](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4460cde59a6594d286b9569bc5603c567a340ae4))
+* **web:** stop narrow report and FSA tiles from clipping or crushing labels ([#1052](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1052)) ([8975cb1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8975cb114afc4be555b892d3f08f7d0194a28fd0))
+* **web:** stop the narrow tax page from crushing tiles and overflowing tables ([#1056](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1056)) ([4b521e3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4b521e36b66b3c9699b066f78cce25a4fc9d6559))
+
 ## [0.2.3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.2...v0.2.3) (2026-10-17)
 
 
