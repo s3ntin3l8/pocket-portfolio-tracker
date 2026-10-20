@@ -481,6 +481,9 @@ export interface IndonesianFinalTax {
     when: string;
     proceeds: string;
     tax: string;
+    /** "recorded" when every sell in the row carried a withholding, "estimated" when
+     *  none did, "mixed" when the day combined both. */
+    taxBasis?: "recorded" | "estimated" | "mixed";
     instrumentId?: string | null;
     quantity?: string;
     avgBuyPrice?: string;

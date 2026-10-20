@@ -266,7 +266,21 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         if (!episode || avgQty.lte(0)) continue;
         const qtyBeforeSale = avgQty;
         const sellQty = Decimal.min(q, avgQty);
-        const proceeds = sellQty.mul(p).sub(f); // instrument ccy
+        // Fee-net, instrument currency. Performance (gain, XIRR) only.
+        const proceeds = sellQty.mul(p).sub(f);
+        // Statutory sale value: consumed quantity × price, fees excluded. The ID 0.1%
+        // is levied on this, not on `proceeds`.
+        const gross = sellQty.mul(p);
+        // A withholding recorded on the sell covers the whole order. Scale it to the
+        // quantity this trade log actually disposed (an oversell is not a disposal).
+        // Zero or blank is "not recorded", not an exemption.
+        const recordedRaw = tx.tax != null && tx.tax.trim() !== "" ? D(tx.tax) : ZERO;
+        const recordedConsumed =
+          q.gt(0) && recordedRaw.gt(0) ? recordedRaw.mul(sellQty).div(q) : null;
+        const recordedForSlice = (sliceQty: Decimal): string | undefined => {
+          if (!recordedConsumed || !sellQty.gt(0)) return undefined;
+          return conv(recordedConsumed.mul(sliceQty).div(sellQty), tx.currency).toString();
+        };
         const sellDate = tx.executedAt;
         const taxYear = sellDate.getUTCFullYear();
 
@@ -312,6 +326,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           const proceedsPerUnit = sellQty.gt(0) ? proceeds.div(sellQty) : ZERO;
           for (const s of fifoSlices) {
             const sliceProceeds = s.qty.mul(proceedsPerUnit);
+            const recorded = recordedForSlice(s.qty);
             const days = daysBetween(s.acqDate, sellDate);
             const sliceVorabCredit = sellQty.gt(0) ? vorabCreditThis.mul(s.qty).div(sellQty) : ZERO;
             episode.legs.push({
@@ -320,6 +335,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
               quantity: s.qty.toString(),
               cost: conv(s.cost, costCcy).toString(),
               proceeds: conv(sliceProceeds, costCcy).toString(),
+              grossProceeds: conv(s.qty.mul(p), costCcy).toString(),
+              ...(recorded !== undefined ? { recordedSalesTax: recorded } : {}),
               gain: conv(sliceProceeds.sub(s.cost), costCcy).toString(),
               holdingDays: days,
               longTerm: heldMoreThanOneYear(s.acqDate, sellDate) && isTaxFreeEligible(instrumentId),
@@ -329,12 +346,15 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           }
         } else {
           const days = daysBetween(episode.entryDate, sellDate);
+          const recorded = recordedForSlice(sellQty);
           episode.legs.push({
             acqDate: toDateKey(episode.entryDate),
             sellDate: toDateKey(sellDate),
             quantity: sellQty.toString(),
             cost: conv(costAvg, costCcy).toString(),
             proceeds: conv(proceeds, costCcy).toString(),
+            grossProceeds: conv(gross, costCcy).toString(),
+            ...(recorded !== undefined ? { recordedSalesTax: recorded } : {}),
             gain: conv(realizedSlice, costCcy).toString(),
             holdingDays: days,
             longTerm:

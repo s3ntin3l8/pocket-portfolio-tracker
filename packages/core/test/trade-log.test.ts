@@ -33,6 +33,97 @@ function run(txns: CoreTransaction[], opts: Partial<ComputeTradesInput> = {}) {
   });
 }
 
+describe("computeTrades — gross sale value (ID sales tax)", () => {
+  it("keeps fee-net proceeds for gain and records quantity × price beside them", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({
+        type: "sell",
+        quantity: "10",
+        price: "150",
+        fees: "15",
+        tax: "5",
+        executedAt: new Date("2021-06-01"),
+      }),
+    ];
+    const { trades } = run(txns);
+    const leg = trades[0].legs[0];
+    expect(leg.proceeds).toBe("1485");
+    expect(leg.grossProceeds).toBe("1500");
+    expect(leg.recordedSalesTax).toBe("5");
+    expect(leg.gain).toBe("485");
+    expect(trades[0].realizedPnL).toBe("485");
+  });
+
+  it("scales a recorded withholding to the quantity actually sold", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "4", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({
+        type: "sell",
+        quantity: "10",
+        price: "100",
+        tax: "10",
+        executedAt: new Date("2021-06-01"),
+      }),
+    ];
+    const { trades } = run(txns);
+    const leg = trades[0].legs[0];
+    expect(leg.quantity).toBe("4");
+    expect(leg.proceeds).toBe("400");
+    expect(leg.grossProceeds).toBe("400");
+    expect(leg.recordedSalesTax).toBe("4");
+  });
+
+  it("omits recordedSalesTax when the sell carries no withholding", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "1", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({ type: "sell", quantity: "1", price: "110", executedAt: new Date("2021-06-01") }),
+    ];
+    const { trades } = run(txns);
+    expect(trades[0].legs[0].recordedSalesTax).toBeUndefined();
+    expect(trades[0].legs[0].grossProceeds).toBe("110");
+  });
+
+  it("splits the gross sale value across FIFO slices and converts it with proceeds", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "6", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({ type: "buy", quantity: "4", price: "100", executedAt: new Date("2021-02-01") }),
+      tx({
+        type: "sell",
+        quantity: "10",
+        price: "150",
+        fees: "10",
+        executedAt: new Date("2021-06-01"),
+      }),
+    ];
+    const fx = (from: string, to: string) => (from === "EUR" && to === "USD" ? "2" : "1");
+    const { trades } = run(txns, { method: "fifo", displayCurrency: "USD", fx });
+    const legs = trades[0].legs;
+    expect(legs.map((l) => l.quantity)).toEqual(["6", "4"]);
+    // Fee-net 1490 split 6:4, then ×2. Gross is 900 and 600, then ×2.
+    expect(legs.map((l) => l.proceeds)).toEqual(["1788", "1192"]);
+    expect(legs.map((l) => l.grossProceeds)).toEqual(["1800", "1200"]);
+    expect(legs.every((l) => l.recordedSalesTax === undefined)).toBe(true);
+  });
+
+  it("splits a recorded withholding across FIFO slices in proportion to quantity", () => {
+    const txns = [
+      tx({ type: "buy", quantity: "6", price: "100", executedAt: new Date("2021-01-01") }),
+      tx({ type: "buy", quantity: "4", price: "100", executedAt: new Date("2021-02-01") }),
+      tx({
+        type: "sell",
+        quantity: "10",
+        price: "150",
+        tax: "10",
+        executedAt: new Date("2021-06-01"),
+      }),
+    ];
+    const { trades } = run(txns, { method: "fifo" });
+    expect(trades[0].legs.map((l) => l.recordedSalesTax)).toEqual(["6", "4"]);
+    expect(trades[0].legs.map((l) => l.grossProceeds)).toEqual(["900", "600"]);
+  });
+});
+
 describe("computeTrades — episode segmentation", () => {
   it("forms one closed episode for a simple buy→sell round-trip", () => {
     const txns = [
