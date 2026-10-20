@@ -473,9 +473,10 @@ is unchanged; the row is taxed as whatever it was booked as.
    an individual through an OJK-registered lending platform is PPh 23 at 15% of the gross,
    withheld by the platform and credited in the annual return — not final, and not PPh 4(2)
    (PMK 69/PMK.03/2022 Art. 3(2)(a), 3(3)(a) and 3(4)). There is no loan-interest row, so
-   this estimate cannot show that 15%. Do not book the interest as cash `interest`. Do not
-   book it as `bonus_cash` either: that counts as income for performance but is in neither
-   tax table, so the page shows 0% instead of the 15%. Leave it out of this estimate.
+   this estimate cannot show that 15%. Do not book the receipt as cash `interest`. Book it
+   as `bonus_cash`: that still counts as income for performance, and it is not in
+   `TAXED_INCOME_TYPES`, so the row is left out of both tax tables rather than shown at 0%
+   or at 20%. The 15% stays the platform's withholding, which Pocket does not compute.
 2. **Stock dividend / bonus shares.** The shares are not cash income. The 0.1% applies only
    when they are sold. Booking the receipt as `dividend` charges 10% that is not due. The
    receipt is a `bonus` corporate action, recorded on the admin-gated Instrument event
