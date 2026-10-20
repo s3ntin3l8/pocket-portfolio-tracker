@@ -1093,3 +1093,332 @@ describe("Indonesian income tax — the Rp7.5M small-balance exemption for bank 
     expect((await portfolioTax(pat, fx)).estimatedTax).toBe("1000.00");
   });
 });
+
+describe("Indonesian bond and sukuk discount", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  type Income = {
+    category: string;
+    rate: string | null;
+    gross: string;
+    tax: string | null;
+    exemption: string | null;
+    taxBasis: string | null;
+    withheldAtSource: boolean;
+  };
+  type IdTax = {
+    disposals: unknown[];
+    income: Income[];
+    totalSalesTax: string;
+    totalIncomeTax: string;
+    estimatedTax: string;
+    taxWithheldAtSource: string;
+    byYear: { year: number; tax: string }[];
+  };
+
+  async function book(sub: string) {
+    const t = await token(sub);
+    await setTaxRegime(t, "ID");
+    const portfolioId = await createPortfolio(t, {
+      baseCurrency: "IDR",
+      country: "ID",
+    });
+    return { t, portfolioId, headers: auth(t) };
+  }
+
+  async function mkBond(symbol: string, market: string, maturityDate?: string) {
+    const [row] = await app.db
+      .insert(instruments)
+      .values({
+        symbol,
+        market,
+        assetClass: "bond" as "equity",
+        currency: "IDR",
+        name: symbol,
+        ...(maturityDate ? { maturityDate } : {}),
+      })
+      .returning();
+    return row!;
+  }
+
+  async function taxOf(headers: Record<string, string>, portfolioId: string, year: number) {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=${year}`,
+      headers,
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().indonesianFinalTax as IdTax;
+  }
+
+  it("taxes coupons only when a bond is redeemed at par", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-par");
+    const bond = await mkBond("ORI020-PAR", "IDX");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2024-02-01T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "coupon",
+      instrumentId: bond.id,
+      quantity: "0",
+      price: "50000",
+      currency: "IDR",
+      executedAt: "2025-03-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2025-08-15T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.disposals).toEqual([]);
+    expect(id.totalSalesTax).toBe("0.00");
+    expect(id.income.map((r) => r.category)).toEqual(["bond_interest"]);
+    expect(id.income[0]).toMatchObject({ gross: "50000.00", tax: "5000.00" });
+    expect(id.estimatedTax).toBe("5000.00");
+  });
+
+  it("taxes a sale above clean cost at 10% of the discount, fees excluded, not at 0.1%", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-up");
+    const bond = await mkBond("ORI020-UP", "IDX");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      fees: "5000",
+      currency: "IDR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1010000",
+      fees: "2000",
+      currency: "IDR",
+      executedAt: "2025-06-15T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    // 10,000 discount × 10%. Not 0.1% of 1,010,000, and not reduced by the 5,000 buy fee.
+    expect(id.disposals).toEqual([]);
+    expect(id.totalSalesTax).toBe("0.00");
+    expect(id.income).toEqual([
+      expect.objectContaining({
+        category: "bond_discount",
+        gross: "10000.00",
+        tax: "1000.00",
+        rate: "0.10",
+        exemption: null,
+        taxBasis: "estimated",
+        withheldAtSource: true,
+      }),
+    ]);
+    expect(id.estimatedTax).toBe("1000.00");
+    expect(id.taxWithheldAtSource).toBe("1000.00");
+    expect(id.byYear.find((y) => y.year === 2025)?.tax).toBe("1000.00");
+  });
+
+  it("uses a withholding recorded on the sell instead of 10%", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-recorded");
+    const bond = await mkBond("ORI020-REC", "IDX");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1010000",
+      tax: "2500",
+      currency: "IDR",
+      executedAt: "2025-06-15T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.income[0]).toMatchObject({
+      category: "bond_discount",
+      tax: "2500.00",
+      taxBasis: "recorded",
+    });
+    expect(id.totalSalesTax).toBe("0.00");
+  });
+
+  it("does not let a sale below cost produce a negative tax or reduce an earlier coupon", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-down");
+    const bond = await mkBond("ORI020-DOWN", "IDX");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2024-06-01T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "coupon",
+      instrumentId: bond.id,
+      quantity: "0",
+      price: "100000",
+      currency: "IDR",
+      executedAt: "2025-02-01T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "990000",
+      currency: "IDR",
+      executedAt: "2025-09-01T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.income.find((r) => r.category === "bond_interest")).toMatchObject({
+      tax: "10000.00",
+    });
+    expect(id.income.find((r) => r.category === "bond_discount")).toMatchObject({
+      gross: "-10000.00",
+      tax: "0.00",
+      exemption: "negative_discount",
+      rate: "0",
+    });
+    expect(id.estimatedTax).toBe("10000.00");
+    expect(id.totalIncomeTax).toBe("10000.00");
+    expect(id.totalSalesTax).toBe("0.00");
+  });
+
+  it("uses 15% when the sale is before 30 Aug 2021 and no tax was recorded", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-15");
+    const bond = await mkBond("ORI020-15", "IDX");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2020-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1010000",
+      currency: "IDR",
+      executedAt: "2021-08-01T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2021);
+    expect(id.income[0]).toMatchObject({
+      category: "bond_discount",
+      rate: "0.15",
+      tax: "1500.00",
+      taxBasis: "estimated",
+    });
+    expect(id.byYear.find((y) => y.year === 2021)?.tax).toBe("1500.00");
+    expect(id.disposals).toEqual([]);
+  });
+
+  it("skips paper maturing within a year of purchase", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-spn");
+    const bond = await mkBond("SPN-1", "SBN", "2025-12-01");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1010000",
+      currency: "IDR",
+      executedAt: "2025-06-15T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.income).toEqual([]);
+    expect(id.disposals).toEqual([]);
+    expect(id.estimatedTax).toBe("0.00");
+    expect(id.totalSalesTax).toBe("0.00");
+  });
+
+  it("taxes an SBN bond's discount and coupon, and not as an IDX share sale", async () => {
+    const { portfolioId, headers } = await book("tax-id-bond-sbn");
+    const bond = await mkBond("SBN-ORI", "SBN");
+    const foreign = await mkBond("BUND", "XETRA");
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2024-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "coupon",
+      instrumentId: bond.id,
+      quantity: "0",
+      price: "20000",
+      currency: "IDR",
+      executedAt: "2025-04-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: bond.id,
+      quantity: "1",
+      price: "1010000",
+      currency: "IDR",
+      executedAt: "2025-07-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId: foreign.id,
+      quantity: "1",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2024-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId: foreign.id,
+      quantity: "1",
+      price: "1010000",
+      currency: "IDR",
+      executedAt: "2025-07-15T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.disposals).toEqual([]);
+    expect(id.totalSalesTax).toBe("0.00");
+    expect(id.income.find((r) => r.category === "bond_interest")).toMatchObject({
+      tax: "2000.00",
+    });
+    expect(id.income.filter((r) => r.category === "bond_discount")).toEqual([
+      expect.objectContaining({ gross: "10000.00", tax: "1000.00", rate: "0.10" }),
+    ]);
+    expect(id.estimatedTax).toBe("3000.00");
+  });
+});

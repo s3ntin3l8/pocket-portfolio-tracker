@@ -95,6 +95,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
     let lots: Lot[] = []; // FIFO ledger
     let avgQty = ZERO; // average-method running quantity
     let avgCost = ZERO; // average-method running cost (fees incl.)
+    let avgClean = ZERO; // average-method running cost (fees excluded)
     let episode: Episode | null = null;
     // Vorabpauschale accrual pool (display currency), gross — drawn down proportionally on
     // each sell (see the "tax"/vorabpauschale branch and the sell branch below). Persists
@@ -231,6 +232,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           for (const l of lots) {
             l.qty = l.qty.mul(factor);
             l.unitCost = l.unitCost.div(factor);
+            l.unitPrice = l.unitPrice.div(factor);
           }
           // Restate acquired units in current-share terms so the per-share
           // avgEntryPrice (= acqQtyPrice / acqQty) and the "quantity traded" shown
@@ -252,9 +254,10 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         if (q.lte(0)) continue;
         if (!episode) episode = makeEpisode(tx.executedAt);
         const cost = q.mul(p).add(f);
-        lots.push({ acqDate: tx.executedAt, qty: q, unitCost: cost.div(q) });
+        lots.push({ acqDate: tx.executedAt, qty: q, unitCost: cost.div(q), unitPrice: p });
         avgQty = avgQty.add(q);
         avgCost = avgCost.add(cost);
+        avgClean = avgClean.add(q.mul(p));
         episode.acqQty = episode.acqQty.add(q);
         episode.acqQtyPrice = episode.acqQtyPrice.add(q.mul(p));
         episode.acqCost = episode.acqCost.add(cost);
@@ -297,20 +300,26 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         // --- average method realized ---
         const avgUnit = avgCost.div(avgQty);
         const costAvg = avgUnit.mul(sellQty);
+        const cleanAvg = avgClean.div(avgQty).mul(sellQty);
 
         // --- FIFO method: consume oldest lots ---
         // Skip-ahead guards against a lot left at qty 0 by a still-open leading position
         // (defensive; lotIdx should already point past fully-consumed lots).
         let remaining = sellQty;
         let costFifo = ZERO;
-        const fifoSlices: { acqDate: Date; qty: Decimal; cost: Decimal }[] = [];
+        const fifoSlices: { acqDate: Date; qty: Decimal; cost: Decimal; unitPrice: Decimal }[] = [];
         while (lotIdx < lots.length && lots[lotIdx].qty.lte(0)) lotIdx++;
         while (remaining.gt(0) && lotIdx < lots.length) {
           const lot = lots[lotIdx];
           const take = Decimal.min(lot.qty, remaining);
           const sliceCost = take.mul(lot.unitCost);
           costFifo = costFifo.add(sliceCost);
-          fifoSlices.push({ acqDate: lot.acqDate, qty: take, cost: sliceCost });
+          fifoSlices.push({
+            acqDate: lot.acqDate,
+            qty: take,
+            cost: sliceCost,
+            unitPrice: lot.unitPrice,
+          });
           lot.qty = lot.qty.sub(take);
           remaining = remaining.sub(take);
           if (lot.qty.lte(0)) lotIdx++;
@@ -336,6 +345,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
               cost: conv(s.cost, costCcy).toString(),
               proceeds: conv(sliceProceeds, costCcy).toString(),
               grossProceeds: conv(s.qty.mul(p), costCcy).toString(),
+              cleanCost: conv(s.qty.mul(s.unitPrice), costCcy).toString(),
               ...(recorded !== undefined ? { recordedSalesTax: recorded } : {}),
               gain: conv(sliceProceeds.sub(s.cost), costCcy).toString(),
               holdingDays: days,
@@ -354,6 +364,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
             cost: conv(costAvg, costCcy).toString(),
             proceeds: conv(proceeds, costCcy).toString(),
             grossProceeds: conv(gross, costCcy).toString(),
+            cleanCost: conv(cleanAvg, costCcy).toString(),
             ...(recorded !== undefined ? { recordedSalesTax: recorded } : {}),
             gain: conv(realizedSlice, costCcy).toString(),
             holdingDays: days,
@@ -367,6 +378,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
 
         // Update average trackers + episode stats.
         avgCost = avgCost.sub(costAvg);
+        avgClean = avgClean.sub(cleanAvg);
         avgQty = avgQty.sub(sellQty);
         episode.soldQty = episode.soldQty.add(sellQty);
         episode.sellQtyPrice = episode.sellQtyPrice.add(sellQty.mul(p));
@@ -383,6 +395,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           lotIdx = 0;
           avgQty = ZERO;
           avgCost = ZERO;
+          avgClean = ZERO;
           vorabPool = ZERO;
         }
       } else if (tx.type === "transfer_out") {
@@ -402,7 +415,9 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         }
         const transferQty = Decimal.min(q, avgQty);
         const avg = avgQty.gt(0) ? avgCost.div(avgQty) : ZERO;
+        const clean = avgQty.gt(0) ? avgClean.div(avgQty) : ZERO;
         avgCost = avgCost.sub(avg.mul(transferQty));
+        avgClean = avgClean.sub(clean.mul(transferQty));
         avgQty = avgQty.sub(transferQty);
         // Don't close the episode — remaining shares may still be held.
       } else if (tx.type === "tax" && tx.kind === "vorabpauschale") {

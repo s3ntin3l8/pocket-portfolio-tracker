@@ -2205,15 +2205,18 @@
       "category": {
         "domestic_dividend": "Dividen",
         "bond_interest": "Bunga obligasi",
+        "bond_discount": "Diskonto obligasi",
         "deposit_interest": "Bunga bank",
         "fund_distribution": "Pembagian reksa dana"
       },
       "exemption": {
-        "small_balance": "dikecualikan (saldo ≤ Rp7,5 juta)"
+        "small_balance": "dikecualikan (saldo ≤ Rp7,5 juta)",
+        "negative_discount": "di bawah harga perolehan (tidak mengurangi kupon)"
       },
       "notes": {
         "domestic_dividend": "Dividen dari perusahaan Indonesia: final 10%, disetor sendiri paling lambat tanggal 15 bulan berikutnya. Dikecualikan jika diinvestasikan kembali di Indonesia paling sedikit 3 tahun.",
         "bond_interest": "Bunga obligasi, termasuk ORI dan SBR: final 10%, dipotong oleh penerbit atau kustodian.",
+        "bond_discount": "Diskonto obligasi atau sukuk Indonesia: selisih harga jual bersih dan harga perolehan bersih, tidak termasuk biaya. Final 10% sejak 30 Agustus 2021, 15% untuk penjualan sebelumnya, dipotong di sumber. Penjualan di harga par tidak menambah apa pun. Penjualan di bawah harga perolehan ditampilkan tetapi tidak mengembalikan kupon yang sudah dipotong, dan pengurangan bunga berjalan tidak dihitung. Harga yang dipakai adalah harga bersih — harga kotor (harga ditambah bunga berjalan) akan membesarkan diskonto. Surat yang jatuh tempo dalam setahun sejak pembelian lot tidak diikutkan.",
         "deposit_interest": "Bunga dari bank di Indonesia, dalam mata uang apa pun: final 20%, dipotong oleh bank. Portofolio dianggap dari Indonesia jika negaranya diatur ke Indonesia, atau, jika negara belum diatur, jika bunganya dalam rupiah. Bunga dikecualikan selama saldo deposito dan tabungan di bank tersebut paling banyak Rp7,5 juta. Pocket memperkirakannya dengan menganggap satu portofolio sebagai satu bank: saldo kas portofolio tepat sebelum setiap pembayaran, dalam semua mata uang yang dikonversi ke rupiah. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
         "fund_distribution": "Pembagian hasil reksa dana dan ETF bukan objek pajak bagi pemegang unit."
       },

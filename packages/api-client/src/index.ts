@@ -537,7 +537,12 @@ export interface IdDisposalLot {
 
 /** How an income row is taxed under the Indonesian regime (see `classifyIdIncome`). */
 export type IdIncomeCategory =
-  "domestic_dividend" | "bond_interest" | "deposit_interest" | "fund_distribution" | "foreign";
+  | "domestic_dividend"
+  | "bond_interest"
+  | "bond_discount"
+  | "deposit_interest"
+  | "fund_distribution"
+  | "foreign";
 
 /** One row of {@link IndonesianFinalTax.income}. */
 export interface IdIncomeRow {
@@ -553,13 +558,15 @@ export interface IdIncomeRow {
   rate: string | null;
   /** `"small_balance"`: Indonesian bank interest exempt because its portfolio's cash
    *  balance (all currencies, in IDR) was at most Rp7,500,000 just before the payment —
-   *  one portfolio treated as one bank. Counts in the gross, adds no tax. null otherwise. */
-  exemption: "small_balance" | null;
+   *  one portfolio treated as one bank. `"negative_discount"`: a bond or sukuk sold
+   *  below clean cost; shown, but it does not reduce coupons already booked. Counts in
+   *  the gross, adds no tax. null otherwise. */
+  exemption: "small_balance" | "negative_discount" | null;
   gross: string;
   /** Indonesian final tax; null for foreign income. */
   tax: string | null;
   net: string | null;
-  /** True when the payer withholds the tax (bond and bank interest). */
+  /** True when the payer withholds the tax (bond interest, bond discount, bank interest). */
   withheldAtSource: boolean;
   /** Recorded withholding, the rate applied, or both across the grouped transactions. */
   taxBasis: "recorded" | "estimated" | "mixed" | null;

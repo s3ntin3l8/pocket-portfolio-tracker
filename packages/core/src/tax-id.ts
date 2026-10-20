@@ -20,6 +20,16 @@
  *       bond_interest      10% final of gross interest for the holding period (government
  *                          bonds and SBN retail included), withheld by the issuer or
  *                          custodian. PP 91/2021 Art. 2, from 30 Aug 2021 (15% before).
+ *                          Coupons keep today's 10% unless a withholding is recorded.
+ *       bond_discount      10% final of the discount on an Indonesian bond or sukuk
+ *                          (sell price − clean cost) × quantity, fees excluded. PP 91/2021
+ *                          Art. 2(3), from 30 Aug 2021; 15% on a sale before that date
+ *                          ({@link ID_BOND_RATE_TABLE}). Withheld at source. Not the 0.1%
+ *                          share tax. A par redemption adds nothing. A discount below cost
+ *                          is informational (`negative_discount`): tax zero, and it does
+ *                          not refund coupons already booked — Art. 2(4)'s accrued-coupon
+ *                          offset is not computed. Price is clean (`transactions.price`);
+ *                          a dirty price would overstate the discount.
  *       deposit_interest   20% final of gross interest on deposits, savings and current
  *                          accounts, withheld by the bank. PP 131/2000 as amended by
  *                          PP 123/2015; PMK 212/PMK.03/2018. Not withheld when the deposit
@@ -35,10 +45,11 @@
  *                          exempt to the extent it is reinvested in Indonesia (PMK 18/2021).
  *                          Pocket can't know the marginal rate, so it is reported
  *                          separately and kept out of the estimate.
- *   - For the two categories withheld at source (bond and deposit interest), a withholding
- *     recorded on the transaction is the tax figure; the statutory rate is only applied
- *     when none is recorded. A domestic dividend is always `gross × 10%` (nothing is
- *     withheld for a resident individual, so a recorded tax there is not Indonesian tax).
+ *   - For the categories withheld at source (bond interest, bond discount and deposit
+ *     interest), a withholding recorded on the transaction is the tax figure; the
+ *     statutory rate is only applied when none is recorded. A domestic dividend is always
+ *     `gross × 10%` (nothing is withheld for a resident individual, so a recorded tax
+ *     there is not Indonesian tax).
  *   - No annual allowance, no tax-loss harvesting, no realized-gain-based computation
  *     (unlike the German path in `tax.ts`).
  *
@@ -58,8 +69,39 @@ export const ID_SALES_TAX_RATE = "0.001";
 /** Domestic dividends, resident individual: 10% final unless reinvested ≥3 years
  *  (UU PPh Art. 17(2c), 4(3)(f)). */
 export const ID_DOMESTIC_DIVIDEND_TAX_RATE = "0.10";
-/** Bond interest/coupons, resident individual: 10% final (PP 91/2021). */
+/** Bond interest/coupons, resident individual: 10% final (PP 91/2021, from 30 Aug 2021). */
 export const ID_BOND_INTEREST_TAX_RATE = "0.10";
+/**
+ * Final rate on Indonesian bond and sukuk discount (and the coupon rate before the
+ * cutover). The latest span whose `from` is on or before the sale date wins.
+ * PP 91/2021: 10% from 30 Aug 2021; 15% before that.
+ */
+export const ID_BOND_RATE_TABLE: readonly { from: string; rate: string }[] = [
+  { from: "0000-01-01", rate: "0.15" },
+  { from: "2021-08-30", rate: "0.10" },
+];
+
+/** The rate in `table` that applies on `on` (YYYY-MM-DD). */
+export function idRateOn(table: readonly { from: string; rate: string }[], on: string): string {
+  let rate = table[0]?.rate ?? "0";
+  for (const span of table) {
+    if (on >= span.from) rate = span.rate;
+  }
+  return rate;
+}
+
+/** Venues whose instruments are Indonesian for income classification. The 0.1% share
+ *  sale stays IDX equity only — these aliases must not widen it. */
+const INDONESIAN_VENUES = new Set(["IDX", "SBN", "KSEI", "IBPA", "PHEI"]);
+
+export function isIndonesianInstrument(instrument: {
+  market: string;
+  isin?: string | null;
+}): boolean {
+  return (
+    INDONESIAN_VENUES.has(instrument.market.toUpperCase()) || /^ID/i.test(instrument.isin ?? "")
+  );
+}
 /** Bank deposit, savings and current-account interest: 20% final (PP 131/2000,
  *  PMK 212/PMK.03/2018). */
 export const ID_DEPOSIT_INTEREST_TAX_RATE = "0.20";
@@ -120,12 +162,18 @@ export interface IdDisposalTax extends IdDisposalInput {
 
 /** How a row of investment income is taxed for an Indonesian resident individual. */
 export type IdIncomeCategory =
-  "domestic_dividend" | "bond_interest" | "deposit_interest" | "fund_distribution" | "foreign";
+  | "domestic_dividend"
+  | "bond_interest"
+  | "bond_discount"
+  | "deposit_interest"
+  | "fund_distribution"
+  | "foreign";
 
 /** Display order of the categories (the UI and the rollup follow it). */
 export const ID_INCOME_CATEGORIES: readonly IdIncomeCategory[] = [
   "domestic_dividend",
   "bond_interest",
+  "bond_discount",
   "deposit_interest",
   "fund_distribution",
   "foreign",
@@ -138,6 +186,8 @@ export function idIncomeTaxRate(category: IdIncomeCategory): string | null {
       return ID_DOMESTIC_DIVIDEND_TAX_RATE;
     case "bond_interest":
       return ID_BOND_INTEREST_TAX_RATE;
+    case "bond_discount":
+      return ID_BOND_INTEREST_TAX_RATE;
     case "deposit_interest":
       return ID_DEPOSIT_INTEREST_TAX_RATE;
     case "fund_distribution":
@@ -149,7 +199,9 @@ export function idIncomeTaxRate(category: IdIncomeCategory): string | null {
 
 /** Whether the payer withholds the category's final tax (so it is not tax still to pay). */
 export function idIncomeWithheldAtSource(category: IdIncomeCategory): boolean {
-  return category === "bond_interest" || category === "deposit_interest";
+  return (
+    category === "bond_interest" || category === "bond_discount" || category === "deposit_interest"
+  );
 }
 
 /** What {@link classifyIdIncome} needs to know about one income transaction. */
@@ -172,20 +224,20 @@ export interface IdIncomeClassifyInput {
  * Decide how an income transaction is taxed.
  *
  * "Domestic" (Indonesian-source) is decided by the paying instrument, never by the
- * transaction currency: an instrument is domestic when it is on the IDX market (the same
- * predicate the 0.1% sales tax uses; Indonesian government retail bonds are booked there
- * too) or its ISIN carries Indonesia's country prefix `ID`. Cash interest has no
- * instrument, so it is decided by the portfolio's country (where the account is held):
- * `ID` is an Indonesian bank, 20% final in any currency (a USD deposit at an Indonesian
- * bank included, PMK 212/2018); any other country is foreign income in any currency. With
- * no country set, the currency is the fallback: IDR interest is treated as Indonesian,
- * interest in any other currency as foreign (docs/tax.md).
+ * transaction currency: an instrument is domestic when {@link isIndonesianInstrument}
+ * says so (IDX, or the bond venues SBN / KSEI / IBPA / PHEI, or an ISIN prefixed `ID`).
+ * Those bond venues widen income classification only — they must not become 0.1% share
+ * sales. Cash interest has no instrument, so it is decided by the portfolio's country
+ * (where the account is held): `ID` is an Indonesian bank, 20% final in any currency (a
+ * USD deposit at an Indonesian bank included, PMK 212/2018); any other country is foreign
+ * income in any currency. With no country set, the currency is the fallback: IDR interest
+ * is treated as Indonesian, interest in any other currency as foreign (docs/tax.md).
  */
 export function classifyIdIncome(input: IdIncomeClassifyInput): IdIncomeCategory {
   const inst = input.instrument ?? null;
   const country = input.portfolioCountry?.trim().toUpperCase() || null;
   const domestic = inst
-    ? inst.market.toUpperCase() === "IDX" || /^ID/i.test(inst.isin ?? "")
+    ? isIndonesianInstrument(inst)
     : country !== null
       ? country === "ID"
       : input.currency.toUpperCase() === "IDR";
@@ -209,7 +261,7 @@ export interface IdCashIncomeSource {
 }
 
 /** Why a row of income carries no tax although its category has a rate. */
-export type IdIncomeExemption = "small_balance";
+export type IdIncomeExemption = "small_balance" | "negative_discount";
 
 /** One income transaction, already in the report's currency. */
 export interface IdIncomeInput {
@@ -227,6 +279,8 @@ export interface IdIncomeInput {
   gross: string;
   /** Withholding recorded on the transaction ("0" when none). */
   recordedTax: string;
+  /** Sale date (YYYY-MM-DD) of a bond discount. Selects the 15% → 10% cutover. */
+  on?: string;
   /** Bank interest only: the paying portfolio's whole cash balance (every currency) in IDR
    *  just before the interest was credited — see {@link idDepositBalanceIdr}. null or
    *  absent when it can't be known; the interest is then taxed at the full rate. */
@@ -246,16 +300,18 @@ export interface IdIncomeTax {
   /** The rate applied: the category's final rate, "0" when {@link exemption} is set; null
    *  for foreign income. */
   rate: string | null;
-  /** Set when the income is exempt although its category is taxed: `"small_balance"` is bank
-   *  interest on a balance ≤ {@link ID_DEPOSIT_EXEMPT_BALANCE_IDR}. Exempt rows count in the
-   *  gross totals but add nothing to the tax. null otherwise. */
+  /** Set when the row carries no tax although its category has a rate.
+   *  `"small_balance"`: bank interest on a balance ≤ {@link ID_DEPOSIT_EXEMPT_BALANCE_IDR}.
+   *  `"negative_discount"`: a bond sold below clean cost. Not a refund of coupons
+   *  (PP 91/2021 Art. 2(4) is not computed). The negative amount is shown; tax is zero.
+   *  Exempt rows count in the gross totals but add nothing to the tax. null otherwise. */
   exemption: IdIncomeExemption | null;
   gross: string;
   /** Indonesian final tax; null for foreign income (not part of the estimate). */
   tax: string | null;
   /** gross − tax; null for foreign income. */
   net: string | null;
-  /** True when the payer withholds this tax (bond and deposit interest). */
+  /** True when the payer withholds this tax (bond interest, bond discount, deposit interest). */
   withheldAtSource: boolean;
   /** Whether `tax` is the recorded withholding, the rate applied, or both across rows;
    *  null for foreign income and for the 0% fund distributions. */
@@ -463,17 +519,25 @@ function incomeRowTax(r: IdIncomeInput): {
   basis: "recorded" | "estimated" | null;
   exemption: IdIncomeExemption | null;
 } | null {
-  const rate = idIncomeTaxRate(r.category);
-  if (rate === null) return null;
+  if (idIncomeTaxRate(r.category) === null) return null;
   const recorded = D(r.recordedTax);
   // A withholding the bank recorded wins over the approximation: the bank knows the
   // customer's whole balance with it, Pocket only this portfolio's.
   if (idIncomeWithheldAtSource(r.category) && recorded.gt(0)) {
     return { tax: recorded, basis: "recorded", exemption: null };
   }
+  // A discount below cost is not a refund of coupons already withheld (PP 91/2021
+  // Art. 2(4) only offsets unpaid accrued coupon, which this estimate does not compute).
+  if (r.category === "bond_discount" && D(r.gross).lte(0)) {
+    return { tax: ZERO, basis: null, exemption: "negative_discount" };
+  }
   if (r.category === "deposit_interest" && idDepositInterestExempt(r.depositBalanceIdr)) {
     return { tax: ZERO, basis: null, exemption: "small_balance" };
   }
+  const rate =
+    r.category === "bond_discount"
+      ? idRateOn(ID_BOND_RATE_TABLE, r.on ?? `${r.year}-12-31`)
+      : idIncomeTaxRate(r.category)!;
   const tax = D(r.gross).times(rate);
   return { tax, basis: tax.isZero() && D(rate).isZero() ? null : "estimated", exemption: null };
 }
@@ -489,6 +553,8 @@ type IncomeAcc = {
   tax: Decimal;
   recorded: Decimal;
   bases: Set<"recorded" | "estimated">;
+  /** Rate actually applied, when it is not the category's current rate. */
+  appliedRate?: string;
 };
 
 function finishIncomeRow(a: IncomeAcc): IdIncomeTax {
@@ -501,7 +567,7 @@ function finishIncomeRow(a: IncomeAcc): IdIncomeTax {
     ...(a.cashSource ? { cashSource: a.cashSource } : {}),
     currency: a.currency,
     category: a.category,
-    rate: a.exemption ? "0" : idIncomeTaxRate(a.category),
+    rate: a.exemption ? "0" : (a.appliedRate ?? idIncomeTaxRate(a.category)),
     exemption: a.exemption,
     gross: a.gross.toFixed(2),
     tax: foreign ? null : a.tax.toFixed(2),
@@ -580,9 +646,10 @@ function incomeTotals(
 
 /**
  * Compute Indonesian final tax for the selected year's disposals and income, plus a
- * per-year rollup across every year the inputs cover. Prior years apply today's rates
- * (the 15% → 10% bond-interest change of 30 Aug 2021 is not replayed), unless a
- * withholding is recorded on the transaction.
+ * per-year rollup across every year the inputs cover. Coupons and the other income
+ * categories use today's rates (a coupon's 15% → 10% change of 30 Aug 2021 is not
+ * replayed) unless a withholding is recorded. Bond discount uses {@link ID_BOND_RATE_TABLE}
+ * on the sale date (`IdIncomeInput.on`).
  */
 export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFinalTax {
   const salesRate = D(ID_SALES_TAX_RATE);
@@ -623,7 +690,11 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
         ? `cash:${r.cashSource.type}:${r.cashSource.currency}`
         : r.symbol;
     const exemption = rowTax?.exemption ?? null;
-    const key = `${source}:${r.currency}:${r.category}:${exemption ?? ""}`;
+    const appliedRate =
+      r.category === "bond_discount" && !exemption
+        ? idRateOn(ID_BOND_RATE_TABLE, r.on ?? `${r.year}-12-31`)
+        : undefined;
+    const key = `${source}:${r.currency}:${r.category}:${exemption ?? ""}:${appliedRate ?? ""}`;
     const acc = groups.get(key) ?? {
       ...(r.instrumentId !== undefined ? { instrumentId: r.instrumentId } : {}),
       symbol: r.symbol,
@@ -631,6 +702,7 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
       currency: r.currency,
       category: r.category,
       exemption,
+      ...(appliedRate ? { appliedRate } : {}),
       gross: ZERO,
       tax: ZERO,
       recorded: ZERO,

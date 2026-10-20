@@ -11,6 +11,9 @@ import {
   ID_DEPOSIT_INTEREST_TAX_RATE,
   ID_FUND_DISTRIBUTION_TAX_RATE,
   ID_DEPOSIT_EXEMPT_BALANCE_IDR,
+  ID_BOND_RATE_TABLE,
+  idRateOn,
+  isIndonesianInstrument,
   idCashBalancesBefore,
   idCashBalancesAtPayments,
   idDepositBalanceIdr,
@@ -36,13 +39,21 @@ describe("Indonesian final-tax rates", () => {
     expect(ID_DEPOSIT_EXEMPT_BALANCE_IDR).toBe("7500000");
     expect(idIncomeTaxRate("domestic_dividend")).toBe("0.10");
     expect(idIncomeTaxRate("bond_interest")).toBe("0.10");
+    expect(idIncomeTaxRate("bond_discount")).toBe("0.10");
     expect(idIncomeTaxRate("deposit_interest")).toBe("0.20");
     expect(idIncomeTaxRate("fund_distribution")).toBe("0");
     expect(idIncomeTaxRate("foreign")).toBeNull();
   });
 
-  it("marks only bond and deposit interest as withheld at source", () => {
+  it("picks the latest bond rate whose start is on or before the sale date", () => {
+    expect(idRateOn(ID_BOND_RATE_TABLE, "2021-08-29")).toBe("0.15");
+    expect(idRateOn(ID_BOND_RATE_TABLE, "2021-08-30")).toBe("0.10");
+    expect(idRateOn(ID_BOND_RATE_TABLE, "2026-01-01")).toBe("0.10");
+  });
+
+  it("marks bond interest, bond discount and deposit interest as withheld at source", () => {
     expect(idIncomeWithheldAtSource("bond_interest")).toBe(true);
+    expect(idIncomeWithheldAtSource("bond_discount")).toBe(true);
     expect(idIncomeWithheldAtSource("deposit_interest")).toBe(true);
     expect(idIncomeWithheldAtSource("domestic_dividend")).toBe(false);
     expect(idIncomeWithheldAtSource("fund_distribution")).toBe(false);
@@ -132,6 +143,20 @@ describe("classifyIdIncome", () => {
         instrument: { market: "US", assetClass: "equity", isin: "US0378331005" },
       }),
     ).toBe("foreign");
+  });
+
+  it("treats SBN, KSEI, IBPA and PHEI as Indonesian for income, not as a share venue", () => {
+    for (const market of ["SBN", "KSEI", "IBPA", "PHEI", "sbn"]) {
+      expect(isIndonesianInstrument({ market, isin: null })).toBe(true);
+      expect(
+        classifyIdIncome({
+          type: "coupon",
+          currency: "IDR",
+          instrument: { market, assetClass: "bond", isin: null },
+        }),
+      ).toBe("bond_interest");
+    }
+    expect(isIndonesianInstrument({ market: "XETRA", isin: "DE000BASF111" })).toBe(false);
   });
 
   it("an instrument-less IDR dividend or coupon keeps its type's category", () => {
@@ -860,5 +885,104 @@ describe("the Rp7.5M small-balance exemption for bank interest", () => {
       expect(idDepositBalanceIdr({ IDR: "100", EUR: "5" }, fx)).toBeNull();
       expect(idDepositBalanceIdr({ IDR: "100", EUR: "0" }, fx)).toBe("100");
     });
+  });
+});
+
+describe("bond and sukuk discount", () => {
+  const discount = (on: string, gross: string, extra: Partial<IdIncomeInput> = {}) =>
+    row({ symbol: "ORI020", category: "bond_discount", gross, on, ...extra });
+
+  it("taxes a sale before 30 Aug 2021 at 15% and one on that date at 10%", () => {
+    const early = indonesianFinalTax({
+      year: 2021,
+      disposals: [],
+      income: [discount("2021-08-01", "10000", { year: 2021 })],
+      byYear: [{ year: 2021, proceeds: "0", realized: "0", salesTax: "0" }],
+    });
+    expect(early.income[0]).toMatchObject({
+      category: "bond_discount",
+      rate: "0.15",
+      tax: "1500.00",
+      withheldAtSource: true,
+      taxBasis: "estimated",
+      exemption: null,
+    });
+    expect(early.byYear[0]!.tax).toBe("1500.00");
+    expect(early.estimatedTax).toBe("1500.00");
+    expect(early.taxWithheldAtSource).toBe("1500.00");
+    expect(early.taxToSelfPay).toBe("0.00");
+
+    const cutover = indonesianFinalTax({
+      ...empty,
+      income: [discount("2021-08-30", "10000")],
+    });
+    expect(cutover.income[0]).toMatchObject({ rate: "0.10", tax: "1000.00" });
+  });
+
+  it("does not tax a discount below cost and does not reduce an earlier coupon", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [
+        row({ symbol: "ORI020", category: "bond_interest", gross: "100000" }),
+        discount("2026-06-01", "-10000"),
+      ],
+    });
+    expect(result.income.find((r) => r.category === "bond_interest")).toMatchObject({
+      tax: "10000.00",
+    });
+    expect(result.income.find((r) => r.category === "bond_discount")).toMatchObject({
+      tax: "0.00",
+      rate: "0",
+      exemption: "negative_discount",
+      gross: "-10000.00",
+      withheldAtSource: true,
+    });
+    expect(result.estimatedTax).toBe("10000.00");
+    expect(result.taxWithheldAtSource).toBe("10000.00");
+  });
+
+  it("lets a recorded withholding win, including when the discount is negative", () => {
+    const recorded = indonesianFinalTax({
+      ...empty,
+      income: [discount("2026-06-01", "10000", { recordedTax: "2500" })],
+    });
+    expect(recorded.income[0]).toMatchObject({
+      tax: "2500.00",
+      taxBasis: "recorded",
+      exemption: null,
+      rate: "0.10",
+    });
+    const loss = indonesianFinalTax({
+      ...empty,
+      income: [discount("2026-06-01", "-10000", { recordedTax: "400" })],
+    });
+    expect(loss.income[0]).toMatchObject({
+      tax: "400.00",
+      exemption: null,
+      taxBasis: "recorded",
+    });
+  });
+
+  it("keeps a 15% discount and a 10% discount in the same year as two rows", () => {
+    const result = indonesianFinalTax({
+      year: 2021,
+      disposals: [],
+      income: [
+        discount("2021-08-01", "10000", { year: 2021 }),
+        discount("2021-09-01", "10000", { year: 2021 }),
+      ],
+      byYear: [],
+    });
+    expect(result.income).toHaveLength(2);
+    expect(result.income.map((r) => r.rate).sort()).toEqual(["0.10", "0.15"]);
+    expect(result.estimatedTax).toBe("2500.00");
+    expect(result.incomeByCategory).toEqual([
+      expect.objectContaining({
+        category: "bond_discount",
+        gross: "20000.00",
+        tax: "2500.00",
+        withheldAtSource: true,
+      }),
+    ]);
   });
 });

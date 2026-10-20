@@ -145,6 +145,82 @@ describe("computeTrades — gross sale value (ID sales tax)", () => {
   });
 });
 
+describe("computeTrades — clean cost (ID bond discount)", () => {
+  it("excludes buy and sell fees from cleanCost and grossProceeds", () => {
+    const txns = [
+      tx({
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        fees: "15",
+        executedAt: new Date("2021-01-01"),
+      }),
+      tx({
+        type: "sell",
+        quantity: "10",
+        price: "150",
+        fees: "10",
+        executedAt: new Date("2021-06-01"),
+      }),
+    ];
+    const leg = run(txns).trades[0].legs[0];
+    expect(leg.cleanCost).toBe("1000");
+    expect(leg.cost).toBe("1015");
+    expect(leg.grossProceeds).toBe("1500");
+    expect(leg.proceeds).toBe("1490");
+    expect(leg.gain).toBe("475");
+  });
+
+  it("keeps each FIFO lot's own clean price", () => {
+    const txns = [
+      tx({
+        type: "buy",
+        quantity: "6",
+        price: "100",
+        fees: "6",
+        executedAt: new Date("2021-01-01"),
+      }),
+      tx({
+        type: "buy",
+        quantity: "4",
+        price: "110",
+        fees: "4",
+        executedAt: new Date("2021-02-01"),
+      }),
+      tx({
+        type: "sell",
+        quantity: "10",
+        price: "150",
+        fees: "10",
+        executedAt: new Date("2021-06-01"),
+      }),
+    ];
+    const legs = run(txns, { method: "fifo" }).trades[0].legs;
+    expect(legs.map((l) => l.cleanCost)).toEqual(["600", "440"]);
+    expect(legs.map((l) => l.cost)).toEqual(["606", "444"]);
+    expect(legs.map((l) => l.grossProceeds)).toEqual(["900", "600"]);
+  });
+
+  it("drops transferred quantity from the clean cost of a later sale", () => {
+    const txns = [
+      tx({
+        type: "buy",
+        quantity: "10",
+        price: "100",
+        fees: "10",
+        executedAt: new Date("2021-01-01"),
+      }),
+      tx({ type: "transfer_out", quantity: "4", executedAt: new Date("2021-03-01") }),
+      tx({ type: "sell", quantity: "6", price: "120", executedAt: new Date("2021-06-01") }),
+    ];
+    const leg = run(txns).trades[0].legs[0];
+    expect(leg.quantity).toBe("6");
+    expect(leg.cleanCost).toBe("600");
+    expect(leg.cost).toBe("606");
+    expect(leg.grossProceeds).toBe("720");
+  });
+});
+
 describe("computeTrades — episode segmentation", () => {
   it("forms one closed episode for a simple buy→sell round-trip", () => {
     const txns = [

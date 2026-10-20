@@ -257,19 +257,21 @@ Final taxes for a **resident individual**, with no annual allowance, no loss-net
 dependency on when a gain was locked in. They tax _proceeds and gross income_, not gains,
 and the rate depends on the type and the source of the income:
 
-| Event (category)                                                        | Rate     | Base                                                  | Who pays                                     | Rule                                                                                                |
-| ----------------------------------------------------------------------- | -------- | ----------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Sale of IDX-listed shares                                               | **0.1%** | Gross sale value, quantity × price, before commission | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                            |
-| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374      |
-| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period                 | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before)                                                    |
-| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below) |
-| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                 |
-| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return                           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                |
+| Event (category)                                                        | Rate     | Base                                                  | Who pays                                     | Rule                                                                                                       |
+| ----------------------------------------------------------------------- | -------- | ----------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Sale of IDX-listed shares                                               | **0.1%** | Gross sale value, quantity × price, before commission | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                                   |
+| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374             |
+| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period                 | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before). Coupons use today's 10% unless a withholding is recorded |
+| Bond / sukuk discount (`bond_discount`)                                 | **10%**  | Clean sale price − clean cost, × quantity, fees out   | Withheld at source                           | PP 91/2021 Art. 2(3). 15% on a sale before 30 Aug 2021. Not the 0.1% share tax                             |
+| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below)        |
+| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                        |
+| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return                           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                       |
 
 `estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
-`taxWithheldAtSource` (sales, bond and bank interest: the payer already withheld it) and
-`taxToSelfPay` (domestic dividends). The Tax page shows both in the hero card and labels each
-income row "withheld at source" or "you pay", so withheld tax doesn't read as tax still owed.
+`taxWithheldAtSource` (sales, bond interest, bond discount and bank interest: the payer
+already withheld it) and `taxToSelfPay` (domestic dividends). The Tax page shows both in the
+hero card and labels each income row "withheld at source" or "you pay", so withheld tax
+doesn't read as tax still owed.
 
 The 0.1% is computed from the trade log's `grossProceeds` (consumed quantity × price, fees
 excluded), not from the fee-net `proceeds` used for gain and XIRR. An oversell is taxed only
@@ -277,6 +279,42 @@ on the quantity actually held. A withholding recorded on the sell (`transactions
 tax for that disposal, scaled by the same fraction; the 0.1% applies only when none is
 recorded. A zero there is not an exemption. A separate `tax` transaction is not added on top.
 `byYear` uses that same decided amount.
+
+### Bond and sukuk discount (PP 91/2021 Art. 2(3))
+
+A sale or redemption of an Indonesian bond or sukuk can also produce a `bond_discount` row,
+beside any coupons. The base is `(clean sale price − clean cost) × quantity`. Both prices
+are the transaction's `price` (per unit, not a percent of par — an ORI with face value
+1,000,000 bought at `1000000` is at par). Fees are excluded: the trade log's `cleanCost` is
+quantity × buy price, while `cost` still includes fees for gain and XIRR. `grossProceeds` is
+the sale side.
+
+- **Par adds nothing.** A redemption at the same clean price as the purchase (the demo
+  ORI020) emits no discount row. Coupons on that bond are still taxed as `bond_interest`.
+- **Above cost** is a positive discount, 10% final, withheld at source. It is not the 0.1%
+  share tax, and it does not appear in the sales-tax disposals. It counts in `estimatedTax`
+  and `taxWithheldAtSource`.
+- **Below cost** is informational. Tax is zero, `exemption` is `negative_discount`, and the
+  negative amount does not reduce coupons already booked. PP 91/2021 Art. 2(4) lets a
+  negative discount offset accrued coupon that has not yet been taxed; this estimate does
+  not compute that offset, so it does not invent a refund.
+- **A withholding recorded on the sell wins**, scaled to the quantity actually sold, the
+  same way as the 0.1%. Zero or blank is not an exemption.
+- **The 15% → 10% cutover is applied to the discount, on the sale date.** Before
+  2021-08-30 with no recorded tax, the rate is 15%; from that date it is 10%. A 15% row
+  and a 10% row in the same year stay separate. Coupons are unchanged: they stay at today's
+  10% unless a withholding is recorded.
+- **The price is clean.** Do not strip bunga berjalan, and do not book a dirty price in
+  `transactions.price`. A dirty price (clean price plus accrued interest) would overstate
+  the discount, because the accrued coupon is already taxed when it is paid.
+- **Short tenor is outside this 10%.** PP 91's "obligasi" does not cover paper of 12 months
+  or less (SPN and the like). No issue date is stored, so a lot is treated as short when
+  its maturity is known and falls 0–366 days after that lot's acquisition (FIFO) or the
+  episode entry (average cost). Unknown maturity is not treated as short. This can skip a
+  long bond bought in its last year.
+- **SBN, KSEI, IBPA and PHEI are Indonesian for income and for this discount only.** They
+  do not make a sale an IDX share sale. The 0.1% stays `market === "IDX"` and
+  `assetClass === "equity"`.
 
 **Exemptions not modelled, stated as notes instead:**
 
@@ -362,11 +400,13 @@ dividends, ETF and reksa dana distributions) is never affected.
 ### How a row is classified (`classifyIdIncome`)
 
 "Domestic" is decided by the **paying instrument**, not the transaction currency: an
-instrument is Indonesian when its market is `IDX` (the predicate the 0.1% sales tax already
-uses; Indonesian government retail bonds are booked on that market) or its ISIN starts with
-`ID`. Currency would misfile an Indonesian issuer paying in USD or a US stock paying in IDR,
-and the portfolio's country (below) says where the account is held, not where a security was
-issued, so neither decides an instrument's income. Then:
+instrument is Indonesian when its market is `IDX`, `SBN`, `KSEI`, `IBPA` or `PHEI`, or its
+ISIN starts with `ID`. `IDX` is also the market the 0.1% sales tax uses, and Indonesian
+government retail bonds are often booked there. The other four venues are income and
+bond-discount only — an instrument on them is not an IDX share sale. Currency would misfile
+an Indonesian issuer paying in USD or a US stock paying in IDR, and the portfolio's country
+(below) says where the account is held, not where a security was issued, so neither decides
+an instrument's income. Then:
 
 1. not Indonesian → `foreign`;
 2. a `mutual_fund` or `etf` → `fund_distribution`;
@@ -396,22 +436,24 @@ consumers; the web shows the translated label from `cashSource`.
 
 ### Recorded withholding
 
-For the two categories withheld at source (bond and bank interest) a withholding recorded on
-the transaction **is** the tax figure (`taxBasis: "recorded"`, or `"mixed"` when only some of
-a row's transactions carry one); the statutory rate applies only when none is recorded. That
-also covers coupons withheld at the old 15% before PP 91/2021. A domestic dividend is always
-`gross × 10%`: nothing is withheld for a resident individual, so a recorded tax there is not
-Indonesian tax. For foreign income the recorded withholding is reported as
-`foreignTaxWithheld` (the creditable amount). Gross is always net received + recorded
-withholding, converted to the report currency at today's rate.
+For the categories withheld at source (bond interest, bond discount and bank interest) a
+withholding recorded on the transaction **is** the tax figure (`taxBasis: "recorded"`, or
+`"mixed"` when only some of a row's transactions carry one); the statutory rate applies only
+when none is recorded. That also covers coupons withheld at the old 15% before PP 91/2021.
+A discount uses the sale-date rate instead (see above) when nothing was recorded. A domestic
+dividend is always `gross × 10%`: nothing is withheld for a resident individual, so a
+recorded tax there is not Indonesian tax. For foreign income the recorded withholding is
+reported as `foreignTaxWithheld` (the creditable amount). Gross is always net received +
+recorded withholding, converted to the report currency at today's rate.
 
 ### By year
 
 `byYear` rolls up every year: the sales tax already decided for that year (recorded
 withholding, or 0.1% of the gross sale value) plus each year's Indonesian income at its
 category's rate (`income`), with foreign income in its own column (`foreignIncome`) and not
-in `tax`. Prior years use today's rates and FX (the 15% → 10% bond change of 2021 is not
-replayed unless the withholding is recorded) — like the German table, it is an estimate.
+in `tax`. Coupons and the other income categories use today's rates and FX (a coupon's
+15% → 10% change of 2021 is not replayed unless the withholding is recorded). Bond discount
+is the exception: its rate follows the sale date. Like the German table, it is an estimate.
 
 Realized gain (`IdYearInput.realized` / `IdDisposalLot.gain`) is carried through the output
 purely for display — it's informational, since ID final tax is never levied on gains.
@@ -464,7 +506,7 @@ regime only" caveat. **Keep that text in sync with this document** when the rule
   - Secondary, quoting Art. 7 PMK 212/2018 for the Rp7.5M rule:
     https://news.ddtc.co.id/berita/nasional/1809863/nabung-di-bank-dapat-bunga-terus-kena-pajak-begini-ketentuannya
     and https://ortax.org/pph-final-atas-bunga-deposito-dan-tabungan
-  - PP 91/2021 (bond interest 10%):
+  - PP 91/2021 (bond interest 10%, and Art. 2(3) the discount):
     https://perpajakan.ddtc.co.id/sumber-hukum/peraturan-pusat/peraturan-pemerintah-91-tahun-2021
   - Domestic dividends, reinvestment and self-payment (PMK 18/2021, PMK 81/2024):
     https://news.ddtc.co.id/berita/nasional/1817070/dividen-tak-diinvestasikan-sesuai-aturan-harus-setor-pph-ini-caranya
