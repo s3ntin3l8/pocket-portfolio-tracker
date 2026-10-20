@@ -345,6 +345,8 @@ describe("ai-tools", () => {
     expect(d).toMatch(/dividends 10%.*bond interest 10%.*bank interest 20%/);
     expect(d).toMatch(/bond\/sukuk discount 10%/);
     expect(d).toMatch(/negative_discount/);
+    expect(d).toMatch(/totalCryptoTax/);
+    expect(d).toMatch(/cryptoTaxVenue/);
     expect(d).toMatch(/portfolio's `country`/);
     expect(d).toMatch(/taxWithheldAtSource/);
     expect(d).toMatch(/taxToSelfPay/);

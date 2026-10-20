@@ -673,6 +673,13 @@
       "when": 1792318747756,
       "tag": "0095_portfolio_country",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792526113358,
+      "tag": "0096_crypto_tax_venue",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,9 @@ export type EditablePortfolio = Pick<
   | "taxAllowanceAnnual"
   | "country"
   | "transactionCount"
->;
+> & {
+  /** Absent on fixtures and on responses from before the column existed. */
+  cryptoTaxVenue?: "domestic" | "foreign" | null;
+};
 
 export const NEW_HOLDER = "__new__";

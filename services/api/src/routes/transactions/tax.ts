@@ -206,6 +206,13 @@ export function registerTaxRoutes(app: FastifyInstance) {
         const idTax = computeIndonesianFinalTaxFromTradeLog({
           tradeLog,
           incomeSources,
+          cryptoBooks: [
+            {
+              tradeLog,
+              cryptoTaxVenue: portfolio.cryptoTaxVenue,
+              portfolioCountry: portfolio.country,
+            },
+          ],
           // Cached FX only for a read-scoped PAT (audit A7), like the history routes.
           depositFxAt: await loadIdDepositFx(
             app,
@@ -348,6 +355,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
                 cashCounted: portfolios.cashCounted,
                 taxAllowanceAnnual: portfolios.taxAllowanceAnnual,
                 country: portfolios.country,
+                cryptoTaxVenue: portfolios.cryptoTaxVenue,
               })
               .from(portfolios)
               .where(and(eq(portfolios.userId, id), isNull(portfolios.accountHolderId)))
@@ -385,6 +393,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
                   cashCounted: portfolios.cashCounted,
                   taxAllowanceAnnual: portfolios.taxAllowanceAnnual,
                   country: portfolios.country,
+                  cryptoTaxVenue: portfolios.cryptoTaxVenue,
                 })
                 .from(portfolios)
                 .where(and(eq(portfolios.userId, id), eq(portfolios.accountHolderId, holder.id)));
@@ -467,6 +476,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
               metaById,
               coreTxns,
               portfolioCountry: p.country,
+              cryptoTaxVenue: p.cryptoTaxVenue,
               forecast: Number(forecast.toString()),
               rateByCcy: pFxRates as Record<string, string>,
             };
@@ -513,6 +523,11 @@ export function registerTaxRoutes(app: FastifyInstance) {
             const idTax = computeIndonesianFinalTaxFromTradeLog({
               tradeLog: mergedLog,
               incomeSources,
+              cryptoBooks: perPortfolio.map((p) => ({
+                tradeLog: p.log,
+                cryptoTaxVenue: p.cryptoTaxVenue,
+                portfolioCountry: p.portfolioCountry,
+              })),
               depositFxAt: await loadIdDepositFx(
                 app,
                 incomeSources,

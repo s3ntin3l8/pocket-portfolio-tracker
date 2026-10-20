@@ -260,6 +260,7 @@ and the rate depends on the type and the source of the income:
 | Event (category)                                                        | Rate     | Base                                                  | Who pays                                     | Rule                                                                                                       |
 | ----------------------------------------------------------------------- | -------- | ----------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Sale of IDX-listed shares                                               | **0.1%** | Gross sale value, quantity × price, before commission | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                                   |
+| Crypto sale (`cryptoDisposals`)                                         | by venue | Gross sale value, quantity × price, fees excluded     | Withheld at source                           | PMK 68/2022 from 1 May 2022; PMK 50/2025 from 1 Aug 2025. Not the 0.1%. See below                          |
 | Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374             |
 | Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period                 | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before). Coupons use today's 10% unless a withholding is recorded |
 | Bond / sukuk discount (`bond_discount`)                                 | **10%**  | Clean sale price − clean cost, × quantity, fees out   | Withheld at source                           | PP 91/2021 Art. 2(3). 15% on a sale before 30 Aug 2021. Not the 0.1% share tax                             |
@@ -268,17 +269,41 @@ and the rate depends on the type and the source of the income:
 | Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return                           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                       |
 
 `estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
-`taxWithheldAtSource` (sales, bond interest, bond discount and bank interest: the payer
-already withheld it) and `taxToSelfPay` (domestic dividends). The Tax page shows both in the
-hero card and labels each income row "withheld at source" or "you pay", so withheld tax
-doesn't read as tax still owed.
+`taxWithheldAtSource` (share sales, crypto sales, bond interest, bond discount and bank
+interest: the payer already withheld it) and `taxToSelfPay` (domestic dividends). The Tax page
+shows both in the hero card and labels each income row "withheld at source" or "you pay", so
+withheld tax doesn't read as tax still owed.
 
 The 0.1% is computed from the trade log's `grossProceeds` (consumed quantity × price, fees
 excluded), not from the fee-net `proceeds` used for gain and XIRR. An oversell is taxed only
 on the quantity actually held. A withholding recorded on the sell (`transactions.tax`) is the
 tax for that disposal, scaled by the same fraction; the 0.1% applies only when none is
 recorded. A zero there is not an exemption. A separate `tax` transaction is not added on top.
-`byYear` uses that same decided amount.
+`byYear` uses that same decided amount. Crypto sales tax is added in the same year column
+and is not part of `totalSalesTax`.
+
+### Crypto sales (PMK 68/2022, PMK 50/2025)
+
+A sale of an instrument with `assetClass === "crypto"` can produce a `cryptoDisposals` row.
+The base is the trade log's `grossProceeds` (quantity × price, fees excluded). Gain is
+ignored, so a sale below cost is still taxed. Buys are not taxed. The old PPN (0.11% /
+0.22%) is not modelled.
+
+The rate follows the **portfolio**, not the coin. `portfolios.cryptoTaxVenue` is `domestic`
+(an Indonesian PAKD/PPMSE) or `foreign`. Null means `domestic` when `portfolios.country` is
+`ID`, and no crypto sales tax otherwise — a German Binance book does not grow an Indonesian
+estimate just because the asset is crypto. There is no per-sale override.
+
+| Sale date               | Domestic    | Foreign     |
+| ----------------------- | ----------- | ----------- |
+| before 2022-05-01       | no estimate | no estimate |
+| 2022-05-01 – 2025-07-31 | 0.10%       | 0.20%       |
+| from 2025-08-01         | 0.21%       | 1%          |
+
+A date with no estimate and no recorded withholding is omitted. A withholding recorded on
+the sell wins. `totalCryptoTax` is folded into `estimatedTax` and `taxWithheldAtSource`. It
+is not added to the 0.1% share total (`totalSalesTax` / the share-sales table). On a holder
+view each portfolio is judged on its own venue before the trade logs are merged.
 
 ### Bond and sukuk discount (PP 91/2021 Art. 2(3))
 

@@ -92,6 +92,7 @@ export function PortfolioEditForm({
           iban={f.iban}
           currency={f.currency}
           country={f.country}
+          cryptoTaxVenue={f.cryptoTaxVenue}
           taxAllowanceAnnual={f.taxAllowanceAnnual}
           showFsaHelper={f.showFsaHelper}
           fsaOverAllocated={f.fsaOverAllocated}
@@ -112,6 +113,7 @@ export function PortfolioEditForm({
           onIbanChange={f.setIban}
           onCurrencyChange={f.setCurrency}
           onCountryChange={f.setCountry}
+          onCryptoTaxVenueChange={f.setCryptoTaxVenue}
           onTaxAllowanceChange={f.setTaxAllowanceAnnual}
           onCashCountedChange={f.setCashCounted}
           onAllowNegativeCashChange={f.setAllowNegativeCash}

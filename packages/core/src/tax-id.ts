@@ -11,6 +11,10 @@
  *     withholding recorded on the sell is the figure for that disposal; the 0.1% applies
  *     only when none was recorded. The caller passes that decided amount (`tax` /
  *     `salesTax`); when it is omitted, this module multiplies `proceeds` by the rate.
+ *   - Crypto sales (PMK 68/2022, PMK 50/2025): a separate final tax on gross sale value,
+ *     rate by venue and sale date ({@link ID_CRYPTO_RATE_TABLE}). Not the 0.1%. No estimate
+ *     before 2022-05-01, and the old PPN is not modelled. Folded into `estimatedTax` and
+ *     `taxWithheldAtSource`.
  *   - Investment income, classified per transaction by {@link classifyIdIncome}:
  *       domestic_dividend  10% final of gross, paid by the investor by the 15th of the
  *                          following month (nothing is withheld for a resident individual);
@@ -90,6 +94,48 @@ export function idRateOn(table: readonly { from: string; rate: string }[], on: s
   return rate;
 }
 
+/** Where a crypto sale was made, for PMK 68/2022 and PMK 50/2025. The rate follows the
+ *  platform, not the coin. */
+export type IdCryptoVenue = "domestic" | "foreign";
+
+/**
+ * PPh final on crypto sale value (quantity × price). Null means no estimate: before
+ * PMK 68/2022 (1 May 2022) this module does not invent a rate, and it does not model
+ * the old PPN. From 1 Aug 2025, PMK 50/2025: 0.21% domestic, 1% foreign.
+ */
+export const ID_CRYPTO_RATE_TABLE: readonly {
+  from: string;
+  domestic: string | null;
+  foreign: string | null;
+}[] = [
+  { from: "0000-01-01", domestic: null, foreign: null },
+  { from: "2022-05-01", domestic: "0.001", foreign: "0.002" },
+  { from: "2025-08-01", domestic: "0.0021", foreign: "0.01" },
+];
+
+/** The crypto sales-tax rate on `on`, or null when that date has no estimate. */
+export function idCryptoRate(venue: IdCryptoVenue, on: string): string | null {
+  let span = ID_CRYPTO_RATE_TABLE[0];
+  for (const row of ID_CRYPTO_RATE_TABLE) {
+    if (on >= row.from) span = row;
+  }
+  if (!span) return null;
+  return venue === "domestic" ? span.domestic : span.foreign;
+}
+
+/** Portfolio setting, else the country fallback. Null venue + country `ID` is domestic.
+ *  Null venue + any other country (or none) is no crypto sales tax. An explicit venue
+ *  wins over the country. */
+export function idCryptoVenue(
+  venue: string | null | undefined,
+  country: string | null | undefined,
+): IdCryptoVenue | null {
+  const set = venue?.trim().toLowerCase();
+  if (set === "domestic" || set === "foreign") return set;
+  if ((country ?? "").trim().toUpperCase() === "ID") return "domestic";
+  return null;
+}
+
 /** Venues whose instruments are Indonesian for income classification. The 0.1% share
  *  sale stays IDX equity only — these aliases must not widen it. */
 const INDONESIAN_VENUES = new Set(["IDX", "SBN", "KSEI", "IBPA", "PHEI"]);
@@ -158,6 +204,31 @@ export interface IdDisposalInput {
 export interface IdDisposalTax extends IdDisposalInput {
   /** Decided sales tax, decimal string. `proceeds × 0.1%` unless the caller passed `tax`. */
   tax: string;
+}
+
+/** One crypto sale already in the report currency. Buys are not passed. */
+export interface IdCryptoDisposalInput {
+  symbol: string;
+  instrumentId?: string | null;
+  /** Sale date, YYYY-MM-DD. Selects the rate table. */
+  when: string;
+  /** Gross sale value (quantity × price, fees excluded). */
+  proceeds: string;
+  venue: IdCryptoVenue;
+  /** Recorded withholding. Omitted or not greater than zero means use the rate table. */
+  tax?: string;
+}
+
+export interface IdCryptoDisposalTax {
+  symbol: string;
+  instrumentId?: string | null;
+  when: string;
+  proceeds: string;
+  venue: IdCryptoVenue;
+  /** Statutory rate, or null when the date is before any estimate and nothing was recorded. */
+  rate: string | null;
+  tax: string;
+  taxBasis: IdIncomeTaxBasis | null;
 }
 
 /** How a row of investment income is taxed for an Indonesian resident individual. */
@@ -367,12 +438,21 @@ export interface IndonesianFinalTaxInput {
   income: IdIncomeInput[];
   /** Per-year proceeds and realized gain across every year the trade log covers. */
   byYear: IdYearInput[];
+  /** Crypto sales of every year. Omitted means none. Not part of the 0.1% share total. */
+  cryptoDisposals?: IdCryptoDisposalInput[];
 }
 
 export interface IndonesianFinalTax {
   disposals: IdDisposalTax[];
   totalProceeds: string;
+  /** 0.1% IDX share sales only. Crypto is {@link totalCryptoTax}. */
   totalSalesTax: string;
+  /** Crypto sales in the selected year. Separate from {@link disposals}. */
+  cryptoDisposals: IdCryptoDisposalTax[];
+  /** Gross crypto sale value in the selected year. */
+  totalCryptoProceeds: string;
+  /** Final tax on those crypto sales. Withheld at source. */
+  totalCryptoTax: string;
   /** The selected year's income, grouped per (instrument, category), every category. */
   income: IdIncomeTax[];
   /** The selected year's income per category, in {@link ID_INCOME_CATEGORIES} order;
@@ -387,9 +467,10 @@ export interface IndonesianFinalTax {
   foreignIncomeGross: string;
   /** Foreign tax recorded as withheld on that income (creditable). */
   foreignTaxWithheld: string;
-  /** totalSalesTax + totalIncomeTax — the hero-card headline figure. */
+  /** totalSalesTax + totalCryptoTax + totalIncomeTax — the hero-card headline figure. */
   estimatedTax: string;
-  /** The part of `estimatedTax` the payer withholds (sales, bond and deposit interest). */
+  /** The part of `estimatedTax` the payer withholds (share sales, crypto sales, bond
+   *  interest, bond discount and deposit interest). */
   taxWithheldAtSource: string;
   /** The part the investor pays (domestic dividends, unless reinvested). */
   taxToSelfPay: string;
@@ -602,6 +683,7 @@ function categoryTotals(rows: IdIncomeTax[]): IdIncomeCategoryTotal[] {
 function incomeTotals(
   rows: IdIncomeTax[],
   totalSalesTax: Decimal,
+  totalCryptoTax: Decimal,
 ): Pick<
   IndonesianFinalTax,
   | "incomeByCategory"
@@ -638,8 +720,8 @@ function incomeTotals(
     totalIncomeNet: gross.minus(tax).toFixed(2),
     foreignIncomeGross: foreignGross.toFixed(2),
     foreignTaxWithheld: foreignWht.toFixed(2),
-    estimatedTax: totalSalesTax.plus(tax).toFixed(2),
-    taxWithheldAtSource: totalSalesTax.plus(withheld).toFixed(2),
+    estimatedTax: totalSalesTax.plus(totalCryptoTax).plus(tax).toFixed(2),
+    taxWithheldAtSource: totalSalesTax.plus(totalCryptoTax).plus(withheld).toFixed(2),
     taxToSelfPay: selfPay.toFixed(2),
   };
 }
@@ -665,6 +747,35 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     totalSalesTax = totalSalesTax.plus(tax);
     return { ...r, tax: tax.toFixed(2) };
   });
+
+  // Crypto is not the 0.1%. A date with no rate and no recorded withholding is omitted
+  // (no invented zero). Rows of other years still feed `byYear`.
+  let totalCryptoProceeds = ZERO;
+  let totalCryptoTax = ZERO;
+  const cryptoByYear = new Map<number, Decimal>();
+  const cryptoDisposals: IdCryptoDisposalTax[] = [];
+  for (const r of input.cryptoDisposals ?? []) {
+    const proceeds = D(r.proceeds);
+    const recorded = r.tax !== undefined && D(r.tax).gt(0) ? D(r.tax) : null;
+    const rate = idCryptoRate(r.venue, r.when);
+    if (recorded === null && rate === null) continue;
+    const tax = recorded ?? proceeds.times(rate!);
+    const year = Number(r.when.slice(0, 4));
+    cryptoByYear.set(year, (cryptoByYear.get(year) ?? ZERO).plus(tax));
+    if (year !== input.year) continue;
+    totalCryptoProceeds = totalCryptoProceeds.plus(proceeds);
+    totalCryptoTax = totalCryptoTax.plus(tax);
+    cryptoDisposals.push({
+      symbol: r.symbol,
+      ...(r.instrumentId !== undefined ? { instrumentId: r.instrumentId } : {}),
+      when: r.when,
+      proceeds: proceeds.toFixed(2),
+      venue: r.venue,
+      rate: rate,
+      tax: tax.toFixed(2),
+      taxBasis: recorded ? "recorded" : "estimated",
+    });
+  }
 
   // Tax is decided per transaction (recorded vs. estimated), then grouped for display.
   const groups = new Map<string, IncomeAcc>();
@@ -718,7 +829,11 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
   }
   const income = [...groups.values()].map(finishIncomeRow);
 
-  const years = new Set<number>([...input.byYear.map((y) => y.year), ...incomeByYear.keys()]);
+  const years = new Set<number>([
+    ...input.byYear.map((y) => y.year),
+    ...incomeByYear.keys(),
+    ...cryptoByYear.keys(),
+  ]);
   const byYear: IdYearTax[] = [...years]
     .sort((a, b) => b - a)
     .map((year) => {
@@ -731,7 +846,10 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
         realized: D(t?.realized ?? "0").toFixed(2),
         income: inc.income.toFixed(2),
         foreignIncome: inc.foreign.toFixed(2),
-        tax: salesTax.plus(inc.tax).toFixed(2),
+        tax: salesTax
+          .plus(inc.tax)
+          .plus(cryptoByYear.get(year) ?? ZERO)
+          .toFixed(2),
       };
     });
 
@@ -739,8 +857,11 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     disposals,
     totalProceeds: totalProceeds.toFixed(2),
     totalSalesTax: totalSalesTax.toFixed(2),
+    cryptoDisposals,
+    totalCryptoProceeds: totalCryptoProceeds.toFixed(2),
+    totalCryptoTax: totalCryptoTax.toFixed(2),
     income,
-    ...incomeTotals(income, totalSalesTax),
+    ...incomeTotals(income, totalSalesTax, totalCryptoTax),
     byYear,
   };
 }
@@ -752,9 +873,12 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
  */
 export function mergeIndonesianFinalTax(parts: IndonesianFinalTax[]): IndonesianFinalTax {
   const disposals = parts.flatMap((p) => p.disposals);
+  const cryptoDisposals = parts.flatMap((p) => p.cryptoDisposals ?? []);
   const income = parts.flatMap((p) => p.income);
   const totalProceeds = parts.reduce((s, p) => s.plus(p.totalProceeds), ZERO);
   const totalSalesTax = parts.reduce((s, p) => s.plus(p.totalSalesTax), ZERO);
+  const totalCryptoProceeds = parts.reduce((s, p) => s.plus(p.totalCryptoProceeds ?? "0"), ZERO);
+  const totalCryptoTax = parts.reduce((s, p) => s.plus(p.totalCryptoTax ?? "0"), ZERO);
   const years = new Map<
     number,
     { realized: Decimal; income: Decimal; foreignIncome: Decimal; tax: Decimal }
@@ -776,8 +900,11 @@ export function mergeIndonesianFinalTax(parts: IndonesianFinalTax[]): Indonesian
     disposals,
     totalProceeds: totalProceeds.toFixed(2),
     totalSalesTax: totalSalesTax.toFixed(2),
+    cryptoDisposals,
+    totalCryptoProceeds: totalCryptoProceeds.toFixed(2),
+    totalCryptoTax: totalCryptoTax.toFixed(2),
     income,
-    ...incomeTotals(income, totalSalesTax),
+    ...incomeTotals(income, totalSalesTax, totalCryptoTax),
     byYear: [...years.entries()]
       .sort(([a], [b]) => b - a)
       .map(([year, v]) => ({

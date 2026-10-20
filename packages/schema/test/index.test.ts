@@ -84,6 +84,14 @@ describe("portfolioInputSchema", () => {
     expect(portfolioPatchSchema.parse({ country: null }).country).toBeNull();
     expect(() => portfolioPatchSchema.parse({ country: "IDN" })).toThrow();
   });
+  it("takes a crypto venue of domestic or foreign, and allows clearing it", () => {
+    expect(portfolioInputSchema.parse({ name: "X" }).cryptoTaxVenue).toBeUndefined();
+    expect(
+      portfolioInputSchema.parse({ name: "X", cryptoTaxVenue: "domestic" }).cryptoTaxVenue,
+    ).toBe("domestic");
+    expect(portfolioPatchSchema.parse({ cryptoTaxVenue: null }).cryptoTaxVenue).toBeNull();
+    expect(() => portfolioPatchSchema.parse({ cryptoTaxVenue: "binance" })).toThrow();
+  });
 });
 
 describe("accountHolderInputSchema", () => {

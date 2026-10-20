@@ -712,6 +712,11 @@
     "country": "Country",
     "countryNone": "Not set",
     "countryHint": "Where the account is held. Under the Indonesian tax regime, interest from an account in Indonesia is taxed as Indonesian bank interest in any currency; interest from an account elsewhere is foreign income. When not set, IDR interest counts as Indonesian.",
+    "cryptoTaxVenue": "Crypto platform",
+    "cryptoTaxVenueNone": "Not set",
+    "cryptoTaxVenueDomestic": "Domestic (PAKD / PPMSE)",
+    "cryptoTaxVenueForeign": "Foreign platform",
+    "cryptoTaxVenueHint": "Where crypto in this portfolio is sold, for the Indonesian sales tax. Not set follows the country: Indonesia uses the domestic rate, any other country is not estimated. One setting for the whole portfolio, not per sale.",
     "birthYear": "Birth year",
     "birthYearPlaceholder": "e.g. 2017",
     "birthYearHint": "Used for the savings forecast.",
@@ -2235,6 +2240,9 @@
         "income": "Indonesian investment income",
         "foreignIncome": "Foreign income",
         "tax": "Est. tax"
+      },
+      "crypto": {
+        "line": "Crypto sales tax {tax} on {proceeds} of gross sale value. Final and withheld, and not the 0.1% share tax. The rate follows the portfolio's crypto platform: 0.21% domestic or 1% foreign from 1 Aug 2025 (0.10% / 0.20% from 1 May 2022). Nothing is estimated before that, and a loss is still taxed on the sale value."
       },
       "footnote": "Indonesia taxes listed-share sales at a final 0.1% and investment income at a final rate per type. Sales tax and interest tax are withheld at source; tax on dividends you pay yourself unless you reinvest them. Foreign income isn't final-taxed and isn't in this estimate. There are no losses to harvest. This is an estimate, not tax advice.",
       "unavailable": "Indonesian tax breakdown is unavailable."

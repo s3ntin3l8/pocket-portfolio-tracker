@@ -14,6 +14,8 @@ import {
   ID_BOND_RATE_TABLE,
   idRateOn,
   isIndonesianInstrument,
+  idCryptoRate,
+  idCryptoVenue,
   idCashBalancesBefore,
   idCashBalancesAtPayments,
   idDepositBalanceIdr,
@@ -984,5 +986,109 @@ describe("bond and sukuk discount", () => {
         withheldAtSource: true,
       }),
     ]);
+  });
+});
+
+describe("crypto sales tax by venue", () => {
+  const sale = (
+    when: string,
+    venue: "domestic" | "foreign",
+    proceeds = "1000000",
+    tax?: string,
+  ) => ({ symbol: "BTC", when, venue, proceeds, ...(tax !== undefined ? { tax } : {}) });
+
+  it("picks the domestic and foreign rates off the sale date", () => {
+    expect(idCryptoRate("domestic", "2022-04-30")).toBeNull();
+    expect(idCryptoRate("foreign", "2022-04-30")).toBeNull();
+    expect(idCryptoRate("domestic", "2022-05-01")).toBe("0.001");
+    expect(idCryptoRate("foreign", "2025-07-31")).toBe("0.002");
+    expect(idCryptoRate("domestic", "2025-08-01")).toBe("0.0021");
+    expect(idCryptoRate("foreign", "2025-08-01")).toBe("0.01");
+    expect(idCryptoVenue(null, "ID")).toBe("domestic");
+    expect(idCryptoVenue(null, "DE")).toBeNull();
+    expect(idCryptoVenue(null, null)).toBeNull();
+    expect(idCryptoVenue("foreign", "ID")).toBe("foreign");
+  });
+
+  it("taxes a domestic sale at 0.21% from 1 Aug 2025 and 0.10% the day before", () => {
+    const later = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      cryptoDisposals: [sale("2025-08-01", "domestic")],
+    });
+    expect(later.cryptoDisposals[0]).toMatchObject({
+      rate: "0.0021",
+      tax: "2100.00",
+      taxBasis: "estimated",
+      venue: "domestic",
+    });
+    expect(later.totalCryptoTax).toBe("2100.00");
+    expect(later.totalCryptoProceeds).toBe("1000000.00");
+    expect(later.totalSalesTax).toBe("0.00");
+    expect(later.estimatedTax).toBe("2100.00");
+    expect(later.taxWithheldAtSource).toBe("2100.00");
+    expect(later.taxToSelfPay).toBe("0.00");
+
+    const earlier = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      cryptoDisposals: [sale("2025-07-31", "domestic")],
+    });
+    expect(earlier.totalCryptoTax).toBe("1000.00");
+    expect(earlier.cryptoDisposals[0]!.rate).toBe("0.001");
+  });
+
+  it("taxes a foreign-venue sale at 1% from 1 Aug 2025", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      cryptoDisposals: [sale("2025-08-01", "foreign")],
+    });
+    expect(result.totalCryptoTax).toBe("10000.00");
+    expect(result.cryptoDisposals[0]!.rate).toBe("0.01");
+    expect(result.totalSalesTax).toBe("0.00");
+  });
+
+  it("makes no estimate before 1 May 2022", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      year: 2022,
+      cryptoDisposals: [sale("2022-04-30", "domestic")],
+    });
+    expect(result.cryptoDisposals).toEqual([]);
+    expect(result.totalCryptoTax).toBe("0.00");
+    expect(result.estimatedTax).toBe("0.00");
+  });
+
+  it("taxes the gross sale value of a loss, unless a recorded withholding wins", () => {
+    const loss = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      cryptoDisposals: [sale("2025-08-01", "domestic", "1000000")],
+    });
+    expect(loss.totalCryptoTax).toBe("2100.00");
+    const recorded = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      cryptoDisposals: [sale("2025-08-01", "domestic", "1000000", "50")],
+    });
+    expect(recorded.cryptoDisposals[0]).toMatchObject({ tax: "50.00", taxBasis: "recorded" });
+    expect(recorded.estimatedTax).toBe("50.00");
+    expect(recorded.totalSalesTax).toBe("0.00");
+  });
+
+  it("adds crypto tax to the year without touching the 0.1% share total", () => {
+    const result = indonesianFinalTax({
+      year: 2025,
+      disposals: [{ symbol: "BBCA", when: "2025-06-01", proceeds: "1000000" }],
+      income: [],
+      byYear: [{ year: 2025, proceeds: "1000000", realized: "0", salesTax: "1000" }],
+      cryptoDisposals: [sale("2025-08-01", "domestic")],
+    });
+    expect(result.totalSalesTax).toBe("1000.00");
+    expect(result.totalProceeds).toBe("1000000.00");
+    expect(result.totalCryptoTax).toBe("2100.00");
+    expect(result.estimatedTax).toBe("3100.00");
+    expect(result.byYear[0]).toMatchObject({ tax: "3100.00" });
   });
 });

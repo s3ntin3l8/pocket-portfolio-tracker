@@ -354,7 +354,9 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       'reksa dana/ETF distributions 0%. Bank interest is exempt (`income[].exemption: "small_balance"`, `rate` "0", ' +
       "tax 0; `incomeByCategory[].exemptGross`) when its portfolio's cash balance in all currencies, converted to IDR, " +
       "was at most Rp7,500,000 just before the payment; this approximates the per-bank rule by treating one portfolio " +
-      "as one bank, so say so. `taxWithheldAtSource` is already " +
+      "as one bank, so say so. Crypto sales are a separate final tax (`cryptoDisposals`, `totalCryptoTax`), inside " +
+      "`estimatedTax` and `taxWithheldAtSource` but not the 0.1% share total: the rate follows the portfolio's " +
+      "`cryptoTaxVenue` (domestic or foreign; null uses domestic only when the portfolio country is ID). `taxWithheldAtSource` is already " +
       "withheld and `taxToSelfPay` is what the user pays; never present the whole `estimatedTax` as still owed. Foreign income " +
       "(`foreignIncomeGross`) is not in `estimatedTax`: it is taxed at the user's marginal rate (5–35%) with a credit for " +
       "`foreignTaxWithheld`, which Pocket cannot compute. An income row with no instrument is cash income; its " +
