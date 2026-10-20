@@ -257,19 +257,26 @@ Final taxes for a **resident individual**, with no annual allowance, no loss-net
 dependency on when a gain was locked in. They tax _proceeds and gross income_, not gains,
 and the rate depends on the type and the source of the income:
 
-| Event (category)                                                        | Rate     | Base                                  | Who pays                                     | Rule                                                                                                |
-| ----------------------------------------------------------------------- | -------- | ------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Sale of IDX-listed shares                                               | **0.1%** | Gross sale proceeds (not gain)        | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                            |
-| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374      |
-| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before)                                                    |
-| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below) |
-| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                 |
-| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                |
+| Event (category)                                                        | Rate     | Base                                                  | Who pays                                     | Rule                                                                                                |
+| ----------------------------------------------------------------------- | -------- | ----------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Sale of IDX-listed shares                                               | **0.1%** | Gross sale value, quantity × price, before commission | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                            |
+| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374      |
+| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period                 | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before)                                                    |
+| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below) |
+| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                 |
+| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return                           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                |
 
 `estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
 `taxWithheldAtSource` (sales, bond and bank interest: the payer already withheld it) and
 `taxToSelfPay` (domestic dividends). The Tax page shows both in the hero card and labels each
 income row "withheld at source" or "you pay", so withheld tax doesn't read as tax still owed.
+
+The 0.1% is computed from the trade log's `grossProceeds` (consumed quantity × price, fees
+excluded), not from the fee-net `proceeds` used for gain and XIRR. An oversell is taxed only
+on the quantity actually held. A withholding recorded on the sell (`transactions.tax`) is the
+tax for that disposal, scaled by the same fraction; the 0.1% applies only when none is
+recorded. A zero there is not an exemption. A separate `tax` transaction is not added on top.
+`byYear` uses that same decided amount.
 
 **Exemptions not modelled, stated as notes instead:**
 
@@ -400,7 +407,8 @@ withholding, converted to the report currency at today's rate.
 
 ### By year
 
-`byYear` rolls up every year: proceeds × 0.1% plus each year's Indonesian income at its
+`byYear` rolls up every year: the sales tax already decided for that year (recorded
+withholding, or 0.1% of the gross sale value) plus each year's Indonesian income at its
 category's rate (`income`), with foreign income in its own column (`foreignIncome`) and not
 in `tax`. Prior years use today's rates and FX (the 15% → 10% bond change of 2021 is not
 replayed unless the withholding is recorded) — like the German table, it is an estimate.

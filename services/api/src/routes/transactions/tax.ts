@@ -192,7 +192,8 @@ export function registerTaxRoutes(app: FastifyInstance) {
               )
             ).toString();
 
-      // Indonesian final tax: 0.1% of SALE PROCEEDS + a final rate per income type on the
+      // Indonesian final tax: 0.1% of the gross sale value (quantity × price, fees
+      // excluded; a recorded sell withholding wins) + a final rate per income type on the
       // income GROSS (`classifyIdIncome`; foreign income kept apart). No
       // Sparerpauschbetrag, no harvesting, no realized-gain computation — so the entire
       // German-shape response (`allowanceUsage`, `harvestSuggestions`,
@@ -485,7 +486,8 @@ export function registerTaxRoutes(app: FastifyInstance) {
           }
           const mergedLog = mergeTradeLogs(logs, display, "fifo");
 
-          // Indonesian final tax: 0.1% of SALE PROCEEDS + a final rate per income type on
+          // Indonesian final tax: 0.1% of the gross sale value (quantity × price, fees
+          // excluded; a recorded sell withholding wins) + a final rate per income type on
           // the income GROSS (`classifyIdIncome`; foreign income kept apart). No
           // Sparerpauschbetrag / harvesting / realized-gain computation. Computed against the
           // holder's MERGED trade log across all their portfolios, so the per-holder ID total

@@ -4,10 +4,13 @@
  * SOURCE of the income.
  *
  * Scope (sources: docs/tax.md › "Indonesian final-tax regime"):
- *   - Sales tax: 0.1% of gross sale PROCEEDS (not gain) for disposals of IDX-listed shares
- *     (the caller filters disposals to `market === "IDX" && assetClass === "equity"`),
- *     withheld by the exchange through the broker. PP 41/1994 as amended by PP 14/1997;
- *     KMK 282/KMK.04/1997.
+ *   - Sales tax: 0.1% of the gross sale value (consumed quantity × price, fees excluded)
+ *     for disposals of IDX-listed shares (the caller filters disposals to
+ *     `market === "IDX" && assetClass === "equity"`), withheld by the exchange through
+ *     the broker. PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997. A
+ *     withholding recorded on the sell is the figure for that disposal; the 0.1% applies
+ *     only when none was recorded. The caller passes that decided amount (`tax` /
+ *     `salesTax`); when it is omitted, this module multiplies `proceeds` by the rate.
  *   - Investment income, classified per transaction by {@link classifyIdIncome}:
  *       domestic_dividend  10% final of gross, paid by the investor by the 15th of the
  *                          following month (nothing is withheld for a resident individual);
@@ -86,6 +89,7 @@ export interface IdDisposalLot {
 export interface IdDisposalInput {
   symbol: string;
   when: string; // YYYY-MM-DD
+  /** Gross sale value (quantity × price, fees excluded). Not the fee-net figure used for gain. */
   proceeds: string;
   /** The underlying instrument's stable id. Optional for backward compatibility (older
    *  callers that don't pass it fall back to `symbol` for row identity in the UI). The
@@ -102,10 +106,15 @@ export interface IdDisposalInput {
   avgBuyPrice?: string;
   sellPrice?: string;
   lots?: IdDisposalLot[];
+  /** Decided sales tax for this row: a recorded withholding, `proceeds × 0.001`, or a
+   *  mix of the two. When omitted, this module applies the rate to `proceeds`. */
+  tax?: string;
+  /** How `tax` was decided. Omitted by callers that leave the rate to this module. */
+  taxBasis?: IdIncomeTaxBasis;
 }
 
 export interface IdDisposalTax extends IdDisposalInput {
-  /** proceeds × 0.1%, decimal string. */
+  /** Decided sales tax, decimal string. `proceeds × 0.1%` unless the caller passed `tax`. */
   tax: string;
 }
 
@@ -269,8 +278,10 @@ export interface IdIncomeCategoryTotal {
 
 export interface IdYearInput {
   year: number;
-  /** Sum of sale proceeds of in-scope disposals closed in this tax year. */
+  /** Sum of in-scope sale values closed in this tax year (the statutory base). */
   proceeds: string;
+  /** Decided sales tax for the year. When omitted, `proceeds × 0.001`. */
+  salesTax?: string;
   /** Realized gain for this tax year — informational only, not taxed under ID. */
   realized: string;
 }
@@ -580,7 +591,9 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
   let totalSalesTax = ZERO;
   const disposals: IdDisposalTax[] = input.disposals.map((r) => {
     const proceeds = D(r.proceeds);
-    const tax = proceeds.times(salesRate);
+    // A caller that already decided the tax (recorded withholding, or gross × rate
+    // computed off the trade log) passes it. Everyone else is taxed on `proceeds`.
+    const tax = r.tax !== undefined ? D(r.tax) : proceeds.times(salesRate);
     totalProceeds = totalProceeds.plus(proceeds);
     totalSalesTax = totalSalesTax.plus(tax);
     return { ...r, tax: tax.toFixed(2) };
@@ -639,7 +652,8 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     .map((year) => {
       const t = input.byYear.find((y) => y.year === year);
       const inc = incomeByYear.get(year) ?? { income: ZERO, foreign: ZERO, tax: ZERO };
-      const salesTax = D(t?.proceeds ?? "0").times(salesRate);
+      const salesTax =
+        t?.salesTax !== undefined ? D(t.salesTax) : D(t?.proceeds ?? "0").times(salesRate);
       return {
         year,
         realized: D(t?.realized ?? "0").toFixed(2),

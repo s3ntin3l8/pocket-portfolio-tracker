@@ -248,6 +248,31 @@ describe("indonesianFinalTax", () => {
     expect(result.taxToSelfPay).toBe("0.00");
   });
 
+  it("uses a decided sales tax instead of proceeds × 0.1%, including in byYear", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      disposals: [
+        { symbol: "BBNI", when: "2026-05-18", proceeds: "1500", tax: "5", taxBasis: "recorded" },
+      ],
+      byYear: [{ year: 2026, proceeds: "1500", salesTax: "5", realized: "100" }],
+    });
+    expect(result.disposals).toEqual([
+      {
+        symbol: "BBNI",
+        when: "2026-05-18",
+        proceeds: "1500",
+        tax: "5.00",
+        taxBasis: "recorded",
+      },
+    ]);
+    expect(result.totalSalesTax).toBe("5.00");
+    expect(result.estimatedTax).toBe("5.00");
+    expect(result.taxWithheldAtSource).toBe("5.00");
+    expect(result.byYear).toEqual([
+      expect.objectContaining({ year: 2026, tax: "5.00", realized: "100.00" }),
+    ]);
+  });
+
   it("domestic dividend: 10% of gross, self-paid, a recorded tax ignored", () => {
     const result = indonesianFinalTax({
       ...empty,

@@ -12,6 +12,7 @@ import type {
   IdCashIncomeSource,
   IdDisposalInput,
   IdIncomeInput,
+  IdIncomeTaxBasis,
   IdYearInput,
 } from "@portfolio/core";
 import {
@@ -26,6 +27,7 @@ import {
   defaultPartialExemptionRate,
   idCashBalancesAtPayments,
   idDepositBalanceIdr,
+  ID_SALES_TAX_RATE,
 } from "@portfolio/core";
 import {
   getFxRates,
@@ -367,12 +369,32 @@ export async function loadIdDepositFx(
 }
 
 /**
+ * The 0.1% base for one trade-log leg. `grossProceeds` is quantity × price (fees
+ * excluded); a leg from a fixture that predates the field falls back to fee-net
+ * `proceeds`. A recorded withholding greater than zero wins. Zero is not an exemption.
+ */
+function idLegSalesTax(
+  leg: { proceeds: string; grossProceeds?: string; recordedSalesTax?: string },
+  rate: Decimal,
+): { gross: Decimal; tax: Decimal; basis: "recorded" | "estimated" } {
+  const gross = new Decimal(leg.grossProceeds ?? leg.proceeds);
+  const recorded =
+    leg.recordedSalesTax != null && leg.recordedSalesTax !== ""
+      ? new Decimal(leg.recordedSalesTax)
+      : null;
+  if (recorded != null && recorded.gt(0)) return { gross, tax: recorded, basis: "recorded" };
+  return { gross, tax: gross.mul(rate), basis: "estimated" };
+}
+
+/**
  * Build the Indonesian final-tax payload from a (single) portfolio's trade log + raw core
  * transactions. Mirrors the web tier's per-holder assembly in `loadTaxYearDetail` so the
  * API and the (replaced) client side agree to the decimal — single source of truth.
  *
  * - Disposals for `year` are grouped by (instrumentId, sellDate) so each disposal row is
- *   one economic sale day, with proceeds / quantity / avg-buy / sell-price.
+ *   one economic sale day. `proceeds` on the row is the gross sale value (quantity ×
+ *   price), not the fee-net trade-log proceeds. Tax is the recorded withholding when the
+ *   sell carries one, otherwise 0.1% of that gross.
  * - Every dividend/coupon/interest transaction becomes one income row with gross = net +
  *   recorded withholding (`cashFlow` computes net = qty × price − fees for income rows) and
  *   a category from `classifyIdIncome` (domestic dividend, bond interest, bank interest,
@@ -381,8 +403,8 @@ export async function loadIdDepositFx(
  *   so the transactions come grouped per portfolio (`incomeSources`). Indonesian bank
  *   interest is exempt when its portfolio's balance before the payment was at most
  *   Rp7.5M (converted with `depositFxAt`, from {@link loadIdDepositFx}).
- * - `byYear` rolls proceeds and income across every year so prior tax years still get a
- *   real Est. tax figure under ID.
+ * - `byYear` carries each year's gross sale value and the sales tax already decided per
+ *   leg (recorded withholding, or 0.1% of that gross), plus that year's income.
  */
 export function computeIndonesianFinalTaxFromTradeLog(input: {
   tradeLog: TradeLog;
@@ -404,6 +426,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
 }): IndonesianFinalTax {
   const { tradeLog, incomeSources, year, metaById, displayCurrency, fxRates } = input;
   const ZERO = "0";
+  const salesRate = new Decimal(ID_SALES_TAX_RATE);
 
   // Native-currency → display-currency. A source currency with no registered rate is
   // excluded (0) and reported via the request's fxMissingCurrencies (audit B2) — never
@@ -432,6 +455,8 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     symbol: string;
     when: string;
     proceeds: Decimal;
+    salesTax: Decimal;
+    bases: Set<"recorded" | "estimated">;
     quantity: Decimal;
     cost: Decimal;
   };
@@ -441,13 +466,15 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     for (const l of t.legs) {
       if (l.taxYear !== year) continue;
       const key = `${t.instrumentId}:${l.sellDate}`;
+      const decided = idLegSalesTax(l, salesRate);
       const qty = new Decimal(l.quantity);
-      const proceeds = new Decimal(l.proceeds);
       const cost = new Decimal(l.cost);
       const existing = disposalGroups.get(key);
       const symbol = metaById.get(t.instrumentId)?.symbol ?? t.instrumentId.slice(0, 8);
       if (existing) {
-        existing.proceeds = existing.proceeds.add(proceeds);
+        existing.proceeds = existing.proceeds.add(decided.gross);
+        existing.salesTax = existing.salesTax.add(decided.tax);
+        existing.bases.add(decided.basis);
         existing.quantity = existing.quantity.add(qty);
         existing.cost = existing.cost.add(cost);
       } else {
@@ -455,22 +482,30 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
           instrumentId: t.instrumentId,
           symbol,
           when: l.sellDate,
-          proceeds,
+          proceeds: decided.gross,
+          salesTax: decided.tax,
+          bases: new Set([decided.basis]),
           quantity: qty,
           cost,
         });
       }
     }
   }
-  const disposals: IdDisposalInput[] = [...disposalGroups.values()].map((g) => ({
-    symbol: g.symbol,
-    when: g.when,
-    instrumentId: g.instrumentId,
-    proceeds: g.proceeds.toFixed(2),
-    quantity: g.quantity.gt(0) ? g.quantity.toString() : ZERO,
-    avgBuyPrice: g.quantity.gt(0) ? g.cost.div(g.quantity).toFixed(2) : ZERO,
-    sellPrice: g.quantity.gt(0) ? g.proceeds.div(g.quantity).toFixed(2) : ZERO,
-  }));
+  const disposals: IdDisposalInput[] = [...disposalGroups.values()].map((g) => {
+    const taxBasis: IdIncomeTaxBasis =
+      g.bases.size > 1 ? "mixed" : ([...g.bases][0] ?? "estimated");
+    return {
+      symbol: g.symbol,
+      when: g.when,
+      instrumentId: g.instrumentId,
+      proceeds: g.proceeds.toFixed(2),
+      tax: g.salesTax.toFixed(2),
+      taxBasis,
+      quantity: g.quantity.gt(0) ? g.quantity.toString() : ZERO,
+      avgBuyPrice: g.quantity.gt(0) ? g.cost.div(g.quantity).toFixed(2) : ZERO,
+      sellPrice: g.quantity.gt(0) ? g.proceeds.div(g.quantity).toFixed(2) : ZERO,
+    };
+  });
 
   // Income (dividend / coupon / interest) of EVERY year, one row per transaction: the core
   // decides each row's rate from its category (and the recorded withholding), then groups the
@@ -532,26 +567,35 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     }
   }
 
-  // Per-year proceeds from the trade log legs (across ALL years, for the byYear table).
-  // TradeLog itself is already in display currency (built via `mergeTradeLogs(logs, display)`),
-  // so byYear rows stay in display currency end-to-end — no FX pass needed here.
-  const proceedsByYearMap = new Map<number, Decimal>();
+  // Per-year gross sale value and the tax already decided per leg (recorded withholding
+  // or 0.1% of gross). TradeLog is already in display currency, so no FX pass here.
+  const salesByYear = new Map<number, { proceeds: Decimal; salesTax: Decimal }>();
   for (const t of tradeLog.trades) {
     if (!salesTaxApplies(t.instrumentId)) continue;
     for (const l of t.legs) {
-      const prev = proceedsByYearMap.get(l.taxYear) ?? new Decimal(0);
-      proceedsByYearMap.set(l.taxYear, prev.add(l.proceeds));
+      const decided = idLegSalesTax(l, salesRate);
+      const prev = salesByYear.get(l.taxYear) ?? {
+        proceeds: new Decimal(0),
+        salesTax: new Decimal(0),
+      };
+      prev.proceeds = prev.proceeds.add(decided.gross);
+      prev.salesTax = prev.salesTax.add(decided.tax);
+      salesByYear.set(l.taxYear, prev);
     }
   }
   const allYears = new Set<number>([
-    ...proceedsByYearMap.keys(),
+    ...salesByYear.keys(),
     ...tradeLog.realizedByYear.map((r) => r.year),
   ]);
-  const byYear: IdYearInput[] = [...allYears].map((y) => ({
-    year: y,
-    proceeds: (proceedsByYearMap.get(y) ?? new Decimal(0)).toFixed(2),
-    realized: tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0",
-  }));
+  const byYear: IdYearInput[] = [...allYears].map((y) => {
+    const acc = salesByYear.get(y);
+    return {
+      year: y,
+      proceeds: (acc?.proceeds ?? new Decimal(0)).toFixed(2),
+      salesTax: (acc?.salesTax ?? new Decimal(0)).toFixed(2),
+      realized: tradeLog.realizedByYear.find((r) => r.year === y)?.amount ?? "0",
+    };
+  });
 
   return indonesianFinalTax({ year, disposals, income, byYear });
 }

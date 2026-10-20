@@ -13,7 +13,15 @@ export interface TradeLeg {
   sellDate: string; // YYYY-MM-DD
   quantity: string;
   cost: string; // display currency
-  proceeds: string; // display currency
+  proceeds: string; // display currency, fee-net — performance only
+  /** Statutory sale value for this slice: consumed quantity × price, fees excluded.
+   *  Same currency as `proceeds`. Optional — omitted on fixtures predating this field;
+   *  computeTrades always sets it. The Indonesian 0.1% uses this, not `proceeds`. */
+  grossProceeds?: string;
+  /** Recorded withholding on this slice (`transactions.tax`), scaled to the quantity
+   *  actually sold and to this slice. Same currency as `proceeds`. Omitted when none
+   *  was recorded (a missing or zero tax is not an exemption). */
+  recordedSalesTax?: string;
   gain: string; // display currency
   holdingDays: number;
   longTerm: boolean;

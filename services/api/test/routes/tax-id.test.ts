@@ -197,6 +197,126 @@ describe("GET /portfolios/:id/tax — Indonesian taxRegime", () => {
     expect(yearRow.tax).toBe("21.50");
   });
 
+  it("levies the 0.1% on quantity × price, and a recorded sell tax wins", async () => {
+    const t = await token("tax-id-gross");
+    const [equity] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-GROSS",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "IDX Gross Co",
+      })
+      .returning();
+    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR" });
+    await setTaxRegime(t, "ID");
+
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "buy",
+      instrumentId: equity.id,
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    // Fees must not shrink the base: 10 × 150 = 1500, not 1485. No recorded tax.
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "sell",
+      instrumentId: equity.id,
+      quantity: "4",
+      price: "150",
+      fees: "15",
+      currency: "EUR",
+      executedAt: "2025-06-15T00:00:00.000Z",
+    });
+    // Same day, so the two sells are one row. This one carries the withholding.
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "sell",
+      instrumentId: equity.id,
+      quantity: "6",
+      price: "150",
+      tax: "9",
+      currency: "EUR",
+      executedAt: "2025-06-15T12:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const id = res.json().indonesianFinalTax;
+    // 4 × 150 = 600 estimated at 0.1% → 0.60; 6 × 150 = 900 recorded as 9.
+    expect(id.disposals).toEqual([
+      expect.objectContaining({
+        symbol: "IDX-GROSS",
+        proceeds: "1500.00",
+        tax: "9.60",
+        taxBasis: "mixed",
+      }),
+    ]);
+    expect(id.totalProceeds).toBe("1500.00");
+    expect(id.totalSalesTax).toBe("9.60");
+    expect(id.taxWithheldAtSource).toBe("9.60");
+    const yearRow = id.byYear.find((r: { year: number }) => r.year === 2025);
+    expect(yearRow.tax).toBe("9.60");
+  });
+
+  it("estimates 0.1% of the gross when the sell's recorded tax is zero", async () => {
+    const t = await token("tax-id-zero-tax");
+    const [equity] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-ZERO",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "EUR",
+        name: "IDX Zero Tax Co",
+      })
+      .returning();
+    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR" });
+    await setTaxRegime(t, "ID");
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "buy",
+      instrumentId: equity.id,
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    // tax "0" is not an exemption. A blank tax is rejected by the input schema,
+    // so the blank case is covered on the trade log instead.
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "sell",
+      instrumentId: equity.id,
+      quantity: "10",
+      price: "200",
+      fees: "20",
+      tax: "0",
+      currency: "EUR",
+      executedAt: "2025-06-15T00:00:00.000Z",
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const id = res.json().indonesianFinalTax;
+    // 10 × 200 = 2000, not 1980. 0.1% of the gross is 2.00, and the basis is estimated.
+    expect(id.disposals).toEqual([
+      expect.objectContaining({
+        symbol: "IDX-ZERO",
+        proceeds: "2000.00",
+        tax: "2.00",
+        taxBasis: "estimated",
+      }),
+    ]);
+    expect(id.totalSalesTax).toBe("2.00");
+  });
+
   it("keeps the DE branch returning allowanceUsage when taxRegime='DE' (no behavior change)", async () => {
     const t = await token("tax-id-3");
     const holderId = await createHolder(t, {
