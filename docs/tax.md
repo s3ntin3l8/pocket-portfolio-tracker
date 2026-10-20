@@ -469,12 +469,18 @@ instrument with no metadata row is treated as foreign rather than guessed.
 is unchanged; the row is taxed as whatever it was booked as.
 
 1. **P2P / LPBBTI interest.** Cash `interest` on a portfolio with `country` `ID` (or unset,
-   in IDR) is `deposit_interest`: 20% final, and the Rp7.5M test. Loan interest a company
-   pays an individual is generally PPh 23 at 15%, not final (not PPh 4(2)). There is no
-   loan-interest row. Do not book that interest as cash `interest`.
+   in IDR) is `deposit_interest`: 20% final, and the Rp7.5M test. Interest a company pays
+   an individual through an OJK-registered lending platform is PPh 23 at 15% of the gross,
+   withheld by the platform and credited in the annual return — not final, and not PPh 4(2)
+   (PMK 69/PMK.03/2022 Art. 3(2)(a), 3(3)(a) and 3(4)). There is no loan-interest row, so
+   this estimate cannot show that 15%. Do not book the interest as cash `interest`. Do not
+   book it as `bonus_cash` either: that counts as income for performance but is in neither
+   tax table, so the page shows 0% instead of the 15%. Leave it out of this estimate.
 2. **Stock dividend / bonus shares.** The shares are not cash income. The 0.1% applies only
-   when they are sold. Booking the receipt as `dividend` charges 10% that is not due. Book
-   it as `bonus`.
+   when they are sold. Booking the receipt as `dividend` charges 10% that is not due. The
+   receipt is a `bonus` corporate action, recorded on the admin-gated Instrument event
+   recorder (`POST /corporate-actions`) — the manual form no longer offers a `bonus`
+   transaction. A `bonus` row that is already stored is not investment income either.
 3. **Reksa dana, IDX ETF, or DIRE booked as `equity`.** The sale picks up the 0.1%, and a
    distribution booked as `dividend` picks up 10%. Class the instrument as `mutual_fund` or
    `etf` (there is no DIRE class): the distribution is `fund_distribution` at 0%, and the
@@ -562,6 +568,10 @@ regime only" caveat. **Keep that text in sync with this document** when the rule
   - Domestic dividends, reinvestment and self-payment (PMK 18/2021, PMK 81/2024):
     https://news.ddtc.co.id/berita/nasional/1817070/dividen-tak-diinvestasikan-sesuai-aturan-harus-setor-pph-ini-caranya
   - Foreign dividends: https://news.ddtc.co.id/berita/nasional/1802109/dividen-luar-negeri-juga-dikecualikan-dari-pph-begini-prosedurnya
+  - PMK 69/PMK.03/2022 Art. 3 (P2P / LPBBTI interest: PPh 23 at 15% of gross, withheld by the
+    OJK-registered platform, credited in the annual return, not final):
+    https://www.pajak.go.id/id/artikel/kepastian-hukum-bagi-investor-p2p-lending
+    and https://news.ddtc.co.id/berita/nasional/39093/potong-pajak-penghasilan-penyelenggara-p2p-lending-harus-tahu-ini
   - IDX sales tax reporting under PMK 81/2024:
     https://news.ddtc.co.id/berita/nasional/1807703/pmk-812024-perinci-ketentuan-bukti-potong-pph-atas-penjualan-saham
 - `packages/core/src/trade-log.ts` — `Trade.vorabByYear` / `TradeLeg.vorabCredit`
