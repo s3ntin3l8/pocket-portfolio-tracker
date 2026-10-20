@@ -465,6 +465,21 @@ name, which were judged too unreliable. On `/networth/tax` each portfolio's inte
 classified with its own portfolio's country before the holder's portfolios are summed. An
 instrument with no metadata row is treated as foreign rather than guessed.
 
+**Three ways this mis-files a book.** Nothing below is a new category. `classifyIdIncome`
+is unchanged; the row is taxed as whatever it was booked as.
+
+1. **P2P / LPBBTI interest.** Cash `interest` on a portfolio with `country` `ID` (or unset,
+   in IDR) is `deposit_interest`: 20% final, and the Rp7.5M test. Loan interest a company
+   pays an individual is generally PPh 23 at 15%, not final (not PPh 4(2)). There is no
+   loan-interest row. Do not book that interest as cash `interest`.
+2. **Stock dividend / bonus shares.** The shares are not cash income. The 0.1% applies only
+   when they are sold. Booking the receipt as `dividend` charges 10% that is not due. Book
+   it as `bonus`.
+3. **Reksa dana, IDX ETF, or DIRE booked as `equity`.** The sale picks up the 0.1%, and a
+   distribution booked as `dividend` picks up 10%. Class the instrument as `mutual_fund` or
+   `etf` (there is no DIRE class): the distribution is `fund_distribution` at 0%, and the
+   sale is not an IDX share sale.
+
 A cash row carries `cashSource: { type, currency }` — its own currency, since every amount is
 in the report currency — and is grouped per type and currency, so EUR and USD interest stay
 two rows. Its `symbol` is a readable English label (`"Cash interest · EUR"`) for API and MCP
