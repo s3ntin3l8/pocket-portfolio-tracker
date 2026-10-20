@@ -23,6 +23,7 @@ import {
   toDateKey,
   indonesianFinalTax,
   classifyIdIncome,
+  isIndonesianInstrument,
   excludeMissingFx,
   defaultPartialExemptionRate,
   idCashBalancesAtPayments,
@@ -386,6 +387,56 @@ function idLegSalesTax(
   return { gross, tax: gross.mul(rate), basis: "estimated" };
 }
 
+/** A lot bought within a year of maturity is treated as a short-term paper (SPN and
+ *  the like), which PP 91/2021 does not call an obligasi. No issue date is stored, so
+ *  this uses the lot's own acquisition. Unknown maturity is not short. */
+function idShortBond(acqDate: string, maturityDate: string | null | undefined): boolean {
+  if (!maturityDate) return false;
+  const acq = Date.parse(`${acqDate}T00:00:00Z`);
+  const maturity = Date.parse(`${maturityDate}T00:00:00Z`);
+  if (Number.isNaN(acq) || Number.isNaN(maturity)) return false;
+  const days = (maturity - acq) / 86_400_000;
+  return days >= 0 && days <= 366;
+}
+
+/** Bond and sukuk discount rows (PP 91/2021 Art. 2(3)). One per trade-log leg.
+ *  Price is clean: `grossProceeds` minus fee-excluded cost. A par redemption adds
+ *  nothing. Not the 0.1% share tax. */
+function idBondDiscountRows(
+  tradeLog: TradeLog,
+  metaById: Map<string, InstrumentMeta>,
+  displayCurrency: string,
+): IdIncomeInput[] {
+  const rows: IdIncomeInput[] = [];
+  for (const t of tradeLog.trades) {
+    const meta = metaById.get(t.instrumentId);
+    if (!meta || meta.assetClass !== "bond" || !isIndonesianInstrument(meta)) continue;
+    for (const l of t.legs) {
+      if (idShortBond(l.acqDate, meta.maturityDate)) continue;
+      const sale = new Decimal(l.grossProceeds ?? l.proceeds);
+      const cost = new Decimal(l.cleanCost ?? l.cost);
+      const discount = sale.minus(cost);
+      if (discount.isZero()) continue;
+      const recordedRaw =
+        l.recordedSalesTax != null && l.recordedSalesTax !== ""
+          ? new Decimal(l.recordedSalesTax)
+          : null;
+      const recorded = recordedRaw != null && recordedRaw.gt(0) ? recordedRaw : new Decimal(0);
+      rows.push({
+        instrumentId: t.instrumentId,
+        symbol: meta.symbol || t.instrumentId.slice(0, 8),
+        currency: displayCurrency,
+        category: "bond_discount",
+        year: l.taxYear,
+        on: l.sellDate,
+        gross: discount.toFixed(2),
+        recordedTax: recorded.toFixed(2),
+      });
+    }
+  }
+  return rows;
+}
+
 /**
  * Build the Indonesian final-tax payload from a (single) portfolio's trade log + raw core
  * transactions. Mirrors the web tier's per-holder assembly in `loadTaxYearDetail` so the
@@ -403,6 +454,9 @@ function idLegSalesTax(
  *   so the transactions come grouped per portfolio (`incomeSources`). Indonesian bank
  *   interest is exempt when its portfolio's balance before the payment was at most
  *   Rp7.5M (converted with `depositFxAt`, from {@link loadIdDepositFx}).
+ * - A sale of an Indonesian bond or sukuk adds one `bond_discount` row per leg:
+ *   clean sale value minus fee-excluded cost (PP 91/2021 Art. 2(3)). A par redemption
+ *   adds nothing. This is not the 0.1% share tax.
  * - `byYear` carries each year's gross sale value and the sales tax already decided per
  *   leg (recorded withholding, or 0.1% of that gross), plus that year's income.
  */
@@ -566,6 +620,8 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
       });
     }
   }
+
+  income.push(...idBondDiscountRows(tradeLog, metaById, displayCurrency));
 
   // Per-year gross sale value and the tax already decided per leg (recorded withholding
   // or 0.1% of gross). TradeLog is already in display currency, so no FX pass here.

@@ -2205,15 +2205,18 @@
       "category": {
         "domestic_dividend": "Dividend",
         "bond_interest": "Bond interest",
+        "bond_discount": "Bond discount",
         "deposit_interest": "Bank interest",
         "fund_distribution": "Fund distribution"
       },
       "exemption": {
-        "small_balance": "exempt (balance ≤ Rp7.5M)"
+        "small_balance": "exempt (balance ≤ Rp7.5M)",
+        "negative_discount": "below cost (does not offset coupons)"
       },
       "notes": {
         "domestic_dividend": "Dividends from Indonesian companies: 10% final, which you pay yourself by the 15th of the following month. Exempt if you reinvest them in Indonesia for at least 3 years.",
         "bond_interest": "Bond interest, including ORI and SBR: 10% final, withheld by the issuer or custodian.",
+        "bond_discount": "Discount on an Indonesian bond or sukuk: the difference between the clean sale price and the clean cost, fees excluded. 10% final from 30 Aug 2021, 15% on an earlier sale, withheld at source. A sale at par adds nothing. A sale below cost is shown but does not refund coupons already withheld, and the accrued-coupon offset is not computed. The price is clean — a dirty price (price plus accrued interest) would overstate the discount. A paper maturing within a year of the lot's purchase is left out.",
         "deposit_interest": "Interest from a bank in Indonesia, in any currency: 20% final, withheld by the bank. A portfolio counts as Indonesian when its country is set to Indonesia, or, with no country set, when the interest is in IDR. Interest is exempt while the deposit and savings balance at that bank is at most Rp7.5 million. Pocket approximates this by treating one portfolio as one bank: it checks the portfolio's cash just before each payment, in all currencies converted to rupiah. Where a withholding is recorded on the transaction, that amount is used.",
         "fund_distribution": "Reksa dana and ETF distributions aren't taxable for unit holders."
       },

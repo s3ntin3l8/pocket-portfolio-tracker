@@ -343,6 +343,8 @@ describe("ai-tools", () => {
   it("get_tax_summary explains the Indonesian per-type rates and what is already withheld", () => {
     const d = byName("get_tax_summary").description;
     expect(d).toMatch(/dividends 10%.*bond interest 10%.*bank interest 20%/);
+    expect(d).toMatch(/bond\/sukuk discount 10%/);
+    expect(d).toMatch(/negative_discount/);
     expect(d).toMatch(/portfolio's `country`/);
     expect(d).toMatch(/taxWithheldAtSource/);
     expect(d).toMatch(/taxToSelfPay/);

@@ -37,6 +37,9 @@ export interface InstrumentMeta {
   /** ISIN when known. Its two-letter prefix is the issuer's country; the Indonesian tax
    *  estimate reads it to tell domestic from foreign income (`classifyIdIncome`). */
   isin?: string | null;
+  /** Bond maturity (YYYY-MM-DD). The ID discount estimate treats a lot acquired within
+   *  a year of this date as short-term paper, outside PP 91/2021. */
+  maturityDate?: string | null;
   /** GICS-style sector populated by the refresh-instrument-metadata job; null until enriched. */
   sector: string | null;
   /**
@@ -120,6 +123,7 @@ export async function valuePortfolio(
         unit: i.unit,
         market: i.market,
         isin: i.isin ?? null,
+        maturityDate: i.maturityDate ?? null,
         sector: i.sector ?? null,
         sectorWeights: (i.sectorWeights as Record<string, number> | null) ?? null,
         countryWeights: (i.countryWeights as Record<string, number> | null) ?? null,

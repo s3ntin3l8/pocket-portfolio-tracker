@@ -22,6 +22,9 @@ export interface TradeLeg {
    *  actually sold and to this slice. Same currency as `proceeds`. Omitted when none
    *  was recorded (a missing or zero tax is not an exemption). */
   recordedSalesTax?: string;
+  /** Acquisition cost of this slice excluding fees (quantity × buy price). Same
+   *  currency as `cost`, which includes fees. Optional on older fixtures. */
+  cleanCost?: string;
   gain: string; // display currency
   holdingDays: number;
   longTerm: boolean;
@@ -134,6 +137,8 @@ export interface Lot {
   acqDate: Date;
   qty: Decimal;
   unitCost: Decimal;
+  /** Price per unit, fees excluded. Splits scale it the same way as `unitCost`. */
+  unitPrice: Decimal;
 }
 
 /** Mutable accumulators for the in-progress episode of one instrument. */
