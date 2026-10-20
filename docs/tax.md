@@ -465,6 +465,28 @@ name, which were judged too unreliable. On `/networth/tax` each portfolio's inte
 classified with its own portfolio's country before the holder's portfolios are summed. An
 instrument with no metadata row is treated as foreign rather than guessed.
 
+**Three ways this mis-files a book.** Nothing below is a new category. `classifyIdIncome`
+is unchanged; the row is taxed as whatever it was booked as.
+
+1. **P2P / LPBBTI interest.** Cash `interest` on a portfolio with `country` `ID` (or unset,
+   in IDR) is `deposit_interest`: 20% final, and the Rp7.5M test. Interest a company pays
+   an individual through an OJK-registered lending platform is PPh 23 at 15% of the gross,
+   withheld by the platform and credited in the annual return — not final, and not PPh 4(2)
+   (PMK 69/PMK.03/2022 Art. 3(2)(a), 3(3)(a) and 3(4)). There is no loan-interest row, so
+   this estimate cannot show that 15%. Do not book the receipt as cash `interest`. Book it
+   as `bonus_cash`: that still counts as income for performance, and it is not in
+   `TAXED_INCOME_TYPES`, so the row is left out of both tax tables rather than shown at 0%
+   or at 20%. The 15% stays the platform's withholding, which Pocket does not compute.
+2. **Stock dividend / bonus shares.** The shares are not cash income. The 0.1% applies only
+   when they are sold. Booking the receipt as `dividend` charges 10% that is not due. The
+   receipt is a `bonus` corporate action, recorded on the admin-gated Instrument event
+   recorder (`POST /corporate-actions`) — the manual form no longer offers a `bonus`
+   transaction. A `bonus` row that is already stored is not investment income either.
+3. **Reksa dana, IDX ETF, or DIRE booked as `equity`.** The sale picks up the 0.1%, and a
+   distribution booked as `dividend` picks up 10%. Class the instrument as `mutual_fund` or
+   `etf` (there is no DIRE class): the distribution is `fund_distribution` at 0%, and the
+   sale is not an IDX share sale.
+
 A cash row carries `cashSource: { type, currency }` — its own currency, since every amount is
 in the report currency — and is grouped per type and currency, so EUR and USD interest stay
 two rows. Its `symbol` is a readable English label (`"Cash interest · EUR"`) for API and MCP
@@ -547,6 +569,10 @@ regime only" caveat. **Keep that text in sync with this document** when the rule
   - Domestic dividends, reinvestment and self-payment (PMK 18/2021, PMK 81/2024):
     https://news.ddtc.co.id/berita/nasional/1817070/dividen-tak-diinvestasikan-sesuai-aturan-harus-setor-pph-ini-caranya
   - Foreign dividends: https://news.ddtc.co.id/berita/nasional/1802109/dividen-luar-negeri-juga-dikecualikan-dari-pph-begini-prosedurnya
+  - PMK 69/PMK.03/2022 Art. 3 (P2P / LPBBTI interest: PPh 23 at 15% of gross, withheld by the
+    OJK-registered platform, credited in the annual return, not final):
+    https://www.pajak.go.id/id/artikel/kepastian-hukum-bagi-investor-p2p-lending
+    and https://news.ddtc.co.id/berita/nasional/39093/potong-pajak-penghasilan-penyelenggara-p2p-lending-harus-tahu-ini
   - IDX sales tax reporting under PMK 81/2024:
     https://news.ddtc.co.id/berita/nasional/1807703/pmk-812024-perinci-ketentuan-bukti-potong-pph-atas-penjualan-saham
 - `packages/core/src/trade-log.ts` — `Trade.vorabByYear` / `TradeLeg.vorabCredit`

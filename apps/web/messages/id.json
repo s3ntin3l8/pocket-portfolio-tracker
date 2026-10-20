@@ -2247,7 +2247,7 @@
       "crypto": {
         "line": "Pajak penjualan kripto {tax} atas {proceeds} nilai jual bruto. Final dan dipotong, bukan pajak saham 0,1%. Tarif mengikuti platform kripto portofolio: 0,21% dalam negeri atau 1% luar negeri sejak 1 Agustus 2025 (0,10% / 0,20% sejak 1 Mei 2022). Sebelum itu tidak diestimasi, dan penjualan rugi tetap dikenakan atas nilai jual."
       },
-      "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan pajak final per jenis atas pendapatan investasi. Pajak penjualan dan pajak bunga dipotong di sumber; pajak dividen disetor sendiri kecuali diinvestasikan kembali. Penghasilan luar negeri tidak dikenakan pajak final dan tidak termasuk estimasi ini. Tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",
+      "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan pajak final per jenis atas pendapatan investasi. Pajak penjualan dan pajak bunga dipotong di sumber; pajak dividen disetor sendiri kecuali diinvestasikan kembali. Penghasilan luar negeri tidak dikenakan pajak final dan tidak termasuk estimasi ini. Tidak ada kerugian untuk dipanen. Pinjaman peer-to-peer yang dicatat sebagai bunga bank, saham bonus yang dicatat sebagai dividen, atau reksa dana yang dicatat sebagai saham dikenai tarif seolah-olah memang demikian. Ini hanya perkiraan, bukan nasihat pajak.",
       "unavailable": "Rincian pajak Indonesia tidak tersedia."
     },
     "vorabpauschale": {
