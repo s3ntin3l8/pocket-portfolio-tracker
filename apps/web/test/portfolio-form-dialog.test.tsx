@@ -95,6 +95,7 @@ const baseInput = {
   documentRetention: false,
   taxAllowanceAnnual: null,
   country: null,
+  cryptoTaxVenue: null,
 };
 
 /**

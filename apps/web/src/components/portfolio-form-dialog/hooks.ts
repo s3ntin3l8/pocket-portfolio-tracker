@@ -170,6 +170,15 @@ export function usePortfolioForm(
         setAccountHolderId(createdHolder.id);
       }
       const fsaTrimmed = taxAllowanceAnnual.trim();
+      // Annotated before the object literal: a nested ternary written
+      // straight into it widens to `string | null`, which is not the
+      // venue union the API accepts.
+      const venue: Portfolio["cryptoTaxVenue"] =
+        cryptoTaxVenue === "foreign"
+          ? "foreign"
+          : cryptoTaxVenue === "domestic"
+            ? "domestic"
+            : null;
       const input = {
         name: trimmed,
         baseCurrency: currency,
@@ -182,12 +191,7 @@ export function usePortfolioForm(
         documentRetention,
         taxAllowanceAnnual: fsaTrimmed !== "" ? fsaTrimmed : null,
         country: country || null,
-        cryptoTaxVenue:
-          cryptoTaxVenue === "foreign"
-            ? "foreign"
-            : cryptoTaxVenue === "domestic"
-              ? "domestic"
-              : null,
+        cryptoTaxVenue: venue,
       };
       if (mode === "edit" && portfolio) {
         await api.updatePortfolio(portfolio.id, input);
