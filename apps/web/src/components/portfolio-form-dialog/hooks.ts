@@ -183,7 +183,11 @@ export function usePortfolioForm(
         taxAllowanceAnnual: fsaTrimmed !== "" ? fsaTrimmed : null,
         country: country || null,
         cryptoTaxVenue:
-          cryptoTaxVenue === "domestic" || cryptoTaxVenue === "foreign" ? cryptoTaxVenue : null,
+          cryptoTaxVenue === "foreign"
+            ? "foreign"
+            : cryptoTaxVenue === "domestic"
+              ? "domestic"
+              : null,
       };
       if (mode === "edit" && portfolio) {
         await api.updatePortfolio(portfolio.id, input);
