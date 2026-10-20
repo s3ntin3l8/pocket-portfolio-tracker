@@ -680,6 +680,13 @@
       "when": 1792526113358,
       "tag": "0096_crypto_tax_venue",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792532000000,
+      "tag": "0097_id_reinvested",
+      "breakpoints": true
     }
   ]
 }

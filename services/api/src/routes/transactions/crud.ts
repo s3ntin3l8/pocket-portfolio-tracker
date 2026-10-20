@@ -71,6 +71,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
               kind: input.kind ?? null,
               loanId: input.loanId ?? null,
               installmentN: input.loanId ? (input.installmentN ?? null) : null,
+              idReinvested: input.idReinvested ?? false,
             })
             .returning();
           return row!;
@@ -223,6 +224,7 @@ export function registerCrudRoutes(app: FastifyInstance) {
               kind: input.kind ?? null,
               loanId,
               installmentN,
+              idReinvested: input.idReinvested ?? false,
             })
             .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
             .returning();

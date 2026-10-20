@@ -5,6 +5,7 @@ import {
   text,
   numeric,
   smallint,
+  boolean,
   jsonb,
   timestamp,
   index,
@@ -61,6 +62,12 @@ export const transactions = pgTable(
      */
     installmentN: smallint("installment_n"),
     externalId: text("external_id"),
+    /**
+     * Attestation only (PMK 18/2021): this dividend was reinvested in Indonesia for at
+     * least three tax years. Default false. The Indonesian estimate honours it only on a
+     * domestic dividend. The end-of-March deadline is not stored.
+     */
+    idReinvested: boolean("id_reinvested").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

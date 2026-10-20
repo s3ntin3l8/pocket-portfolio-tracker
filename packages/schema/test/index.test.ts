@@ -187,6 +187,27 @@ describe("transactionInputSchema", () => {
     expect(withoutKind.kind).toBeUndefined();
   });
 
+  it("accepts an attested reinvestment flag and leaves it unset when omitted", () => {
+    const flagged = transactionInputSchema.parse({
+      portfolioId: UUID,
+      type: "dividend",
+      price: "1000",
+      currency: "IDR",
+      executedAt: "2026-04-01T00:00:00.000Z",
+      idReinvested: true,
+    });
+    expect(flagged.idReinvested).toBe(true);
+    const omitted = transactionInputSchema.parse({
+      portfolioId: UUID,
+      type: "buy",
+      price: "1",
+      quantity: "1",
+      currency: "IDR",
+      executedAt: "2026-04-01T00:00:00.000Z",
+    });
+    expect(omitted.idReinvested).toBeUndefined();
+  });
+
   it("accepts kind: null", () => {
     const tx = transactionInputSchema.parse({
       portfolioId: UUID,

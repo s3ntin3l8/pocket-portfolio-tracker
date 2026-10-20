@@ -18,7 +18,9 @@
  *   - Investment income, classified per transaction by {@link classifyIdIncome}:
  *       domestic_dividend  10% final of gross, paid by the investor by the 15th of the
  *                          following month (nothing is withheld for a resident individual);
- *                          EXEMPT if reinvested in Indonesia for at least 3 tax years.
+ *                          EXEMPT (`reinvested`) when the caller attests
+ *                          {@link IdIncomeInput.reinvested}. Not inferred from a later
+ *                          buy. A flag on any other category is ignored.
  *                          UU PPh Art. 4(3)(f) and 17(2c) as amended by UU HPP 7/2021;
  *                          PMK 18/PMK.03/2021; PMK 81/2024 Art. 370–374.
  *       bond_interest      10% final of gross interest for the holding period (government
@@ -332,7 +334,7 @@ export interface IdCashIncomeSource {
 }
 
 /** Why a row of income carries no tax although its category has a rate. */
-export type IdIncomeExemption = "small_balance" | "negative_discount";
+export type IdIncomeExemption = "small_balance" | "negative_discount" | "reinvested";
 
 /** One income transaction, already in the report's currency. */
 export interface IdIncomeInput {
@@ -350,6 +352,10 @@ export interface IdIncomeInput {
   gross: string;
   /** Withholding recorded on the transaction ("0" when none). */
   recordedTax: string;
+  /** Set when the user attests that this dividend was reinvested in Indonesia for at
+   *  least 3 tax years (PMK 18/2021). Honoured only for `domestic_dividend`. Not inferred
+   *  from a later buy. The end-of-March deadline is not checked. */
+  reinvested?: boolean;
   /** Sale date (YYYY-MM-DD) of a bond discount. Selects the 15% → 10% cutover. */
   on?: string;
   /** Bank interest only: the paying portfolio's whole cash balance (every currency) in IDR
@@ -375,6 +381,8 @@ export interface IdIncomeTax {
    *  `"small_balance"`: bank interest on a balance ≤ {@link ID_DEPOSIT_EXEMPT_BALANCE_IDR}.
    *  `"negative_discount"`: a bond sold below clean cost. Not a refund of coupons
    *  (PP 91/2021 Art. 2(4) is not computed). The negative amount is shown; tax is zero.
+   *  `"reinvested"`: a domestic dividend attested as reinvested in Indonesia for at
+   *  least 3 tax years. Gross still counts; the row is not tax to self-pay.
    *  Exempt rows count in the gross totals but add nothing to the tax. null otherwise. */
   exemption: IdIncomeExemption | null;
   gross: string;
@@ -601,6 +609,11 @@ function incomeRowTax(r: IdIncomeInput): {
   exemption: IdIncomeExemption | null;
 } | null {
   if (idIncomeTaxRate(r.category) === null) return null;
+  // Attested, not inferred. Only a domestic dividend: the same flag on a coupon, a fund
+  // distribution or a foreign dividend changes nothing.
+  if (r.category === "domestic_dividend" && r.reinvested) {
+    return { tax: ZERO, basis: null, exemption: "reinvested" };
+  }
   const recorded = D(r.recordedTax);
   // A withholding the bank recorded wins over the approximation: the bank knows the
   // customer's whole balance with it, Pocket only this portfolio's.

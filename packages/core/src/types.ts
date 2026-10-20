@@ -75,6 +75,10 @@ export interface CoreTransaction {
   // interest). Informational — used by the trade log to surface tax-by-year; the
   // cash effect lives in `price`. null/undefined when not applicable.
   tax?: string | null;
+  // Attestation (PMK 18/2021) that a dividend was reinvested in Indonesia for at least
+  // 3 tax years. Read only by the Indonesian domestic-dividend exemption. Undefined is
+  // not attested, and it is never inferred from a later buy.
+  idReinvested?: boolean;
   // Groups executions of the same broker savings plan (Sparplan). Written by the TR
   // importer; used only by sparplan detection. null/undefined for non-plan rows.
   savingsPlanId?: string | null;

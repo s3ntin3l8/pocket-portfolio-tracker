@@ -1706,6 +1706,8 @@
       "submitting": "Saving…",
       "error": "Couldn't save the transaction. Check the fields and try again.",
       "tax": "Tax withheld",
+      "idReinvested": "Reinvested in Indonesia for at least 3 tax years",
+      "idReinvestedHint": "Due by the end of March of the following year. Pocket does not track that deadline.",
       "fxRate": "FX Rate override",
       "fxRatePlaceholder": "e.g. 15500",
       "shares": "Shares",
@@ -2216,7 +2218,8 @@
       },
       "exemption": {
         "small_balance": "exempt (balance ≤ Rp7.5M)",
-        "negative_discount": "below cost (does not offset coupons)"
+        "negative_discount": "below cost (does not offset coupons)",
+        "reinvested": "reinvested for at least 3 tax years"
       },
       "notes": {
         "domestic_dividend": "Dividends from Indonesian companies: 10% final, which you pay yourself by the 15th of the following month. Exempt if you reinvest them in Indonesia for at least 3 years.",

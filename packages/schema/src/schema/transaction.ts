@@ -27,6 +27,10 @@ export const transactionInputSchema = z
     // installments). `undefined` leaves a stored link unchanged on PATCH; `null` unlinks.
     loanId: z.guid().nullable().optional(),
     installmentN: z.number().int().positive().nullable().optional(),
+    // Attestation that a dividend was reinvested in Indonesia for at least 3 tax years.
+    // Omitted leaves it unset on the input; the route stores false. Ignored unless the
+    // row is a domestic dividend.
+    idReinvested: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.type !== "loan_repayment" && (v.loanId != null || v.installmentN != null)) {

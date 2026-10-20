@@ -42,6 +42,7 @@ function toInitial(tx: TxRow): AddTransactionInitial {
     externalId: tx.externalId,
     loanId: tx.loanId,
     installmentN: tx.installmentN,
+    idReinvested: tx.idReinvested,
   };
 }
 

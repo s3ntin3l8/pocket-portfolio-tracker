@@ -76,6 +76,7 @@ export default async function EditTransactionPage({
           externalId: tx.externalId,
           loanId: tx.loanId,
           installmentN: tx.installmentN,
+          idReinvested: tx.idReinvested,
         }}
       />
     </div>

@@ -576,9 +576,10 @@ export interface IdIncomeRow {
   /** `"small_balance"`: Indonesian bank interest exempt because its portfolio's cash
    *  balance (all currencies, in IDR) was at most Rp7,500,000 just before the payment —
    *  one portfolio treated as one bank. `"negative_discount"`: a bond or sukuk sold
-   *  below clean cost; shown, but it does not reduce coupons already booked. Counts in
-   *  the gross, adds no tax. null otherwise. */
-  exemption: "small_balance" | "negative_discount" | null;
+   *  below clean cost; shown, but it does not reduce coupons already booked.
+   *  `"reinvested"`: a domestic dividend attested as reinvested in Indonesia for at
+   *  least 3 tax years. Counts in the gross, adds no tax. null otherwise. */
+  exemption: "small_balance" | "negative_discount" | "reinvested" | null;
   gross: string;
   /** Indonesian final tax; null for foreign income. */
   tax: string | null;
@@ -1028,6 +1029,8 @@ export interface Transaction {
   /** The cicilan loan a `loan_repayment` belongs to, and the schedule installment it settles. */
   loanId?: string | null;
   installmentN?: number | null;
+  /** Attested reinvestment of a dividend (PMK 18/2021). False unless the user set it. */
+  idReinvested?: boolean;
   instrument: InstrumentMeta | null;
   /** True when the parent import has a retained source document available for download (#231). */
   hasDocument: boolean;

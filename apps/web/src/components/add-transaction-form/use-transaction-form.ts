@@ -72,6 +72,8 @@ export interface AddTransactionInitial {
   /** The cicilan loan / schedule installment a `loan_repayment` is linked to. */
   loanId?: string | null;
   installmentN?: number | null;
+  /** Attested reinvestment of a dividend. Absent is not attested. */
+  idReinvested?: boolean;
 }
 
 /** An installment/payoff booked by the schedule itself — its link to the loan is fixed. */
@@ -125,6 +127,7 @@ export function useTransactionForm({
   const [grossNative, setGrossNative] = useState(() => initial?.grossNative ?? "");
   const [description, setDescription] = useState(() => initial?.description ?? "");
   const [tags, setTags] = useState(() => initial?.tags?.join(", ") ?? "");
+  const [idReinvested, setIdReinvested] = useState(() => initial?.idReinvested ?? false);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Instrument[]>([]);
@@ -438,6 +441,9 @@ export function useTransactionForm({
         ...(isLoanRepaymentType
           ? { loanId: loanId || null, installmentN: loanId ? installmentN : null }
           : {}),
+        // Only a dividend can be the attested reinvestment. Any other type stores false,
+        // including a dividend edited into a coupon.
+        idReinvested: type === "dividend" && idReinvested,
       };
       if (transactionId) {
         await client.updateTransaction(portfolioId, transactionId, payload);
@@ -501,6 +507,8 @@ export function useTransactionForm({
     setDescription,
     tags,
     setTags,
+    idReinvested,
+    setIdReinvested,
     query,
     results,
     discovered,

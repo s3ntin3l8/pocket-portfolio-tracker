@@ -270,7 +270,8 @@ and the rate depends on the type and the source of the income:
 
 `estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
 `taxWithheldAtSource` (share sales, crypto sales, bond interest, bond discount and bank
-interest: the payer already withheld it) and `taxToSelfPay` (domestic dividends). The Tax page
+interest: the payer already withheld it) and `taxToSelfPay` (domestic dividends that are not
+attested as reinvested). The Tax page
 shows both in the hero card and labels each income row "withheld at source" or "you pay", so
 withheld tax doesn't read as tax still owed.
 
@@ -341,13 +342,23 @@ the sale side.
   do not make a sale an IDX share sale. The 0.1% stays `market === "IDX"` and
   `assetClass === "equity"`.
 
+**A reinvested domestic dividend (attested):**
+
+- UU PPh Art. 4(3)(f) / PMK 18/2021: a domestic dividend received by a resident individual
+  is exempt from the 10% if it is reinvested in Indonesia for at least three tax years. The
+  investment is due by the end of March of the following year (PMK 18/2021 Art. 36).
+- Pocket cannot see the reinvestment, and it does not infer one from a later buy. A dividend
+  can be attested with `transactions.idReinvested` (default false). When the row is a
+  `domestic_dividend` and the flag is set, tax is zero, `exemption` is `reinvested`, the
+  gross still counts as income, and the row leaves `taxToSelfPay`. Clearing the flag
+  restores the 10%. The deadline is not stored.
+- The flag does nothing for a foreign dividend, a coupon, or a fund distribution.
+
 **Exemptions not modelled, stated as notes instead:**
 
-- **Dividends reinvested in Indonesia for at least 3 tax years are exempt** (Art. 4(3)(f);
-  the investment is due by the end of March of the following year, PMK 18/2021 Art. 36).
-  Pocket can't tell whether the user reinvested, so the 10% is shown with that note.
 - **Foreign dividends reinvested in Indonesia** can be exempt to the amount reinvested
-  (PMK 18/2021). Foreign income stays out of the estimate either way.
+  (PMK 18/2021). That reduction is not computed. Foreign income stays out of the estimate
+  either way.
 
 ### The Rp7.5M bank-interest exemption (approximated)
 
