@@ -268,8 +268,8 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         const sellQty = Decimal.min(q, avgQty);
         // Fee-net, instrument currency. Performance (gain, XIRR) only.
         const proceeds = sellQty.mul(p).sub(f);
-        // Statutory sale value: consumed quantity × price, fees excluded. The ID 0.1%
-        // is levied on this, not on `proceeds`.
+        // Statutory sale value: consumed quantity × price, fees excluded. Converted
+        // with costCcy, the same currency as fee-net `proceeds` (not tx.currency).
         const gross = sellQty.mul(p);
         // A withholding recorded on the sell covers the whole order. Scale it to the
         // quantity this trade log actually disposed (an oversell is not a disposal).

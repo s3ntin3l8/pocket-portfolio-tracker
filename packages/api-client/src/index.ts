@@ -479,6 +479,7 @@ export interface IndonesianFinalTax {
   disposals: {
     symbol: string;
     when: string;
+    /** Gross sale value (quantity × price, fees excluded). Not the fee-net figure used for gain. */
     proceeds: string;
     tax: string;
     /** "recorded" when every sell in the row carried a withholding, "estimated" when

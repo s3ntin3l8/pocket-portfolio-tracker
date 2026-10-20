@@ -89,6 +89,7 @@ export interface IdDisposalLot {
 export interface IdDisposalInput {
   symbol: string;
   when: string; // YYYY-MM-DD
+  /** Gross sale value (quantity × price, fees excluded). Not the fee-net figure used for gain. */
   proceeds: string;
   /** The underlying instrument's stable id. Optional for backward compatibility (older
    *  callers that don't pass it fall back to `symbol` for row identity in the UI). The

@@ -84,6 +84,27 @@ describe("computeTrades — gross sale value (ID sales tax)", () => {
     expect(trades[0].legs[0].grossProceeds).toBe("110");
   });
 
+  it("treats a zero or blank withholding as not recorded, not as an exemption", () => {
+    for (const tax of ["0", ""]) {
+      const txns = [
+        tx({ type: "buy", quantity: "10", price: "100", executedAt: new Date("2021-01-01") }),
+        tx({
+          type: "sell",
+          quantity: "10",
+          price: "150",
+          fees: "15",
+          tax,
+          executedAt: new Date("2021-06-01"),
+        }),
+      ];
+      const leg = run(txns).trades[0].legs[0];
+      // The 0.1% base stays the gross. A zero must not be stored as a recorded tax.
+      expect(leg.grossProceeds).toBe("1500");
+      expect(leg.proceeds).toBe("1485");
+      expect(leg.recordedSalesTax).toBeUndefined();
+    }
+  });
+
   it("splits the gross sale value across FIFO slices and converts it with proceeds", () => {
     const txns = [
       tx({ type: "buy", quantity: "6", price: "100", executedAt: new Date("2021-01-01") }),
