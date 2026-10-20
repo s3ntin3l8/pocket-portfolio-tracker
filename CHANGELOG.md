@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.4...v0.2.5) (2026-10-20)
+
+
+### Features
+
+* **tax-id:** attested exemption for reinvested domestic dividends ([#1080](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1080)) ([3b53bd5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3b53bd5406633b4e05aa29af87adbe7fc3e26da2))
+* **tax-id:** crypto sales tax by venue ([#1079](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1079)) ([aed2017](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/aed2017fc28f9f38d073b13329231ba740e93d29))
+* **tax-id:** final tax on Indonesian bond and sukuk discount ([#1078](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1078)) ([85c907a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/85c907a07918dbbee864a00e1e204960abe2534d))
+
+
+### Bug Fixes
+
+* **tax-id:** levy the 0.1% on gross IDX sale proceeds ([#1076](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1076)) ([274262d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/274262d93f29e22f249ed784b827e5d3ed7269ce))
+
 ## [0.2.4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.3...v0.2.4) (2026-10-19)
 
 
