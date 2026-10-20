@@ -1706,6 +1706,8 @@
       "submitting": "Menyimpan…",
       "error": "Tidak dapat menyimpan transaksi. Periksa kolom dan coba lagi.",
       "tax": "Pajak ditahan",
+      "idReinvested": "Diinvestasikan kembali di Indonesia paling sedikit 3 tahun pajak",
+      "idReinvestedHint": "Paling lambat akhir Maret tahun berikutnya. Pocket tidak mencatat batas waktu itu.",
       "fxRate": "Kurs manual",
       "fxRatePlaceholder": "mis. 15500",
       "shares": "Jumlah lembar",
@@ -2216,7 +2218,8 @@
       },
       "exemption": {
         "small_balance": "dikecualikan (saldo ≤ Rp7,5 juta)",
-        "negative_discount": "di bawah harga perolehan (tidak mengurangi kupon)"
+        "negative_discount": "di bawah harga perolehan (tidak mengurangi kupon)",
+        "reinvested": "diinvestasikan kembali paling sedikit 3 tahun pajak"
       },
       "notes": {
         "domestic_dividend": "Dividen dari perusahaan Indonesia: final 10%, disetor sendiri paling lambat tanggal 15 bulan berikutnya. Dikecualikan jika diinvestasikan kembali di Indonesia paling sedikit 3 tahun.",

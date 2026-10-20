@@ -18,6 +18,7 @@ export function txRowToCore(r: TxRow): CoreTransaction {
     installmentN: r.installmentN,
     kind: r.kind,
     tax: r.tax,
+    idReinvested: r.idReinvested,
     savingsPlanId: r.savingsPlanId,
     status: r.status,
     source: r.source,

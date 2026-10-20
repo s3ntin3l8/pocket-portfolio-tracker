@@ -1616,4 +1616,125 @@ describe("Indonesian crypto sales tax by venue", () => {
     expect(id.cryptoDisposals[0]).toMatchObject({ tax: "50.00", taxBasis: "recorded" });
     expect(id.estimatedTax).toBe("50.00");
   });
+
+  it("exempts an attested reinvested domestic dividend and ignores the flag elsewhere", async () => {
+    const t = await token("tax-id-reinvested");
+    const mk = async (
+      symbol: string,
+      market: string,
+      assetClass: "equity" | "bond" | "mutual_fund",
+    ) => {
+      const [row] = await app.db
+        .insert(instruments)
+        .values({ symbol, market, assetClass, currency: "IDR", name: symbol })
+        .returning();
+      return row!;
+    };
+    const idx = await mk("IDX-REINV", "IDX", "equity");
+    const bond = await mk("ORI-REINV", "IDX", "bond");
+    const fund = await mk("RD-REINV", "IDX", "mutual_fund");
+    const us = await mk("US-REINV", "US", "equity");
+    const portfolioId = await createPortfolio(t, { baseCurrency: "IDR", country: "ID" });
+    await setTaxRegime(t, "ID");
+    const headers = auth(t);
+    const income = (payload: Record<string, unknown>) =>
+      seedTransaction(app, portfolioId, headers, {
+        quantity: "0",
+        currency: "IDR",
+        executedAt: "2025-04-10T00:00:00.000Z",
+        ...payload,
+      });
+
+    const flagged = await income({
+      type: "dividend",
+      instrumentId: idx.id,
+      price: "1000000",
+      idReinvested: true,
+    });
+    await income({ type: "coupon", instrumentId: bond.id, price: "500000", idReinvested: true });
+    await income({ type: "dividend", instrumentId: fund.id, price: "300000", idReinvested: true });
+    await income({
+      type: "dividend",
+      instrumentId: us.id,
+      price: "100",
+      tax: "15",
+      idReinvested: true,
+    });
+
+    const before = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers,
+    });
+    expect(before.statusCode).toBe(200);
+    const id = before.json().indonesianFinalTax;
+    expect(id.income).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          symbol: "IDX-REINV",
+          category: "domestic_dividend",
+          exemption: "reinvested",
+          rate: "0",
+          gross: "1000000.00",
+          tax: "0.00",
+        }),
+        expect.objectContaining({
+          symbol: "ORI-REINV",
+          category: "bond_interest",
+          exemption: null,
+          tax: "50000.00",
+        }),
+        expect.objectContaining({
+          symbol: "RD-REINV",
+          category: "fund_distribution",
+          exemption: null,
+          tax: "0.00",
+        }),
+      ]),
+    );
+    expect(id.totalIncomeGross).toBe("1800000.00");
+    expect(id.totalIncomeTax).toBe("50000.00");
+    expect(id.taxToSelfPay).toBe("0.00");
+    expect(id.foreignIncomeGross).toBe("115.00");
+    expect(id.foreignTaxWithheld).toBe("15.00");
+    expect(id.income.find((r: { category: string }) => r.category === "foreign").exemption).toBe(
+      null,
+    );
+
+    const cleared = await app.inject({
+      method: "PATCH",
+      url: `/portfolios/${portfolioId}/transactions/${flagged.id}`,
+      headers,
+      payload: {
+        type: "dividend",
+        instrumentId: idx.id,
+        quantity: "0",
+        price: "1000000",
+        currency: "IDR",
+        executedAt: "2025-04-10T00:00:00.000Z",
+        idReinvested: false,
+      },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().idReinvested).toBe(false);
+
+    const after = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers,
+    });
+    const restored = after.json().indonesianFinalTax;
+    expect(restored.income).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          symbol: "IDX-REINV",
+          exemption: null,
+          rate: "0.10",
+          tax: "100000.00",
+        }),
+      ]),
+    );
+    expect(restored.taxToSelfPay).toBe("100000.00");
+    expect(restored.totalIncomeGross).toBe("1800000.00");
+  });
 });

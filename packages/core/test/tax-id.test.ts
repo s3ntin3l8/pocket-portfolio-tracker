@@ -1092,3 +1092,86 @@ describe("crypto sales tax by venue", () => {
     expect(result.byYear[0]).toMatchObject({ tax: "3100.00" });
   });
 });
+
+describe("reinvested domestic dividends", () => {
+  it("zeroes the tax, keeps the gross, and leaves taxToSelfPay", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [
+        row({
+          symbol: "BBCA",
+          category: "domestic_dividend",
+          gross: "1000000",
+          reinvested: true,
+        }),
+        row({ symbol: "BBCA", category: "domestic_dividend", gross: "200000" }),
+      ],
+    });
+    expect(result.income).toEqual([
+      expect.objectContaining({
+        symbol: "BBCA",
+        category: "domestic_dividend",
+        exemption: "reinvested",
+        rate: "0",
+        gross: "1000000.00",
+        tax: "0.00",
+        net: "1000000.00",
+        withheldAtSource: false,
+        taxBasis: null,
+      }),
+      expect.objectContaining({
+        exemption: null,
+        rate: "0.10",
+        gross: "200000.00",
+        tax: "20000.00",
+        taxBasis: "estimated",
+      }),
+    ]);
+    expect(result.totalIncomeGross).toBe("1200000.00");
+    expect(result.totalIncomeTax).toBe("20000.00");
+    expect(result.taxToSelfPay).toBe("20000.00");
+    expect(result.estimatedTax).toBe("20000.00");
+    expect(result.incomeByCategory.find((c) => c.category === "domestic_dividend")).toMatchObject({
+      rate: "0.10",
+      gross: "1200000.00",
+      exemptGross: "1000000.00",
+      tax: "20000.00",
+    });
+    expect(result.byYear[0]).toMatchObject({ year: 2026, income: "1200000.00", tax: "20000.00" });
+  });
+
+  it("does nothing for a foreign dividend, a coupon, or a fund distribution", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      income: [
+        row({
+          symbol: "AAPL",
+          category: "foreign",
+          gross: "100",
+          recordedTax: "15",
+          reinvested: true,
+        }),
+        row({ symbol: "ORI", category: "bond_interest", gross: "500000", reinvested: true }),
+        row({ symbol: "RD", category: "fund_distribution", gross: "300000", reinvested: true }),
+      ],
+    });
+    expect(result.income.find((r) => r.category === "foreign")).toMatchObject({
+      exemption: null,
+      tax: null,
+    });
+    expect(result.foreignIncomeGross).toBe("100.00");
+    expect(result.foreignTaxWithheld).toBe("15.00");
+    expect(result.income.find((r) => r.category === "bond_interest")).toMatchObject({
+      exemption: null,
+      rate: "0.10",
+      tax: "50000.00",
+    });
+    expect(result.income.find((r) => r.category === "fund_distribution")).toMatchObject({
+      exemption: null,
+      rate: "0",
+      tax: "0.00",
+    });
+    expect(result.estimatedTax).toBe("50000.00");
+    expect(result.taxToSelfPay).toBe("0.00");
+  });
+});

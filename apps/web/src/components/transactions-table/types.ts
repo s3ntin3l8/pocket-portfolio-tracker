@@ -115,6 +115,7 @@ export interface TxRow {
   /** The cicilan loan a loan_repayment belongs to, and the installment it settles. */
   loanId?: string | null;
   installmentN?: number | null;
+  idReinvested?: boolean;
   instrument: {
     symbol?: string | null;
     name?: string | null;

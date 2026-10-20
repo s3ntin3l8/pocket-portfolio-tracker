@@ -653,6 +653,7 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
         year: t.executedAt.getUTCFullYear(),
         gross: net.add(recordedTax).toFixed(2),
         recordedTax: recordedTax.toFixed(2),
+        ...(t.idReinvested ? { reinvested: true } : {}),
         // Bank interest: its portfolio's whole cash balance in IDR when it was credited,
         // which decides the Rp7.5M exemption (one portfolio = one bank).
         ...(input.depositFxAt && balancesAt?.has(t)

@@ -516,6 +516,37 @@ describe("AddTransactionForm", () => {
         quantity: "0",
         fees: "0",
         price: "37500",
+        idReinvested: false,
+      }),
+    );
+    expect(screen.queryByRole("checkbox", { name: m.idReinvested })).toBeNull();
+  });
+
+  it("attests a dividend as reinvested in Indonesia", async () => {
+    const client = makeClient();
+    renderForm(client);
+
+    selectBucket(messages.Manage.tx.bucketIncome);
+    expect(screen.getByRole("checkbox", { name: m.idReinvested })).toBeInTheDocument();
+    expect(screen.getByText(m.idReinvestedHint)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: m.idReinvested }));
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.netAmount), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-04-10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createTransaction).toHaveBeenCalled());
+    expect(client.createTransaction).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({
+        type: "dividend",
+        price: "1000000",
+        quantity: "0",
+        idReinvested: true,
       }),
     );
   });

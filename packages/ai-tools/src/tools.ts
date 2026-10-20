@@ -345,7 +345,7 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       "Tax summary for a tax year (German regime: Sparerpauschbetrag/FSA; Indonesian final tax under the ID regime). Fails if a depot has no FSA allocation configured. Covers realized gains, Freistellungsauftrag (FSA) usage and headroom, " +
       "loss pots and estimated tax. One portfolio, or all grouped by holder. Not tax advice. " +
       "Under the ID regime `indonesianFinalTax` taxes each income row at its own final rate (`income[].category`): " +
-      "Indonesian dividends 10% (paid by the user, exempt if reinvested in Indonesia for 3 years), bond interest 10% and " +
+      'Indonesian dividends 10% (paid by the user; `income[].exemption: "reinvested"` when the dividend is attested as reinvested in Indonesia for 3 years, tax 0, still in the gross, not in taxToSelfPay), bond interest 10% and ' +
       "bond/sukuk discount 10% of the clean-price difference (15% on a sale before 30 Aug 2021; a sale below cost is " +
       '`income[].exemption: "negative_discount"` and does not refund coupons) and ' +
       "bank interest 20% from a bank in Indonesia, in any currency (interest, discount and bank interest withheld at source; cash interest follows the " +

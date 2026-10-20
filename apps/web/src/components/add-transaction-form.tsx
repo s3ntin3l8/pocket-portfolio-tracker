@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useId, useRef } from "react";
 
 import { TransactionSourcesSection } from "@/components/transaction-sources-section";
@@ -182,6 +183,22 @@ export function AddTransactionForm({
         t={form.t}
         isDesktop={isDesktop}
       />
+
+      {form.type === "dividend" && (
+        <div className="space-y-1">
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id={`${formId}-reinvested`}
+              checked={form.idReinvested}
+              onCheckedChange={(v) => form.setIdReinvested(v === true)}
+            />
+            <label htmlFor={`${formId}-reinvested`} className="text-sm leading-snug">
+              {form.t("idReinvested")}
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">{form.t("idReinvestedHint")}</p>
+        </div>
+      )}
 
       <DetailsFields
         currency={form.currency}
