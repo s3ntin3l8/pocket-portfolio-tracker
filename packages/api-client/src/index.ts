@@ -492,7 +492,24 @@ export interface IndonesianFinalTax {
     lots?: IdDisposalLot[];
   }[];
   totalProceeds: string;
+  /** 0.1% of IDX share sales. Crypto is `totalCryptoTax`, not this. */
   totalSalesTax: string;
+  /** Crypto sales in the selected year. Empty when the portfolio has no crypto venue. */
+  cryptoDisposals: {
+    symbol: string;
+    instrumentId?: string | null;
+    when: string;
+    /** Gross sale value, quantity × price, fees excluded. */
+    proceeds: string;
+    venue: "domestic" | "foreign";
+    /** Null only when a withholding was recorded on a date with no statutory rate. */
+    rate: string | null;
+    tax: string;
+    taxBasis: "recorded" | "estimated" | "mixed" | null;
+  }[];
+  totalCryptoProceeds: string;
+  /** Final crypto sales tax. Inside `estimatedTax` and `taxWithheldAtSource`. */
+  totalCryptoTax: string;
   /** The year's investment income, one row per (instrument, category). */
   income: IdIncomeRow[];
   /** The same income per category (only categories with income), in display order. */
@@ -506,9 +523,9 @@ export interface IndonesianFinalTax {
   foreignIncomeGross: string;
   /** Foreign tax recorded as withheld on that income (creditable). */
   foreignTaxWithheld: string;
-  /** Sales tax + final tax on the Indonesian income. */
+  /** Share sales tax + crypto sales tax + final tax on the Indonesian income. */
   estimatedTax: string;
-  /** The part of `estimatedTax` the payer withholds (sales, bond and bank interest). */
+  /** The part of `estimatedTax` the payer withholds (share sales, crypto sales, bond and bank interest). */
   taxWithheldAtSource: string;
   /** The part the investor pays (domestic dividends, unless reinvested ≥3 years). */
   taxToSelfPay: string;
@@ -658,6 +675,10 @@ export interface Portfolio {
    *  Indonesian tax regime it decides whether cash interest is domestic (20% final) or foreign
    *  income; unset falls back to the currency (IDR = domestic). */
   country: string | null;
+  /** Crypto platform for the Indonesian sales tax: "domestic", "foreign", or null.
+   *  Null uses the domestic rate only when `country` is ID; otherwise crypto sales are
+   *  not estimated. No per-sale override. */
+  cryptoTaxVenue: "domestic" | "foreign" | null;
   /** Number of transactions in the portfolio. Populated only by the list endpoint
    *  (GET /portfolios) — used by the delete-confirm UI; omitted on create/edit responses. */
   transactionCount?: number;

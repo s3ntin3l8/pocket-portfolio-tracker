@@ -13,6 +13,7 @@ import type {
   IdDisposalInput,
   IdIncomeInput,
   IdIncomeTaxBasis,
+  IdCryptoDisposalInput,
   IdYearInput,
 } from "@portfolio/core";
 import {
@@ -24,6 +25,7 @@ import {
   indonesianFinalTax,
   classifyIdIncome,
   isIndonesianInstrument,
+  idCryptoVenue,
   excludeMissingFx,
   defaultPartialExemptionRate,
   idCashBalancesAtPayments,
@@ -437,6 +439,41 @@ function idBondDiscountRows(
   return rows;
 }
 
+/** Crypto sale rows (PMK 68/2022, PMK 50/2025). One per trade-log leg of a `crypto`
+ *  instrument, and only when the portfolio resolves to a venue. Gross is quantity ×
+ *  price. Not the 0.1% share tax. A date before 2022-05-01 with no recorded tax is
+ *  left for the core to drop. */
+function idCryptoDisposalInputs(
+  books: { tradeLog: TradeLog; cryptoTaxVenue: string | null; portfolioCountry: string | null }[],
+  metaById: Map<string, InstrumentMeta>,
+): IdCryptoDisposalInput[] {
+  const rows: IdCryptoDisposalInput[] = [];
+  for (const book of books) {
+    const venue = idCryptoVenue(book.cryptoTaxVenue, book.portfolioCountry);
+    if (!venue) continue;
+    for (const t of book.tradeLog.trades) {
+      const meta = metaById.get(t.instrumentId);
+      if (meta?.assetClass !== "crypto") continue;
+      for (const l of t.legs) {
+        const recordedRaw =
+          l.recordedSalesTax != null && l.recordedSalesTax !== ""
+            ? new Decimal(l.recordedSalesTax)
+            : null;
+        const recorded = recordedRaw != null && recordedRaw.gt(0) ? recordedRaw : null;
+        rows.push({
+          instrumentId: t.instrumentId,
+          symbol: meta.symbol || t.instrumentId.slice(0, 8),
+          when: l.sellDate,
+          proceeds: new Decimal(l.grossProceeds ?? l.proceeds).toFixed(2),
+          venue,
+          ...(recorded ? { tax: recorded.toFixed(2) } : {}),
+        });
+      }
+    }
+  }
+  return rows;
+}
+
 /**
  * Build the Indonesian final-tax payload from a (single) portfolio's trade log + raw core
  * transactions. Mirrors the web tier's per-holder assembly in `loadTaxYearDetail` so the
@@ -457,6 +494,8 @@ function idBondDiscountRows(
  * - A sale of an Indonesian bond or sukuk adds one `bond_discount` row per leg:
  *   clean sale value minus fee-excluded cost (PP 91/2021 Art. 2(3)). A par redemption
  *   adds nothing. This is not the 0.1% share tax.
+ * - Crypto sales are a separate final tax (`cryptoBooks`): gross quantity × price, rate by
+ *   the portfolio's venue and the sale date. They are not added to the 0.1% share total.
  * - `byYear` carries each year's gross sale value and the sales tax already decided per
  *   leg (recorded withholding, or 0.1% of that gross), plus that year's income.
  */
@@ -477,8 +516,15 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   /** Native-currency → displayCurrency conversion rates, keyed by the native currency.
    *  Obtained from `getFxRates(app.db, ccys, display)` in the calling route. */
   fxRates: Map<string, number>;
+  /** One book per portfolio. Crypto tax is decided here, before trade logs are merged,
+   *  because two portfolios can sell the same coin at different venues. */
+  cryptoBooks?: {
+    tradeLog: TradeLog;
+    cryptoTaxVenue: string | null;
+    portfolioCountry: string | null;
+  }[];
 }): IndonesianFinalTax {
-  const { tradeLog, incomeSources, year, metaById, displayCurrency, fxRates } = input;
+  const { tradeLog, incomeSources, year, metaById, displayCurrency, fxRates, cryptoBooks } = input;
   const ZERO = "0";
   const salesRate = new Decimal(ID_SALES_TAX_RATE);
 
@@ -653,5 +699,11 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     };
   });
 
-  return indonesianFinalTax({ year, disposals, income, byYear });
+  return indonesianFinalTax({
+    year,
+    disposals,
+    income,
+    byYear,
+    cryptoDisposals: idCryptoDisposalInputs(cryptoBooks ?? [], metaById),
+  });
 }

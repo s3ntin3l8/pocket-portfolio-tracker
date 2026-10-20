@@ -39,6 +39,7 @@ export function usePortfolioForm(
   const [documentRetention, setDocumentRetention] = useState(portfolio?.documentRetention ?? false);
   const [taxAllowanceAnnual, setTaxAllowanceAnnual] = useState(portfolio?.taxAllowanceAnnual ?? "");
   const [country, setCountry] = useState(portfolio?.country ?? "");
+  const [cryptoTaxVenue, setCryptoTaxVenue] = useState(portfolio?.cryptoTaxVenue ?? "");
   const [siblingPortfolios, setSiblingPortfolios] = useState<Portfolio[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -132,6 +133,7 @@ export function usePortfolioForm(
       setDocumentRetention(portfolio?.documentRetention ?? false);
       setTaxAllowanceAnnual(portfolio?.taxAllowanceAnnual ?? "");
       setCountry(portfolio?.country ?? "");
+      setCryptoTaxVenue(portfolio?.cryptoTaxVenue ?? "");
       setSiblingPortfolios([]);
       setError(false);
       setConfirmDelete(false);
@@ -180,6 +182,8 @@ export function usePortfolioForm(
         documentRetention,
         taxAllowanceAnnual: fsaTrimmed !== "" ? fsaTrimmed : null,
         country: country || null,
+        cryptoTaxVenue:
+          cryptoTaxVenue === "domestic" || cryptoTaxVenue === "foreign" ? cryptoTaxVenue : null,
       };
       if (mode === "edit" && portfolio) {
         await api.updatePortfolio(portfolio.id, input);
@@ -280,6 +284,8 @@ export function usePortfolioForm(
     setTaxAllowanceAnnual,
     country,
     setCountry,
+    cryptoTaxVenue,
+    setCryptoTaxVenue,
     siblingPortfolios,
     busy,
     error,

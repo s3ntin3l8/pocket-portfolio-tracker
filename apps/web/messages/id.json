@@ -712,6 +712,11 @@
     "country": "Negara",
     "countryNone": "Belum diatur",
     "countryHint": "Negara tempat rekening ini berada. Dalam rezim pajak Indonesia, bunga dari rekening di Indonesia dikenai pajak sebagai bunga bank Indonesia dalam mata uang apa pun; bunga dari rekening di luar negeri adalah penghasilan luar negeri. Jika belum diatur, bunga dalam rupiah dianggap dari Indonesia.",
+    "cryptoTaxVenue": "Platform kripto",
+    "cryptoTaxVenueNone": "Belum diatur",
+    "cryptoTaxVenueDomestic": "Dalam negeri (PAKD / PPMSE)",
+    "cryptoTaxVenueForeign": "Platform luar negeri",
+    "cryptoTaxVenueHint": "Tempat kripto di portofolio ini dijual, untuk pajak penjualan Indonesia. Jika belum diatur, mengikuti negara: Indonesia memakai tarif dalam negeri, negara lain tidak diestimasi. Satu pengaturan untuk seluruh portofolio, bukan per penjualan.",
     "birthYear": "Tahun lahir",
     "birthYearPlaceholder": "mis. 2017",
     "birthYearHint": "Digunakan untuk proyeksi tabungan.",
@@ -2235,6 +2240,9 @@
         "income": "Pendapatan investasi dalam negeri",
         "foreignIncome": "Penghasilan luar negeri",
         "tax": "Est. pajak"
+      },
+      "crypto": {
+        "line": "Pajak penjualan kripto {tax} atas {proceeds} nilai jual bruto. Final dan dipotong, bukan pajak saham 0,1%. Tarif mengikuti platform kripto portofolio: 0,21% dalam negeri atau 1% luar negeri sejak 1 Agustus 2025 (0,10% / 0,20% sejak 1 Mei 2022). Sebelum itu tidak diestimasi, dan penjualan rugi tetap dikenakan atas nilai jual."
       },
       "footnote": "Indonesia mengenakan pajak final 0,1% atas penjualan saham tercatat dan pajak final per jenis atas pendapatan investasi. Pajak penjualan dan pajak bunga dipotong di sumber; pajak dividen disetor sendiri kecuali diinvestasikan kembali. Penghasilan luar negeri tidak dikenakan pajak final dan tidak termasuk estimasi ini. Tidak ada kerugian untuk dipanen. Ini hanya perkiraan, bukan nasihat pajak.",
       "unavailable": "Rincian pajak Indonesia tidak tersedia."

@@ -1422,3 +1422,198 @@ describe("Indonesian bond and sukuk discount", () => {
     expect(id.estimatedTax).toBe("3000.00");
   });
 });
+
+describe("Indonesian crypto sales tax by venue", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  async function book(
+    sub: string,
+    opts: { country?: string | null; cryptoTaxVenue?: "domestic" | "foreign" | null } = {},
+  ) {
+    const t = await token(sub);
+    await setTaxRegime(t, "ID");
+    const portfolioId = await createPortfolio(t, {
+      baseCurrency: "IDR",
+      country: opts.country ?? null,
+      cryptoTaxVenue: opts.cryptoTaxVenue ?? null,
+    });
+    const [coin] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: `${sub}-BTC`,
+        market: "CCC",
+        assetClass: "crypto" as "equity",
+        currency: "IDR",
+        name: "Bitcoin",
+      })
+      .returning();
+    return { portfolioId, headers: auth(t), coin: coin! };
+  }
+
+  async function taxOf(headers: Record<string, string>, portfolioId: string, year: number) {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=${year}`,
+      headers,
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().indonesianFinalTax as {
+      disposals: unknown[];
+      totalSalesTax: string;
+      totalCryptoTax: string;
+      totalCryptoProceeds: string;
+      estimatedTax: string;
+      taxWithheldAtSource: string;
+      cryptoDisposals: {
+        rate: string | null;
+        tax: string;
+        venue: string;
+        taxBasis: string | null;
+      }[];
+    };
+  }
+
+  async function roundTrip(
+    headers: Record<string, string>,
+    portfolioId: string,
+    instrumentId: string,
+    sell: { price: string; at: string; fees?: string; tax?: string },
+    buyPrice = "1000000",
+  ) {
+    await seedTransaction(app, portfolioId, headers, {
+      type: "buy",
+      instrumentId,
+      quantity: "1",
+      price: buyPrice,
+      currency: "IDR",
+      executedAt: "2024-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, headers, {
+      type: "sell",
+      instrumentId,
+      quantity: "1",
+      price: sell.price,
+      currency: "IDR",
+      fees: sell.fees,
+      tax: sell.tax,
+      executedAt: sell.at,
+    });
+  }
+
+  it("taxes a domestic sale on 2025-08-01 at 0.21% of gross, not as a share sale", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-dom", {
+      cryptoTaxVenue: "domestic",
+    });
+    await roundTrip(headers, portfolioId, coin.id, {
+      price: "1000000",
+      at: "2025-08-01T00:00:00.000Z",
+      fees: "5000",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.disposals).toEqual([]);
+    expect(id.totalSalesTax).toBe("0.00");
+    expect(id.totalCryptoProceeds).toBe("1000000.00");
+    expect(id.totalCryptoTax).toBe("2100.00");
+    expect(id.cryptoDisposals[0]).toMatchObject({
+      rate: "0.0021",
+      venue: "domestic",
+      taxBasis: "estimated",
+    });
+    expect(id.estimatedTax).toBe("2100.00");
+    expect(id.taxWithheldAtSource).toBe("2100.00");
+  });
+
+  it("uses 0.10% on 2025-07-31", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-jul", {
+      cryptoTaxVenue: "domestic",
+    });
+    await roundTrip(headers, portfolioId, coin.id, {
+      price: "1000000",
+      at: "2025-07-31T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.totalCryptoTax).toBe("1000.00");
+    expect(id.cryptoDisposals[0]!.rate).toBe("0.001");
+  });
+
+  it("uses 1% for a foreign venue on 2025-08-01", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-for", {
+      country: "ID",
+      cryptoTaxVenue: "foreign",
+    });
+    await roundTrip(headers, portfolioId, coin.id, {
+      price: "1000000",
+      at: "2025-08-01T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.totalCryptoTax).toBe("10000.00");
+    expect(id.cryptoDisposals[0]).toMatchObject({ venue: "foreign", rate: "0.01" });
+    expect(id.totalSalesTax).toBe("0.00");
+  });
+
+  it("estimates nothing when the venue is unset and the country is not Indonesia", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-de", { country: "DE" });
+    await roundTrip(headers, portfolioId, coin.id, {
+      price: "1000000",
+      at: "2025-08-01T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.cryptoDisposals).toEqual([]);
+    expect(id.totalCryptoTax).toBe("0.00");
+    expect(id.estimatedTax).toBe("0.00");
+    expect(id.totalSalesTax).toBe("0.00");
+  });
+
+  it("treats an Indonesian portfolio with no venue as domestic", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-id", { country: "ID" });
+    await roundTrip(headers, portfolioId, coin.id, {
+      price: "1000000",
+      at: "2025-08-01T00:00:00.000Z",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.totalCryptoTax).toBe("2100.00");
+    expect(id.cryptoDisposals[0]!.venue).toBe("domestic");
+  });
+
+  it("taxes a losing sale on the gross proceeds", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-loss", {
+      cryptoTaxVenue: "domestic",
+    });
+    await roundTrip(
+      headers,
+      portfolioId,
+      coin.id,
+      { price: "1000000", at: "2025-08-01T00:00:00.000Z", fees: "5000" },
+      "2000000",
+    );
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.totalCryptoProceeds).toBe("1000000.00");
+    expect(id.totalCryptoTax).toBe("2100.00");
+  });
+
+  it("lets a withholding recorded on the sell win", async () => {
+    const { portfolioId, headers, coin } = await book("tax-id-crypto-rec", {
+      cryptoTaxVenue: "domestic",
+    });
+    await roundTrip(headers, portfolioId, coin.id, {
+      price: "1000000",
+      at: "2025-08-01T00:00:00.000Z",
+      tax: "50",
+    });
+    const id = await taxOf(headers, portfolioId, 2025);
+    expect(id.cryptoDisposals[0]).toMatchObject({ tax: "50.00", taxBasis: "recorded" });
+    expect(id.estimatedTax).toBe("50.00");
+  });
+});

@@ -17,6 +17,7 @@ export type EditablePortfolio = Pick<
   | "documentRetention"
   | "taxAllowanceAnnual"
   | "country"
+  | "cryptoTaxVenue"
   | "transactionCount"
 >;
 

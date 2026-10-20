@@ -31,6 +31,7 @@ export function PortfolioFormSections({
   iban,
   currency,
   country,
+  cryptoTaxVenue,
   taxAllowanceAnnual,
   showFsaHelper,
   fsaOverAllocated,
@@ -53,6 +54,7 @@ export function PortfolioFormSections({
   onIbanChange,
   onCurrencyChange,
   onCountryChange,
+  onCryptoTaxVenueChange,
   onTaxAllowanceChange,
   onCashCountedChange,
   onAllowNegativeCashChange,
@@ -72,6 +74,7 @@ export function PortfolioFormSections({
   iban: string;
   currency: string;
   country: string;
+  cryptoTaxVenue: string;
   taxAllowanceAnnual: string;
   showFsaHelper: boolean;
   fsaOverAllocated: boolean;
@@ -92,6 +95,7 @@ export function PortfolioFormSections({
   onIbanChange: (v: string) => void;
   onCurrencyChange: (v: string) => void;
   onCountryChange: (v: string) => void;
+  onCryptoTaxVenueChange: (v: string) => void;
   onTaxAllowanceChange: (v: string) => void;
   onCashCountedChange: (v: boolean) => void;
   onAllowNegativeCashChange: (v: boolean) => void;
@@ -236,6 +240,20 @@ export function PortfolioFormSections({
       </div>
 
       <CountrySelect id={`${uid}-country`} value={country} onChange={onCountryChange} />
+
+      <div className="space-y-1.5">
+        <Label htmlFor={`${uid}-crypto-venue`}>{t("cryptoTaxVenue")}</Label>
+        <Select
+          id={`${uid}-crypto-venue`}
+          value={cryptoTaxVenue}
+          onChange={(e) => onCryptoTaxVenueChange(e.target.value)}
+        >
+          <option value="">{t("cryptoTaxVenueNone")}</option>
+          <option value="domestic">{t("cryptoTaxVenueDomestic")}</option>
+          <option value="foreign">{t("cryptoTaxVenueForeign")}</option>
+        </Select>
+        <p className="text-xs text-muted-foreground">{t("cryptoTaxVenueHint")}</p>
+      </div>
 
       <div className="space-y-1.5">
         <Label htmlFor={`${uid}-fsa`}>{t("taxAllowanceAnnual")}</Label>

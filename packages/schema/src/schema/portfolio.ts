@@ -16,6 +16,8 @@ const portfolioFields = {
   /** Where the account is held (ISO 3166-1 alpha-2), or null when unset. Decides the
    *  Indonesian tax classification of cash interest (docs/tax.md). */
   country: countryCode.nullable(),
+  /** Crypto sale venue for the Indonesian final tax. Null follows `country`. */
+  cryptoTaxVenue: z.enum(["domestic", "foreign"]).nullable(),
 };
 
 export const portfolioInputSchema = z.object({
@@ -30,6 +32,7 @@ export const portfolioInputSchema = z.object({
   documentRetention: portfolioFields.documentRetention.default(false),
   taxAllowanceAnnual: portfolioFields.taxAllowanceAnnual.optional(),
   country: portfolioFields.country.optional(),
+  cryptoTaxVenue: portfolioFields.cryptoTaxVenue.optional(),
 });
 export type PortfolioInput = z.infer<typeof portfolioInputSchema>;
 
