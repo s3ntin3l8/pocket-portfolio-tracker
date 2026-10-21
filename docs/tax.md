@@ -275,8 +275,10 @@ attested as reinvested). The Tax page
 shows both in the hero card and labels each income row "withheld at source" or "you pay", so
 withheld tax doesn't read as tax still owed.
 
-The 0.1% is computed from the trade log's `grossProceeds` (consumed quantity × price, fees
-excluded), not from the fee-net `proceeds` used for gain and XIRR. An oversell is taxed only
+The 0.1% is computed from quantity × price (fees excluded): the trade log's
+`nativeGrossProceeds`, converted into the report currency at the **sale date**.
+`grossProceeds` is that same figure at the valuation rate and stays the performance
+number; the tax report does not re-rate it. An oversell is taxed only
 on the quantity actually held. A withholding recorded on the sell (`transactions.tax`) is the
 tax for that disposal, scaled by the same fraction; the 0.1% applies only when none is
 recorded. A zero there is not an exemption. A separate `tax` transaction is not added on top.
@@ -286,7 +288,8 @@ and is not part of `totalSalesTax`.
 ### Crypto sales (PMK 68/2022, PMK 50/2025)
 
 A sale of an instrument with `assetClass === "crypto"` can produce a `cryptoDisposals` row.
-The base is the trade log's `grossProceeds` (quantity × price, fees excluded). Gain is
+The base is quantity × price (fees excluded), converted at the sale date the same way as
+the 0.1%. Gain is
 ignored, so a sale below cost is still taxed. Buys are not taxed. The old PPN (0.11% /
 0.22%) is not modelled.
 
@@ -312,8 +315,9 @@ A sale or redemption of an Indonesian bond or sukuk can also produce a `bond_dis
 beside any coupons. The base is `(clean sale price − clean cost) × quantity`. Both prices
 are the transaction's `price` (per unit, not a percent of par — an ORI with face value
 1,000,000 bought at `1000000` is at par). Fees are excluded: the trade log's `cleanCost` is
-quantity × buy price, while `cost` still includes fees for gain and XIRR. `grossProceeds` is
-the sale side.
+quantity × buy price, while `cost` still includes fees for gain and XIRR. Sale value and
+clean cost both convert at the **sale date** (one rate). `grossProceeds` is
+the sale side at the valuation rate.
 
 - **Par adds nothing.** A redemption at the same clean price as the purchase (the demo
   ORI020) emits no discount row. Coupons on that bond are still taxed as `bond_interest`.
@@ -502,16 +506,19 @@ A discount uses the sale-date rate instead (see above) when nothing was recorded
 dividend is always `gross × 10%`: nothing is withheld for a resident individual, so a
 recorded tax there is not Indonesian tax. For foreign income the recorded withholding is
 reported as `foreignTaxWithheld` (the creditable amount). Gross is always net received +
-recorded withholding, converted to the report currency at today's rate.
+recorded withholding, converted to the report currency at the **payment date**'s rate.
+A missing rate drops that row and names the currency (`fxMissingCurrencies`); it is never
+counted 1:1.
 
 ### By year
 
 `byYear` rolls up every year: the sales tax already decided for that year (recorded
 withholding, or 0.1% of the gross sale value) plus each year's Indonesian income at its
 category's rate (`income`), with foreign income in its own column (`foreignIncome`) and not
-in `tax`. Coupons and the other income categories use today's rates and FX (a coupon's
-15% → 10% change of 2021 is not replayed unless the withholding is recorded). Bond discount
-is the exception: its rate follows the sale date. Like the German table, it is an estimate.
+in `tax`. Coupons and the other income categories keep today's statutory rate (a coupon's
+15% → 10% change of 2021 is not replayed unless the withholding is recorded); the amounts
+themselves convert at the payment date, and a sale at the sale date. Bond discount
+is the exception on the rate: its rate follows the sale date. Like the German table, it is an estimate.
 
 Realized gain (`IdYearInput.realized` / `IdDisposalLot.gain`) is carried through the output
 purely for display — it's informational, since ID final tax is never levied on gains.
