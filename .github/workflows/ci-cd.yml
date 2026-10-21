@@ -10,7 +10,7 @@ jobs:
   test-node:
     permissions:
       contents: read
-    uses: s3ntin3l8/.github/.github/workflows/ci-node.yml@625ef2e6a67ceb22b1b5e82bfc11dda6b68e1c20 # main @ 2026-10-21
+    uses: s3ntin3l8/.github/.github/workflows/ci-node.yml@8cbee823b2c24a947211641a99240c37f3055e74 # main @ 2026-10-21
     with:
       node-version: "26"
       # Root scripts fan out across all workspaces (Turbo for build/lint/typecheck,
@@ -28,9 +28,12 @@ jobs:
       test-shards: "4"
       turbo-cache: true
       strict-checks: true
-      # Only the files this push touched can have introduced a secret, and the
-      # baseline is keyed by filename and line number, so an unchanged file
-      # keeps its entry and the scan stays consistent.
+      # Only the files this push touched can have introduced a secret.
+      # detect-secrets matches a known secret by filename, hash and type -- not
+      # by line number -- so a secret that shifts lines is still recognised,
+      # and the hook rewrites the baseline's line number and fails the build
+      # until the baseline is refreshed. That is why a change to a baselined
+      # file needs the baseline refreshed in the same change.
       detect-secrets-scope: "changed"
     secrets: inherit
 
