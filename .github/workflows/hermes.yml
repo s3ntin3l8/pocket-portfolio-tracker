@@ -74,6 +74,12 @@ jobs:
     with:
       mode: auto # review on trigger, no @mention needed
       mention-trigger: s3ntin3l8-hermes
+      # Dispatch through Hermes' Runs API and poll the run to a terminal
+      # status: the check goes red when the review fails, instead of turning
+      # green the moment the request is accepted (which is how a saturated
+      # gateway used to read as "relayed"). The polling job holds its runner
+      # for the length of the review (minutes).
+      hermes-use-runs: true
     secrets: inherit # pragma: allowlist secret
 
   on-demand-review:
@@ -92,4 +98,10 @@ jobs:
     uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
       mention-trigger: s3ntin3l8-hermes # mode: on-demand is the reusable workflow's default
+      # Dispatch through Hermes' Runs API and poll the run to a terminal
+      # status: the check goes red when the review fails, instead of turning
+      # green the moment the request is accepted (which is how a saturated
+      # gateway used to read as "relayed"). The polling job holds its runner
+      # for the length of the review (minutes).
+      hermes-use-runs: true
     secrets: inherit # pragma: allowlist secret
