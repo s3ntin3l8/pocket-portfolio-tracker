@@ -514,8 +514,8 @@ export interface IndonesianFinalTax {
   totalCryptoProceeds: string;
   /** Final crypto sales tax. Inside `estimatedTax` and `taxWithheldAtSource`. */
   totalCryptoTax: string;
-  /** Gold-bar sales in the selected year. PPh 22, not a final tax. Absent on older payloads. */
-  goldDisposals?: {
+  /** Gold-bar sales in the selected year. PPh 22, not a final tax. */
+  goldDisposals: {
     symbol: string;
     instrumentId?: string | null;
     when: string;
@@ -526,9 +526,9 @@ export interface IndonesianFinalTax {
     taxBasis: "recorded" | "estimated";
   }[];
   /** Gross of `goldDisposals`. Not inside `estimatedTax`. */
-  totalGoldProceeds?: string;
+  totalGoldProceeds: string;
   /** PPh 22 on those sales. Not inside `estimatedTax`, `taxWithheldAtSource` or `taxToSelfPay`. */
-  totalGoldTax?: string;
+  totalGoldTax: string;
   /** The year's investment income, one row per (instrument, category). */
   income: IdIncomeRow[];
   /** The same income per category (only categories with income), in display order. */
