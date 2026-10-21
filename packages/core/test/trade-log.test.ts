@@ -51,6 +51,9 @@ describe("computeTrades — gross sale value (ID sales tax)", () => {
     expect(leg.proceeds).toBe("1485");
     expect(leg.grossProceeds).toBe("1500");
     expect(leg.recordedSalesTax).toBe("5");
+    expect(leg.nativeGrossProceeds).toBe("1500");
+    expect(leg.nativeRecordedSalesTax).toBe("5");
+    expect(leg.nativeCurrency).toBe("EUR");
     expect(leg.gain).toBe("485");
     expect(trades[0].realizedPnL).toBe("485");
   });
@@ -72,6 +75,8 @@ describe("computeTrades — gross sale value (ID sales tax)", () => {
     expect(leg.proceeds).toBe("400");
     expect(leg.grossProceeds).toBe("400");
     expect(leg.recordedSalesTax).toBe("4");
+    expect(leg.nativeGrossProceeds).toBe("400");
+    expect(leg.nativeRecordedSalesTax).toBe("4");
   });
 
   it("omits recordedSalesTax when the sell carries no withholding", () => {
@@ -102,6 +107,8 @@ describe("computeTrades — gross sale value (ID sales tax)", () => {
       expect(leg.grossProceeds).toBe("1500");
       expect(leg.proceeds).toBe("1485");
       expect(leg.recordedSalesTax).toBeUndefined();
+      expect(leg.nativeGrossProceeds).toBe("1500");
+      expect(leg.nativeRecordedSalesTax).toBeUndefined();
     }
   });
 
@@ -124,6 +131,9 @@ describe("computeTrades — gross sale value (ID sales tax)", () => {
     // Fee-net 1490 split 6:4, then ×2. Gross is 900 and 600, then ×2.
     expect(legs.map((l) => l.proceeds)).toEqual(["1788", "1192"]);
     expect(legs.map((l) => l.grossProceeds)).toEqual(["1800", "1200"]);
+    // Native stays in the sell currency. The Indonesian report converts it later.
+    expect(legs.map((l) => l.nativeGrossProceeds)).toEqual(["900", "600"]);
+    expect(legs.every((l) => l.nativeCurrency === "EUR")).toBe(true);
     expect(legs.every((l) => l.recordedSalesTax === undefined)).toBe(true);
   });
 

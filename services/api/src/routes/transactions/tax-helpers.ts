@@ -22,6 +22,7 @@ import {
   projectDividends,
   convert,
   toDateKey,
+  tryConvert,
   indonesianFinalTax,
   classifyIdIncome,
   isIndonesianInstrument,
@@ -371,22 +372,106 @@ export async function loadIdDepositFx(
   return (at) => makeFxRateFn(ratesByDate.get(toDateKey(at)) ?? {}, "IDR");
 }
 
+/** FX into the report currency as of a payment or sale date. */
+export type IdTaxFxAt = (at: Date) => FxRateFn;
+
 /**
- * The 0.1% base for one trade-log leg. `grossProceeds` is quantity × price (fees
- * excluded); a leg from a fixture that predates the field falls back to fee-net
- * `proceeds`. A recorded withholding greater than zero wins. Zero is not an exemption.
+ * FX for the Indonesian report's own amounts: each income row, sale, bond discount,
+ * and crypto disposal converts at that row's date. The Rp7.5M test stays on
+ * {@link loadIdDepositFx}. Performance and the German income pool are not touched.
+ * A currency with no rate in the carry-forward window is omitted; {@link makeFxRateFn}
+ * records it and the row is left out, never counted 1:1.
  */
-function idLegSalesTax(
-  leg: { proceeds: string; grossProceeds?: string; recordedSalesTax?: string },
-  rate: Decimal,
-): { gross: Decimal; tax: Decimal; basis: "recorded" | "estimated" } {
-  const gross = new Decimal(leg.grossProceeds ?? leg.proceeds);
-  const recorded =
+export async function loadIdReportFx(
+  app: FastifyInstance,
+  sources: IdIncomeSource[],
+  logs: TradeLog[],
+  displayCurrency: string,
+  fxProvider?: FxProvider | null,
+): Promise<IdTaxFxAt> {
+  const currencies = new Set<string>();
+  const dates = new Set<string>();
+  for (const { coreTxns } of sources) {
+    for (const t of coreTxns) {
+      if (
+        t.type !== "dividend" &&
+        t.type !== "coupon" &&
+        t.type !== "interest" &&
+        t.type !== "sell"
+      ) {
+        continue;
+      }
+      if (t.currency !== displayCurrency) currencies.add(t.currency);
+      dates.add(toDateKey(t.executedAt));
+    }
+  }
+  for (const log of logs) {
+    for (const tr of log.trades) {
+      if (tr.currency !== displayCurrency) currencies.add(tr.currency);
+      for (const l of tr.legs) {
+        if (l.nativeCurrency && l.nativeCurrency !== displayCurrency)
+          currencies.add(l.nativeCurrency);
+        dates.add(l.sellDate);
+      }
+    }
+  }
+  // Include today so a book that only has a current rate (the valuation cache, and the
+  // tests that insert one row dated today) still converts earlier payments: getFxRatesForDates
+  // carries the earliest known rate back, but only across dates it was asked for, and it
+  // does not load a rate later than the latest of those dates.
+  if (dates.size > 0) dates.add(toDateKey(new Date()));
+  const ratesByDate =
+    dates.size === 0 || currencies.size === 0
+      ? new Map<string, Record<string, string>>()
+      : await getFxRatesForDates(app.db, [...currencies], displayCurrency, [...dates], fxProvider);
+  return (at) => makeFxRateFn(ratesByDate.get(toDateKey(at)) ?? {}, displayCurrency);
+}
+
+/** null means the amount cannot be expressed in the report currency. */
+type DatedFx = (amount: Decimal, currency: string, at: Date) => Decimal | null;
+
+function saleInstant(sellDate: string): Date {
+  return new Date(`${sellDate}T00:00:00.000Z`);
+}
+
+/** Native sale figures at the sale date, or the trade log's display figures when
+ *  no dated FX was loaded. null drops the leg (missing rate — already recorded). */
+function legAtSale(
+  leg: {
+    sellDate: string;
+    grossProceeds?: string;
+    proceeds: string;
+    cleanCost?: string;
+    cost: string;
+    recordedSalesTax?: string;
+    nativeGrossProceeds?: string;
+    nativeCleanCost?: string;
+    nativeRecordedSalesTax?: string;
+    nativeCurrency?: string;
+  },
+  convert: DatedFx | null,
+): { gross: Decimal; cleanCost: Decimal; recorded: Decimal | null } | null {
+  if (convert && leg.nativeGrossProceeds && leg.nativeCurrency) {
+    const at = saleInstant(leg.sellDate);
+    const gross = convert(new Decimal(leg.nativeGrossProceeds), leg.nativeCurrency, at);
+    const clean = convert(new Decimal(leg.nativeCleanCost ?? "0"), leg.nativeCurrency, at);
+    if (gross === null || clean === null) return null;
+    // Zero or blank is not an exemption: the caller estimates 0.1% (or the discount rate).
+    if (!leg.nativeRecordedSalesTax) return { gross, cleanCost: clean, recorded: null };
+    const recorded = convert(new Decimal(leg.nativeRecordedSalesTax), leg.nativeCurrency, at);
+    if (recorded === null) return null;
+    if (!recorded.gt(0)) return { gross, cleanCost: clean, recorded: null };
+    return { gross, cleanCost: clean, recorded };
+  }
+  const recordedRaw =
     leg.recordedSalesTax != null && leg.recordedSalesTax !== ""
       ? new Decimal(leg.recordedSalesTax)
       : null;
-  if (recorded != null && recorded.gt(0)) return { gross, tax: recorded, basis: "recorded" };
-  return { gross, tax: gross.mul(rate), basis: "estimated" };
+  return {
+    gross: new Decimal(leg.grossProceeds ?? leg.proceeds),
+    cleanCost: new Decimal(leg.cleanCost ?? leg.cost),
+    recorded: recordedRaw != null && recordedRaw.gt(0) ? recordedRaw : null,
+  };
 }
 
 /** A lot bought within a year of maturity is treated as a short-term paper (SPN and
@@ -402,12 +487,14 @@ function idShortBond(acqDate: string, maturityDate: string | null | undefined): 
 }
 
 /** Bond and sukuk discount rows (PP 91/2021 Art. 2(3)). One per trade-log leg.
- *  Price is clean: `grossProceeds` minus fee-excluded cost. A par redemption adds
- *  nothing. Not the 0.1% share tax. */
+ *  Price is clean: sale value minus fee-excluded cost, both in the sale currency,
+ *  then converted at the sale date when `convert` is set. A par redemption adds
+ *  nothing. Not the 0.1% share tax. A leg that cannot be converted is omitted. */
 function idBondDiscountRows(
   tradeLog: TradeLog,
   metaById: Map<string, InstrumentMeta>,
   displayCurrency: string,
+  convert: DatedFx | null,
 ): IdIncomeInput[] {
   const rows: IdIncomeInput[] = [];
   for (const t of tradeLog.trades) {
@@ -415,15 +502,11 @@ function idBondDiscountRows(
     if (!meta || meta.assetClass !== "bond" || !isIndonesianInstrument(meta)) continue;
     for (const l of t.legs) {
       if (idShortBond(l.acqDate, meta.maturityDate)) continue;
-      const sale = new Decimal(l.grossProceeds ?? l.proceeds);
-      const cost = new Decimal(l.cleanCost ?? l.cost);
-      const discount = sale.minus(cost);
+      const figures = legAtSale(l, convert);
+      if (!figures) continue;
+      const discount = figures.gross.minus(figures.cleanCost);
       if (discount.isZero()) continue;
-      const recordedRaw =
-        l.recordedSalesTax != null && l.recordedSalesTax !== ""
-          ? new Decimal(l.recordedSalesTax)
-          : null;
-      const recorded = recordedRaw != null && recordedRaw.gt(0) ? recordedRaw : new Decimal(0);
+      const recorded = figures.recorded ?? new Decimal(0);
       rows.push({
         instrumentId: t.instrumentId,
         symbol: meta.symbol || t.instrumentId.slice(0, 8),
@@ -446,6 +529,7 @@ function idBondDiscountRows(
 function idCryptoDisposalInputs(
   books: { tradeLog: TradeLog; cryptoTaxVenue: string | null; portfolioCountry: string | null }[],
   metaById: Map<string, InstrumentMeta>,
+  convert: DatedFx | null,
 ): IdCryptoDisposalInput[] {
   const rows: IdCryptoDisposalInput[] = [];
   for (const book of books) {
@@ -455,16 +539,15 @@ function idCryptoDisposalInputs(
       const meta = metaById.get(t.instrumentId);
       if (meta?.assetClass !== "crypto") continue;
       for (const l of t.legs) {
-        const recordedRaw =
-          l.recordedSalesTax != null && l.recordedSalesTax !== ""
-            ? new Decimal(l.recordedSalesTax)
-            : null;
-        const recorded = recordedRaw != null && recordedRaw.gt(0) ? recordedRaw : null;
+        const figures = legAtSale(l, convert);
+        if (!figures) continue;
+        const recorded =
+          figures.recorded != null && figures.recorded.gt(0) ? figures.recorded : null;
         rows.push({
           instrumentId: t.instrumentId,
           symbol: meta.symbol || t.instrumentId.slice(0, 8),
           when: l.sellDate,
-          proceeds: new Decimal(l.grossProceeds ?? l.proceeds).toFixed(2),
+          proceeds: figures.gross.toFixed(2),
           venue,
           ...(recorded ? { tax: recorded.toFixed(2) } : {}),
         });
@@ -481,8 +564,9 @@ function idCryptoDisposalInputs(
  *
  * - Disposals for `year` are grouped by (instrumentId, sellDate) so each disposal row is
  *   one economic sale day. `proceeds` on the row is the gross sale value (quantity ×
- *   price), not the fee-net trade-log proceeds. Tax is the recorded withholding when the
- *   sell carries one, otherwise 0.1% of that gross.
+ *   price) in the report currency at the sale date, not the fee-net trade-log proceeds
+ *   and not that gross re-rated at today's valuation rate. Tax is the recorded
+ *   withholding when the sell carries one, otherwise 0.1% of that gross.
  * - Every dividend/coupon/interest transaction becomes one income row with gross = net +
  *   recorded withholding (`cashFlow` computes net = qty × price − fees for income rows) and
  *   a category from `classifyIdIncome` (domestic dividend, bond interest, bank interest,
@@ -514,8 +598,11 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
    *  and label them IDR (the response's `currency` field). */
   displayCurrency: string;
   /** Native-currency → displayCurrency conversion rates, keyed by the native currency.
-   *  Obtained from `getFxRates(app.db, ccys, display)` in the calling route. */
+   *  Used only when `fxAt` is omitted. */
   fxRates: Map<string, number>;
+  /** Payment-date FX. When set, each income row and each sale converts at its own date
+   *  from the leg's native amount, not from the trade log's already-converted proceeds. */
+  fxAt?: IdTaxFxAt;
   /** One book per portfolio. Crypto tax is decided here, before trade logs are merged,
    *  because two portfolios can sell the same coin at different venues. */
   cryptoBooks?: {
@@ -528,18 +615,23 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
   const ZERO = "0";
   const salesRate = new Decimal(ID_SALES_TAX_RATE);
 
-  // Native-currency → display-currency. A source currency with no registered rate is
-  // excluded (0) and reported via the request's fxMissingCurrencies (audit B2) — never
-  // counted 1:1, and never a failed report.
-  const fxTo = (amount: Decimal, fromCurrency: string): Decimal => {
+  // Native-currency → display-currency at a row's own date. A source currency with no
+  // rate is excluded (the row is dropped) and reported via fxMissingCurrencies — never
+  // counted 1:1. Without `fxAt`, the single valuation map is the rate for every date.
+  const convertDated: DatedFx = (amount, fromCurrency, at) => {
     if (fromCurrency === displayCurrency) return amount;
+    if (input.fxAt) {
+      const out = tryConvert(amount.toString(), fromCurrency, displayCurrency, input.fxAt(at));
+      return out === null ? null : new Decimal(out);
+    }
     const rate = fxRates.get(fromCurrency);
     if (rate === undefined) {
       recordFxMissing([fromCurrency]);
-      return new Decimal(0);
+      return null;
     }
     return amount.mul(rate);
   };
+  const dated = input.fxAt ? convertDated : null;
 
   // The 0.1% final sales tax only covers disposals of IDX-listed shares; gold, crypto,
   // foreign-listed ETFs/stocks and bonds are out of scope (audit C4). Unknown instruments
@@ -565,10 +657,16 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     if (!salesTaxApplies(t.instrumentId)) continue;
     for (const l of t.legs) {
       if (l.taxYear !== year) continue;
+      const figures = legAtSale(l, dated);
+      if (!figures) continue;
+      const decided = {
+        gross: figures.gross,
+        tax: figures.recorded ?? figures.gross.mul(salesRate),
+        basis: (figures.recorded ? "recorded" : "estimated") as "recorded" | "estimated",
+      };
       const key = `${t.instrumentId}:${l.sellDate}`;
-      const decided = idLegSalesTax(l, salesRate);
       const qty = new Decimal(l.quantity);
-      const cost = new Decimal(l.cost);
+      const cost = figures.cleanCost;
       const existing = disposalGroups.get(key);
       const symbol = metaById.get(t.instrumentId)?.symbol ?? t.instrumentId.slice(0, 8);
       if (existing) {
@@ -634,10 +732,10 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
         portfolioCountry,
       });
       // cashFlow computes net = (qty>0 ? qty*price : price) − fees for income rows; gross is
-      // net + the withholding recorded on the row. Both are converted to the display currency
-      // so the sums don't mix native-currency figures under the response's display label.
-      const net = fxTo(new Decimal(cashFlow(t).toString()), t.currency);
-      const recordedTax = fxTo(new Decimal(t.tax ?? "0"), t.currency);
+      // net + the withholding recorded on the row. Both convert at the payment date.
+      const net = convertDated(new Decimal(cashFlow(t).toString()), t.currency, t.executedAt);
+      const recordedTax = convertDated(new Decimal(t.tax ?? "0"), t.currency, t.executedAt);
+      if (net === null || recordedTax === null) continue;
       // Cash income (no instrument) carries its type and own currency; its `symbol` is a
       // readable English label for API/MCP consumers (the web localises from `cashSource`),
       // never the bare type key ("interest").
@@ -668,21 +766,23 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     }
   }
 
-  income.push(...idBondDiscountRows(tradeLog, metaById, displayCurrency));
+  income.push(...idBondDiscountRows(tradeLog, metaById, displayCurrency, dated));
 
   // Per-year gross sale value and the tax already decided per leg (recorded withholding
-  // or 0.1% of gross). TradeLog is already in display currency, so no FX pass here.
+  // or 0.1% of gross), in the report currency at each sale's own date.
   const salesByYear = new Map<number, { proceeds: Decimal; salesTax: Decimal }>();
   for (const t of tradeLog.trades) {
     if (!salesTaxApplies(t.instrumentId)) continue;
     for (const l of t.legs) {
-      const decided = idLegSalesTax(l, salesRate);
+      const figures = legAtSale(l, dated);
+      if (!figures) continue;
+      const tax = figures.recorded ?? figures.gross.mul(salesRate);
       const prev = salesByYear.get(l.taxYear) ?? {
         proceeds: new Decimal(0),
         salesTax: new Decimal(0),
       };
-      prev.proceeds = prev.proceeds.add(decided.gross);
-      prev.salesTax = prev.salesTax.add(decided.tax);
+      prev.proceeds = prev.proceeds.add(figures.gross);
+      prev.salesTax = prev.salesTax.add(tax);
       salesByYear.set(l.taxYear, prev);
     }
   }
@@ -705,6 +805,6 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     disposals,
     income,
     byYear,
-    cryptoDisposals: idCryptoDisposalInputs(cryptoBooks ?? [], metaById),
+    cryptoDisposals: idCryptoDisposalInputs(cryptoBooks ?? [], metaById, dated),
   });
 }

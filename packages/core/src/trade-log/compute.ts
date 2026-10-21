@@ -284,6 +284,10 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           if (!recordedConsumed || !sellQty.gt(0)) return undefined;
           return conv(recordedConsumed.mul(sliceQty).div(sellQty), tx.currency).toString();
         };
+        const nativeRecordedForSlice = (sliceQty: Decimal): string | undefined => {
+          if (!recordedConsumed || !sellQty.gt(0)) return undefined;
+          return recordedConsumed.mul(sliceQty).div(sellQty).toString();
+        };
         const sellDate = tx.executedAt;
         const taxYear = sellDate.getUTCFullYear();
 
@@ -336,6 +340,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
           for (const s of fifoSlices) {
             const sliceProceeds = s.qty.mul(proceedsPerUnit);
             const recorded = recordedForSlice(s.qty);
+            const nativeRecorded = nativeRecordedForSlice(s.qty);
             const days = daysBetween(s.acqDate, sellDate);
             const sliceVorabCredit = sellQty.gt(0) ? vorabCreditThis.mul(s.qty).div(sellQty) : ZERO;
             episode.legs.push({
@@ -346,7 +351,11 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
               proceeds: conv(sliceProceeds, costCcy).toString(),
               grossProceeds: conv(s.qty.mul(p), costCcy).toString(),
               cleanCost: conv(s.qty.mul(s.unitPrice), costCcy).toString(),
+              nativeGrossProceeds: s.qty.mul(p).toString(),
+              nativeCleanCost: s.qty.mul(s.unitPrice).toString(),
+              nativeCurrency: tx.currency,
               ...(recorded !== undefined ? { recordedSalesTax: recorded } : {}),
+              ...(nativeRecorded !== undefined ? { nativeRecordedSalesTax: nativeRecorded } : {}),
               gain: conv(sliceProceeds.sub(s.cost), costCcy).toString(),
               holdingDays: days,
               longTerm: heldMoreThanOneYear(s.acqDate, sellDate) && isTaxFreeEligible(instrumentId),
@@ -357,6 +366,7 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
         } else {
           const days = daysBetween(episode.entryDate, sellDate);
           const recorded = recordedForSlice(sellQty);
+          const nativeRecorded = nativeRecordedForSlice(sellQty);
           episode.legs.push({
             acqDate: toDateKey(episode.entryDate),
             sellDate: toDateKey(sellDate),
@@ -365,7 +375,11 @@ export function computeTrades(input: ComputeTradesInput): TradeLog {
             proceeds: conv(proceeds, costCcy).toString(),
             grossProceeds: conv(gross, costCcy).toString(),
             cleanCost: conv(cleanAvg, costCcy).toString(),
+            nativeGrossProceeds: gross.toString(),
+            nativeCleanCost: cleanAvg.toString(),
+            nativeCurrency: tx.currency,
             ...(recorded !== undefined ? { recordedSalesTax: recorded } : {}),
+            ...(nativeRecorded !== undefined ? { nativeRecordedSalesTax: nativeRecorded } : {}),
             gain: conv(realizedSlice, costCcy).toString(),
             holdingDays: days,
             longTerm:

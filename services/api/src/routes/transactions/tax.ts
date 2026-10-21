@@ -54,6 +54,7 @@ import {
   buildTfRates,
   computeIndonesianFinalTaxFromTradeLog,
   loadIdDepositFx,
+  loadIdReportFx,
 } from "./tax-helpers.js";
 import { isReadOnlyPat } from "../../plugins/auth.js";
 
@@ -203,6 +204,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
       // are wasted cycles for ID.
       if (regime === "ID") {
         const incomeSources = [{ coreTxns, portfolioCountry: portfolio.country }];
+        const fxProvider = isReadOnlyPat(request) ? null : undefined;
         const idTax = computeIndonesianFinalTaxFromTradeLog({
           tradeLog,
           incomeSources,
@@ -214,10 +216,15 @@ export function registerTaxRoutes(app: FastifyInstance) {
             },
           ],
           // Cached FX only for a read-scoped PAT (audit A7), like the history routes.
-          depositFxAt: await loadIdDepositFx(
+          depositFxAt: await loadIdDepositFx(app, incomeSources, fxProvider),
+          // Payment-date FX for the report's own amounts. The valuation map above stays
+          // the performance rate and is only a fallback when this load is omitted.
+          fxAt: await loadIdReportFx(
             app,
             incomeSources,
-            isReadOnlyPat(request) ? null : undefined,
+            [tradeLog],
+            portfolio.baseCurrency,
+            fxProvider,
           ),
           year,
           metaById,
@@ -520,6 +527,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
               coreTxns: p.coreTxns,
               portfolioCountry: p.portfolioCountry,
             }));
+            const fxProvider = isReadOnlyPat(request) ? null : undefined;
             const idTax = computeIndonesianFinalTaxFromTradeLog({
               tradeLog: mergedLog,
               incomeSources,
@@ -528,11 +536,8 @@ export function registerTaxRoutes(app: FastifyInstance) {
                 cryptoTaxVenue: p.cryptoTaxVenue,
                 portfolioCountry: p.portfolioCountry,
               })),
-              depositFxAt: await loadIdDepositFx(
-                app,
-                incomeSources,
-                isReadOnlyPat(request) ? null : undefined,
-              ),
+              depositFxAt: await loadIdDepositFx(app, incomeSources, fxProvider),
+              fxAt: await loadIdReportFx(app, incomeSources, [mergedLog], display, fxProvider),
               year,
               metaById: meta,
               displayCurrency: display,

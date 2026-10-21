@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { sql } from "drizzle-orm";
 import { generateKeyPair, SignJWT } from "jose";
 import { fxRates, instruments } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
@@ -1736,5 +1737,210 @@ describe("Indonesian crypto sales tax by venue", () => {
     );
     expect(restored.taxToSelfPay).toBe("100000.00");
     expect(restored.totalIncomeGross).toBe("1800000.00");
+  });
+});
+
+describe("Indonesian tax amounts convert at the payment or sale date", () => {
+  beforeAll(async () => {
+    const kp = await generateKeyPair("ES256");
+    privateKey = kp.privateKey;
+    process.env.AUTHENTIK_ISSUER = ISSUER;
+    process.env.AUTHENTIK_AUDIENCE = AUDIENCE;
+    process.env.RATE_LIMIT_MAX = "10000";
+    app = await buildApp({ authKey: kp.publicKey });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    closeDb();
+  });
+
+  it("converts an IDR dividend at the payment-date rate, not today's", async () => {
+    const t = await token("tax-id-fx-div");
+    await setTaxRegime(t, "ID");
+    const today = toDateKey(new Date());
+    // 1 EUR = 16,000 IDR on the payment date, 17,000 today. Stored as IDR → EUR.
+    await app.db
+      .insert(fxRates)
+      .values([
+        { base: "IDR", quote: "EUR", rate: "0.0000625", date: "2024-04-10" },
+        { base: "IDR", quote: "EUR", rate: "0.0000588235294118", date: today },
+      ])
+      .onConflictDoUpdate({
+        target: [fxRates.base, fxRates.quote, fxRates.date],
+        set: { rate: sql`excluded.rate` },
+      });
+    const [equity] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-FX-DIV",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "IDX FX Div",
+      })
+      .returning();
+    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR" });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "dividend",
+      instrumentId: equity!.id,
+      quantity: "0",
+      price: "16000000",
+      currency: "IDR",
+      executedAt: "2024-04-10T00:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2024`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const id = res.json().indonesianFinalTax;
+    // 16,000,000 / 16,000 = 1,000. Today's 17,000 would be 941.18.
+    expect(id.totalIncomeGross).toBe("1000.00");
+    expect(id.totalIncomeTax).toBe("100.00");
+    expect(id.income).toEqual([
+      expect.objectContaining({ category: "domestic_dividend", gross: "1000.00", tax: "100.00" }),
+    ]);
+  });
+
+  it("converts an IDX sale at that day's rate, not the dividend day's or today's", async () => {
+    const t = await token("tax-id-fx-sale");
+    await setTaxRegime(t, "ID");
+    const me = await app.inject({
+      method: "PATCH",
+      url: "/me",
+      headers: auth(t),
+      payload: { displayCurrency: "EUR" },
+    });
+    expect(me.statusCode).toBe(200);
+    const today = toDateKey(new Date());
+    await app.db
+      .insert(fxRates)
+      .values([
+        { base: "IDR", quote: "EUR", rate: "0.0000625", date: "2024-04-10" },
+        { base: "IDR", quote: "EUR", rate: "0.00005", date: "2024-08-01" },
+        { base: "IDR", quote: "EUR", rate: "0.0000588235294118", date: today },
+      ])
+      .onConflictDoUpdate({
+        target: [fxRates.base, fxRates.quote, fxRates.date],
+        set: { rate: sql`excluded.rate` },
+      });
+    const [equity] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-FX-SALE",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "IDX FX Sale",
+      })
+      .returning();
+    const holderId = await createHolder(t, { name: "FX Holder" });
+    const portfolioId = await createPortfolio(t, {
+      baseCurrency: "EUR",
+      accountHolderId: holderId,
+    });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "buy",
+      instrumentId: equity!.id,
+      quantity: "1000",
+      price: "10000",
+      currency: "IDR",
+      executedAt: "2024-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "sell",
+      instrumentId: equity!.id,
+      quantity: "1000",
+      price: "16000",
+      currency: "IDR",
+      executedAt: "2024-08-01T00:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2024`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const id = res.json().indonesianFinalTax;
+    // 1,000 × 16,000 IDR = 16,000,000. / 20,000 = 800. Today's 17,000 would be 941.18.
+    expect(id.totalProceeds).toBe("800.00");
+    expect(id.totalSalesTax).toBe("0.80");
+    expect(id.disposals).toEqual([
+      expect.objectContaining({ when: "2024-08-01", proceeds: "800.00", tax: "0.80" }),
+    ]);
+    const yearRow = id.byYear.find((r: { year: number }) => r.year === 2024);
+    expect(yearRow.tax).toBe("0.80");
+
+    const net = await app.inject({
+      method: "GET",
+      url: "/networth/tax?year=2024",
+      headers: auth(t),
+    });
+    expect(net.statusCode).toBe(200);
+    const [entry] = net.json() as {
+      indonesianFinalTax: { totalProceeds: string; totalSalesTax: string };
+    }[];
+    expect(entry!.indonesianFinalTax.totalProceeds).toBe("800.00");
+    expect(entry!.indonesianFinalTax.totalSalesTax).toBe("0.80");
+  });
+
+  it("drops an income row whose currency has no rate and names that currency", async () => {
+    const t = await token("tax-id-fx-miss");
+    await setTaxRegime(t, "ID");
+    const [idx] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "IDX-FX-KEEP",
+        market: "IDX",
+        assetClass: "equity",
+        currency: "IDR",
+        name: "IDX keep",
+      })
+      .returning();
+    const [foreign] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "US-FX-CHF",
+        market: "US",
+        assetClass: "equity",
+        currency: "CHF",
+        name: "CHF name",
+      })
+      .returning();
+    const portfolioId = await createPortfolio(t, { baseCurrency: "IDR" });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "dividend",
+      instrumentId: idx!.id,
+      quantity: "0",
+      price: "1000000",
+      currency: "IDR",
+      executedAt: "2024-04-10T00:00:00.000Z",
+    });
+    await seedTransaction(app, portfolioId, auth(t), {
+      type: "dividend",
+      instrumentId: foreign!.id,
+      quantity: "0",
+      price: "100",
+      currency: "CHF",
+      executedAt: "2024-05-01T00:00:00.000Z",
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2024`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      indonesianFinalTax: { income: { symbol: string; gross: string }[]; totalIncomeGross: string };
+      fxMissingCurrencies?: string[];
+    };
+    expect(body.indonesianFinalTax.income.map((r) => r.symbol)).toEqual(["IDX-FX-KEEP"]);
+    expect(body.indonesianFinalTax.totalIncomeGross).toBe("1000000.00");
+    expect(body.fxMissingCurrencies).toContain("CHF");
   });
 });

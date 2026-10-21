@@ -22,6 +22,15 @@ export interface TradeLeg {
    *  actually sold and to this slice. Same currency as `proceeds`. Omitted when none
    *  was recorded (a missing or zero tax is not an exemption). */
   recordedSalesTax?: string;
+  /** `grossProceeds` before FX, in `nativeCurrency`. The Indonesian report converts
+   *  this at the sale date. Performance keeps using `grossProceeds`. */
+  nativeGrossProceeds?: string;
+  /** `cleanCost` before FX, in `nativeCurrency`. */
+  nativeCleanCost?: string;
+  /** `recordedSalesTax` before FX, in `nativeCurrency`. */
+  nativeRecordedSalesTax?: string;
+  /** Currency of the `native*` amounts (the sell's currency). */
+  nativeCurrency?: string;
   /** Acquisition cost of this slice excluding fees (quantity × buy price). Same
    *  currency as `cost`, which includes fees. Optional on older fixtures. */
   cleanCost?: string;
