@@ -5,6 +5,35 @@ import type { YearTax } from "../trade-log.js";
 import { DEFAULT_CAPITAL_GAINS_TAX_RATE } from "./rates.js";
 import type { AllowanceUsageInput, AllowanceUsage } from "./types.js";
 
+const STATUTORY_RATE = D(DEFAULT_CAPITAL_GAINS_TAX_RATE);
+const KAPEST = D("0.25");
+const SOLI_ON_KAPEST = D("1.055");
+
+/**
+ * Tax on the taxable excess after a §32d Abs. 5 foreign-tax credit.
+ *
+ * At the statutory 26.375% the credit reduces the 25% Kapitalertragsteuer and the
+ * 5.5% Solidaritätszuschlag is recomputed on what remains. Any other rate (a
+ * holder-specific figure, including church tax) is reduced by the credit and floored
+ * at zero — that rate is not split back into KapESt and Soli.
+ */
+function taxAfterForeignCredit(
+  excess: Decimal,
+  rate: Decimal,
+  credit: Decimal,
+): { tax: Decimal; applied: Decimal } {
+  if (excess.lte(ZERO)) return { tax: ZERO, applied: ZERO };
+  const offered = Decimal.max(ZERO, credit);
+  if (rate.eq(STATUTORY_RATE)) {
+    const kapest = excess.times(KAPEST);
+    const applied = Decimal.min(offered, kapest);
+    return { tax: kapest.minus(applied).times(SOLI_ON_KAPEST), applied };
+  }
+  const grossTax = Decimal.max(ZERO, excess.times(rate));
+  const applied = Decimal.min(offered, grossTax);
+  return { tax: grossTax.minus(applied), applied };
+}
+
 export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   const year = input.year ?? new Date().getUTCFullYear();
   const allowance = D(input.allowanceAnnual);
@@ -91,6 +120,11 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
   const remaining = Decimal.max(ZERO, allowance.minus(usedYtd));
   const taxSavingAvailable = remaining.times(taxRate);
   const taxableExcess = Decimal.max(ZERO, rawUsed.minus(allowance));
+  const afterCredit = taxAfterForeignCredit(
+    taxableExcess,
+    taxRate,
+    D(input.foreignTaxCredit ?? "0"),
+  );
 
   const rawProjected = stockUsedProjected.plus(generalUsedProjected);
   const projectedUsedFullYear = Decimal.min(rawProjected, allowance);
@@ -117,6 +151,8 @@ export function allowanceUsageYTD(input: AllowanceUsageInput): AllowanceUsage {
     },
     usedYtd: usedYtd.toFixed(2),
     taxableExcess: taxableExcess.toFixed(2),
+    foreignTaxCredit: afterCredit.applied.toFixed(2),
+    estimatedTax: afterCredit.tax.toFixed(2),
     remaining: remaining.toFixed(2),
     taxRate: taxRate.toString(),
     taxSavingAvailable: taxSavingAvailable.toFixed(2),

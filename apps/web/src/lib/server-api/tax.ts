@@ -434,7 +434,7 @@ export async function loadTaxYearDetail(
                   year: y,
                   realized: u.realizedGainsAdjusted,
                   dividends: u.incomeYtd,
-                  tax: taxable.mul(taxRate).toFixed(2),
+                  tax: u.estimatedTax ?? taxable.mul(taxRate).toFixed(2),
                   fsaUsed: u.usedYtd,
                 };
               }

@@ -86,6 +86,29 @@ used for "tax saving" figures, in this order:
    k = 8% gives 27.8186%. `churchTax` is a boolean, so 9% is assumed unless an explicit
    rate is configured.
 
+### Foreign withholding (§32d Abs. 5 EStG)
+
+The tax on the year's taxable excess is reduced by foreign tax that was actually withheld
+on a dividend, coupon or interest. It does not reduce the Sparerpauschbetrag, and it is
+not estimated from the Indonesian resident rates.
+
+- A source breakdown (`transaction_sources.taxComponents`) credits only `quellensteuer`.
+  Kapitalertragsteuer, Solidaritätszuschlag and Kirchensteuer stay German tax already
+  withheld.
+- With no breakdown, `transactions.tax` is credited only when the row is Indonesian income:
+  `domestic_dividend`, `bond_interest` or `deposit_interest`. A German share's tax is not
+  a credit. A row with no recorded withholding is not given 10% or 20%.
+- Each row is capped at 25% of that row's German taxable gross, after Teilfreistellung.
+- The year is capped at the German tax on the taxable excess. At the statutory **26.375%**
+  the credit reduces the 25% Kapitalertragsteuer and the 5.5% Solidaritätszuschlag is
+  recomputed on what remains. A holder-specific rate (including church tax) is reduced by
+  the credit and floored at zero; that rate is not split back into its parts.
+- The 0.1% IDX sales levy, the crypto sales tax and the bond-discount tax are taxes on a
+  sale, not on the income, and are not credits.
+
+`allowanceUsage.foreignTaxCredit` is what was applied. `allowanceUsage.estimatedTax` is the
+tax after it. Both are in the trade log's currency.
+
 ### Holding period (§23 EStG)
 
 Gold/crypto gains are tax-free only if held **more than one year**. The test is calendar

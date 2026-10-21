@@ -55,6 +55,7 @@ import {
   computeIndonesianFinalTaxFromTradeLog,
   loadIdDepositFx,
   loadIdReportFx,
+  foreignTaxCreditForYear,
 } from "./tax-helpers.js";
 import { isReadOnlyPat } from "../../plugins/auth.js";
 
@@ -263,6 +264,20 @@ export function registerTaxRoutes(app: FastifyInstance) {
         forecastIncomeRestOfYear,
         assetClasses,
         lossCarryForward: convertLossCarryForward(lossCarryForwardInput, toLog),
+        foreignTaxCredit: await foreignTaxCreditForYear(
+          app,
+          [
+            {
+              coreTxns,
+              portfolioCountry: portfolio.country,
+              metaById,
+              fxRates,
+            },
+          ],
+          portfolio.baseCurrency,
+          year,
+          tfRates,
+        ),
       });
       const suggestions = harvestSuggestions({
         tradeLog,
@@ -594,6 +609,18 @@ export function registerTaxRoutes(app: FastifyInstance) {
             forecastIncomeRestOfYear,
             assetClasses,
             lossCarryForward,
+            foreignTaxCredit: await foreignTaxCreditForYear(
+              app,
+              perPortfolio.map((p) => ({
+                coreTxns: p.coreTxns,
+                portfolioCountry: p.portfolioCountry,
+                metaById: p.metaById,
+                fxRates: p.rateByCcy,
+              })),
+              display,
+              year,
+              tfRates,
+            ),
           });
           const suggestions = harvestSuggestions({
             tradeLog: mergedLog,

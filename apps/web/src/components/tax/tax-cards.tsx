@@ -337,7 +337,7 @@ export function CoverageCard({
             </p>
             <p className="text-xs text-muted-foreground">
               {t("coverage.summary.abgeltungsteuer", { rate: ratePct })} ·{" "}
-              {money(Number(u.taxableExcess) * Number(u.taxRate))} ·{" "}
+              {money(u.estimatedTax ?? Number(u.taxableExcess) * Number(u.taxRate))} ·{" "}
               {t("coverage.summary.withheld")}
             </p>
           </div>

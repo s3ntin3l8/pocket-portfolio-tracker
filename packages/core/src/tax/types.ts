@@ -21,6 +21,10 @@ export interface AllowanceUsage {
   generalPot: PotUsage;
   usedYtd: string;
   taxableExcess: string;
+  /** §32d Abs. 5 credit actually applied against the tax on `taxableExcess`. */
+  foreignTaxCredit: string;
+  /** Tax on `taxableExcess` after `foreignTaxCredit`. */
+  estimatedTax: string;
   remaining: string;
   taxRate: string;
   taxSavingAvailable: string;
@@ -62,6 +66,12 @@ export interface AllowanceUsageInput {
   forecastIncomeRestOfYear?: string;
   assetClasses?: Record<string, string>;
   lossCarryForward?: { stock?: string; general?: string };
+  /**
+   * Sum of per-row foreign withholding already capped at 25% of each row's taxable
+   * gross. This function caps the year at the German tax on `taxableExcess`.
+   * Omitted means no credit.
+   */
+  foreignTaxCredit?: string;
 }
 
 export interface HarvestSuggestionsInput extends AllowanceUsageInput {

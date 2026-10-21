@@ -208,8 +208,10 @@ function TaxHolderOverviewDe({
 
   const taxRate = Number(u.taxRate);
   const taxable = Number(u.taxableExcess);
-  const estimatedTax = taxable * taxRate;
+  const estimatedTax =
+    u.estimatedTax != null && u.estimatedTax !== "" ? Number(u.estimatedTax) : taxable * taxRate;
   const ratePct = (taxRate * 100).toLocaleString(locale, { maximumFractionDigits: 3 });
+  const foreignCredit = Number(u.foreignTaxCredit ?? 0);
 
   const harvestRemaining = u.projectedRemaining ?? u.remaining;
   const combinedHarvest = harvestSummary(harvestSuggestions, harvestRemaining, u.taxRate);
@@ -222,7 +224,15 @@ function TaxHolderOverviewDe({
           <EstimatedTaxHero
             label={t("hero.estimatedTax", { year: entry.year })}
             value={moneyCompact(estimatedTax)}
-            description={t("hero.estimatedTaxDesc", { rate: ratePct, taxable: money(taxable) })}
+            description={
+              foreignCredit > 0
+                ? t("hero.estimatedTaxDescCredit", {
+                    rate: ratePct,
+                    taxable: money(taxable),
+                    credit: money(foreignCredit),
+                  })
+                : t("hero.estimatedTaxDesc", { rate: ratePct, taxable: money(taxable) })
+            }
           />
 
           <VorabpauschaleRow allowanceUsage={u} money={money} t={t} />

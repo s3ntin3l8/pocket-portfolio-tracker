@@ -2124,6 +2124,7 @@
     "hero": {
       "estimatedTax": "Perkiraan pajak · {year}",
       "estimatedTaxDesc": "Abgeltungsteuer {rate}% dari {taxable}",
+      "estimatedTaxDescCredit": "Abgeltungsteuer {rate}% dari {taxable}, dikurangi {credit} pajak luar negeri",
       "realizedGains": "Keuntungan terealisasi · YTD",
       "realizedGainsDesc": "{count} pelepasan · disesuaikan Tf",
       "dividendsYtd": "Pendapatan investasi · YTD",

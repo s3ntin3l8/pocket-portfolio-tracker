@@ -2124,6 +2124,7 @@
     "hero": {
       "estimatedTax": "Estimated tax · {year}",
       "estimatedTaxDesc": "Abgeltungsteuer {rate}% on {taxable}",
+      "estimatedTaxDescCredit": "Abgeltungsteuer {rate}% on {taxable}, less {credit} foreign tax",
       "realizedGains": "Realized gains · YTD",
       "realizedGainsDesc": "{count} disposals · Tf-adjusted",
       "dividendsYtd": "Investment income · YTD",

@@ -380,6 +380,10 @@ export interface AllowanceUsage {
    * realizedGainsAdjusted/incomeYtd/usedYtd (no longer simply additive post-two-pot).
    */
   taxableExcess: string;
+  /** §32d Abs. 5 credit applied against the tax on `taxableExcess`. Absent on older payloads. */
+  foreignTaxCredit?: string;
+  /** Tax on `taxableExcess` after `foreignTaxCredit`. Absent: `taxableExcess × taxRate`. */
+  estimatedTax?: string;
   /** Remaining allowance (never negative), decimal string. */
   remaining: string;
   /** Effective KapSt rate (decimal string, e.g. "0.25"). */

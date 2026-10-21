@@ -1,7 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
 import { and, eq, inArray } from "drizzle-orm";
-import { dividendEvents, instruments, lossCarryforward, portfolios } from "@portfolio/db";
+import {
+  dividendEvents,
+  instruments,
+  lossCarryforward,
+  portfolios,
+  transactionSources,
+} from "@portfolio/db";
 import type {
   CoreTransaction,
   FxRateFn,
@@ -312,6 +318,114 @@ export function buildTfRates(
     if (rate !== null) result[t.instrumentId] = rate;
   }
   return result;
+}
+
+const FOREIGN_CREDIT_CATEGORIES = new Set([
+  "domestic_dividend",
+  "bond_interest",
+  "deposit_interest",
+]);
+
+function componentRecord(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof v === "string" || typeof v === "number") out[k] = String(v);
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * Creditable foreign withholding for a German year (§32d Abs. 5 EStG), already capped
+ * at 25% of each row's taxable gross (after Teilfreistellung). The year cap — no more
+ * than the German tax on the taxable excess — is applied by `allowanceUsageYTD`.
+ *
+ * A source breakdown credits only `quellensteuer`. Without one, `transactions.tax` is
+ * credited only for Indonesian income (domestic dividend, bond interest, bank interest).
+ * A German share's tax is not a credit, and nothing is imputed at 10% or 20%. Sales
+ * taxes (the 0.1%, crypto, bond discount) are not income rows, so they are not here.
+ * Amounts use the same valuation FX as the trade log. A missing rate drops the row.
+ */
+export async function foreignTaxCreditForYear(
+  app: FastifyInstance,
+  books: {
+    coreTxns: CoreTransaction[];
+    portfolioCountry: string | null;
+    metaById: Map<string, InstrumentMeta>;
+    fxRates: Record<string, string>;
+  }[],
+  displayCurrency: string,
+  year: number,
+  tfRates: Record<string, string | number>,
+): Promise<string> {
+  const income = books.flatMap((book) =>
+    book.coreTxns
+      .filter(
+        (t) =>
+          (t.type === "dividend" || t.type === "coupon" || t.type === "interest") &&
+          t.executedAt.getUTCFullYear() === year &&
+          t.id,
+      )
+      .map((t) => ({ book, t })),
+  );
+  if (income.length === 0) return "0.00";
+
+  const byTx = new Map<string, Record<string, string>[]>();
+  const rows = await app.db
+    .select({
+      transactionId: transactionSources.transactionId,
+      taxComponents: transactionSources.taxComponents,
+    })
+    .from(transactionSources)
+    .where(
+      inArray(
+        transactionSources.transactionId,
+        income.map(({ t }) => t.id!),
+      ),
+    );
+  for (const row of rows) {
+    const parsed = componentRecord(row.taxComponents);
+    if (!parsed) continue;
+    const list = byTx.get(row.transactionId) ?? [];
+    list.push(parsed);
+    byTx.set(row.transactionId, list);
+  }
+
+  let total = new Decimal(0);
+  for (const { book, t } of income) {
+    const parts = byTx.get(t.id!) ?? [];
+    const hasBreakdown = parts.length > 0;
+    let native = new Decimal(0);
+    if (hasBreakdown) {
+      for (const part of parts) {
+        const q = part.quellensteuer;
+        if (q && new Decimal(q).gt(0)) native = native.add(q);
+      }
+    } else if (new Decimal(t.tax ?? "0").gt(0)) {
+      const meta = t.instrumentId ? book.metaById.get(t.instrumentId) : undefined;
+      const category = classifyIdIncome({
+        type: t.type as "dividend" | "coupon" | "interest",
+        currency: t.currency,
+        instrument: t.instrumentId ? (meta ?? { market: "", assetClass: "", isin: null }) : null,
+        portfolioCountry: book.portfolioCountry,
+      });
+      if (FOREIGN_CREDIT_CATEGORIES.has(category)) native = new Decimal(t.tax!);
+    }
+    if (native.lte(0)) continue;
+
+    const fx = makeFxRateFn(book.fxRates, displayCurrency);
+    const net = tryConvert(cashFlow(t).toString(), t.currency, displayCurrency, fx);
+    const tax = tryConvert(t.tax ?? "0", t.currency, displayCurrency, fx);
+    const credit = tryConvert(native.toString(), t.currency, displayCurrency, fx);
+    if (net === null || tax === null || credit === null) continue;
+    const gross = new Decimal(net).add(tax);
+    const tf = new Decimal(t.instrumentId ? (tfRates[t.instrumentId] ?? "0") : "0");
+    const taxable = gross.mul(Decimal.max(new Decimal(0), new Decimal(1).minus(tf)));
+    total = total.add(
+      Decimal.min(new Decimal(credit), Decimal.max(taxable.mul("0.25"), new Decimal(0))),
+    );
+  }
+  return total.toFixed(2);
 }
 
 /** One portfolio's income transactions and its country, the unit cash interest is judged by. */

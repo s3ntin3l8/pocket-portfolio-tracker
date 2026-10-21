@@ -1451,3 +1451,42 @@ describe("harvestSummary", () => {
     });
   });
 });
+
+describe("allowanceUsageYTD — foreign tax credit", () => {
+  function usage(credit: string, rate = "0.25", allowance = "0", income = "100") {
+    return allowanceUsageYTD({
+      tradeLog: makeTradeLog({
+        dividendsByYear: [{ year: 2025, amount: income, tax: "0" }],
+      }),
+      tfRates: {},
+      taxRate: rate,
+      allowanceAnnual: allowance,
+      year: 2025,
+      foreignTaxCredit: credit,
+    });
+  }
+
+  it("subtracts the credit from a holder-specific rate and floors at zero", () => {
+    const u = usage("10");
+    expect(u.taxableExcess).toBe("100.00");
+    expect(u.foreignTaxCredit).toBe("10.00");
+    expect(u.estimatedTax).toBe("15.00");
+    const wiped = usage("40");
+    expect(wiped.foreignTaxCredit).toBe("25.00");
+    expect(wiped.estimatedTax).toBe("0.00");
+  });
+
+  it("applies a statutory credit to the 25% and recomputes the 5.5% Soli", () => {
+    const u = usage("10", "0.26375");
+    expect(u.foreignTaxCredit).toBe("10.00");
+    expect(u.estimatedTax).toBe("15.83");
+    expect(usage("0", "0.26375").estimatedTax).toBe("26.38");
+  });
+
+  it("caps the credit at the German tax for the year", () => {
+    const u = usage("10", "0.25", "80", "100");
+    expect(u.taxableExcess).toBe("20.00");
+    expect(u.foreignTaxCredit).toBe("5.00");
+    expect(u.estimatedTax).toBe("0.00");
+  });
+});
