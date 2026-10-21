@@ -78,7 +78,9 @@ jobs:
       # status: the check goes red when the review fails, instead of turning
       # green the moment the request is accepted (which is how a saturated
       # gateway used to read as "relayed"). The polling job holds its runner
-      # for the length of the review (minutes).
+      # for the length of the review (minutes). The Runs path also reacts
+      # with an eye to the pull request and to the comment that asked for the
+      # review, so a request is visibly picked up.
       hermes-use-runs: true
     secrets: inherit # pragma: allowlist secret
 
@@ -98,10 +100,8 @@ jobs:
     uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
       mention-trigger: s3ntin3l8-hermes # mode: on-demand is the reusable workflow's default
-      # Dispatch through Hermes' Runs API and poll the run to a terminal
-      # status: the check goes red when the review fails, instead of turning
-      # green the moment the request is accepted (which is how a saturated
-      # gateway used to read as "relayed"). The polling job holds its runner
-      # for the length of the review (minutes).
+      # See the auto-review job above: poll the run instead of firing and
+      # forgetting, so a review that failed is a red check rather than a
+      # silent no-op.
       hermes-use-runs: true
     secrets: inherit # pragma: allowlist secret
