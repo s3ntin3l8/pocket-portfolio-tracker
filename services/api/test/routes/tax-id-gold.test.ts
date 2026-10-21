@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { instruments } from "@portfolio/db";
+import { fxRates, instruments } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 
@@ -224,5 +224,61 @@ describe("Indonesian tax — gold-bar PPh 22", () => {
     expect(id.goldDisposals).toEqual([]);
     expect(id.totalGoldTax).toBe("0.00");
     expect(id.totalSalesTax).toBe("0.00");
+  });
+
+  it("converts a euro sale in an Indonesian portfolio at the sale date for the rupiah test", async () => {
+    const t = await token("id-gold-eur");
+    await setTaxRegime(t);
+    await app.db.insert(fxRates).values({
+      base: "EUR",
+      quote: "IDR",
+      rate: "17000",
+      date: "2025-08-01",
+    });
+    const portfolioId = await createPortfolio(t, { baseCurrency: "EUR", country: "ID" });
+    const bar = await instrument("LM-EUR", "XAU", "gold", "EUR");
+    await sell(t, portfolioId, bar.id, "1000", "2025-08-01", { currency: "EUR" });
+    const id = await taxOf(t, portfolioId);
+    // 1,000 EUR × 17,000 = Rp17,000,000, over the threshold. 0.25% of the euro gross.
+    expect(id.goldDisposals[0]).toMatchObject({
+      tax: "2.50",
+      rate: "0.0025",
+      taxBasis: "estimated",
+    });
+    expect(id.totalGoldProceeds).toBe("1000.00");
+    expect(id.totalGoldTax).toBe("2.50");
+    expect(id.estimatedTax).toBe("0.00");
+    expect(id.taxToSelfPay).toBe("0.00");
+  });
+
+  it("drops a non-rupiah sale when the IDR rate is missing and still shows a recorded tax", async () => {
+    const t = await token("id-gold-fx-miss");
+    await setTaxRegime(t);
+    const portfolioId = await createPortfolio(t, { baseCurrency: "CHF", country: "ID" });
+    const bar = await instrument("LM-MISS", "XAU", "gold", "CHF");
+    await sell(t, portfolioId, bar.id, "1000", "2025-09-01", { currency: "CHF" });
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/tax?year=2025`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      indonesianFinalTax: { goldDisposals: unknown[]; totalGoldTax: string };
+      fxMissingCurrencies?: string[];
+    };
+    expect(body.indonesianFinalTax.goldDisposals).toEqual([]);
+    expect(body.indonesianFinalTax.totalGoldTax).toBe("0.00");
+    expect(body.fxMissingCurrencies).toContain("CHF");
+
+    const recordedBook = await createPortfolio(t, { baseCurrency: "CHF", country: "ID" });
+    const recorded = await instrument("LM-CHF-REC", "XAU", "gold", "CHF");
+    await sell(t, recordedBook, recorded.id, "1000", "2025-09-02", {
+      currency: "CHF",
+      tax: "3",
+    });
+    const shown = await taxOf(t, recordedBook);
+    expect(shown.goldDisposals[0]).toMatchObject({ tax: "3.00", taxBasis: "recorded" });
+    expect(shown.estimatedTax).toBe("0.00");
   });
 });
