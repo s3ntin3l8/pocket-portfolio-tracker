@@ -10,7 +10,7 @@ jobs:
   test-node:
     permissions:
       contents: read
-    uses: s3ntin3l8/.github/.github/workflows/ci-node.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
+    uses: s3ntin3l8/.github/.github/workflows/ci-node.yml@625ef2e6a67ceb22b1b5e82bfc11dda6b68e1c20 # main @ 2026-10-21
     with:
       node-version: "26"
       # Root scripts fan out across all workspaces (Turbo for build/lint/typecheck,
@@ -28,6 +28,10 @@ jobs:
       test-shards: "4"
       turbo-cache: true
       strict-checks: true
+      # Only the files this push touched can have introduced a secret, and the
+      # baseline is keyed by filename and line number, so an unchanged file
+      # keeps its entry and the scan stays consistent.
+      detect-secrets-scope: "changed"
     secrets: inherit
 
   test-python:
