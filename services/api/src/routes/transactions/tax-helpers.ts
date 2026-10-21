@@ -20,6 +20,7 @@ import type {
   IdIncomeInput,
   IdIncomeTaxBasis,
   IdCryptoDisposalInput,
+  IdGoldDisposalInput,
   IdYearInput,
 } from "@portfolio/core";
 import {
@@ -541,6 +542,41 @@ export async function loadIdReportFx(
   return (at) => makeFxRateFn(ratesByDate.get(toDateKey(at)) ?? {}, displayCurrency);
 }
 
+/**
+ * FX into IDR for gold-bar sales that are not themselves in IDR, so the Rp10,000,000
+ * test has a rupiah gross. No load when the report is already IDR, or every in-scope
+ * sale is. A missing rate leaves that sale unestimated (a recorded withholding is
+ * still shown) and names the currency.
+ */
+export async function loadIdGoldFx(
+  app: FastifyInstance,
+  sources: IdIncomeSource[],
+  metaById: Map<string, { market: string; assetClass: string; isin?: string | null }>,
+  displayCurrency: string,
+  fxProvider?: FxProvider | null,
+): Promise<IdTaxFxAt> {
+  const currencies = new Set<string>();
+  const dates = new Set<string>();
+  if (displayCurrency.toUpperCase() !== "IDR") {
+    for (const { coreTxns, portfolioCountry } of sources) {
+      for (const t of coreTxns) {
+        if (t.type !== "sell" || !t.instrumentId) continue;
+        const meta = metaById.get(t.instrumentId);
+        if (!meta || !goldSaleInScope(meta, t.currency, portfolioCountry)) continue;
+        if (t.currency.toUpperCase() === "IDR") continue;
+        currencies.add(t.currency.toUpperCase());
+        dates.add(toDateKey(t.executedAt));
+      }
+    }
+  }
+  if (dates.size > 0) dates.add(toDateKey(new Date()));
+  const ratesByDate =
+    dates.size === 0 || currencies.size === 0
+      ? new Map<string, Record<string, string>>()
+      : await getFxRatesForDates(app.db, [...currencies], "IDR", [...dates], fxProvider);
+  return (at) => makeFxRateFn(ratesByDate.get(toDateKey(at)) ?? {}, "IDR");
+}
+
 /** null means the amount cannot be expressed in the report currency. */
 type DatedFx = (amount: Decimal, currency: string, at: Date) => Decimal | null;
 
@@ -636,6 +672,62 @@ function idBondDiscountRows(
   return rows;
 }
 
+function goldSaleInScope(
+  meta: { market: string; assetClass: string; isin?: string | null },
+  currency: string,
+  portfolioCountry: string | null,
+): boolean {
+  if (meta.assetClass !== "gold") return false;
+  if (currency.toUpperCase() === "IDR") return true;
+  if (isIndonesianInstrument(meta)) return true;
+  return (portfolioCountry ?? "").trim().toUpperCase() === "ID";
+}
+
+/** Gold-bar sales (PMK 51/2025, PMK 52/2025). One row per sell transaction — the
+ *  Rp10,000,000 test is the transaction, not a FIFO slice. Only an Indonesian sale:
+ *  IDR, an instrument this report already treats as Indonesian, or a portfolio in ID.
+ *  Gross is quantity × price. A non-IDR sale needs an IDR amount for the threshold. */
+function idGoldDisposalInputs(
+  sources: IdIncomeSource[],
+  metaById: Map<string, InstrumentMeta>,
+  displayCurrency: string,
+  convert: DatedFx,
+  toIdr: DatedFx,
+): IdGoldDisposalInput[] {
+  const rows: IdGoldDisposalInput[] = [];
+  for (const { coreTxns, portfolioCountry } of sources) {
+    for (const t of coreTxns) {
+      if (t.type !== "sell" || !t.instrumentId) continue;
+      const meta = metaById.get(t.instrumentId);
+      if (!meta || !goldSaleInScope(meta, t.currency, portfolioCountry)) continue;
+      const grossNative = new Decimal(t.quantity).mul(t.price);
+      const at = t.executedAt;
+      const gross = convert(grossNative, t.currency, at);
+      const recordedConv = convert(new Decimal(t.tax ?? "0"), t.currency, at);
+      if (gross === null || recordedConv === null) continue;
+      const currency = t.currency.toUpperCase();
+      let proceedsIdr: string | null;
+      if (currency === "IDR") proceedsIdr = grossNative.toFixed(2);
+      else if (displayCurrency.toUpperCase() === "IDR") proceedsIdr = gross.toFixed(2);
+      else {
+        const idr = toIdr(grossNative, t.currency, at);
+        proceedsIdr = idr === null ? null : idr.toFixed(2);
+      }
+      const recorded = recordedConv.gt(0) ? recordedConv.toFixed(2) : undefined;
+      if (!recorded && proceedsIdr === null) continue;
+      rows.push({
+        instrumentId: t.instrumentId,
+        symbol: meta.symbol || t.instrumentId.slice(0, 8),
+        when: toDateKey(at),
+        proceeds: gross.toFixed(2),
+        proceedsIdr: proceedsIdr ?? "0.00",
+        ...(recorded ? { tax: recorded } : {}),
+      });
+    }
+  }
+  return rows;
+}
+
 /** Crypto sale rows (PMK 68/2022, PMK 50/2025). One per trade-log leg of a `crypto`
  *  instrument, and only when the portfolio resolves to a venue. Gross is quantity ×
  *  price. Not the 0.1% share tax. A date before 2022-05-01 with no recorded tax is
@@ -694,6 +786,8 @@ function idCryptoDisposalInputs(
  *   adds nothing. This is not the 0.1% share tax.
  * - Crypto sales are a separate final tax (`cryptoBooks`): gross quantity × price, rate by
  *   the portfolio's venue and the sale date. They are not added to the 0.1% share total.
+ * - A gold-bar sell that is Indonesian (IDR, an Indonesian instrument, or a portfolio in
+ *   ID) can add a PPh 22 row. It is not final and not the 0.1%.
  * - `byYear` carries each year's gross sale value and the sales tax already decided per
  *   leg (recorded withholding, or 0.1% of that gross), plus that year's income.
  */
@@ -724,6 +818,9 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     cryptoTaxVenue: string | null;
     portfolioCountry: string | null;
   }[];
+  /** FX into IDR at a gold sale's date, for the Rp10,000,000 test when the sale
+   *  itself is not in IDR. Unused when the sale currency or the report is IDR. */
+  idrAt?: IdTaxFxAt;
 }): IndonesianFinalTax {
   const { tradeLog, incomeSources, year, metaById, displayCurrency, fxRates, cryptoBooks } = input;
   const ZERO = "0";
@@ -746,6 +843,15 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     return amount.mul(rate);
   };
   const dated = input.fxAt ? convertDated : null;
+  const toIdr: DatedFx = (amount, fromCurrency, at) => {
+    if (fromCurrency.toUpperCase() === "IDR") return amount;
+    if (!input.idrAt) {
+      recordFxMissing([fromCurrency]);
+      return null;
+    }
+    const out = tryConvert(amount.toString(), fromCurrency, "IDR", input.idrAt(at));
+    return out === null ? null : new Decimal(out);
+  };
 
   // The 0.1% final sales tax only covers disposals of IDX-listed shares; gold, crypto,
   // foreign-listed ETFs/stocks and bonds are out of scope (audit C4). Unknown instruments
@@ -920,5 +1026,12 @@ export function computeIndonesianFinalTaxFromTradeLog(input: {
     income,
     byYear,
     cryptoDisposals: idCryptoDisposalInputs(cryptoBooks ?? [], metaById, dated),
+    goldDisposals: idGoldDisposalInputs(
+      incomeSources,
+      metaById,
+      displayCurrency,
+      convertDated,
+      toIdr,
+    ),
   });
 }

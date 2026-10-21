@@ -280,21 +280,23 @@ Final taxes for a **resident individual**, with no annual allowance, no loss-net
 dependency on when a gain was locked in. They tax _proceeds and gross income_, not gains,
 and the rate depends on the type and the source of the income:
 
-| Event (category)                                                        | Rate     | Base                                                  | Who pays                                     | Rule                                                                                                       |
-| ----------------------------------------------------------------------- | -------- | ----------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Sale of IDX-listed shares                                               | **0.1%** | Gross sale value, quantity × price, before commission | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                                   |
-| Crypto sale (`cryptoDisposals`)                                         | by venue | Gross sale value, quantity × price, fees excluded     | Withheld at source                           | PMK 68/2022 from 1 May 2022; PMK 50/2025 from 1 Aug 2025. Not the 0.1%. See below                          |
-| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**  | Gross dividend                                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374             |
-| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**  | Gross interest for the holding period                 | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before). Coupons use today's 10% unless a withholding is recorded |
-| Bond / sukuk discount (`bond_discount`)                                 | **10%**  | Clean sale price − clean cost, × quantity, fees out   | Withheld at source                           | PP 91/2021 Art. 2(3). 15% on a sale before 30 Aug 2021. Not the 0.1% share tax                             |
-| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**  | Gross interest                                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below)        |
-| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**   | —                                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                        |
-| Foreign-source income (`foreign`)                                       | marginal | Gross, in the annual return                           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                       |
+| Event (category)                                                        | Rate      | Base                                                  | Who pays                                     | Rule                                                                                                       |
+| ----------------------------------------------------------------------- | --------- | ----------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Sale of IDX-listed shares                                               | **0.1%**  | Gross sale value, quantity × price, before commission | Withheld by the exchange via the broker      | PP 41/1994 as amended by PP 14/1997; KMK 282/KMK.04/1997                                                   |
+| Crypto sale (`cryptoDisposals`)                                         | by venue  | Gross sale value, quantity × price, fees excluded     | Withheld at source                           | PMK 68/2022 from 1 May 2022; PMK 50/2025 from 1 Aug 2025. Not the 0.1%. See below                          |
+| Gold-bar sale to an LJK Bulion (`goldDisposals`)                        | **0.25%** | Gross sale value above Rp10,000,000                   | Withheld at source, **not final**            | PMK 51/2025 and PMK 52/2025 from 1 Aug 2025. Not in `estimatedTax` or `taxToSelfPay`. See below            |
+| Dividend of an Indonesian company (`domestic_dividend`)                 | **10%**   | Gross dividend                                        | The investor, by the 15th of the next month  | UU PPh Art. 4(3)(f), 17(2c) as amended by UU HPP 7/2021; PMK 18/2021; PMK 81/2024 Art. 370–374             |
+| Bond interest / coupon, SBN retail included (`bond_interest`)           | **10%**   | Gross interest for the holding period                 | Withheld by the issuer or custodian          | PP 91/2021 Art. 2 (from 30 Aug 2021; 15% before). Coupons use today's 10% unless a withholding is recorded |
+| Bond / sukuk discount (`bond_discount`)                                 | **10%**   | Clean sale price − clean cost, × quantity, fees out   | Withheld at source                           | PP 91/2021 Art. 2(3). 15% on a sale before 30 Aug 2021. Not the 0.1% share tax                             |
+| Bank deposit, savings and current-account interest (`deposit_interest`) | **20%**   | Gross interest                                        | Withheld by the bank                         | PP 131/2000 as amended by PP 123/2015; PMK 212/PMK.03/2018; 0% when the balance is ≤ Rp7.5M (below)        |
+| Reksa dana / IDX ETF / DIRE distribution (`fund_distribution`)          | **0%**    | —                                                     | Not an income-tax object for the unit holder | UU PPh Art. 4(3)(i)                                                                                        |
+| Foreign-source income (`foreign`)                                       | marginal  | Gross, in the annual return                           | The investor, with a foreign tax credit      | UU PPh Art. 17 (5–35%), Art. 24; PMK 192/PMK.03/2018                                                       |
 
 `estimatedTax` = sales tax + the final tax on the Indonesian income. It is split into
 `taxWithheldAtSource` (share sales, crypto sales, bond interest, bond discount and bank
 interest: the payer already withheld it) and `taxToSelfPay` (domestic dividends that are not
-attested as reinvested). The Tax page
+attested as reinvested). Gold-bar PPh 22 is withheld but it is not a final tax, so it is
+in neither figure. The Tax page
 shows both in the hero card and labels each income row "withheld at source" or "you pay", so
 withheld tax doesn't read as tax still owed.
 
@@ -331,6 +333,25 @@ A date with no estimate and no recorded withholding is omitted. A withholding re
 the sell wins. `totalCryptoTax` is folded into `estimatedTax` and `taxWithheldAtSource`. It
 is not added to the 0.1% share total (`totalSalesTax` / the share-sales table). On a holder
 view each portfolio is judged on its own venue before the trade logs are merged.
+
+### Gold bars (PMK 51/2025, PMK 52/2025)
+
+An end consumer selling gold bars to an LJK Bulion on or after **1 Aug 2025** can produce
+a `goldDisposals` row. The base is the sale's quantity × price (fees excluded), one row
+per sell transaction. At or under **Rp10,000,000** there is no PPh 22. Above that, the
+institution withholds **0.25%** of the purchase price. A consumer buying bars is not taxed.
+
+The sale counts only when it is Indonesian: the sale currency is IDR, the instrument is
+one this report already treats as Indonesian, or the portfolio's country is `ID`. A gold
+sale in another book is unchanged. A gold ETF booked as `etf` or `mutual_fund` stays a
+fund distribution at 0% and is not this, and it is not an IDX share sale.
+
+PPh 22 here is a withholding, not one of the final taxes. The row is shown
+(`totalGoldTax`) and is not added to `estimatedTax`, `taxWithheldAtSource`, `taxToSelfPay`
+or the 0.1% (`totalSalesTax`). There is no NPWP flag, so the pre-August Antam buyback
+rates (1.5% / 3% under PMK 34/2017) are not estimated: a sale before 2025-08-01 with no
+recorded withholding is omitted. A withholding recorded on the sell is the figure shown,
+including under the threshold and before that date.
 
 ### Bond and sukuk discount (PP 91/2021 Art. 2(3))
 
@@ -605,6 +626,9 @@ regime only" caveat. **Keep that text in sync with this document** when the rule
     and https://news.ddtc.co.id/berita/nasional/39093/potong-pajak-penghasilan-penyelenggara-p2p-lending-harus-tahu-ini
   - IDX sales tax reporting under PMK 81/2024:
     https://news.ddtc.co.id/berita/nasional/1807703/pmk-812024-perinci-ketentuan-bukti-potong-pph-atas-penjualan-saham
+  - PMK 51/2025 and PMK 52/2025 (gold bars, from 1 Aug 2025: no PPh 22 on a consumer
+    purchase; 0.25% when an end consumer sells bars to an LJK Bulion above Rp10,000,000):
+    https://pajak.go.id/id/siaran-pers/pemerintah-tegaskan-konsumen-akhir-tak-dipungut-pajak-atas-pembelian-emas
 - `packages/core/src/trade-log.ts` — `Trade.vorabByYear` / `TradeLeg.vorabCredit`
   (Vorabpauschale share-accounting), FIFO/average trade-log construction.
 - `packages/core/src/valuation.ts` — `CostBasisMode`.

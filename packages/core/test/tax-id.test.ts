@@ -1175,3 +1175,90 @@ describe("reinvested domestic dividends", () => {
     expect(result.taxToSelfPay).toBe("0.00");
   });
 });
+
+describe("gold-bar PPh 22", () => {
+  const sale = (when: string, proceedsIdr: string, tax?: string, proceeds = proceedsIdr) => ({
+    symbol: "XAU",
+    when,
+    proceeds,
+    proceedsIdr,
+    ...(tax !== undefined ? { tax } : {}),
+  });
+
+  it("charges nothing at Rp10,000,000 and 0.25% one rupiah over", () => {
+    const at = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      goldDisposals: [sale("2025-08-01", "10000000")],
+    });
+    expect(at.goldDisposals).toEqual([]);
+    expect(at.totalGoldTax).toBe("0.00");
+    expect(at.estimatedTax).toBe("0.00");
+    expect(at.taxToSelfPay).toBe("0.00");
+    expect(at.totalSalesTax).toBe("0.00");
+
+    const over = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      goldDisposals: [sale("2025-08-01", "10000001")],
+    });
+    expect(over.goldDisposals[0]).toMatchObject({
+      rate: "0.0025",
+      tax: "25000.00",
+      taxBasis: "estimated",
+    });
+    expect(over.totalGoldProceeds).toBe("10000001.00");
+    expect(over.totalGoldTax).toBe("25000.00");
+    expect(over.estimatedTax).toBe("0.00");
+    expect(over.taxWithheldAtSource).toBe("0.00");
+    expect(over.taxToSelfPay).toBe("0.00");
+    expect(over.byYear.find((y) => y.year === 2025)?.tax ?? "0.00").toBe("0.00");
+  });
+
+  it("shows a recorded withholding instead of 0.25%, including before the date", () => {
+    const recorded = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      goldDisposals: [sale("2025-09-01", "20000000", "1000")],
+    });
+    expect(recorded.goldDisposals[0]).toMatchObject({
+      tax: "1000.00",
+      rate: null,
+      taxBasis: "recorded",
+    });
+    expect(recorded.totalGoldTax).toBe("1000.00");
+    expect(recorded.estimatedTax).toBe("0.00");
+
+    const early = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      goldDisposals: [sale("2025-07-31", "20000000", "80")],
+    });
+    expect(early.goldDisposals[0]).toMatchObject({ tax: "80.00", taxBasis: "recorded" });
+  });
+
+  it("does not estimate a sale on 31 Jul 2025", () => {
+    const result = indonesianFinalTax({
+      ...empty,
+      year: 2025,
+      goldDisposals: [sale("2025-07-31", "20000000")],
+    });
+    expect(result.goldDisposals).toEqual([]);
+    expect(result.totalGoldTax).toBe("0.00");
+    expect(result.estimatedTax).toBe("0.00");
+  });
+
+  it("does not add the withholding to the 0.1% share tax", () => {
+    const result = indonesianFinalTax({
+      year: 2025,
+      disposals: [{ symbol: "BBCA", when: "2025-06-01", proceeds: "1000000" }],
+      income: [],
+      byYear: [{ year: 2025, proceeds: "1000000", realized: "0", salesTax: "1000" }],
+      goldDisposals: [sale("2025-08-01", "20000000")],
+    });
+    expect(result.totalSalesTax).toBe("1000.00");
+    expect(result.estimatedTax).toBe("1000.00");
+    expect(result.totalGoldTax).toBe("50000.00");
+    expect(result.byYear[0]).toMatchObject({ tax: "1000.00" });
+  });
+});

@@ -147,6 +147,15 @@ export function TaxHolderSectionId({
         </p>
       )}
 
+      {(idTax.goldDisposals?.length ?? 0) > 0 && (
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {t("id.gold.line", {
+            tax: money(idTax.totalGoldTax ?? "0"),
+            proceeds: money(idTax.totalGoldProceeds ?? "0"),
+          })}
+        </p>
+      )}
+
       <p className="text-xs text-muted-foreground leading-relaxed">{t("id.footnote")}</p>
     </>
   );
