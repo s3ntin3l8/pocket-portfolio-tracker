@@ -356,7 +356,11 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       "was at most Rp7,500,000 just before the payment; this approximates the per-bank rule by treating one portfolio " +
       "as one bank, so say so. Crypto sales are a separate final tax (`cryptoDisposals`, `totalCryptoTax`), inside " +
       "`estimatedTax` and `taxWithheldAtSource` but not the 0.1% share total: the rate follows the portfolio's " +
-      "`cryptoTaxVenue` (domestic or foreign; null uses domestic only when the portfolio country is ID). `taxWithheldAtSource` is already " +
+      "`cryptoTaxVenue` (domestic or foreign; null uses domestic only when the portfolio country is ID). " +
+      "A gold-bar sale (`goldDisposals`, `totalGoldTax`) withholds PPh 22 at 0.25% of the gross when it is above " +
+      "Rp10,000,000 on or after 1 Aug 2025. It is not final and not the 0.1%: it is not in `estimatedTax`, " +
+      "`taxWithheldAtSource` or `taxToSelfPay`. At or under Rp10,000,000, and before that date, nothing is estimated. " +
+      "A gold ETF booked as etf or mutual_fund is not this. `taxWithheldAtSource` is already " +
       "withheld and `taxToSelfPay` is what the user pays; never present the whole `estimatedTax` as still owed. Foreign income " +
       "(`foreignIncomeGross`) is not in `estimatedTax`: it is taxed at the user's marginal rate (5–35%) with a credit for " +
       "`foreignTaxWithheld`, which Pocket cannot compute. An income row with no instrument is cash income; its " +

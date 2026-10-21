@@ -15,6 +15,10 @@
  *     rate by venue and sale date ({@link ID_CRYPTO_RATE_TABLE}). Not the 0.1%. No estimate
  *     before 2022-05-01, and the old PPN is not modelled. Folded into `estimatedTax` and
  *     `taxWithheldAtSource`.
+ *   - Gold-bar sales (PMK 51/2025, PMK 52/2025, from 1 Aug 2025): PPh 22 at 0.25% of the
+ *     gross when an end consumer sells bars for more than Rp10,000,000. A withholding,
+ *     not a final tax — shown, and not added to `estimatedTax` or `taxToSelfPay`.
+ *     Nothing is estimated at or under that amount, or before the date. Buys are not taxed.
  *   - Investment income, classified per transaction by {@link classifyIdIncome}:
  *       domestic_dividend  10% final of gross, paid by the investor by the 15th of the
  *                          following month (nothing is withheld for a resident individual);
@@ -233,6 +237,59 @@ export interface IdCryptoDisposalTax {
   taxBasis: IdIncomeTaxBasis | null;
 }
 
+/** PPh 22 on an end-consumer sale of gold bars to an LJK Bulion (PMK 51/2025, PMK 52/2025). */
+export const ID_GOLD_PPH22_RATE = "0.0025";
+/** No PPh 22 at or under this gross, in IDR. One rupiah over is taxed. */
+export const ID_GOLD_PPH22_THRESHOLD_IDR = "10000000";
+/** First date the 0.25% is estimated. Earlier sales are not given the old 1.5%/3%. */
+export const ID_GOLD_PPH22_FROM = "2025-08-01";
+
+/** One gold-bar sale already in the report currency. Buys are not passed. */
+export interface IdGoldDisposalInput {
+  symbol: string;
+  instrumentId?: string | null;
+  /** Sale date, YYYY-MM-DD. */
+  when: string;
+  /** Gross sale value in the report currency (quantity × price, fees excluded). */
+  proceeds: string;
+  /** The same gross in IDR. The Rp10,000,000 test uses this, not `proceeds`. */
+  proceedsIdr: string;
+  /** Recorded withholding in the report currency. Greater than zero wins. */
+  tax?: string;
+}
+
+export interface IdGoldDisposalTax {
+  symbol: string;
+  instrumentId?: string | null;
+  when: string;
+  proceeds: string;
+  /** `0.0025` when estimated, null when a recorded withholding was used. */
+  rate: string | null;
+  tax: string;
+  taxBasis: "recorded" | "estimated";
+}
+
+/**
+ * PPh 22 for one in-scope gold-bar sale, or null when there is nothing to show.
+ * Recorded withholding is shown even under the threshold and before 1 Aug 2025.
+ * Otherwise no estimate at or under Rp10,000,000, or before that date.
+ */
+export function idGoldPph22(row: IdGoldDisposalInput): {
+  tax: Decimal;
+  rate: string | null;
+  basis: "recorded" | "estimated";
+} | null {
+  const recorded = row.tax !== undefined && D(row.tax).gt(0) ? D(row.tax) : null;
+  if (recorded) return { tax: recorded, rate: null, basis: "recorded" };
+  if (row.when < ID_GOLD_PPH22_FROM) return null;
+  if (!D(row.proceedsIdr).gt(ID_GOLD_PPH22_THRESHOLD_IDR)) return null;
+  return {
+    tax: D(row.proceeds).times(ID_GOLD_PPH22_RATE),
+    rate: ID_GOLD_PPH22_RATE,
+    basis: "estimated",
+  };
+}
+
 /** How a row of investment income is taxed for an Indonesian resident individual. */
 export type IdIncomeCategory =
   | "domestic_dividend"
@@ -448,6 +505,8 @@ export interface IndonesianFinalTaxInput {
   byYear: IdYearInput[];
   /** Crypto sales of every year. Omitted means none. Not part of the 0.1% share total. */
   cryptoDisposals?: IdCryptoDisposalInput[];
+  /** Gold-bar sales of every year. Omitted means none. Not a final tax. */
+  goldDisposals?: IdGoldDisposalInput[];
 }
 
 export interface IndonesianFinalTax {
@@ -461,6 +520,12 @@ export interface IndonesianFinalTax {
   totalCryptoProceeds: string;
   /** Final tax on those crypto sales. Withheld at source. */
   totalCryptoTax: string;
+  /** Gold-bar sales in the selected year. PPh 22, not a final tax and not the 0.1%. */
+  goldDisposals: IdGoldDisposalTax[];
+  /** Gross gold-bar sale value in the selected year, for the rows above. */
+  totalGoldProceeds: string;
+  /** PPh 22 shown on those sales. Not part of `estimatedTax` or `taxToSelfPay`. */
+  totalGoldTax: string;
   /** The selected year's income, grouped per (instrument, category), every category. */
   income: IdIncomeTax[];
   /** The selected year's income per category, in {@link ID_INCOME_CATEGORIES} order;
@@ -790,6 +855,30 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     });
   }
 
+  // Gold-bar PPh 22 is a withholding, not a final tax: shown, and kept out of
+  // estimatedTax, taxWithheldAtSource, taxToSelfPay and the year column.
+  let totalGoldProceeds = ZERO;
+  let totalGoldTax = ZERO;
+  const goldDisposals: IdGoldDisposalTax[] = [];
+  for (const r of input.goldDisposals ?? []) {
+    const decided = idGoldPph22(r);
+    if (!decided) continue;
+    const year = Number(r.when.slice(0, 4));
+    if (year !== input.year) continue;
+    const proceeds = D(r.proceeds);
+    totalGoldProceeds = totalGoldProceeds.plus(proceeds);
+    totalGoldTax = totalGoldTax.plus(decided.tax);
+    goldDisposals.push({
+      symbol: r.symbol,
+      ...(r.instrumentId !== undefined ? { instrumentId: r.instrumentId } : {}),
+      when: r.when,
+      proceeds: proceeds.toFixed(2),
+      rate: decided.rate,
+      tax: decided.tax.toFixed(2),
+      taxBasis: decided.basis,
+    });
+  }
+
   // Tax is decided per transaction (recorded vs. estimated), then grouped for display.
   const groups = new Map<string, IncomeAcc>();
   const incomeByYear = new Map<number, { income: Decimal; foreign: Decimal; tax: Decimal }>();
@@ -873,6 +962,9 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
     cryptoDisposals,
     totalCryptoProceeds: totalCryptoProceeds.toFixed(2),
     totalCryptoTax: totalCryptoTax.toFixed(2),
+    goldDisposals,
+    totalGoldProceeds: totalGoldProceeds.toFixed(2),
+    totalGoldTax: totalGoldTax.toFixed(2),
     income,
     ...incomeTotals(income, totalSalesTax, totalCryptoTax),
     byYear,
@@ -887,11 +979,14 @@ export function indonesianFinalTax(input: IndonesianFinalTaxInput): IndonesianFi
 export function mergeIndonesianFinalTax(parts: IndonesianFinalTax[]): IndonesianFinalTax {
   const disposals = parts.flatMap((p) => p.disposals);
   const cryptoDisposals = parts.flatMap((p) => p.cryptoDisposals ?? []);
+  const goldDisposals = parts.flatMap((p) => p.goldDisposals ?? []);
   const income = parts.flatMap((p) => p.income);
   const totalProceeds = parts.reduce((s, p) => s.plus(p.totalProceeds), ZERO);
   const totalSalesTax = parts.reduce((s, p) => s.plus(p.totalSalesTax), ZERO);
   const totalCryptoProceeds = parts.reduce((s, p) => s.plus(p.totalCryptoProceeds ?? "0"), ZERO);
   const totalCryptoTax = parts.reduce((s, p) => s.plus(p.totalCryptoTax ?? "0"), ZERO);
+  const totalGoldProceeds = parts.reduce((s, p) => s.plus(p.totalGoldProceeds ?? "0"), ZERO);
+  const totalGoldTax = parts.reduce((s, p) => s.plus(p.totalGoldTax ?? "0"), ZERO);
   const years = new Map<
     number,
     { realized: Decimal; income: Decimal; foreignIncome: Decimal; tax: Decimal }
@@ -916,6 +1011,9 @@ export function mergeIndonesianFinalTax(parts: IndonesianFinalTax[]): Indonesian
     cryptoDisposals,
     totalCryptoProceeds: totalCryptoProceeds.toFixed(2),
     totalCryptoTax: totalCryptoTax.toFixed(2),
+    goldDisposals,
+    totalGoldProceeds: totalGoldProceeds.toFixed(2),
+    totalGoldTax: totalGoldTax.toFixed(2),
     income,
     ...incomeTotals(income, totalSalesTax, totalCryptoTax),
     byYear: [...years.entries()]

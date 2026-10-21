@@ -2248,6 +2248,9 @@
       "crypto": {
         "line": "Crypto sales tax {tax} on {proceeds} of gross sale value. Final and withheld, and not the 0.1% share tax. The rate follows the portfolio's crypto platform: 0.21% domestic or 1% foreign from 1 Aug 2025 (0.10% / 0.20% from 1 May 2022). Nothing is estimated before that, and a loss is still taxed on the sale value."
       },
+      "gold": {
+        "line": "Gold-bar PPh 22 of {tax} withheld on {proceeds} sold above Rp10 million, from 1 Aug 2025. A withholding, not a final tax, so it is not part of the estimate or of tax still to pay. A sale at or under Rp10,000,000 is not charged."
+      },
       "footnote": "Indonesia taxes listed-share sales at a final 0.1% and investment income at a final rate per type. Sales tax and interest tax are withheld at source; tax on dividends you pay yourself unless you reinvest them. Foreign income isn't final-taxed and isn't in this estimate. There are no losses to harvest. A peer-to-peer loan booked as bank interest, bonus shares booked as a dividend, or a fund booked as a share is taxed as if it were. This is an estimate, not tax advice.",
       "unavailable": "Indonesian tax breakdown is unavailable."
     },

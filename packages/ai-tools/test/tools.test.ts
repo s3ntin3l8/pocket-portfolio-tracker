@@ -348,6 +348,8 @@ describe("ai-tools", () => {
     expect(d).toMatch(/`income\[\]\.exemption: "reinvested"`/);
     expect(d).toMatch(/totalCryptoTax/);
     expect(d).toMatch(/cryptoTaxVenue/);
+    expect(d).toMatch(/totalGoldTax/);
+    expect(d).toMatch(/not in `estimatedTax`, `taxWithheldAtSource` or `taxToSelfPay`/);
     expect(d).toMatch(/portfolio's `country`/);
     expect(d).toMatch(/taxWithheldAtSource/);
     expect(d).toMatch(/taxToSelfPay/);

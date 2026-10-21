@@ -55,6 +55,7 @@ import {
   computeIndonesianFinalTaxFromTradeLog,
   loadIdDepositFx,
   loadIdReportFx,
+  loadIdGoldFx,
   foreignTaxCreditForYear,
 } from "./tax-helpers.js";
 import { isReadOnlyPat } from "../../plugins/auth.js";
@@ -224,6 +225,13 @@ export function registerTaxRoutes(app: FastifyInstance) {
             app,
             incomeSources,
             [tradeLog],
+            portfolio.baseCurrency,
+            fxProvider,
+          ),
+          idrAt: await loadIdGoldFx(
+            app,
+            incomeSources,
+            metaById,
             portfolio.baseCurrency,
             fxProvider,
           ),
@@ -553,6 +561,7 @@ export function registerTaxRoutes(app: FastifyInstance) {
               })),
               depositFxAt: await loadIdDepositFx(app, incomeSources, fxProvider),
               fxAt: await loadIdReportFx(app, incomeSources, [mergedLog], display, fxProvider),
+              idrAt: await loadIdGoldFx(app, incomeSources, meta, display, fxProvider),
               year,
               metaById: meta,
               displayCurrency: display,
