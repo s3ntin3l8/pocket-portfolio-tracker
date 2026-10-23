@@ -240,3 +240,7 @@ GitHub Actions in `.github/workflows/` are thin callers of the reusable workflow
 test:coverage and build fan out via Turbo, then a Docker image is built from the root
 `Dockerfile`. Releases are automated via
 [Release Please](https://github.com/googleapis/release-please).
+
+## License
+
+Copyright (C) 2026 Björn Hansen — licensed under [AGPL-3.0-or-later](LICENSE).
