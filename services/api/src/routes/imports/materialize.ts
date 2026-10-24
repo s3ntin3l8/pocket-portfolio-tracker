@@ -5,8 +5,7 @@ import { portfolios, screenshotImports, transactionSources } from "@portfolio/db
 import type { ParsedTransaction } from "@portfolio/schema";
 import { parsedTransactionSchema } from "@portfolio/schema";
 import { parserToTxSource, isEuParser } from "../../services/parsers/dedup.js";
-import { materializeDrafts } from "../../services/materialize-drafts.js";
-import { isCashMovementAction } from "../../services/pytr/mapper.js";
+import { materializeDrafts, type DuplicateMatch } from "../../services/materialize-drafts.js";
 import {
   finalizeReceipts,
   retainDocumentForTransaction,
@@ -18,6 +17,10 @@ import { ownedPortfolio } from "../helpers.js";
 const materializeBodySchema = z.object({
   portfolioId: z.string().uuid(),
   acknowledgeAccountMismatch: z.boolean().default(false),
+  // Clears a duplicate-409: the user consciously chose to import the flagged duplicates.
+  // A duplicate of a *pending* row still needs a per-row decision — the blanket flag never
+  // clears those.
+  acknowledgeDuplicates: z.boolean().default(false),
 });
 
 const accountCheckBodySchema = z.object({
@@ -30,34 +33,51 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
     drafts: ParsedTransaction[];
     parserTag: string;
     targetPortfolioId: string;
-  }): Promise<{ materialized: number; excludedCashMovements: number; enriched: number }> {
-    const { imp, drafts, parserTag, targetPortfolioId } = opts;
+    acknowledgeDuplicates?: boolean;
+  }): Promise<
+    | { kind: "duplicate"; plainDuplicates: DuplicateMatch[]; pendingDuplicates: DuplicateMatch[] }
+    | {
+        kind: "ok";
+        materialized: number;
+        enriched: number;
+        matchedTransactionIds: string[];
+      }
+  > {
+    const { imp, drafts, parserTag, targetPortfolioId, acknowledgeDuplicates } = opts;
     const [pf] = await app.db
       .select({
-        cashCounted: portfolios.cashCounted,
         documentRetention: portfolios.documentRetention,
       })
       .from(portfolios)
       .where(eq(portfolios.id, targetPortfolioId))
       .limit(1);
 
-    let toWrite = drafts;
-    let excludedCashMovements = 0;
-    if (parserTag === "tr-pdf" && pf && !pf.cashCounted) {
-      const before = toWrite.length;
-      toWrite = toWrite.filter((d) => !isCashMovementAction(d.action));
-      excludedCashMovements = before - toWrite.length;
-    }
+    // Cash transactions are always imported — the portfolio's `cashCounted` boundary
+    // decides whether they are counted and shown, both of which are read-time decisions
+    // over the stored rows (see routes/imports/confirm.ts for the same reasoning).
 
     const res = await materializeDrafts(app, {
-      drafts: toWrite,
+      drafts,
       targetPortfolioId,
       source: parserToTxSource(parserTag) as "csv" | "pdf" | "ibkr" | "screenshot" | "manual",
       importId: imp.id,
       status: "draft",
       isEu: isEuParser(parserTag),
       euWhenIsin: parserTag === "ai",
+      mode: "user",
+      acknowledgeDuplicates,
     });
+
+    // A duplicate that needs a decision blocks the import — exactly like the confirm
+    // path. The materialization path and the confirm path must agree: the same file
+    // imported through either entry point has to behave the same way.
+    if (res.kind === "duplicate") {
+      return {
+        kind: "duplicate",
+        plainDuplicates: res.plainDuplicates,
+        pendingDuplicates: res.pendingDuplicates,
+      };
+    }
 
     await app.db
       .update(screenshotImports)
@@ -115,7 +135,12 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
       }
     }
 
-    return { materialized: res.written.length, excludedCashMovements, enriched: res.enriched };
+    return {
+      kind: "ok",
+      materialized: res.written.length,
+      enriched: res.enriched,
+      matchedTransactionIds: res.matchedTransactionIds,
+    };
   }
 
   app.post<{ Params: { importId: string } }>(
@@ -123,7 +148,8 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const id = request.userId;
-      const { portfolioId, acknowledgeAccountMismatch } = materializeBodySchema.parse(request.body);
+      const { portfolioId, acknowledgeAccountMismatch, acknowledgeDuplicates } =
+        materializeBodySchema.parse(request.body);
 
       const [imp] = await app.db
         .select()
@@ -172,7 +198,45 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
         drafts,
         parserTag: imp.parser ?? "csv",
         targetPortfolioId: portfolioId,
+        acknowledgeDuplicates,
       });
+      if (mat.kind === "duplicate") {
+        // Same 409 shape as the confirm path, so the client handles both entry points
+        // identically.
+        const isoDay = (v: Date | string) =>
+          (v instanceof Date ? v.toISOString() : new Date(v).toISOString()).slice(0, 10);
+        const describe = (entry: DuplicateMatch, pending: boolean) => {
+          const d = drafts[entry.draftIndex];
+          return {
+            draftIndex: entry.draftIndex,
+            externalId: d?.externalId ?? `import:${imp.id}:${entry.draftIndex}`,
+            matchedTransactionId: entry.matched.id,
+            name: d?.name ?? d?.isin ?? d?.ticker ?? null,
+            action: d?.action ?? null,
+            quantity: d?.quantity ?? null,
+            executedAt: d ? isoDay(d.executedAt) : null,
+            matchedSource: entry.matched.source,
+            matchedExecutedAt: isoDay(entry.matched.executedAt),
+            pending,
+          };
+        };
+        request.log.info(
+          {
+            importId: imp.id,
+            duplicates: mat.plainDuplicates.length,
+            pending: mat.pendingDuplicates.length,
+          },
+          "materialize blocked: cross-source duplicates",
+        );
+        return reply.code(409).send({
+          error: "duplicate_transactions",
+          count: mat.plainDuplicates.length + mat.pendingDuplicates.length,
+          duplicates: [
+            ...mat.plainDuplicates.map((d) => describe(d, false)),
+            ...mat.pendingDuplicates.map((d) => describe(d, true)),
+          ],
+        });
+      }
       request.log.info(
         { importId: imp.id, materialized: mat.materialized, portfolioId },
         "import materialized as drafts",
@@ -183,7 +247,6 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
         materialized: true,
         portfolioId,
         materializedCount: mat.materialized,
-        excludedCashMovements: mat.excludedCashMovements,
         enrichedCount: mat.enriched,
       };
     },

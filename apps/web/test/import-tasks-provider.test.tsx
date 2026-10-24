@@ -34,7 +34,6 @@ function makeClient(overrides: Partial<ImportClient> = {}): ImportClient {
     confirmImport: vi.fn(async () => ({ confirmed: 1 })),
     materializeImport: vi.fn(async () => ({
       materializedCount: 1,
-      excludedCashMovements: 0,
       enrichedCount: 0,
     })),
     checkAccounts: vi.fn(async () => ({ mismatches: [] })),
@@ -101,8 +100,8 @@ describe("ImportTasksProvider", () => {
   it("materialize: sums counts across units and resolves the toast to success", async () => {
     const materializeImport = vi
       .fn()
-      .mockResolvedValueOnce({ materializedCount: 2, excludedCashMovements: 0, enrichedCount: 0 })
-      .mockResolvedValueOnce({ materializedCount: 3, excludedCashMovements: 0, enrichedCount: 0 });
+      .mockResolvedValueOnce({ materializedCount: 2, enrichedCount: 0 })
+      .mockResolvedValueOnce({ materializedCount: 3, enrichedCount: 0 });
     h.client = makeClient({ materializeImport });
 
     renderRunner(
@@ -115,8 +114,8 @@ describe("ImportTasksProvider", () => {
     );
 
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp-a", "p1", false);
-    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp-b", "p2", false);
+    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp-a", "p1", false, undefined);
+    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp-b", "p2", false, undefined);
     // 2 + 3 = 5 imported.
     const [msg, opts] = h.success.mock.calls[0]! as [string, { id?: string | number }];
     expect(msg).toContain("5");
@@ -148,12 +147,11 @@ describe("ImportTasksProvider", () => {
     expect(h.loading).toHaveBeenCalledTimes(1);
   });
 
-  it("reports 'X of Y' and splits the gap into excluded cash + skipped duplicates", async () => {
-    // Expected 12, server materializes 9 with 1 cash excluded → 2 duplicates skipped.
+  it("reports 'X of Y' and splits the gap into merged + skipped duplicates", async () => {
+    // Expected 12, server materializes 9 → 3 drafts didn't land, all of them duplicates.
     h.client = makeClient({
       materializeImport: vi.fn(async () => ({
         materializedCount: 9,
-        excludedCashMovements: 1,
         enrichedCount: 0,
       })),
     });
@@ -163,21 +161,20 @@ describe("ImportTasksProvider", () => {
     const [msg, opts] = h.success.mock.calls[0]! as [string, { description?: string }];
     expect(msg).toContain("9");
     expect(msg).toContain("12");
-    // Description carries both the excluded-cash (1) and duplicate-skipped (2) counts.
-    expect(opts.description).toContain("1");
-    expect(opts.description).toContain("2");
+    // Description carries the duplicate-skipped count. Cash movements are never excluded —
+    // the portfolio's boundary decides what is counted and shown, not what is imported.
+    expect(opts.description).toContain("3");
   });
 
-  it("surfaces excluded cash movements in the success description", async () => {
+  it("surfaces the drafts that were merged into an existing transaction", async () => {
     h.client = makeClient({
       materializeImport: vi.fn(async () => ({
         materializedCount: 4,
-        excludedCashMovements: 2,
-        enrichedCount: 0,
+        enrichedCount: 2,
       })),
     });
 
-    renderRunner(materializeTask());
+    renderRunner(materializeTask({ expectedCount: 6 }));
 
     await waitFor(() => expect(h.success).toHaveBeenCalled());
     const opts = h.success.mock.calls[0]![1] as { description?: string };
@@ -189,7 +186,7 @@ describe("ImportTasksProvider", () => {
     const materializeImport = vi
       .fn()
       .mockRejectedValueOnce(Object.assign(new Error("x"), { status: 503 }))
-      .mockResolvedValueOnce({ materializedCount: 1, excludedCashMovements: 0, enrichedCount: 0 });
+      .mockResolvedValueOnce({ materializedCount: 1, enrichedCount: 0 });
     h.client = makeClient({ materializeImport });
 
     renderRunner(materializeTask());
@@ -209,7 +206,7 @@ describe("ImportTasksProvider", () => {
     // Retry replays the same task (no acknowledge change) and resolves to success.
     opts.action!.onClick();
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", false);
+    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", false, undefined);
   });
 
   it("session-expiry 401 → 'session expired' description (not opaque generic)", async () => {
@@ -229,7 +226,7 @@ describe("ImportTasksProvider", () => {
     const materializeImport = vi
       .fn()
       .mockRejectedValueOnce(Object.assign(new Error("unauthorized"), { status: 401 }))
-      .mockResolvedValueOnce({ materializedCount: 1, excludedCashMovements: 0, enrichedCount: 0 });
+      .mockResolvedValueOnce({ materializedCount: 1, enrichedCount: 0 });
     h.client = makeClient({ materializeImport });
     renderRunner(materializeTask());
 
@@ -260,11 +257,10 @@ describe("ImportTasksProvider", () => {
   it("partial failure → Retry resumes only the un-written units and totals correctly", async () => {
     let impBCalls = 0;
     const materializeImport = vi.fn(async (importId: string) => {
-      if (importId === "imp-a")
-        return { materializedCount: 2, excludedCashMovements: 0, enrichedCount: 0 };
+      if (importId === "imp-a") return { materializedCount: 2, enrichedCount: 0 };
       impBCalls++;
       if (impBCalls === 1) throw Object.assign(new Error("x"), { status: 401 });
-      return { materializedCount: 3, excludedCashMovements: 0, enrichedCount: 0 };
+      return { materializedCount: 3, enrichedCount: 0 };
     });
     h.client = makeClient({ materializeImport });
 
@@ -307,7 +303,7 @@ describe("ImportTasksProvider", () => {
           }),
         ),
       )
-      .mockResolvedValueOnce({ materializedCount: 1, excludedCashMovements: 0, enrichedCount: 0 });
+      .mockResolvedValueOnce({ materializedCount: 1, enrichedCount: 0 });
     h.client = makeClient({ materializeImport });
 
     renderRunner(materializeTask());
@@ -324,8 +320,8 @@ describe("ImportTasksProvider", () => {
     // Invoking the action replays the same task acknowledged.
     opts.action!.onClick();
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp1", "p1", false);
-    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", true);
+    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp1", "p1", false, undefined);
+    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", true, undefined);
   });
 
   it("confirm (gold contract) path → count comes from `confirmed`", async () => {
@@ -343,7 +339,7 @@ describe("ImportTasksProvider", () => {
     });
 
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(confirmImport).toHaveBeenCalledWith("imp-c", [], [], "p1", false);
+    expect(confirmImport).toHaveBeenCalledWith("imp-c", [], [], "p1", false, undefined);
     expect(h.refresh).toHaveBeenCalledTimes(1);
   });
 });

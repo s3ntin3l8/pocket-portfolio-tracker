@@ -37,6 +37,7 @@ export function useImportClient(): ImportClient {
         portfolioId,
         acknowledgeAccountMismatch,
         acknowledgeDuplicates,
+        resolutions,
       ) =>
         api.confirmImport(
           importId,
@@ -45,9 +46,20 @@ export function useImportClient(): ImportClient {
           portfolioId,
           acknowledgeAccountMismatch,
           acknowledgeDuplicates,
+          resolutions,
         ),
-      materializeImport: (importId, portfolioId, acknowledgeAccountMismatch) =>
-        api.materializeImport(importId, portfolioId, acknowledgeAccountMismatch),
+      materializeImport: (
+        importId,
+        portfolioId,
+        acknowledgeAccountMismatch,
+        acknowledgeDuplicates,
+      ) =>
+        api.materializeImport(
+          importId,
+          portfolioId,
+          acknowledgeAccountMismatch,
+          acknowledgeDuplicates,
+        ),
       checkAccounts: (units) => api.checkAccounts(units),
       uploadDocument: (file, opts) => api.uploadDocument(file, opts),
     }),

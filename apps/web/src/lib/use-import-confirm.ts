@@ -6,6 +6,8 @@ import {
   duplicatesFromError,
   type DuplicateConflict,
   type DuplicateMatch,
+  type DuplicateResolution,
+  type DuplicateResolutionAction,
   type AccountMismatch,
 } from "@portfolio/api-client";
 import { stripUid, type ImportDraft, type ReviewDraft } from "@/components/import-flow/types";
@@ -79,12 +81,18 @@ export interface UseImportConfirmResult {
   pendingSubset: React.MutableRefObject<ReviewDraft[]>;
   /** The acknowledge-mismatch flag from the last confirm call — used when re-confirming after enrich. */
   pendingAcknowledgeMismatch: React.MutableRefObject<boolean>;
+  /** Per-row decisions taken since the last confirm — replayed on the next confirm. */
+  pendingResolutions: React.MutableRefObject<DuplicateResolution[]>;
   confirm: (
     uids?: string[],
     acknowledgeMismatch?: boolean,
     acknowledgeDup?: boolean,
   ) => Promise<void>;
   enrichOneDuplicate: (d: DuplicateMatch) => Promise<void>;
+  /** Resolve one duplicate by dropping it (neither written nor folded into anything). */
+  skipOneDuplicate: (d: DuplicateMatch) => Promise<void>;
+  /** Resolve one duplicate with an explicit per-row disposition. */
+  resolveDuplicate: (d: DuplicateMatch, action: DuplicateResolutionAction) => Promise<void>;
 }
 
 const DEFAULT_ERROR = "Something went wrong. Please try again.";
@@ -107,6 +115,28 @@ export function useImportConfirm({
   const [accountMismatch, setAccountMismatch] = useState<AccountMismatch | null>(null);
   const pendingSubset = useRef<ReviewDraft[]>([]);
   const pendingAcknowledgeMismatch = useRef(false);
+  const pendingResolutions = useRef<DuplicateResolution[]>([]);
+
+  /**
+   * Find the draft a conflict refers to.
+   *
+   * The server identifies a conflict by its stable `externalId` first and by the index into
+   * the array it received as a fallback. The index is only advisory: the server may have
+   * filtered the submitted array before classifying, so the two can disagree. Identity wins
+   * whenever it is available.
+   */
+  function resolveDraft(d: DuplicateMatch): { draft: ReviewDraft; index: number } | null {
+    const subset = pendingSubset.current;
+    if (d.externalId) {
+      const byId = subset.findIndex((dr) => {
+        const ext = (dr as { externalId?: string | null }).externalId;
+        return ext != null && ext === d.externalId;
+      });
+      if (byId >= 0) return { draft: subset[byId], index: byId };
+    }
+    const byIndex = subset[d.draftIndex];
+    return byIndex ? { draft: byIndex, index: d.draftIndex } : null;
+  }
 
   async function confirm(uids?: string[], acknowledgeMismatch = false, acknowledgeDup = false) {
     setError(null);
@@ -131,9 +161,11 @@ export function useImportConfirm({
         getPortfolioId(),
         acknowledgeMismatch,
         acknowledgeDup,
+        pendingResolutions.current,
       );
       setDuplicateConflict(null);
       setAccountMismatch(null);
+      pendingResolutions.current = [];
 
       // Partial-confirm mode: when enabled and the subset < the full draft list,
       // stay on the review page, drop the confirmed rows, and show a success notice.
@@ -160,8 +192,9 @@ export function useImportConfirm({
   }
 
   async function enrichOneDuplicate(d: DuplicateMatch) {
-    const draft = pendingSubset.current[d.draftIndex];
-    if (!draft) return;
+    const found = resolveDraft(d);
+    if (!found) return;
+    const { draft, index } = found;
     try {
       await client.enrichImport(
         importId,
@@ -177,9 +210,7 @@ export function useImportConfirm({
       );
       // Drop the enriched draft from the pending set; clear the duplicate conflict;
       // re-confirm the remaining drafts (with the same mismatch-acknowledge as before).
-      const remainingUids = pendingSubset.current
-        .filter((_, i) => i !== d.draftIndex)
-        .map((dr) => dr.uid);
+      const remainingUids = pendingSubset.current.filter((_, i) => i !== index).map((dr) => dr.uid);
       setDuplicateConflict(null);
       setDrafts((ds) => ds.filter((dr) => dr.uid !== draft.uid));
       if (remainingUids.length > 0) {
@@ -191,6 +222,60 @@ export function useImportConfirm({
     }
   }
 
+  /**
+   * Drop one duplicate: it is neither written nor folded into the matched transaction.
+   *
+   * This is the resolution the server could not express before — "import the new trades,
+   * skip the ones I already have" — and it is the safe default for a duplicate the user
+   * did not recognise as the same trade.
+   */
+  async function skipOneDuplicate(d: DuplicateMatch) {
+    const found = resolveDraft(d);
+    if (!found) return;
+    const { draft, index } = found;
+
+    // Record the decision so the server applies it on the next confirm.
+    pendingResolutions.current = [
+      ...pendingResolutions.current.filter((r) => r.draftIndex !== index),
+      { draftIndex: index, action: "skip" },
+    ];
+
+    // Drop it from the pending set and re-confirm the rest.
+    const remainingUids = pendingSubset.current.filter((_, i) => i !== index).map((dr) => dr.uid);
+    setDuplicateConflict(null);
+    setDrafts((ds) => ds.filter((dr) => dr.uid !== draft.uid));
+    if (remainingUids.length > 0) {
+      await confirm(remainingUids, pendingAcknowledgeMismatch.current, false);
+    }
+  }
+
+  /** Resolve a duplicate with an explicit per-row disposition. */
+  async function resolveDuplicate(d: DuplicateMatch, action: DuplicateResolutionAction) {
+    if (action === "enrich") {
+      await enrichOneDuplicate(d);
+      return;
+    }
+    if (action === "skip") {
+      await skipOneDuplicate(d);
+      return;
+    }
+    // "import" — write it as its own transaction. The server needs the explicit
+    // disposition; the blanket acknowledgement is not used for it.
+    const found = resolveDraft(d);
+    if (!found) return;
+    const { index } = found;
+    pendingResolutions.current = [
+      ...pendingResolutions.current.filter((r) => r.draftIndex !== index),
+      { draftIndex: index, action: "import" },
+    ];
+    setDuplicateConflict(null);
+    await confirm(
+      pendingSubset.current.map((dr) => dr.uid),
+      pendingAcknowledgeMismatch.current,
+      false,
+    );
+  }
+
   return {
     error,
     setError,
@@ -200,7 +285,10 @@ export function useImportConfirm({
     setAccountMismatch,
     pendingSubset,
     pendingAcknowledgeMismatch,
+    pendingResolutions,
     confirm,
     enrichOneDuplicate,
+    skipOneDuplicate,
+    resolveDuplicate,
   };
 }

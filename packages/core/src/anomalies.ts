@@ -26,6 +26,12 @@ export interface Anomaly {
 }
 
 export interface ReconciliationGap {
+  /**
+   * Which broker this gap came from (`"tr"`, `"ibkr"`, …). A portfolio can be connected to
+   * more than one broker, and each reports its own gap — the broker is carried into the
+   * anomaly meta so the two are never confused with one another.
+   */
+  broker?: string;
   cash: {
     currency: string;
     reported: string;
@@ -51,12 +57,19 @@ type Event = { kind: "tx"; at: Date; tx: TxWithId } | { kind: "ca"; at: Date; ca
 // while still catching a materially-sized missed/extra transaction. The incremental
 // {@link DRIFT_THRESHOLD} below is the sharper guard — it ignores the standing baseline and
 // flags only a *new* divergence introduced by the latest sync.
-const GAP_THRESHOLD = new Decimal("1.00");
+/**
+ * The absolute cash-reconciliation tolerance. Exported so the surfaces that *report* a
+ * gap (the broker connect summary) use the same number as the surfaces that *alarm* on
+ * one — they used to disagree, so the same reconciliation showed as "off by X" on one
+ * screen and no anomaly at all on the other.
+ */
+export const GAP_THRESHOLD = new Decimal("1.00");
 // Incremental drift tolerance: how much the cash diff may move between two consecutive syncs
 // before it is flagged. Tight (well under the absolute gap) so a single newly-mismapped event
 // surfaces immediately and is attributable to the sync that introduced it — even when the
 // absolute gap stays small. No hard-coded balance target, so it rides the growing account.
-const DRIFT_THRESHOLD = new Decimal("0.50");
+/** The incremental-drift tolerance — exported for the same reason as {@link GAP_THRESHOLD}. */
+export const DRIFT_THRESHOLD = new Decimal("0.50");
 // Position qty tolerance: TR savings-plan fractions go to ~6 dp. 1e-4 ignores floating-
 // point noise while still catching meaningful discrepancies (e.g. a missed buy event).
 const POSITION_GAP_THRESHOLD = new Decimal("0.0001");
@@ -85,7 +98,7 @@ export function detectAnomalies(
      *  posts before its funding deposit clears) can suppress the negative-cash check entirely. */
     allowNegativeCash?: boolean;
     /** Broker-reported vs. derived cash reconciliation from the TR connection. */
-    reconciliationGap?: ReconciliationGap | null;
+    reconciliationGap?: ReconciliationGap | ReconciliationGap[] | null;
   },
 ): Anomaly[] {
   const anomalies: Anomaly[] = [];
@@ -255,15 +268,22 @@ export function detectAnomalies(
   }
 
   // ── 3. Reconciliation gaps ─────────────────────────────────────────────────
-  if (opts?.reconciliationGap) {
-    for (const { currency, reported, derived, diff, driftSincePrev } of opts.reconciliationGap
-      .cash) {
+  // A portfolio can be connected to several brokers, each reporting its own gap — the
+  // option therefore accepts one gap or a list of them.
+  const gaps = opts?.reconciliationGap
+    ? Array.isArray(opts.reconciliationGap)
+      ? opts.reconciliationGap
+      : [opts.reconciliationGap]
+    : [];
+  for (const gap of gaps) {
+    const broker = gap.broker;
+    for (const { currency, reported, derived, diff, driftSincePrev } of gap.cash) {
       if (new Decimal(diff).abs().gte(GAP_THRESHOLD)) {
         anomalies.push({
           code: "reconciliation_gap",
           severity: "warning",
           scope: "portfolio",
-          meta: { currency, reported, derived, diff },
+          meta: { currency, reported, derived, diff, ...(broker ? { broker } : {}) },
         });
       }
       // Incremental guard: a NEW divergence since the previous sync, regardless of how small
@@ -274,17 +294,24 @@ export function detectAnomalies(
           code: "reconciliation_drift",
           severity: "warning",
           scope: "portfolio",
-          meta: { currency, reported, derived, diff, driftSincePrev },
+          meta: {
+            currency,
+            reported,
+            derived,
+            diff,
+            driftSincePrev,
+            ...(broker ? { broker } : {}),
+          },
         });
       }
     }
-    for (const { isin, reported, derived, diff } of opts.reconciliationGap.positions ?? []) {
+    for (const { isin, reported, derived, diff } of gap.positions ?? []) {
       if (new Decimal(diff).abs().gte(POSITION_GAP_THRESHOLD)) {
         anomalies.push({
           code: "position_gap",
           severity: "warning",
           scope: "portfolio",
-          meta: { isin, reported, derived, diff },
+          meta: { isin, reported, derived, diff, ...(broker ? { broker } : {}) },
         });
       }
     }

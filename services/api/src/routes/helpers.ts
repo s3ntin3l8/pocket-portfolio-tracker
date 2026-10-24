@@ -68,9 +68,19 @@ export function paginate(p: PaginationParams): { limit?: number; offset?: number
  * requests that differ only in WHICH filter carries a value (`year=2024` vs `q=2024`,
  * `include=X` vs `exclude=X`) never collapse onto one key (audit D4). Callers must pass a
  * fixed number of parts in a fixed order.
+ *
+ * The parts are **length-prefixed** before joining. A raw `|` join was ambiguous: the
+ * user-controlled filter values (`?convertTo=a&typeFilter=b` and `?convertTo=a%7Cb`)
+ * produced the same key, so a request could be served a response computed for a different
+ * filter combination. Length-prefixing makes every part unambiguous.
  */
 export function cacheKey(...parts: (string | number | null | undefined)[]): string {
-  return parts.map((p) => (p == null ? "" : String(p))).join("|");
+  return parts
+    .map((p) => {
+      const s = p == null ? "" : String(p);
+      return `${s.length}:${s}`;
+    })
+    .join("|");
 }
 
 /** Insert a row and return it with a 201 status. */

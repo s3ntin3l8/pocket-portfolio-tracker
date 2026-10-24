@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { accountHolders, lossCarryforward } from "@portfolio/db";
 import { createAndReturn, deleteOwnedOr404 } from "./helpers.js";
+import { DE_TAX_AMOUNT_CURRENCY } from "./transactions/tax-helpers.js";
 import {
   accountHolderInputSchema,
   accountHolderPatchSchema,
@@ -82,7 +83,7 @@ export async function accountHoldersRoute(app: FastifyInstance) {
   }
 
   function toCarryforwardEntries(rows: (typeof lossCarryforward.$inferSelect)[]) {
-    return rows.map((r) => ({ pot: r.pot, amount: r.amount }));
+    return rows.map((r) => ({ pot: r.pot, amount: r.amount, currency: r.currency }));
   }
 
   // Loss carry-forward (Verlustverrechnungstopf) — settled €-figures from the holder's
@@ -140,6 +141,8 @@ export async function accountHoldersRoute(app: FastifyInstance) {
               taxYear,
               pot: e.pot,
               amount: e.amount,
+              // Every amount carries its own currency.
+              currency: DE_TAX_AMOUNT_CURRENCY,
               source: "manual" as const,
             })),
           );

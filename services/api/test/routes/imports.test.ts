@@ -179,6 +179,7 @@ describe("CSV import → confirm flow", () => {
           name: "DKB matched",
           baseCurrency: "EUR",
           accountNumber: "DE78120300001066505387",
+          cashCounted: true,
         },
       })
     ).json().id;
@@ -390,6 +391,57 @@ describe("CSV import → confirm flow", () => {
     expect(pytr.json().mismatches).toEqual([]);
   });
 
+  it("a cash-outside portfolio imports the cash movements but does not count them (#326)", async () => {
+    const t = await token("dkb-cash-outside");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        // Cash-outside (the default): the cash is recorded but outside the boundary.
+        payload: { name: "DKB cash-outside", baseCurrency: "EUR" },
+      })
+    ).json().id;
+
+    const imp = await app.inject({
+      method: "POST",
+      url: `/imports/csv`,
+      headers: auth(t),
+      payload: { content: DKB_GIRO_CSV, format: "dkb" },
+    });
+    expect(imp.statusCode).toBe(201);
+    const { importId, drafts } = imp.json();
+
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { portfolioId, transactions: drafts },
+    });
+    expect(confirm.statusCode).toBe(201);
+    // All four rows are written — the deposit and the withdrawal included.
+    expect(confirm.json().confirmed).toBe(4);
+
+    // The cash rows are hidden from the transaction list (the boundary decides what is
+    // shown), but they are stored: flipping the toggle reveals them.
+    const hidden = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/transactions?all=1`,
+      headers: auth(t),
+    });
+    expect(hidden.json()).toHaveLength(2);
+
+    // And they do not count towards the contribution: the invested capital only
+    // (0.3355 × 74.506). The €75 deposit and the €509.59 withdrawal are cash outside the
+    // boundary, and the €0.67 dividend is income — neither is contributed capital.
+    const contrib = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/contributions`,
+      headers: auth(t),
+    });
+    expect(contrib.json().totalContributed).toBe("24.996763");
+  });
+
   it("imports a DKB Girokonto export: securities + cash, idempotent on re-import", async () => {
     const t = await token("dkb-user");
     const portfolioId = (
@@ -397,7 +449,7 @@ describe("CSV import → confirm flow", () => {
         method: "POST",
         url: "/portfolios",
         headers: auth(t),
-        payload: { name: "DKB", baseCurrency: "EUR" },
+        payload: { name: "DKB", baseCurrency: "EUR", cashCounted: true },
       })
     ).json().id;
 

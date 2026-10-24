@@ -42,9 +42,9 @@ export function liabilityBalances(transactions: CoreTransaction[]): Record<strin
 export function totalLiabilities(
   transactions: CoreTransaction[],
   displayCurrency: string,
-  fx?: FxRateFn,
+  fx: FxRateFn,
 ): string {
-  const f: FxRateFn = fx ?? (() => "1");
+  const f: FxRateFn = fx;
   let total = new Decimal(0);
   for (const [ccy, amount] of Object.entries(liabilityBalances(transactions))) {
     total = total.add(convert(amount, ccy, displayCurrency, f));

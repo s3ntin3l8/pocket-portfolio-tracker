@@ -95,7 +95,7 @@ describe("pytr import → confirm", () => {
         method: "POST",
         url: "/portfolios",
         headers: auth(t),
-        payload: { name: "TR", baseCurrency: "EUR" },
+        payload: { name: "TR", baseCurrency: "EUR", cashCounted: true },
       })
     ).json().id;
     const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));
@@ -243,7 +243,7 @@ describe("pytr import → confirm", () => {
     return imp.id;
   }
 
-  it("TR PDF into a cash-outside portfolio excludes cash movements, surfaces the count (#326)", async () => {
+  it("TR PDF into a cash-outside portfolio imports the cash movements (#326)", async () => {
     const t = await token("trpdf-cash-outside");
     const importId = await makePortfolioAndTrPdfImport(t, false);
     const confirm = await app.inject({
@@ -253,11 +253,15 @@ describe("pytr import → confirm", () => {
       payload: { transactions: TR_PDF_DRAFTS },
     });
     expect(confirm.statusCode).toBe(201);
-    const { confirmed, excludedCashMovements, transactions } = confirm.json();
-    // Only the buy is written; the deposit + withdrawal true-ups are dropped and counted.
-    expect(confirmed).toBe(1);
-    expect(excludedCashMovements).toBe(2);
-    expect(transactions.map((x: { externalId: string }) => x.externalId)).toEqual(["trpdf-buy"]);
+    const { confirmed, transactions } = confirm.json();
+    // The cash movements are imported whatever the boundary is — the boundary decides
+    // whether they are counted and shown, both read-time decisions over the stored rows.
+    expect(confirmed).toBe(3);
+    expect(transactions.map((x: { externalId: string }) => x.externalId).sort()).toEqual([
+      "trpdf-buy",
+      "trpdf-dep",
+      "trpdf-wd",
+    ]);
   });
 
   it("TR PDF into a cash-inside portfolio imports the cash movements too (#326)", async () => {
@@ -270,9 +274,8 @@ describe("pytr import → confirm", () => {
       payload: { transactions: TR_PDF_DRAFTS },
     });
     expect(confirm.statusCode).toBe(201);
-    const { confirmed, excludedCashMovements } = confirm.json();
+    const { confirmed } = confirm.json();
     expect(confirmed).toBe(3);
-    expect(excludedCashMovements).toBe(0);
   });
 
   // Stage + confirm one security draft for a fresh TR portfolio, returning the stored instrument.
@@ -561,7 +564,7 @@ describe("pytr import → confirm", () => {
         method: "POST",
         url: "/portfolios",
         headers: auth(t),
-        payload: { name: "TR", baseCurrency: "EUR" },
+        payload: { name: "TR", baseCurrency: "EUR", cashCounted: true },
       })
     ).json().id;
     const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));
@@ -608,7 +611,7 @@ describe("pytr import → confirm", () => {
         method: "POST",
         url: "/portfolios",
         headers: auth(t),
-        payload: { name: "TR", baseCurrency: "EUR" },
+        payload: { name: "TR", baseCurrency: "EUR", cashCounted: true },
       })
     ).json().id;
     const [pf] = await getDb().select().from(portfolios).where(eq(portfolios.id, portfolioId));

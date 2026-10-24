@@ -245,6 +245,11 @@ export async function syncIbkrConnection(
 
   let materializedDrafts = 0;
   if (importId && draftsToMaterialize.length > 0) {
+    // Cash transactions are always imported — the portfolio's `cashCounted` boundary
+    // decides whether they are counted and shown, both read-time decisions over the stored
+    // rows. The opening-balance anchor is written for every portfolio, which is what makes
+    // the derived cash (`startingCash + in-window flows = endingCash`) correct for an
+    // invest-only portfolio too.
     const res = await materializeDrafts(
       { db, log },
       {
@@ -254,21 +259,38 @@ export async function syncIbkrConnection(
         importId,
         status: "draft",
         isEu: true,
+        mode: "sync",
       },
     );
-    materializedDrafts = res.written.length;
-    if (res.collapsed.length > 0) {
-      await db
-        .insert(trResolvedEvents)
-        .values(
-          res.collapsed.map((eventId) => ({
-            portfolioId,
-            source: "ibkr",
-            eventId,
-            resolution: "confirmed",
-          })),
-        )
-        .onConflictDoNothing();
+    if (res.kind === "duplicate") {
+      // A broker event that duplicates an existing trade needs a decision. The sync
+      // cannot ask the user, so the events stay unresolved and re-stage on the next
+      // sync rather than being dropped or written twice.
+      log?.warn(
+        {
+          connectionId,
+          importId,
+          duplicates: res.plainDuplicates.length,
+          pending: res.pendingDuplicates.length,
+        },
+        "ibkr sync: cross-source duplicates need a decision — events stay unresolved",
+      );
+    } else {
+      materializedDrafts = res.written.length;
+      // Only a successful enrichment collapses an event (see the pytr sync).
+      if (res.collapsed.length > 0) {
+        await db
+          .insert(trResolvedEvents)
+          .values(
+            res.collapsed.map((eventId) => ({
+              portfolioId,
+              source: "ibkr",
+              eventId,
+              resolution: "confirmed",
+            })),
+          )
+          .onConflictDoNothing();
+      }
     }
   }
 

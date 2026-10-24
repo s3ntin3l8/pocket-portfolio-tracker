@@ -95,7 +95,7 @@ export interface IncomeStats {
 export interface AggregateIncomeInput {
   events: IncomeEntry[];
   displayCurrency: string;
-  fx?: FxRateFn;
+  fx: FxRateFn;
   now?: Date;
   forecastCoupons?: { amount: string; currency: string }[];
   restOfYearCoupons?: { amount: string; currency: string }[];
@@ -109,7 +109,7 @@ const ZERO = () => new Decimal(0);
 
 export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
   const { events, displayCurrency } = input;
-  const fx: FxRateFn = input.fx ?? (() => "1");
+  const fx: FxRateFn = input.fx;
   const now = input.now ?? new Date();
 
   const ttmStart = new Date(now);

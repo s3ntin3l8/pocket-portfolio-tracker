@@ -5,7 +5,7 @@ const api = {
   importScreenshot: vi.fn(async () => ({ importId: "i", drafts: [], contracts: [], errors: [] })),
   importCsv: vi.fn(async () => ({ importId: "i", drafts: [], contracts: [], errors: [] })),
   confirmImport: vi.fn(async () => ({ confirmed: 1 })),
-  materializeImport: vi.fn(async () => ({ materializedCount: 1, excludedCashMovements: 0 })),
+  materializeImport: vi.fn(async () => ({ materializedCount: 1 })),
 };
 vi.mock("@/lib/api", () => ({ useApiClient: () => api }));
 
@@ -31,10 +31,10 @@ describe("useImportClient", () => {
     expect(api.importCsv).toHaveBeenCalledWith("a,b", "x.csv", "auto", false, "batch-1");
 
     await client.confirmImport("imp", [], [], "p1", true, false);
-    expect(api.confirmImport).toHaveBeenCalledWith("imp", [], [], "p1", true, false);
+    expect(api.confirmImport).toHaveBeenCalledWith("imp", [], [], "p1", true, false, undefined);
 
     await client.materializeImport("imp", "p1", true);
-    expect(api.materializeImport).toHaveBeenCalledWith("imp", "p1", true);
+    expect(api.materializeImport).toHaveBeenCalledWith("imp", "p1", true, undefined);
   });
 
   it("is memoised while the api client is stable", () => {

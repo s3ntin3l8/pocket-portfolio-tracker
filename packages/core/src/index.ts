@@ -13,7 +13,7 @@ export {
   type HoldingsCursor,
   type ShareCheckpoint,
 } from "./holdings.js";
-export { cashFlow, cashBalances, isCashAccountMovement } from "./cash.js";
+export { cashFlow, cashBalances, incomeFlow, isCashAccountMovement } from "./cash.js";
 export { xirr, type CashFlowPoint } from "./xirr.js";
 export {
   periodXirr,
@@ -240,6 +240,8 @@ export {
   type Anomaly,
   type AnomalyCode,
   type ReconciliationGap,
+  GAP_THRESHOLD,
+  DRIFT_THRESHOLD,
 } from "./anomalies.js";
 export { openLots, type LotView } from "./lots.js";
 export { maxDrawdown, type DrawdownResult, type NetWorthPoint } from "./drawdown.js";

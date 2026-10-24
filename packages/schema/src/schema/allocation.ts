@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { decimalString } from "./primitives.js";
+import { currencyCode, decimalString } from "./primitives.js";
 
 export const allocationDimensionSchema = z.enum([
   "asset_class",
@@ -33,6 +33,9 @@ export type AllocationTargetSet = z.infer<typeof allocationTargetSetSchema>;
 export const lossCarryforwardEntrySchema = z.object({
   pot: z.enum(["stock", "general"]),
   amount: decimalString,
+  /** The currency of `amount` — a German loss carry-forward is booked in EUR. Optional on
+   *  input (it defaults to EUR) but always present on the response. */
+  currency: currencyCode.optional(),
 });
 export type LossCarryforwardEntry = z.infer<typeof lossCarryforwardEntrySchema>;
 

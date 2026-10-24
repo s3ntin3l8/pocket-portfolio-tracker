@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { instruments, transactions } from "@portfolio/db";
 import type { ParsedTransaction } from "@portfolio/schema";
 import type { DB } from "../../db/client.js";
 import { findCrossSourceDuplicates } from "./dedup.js";
+import { CONFIRMED_TX_STATUSES } from "../import-policy.js";
 
 /** Best-effort instrument identity for upload-time dedup, before instruments are resolved:
  *  prefer ISIN, then WKN, then a normalised name. Returns null when nothing is available.
@@ -51,6 +52,13 @@ export async function findCommittedDuplicates(
 ): Promise<Array<{ draftIndex: number; matched: CommittedTx }>> {
   if (drafts.length === 0) return [];
 
+  // Bounded by the drafts' date range (±1 day covers the fingerprint's trade-vs-settlement
+  // skew) so the query rides the (portfolioId, executedAt) index instead of loading every
+  // row of the portfolio.
+  const dayMs = 24 * 60 * 60 * 1000;
+  const draftTimes = drafts
+    .map((d) => new Date(d.executedAt).getTime())
+    .filter((t) => Number.isFinite(t));
   const rows = await dbClient
     .select({
       id: transactions.id,
@@ -59,23 +67,37 @@ export async function findCommittedDuplicates(
       quantity: transactions.quantity,
       price: transactions.price,
       source: transactions.source,
+      status: transactions.status,
       isin: instruments.isin,
       wkn: instruments.wkn,
       name: instruments.name,
     })
     .from(transactions)
     .leftJoin(instruments, eq(instruments.id, transactions.instrumentId))
-    .where(eq(transactions.portfolioId, portfolioId));
+    .where(
+      draftTimes.length === 0
+        ? eq(transactions.portfolioId, portfolioId)
+        : and(
+            eq(transactions.portfolioId, portfolioId),
+            gte(transactions.executedAt, new Date(Math.min(...draftTimes) - dayMs)),
+            lte(transactions.executedAt, new Date(Math.max(...draftTimes) + dayMs)),
+          ),
+    );
 
-  const committed: CommittedTx[] = rows.map((r) => ({
-    id: r.id,
-    key: uploadIdentity(r.isin, r.wkn, r.name),
-    action: r.type,
-    quantity: r.quantity,
-    price: r.price,
-    executedAt: r.executedAt,
-    source: r.source,
-  }));
+  // Only confirmed rows are "already imported". A pending (`draft`) row is unconfirmed and
+  // an `archived` row is deliberately excluded — neither is visible to any derivation, so
+  // neither may be reported as a duplicate of an incoming import.
+  const committed: CommittedTx[] = rows
+    .filter((r) => (CONFIRMED_TX_STATUSES as readonly string[]).includes(r.status))
+    .map((r) => ({
+      id: r.id,
+      key: uploadIdentity(r.isin, r.wkn, r.name),
+      action: r.type,
+      quantity: r.quantity,
+      price: r.price,
+      executedAt: r.executedAt,
+      source: r.source,
+    }));
   const draftCandidates = drafts.map((d) => ({
     key: uploadIdentity(d.isin, d.wkn, d.name),
     action: d.action,

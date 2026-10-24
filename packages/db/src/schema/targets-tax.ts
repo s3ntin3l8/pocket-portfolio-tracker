@@ -50,6 +50,12 @@ export const lossCarryforward = pgTable(
     taxYear: integer("tax_year").notNull(),
     pot: lossPotEnum("pot").notNull(),
     amount: numeric("amount").notNull(),
+    /**
+     * The currency of `amount`. A German loss carry-forward is booked in EUR, but the
+     * column said nothing about it — the currency was implied by a constant in another
+     * package. Every amount carries its own currency here.
+     */
+    currency: text("currency").notNull().default("EUR"),
     source: text("source").notNull().default("manual"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -8,12 +8,15 @@ import {
   gte,
   inArray,
   lt,
+  notInArray,
+  or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { portfolios, transactions, users } from "@portfolio/db";
 import { ACQUISITION_TYPES, INCOME_TYPES } from "@portfolio/core";
 import { withDerivationCache } from "../../lib/derivation-cache.js";
+import { CONFIRMED_TX_STATUSES } from "../../services/import-policy.js";
 import { parsePagination, cacheKey, ALL_ROWS_CAP } from "../helpers.js";
 import {
   yearRange,
@@ -46,10 +49,46 @@ function parseIdsParam(raw: string | undefined): string[] | null {
  * `normal` and `cash_neutral` — the same set every derivation reads through `toCoreTxns`
  * (drafts are unconfirmed, archived rows are excluded from all derivations). The row list
  * itself keeps showing drafts/archived rows so the user can confirm or un-archive them.
+ *
+ * The set lives in `services/import-policy.ts` because the dedup candidate set must use the
+ * identical predicate: a row no derivation can see must not be able to block an import.
  */
-const CONFIRMED_STATUSES = ["normal", "cash_neutral"] as const;
 function summaryConditions(conditions: SQL[]): SQL[] {
-  return [...conditions, inArray(transactions.status, [...CONFIRMED_STATUSES])];
+  return [...conditions, inArray(transactions.status, [...CONFIRMED_TX_STATUSES])];
+}
+
+/**
+ * The transaction types that are *pure cash movements* — money crossing the portfolio's
+ * cash boundary and nothing else.
+ *
+ * The rows are always imported; the portfolio's `cashCounted` toggle decides whether they
+ * are *counted* (net worth, cash balance, contributions) and whether they are *shown* here.
+ * For an invest-only (cash-outside) portfolio the transaction list is the securities ledger,
+ * so these rows are filtered out of the query — the data is still in the database, and every
+ * derivation reads it from there directly (routes/transactions/shared/helpers.ts), never
+ * through this route.
+ *
+ * Only the broker-reported cash movements are hidden. A hand-authored `adjustment` (the
+ * user's own cash true-up) and the loan rows stay visible: they are not cash transactions,
+ * they have their own surfaces, and hiding a row the user authored would make it
+ * unreachable from the ledger.
+ */
+const CASH_TRANSACTION_TYPES = ["deposit", "withdrawal"] as const;
+
+/**
+ * The list condition that hides the pure cash rows of the given cash-outside portfolios.
+ *
+ * A row is hidden when *its* portfolio is cash-outside AND it is a cash movement — so a
+ * networth scope spanning several portfolios hides each portfolio's cash rows according to
+ * that portfolio's own boundary. `type` and `portfolioId` are both NOT NULL, so the
+ * `NOT IN` semantics are unambiguous.
+ */
+function hideCashRows(cashOutsidePortfolioIds: string[]): SQL | undefined {
+  if (cashOutsidePortfolioIds.length === 0) return undefined;
+  return or(
+    notInArray(transactions.portfolioId, cashOutsidePortfolioIds),
+    notInArray(transactions.type, [...CASH_TRANSACTION_TYPES]),
+  );
 }
 
 /**
@@ -129,6 +168,13 @@ export function registerListRoutes(app: FastifyInstance) {
       const paginate = !wantsArray(request.query, all, idsFilter);
 
       const conditions = [eq(transactions.portfolioId, request.params.portfolioId)];
+      // The portfolio's cash boundary decides whether the pure cash rows are part of the
+      // transaction view. An invest-only portfolio shows the securities ledger; the rows
+      // themselves are always stored (and always counted by the tax/anomaly/summary
+      // derivations, which read the database directly).
+      const cashOutside = request.portfolio.cashCounted ? [] : [request.params.portfolioId];
+      const cashCondition = hideCashRows(cashOutside);
+      if (cashCondition) conditions.push(cashCondition);
       if (idsFilter) conditions.push(inArray(transactions.id, idsFilter));
       if (instrumentIdFilter) conditions.push(eq(transactions.instrumentId, instrumentIdFilter));
       if (typeFilter === "buy") conditions.push(inArray(transactions.type, ACQUISITION_TYPES));
@@ -172,6 +218,9 @@ export function registerListRoutes(app: FastifyInstance) {
           idsFilter?.join(",") ?? "",
           draftsOnly ? "draft" : "",
           request.portfolio.baseCurrency,
+          // The boundary decides which rows the list contains — it has to be part of the
+          // key, or flipping the toggle would serve the previous set from the cache.
+          request.portfolio.cashCounted ? "cash-in" : "cash-out",
         );
         const cached = await withDerivationCache(transactionsCache, ck, async () => {
           const [merged, summaryRows] = await Promise.all([
@@ -307,7 +356,12 @@ export function registerListRoutes(app: FastifyInstance) {
 
     const [pfs, [u]] = await Promise.all([
       app.db
-        .select({ id: portfolios.id, name: portfolios.name, baseCurrency: portfolios.baseCurrency })
+        .select({
+          id: portfolios.id,
+          name: portfolios.name,
+          baseCurrency: portfolios.baseCurrency,
+          cashCounted: portfolios.cashCounted,
+        })
         .from(portfolios)
         .where(eq(portfolios.userId, id)),
       app.db
@@ -323,6 +377,11 @@ export function registerListRoutes(app: FastifyInstance) {
     const nameById = new Map(pfs.map((p) => [p.id, p.name]));
 
     const conditions = [inArray(transactions.portfolioId, pfIds)];
+    // Each portfolio's own boundary decides whether its cash rows are part of the view —
+    // a networth scope spans portfolios that may disagree.
+    const cashOutsideIds = pfs.filter((p) => !p.cashCounted).map((p) => p.id);
+    const cashCondition = hideCashRows(cashOutsideIds);
+    if (cashCondition) conditions.push(cashCondition);
     if (idsFilter) conditions.push(inArray(transactions.id, idsFilter));
     if (instrumentIdFilter) conditions.push(eq(transactions.instrumentId, instrumentIdFilter));
     if (typeFilter === "buy") conditions.push(inArray(transactions.type, ACQUISITION_TYPES));
@@ -363,6 +422,9 @@ export function registerListRoutes(app: FastifyInstance) {
         idsFilter?.join(",") ?? "",
         draftsOnly ? "draft" : "",
         displayCurrency,
+        // The boundary decides which rows the list contains — it has to be part of the key,
+        // or flipping a portfolio's toggle would serve the previous set from the cache.
+        [...cashOutsideIds].sort().join(","),
       );
       const cached = await withDerivationCache(networthTransactionsCache, ck, async () => {
         const [merged, summaryRows] = await Promise.all([

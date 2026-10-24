@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   actionClass,
   decimalsClose,
+  decimalCandidates,
   findCrossSourceDuplicates,
   parseLooseDecimal,
   recomputeRollup,
@@ -22,9 +23,12 @@ describe("actionClass", () => {
 });
 
 describe("parseLooseDecimal", () => {
-  it("parses English and German decimal marks identically", () => {
-    expect(parseLooseDecimal("74.506")).toBe(74.506);
-    expect(parseLooseDecimal("74,506")).toBe(74.506);
+  it("parses an English decimal mark", () => {
+    expect(parseLooseDecimal("74.50600000")).toBe(74.506);
+  });
+
+  it("parses a German decimal mark", () => {
+    expect(parseLooseDecimal("74,50600000")).toBe(74.506);
   });
 
   it("handles thousands separators on both conventions", () => {
@@ -32,10 +36,39 @@ describe("parseLooseDecimal", () => {
     expect(parseLooseDecimal("1,234.56")).toBe(1234.56);
   });
 
+  it("reads a dot-grouped thousands value the German way (1.674 → 1674)", () => {
+    // The DKB files write "1.674" for 1674. The old bespoke parser read it as 1.674 —
+    // a 1000× error that made a German draft fail to match its normalized stored value.
+    expect(parseLooseDecimal("1.674")).toBe(1674);
+    expect(parseLooseDecimal("1.674.000")).toBe(1674000);
+  });
+
+  it("does not read a longer decimal run as a thousands group", () => {
+    // Eight decimals after the dot is a quantity, not a thousands group.
+    expect(parseLooseDecimal("74.50600000")).toBe(74.506);
+    expect(parseLooseDecimal("74.506")).toBe(74506);
+  });
+
   it("returns null for non-numeric input", () => {
     expect(parseLooseDecimal("abc")).toBeNull();
     expect(parseLooseDecimal("")).toBeNull();
     expect(parseLooseDecimal(null)).toBeNull();
+  });
+});
+
+describe("decimalCandidates", () => {
+  it("offers both readings of a locale-ambiguous pure-dot value", () => {
+    expect(decimalCandidates("1.674").sort((a, b) => a - b)).toEqual([1.674, 1674]);
+  });
+
+  it("offers one reading for an unambiguous value", () => {
+    expect(decimalCandidates("74,506")).toEqual([74.506]);
+    expect(decimalCandidates("74.50600000")).toEqual([74.506]);
+  });
+
+  it("returns nothing for non-numeric input", () => {
+    expect(decimalCandidates("abc")).toEqual([]);
+    expect(decimalCandidates(null)).toEqual([]);
   });
 });
 
@@ -50,9 +83,23 @@ describe("decimalsClose", () => {
     expect(decimalsClose("74,506", "74.506")).toBe(true);
   });
 
+  it("matches a German thousands value against its normalized form", () => {
+    // The M10 regression: "1.674" (German, = 1674) against a stored "1674".
+    expect(decimalsClose("1.674", "1674")).toBe(true);
+    expect(decimalsClose("1.674", "1674.00")).toBe(true);
+    expect(decimalsClose("1.674,56", "1674.56")).toBe(true);
+  });
+
   it("keeps genuinely different same-instrument quantities apart", () => {
     // The two real A2H9QY buys on 2021-07-05 — 1.3358 vs 3.1399 units.
     expect(decimalsClose("1.3358", "3.1399")).toBe(false);
+  });
+
+  it("does not let the thousands reading invent a match", () => {
+    // "1.674" vs "1674.01" — under the German reading these differ by 0.01 (far above the
+    // absolute tolerance but within 0.2% of 1674 … so they are close on purpose: the
+    // tolerance is relative to the magnitude). Guard the opposite direction instead:
+    expect(decimalsClose("1.674", "16.74")).toBe(false);
   });
 
   it("uses an absolute floor for sub-unit values", () => {

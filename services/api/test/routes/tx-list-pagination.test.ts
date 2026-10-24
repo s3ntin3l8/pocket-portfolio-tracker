@@ -53,7 +53,9 @@ describe("transaction list pagination contract (audit D5) + ids cache key (audit
         method: "POST",
         url: "/portfolios",
         headers: auth(t),
-        payload: { name: "Pagination book", baseCurrency: "EUR" },
+        // Cash-inclusive so the fixtures (deposit rows) are part of the view — this test is
+        // about the pagination contract, not the cash boundary (see the cash-row list test).
+        payload: { name: "Pagination book", baseCurrency: "EUR", cashCounted: true },
       })
     ).json().id as string;
     // Inserted in a shuffled date order so "newest first" is not insertion order.

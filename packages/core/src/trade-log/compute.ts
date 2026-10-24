@@ -29,7 +29,7 @@ import { augmentTransactionsWithSyntheticMergerLegs } from "../merger-augment.js
  * not your official tax figure" disclaimer for that reason.
  */
 export function computeTrades(input: ComputeTradesInput): TradeLog {
-  const fx: FxRateFn = input.fx ?? (() => "1");
+  const fx: FxRateFn = input.fx;
   const method = input.method ?? "average";
   const now = input.now ?? new Date();
   const dust = D(input.dustEpsilon ?? DEFAULT_DUST);

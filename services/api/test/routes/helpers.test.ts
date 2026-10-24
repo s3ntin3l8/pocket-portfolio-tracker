@@ -87,16 +87,27 @@ describe("paginate", () => {
 
 describe("cacheKey", () => {
   it("joins parts positionally", () => {
-    expect(cacheKey("a", "b", "c")).toBe("a|b|c");
+    // Parts are length-prefixed so no combination of values can be mistaken for another.
+    expect(cacheKey("a", "b", "c")).toBe("1:a|1:b|1:c");
   });
 
   it("keeps a slot for null, undefined and empty strings", () => {
-    expect(cacheKey("pf1", null, "method", undefined)).toBe("pf1||method|");
-    expect(cacheKey("id", "", "range")).toBe("id||range");
+    expect(cacheKey("pf1", null, "method", undefined)).toBe("3:pf1|0:|6:method|0:");
+    expect(cacheKey("id", "", "range")).toBe("2:id|0:|5:range");
   });
 
   it("handles numbers", () => {
-    expect(cacheKey("page", 1, "size", 25)).toBe("page|1|size|25");
+    expect(cacheKey("page", 1, "size", 25)).toBe("4:page|1:1|4:size|2:25");
+  });
+
+  // A raw "|" join was ambiguous: a user-controlled filter value could contain the
+  // separator, so two different requests produced the same key and one was served the
+  // other's response.
+  it("a value containing the separator cannot collide with a different split", () => {
+    expect(cacheKey("a", "b|c")).not.toBe(cacheKey("a|b", "c"));
+    expect(cacheKey("convertTo=a", "typeFilter=b")).not.toBe(
+      cacheKey("convertTo=a|typeFilter", "b"),
+    );
   });
 
   // Audit D4: the three collisions the old filter-then-join produced.

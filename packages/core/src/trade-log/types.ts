@@ -131,7 +131,7 @@ export interface ComputeTradesInput {
   /** Latest price + currency keyed by instrument id (open-position valuation). */
   prices: Record<string, { price: string; currency: string }>;
   displayCurrency: string;
-  fx?: FxRateFn;
+  fx: FxRateFn;
   method?: TradeMethod; // default "average"
   costBasisMode?: CostBasisMode; // default "purchase_price"
   now?: Date;

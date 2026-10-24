@@ -79,7 +79,8 @@ afterAll(async () => {
 
 describe("syncIbkrConnection", () => {
   it("creates a collector draft with 8 items from the activity fixture", async () => {
-    const { conn } = await makeConnection("t1");
+    // Cash-inclusive: the fixture's 2 cash-summary rows are part of the mapping.
+    const { conn } = await makeConnection("t1", { cashCounted: true });
     const result = await syncIbkrConnection(getDb(), enc, mockFlex(), conn);
     expect(result.status).toBe("connected");
     expect(result.drafts).toBe(8);
@@ -88,7 +89,7 @@ describe("syncIbkrConnection", () => {
   });
 
   it("does not re-materialize events already in the table", async () => {
-    const { conn } = await makeConnection("t2");
+    const { conn } = await makeConnection("t2", { cashCounted: true });
 
     // First sync materializes 8 draft transactions.
     const r1 = await syncIbkrConnection(getDb(), enc, mockFlex(), conn);
@@ -98,6 +99,15 @@ describe("syncIbkrConnection", () => {
     // (the externalId set absorbs them; no dependence on the resolved ledger).
     const r2 = await syncIbkrConnection(getDb(), enc, mockFlex(), conn);
     expect(r2.drafts).toBe(0);
+  });
+
+  it("a cash-outside portfolio imports the cash summary rows too (issue #326)", async () => {
+    // The same fixture, but into an invest-only portfolio: the 2 cash-summary rows are
+    // imported like every other row — the boundary decides what is *counted* and *shown*,
+    // not what is stored.
+    const { conn } = await makeConnection("t2b");
+    const result = await syncIbkrConnection(getDb(), enc, mockFlex(), conn);
+    expect(result.drafts).toBe(8);
   });
 
   it("sets connection to expired when flex client throws IbkrFlexError(expired)", async () => {

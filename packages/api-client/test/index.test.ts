@@ -570,6 +570,8 @@ describe("createApiClient request methods", () => {
         contracts: [],
         acknowledgeAccountMismatch: false,
         acknowledgeDuplicates: false,
+        // The per-row duplicate resolutions travel with every confirm (empty by default).
+        resolutions: [],
       },
     },
     { name: "getImport", call: (c) => c.getImport("imp1"), method: "GET", url: "/imports/imp1" },

@@ -8,6 +8,7 @@ import {
   transactions,
   dismissedAnomalies,
   trConnections,
+  ibkrConnections,
   userPreferences,
 } from "@portfolio/db";
 import {
@@ -224,12 +225,21 @@ export async function computePortfolioAnomalies(
   portfolio: { id: string; cashCounted: boolean; allowNegativeCash: boolean },
 ): Promise<Anomaly[]> {
   const { filtered } = await withDerivationCache(anomaliesCache, portfolio.id, async () => {
-    const [rows, trConn, dismissed] = await Promise.all([
+    const [rows, trConn, ibkrConn, dismissed] = await Promise.all([
       app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolio.id)),
       app.db
         .select({ lastReconciliation: trConnections.lastReconciliation })
         .from(trConnections)
         .where(eq(trConnections.portfolioId, portfolio.id))
+        .limit(1)
+        .then((r) => r[0] ?? null),
+      // IBKR reports its own cash reconciliation gap in the same shape as TR. Reading only
+      // the TR connection left the whole reconciliation block of `detectAnomalies` blind to
+      // IBKR — no gap banner, no anomaly count, no Activity badge.
+      app.db
+        .select({ lastReconciliation: ibkrConnections.lastReconciliation })
+        .from(ibkrConnections)
+        .where(eq(ibkrConnections.portfolioId, portfolio.id))
         .limit(1)
         .then((r) => r[0] ?? null),
       app.db
@@ -250,10 +260,19 @@ export async function computePortfolioAnomalies(
     const reconciliation = rawReconciliation
       ? netManualAdjustments(rawReconciliation, coreTxns)
       : rawReconciliation;
+    const rawIbkrReconciliation = ibkrConn?.lastReconciliation as
+      ReconciliationGap | null | undefined;
+    const ibkrReconciliation = rawIbkrReconciliation
+      ? netManualAdjustments(rawIbkrReconciliation, coreTxns)
+      : rawIbkrReconciliation;
+    // One gap per connected broker — a portfolio can have both.
+    const reconciliationGaps: ReconciliationGap[] = [];
+    if (reconciliation) reconciliationGaps.push({ ...reconciliation, broker: "tr" });
+    if (ibkrReconciliation) reconciliationGaps.push({ ...ibkrReconciliation, broker: "ibkr" });
     const anomalies = detectAnomalies(coreTxns, cas, {
       cashCounted: portfolio.cashCounted,
       allowNegativeCash: portfolio.allowNegativeCash,
-      reconciliationGap: reconciliation ?? null,
+      reconciliationGap: reconciliationGaps.length > 0 ? reconciliationGaps : null,
     });
     // Portfolio-level anomalies (broker reconciliation gaps) carry no transaction to point
     // at; tag them with their portfolio so the aggregate view can tell them apart and link

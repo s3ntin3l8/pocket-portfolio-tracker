@@ -99,7 +99,11 @@ describe("Trade Republic CSV import path", () => {
         headers: auth(t),
       })
     ).json();
-    expect(list).toHaveLength(4);
+    // A TR account is the mixed-cash case → cash-outside (the default), so the €500
+    // deposit is imported but hidden from the transaction list: the boundary decides what
+    // is *counted* and *shown*, not what is stored. 4 rows were imported, 3 are visible.
+    expect(list).toHaveLength(3);
+    expect(list.some((tx: { type: string }) => tx.type === "deposit")).toBe(false);
     const persisted = list.find((tx: { type: string }) => tx.type === "dividend");
     // The EU-broker path resolved the US ISIN to an instrument and persisted the enrichment.
     expect(persisted).toMatchObject({ type: "dividend", tax: "0.59", fxRate: "1.103400" });
@@ -109,10 +113,10 @@ describe("Trade Republic CSV import path", () => {
     // PDF to enrich against.
     expect(persisted.shares).toBe("11");
 
-    // A TR account is the mixed-cash case → cash-outside (the default), so contribution is
-    // the invested capital: the €241.52 buy (2 × 120.26 + €1 fee). The €500 deposit is
-    // ignored (cash outside the boundary), and the saveback (now `bonus_cash`) and the
-    // dividend are income — neither inflates the contributed total.
+    // Contribution is the invested capital: the €241.52 buy (2 × 120.26 + €1 fee). The
+    // €500 deposit never entered the portfolio (cash outside the boundary), and the
+    // saveback (now `bonus_cash`) and the dividend are income — neither inflates the
+    // contributed total.
     const contrib = (
       await app.inject({
         method: "GET",

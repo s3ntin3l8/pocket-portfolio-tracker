@@ -1,4 +1,5 @@
 import type { TaxComponents } from "@portfolio/schema";
+import { Decimal } from "decimal.js";
 import { SOURCE_RANK } from "./constants.js";
 
 /**
@@ -126,18 +127,14 @@ export function recomputeRollup(rows: SourceRow[]): {
 
   function sumField(field: "tax" | "fees", rank: number): string | null {
     if (rank < 0) return null;
-    let cents = 0;
-    let found = false;
+    const values: string[] = [];
     for (const r of rows) {
-      if ((SOURCE_RANK[r.sourceType] ?? 0) === rank && r[field] != null) {
-        const n = parseFloat(r[field]!);
-        if (Number.isFinite(n)) {
-          cents += Math.round(n * 100);
-          found = true;
-        }
-      }
+      if ((SOURCE_RANK[r.sourceType] ?? 0) === rank && r[field] != null) values.push(r[field]!);
     }
-    return found ? (cents / 100).toFixed(2) : null;
+    if (values.length === 0) return null;
+    // Exact decimal arithmetic (scaled BigInt), not `parseFloat` + cents rounding: money is
+    // never a float, and a value like "0.005" must not silently become "0.01" or "0.00".
+    return sumDecimalExact(values);
   }
 
   /** Like `sumField`, but preserves full decimal precision (for perShare/grossNative). */
@@ -166,19 +163,20 @@ export function recomputeRollup(rows: SourceRow[]): {
   function fxRateField(rank: number): string | null {
     if (rank < 0) return null;
     let fallback: string | null = null;
-    let weightedSum = 0;
-    let weightTotal = 0;
+    let weightedSum = new Decimal(0);
+    let weightTotal = new Decimal(0);
     for (const r of rows) {
       if ((SOURCE_RANK[r.sourceType] ?? 0) !== rank || r.fxRate == null) continue;
       if (fallback === null) fallback = r.fxRate;
-      const fx = parseFloat(r.fxRate);
-      const weight = r.grossNative != null ? parseFloat(r.grossNative) : NaN;
-      if (Number.isFinite(fx) && Number.isFinite(weight) && weight > 0) {
-        weightedSum += fx * weight;
-        weightTotal += weight;
+      // Decimal throughout — the weighted average is a rate, but its inputs are money.
+      const fx = new Decimal(r.fxRate);
+      const weight = r.grossNative != null ? new Decimal(r.grossNative) : null;
+      if (weight && weight.isFinite() && weight.gt(0)) {
+        weightedSum = weightedSum.plus(fx.mul(weight));
+        weightTotal = weightTotal.plus(weight);
       }
     }
-    return weightTotal > 0 ? (weightedSum / weightTotal).toFixed(6) : fallback;
+    return weightTotal.gt(0) ? weightedSum.div(weightTotal).toFixed(6) : fallback;
   }
 
   // Merge taxComponents across all rows (union — later rows clobber earlier for same key).

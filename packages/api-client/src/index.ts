@@ -329,6 +329,8 @@ export interface AccountHolderInput {
 export interface LossCarryforwardEntry {
   pot: "stock" | "general";
   amount: string;
+  /** The currency of `amount` (a German loss carry-forward is booked in EUR). */
+  currency?: string;
 }
 
 export interface LossCarryforwardResponse {
@@ -2390,6 +2392,20 @@ export function accountMismatchFromError(err: unknown): AccountMismatch | null {
 }
 
 /** One selected draft that economically matches an already-committed transaction (#217, #230). */
+/**
+ * The user's per-row decision for a duplicate the server reported:
+ * - `skip`   — don't write it and don't enrich anything with it
+ * - `import` — write it as its own transaction even though it duplicates an existing one
+ * - `enrich` — fold it into the matched transaction (link the document, merge tax/fees)
+ */
+export type DuplicateResolutionAction = "skip" | "import" | "enrich";
+
+export interface DuplicateResolution {
+  /** Index of the draft in the submitted confirm-subset. */
+  draftIndex: number;
+  action: DuplicateResolutionAction;
+}
+
 export interface DuplicateMatch {
   /** Instrument name/ISIN/ticker of the duplicated draft (best-effort, may be null). */
   name: string | null;
@@ -2403,6 +2419,18 @@ export interface DuplicateMatch {
   matchedExecutedAt: string;
   /** Index of this draft in the submitted confirm-subset (for dropping it after enrich). */
   draftIndex: number;
+  /**
+   * The draft's stable identity (`externalId`). Preferred over `draftIndex` for resolving a
+   * conflict: the index only lines up with the array the client submitted, the id is stable
+   * across parse and confirm.
+   */
+  externalId?: string;
+  /**
+   * The match is an **unconfirmed** (pending) transaction row rather than a committed one.
+   * A pending row is invisible to every derivation, so it needs an explicit decision — the
+   * blanket "import anyway" does not clear it.
+   */
+  pending?: boolean;
   /** Id of the already-committed transaction — used to target the enrich route. */
   matchedTransactionId: string;
 }
@@ -2504,6 +2532,23 @@ export interface CappedList<T> {
    *  header), else `null`. Callers that export or total the rows must not present a
    *  truncated list as complete. */
   truncatedAt: number | null;
+  /**
+   * Currencies the server could not convert (no FX rate) and therefore excluded from the
+   * response's totals. Read from the `x-fx-missing-currencies` header — array-shaped
+   * responses carry no top-level `fxMissingCurrencies` field, so without the header the
+   * flag was silently lost on exactly the responses that need it.
+   */
+  fxMissingCurrencies?: string[];
+}
+
+/** Read the `x-fx-missing-currencies` header into a list of currency codes. */
+export function fxMissingFromHeaders(headers: Headers | undefined): string[] {
+  const raw = headers?.get("x-fx-missing-currencies");
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((c) => c.trim())
+    .filter((c) => c.length > 0);
 }
 
 /** Merge the timeout with an optional caller signal. */
@@ -2936,7 +2981,12 @@ export function createApiClient(config: ApiClientConfig) {
         opts,
       );
       const cap = Number(headers?.get("x-result-truncated"));
-      return { rows: data, truncatedAt: Number.isFinite(cap) && cap > 0 ? cap : null };
+      const fxMissingCurrencies = fxMissingFromHeaders(headers);
+      return {
+        rows: data,
+        truncatedAt: Number.isFinite(cap) && cap > 0 ? cap : null,
+        ...(fxMissingCurrencies.length > 0 ? { fxMissingCurrencies } : {}),
+      };
     },
     /** Paginated variant: returns one page + total count. Enrichment only runs on the
      *  returned page, so this is ~10× faster than fetching all 945+ rows. Accepts optional
@@ -2961,7 +3011,7 @@ export function createApiClient(config: ApiClientConfig) {
       if (year) params.set("year", year);
       if (q) params.set("q", q);
       if (instrumentId) params.set("instrumentId", instrumentId);
-      return request<{
+      return requestWithHeaders<{
         rows: Transaction[];
         total: number;
         summary?: {
@@ -2973,8 +3023,22 @@ export function createApiClient(config: ApiClientConfig) {
         };
         years?: string[];
         draftCount?: number;
-      }>("GET", `/portfolios/${portfolioId}/transactions?${params}`, undefined, opts).then((d) =>
-        validated(paginatedTransactionsResponseSchema, "/portfolios/:id/transactions", d),
+        /** Currencies the server could not convert (no FX rate) — read from the
+         *  `x-fx-missing-currencies` header. */
+        fxMissingCurrencies?: string[];
+      }>("GET", `/portfolios/${portfolioId}/transactions?${params}`, undefined, opts).then(
+        ({ data: d, headers }) => {
+          const fxMissingCurrencies = fxMissingFromHeaders(headers);
+          const page = validated(
+            paginatedTransactionsResponseSchema,
+            "/portfolios/:id/transactions",
+            d,
+          );
+          return {
+            ...page,
+            ...(fxMissingCurrencies.length > 0 ? { fxMissingCurrencies } : {}),
+          };
+        },
       );
     },
     /** Aggregate paginated transactions across all portfolios (networth scope).
@@ -2994,7 +3058,7 @@ export function createApiClient(config: ApiClientConfig) {
       if (year) params.set("year", year);
       if (q) params.set("q", q);
       if (instrumentId) params.set("instrumentId", instrumentId);
-      return request<{
+      return requestWithHeaders<{
         rows: Transaction[];
         total: number;
         summary?: {
@@ -3006,9 +3070,21 @@ export function createApiClient(config: ApiClientConfig) {
         };
         years?: string[];
         draftCount?: number;
-      }>("GET", `/networth/transactions?${params}`).then((d) =>
-        validated(paginatedNetworthTransactionsResponseSchema, "/networth/transactions", d),
-      );
+        /** Currencies the server could not convert (no FX rate) — read from the
+         *  `x-fx-missing-currencies` header. */
+        fxMissingCurrencies?: string[];
+      }>("GET", `/networth/transactions?${params}`).then(({ data: d, headers }) => {
+        const fxMissingCurrencies = fxMissingFromHeaders(headers);
+        const page = validated(
+          paginatedNetworthTransactionsResponseSchema,
+          "/networth/transactions",
+          d,
+        );
+        return {
+          ...page,
+          ...(fxMissingCurrencies.length > 0 ? { fxMissingCurrencies } : {}),
+        };
+      });
     },
     /** Id/portfolio/status of every transaction matching the list filters (no pagination,
      *  no enrichment; capped server-side, `truncatedAt` set when it was). Backs "select all
@@ -3033,7 +3109,12 @@ export function createApiClient(config: ApiClientConfig) {
         { id: string; portfolioId: string; status: string }[]
       >("GET", `${path}?${params}`);
       const cap = Number(headers?.get("x-result-truncated"));
-      return { rows: data, truncatedAt: Number.isFinite(cap) && cap > 0 ? cap : null };
+      const fxMissingCurrencies = fxMissingFromHeaders(headers);
+      return {
+        rows: data,
+        truncatedAt: Number.isFinite(cap) && cap > 0 ? cap : null,
+        ...(fxMissingCurrencies.length > 0 ? { fxMissingCurrencies } : {}),
+      };
     },
     /** Fetch exactly the given transaction ids, enriched the same way as a normal page —
      *  regardless of pagination/type/year/search scope. Used by "Show flagged only" (#562)
@@ -3388,21 +3469,23 @@ export function createApiClient(config: ApiClientConfig) {
       portfolioId?: string,
       acknowledgeAccountMismatch = false,
       acknowledgeDuplicates = false,
+      resolutions: DuplicateResolution[] = [],
     ) =>
       request<{
         confirmed: number;
         transactions: Transaction[];
         likelyDuplicates: number;
+        /** Duplicates of *pending* (unconfirmed) rows — these always need an explicit decision. */
+        pendingDuplicates?: number;
         enriched: number;
         skipped: number;
-        /** Cash-movement rows dropped because the target portfolio is cash-outside (#326). */
-        excludedCashMovements: number;
       }>("POST", `/imports/${importId}/confirm`, {
         portfolioId,
         transactions,
         contracts,
         acknowledgeAccountMismatch,
         acknowledgeDuplicates,
+        resolutions,
       }),
     /**
      * Materialize a staged import's parsed drafts into the chosen portfolio as `status='draft'`
@@ -3414,17 +3497,18 @@ export function createApiClient(config: ApiClientConfig) {
       importId: string,
       portfolioId: string,
       acknowledgeAccountMismatch = false,
+      acknowledgeDuplicates = false,
     ) =>
       request<{
         importId: string;
         materialized: boolean;
         portfolioId: string;
         materializedCount: number;
-        excludedCashMovements: number;
         enrichedCount: number;
       }>("POST", `/imports/${importId}/materialize`, {
         portfolioId,
         acknowledgeAccountMismatch,
+        acknowledgeDuplicates,
       }),
     /**
      * Read-only pre-flight for the upload modal's Confirm: for each (importId, portfolioId)

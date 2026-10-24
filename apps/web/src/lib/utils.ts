@@ -341,7 +341,10 @@ export function reconciliationItem(
     title: ta(isPosition ? "reconciliationPositionTitle" : "reconciliationTitle"),
     detail: anomalyLabel(a, ta, locale),
     tag: ta("portfolioTag"),
-    dismissLabel: ta("dismiss"),
+    // A portfolio-scoped anomaly points at no transaction, so the server-side dismissal
+    // table (keyed by transaction) cannot record it — the dismissal is session-scoped and
+    // the banner returns on the next navigation. The label says so.
+    dismissLabel: ta("dismissForNow"),
     action,
   };
 }

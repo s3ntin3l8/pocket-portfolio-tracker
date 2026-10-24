@@ -3,7 +3,6 @@ import {
   FIXED_ACTIONS,
   TRADE_EVENTS,
   CARD_EVENTS,
-  CASH_BY_SIGN,
   CASH_CORPORATE_ACTION,
   SHARE_CORPORATE_ACTION,
   NO_CASH_CORPORATE_ACTION,
@@ -40,14 +39,4 @@ export function categoryForEventType(eventType: string): ImportCategory {
     return "trade";
   if (action === "dividend" || action === "coupon" || action === "interest") return "income";
   return "cashflow";
-}
-
-export function isCashMovementEvent(eventType: string): boolean {
-  if (CARD_EVENTS.has(eventType)) return true;
-  if (CASH_BY_SIGN.has(eventType)) return true;
-  return isCashMovementAction(FIXED_ACTIONS[eventType] ?? "");
-}
-
-export function isCashMovementAction(action: string): boolean {
-  return action === "deposit" || action === "withdrawal";
 }

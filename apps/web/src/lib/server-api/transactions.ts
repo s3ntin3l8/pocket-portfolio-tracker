@@ -63,6 +63,8 @@ export async function loadNetworthTransactionsPaginated(
       summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
       years?: string[];
       draftCount?: number;
+      /** Currencies the server could not convert (no FX rate) — excluded from the totals. */
+      fxMissingCurrencies?: string[];
     }
   | (DataFailure & { rows: []; total: 0 })
 > {
@@ -85,6 +87,9 @@ export async function loadNetworthTransactionsPaginated(
       summary: data.summary,
       years: data.years,
       draftCount: data.draftCount,
+      // Currencies the server could not convert — the flag travels in a header, so it has
+      // to be forwarded explicitly or the banner never appears.
+      fxMissingCurrencies: data.fxMissingCurrencies,
     };
   } catch (err) {
     return { ...classifyFailure(err), rows: [], total: 0 };
@@ -109,6 +114,8 @@ export async function loadTransactionsPaginated(
       summary?: { totalInvested: string; totalProceeds: string; totalIncome: string };
       years?: string[];
       draftCount?: number;
+      /** Currencies the server could not convert (no FX rate) — excluded from the totals. */
+      fxMissingCurrencies?: string[];
     }
   | (DataFailure & { rows: []; total: 0 })
 > {
@@ -134,6 +141,9 @@ export async function loadTransactionsPaginated(
       summary: data.summary,
       years: data.years,
       draftCount: data.draftCount,
+      // Currencies the server could not convert — the flag travels in a header, so it has
+      // to be forwarded explicitly or the banner never appears.
+      fxMissingCurrencies: data.fxMissingCurrencies,
     };
   } catch (err) {
     return { ...classifyFailure(err), rows: [], total: 0 };

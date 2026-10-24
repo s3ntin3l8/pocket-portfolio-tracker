@@ -80,6 +80,11 @@ function compactHeadline(s: PortfolioSummary | NetWorth) {
     totalUnrealizedPnL: s.totalUnrealizedPnL,
     totalRealizedPnL: s.totalRealizedPnL,
     totalIncome: s.totalIncome,
+    // The basis travels with the number: "income" means one specific thing (dividends,
+    // coupons, interest and broker bonuses, net of fees and of standalone tax debits).
+    // Without it the assistant could answer with a different definition than the UI shows.
+    totalIncomeBasis:
+      "dividends, coupons, interest and broker bonuses received, net of fees and standalone tax debits",
     totalLiabilities: s.totalLiabilities,
     totalDayChange: s.totalDayChange,
     cashTracked: s.cashTracked,

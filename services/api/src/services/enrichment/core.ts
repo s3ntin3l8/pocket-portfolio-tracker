@@ -84,10 +84,14 @@ export async function enrichTransactionFromDrafts(
   }
 
   const [txRow] = await dbClient
-    .select({ id: transactions.id, type: transactions.type })
+    .select({ id: transactions.id, type: transactions.type, status: transactions.status })
     .from(transactions)
     .where(eq(transactions.id, transactionId));
   if (!txRow) return writtenIds;
+  // An archived row is excluded from every derivation — the user deliberately hid it.
+  // Rewriting its tax/fees/price behind their back would resurrect values they chose to
+  // step away from, so the evidence is recorded but the row itself is left alone.
+  if (txRow.status === "archived") return writtenIds;
 
   const allSourceRows = await dbClient
     .select({

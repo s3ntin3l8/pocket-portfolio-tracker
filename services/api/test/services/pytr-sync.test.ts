@@ -557,20 +557,21 @@ describe("syncTrConnection", () => {
     expect(await draftTxIds(conn.portfolioId!)).toEqual(["b-card", "b-dep", "b-trade"]);
   });
 
-  it("cash-outside portfolio excludes deposits & card, keeps trades, surfaces unknowns (#326)", async () => {
+  it("cash-outside portfolio imports the cash movements too — the boundary decides what is counted, not what is imported (#326)", async () => {
     const conn = await makeConnection("cash-outside", false);
     const db = getDb();
     const runner = runnerWith(async () => ({ events: BOUNDARY_EVENTS, sessionData: "J" }));
 
     const r = await syncTrConnection(db, enc, runner, conn);
-    // Only the trade is materialized; deposit + card are excluded (not even errors). The
-    // unknown MYSTERY event is NOT a known cash movement, so it still flows through and surfaces.
-    expect(r.drafts).toBe(1);
+    // The deposit and the card spend are imported like every other event: the portfolio's
+    // `cashCounted` boundary decides whether they are *counted* and *shown*, both read-time
+    // decisions over the stored rows. Dropping them here would lose the data the user needs
+    // when they flip the portfolio, and would understate the deposit-interest base.
+    expect(r.drafts).toBe(3);
     expect(r.errors).toBe(1);
 
-    expect(await draftTxIds(conn.portfolioId!)).toEqual(["b-trade"]);
-    // The unknown event surfaced as an attention error on the anchor; the cash movements did
-    // not (silently excluded from materializing, but never surfaced as gaps either).
+    expect(await draftTxIds(conn.portfolioId!)).toEqual(["b-card", "b-dep", "b-trade"]);
+    // The unknown MYSTERY event still surfaces as an attention error on the anchor.
     const [anchor] = await db
       .select()
       .from(screenshotImports)
@@ -585,22 +586,23 @@ describe("syncTrConnection", () => {
     expect(parsed.errors.some((e) => e.eventId === "b-dep" || e.eventId === "b-card")).toBe(false);
   });
 
-  it("re-stages excluded cash movements after the portfolio flips to cash-inside (#326)", async () => {
+  it("keeps the imported cash movements when the portfolio flips to cash-inside (#326)", async () => {
     const conn = await makeConnection("cash-flip", false);
     const db = getDb();
     const runner = runnerWith(async () => ({ events: BOUNDARY_EVENTS, sessionData: "J" }));
 
-    // Cash-outside: deposit + card excluded and NOT marked seen.
+    // The cash movements are imported on the first sync, whatever the boundary is.
     const r1 = await syncTrConnection(db, enc, runner, conn);
-    expect(r1.drafts).toBe(1);
+    expect(r1.drafts).toBe(3);
 
-    // Flip the boundary to cash-inside; the previously-excluded movements now stage.
+    // Flipping the boundary changes what is *counted* and *shown*, not what is stored — so
+    // there is nothing left to stage.
     await db
       .update(portfolios)
       .set({ cashCounted: true })
       .where(eq(portfolios.id, conn.portfolioId!));
     const r2 = await syncTrConnection(db, enc, runner, conn);
-    expect(r2.drafts).toBe(2); // the deposit + card; the trade was already materialized
+    expect(r2.drafts).toBe(0);
 
     expect(await draftTxIds(conn.portfolioId!)).toEqual(["b-card", "b-dep", "b-trade"]);
   });
@@ -723,9 +725,9 @@ describe("syncTrConnection", () => {
   });
 
   it("reconciliation is boundary-agnostic: cash-outside still derives from the full timeline (#326)", async () => {
-    // A cash-outside portfolio does NOT stage the deposit or card spend — but reconciliation
-    // must still count them, or TR's reported balance would diverge from ours. The deposit
-    // (+500) minus card spend (-12.5) = 487.5 derived, regardless of the staging filter.
+    // Reconciliation is derived from the full feed timeline, never from the staged rows —
+    // TR's reported balance must match ours whatever the portfolio's boundary is. The
+    // deposit (+500) minus card spend (-12.5) = 487.5 derived.
     const conn = await makeConnection("reconcile-cash-outside", false);
     const db = getDb();
     const evs = [
@@ -751,9 +753,9 @@ describe("syncTrConnection", () => {
     }));
 
     const result = await syncTrConnection(db, enc, runner, conn);
-    // Neither cash movement was staged (cash-outside)...
-    expect(result.drafts).toBe(0);
-    // ...yet reconciliation derived the full balance and matches TR exactly (zero drift).
+    // Both cash movements are staged (they are imported whatever the boundary is)...
+    expect(result.drafts).toBe(2);
+    // ...and reconciliation derived the full balance and matches TR exactly (zero drift).
     expect(result.reconciliation?.cash).toEqual([
       { currency: "EUR", reported: "487.5", derived: "487.5", diff: "0.00" },
     ]);

@@ -70,13 +70,18 @@ export async function applyCancellations(opts: {
     }
   }
 
+  // The ledger has to forget the `:original` variants too — the rows are removed above,
+  // but the split's backdated leg kept its own ledger id, so a later sync could still
+  // treat that leg as resolved.
   await db
     .delete(trResolvedEvents)
     .where(
       and(
         eq(trResolvedEvents.portfolioId, portfolioId),
         eq(trResolvedEvents.source, "pytr"),
-        inArray(trResolvedEvents.eventId, [...cancelledIds]),
+        inArray(trResolvedEvents.eventId, [
+          ...[...cancelledIds].flatMap((id) => [id, `${id}${RECLASSIFICATION_ORIGINAL_SUFFIX}`]),
+        ]),
       ),
     );
   if (cancelled > 0) {

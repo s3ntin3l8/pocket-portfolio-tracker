@@ -1,5 +1,6 @@
 import { Decimal } from "decimal.js";
 import { D } from "./decimal.js";
+import { INCOME_TYPES } from "./categorization.js";
 import type { CoreTransaction } from "./types.js";
 
 /** Signed cash effect of a single transaction (positive = cash in). */
@@ -77,6 +78,31 @@ export function cashFlow(tx: CoreTransaction): Decimal {
     default:
       return new Decimal(0);
   }
+}
+
+/**
+ * The income a single transaction contributes to the portfolio's "Income" figure.
+ *
+ * **One definition, used everywhere.** The transactions list shows an "Income" total and
+ * the portfolio summary (and the Gain explainer that reads it) show another; two
+ * definitions of the same word meant a €20 broker bonus read as "Income €20" on one
+ * screen and "Income €0" on the other — and the assistant tool was handed the second
+ * one, so it answered "you earned €0" while the app's own banner said €20.
+ *
+ * The rule is the transactions list's: income is `dividend | coupon | interest |
+ * bonus_cash`, valued per-unit when the row carries a quantity and as a lump sum in
+ * `price` otherwise, minus fees — and a standalone `tax` debit (the Vorabpauschale)
+ * reduces it. That is exactly `cashFlow()` over those rows.
+ */
+export function incomeFlow(tx: CoreTransaction): Decimal {
+  if (
+    (INCOME_TYPES as readonly string[]).includes(tx.type) ||
+    tx.type === "tax" ||
+    tx.type === "fee"
+  ) {
+    return cashFlow(tx);
+  }
+  return new Decimal(0);
 }
 
 /**

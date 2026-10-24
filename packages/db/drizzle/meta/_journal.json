@@ -687,6 +687,13 @@
       "when": 1792532000000,
       "tag": "0097_id_reinvested",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792792264103,
+      "tag": "0098_gigantic_power_pack",
+      "breakpoints": true
     }
   ]
 }

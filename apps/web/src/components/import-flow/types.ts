@@ -1,6 +1,11 @@
 "use client";
 
-import type { AccountMismatch, ImportIssue, DocumentCategory } from "@portfolio/api-client";
+import type {
+  AccountMismatch,
+  DuplicateResolution,
+  ImportIssue,
+  DocumentCategory,
+} from "@portfolio/api-client";
 
 export type { ImportIssue } from "@portfolio/api-client";
 
@@ -116,12 +121,22 @@ export interface ImportClient {
     portfolioId?: string,
     acknowledgeAccountMismatch?: boolean,
     acknowledgeDuplicates?: boolean,
-  ): Promise<{ confirmed: number; excludedCashMovements?: number; enriched?: number }>;
+    resolutions?: DuplicateResolution[],
+  ): Promise<{
+    confirmed: number;
+    enriched?: number;
+    likelyDuplicates?: number;
+    pendingDuplicates?: number;
+  }>;
   materializeImport(
     importId: string,
     portfolioId: string,
     acknowledgeAccountMismatch?: boolean,
-  ): Promise<{ materializedCount: number; excludedCashMovements: number; enrichedCount: number }>;
+    acknowledgeDuplicates?: boolean,
+  ): Promise<{
+    materializedCount: number;
+    enrichedCount: number;
+  }>;
   checkAccounts(
     units: MaterializeUnit[],
   ): Promise<{ mismatches: ({ importId: string } & AccountMismatch)[] }>;
@@ -140,6 +155,8 @@ export interface ImportTask {
   kind: "materialize" | "confirm";
   label: string;
   acknowledge: boolean;
+  /** Clears a duplicate-409 — the user consciously chose to import the duplicates. */
+  acknowledgeDuplicates?: boolean;
   expectedCount?: number;
   units?: MaterializeUnit[];
   importId?: string;
@@ -191,7 +208,6 @@ export const demoClient: ImportClient = {
   }),
   materializeImport: async () => ({
     materializedCount: 0,
-    excludedCashMovements: 0,
     enrichedCount: 0,
   }),
   checkAccounts: async () => ({ mismatches: [] }),

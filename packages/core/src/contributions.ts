@@ -22,7 +22,7 @@ const EXCLUDED_ACQUISITION_KINDS = new Set(["saveback", "merger", "reinvestment"
 export interface ContributionInput {
   txns: CoreTransaction[];
   displayCurrency: string;
-  fx?: FxRateFn;
+  fx: FxRateFn;
   now?: Date;
   /**
    * Where this portfolio's investment boundary sits (see CLAUDE.md "one boundary
@@ -555,7 +555,7 @@ export function transferFlowPoints(
  * for what counts as a contribution.
  */
 export function contributionStats(input: ContributionInput): ContributionStats {
-  const fx: FxRateFn = input.fx ?? (() => "1");
+  const fx: FxRateFn = input.fx;
   const display = input.displayCurrency;
   const boundary = input.boundary ?? "inside";
 

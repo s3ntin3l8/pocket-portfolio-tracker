@@ -9,7 +9,9 @@
     "row": "{name} · {action} · {date} (already imported from {source})",
     "importAnyway": "Import anyway",
     "enrichExisting": "Enrich existing",
-    "more": "+{count} more"
+    "more": "+{count} more",
+    "skipExisting": "Skip",
+    "pendingRow": "an unconfirmed draft already covers this"
   },
   "Install": {
     "title": "Add Pocket to your home screen",
@@ -767,11 +769,12 @@
       "filesLabel": "{count, plural, one {# file} other {# files}}",
       "success": "{count, plural, one {# transaction imported} other {# transactions imported}}",
       "successOfTotal": "Imported {count} of {total} transactions",
-      "excluded": "{count, plural, one {# cash movement excluded} other {# cash movements excluded}} — cash is outside this portfolio's boundary.",
       "enriched": "{count, plural, one {# matched an existing transaction — details merged in} other {# matched existing transactions — details merged in}}",
       "skipped": "{count, plural, one {# duplicate skipped} other {# duplicates skipped}}",
       "error": "Import failed",
       "retry": "Retry",
+      "duplicates": "{count, plural, one {# selected transaction was} other {# selected transactions were}} already imported from another source. Importing again will create duplicates.",
+      "importAnyway": "Import anyway",
       "viewTransactions": "View"
     },
     "steps": {
@@ -1607,7 +1610,7 @@
       "chipIncome": "Income",
       "chipIssues": "Needs review · {count}",
       "allTime": "All time",
-      "incomeBasis": "All income types, net of fees and tax rows"
+      "incomeBasis": "Dividends, coupons, interest and broker bonuses, net of fees and tax rows"
     },
     "transactionCol": "Transaction",
     "price": "Price",
@@ -1869,7 +1872,7 @@
     "scope": {
       "title": "What gets imported",
       "cashInside": "Savings portfolio: all activity is imported — trades, dividends, interest, corporate actions, and cash movements (deposits, withdrawals and card spending).",
-      "cashOutside": "Invest-only portfolio: trades, dividends, interest and corporate actions are imported. Cash movements (deposits, withdrawals, card spending) are excluded to keep the cash boundary clean. Change this in the portfolio's “Cash is part of this portfolio” setting."
+      "cashOutside": "Invest-only portfolio: everything is imported, including cash movements (deposits, withdrawals, card spending). The cash is recorded but not counted in the portfolio's value and contributions, and it is hidden from the transaction list — switch on “Cash is part of this portfolio” to count and show it."
     },
     "reconcile": {
       "title": "Cash reconciliation",
@@ -2326,6 +2329,7 @@
     "reconciliationPositionTitle": "Position doesn't reconcile",
     "viewHolding": "View holding",
     "openConnection": "Open connection",
+    "dismissForNow": "Hide for now",
     "portfolioTag": "Portfolio"
   },
   "PeriodSelector": {
@@ -2625,7 +2629,7 @@
     "fieldRealized": "Realized gain",
     "fieldRealizedDef": "Gains already locked in by selling.",
     "fieldIncome": "Income",
-    "fieldIncomeDef": "Dividends, coupons and interest received. Counted as return, never as contribution.",
+    "fieldIncomeDef": "Dividends, coupons, interest and broker bonuses received, net of fees and standalone tax debits. Counted as return, never as contribution.",
     "boundaryInside": "Cash counts in this scope. Contributions are deposits minus withdrawals, and the value includes cash.",
     "boundaryOutside": "Cash is outside this scope. Contributions are net invested capital, and the value covers securities only.",
     "boundaryMixed": "This scope combines portfolios with different cash boundaries. Each portfolio pairs its value and contributions on its own boundary before they are added up.",

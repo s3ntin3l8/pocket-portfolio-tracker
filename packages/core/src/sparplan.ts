@@ -13,7 +13,7 @@ export interface SparplanInput {
   txns: CoreTransaction[];
   displayCurrency: string;
   /** FX conversion function (from → to currency). Defaults to identity (no-op). */
-  fx?: FxRateFn;
+  fx: FxRateFn;
   /** Inject the current date for deterministic tests. Defaults to `new Date()`. */
   now?: Date;
 }
@@ -249,7 +249,7 @@ function bucketLevels(
  */
 export function detectSparplans(input: SparplanInput): SparplanStats {
   const { txns, displayCurrency } = input;
-  const fx: FxRateFn = input.fx ?? (() => "1");
+  const fx: FxRateFn = input.fx;
   const now = input.now ?? new Date();
 
   // Candidate rows: instrument-buying rows, excluding broker-credited kinds.

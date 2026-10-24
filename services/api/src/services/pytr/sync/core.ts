@@ -7,12 +7,7 @@ import {
   trConnections,
   trResolvedEvents,
 } from "@portfolio/db";
-import {
-  mapTrEvents,
-  mapTrEventToDraft,
-  isCashMovementEvent,
-  extractReportDocuments,
-} from "../mapper.js";
+import { mapTrEvents, mapTrEventToDraft, extractReportDocuments } from "../mapper.js";
 import { PytrAuthError } from "../runner.js";
 import { sanitizeConnectionError } from "../../../lib/sanitize-error.js";
 import type { PytrRunner } from "../runner.js";
@@ -71,18 +66,15 @@ export async function syncTrConnection(
   const sessionData = encryption.decryptString(connection.sessionEnc);
   const portfolioId = connection.portfolioId;
 
-  // The portfolio's cash boundary drives what we stage (cashCounted) and document retention.
+  // The portfolio's cash boundary drives the document-retention decision.
   // Fetch both once up front and reuse below.
   const [portfolio] = await db
     .select({
-      cashCounted: portfolios.cashCounted,
       documentRetention: portfolios.documentRetention,
     })
     .from(portfolios)
     .where(eq(portfolios.id, portfolioId))
     .limit(1);
-  const cashCounted = portfolio?.cashCounted ?? false;
-
   const connectionId = connection.id;
   let result: Awaited<ReturnType<PytrRunner["export"]>>;
   try {
@@ -122,16 +114,6 @@ export async function syncTrConnection(
     .filter((m) => m.id);
   const exportIds = new Set(meta.map((m) => m.id));
   const cancelledIds = new Set(meta.filter((m) => isCancelled(m.status)).map((m) => m.id));
-  const eventTypeById = new Map(meta.map((m) => [m.id, m.eventType]));
-
-  // Boundary-driven staging filter (issue #326): a cash-inside (savings) portfolio imports
-  // everything; a cash-outside (invest-only) portfolio excludes genuine cash movements
-  // (deposits/withdrawals/card spending) so they don't manufacture phantom flows against a
-  // value boundary that excludes cash. Unknown/unmapped event types are NOT excluded — they
-  // flow through and surface as attention gaps (never silently dropped). Excluded events stay
-  // NOT-seen, so flipping the portfolio to cash-inside re-stages them on the next sync.
-  const allowed = (id: string) =>
-    cashCounted ? true : !isCashMovementEvent(eventTypeById.get(id) ?? "");
 
   // 1. Un-import any confirmed transactions whose source event is now cancelled, and forget
   //    them in the ledger so a later re-execution can re-stage.
@@ -254,15 +236,14 @@ export async function syncTrConnection(
   const newRaw = events.filter((e) => {
     const o = e as Record<string, unknown>;
     const id = typeof o.id === "string" ? o.id : "";
-    if (!id || resolved.has(id) || existingTxIds.has(id) || stagedIds.has(id) || !allowed(id))
-      return false;
+    if (!id || resolved.has(id) || existingTxIds.has(id) || stagedIds.has(id)) return false;
     if (typeof o.status === "string" && o.status.toUpperCase() !== "EXECUTED") return false;
     return true;
   });
   const { drafts: newDrafts, errors: newErrors } = mapTrEvents(newRaw);
   // Account-level report documents (e.g. the annual tax report) — these events are
   // intentionally excluded from newDrafts (SKIP_EVENTS in mapper.ts), so pull their
-  // documentRefs separately. Not gated by cashCounted/allowed(): a report isn't a cash
+  // documentRefs separately. Not gated by cashCounted: a report isn't a cash
   // movement, so it's always relevant regardless of the portfolio's boundary.
   const reportRefs = extractReportDocuments(newRaw);
   log?.debug(
@@ -280,15 +261,19 @@ export async function syncTrConnection(
   // 5. Drafts now become real `transactions` rows with status='draft' (visible in the main
   //    table, awaiting per-row/batch confirm) instead of being staged in the collector. Carry
   //    forward any *legacy* staged drafts (pre-migration collectors) so they migrate into the
-  //    new model, plus this sync's new drafts. The cash-boundary `allowed()` filter has already
-  //    gated both sets, so no cash-movement row reaches a cash-outside portfolio.
+  //    new model, plus this sync's new drafts.
+  //
+  //    Cash movements are staged like every other event: the portfolio's `cashCounted`
+  //    boundary decides whether they are *counted* and *shown*, both of which are read-time
+  //    decisions over the stored rows. Excluding them here would lose the data the user
+  //    needs when they switch the portfolio to cash-inside, and would understate the
+  //    Indonesian deposit-interest base (packages/core/src/tax-id.ts).
   const keptDrafts = (existing?.drafts ?? []).filter(
     (d) =>
       d.externalId &&
       !resolved.has(d.externalId) &&
       !cancelledIds.has(d.externalId) &&
-      exportIds.has(d.externalId) &&
-      allowed(d.externalId),
+      exportIds.has(d.externalId),
   );
   // Errors are NOT carried verbatim: any whose event is still in the export was just
   // re-derived above (into a fresh draft if its detail recovered, else a fresh error), so
@@ -339,24 +324,42 @@ export async function syncTrConnection(
         importId,
         status: "draft",
         isEu: true,
+        mode: "sync",
       },
     );
-    materializedDrafts = res.written.length;
-    materializedWritten = res.written.map((r) => ({ id: r.id, externalId: r.externalId }));
-    // Events that collapsed into an existing (cross-source) row are represented already —
-    // record them resolved so the next sync doesn't re-process them.
-    if (res.collapsed.length > 0) {
-      await db
-        .insert(trResolvedEvents)
-        .values(
-          res.collapsed.map((eventId) => ({
-            portfolioId,
-            source: "pytr",
-            eventId,
-            resolution: "confirmed",
-          })),
-        )
-        .onConflictDoNothing();
+    if (res.kind === "duplicate") {
+      // A broker event that duplicates an existing trade needs a decision. The sync
+      // cannot ask the user, so the events stay unresolved and re-stage on the next
+      // sync rather than being dropped or written twice.
+      log?.warn(
+        {
+          connectionId,
+          importId,
+          duplicates: res.plainDuplicates.length,
+          pending: res.pendingDuplicates.length,
+        },
+        "tr sync: cross-source duplicates need a decision — events stay unresolved",
+      );
+    } else {
+      materializedDrafts = res.written.length;
+      materializedWritten = res.written.map((r) => ({ id: r.id, externalId: r.externalId }));
+      // Events that collapsed into an existing (cross-source) row are represented
+      // already — record them resolved so the next sync doesn't re-process them. Only a
+      // *successful* enrichment collapses an event: a failed one stays unresolved and
+      // re-stages, so the broker's values are never silently lost.
+      if (res.collapsed.length > 0) {
+        await db
+          .insert(trResolvedEvents)
+          .values(
+            res.collapsed.map((eventId) => ({
+              portfolioId,
+              source: "pytr",
+              eventId,
+              resolution: "confirmed",
+            })),
+          )
+          .onConflictDoNothing();
+      }
     }
   }
 
