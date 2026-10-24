@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { getSession } from "next-auth/react";
-import { accountMismatchFromError } from "@portfolio/api-client";
+import { accountMismatchFromError, duplicatesFromError } from "@portfolio/api-client";
 import { useRouter } from "@/i18n/navigation";
 import { useImportClient } from "@/lib/use-import-client";
 import { classifyImportError, importErrorDetail } from "@/lib/import-errors";
@@ -34,8 +34,6 @@ interface WriteProgress {
   doneImportIds: string[];
   /** Rows written so far (carried into the final "imported X of Y" total). */
   count: number;
-  /** Cash movements excluded so far (boundary), carried into the toast description. */
-  excluded: number;
   /** Drafts that matched an existing transaction and had their detail folded in (source
    *  provenance + tax/fee/venue rollup) rather than being dropped — carried so the toast
    *  can say "merged" instead of implying they were discarded. */
@@ -45,7 +43,6 @@ interface WriteProgress {
 const emptyProgress = (): WriteProgress => ({
   doneImportIds: [],
   count: 0,
-  excluded: 0,
   enriched: 0,
 });
 
@@ -61,6 +58,8 @@ class PartialWriteError extends Error {
   constructor(
     readonly underlying: unknown,
     readonly progress: WriteProgress,
+    /** The unit that failed — the duplicate draft indices belong to *its* draft array. */
+    readonly failedImportId?: string,
   ) {
     super("partial_write");
     this.name = "PartialWriteError";
@@ -78,14 +77,26 @@ async function materializeUnits(
   client: ImportClient,
   units: { importId: string; portfolioId: string }[],
   acknowledge: boolean,
+  acknowledgeDuplicates: boolean | undefined,
+  resolutions: ImportTask["resolutions"],
   startedDone: number,
   onProgress: (totalDone: number, addedThisPass: number) => void,
 ) {
+  // The draft indices are relative to one import's draft array — a multi-file task must
+  // not hand one file's indices to another file, where the same index is a different row.
+  const resolutionsFor = (importId: string) =>
+    resolutions?.find((r) => r.importId === importId)?.resolutions;
   let completed = 0;
   let added = 0;
   const outcomes = await mapPool(units, IMPORT_CONCURRENCY, async (unit) => {
     try {
-      const r = await client.materializeImport(unit.importId, unit.portfolioId, acknowledge);
+      const r = await client.materializeImport(
+        unit.importId,
+        unit.portfolioId,
+        acknowledge,
+        acknowledgeDuplicates,
+        resolutionsFor(unit.importId),
+      );
       completed++;
       added += r.materializedCount;
       onProgress(startedDone + completed, added);
@@ -93,7 +104,6 @@ async function materializeUnits(
         ok: true as const,
         importId: unit.importId,
         count: r.materializedCount,
-        excluded: r.excludedCashMovements,
         enriched: r.enrichedCount,
       };
     } catch (err) {
@@ -103,14 +113,13 @@ async function materializeUnits(
 
   const ok = outcomes.filter((o) => o.ok);
   const count = ok.reduce((s, o) => s + (o.ok ? o.count : 0), 0);
-  const excluded = ok.reduce((s, o) => s + (o.ok ? o.excluded : 0), 0);
   const enriched = ok.reduce((s, o) => s + (o.ok ? o.enriched : 0), 0);
   const doneImportIds = ok.map((o) => o.importId);
   const failed = outcomes.find((o) => !o.ok);
   if (failed && !failed.ok) {
-    throw new PartialWriteError(failed.err, { doneImportIds, count, excluded, enriched });
+    throw new PartialWriteError(failed.err, { doneImportIds, count, enriched }, failed.importId);
   }
-  return { count, excluded, enriched, doneImportIds };
+  return { count, enriched, doneImportIds };
 }
 
 /**
@@ -136,7 +145,6 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
       toast.loading(t("toast.importing", { label: task.label }), { id });
       try {
         let count = carry.count;
-        let excluded = carry.excluded;
         let enriched = carry.enriched;
 
         if (task.kind === "materialize") {
@@ -146,6 +154,8 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             client,
             remaining,
             task.acknowledge,
+            task.acknowledgeDuplicates,
+            task.resolutions,
             carry.doneImportIds.length,
             (totalDone, addedThisPass) => {
               // Live per-file progress only makes sense for a multi-file import.
@@ -164,7 +174,6 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             },
           );
           count += r.count;
-          excluded += r.excluded;
           enriched += r.enriched;
         } else {
           const r = await client.confirmImport(
@@ -173,29 +182,27 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             task.contracts,
             task.portfolioId,
             task.acknowledge,
+            task.acknowledgeDuplicates,
+            task.resolutions?.find((r) => r.importId === (task.importId ?? ""))?.resolutions,
           );
           count += r.confirmed;
-          excluded += r.excludedCashMovements ?? 0;
           enriched += r.enriched ?? 0;
         }
         router.refresh(); // surface the new transactions on whatever screen is open
 
-        // "Imported X of Y" when some drafts didn't land; split the gap into cash (excluded
-        // by the portfolio's boundary), matches that got merged into an existing transaction
-        // (not dropped — the server already tells us this count, see `enriched`), and only
-        // whatever's left over as genuine duplicates.
+        // "Imported X of Y" when some drafts didn't land; the gap is split into matches that
+        // got merged into an existing transaction (not dropped — the server already tells us
+        // this count, see `enriched`) and whatever's left over as genuine duplicates.
         const expected = task.expectedCount;
         const shortfall = expected != null ? Math.max(0, expected - count) : 0;
-        const cash = excluded;
-        const merged = Math.min(Math.max(0, shortfall - cash), enriched);
-        const dups = Math.max(0, shortfall - cash - merged);
+        const merged = Math.min(shortfall, enriched);
+        const dups = Math.max(0, shortfall - merged);
         const message =
           shortfall > 0
             ? t("toast.successOfTotal", { count, total: expected! })
             : t("toast.success", { count });
         const description =
           [
-            cash > 0 ? t("toast.excluded", { count: cash }) : null,
             merged > 0 ? t("toast.enriched", { count: merged }) : null,
             dups > 0 ? t("toast.skipped", { count: dups }) : null,
           ]
@@ -219,53 +226,95 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
           ? {
               doneImportIds: [...carry.doneImportIds, ...partial.progress.doneImportIds],
               count: carry.count + partial.progress.count,
-              excluded: carry.excluded + partial.progress.excluded,
               enriched: carry.enriched + partial.progress.enriched,
             }
           : carry;
 
-        const mismatch = accountMismatchFromError(underlying);
-        if (mismatch) {
-          const description =
-            mismatch.kind === "other_portfolio"
-              ? t("accountMismatch.otherPortfolio", {
-                  portfolio: mismatch.matchedName ?? "",
-                  account: mismatch.detected,
-                })
-              : t("accountMismatch.noMatch", { account: mismatch.detected });
+        // A duplicate 409 is not a generic error: retrying replays the very same request
+        // and lands on the very same 409. Offer the acknowledgement that clears it (the
+        // drafts are still staged server-side, so the write resumes from them).
+        const duplicates = duplicatesFromError(underlying);
+        if (duplicates) {
           toast.error(t("toast.error"), {
             id,
-            description,
+            description: t("toast.duplicates", { count: duplicates.count }),
             duration: Infinity, // keep it up until the user decides
             action: {
-              label: t("accountMismatch.importAnyway"),
-              onClick: () => void execute({ ...task, acknowledge: true }, id, nextCarry),
+              label: t("toast.skipDuplicates"),
+              // Skip the rows that are already in the portfolio and import the rest. The
+              // blanket acknowledgement would write the duplicates a second time, and it
+              // cannot clear a duplicate of a *pending* row at all — a per-row "skip" is the
+              // only resolution that works for both.
+              onClick: () => {
+                // The import the conflict belongs to. Both sources can be absent in
+                // principle — in that case there is nothing to attach the resolutions to,
+                // and recording them under a sentinel id would silently drop them.
+                const failingImportId = partial?.failedImportId ?? task.importId;
+                if (!failingImportId) return;
+                void execute(
+                  {
+                    ...task,
+                    resolutions: [
+                      ...(task.resolutions ?? []).filter((r) => r.importId !== failingImportId),
+                      {
+                        importId: failingImportId,
+                        resolutions: duplicates.duplicates.map((d) => ({
+                          draftIndex: d.draftIndex,
+                          action: "skip" as const,
+                        })),
+                      },
+                    ],
+                  },
+                  id,
+                  nextCarry,
+                );
+              },
             },
           });
         } else {
-          // The modal is gone, so the only way back is a toast action. Drafts are still staged
-          // server-side, so Retry replays the remaining units (with a fresh token).
-          const info = classifyImportError(underlying);
-          const detail = info.reason === "generic" ? importErrorDetail(info) : null;
-          const description = detail
-            ? t("errors.genericDetailed", { detail })
-            : t(`errors.${info.reason}`, { provider: info.provider ?? "" });
-          const retry = async () => {
-            // A session-expiry retry must force a token refresh first: replaying immediately would
-            // re-send the same stale token, because SessionProvider's focus-refetch may not have
-            // landed yet when the user clicks. `getSession()` round-trips and rotates the token,
-            // and the api-client reads it live (lib/api.ts), so the resumed write authenticates.
-            if (info.reason === "sessionExpired") await getSession();
-            await execute(task, id, nextCarry);
-          };
-          toast.error(t("toast.error"), {
-            id,
-            description,
-            action: {
-              label: t("toast.retry"),
-              onClick: () => void retry(),
-            },
-          });
+          const mismatch = accountMismatchFromError(underlying);
+          if (mismatch) {
+            const description =
+              mismatch.kind === "other_portfolio"
+                ? t("accountMismatch.otherPortfolio", {
+                    portfolio: mismatch.matchedName ?? "",
+                    account: mismatch.detected,
+                  })
+                : t("accountMismatch.noMatch", { account: mismatch.detected });
+            toast.error(t("toast.error"), {
+              id,
+              description,
+              duration: Infinity, // keep it up until the user decides
+              action: {
+                label: t("accountMismatch.importAnyway"),
+                onClick: () => void execute({ ...task, acknowledge: true }, id, nextCarry),
+              },
+            });
+          } else {
+            // The modal is gone, so the only way back is a toast action. Drafts are still staged
+            // server-side, so Retry replays the remaining units (with a fresh token).
+            const info = classifyImportError(underlying);
+            const detail = info.reason === "generic" ? importErrorDetail(info) : null;
+            const description = detail
+              ? t("errors.genericDetailed", { detail })
+              : t(`errors.${info.reason}`, { provider: info.provider ?? "" });
+            const retry = async () => {
+              // A session-expiry retry must force a token refresh first: replaying immediately would
+              // re-send the same stale token, because SessionProvider's focus-refetch may not have
+              // landed yet when the user clicks. `getSession()` round-trips and rotates the token,
+              // and the api-client reads it live (lib/api.ts), so the resumed write authenticates.
+              if (info.reason === "sessionExpired") await getSession();
+              await execute(task, id, nextCarry);
+            };
+            toast.error(t("toast.error"), {
+              id,
+              description,
+              action: {
+                label: t("toast.retry"),
+                onClick: () => void retry(),
+              },
+            });
+          }
         }
       }
     }

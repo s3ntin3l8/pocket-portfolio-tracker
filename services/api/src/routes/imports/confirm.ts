@@ -9,11 +9,12 @@ import {
 } from "@portfolio/schema";
 import { accountMismatchVerdict } from "./helpers.js";
 import { ownedPortfolio } from "../helpers.js";
-import { isCashMovementAction } from "../../services/pytr/mapper.js";
+import { enrichTransactionFromDrafts } from "../../services/enrichment.js";
 import {
   resolveDraftInstruments,
   classifyDraftDuplicates,
   writeResolvedDrafts,
+  decideDuplicates,
   type CommittedCandidate,
   type TxRow,
 } from "../../services/materialize-drafts.js";
@@ -36,6 +37,22 @@ const confirmBodySchema = z.object({
   // Set true to proceed past cross-source economic duplicates (the same trade was already
   // imported from another format). The server otherwise refuses with 409 (#217).
   acknowledgeDuplicates: z.boolean().default(false),
+  // Per-draft disposition for the duplicates the server reported. Each entry names the
+  // draft by its index in the submitted `transactions` array and says what to do with it:
+  //   • "skip"   — don't write it and don't enrich anything with it (the trade is already
+  //                in the portfolio; this import just repeats it)
+  //   • "import" — write it as its own transaction even though it duplicates an existing one
+  //   • "enrich" — fold it into the matched transaction (link the document, merge tax/fees)
+  // An entry wins over `acknowledgeDuplicates` for that draft. Drafts without an entry fall
+  // back to the blanket behaviour.
+  resolutions: z
+    .array(
+      z.object({
+        draftIndex: z.number().int().nonnegative(),
+        action: z.enum(["skip", "import", "enrich"]),
+      }),
+    )
+    .default([]),
 });
 
 /** Registers POST /imports/:importId/confirm — write the (possibly edited) drafts as
@@ -66,9 +83,9 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
         portfolioId: bodyPortfolioId,
         acknowledgeAccountMismatch,
         acknowledgeDuplicates,
+        resolutions,
       } = confirmBody;
-      // `drafts` is `let` because a cash-outside portfolio drops cash-movement rows below.
-      let drafts = confirmBody.transactions;
+      const drafts = confirmBody.transactions;
       if (drafts.length === 0 && contracts.length === 0) {
         return reply.code(400).send({ error: "nothing_to_confirm" });
       }
@@ -147,25 +164,13 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
       // OpenFIGI ISIN-resolution path for all of them.
       const isEu = isDkb || isPytr || isTrCsv || isDkbPdf || isTrPdf || isIbkr;
 
-      // Cash-boundary filter (issue #326): a cash-outside (invest-only) portfolio excludes
-      // genuine cash movements (deposits/withdrawals) so they don't manufacture phantom flows
-      // against a value boundary that excludes cash. The pytr *sync* path already gates these
-      // at staging; the deterministic TR PDF path only learns its target portfolio here at
-      // confirm time, so it filters here instead. The only cash-movement rows a TR PDF emits
-      // are tax-optimization deposit/withdrawal true-ups. Surfaced (logged + returned), never
-      // silently dropped. Generalizes to any cash-outside import if we choose to widen `isTrPdf`.
-      let excludedCashMovements = 0;
-      if (isTrPdf && !targetPortfolio.cashCounted) {
-        const before = drafts.length;
-        drafts = drafts.filter((d) => !isCashMovementAction(d.action));
-        excludedCashMovements = before - drafts.length;
-        if (excludedCashMovements > 0) {
-          request.log.info(
-            { importId: imp.id, excludedCashMovements, portfolioId: targetPortfolioId },
-            "confirm: excluded cash movements (cash-outside portfolio)",
-          );
-        }
-      }
+      // Cash transactions are always imported. The portfolio's `cashCounted` boundary
+      // decides whether they are *counted* (net worth, cash, contributions) and whether
+      // they are *shown* in the transaction list — both of which are read-time decisions
+      // over the stored rows, not a write-time filter. Dropping them here would lose the
+      // data the user needs when they switch the portfolio to cash-inside, and would
+      // understate the Indonesian deposit-interest base, which is derived from the cash
+      // rows and deliberately ignores the boundary (packages/core/src/tax-id.ts).
 
       request.log.info(
         {
@@ -226,10 +231,13 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
             kind: "ok";
             written: TxRow[];
             enrichmentMatches: Array<{ draftIndex: number; matchedTransactionId: string }>;
+            skippedDuplicates: number;
+            pendingDuplicates: number;
           }
         | {
             kind: "duplicate";
             plainDuplicates: Array<{ draftIndex: number; matched: CommittedCandidate }>;
+            pendingDuplicates: Array<{ draftIndex: number; matched: CommittedCandidate }>;
             enrichmentMatches: Array<{ draftIndex: number; matchedTransactionId: string }>;
           };
       const txResult = await app.db.transaction(async (tx) => {
@@ -244,51 +252,69 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
           sql`SELECT 1 FROM ${portfolios} WHERE ${portfolios.id} = ${targetPortfolioId} FOR UPDATE`,
         );
 
-        const { enrichmentMatches, enrichmentDraftIndices, plainDuplicates } =
-          await classifyDraftDuplicates(
-            { db: tx, log: request.log },
-            {
-              resolved,
-              targetPortfolioId,
-              source,
-              importId: imp.id,
-            },
-          );
+        const classification = await classifyDraftDuplicates(
+          { db: tx, log: request.log },
+          {
+            resolved,
+            targetPortfolioId,
+            source,
+            importId: imp.id,
+          },
+        );
 
-        const likelyDuplicates = plainDuplicates.length;
-        if (likelyDuplicates > 0) {
-          request.log.info(
-            {
-              importId: imp.id,
-              likelyDuplicates,
-              enrichments: enrichmentMatches.length,
-              acknowledged: acknowledgeDuplicates,
-            },
-            "confirm: cross-source duplicates among selected drafts",
-          );
-          if (!acknowledgeDuplicates) {
-            // Don't write anything — surface the 409 to the caller. Committing
-            // here is fine; this is a read-only tx (the FOR UPDATE lock is
-            // released on commit, not rollback).
-            return {
-              kind: "duplicate",
-              plainDuplicates,
-              enrichmentMatches,
-            } satisfies TxResult;
-          }
+        // Per-row dispositions win over the blanket `acknowledgeDuplicates` flag. The
+        // client resolves one duplicate at a time ("skip" / "import" / "enrich"), which
+        // is the only way to express "import the new trades, skip the ones I already have".
+        const decisions = decideDuplicates({
+          enrichmentMatches: classification.enrichmentMatches,
+          plainDuplicates: classification.plainDuplicates,
+          pendingDuplicates: classification.pendingDuplicates,
+          resolutions,
+          acknowledgeDuplicates,
+        });
+        const { enrichmentMatches } = decisions;
+
+        request.log.info(
+          {
+            importId: imp.id,
+            likelyDuplicates: decisions.counts.duplicates,
+            pendingDuplicates: decisions.counts.pending,
+            enrichments: decisions.counts.enrichments,
+            acknowledged: acknowledgeDuplicates,
+            resolutions: resolutions.length,
+          },
+          "confirm: cross-source duplicates among selected drafts",
+        );
+
+        if (decisions.blockedPlain.length > 0 || decisions.blockedPending.length > 0) {
+          // Don't write anything — surface the 409 to the caller. Committing
+          // here is fine; this is a read-only tx (the FOR UPDATE lock is
+          // released on commit, not rollback).
+          return {
+            kind: "duplicate",
+            plainDuplicates: decisions.blockedPlain,
+            pendingDuplicates: decisions.blockedPending,
+            enrichmentMatches,
+          } satisfies TxResult;
         }
 
         // Pass 2 — write the (non-enrichment) drafts as new transactions + source rows.
         // Confirm writes status="normal"; the shared writer is also used by sync with "draft".
+        const skipDraftIndices = new Set<number>([
+          ...decisions.enrichmentMatches.map((m) => m.draftIndex),
+          ...decisions.skippedIndices,
+        ]);
         const {
           written: draftRows,
           attempted: draftAttempted,
           skipped: draftSkipped,
         } = await writeResolvedDrafts(tx, {
           resolved,
-          // Confirm skips only enrichment matches; acknowledged plain duplicates are still
-          // inserted (the user opted in via acknowledgeDuplicates → 409 cleared).
-          skipDraftIndices: enrichmentDraftIndices,
+          // Skipped: enrichment matches (folded into the matched row instead), cash
+          // movements excluded by the cash-outside gate, and drafts the user explicitly
+          // skipped. Acknowledged plain duplicates are still inserted (the user opted in
+          // via acknowledgeDuplicates → 409 cleared, or via a per-row "import").
+          skipDraftIndices,
           targetPortfolioId,
           source,
           importId: imp.id,
@@ -297,6 +323,18 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
         attempted += draftAttempted;
         skipped += draftSkipped;
         const written = [...draftRows];
+
+        // Enrichment runs inside the write transaction: the matched row is updated with the
+        // incoming document's tax/fees atomically with the rest of the import. A failure
+        // aborts the transaction, so a draft is never "skipped and not enriched" — the
+        // import stays unconfirmed and the user can retry.
+        for (const { draftIndex, matchedTransactionId } of enrichmentMatches) {
+          const { draft } = resolved[draftIndex];
+          await enrichTransactionFromDrafts(matchedTransactionId, tx, [draft], {
+            importId: imp.id,
+            importSource: source,
+          });
+        }
 
         // Financed gold contracts: create the gold instrument + loan, then insert
         // the derived legs (buy, drawdown, admin/discount fees, due installments),
@@ -401,40 +439,54 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
             finalStatus = "confirmed";
           }
         }
-        return { kind: "ok", written, enrichmentMatches } satisfies TxResult;
+        return {
+          kind: "ok",
+          written,
+          enrichmentMatches,
+          skippedDuplicates: decisions.counts.duplicates,
+          pendingDuplicates: decisions.counts.pending,
+        } satisfies TxResult;
       });
 
       if (txResult.kind === "duplicate") {
         const isoDay = (v: Date | string) =>
           (v instanceof Date ? v.toISOString() : new Date(v).toISOString()).slice(0, 10);
+        // `draftIndex` is the index into the array the client submitted — the server no
+        // longer filters that array before classifying, so the index always lines up.
+        // `externalId` is the draft's stable identity and is what the client should
+        // resolve against (the index is only advisory).
+        const describe = (
+          entry: { draftIndex: number; matched: CommittedCandidate },
+          pending: boolean,
+        ) => {
+          const d = resolved[entry.draftIndex].draft;
+          const m = entry.matched;
+          return {
+            draftIndex: entry.draftIndex,
+            externalId: d.externalId ?? `import:${imp.id}:${entry.draftIndex}`,
+            matchedTransactionId: m.id,
+            name: d.name ?? d.isin ?? d.ticker ?? null,
+            action: d.action,
+            quantity: d.quantity,
+            executedAt: isoDay(d.executedAt),
+            matchedSource: m.source,
+            matchedExecutedAt: isoDay(m.executedAt),
+            pending,
+          };
+        };
         return reply.code(409).send({
           error: "duplicate_transactions",
-          count: txResult.plainDuplicates.length,
-          duplicates: txResult.plainDuplicates.map(({ draftIndex, matched }) => {
-            const d = resolved[draftIndex].draft;
-            const m = matched as {
-              id: string;
-              action: string;
-              quantity: string;
-              executedAt: Date;
-              source: string | null;
-            };
-            return {
-              draftIndex,
-              matchedTransactionId: m.id,
-              name: d.name ?? d.isin ?? d.ticker ?? null,
-              action: d.action,
-              quantity: d.quantity,
-              executedAt: isoDay(d.executedAt),
-              matchedSource: m.source,
-              matchedExecutedAt: isoDay(m.executedAt),
-            };
-          }),
+          count: txResult.plainDuplicates.length + txResult.pendingDuplicates.length,
+          duplicates: [
+            ...txResult.plainDuplicates.map((d) => describe(d, false)),
+            ...txResult.pendingDuplicates.map((d) => describe(d, true)),
+          ],
         });
       }
       const created = txResult.written;
       const { enrichmentMatches } = txResult;
-      const likelyDuplicates = 0;
+      const likelyDuplicates = txResult.skippedDuplicates;
+      const pendingDuplicates = txResult.pendingDuplicates;
 
       const { enriched } = await finalizeConfirmedImport(app, {
         importId: imp.id,
@@ -443,13 +495,10 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
         isPytr,
         isDkbPdf,
         isTrPdf,
-        source,
         enrichmentMatches,
-        resolved,
         userId: id,
         requestLog: request.log,
       });
-
       request.log.info(
         {
           importId: imp.id,
@@ -457,8 +506,8 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
           written: created.length,
           enriched,
           skipped,
-          skippedDuplicates: attempted - created.length,
-          excludedCashMovements,
+          skippedDuplicates: likelyDuplicates,
+          pendingDuplicates,
           finalStatus,
         },
         "confirm complete",
@@ -469,9 +518,9 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
         confirmed: created.length,
         transactions: created,
         likelyDuplicates,
+        pendingDuplicates,
         enriched,
         skipped,
-        excludedCashMovements,
       };
     },
   );

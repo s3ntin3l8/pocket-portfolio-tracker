@@ -1,11 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq, isNull } from "drizzle-orm";
 import { transactionSources } from "@portfolio/db";
-import type { ResolvedDraft } from "../../services/materialize-drafts.js";
-import {
-  enrichTransactionFromDrafts,
-  enrichTransactionsFromStoredDocuments,
-} from "../../services/enrichment.js";
+import { enrichTransactionsFromStoredDocuments } from "../../services/enrichment.js";
 import {
   finalizeReceipts,
   linkTrReceiptsToTransactions,
@@ -23,9 +19,7 @@ export async function finalizeConfirmedImport(
     isPytr: boolean;
     isDkbPdf: boolean;
     isTrPdf: boolean;
-    source: string;
     enrichmentMatches: { draftIndex: number; matchedTransactionId: string }[];
-    resolved: ResolvedDraft[];
     userId: string;
     requestLog: {
       info: (...args: unknown[]) => void;
@@ -41,9 +35,7 @@ export async function finalizeConfirmedImport(
     isPytr,
     isDkbPdf,
     isTrPdf,
-    source,
     enrichmentMatches,
-    resolved,
     userId,
     requestLog,
   } = opts;
@@ -70,18 +62,16 @@ export async function finalizeConfirmedImport(
   const portfolio = await ownedPortfolio(app, userId, targetPortfolioId);
   const retain = portfolio?.documentRetention ?? false;
 
-  // Auto-enrich: for each draft classified as "enrichment", fold its
-  // fields into the matched existing transaction and link/retain the staged PDF.
-  // Must run BEFORE finalizeReceipts.
+  // Auto-enrich: for each draft classified as "enrichment", the matched existing row was
+  // already folded in — inside the confirm transaction, so the update is atomic with the
+  // write (a failure aborts the import instead of leaving a draft "skipped and not
+  // enriched"). What remains here is the *document* side of the enrichment: linking and
+  // retaining the staged PDF against the matched transaction. Must run BEFORE
+  // finalizeReceipts.
   let enriched = 0;
   if (enrichmentMatches.length > 0) {
     try {
-      for (const { draftIndex, matchedTransactionId } of enrichmentMatches) {
-        const { draft } = resolved[draftIndex];
-        await enrichTransactionFromDrafts(matchedTransactionId, app.db, [draft], {
-          importId,
-          importSource: source,
-        });
+      for (const { matchedTransactionId } of enrichmentMatches) {
         if (retain) {
           await retainDocumentForTransaction(app, {
             importId,
@@ -93,7 +83,7 @@ export async function finalizeConfirmedImport(
       }
       requestLog.info({ importId, enriched }, "confirm: auto-enrichment applied");
     } catch (err) {
-      requestLog.warn({ err }, "confirm: auto-enrichment failed (non-fatal)");
+      requestLog.warn({ err }, "confirm: enrichment document retention failed (non-fatal)");
     }
   }
 

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 const pkg = (name: string) =>
   path.resolve(import.meta.dirname, `../../packages/${name}/src/index.ts`);
@@ -17,6 +17,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    // Vitest 5's default exclude no longer covers `dist/`, so a prior `npm run build`
+    // leaves compiled copies of the test files behind and they get collected as a
+    // second, stale copy of every suite. Exclude the build output explicitly.
+    exclude: [...configDefaults.exclude, "**/dist/**"],
     // Builds one pre-migrated PGlite template once (see global-setup.ts); setup.ts
     // then copies it into each file's tmp dir instead of every file bootstrapping +
     // migrating its own PGlite cluster from scratch (~1.4s vs ~0.13s per file).

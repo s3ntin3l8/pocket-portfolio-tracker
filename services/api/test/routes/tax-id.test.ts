@@ -856,6 +856,49 @@ describe("Indonesian income tax — cash interest follows the portfolio's countr
     ]);
   });
 
+  it("counts the cash rows in the deposit-interest base, even for a cash-outside portfolio", async () => {
+    // The Rp7.5M small-balance exemption is judged on the paying portfolio's cash balance
+    // at the payment's date. The cash sits at the bank whatever the portfolio's boundary is
+    // ("cash outside the performance boundary still sits at the bank and earns interest") —
+    // so the deposit row has to be *stored*, or the balance is unknown and the interest is
+    // taxed at the full 20% instead of being exempt.
+    const t = await token("tax-id-cash-boundary");
+    await setTaxRegime(t, "ID");
+    const holderId = await createHolder(t, { name: "Cash Boundary Holder" });
+    const pid = await createPortfolio(t, {
+      name: "ID bank invest-only",
+      baseCurrency: "IDR",
+      accountHolderId: holderId,
+      country: "ID",
+      cashCounted: false,
+    });
+    // A 5,000,000 IDR deposit — under the Rp7.5M threshold — and the interest it earns.
+    await seedTransaction(app, pid, auth(t), {
+      type: "deposit",
+      quantity: "0",
+      price: "5000000",
+      currency: "IDR",
+      executedAt: "2025-01-15T00:00:00.000Z",
+    });
+    await seedTransaction(app, pid, auth(t), {
+      type: "interest",
+      quantity: "0",
+      price: "100000",
+      currency: "IDR",
+      executedAt: "2025-06-30T00:00:00.000Z",
+    });
+
+    const id = await portfolioTax(t, pid);
+    expect(id.incomeByCategory).toEqual([
+      expect.objectContaining({
+        category: "deposit_interest",
+        gross: "100000.00",
+        // The 5,000,000 IDR balance is under the threshold → exempt → no final tax.
+        tax: "0.00",
+      }),
+    ]);
+  });
+
   it("reports IDR interest at a bank outside Indonesia as foreign income", async () => {
     const { t, deBank } = await seedCountries("tax-id-country-2");
     const id = await portfolioTax(t, deBank);

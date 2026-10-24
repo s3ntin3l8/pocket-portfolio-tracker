@@ -14,6 +14,10 @@ export interface BannerItem {
 }
 
 export function ReconciliationBannerGroup({ items }: { items: BannerItem[] }) {
+  // Portfolio-scoped anomalies carry no transaction to point at, so the server-side
+  // dismissal table (keyed by transaction) cannot record them — the dismissal is
+  // therefore session-scoped and the banner returns on the next navigation. The label
+  // says so, so the behaviour is not a surprise.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   if (items.length === 0) return null;

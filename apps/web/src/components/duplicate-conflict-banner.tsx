@@ -2,7 +2,11 @@
 
 import { AlertCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { DuplicateConflict, DuplicateMatch } from "@portfolio/api-client";
+import type {
+  DuplicateConflict,
+  DuplicateMatch,
+  DuplicateResolutionAction,
+} from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 
 const MAX_SHOWN = 5;
@@ -11,6 +15,14 @@ interface DuplicateConflictBannerProps {
   conflict: DuplicateConflict;
   onEnrich: (d: DuplicateMatch) => void;
   onImportAnyway: () => void;
+  /**
+   * Resolve one duplicate with an explicit per-row disposition:
+   * `skip` drops it, `import` writes it as its own transaction, `enrich` folds it into the
+   * matched row. Without this the only options were "enrich everything" or "import
+   * everything", and the user's real intent — *import the new trades, skip the ones I
+   * already have* — was not expressible.
+   */
+  onResolve?: (d: DuplicateMatch, action: DuplicateResolutionAction) => void;
 }
 
 /**
@@ -19,7 +31,7 @@ interface DuplicateConflictBannerProps {
  * review flow (draft-review-client.tsx) so the UX is identical regardless of entry point.
  *
  * - Shows up to 5 duplicate rows with the matched source.
- * - Per-row "Enrich existing" button when a target transaction is known.
+ * - Per-row "Skip" (drop this one) and "Enrich existing" (fold it into the matched row).
  * - Box-level "Import anyway" to re-confirm with acknowledgeDuplicates=true.
  * - "+N more" overflow line when there are more than 5 matches.
  */
@@ -27,6 +39,7 @@ export function DuplicateConflictBanner({
   conflict,
   onEnrich,
   onImportAnyway,
+  onResolve,
 }: DuplicateConflictBannerProps) {
   const t = useTranslations("Duplicates");
 
@@ -45,7 +58,10 @@ export function DuplicateConflictBanner({
           {shown.length > 0 && (
             <ul className="space-y-1.5 pl-4 text-xs">
               {shown.map((d, i) => (
-                <li key={i} className="flex items-center gap-2">
+                <li
+                  key={d.externalId ?? `${d.matchedTransactionId}:${i}`}
+                  className="flex items-center gap-2"
+                >
                   <span className="flex-1 text-warning/90">
                     {t("row", {
                       name: d.name ?? "—",
@@ -53,7 +69,18 @@ export function DuplicateConflictBanner({
                       date: d.executedAt,
                       source: d.matchedSource ?? "—",
                     })}
+                    {d.pending ? ` — ${t("pendingRow")}` : null}
                   </span>
+                  {onResolve && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 shrink-0 text-xs"
+                      onClick={() => onResolve(d, "skip")}
+                    >
+                      {t("skipExisting")}
+                    </Button>
+                  )}
                   {d.matchedTransactionId && (
                     <Button
                       size="sm"

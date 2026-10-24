@@ -5,7 +5,7 @@ const api = {
   importScreenshot: vi.fn(async () => ({ importId: "i", drafts: [], contracts: [], errors: [] })),
   importCsv: vi.fn(async () => ({ importId: "i", drafts: [], contracts: [], errors: [] })),
   confirmImport: vi.fn(async () => ({ confirmed: 1 })),
-  materializeImport: vi.fn(async () => ({ materializedCount: 1, excludedCashMovements: 0 })),
+  materializeImport: vi.fn(async () => ({ materializedCount: 1 })),
 };
 vi.mock("@/lib/api", () => ({ useApiClient: () => api }));
 
@@ -31,10 +31,26 @@ describe("useImportClient", () => {
     expect(api.importCsv).toHaveBeenCalledWith("a,b", "x.csv", "auto", false, "batch-1");
 
     await client.confirmImport("imp", [], [], "p1", true, false);
-    expect(api.confirmImport).toHaveBeenCalledWith("imp", [], [], "p1", true, false);
+    expect(api.confirmImport).toHaveBeenCalledWith("imp", [], [], "p1", true, false, undefined);
 
     await client.materializeImport("imp", "p1", true);
-    expect(api.materializeImport).toHaveBeenCalledWith("imp", "p1", true);
+    expect(api.materializeImport).toHaveBeenCalledWith("imp", "p1", true, undefined, undefined);
+  });
+
+  // The adapter is the only implementation of the ImportClient interface, and a function
+  // with fewer parameters satisfies a wider signature — so TypeScript would not have
+  // caught it dropping the resolutions. Exercise the real adapter.
+  it("forwards the per-row resolutions to the api client", async () => {
+    const { result } = renderHook(() => useImportClient());
+    const client = result.current;
+
+    const resolutions = [{ draftIndex: 2, action: "skip" as const }];
+
+    await client.confirmImport("imp", [], [], "p1", true, false, resolutions);
+    expect(api.confirmImport).toHaveBeenCalledWith("imp", [], [], "p1", true, false, resolutions);
+
+    await client.materializeImport("imp", "p1", true, false, resolutions);
+    expect(api.materializeImport).toHaveBeenCalledWith("imp", "p1", true, false, resolutions);
   });
 
   it("is memoised while the api client is stable", () => {

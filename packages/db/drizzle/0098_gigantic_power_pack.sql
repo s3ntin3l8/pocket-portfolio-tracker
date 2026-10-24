@@ -1,0 +1,1 @@
+ALTER TABLE "loss_carryforward" ADD COLUMN "currency" text DEFAULT 'EUR' NOT NULL;

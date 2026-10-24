@@ -12,7 +12,8 @@ import { parseFlexXml } from "../../../services/ibkr/flex-parse.js";
 import { mapFlexToDrafts } from "../../../services/ibkr/mapper.js";
 import type { CsvParseResult } from "../../../services/parsers/csv.js";
 import { findCommittedDuplicates } from "../../../services/parsers/likely-duplicates.js";
-import { classifyMatch, parserToTxSource } from "../../../services/parsers/dedup.js";
+import { classifyMatchByParser } from "../../../services/parsers/dedup.js";
+import { isEnrichmentCapable, parserCarriesDocument } from "../../../services/import-policy.js";
 import { normalizeAccountNumber, portfolioMatchesAccount } from "../helpers.js";
 
 export const csvBodySchema = z.object({
@@ -167,8 +168,10 @@ export async function annotateLikelyDuplicates(
 ): Promise<void> {
   if (!portfolioId || drafts.length === 0) return;
 
-  const incomingTxSource = parserToTxSource(importParser);
-  const importIsFileUpload = incomingTxSource === "screenshot" || incomingTxSource === "pdf";
+  // The annotation is advisory — the confirm gate re-classifies authoritatively. Both must
+  // use the *same* rule, otherwise the review screen filters a row the confirm gate would
+  // have enriched (or vice versa) and the import silently loses a trade.
+  const importHasDocument = parserCarriesDocument(importParser);
 
   for (const { draftIndex, matched } of await findCommittedDuplicates(
     app.db,
@@ -177,8 +180,11 @@ export async function annotateLikelyDuplicates(
   )) {
     const draft = drafts[draftIndex];
     const hasTaxComponents = draft.taxComponents && Object.keys(draft.taxComponents).length > 0;
-    const draftHasEnrichment = importIsFileUpload || !!hasTaxComponents;
-    const kind = classifyMatch(importParser, matched.source ?? "csv", draftHasEnrichment);
+    const draftHasEnrichment = isEnrichmentCapable({
+      hasStagedDocument: importHasDocument,
+      hasTaxComponents: !!hasTaxComponents,
+    });
+    const kind = classifyMatchByParser(importParser, matched.source ?? "csv", draftHasEnrichment);
     (drafts[draftIndex] as Record<string, unknown>).likelyDuplicate = {
       kind,
       source: matched.source,

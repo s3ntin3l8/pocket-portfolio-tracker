@@ -50,7 +50,10 @@ export {
 } from "./scheduler/enqueue.js";
 
 import { PgBoss } from "pg-boss";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt, or } from "drizzle-orm";
+// The re-export at the top of this file does not bring the name into scope — import it
+// separately for the cron claim's lease.
+import { SYNC_CLAIM_LEASE_MS } from "./scheduler/config.js";
 import type { FastifyInstance } from "fastify";
 import { backfillJobs, ibkrConnections, trConnections } from "@portfolio/db";
 import { getDb } from "../db/client.js";
@@ -228,18 +231,50 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
               and(eq(trConnections.status, "connected"), eq(trConnections.syncing, false)),
         );
       for (const conn of conns) {
-        const result = await syncTrConnection(
-          getDb(),
-          app.encryption,
-          app.pytr,
-          conn,
-          app.log,
-          app.storage,
-        );
-        if (result.status === "connected") {
-          app.log.info({ connectionId: conn.id, result }, "tr sync complete");
-        } else {
-          app.log.warn({ connectionId: conn.id, result }, "tr sync non-connected");
+        // Claim the connection atomically, exactly like the manual route does. The cron
+        // sweep used to only *read* `syncing = false`, so two sweeps (or a sweep and a
+        // manual sync) could sync the same connection at once — the collector's
+        // read-modify-write then raced itself and left an orphan anchor import behind.
+        if (!targetId) {
+          const [claimed] = await getDb()
+            .update(trConnections)
+            .set({ syncing: true, updatedAt: new Date() })
+            .where(
+              and(
+                eq(trConnections.id, conn.id),
+                or(
+                  eq(trConnections.syncing, false),
+                  lt(trConnections.updatedAt, new Date(Date.now() - SYNC_CLAIM_LEASE_MS)),
+                ),
+              ),
+            )
+            .returning({ id: trConnections.id });
+          if (!claimed) continue; // another worker got there first
+        }
+        try {
+          const result = await syncTrConnection(
+            getDb(),
+            app.encryption,
+            app.pytr,
+            conn,
+            app.log,
+            app.storage,
+          );
+          if (result.status === "connected") {
+            app.log.info({ connectionId: conn.id, result }, "tr sync complete");
+          } else {
+            app.log.warn({ connectionId: conn.id, result }, "tr sync non-connected");
+          }
+        } finally {
+          if (!targetId) {
+            // Release the claim so the frontend poller sees a terminal state — but only if
+            // we still hold it. The lease can expire mid-run and another worker can claim
+            // the connection; clearing `syncing` then would release *their* claim.
+            await getDb()
+              .update(trConnections)
+              .set({ syncing: false, updatedAt: new Date() })
+              .where(and(eq(trConnections.id, conn.id), eq(trConnections.syncing, true)));
+          }
         }
       }
     } catch (err) {

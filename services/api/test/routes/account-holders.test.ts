@@ -229,8 +229,8 @@ describe("account holders", () => {
         .json()
         .entries.sort((a: { pot: string }, b: { pot: string }) => a.pot.localeCompare(b.pot));
       expect(entries).toEqual([
-        { pot: "general", amount: "120.50" },
-        { pot: "stock", amount: "500" },
+        { pot: "general", amount: "120.50", currency: "EUR" },
+        { pot: "stock", amount: "500", currency: "EUR" },
       ]);
 
       const get = await app.inject({
@@ -256,7 +256,7 @@ describe("account holders", () => {
         headers: auth(t),
         payload: { taxYear: 2025, entries: [{ pot: "general", amount: "80" }] },
       });
-      expect(second.json().entries).toEqual([{ pot: "general", amount: "80" }]);
+      expect(second.json().entries).toEqual([{ pot: "general", amount: "80", currency: "EUR" }]);
     });
 
     it("keeps different tax years independent", async () => {
@@ -279,7 +279,7 @@ describe("account holders", () => {
         url: `/account-holders/${holderId}/loss-carryforward?taxYear=2024`,
         headers: auth(t),
       });
-      expect(y2024.json().entries).toEqual([{ pot: "stock", amount: "100" }]);
+      expect(y2024.json().entries).toEqual([{ pot: "stock", amount: "100", currency: "EUR" }]);
     });
 
     it("rejects a duplicate pot in the same PUT payload", async () => {

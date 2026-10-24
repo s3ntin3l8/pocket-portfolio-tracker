@@ -4,7 +4,8 @@ import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { loans, screenshotImports, transactions, trResolvedEvents } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { type ImportIssue, type ParsedTransaction } from "@portfolio/schema";
-import { classifyMatch, parserToTxSource } from "../services/parsers/dedup.js";
+import { classifyMatchByParser } from "../services/parsers/dedup.js";
+import { isEnrichmentCapable, parserCarriesDocument } from "../services/import-policy.js";
 import { findCommittedDuplicates } from "../services/parsers/likely-duplicates.js";
 import {
   deleteReceiptsForImport,
@@ -470,21 +471,28 @@ export async function importsRoute(app: FastifyInstance) {
 
       const matches = await findCommittedDuplicates(app.db, portfolioId, drafts);
 
-      // Classify against the import's *raw* parser tag — classifyMatch converts it to a tx
-      // source internally, so passing an already-converted source here would double-convert
-      // ("dkb-pdf" → "pdf" → "screenshot") and mis-badge PDF re-imports. A PDF upload carries
-      // a document, so it counts as a file upload (enrichment-capable) just like a screenshot.
+      // Classify against the import's *raw* parser tag — `classifyMatchByParser` converts it
+      // to a tx source internally, so passing an already-converted source here would
+      // double-convert ("dkb-pdf" → "pdf" → "screenshot") and mis-badge PDF re-imports.
+      // The enrichment-capability rule is shared with the confirm gate (import-policy.ts) so
+      // this preview and the authoritative classification can never disagree.
       const incomingParser = imp.parser ?? "csv";
-      const incomingTxSource = parserToTxSource(incomingParser);
-      const importIsFileUpload = incomingTxSource === "screenshot" || incomingTxSource === "pdf";
+      const importHasDocument = parserCarriesDocument(incomingParser);
       const isoDay = (v: Date | string) =>
         (v instanceof Date ? v.toISOString() : new Date(v).toISOString()).slice(0, 10);
 
       const annotations = matches.map(({ draftIndex, matched }) => {
         const d = drafts[draftIndex];
         const hasTaxComponents = d.taxComponents && Object.keys(d.taxComponents).length > 0;
-        const draftHasEnrichment = importIsFileUpload || !!hasTaxComponents;
-        const kind = classifyMatch(incomingParser, matched.source ?? "csv", draftHasEnrichment);
+        const draftHasEnrichment = isEnrichmentCapable({
+          hasStagedDocument: importHasDocument,
+          hasTaxComponents: !!hasTaxComponents,
+        });
+        const kind = classifyMatchByParser(
+          incomingParser,
+          matched.source ?? "csv",
+          draftHasEnrichment,
+        );
         return {
           draftIndex,
           kind,

@@ -108,7 +108,7 @@ export interface NetWorthInput {
   prices: Record<string, PriceQuote>;
   cash: Record<string, string>;
   displayCurrency: string;
-  fx?: FxRateFn;
+  fx: FxRateFn;
   /** Outstanding loan liabilities, already summed to the display currency. */
   liabilities?: string;
   /**
@@ -139,7 +139,7 @@ export interface NetWorthInput {
  * still contributes nothing; that gap is #736's, not this function's, to close.
  */
 export function netWorth(input: NetWorthInput): string {
-  const fx: FxRateFn = input.fx ?? (() => "1");
+  const fx: FxRateFn = input.fx;
   let total = new Decimal(0);
 
   for (const h of input.holdings) {

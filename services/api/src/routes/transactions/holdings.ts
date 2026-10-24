@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
-import { transactions, dismissedAnomalies, trConnections } from "@portfolio/db";
+import { transactions, dismissedAnomalies, trConnections, ibkrConnections } from "@portfolio/db";
 import { toCoreTxns } from "../../services/tx-core.js";
 import { netManualAdjustments } from "../../services/pytr/reconcile.js";
 import { loadSparklines } from "../../services/sparklines.js";
@@ -32,12 +32,20 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
     async (request) => {
       const { portfolioId } = request.params;
       const portfolio = request.portfolio;
-      const [rows, trConn, dismissed] = await Promise.all([
+      const [rows, trConn, ibkrConn, dismissed] = await Promise.all([
         app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolioId)),
         app.db
           .select({ lastReconciliation: trConnections.lastReconciliation })
           .from(trConnections)
           .where(eq(trConnections.portfolioId, portfolioId))
+          .limit(1)
+          .then((r) => r[0] ?? null),
+        // IBKR reports its own reconciliation gap in the same shape as TR — reading only
+        // the TR connection left the reconciliation anomalies blind to IBKR portfolios.
+        app.db
+          .select({ lastReconciliation: ibkrConnections.lastReconciliation })
+          .from(ibkrConnections)
+          .where(eq(ibkrConnections.portfolioId, portfolioId))
           .limit(1)
           .then((r) => r[0] ?? null),
         app.db
@@ -59,10 +67,19 @@ export function registerHoldingsRoutes(app: FastifyInstance) {
       const reconciliation = rawReconciliation
         ? netManualAdjustments(rawReconciliation, coreTxns)
         : rawReconciliation;
+      const rawIbkrReconciliation = ibkrConn?.lastReconciliation as
+        ReconciliationGap | null | undefined;
+      const ibkrReconciliation = rawIbkrReconciliation
+        ? netManualAdjustments(rawIbkrReconciliation, coreTxns)
+        : rawIbkrReconciliation;
+      // One gap per connected broker — a portfolio can have both.
+      const reconciliationGaps: ReconciliationGap[] = [];
+      if (reconciliation) reconciliationGaps.push({ ...reconciliation, broker: "tr" });
+      if (ibkrReconciliation) reconciliationGaps.push({ ...ibkrReconciliation, broker: "ibkr" });
       const anomalies = detectAnomalies(coreTxns, cas, {
         cashCounted: portfolio.cashCounted,
         allowNegativeCash: portfolio.allowNegativeCash,
-        reconciliationGap: reconciliation ?? null,
+        reconciliationGap: reconciliationGaps.length > 0 ? reconciliationGaps : null,
       });
       const dismissedSet = new Set(dismissed.map((d) => `${d.transactionId}:${d.code}`));
       const filtered = anomalies.filter(

@@ -59,7 +59,8 @@ describe("DraftReviewClient", () => {
     renderClient();
     fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
     await waitFor(() =>
-      expect(confirmImport).toHaveBeenCalledWith("imp1", [DRAFT], [], undefined, false, false),
+      // The per-row duplicate resolutions travel with every confirm (empty when there are none).
+      expect(confirmImport).toHaveBeenCalledWith("imp1", [DRAFT], [], undefined, false, false, []),
     );
     expect(push).toHaveBeenCalledWith("/transactions");
   });
@@ -85,7 +86,8 @@ describe("DraftReviewClient", () => {
     fireEvent.click(screen.getByRole("button", { name: messages.Import.confirm }));
     await waitFor(() =>
       // Only the clean DRAFT reaches the API; the likelyDuplicate is excluded.
-      expect(confirmImport).toHaveBeenCalledWith("imp1", [DRAFT], [], undefined, false, false),
+      // The per-row duplicate resolutions travel with every confirm (empty when there are none).
+      expect(confirmImport).toHaveBeenCalledWith("imp1", [DRAFT], [], undefined, false, false, []),
     );
   });
 
@@ -110,8 +112,26 @@ describe("DraftReviewClient", () => {
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/transactions"));
     // First attempt did not acknowledge; the retry does.
-    expect(confirmImport).toHaveBeenNthCalledWith(1, "imp1", [DRAFT], [], undefined, false, false);
-    expect(confirmImport).toHaveBeenNthCalledWith(2, "imp1", [DRAFT], [], undefined, false, true);
+    expect(confirmImport).toHaveBeenNthCalledWith(
+      1,
+      "imp1",
+      [DRAFT],
+      [],
+      undefined,
+      false,
+      false,
+      [],
+    );
+    expect(confirmImport).toHaveBeenNthCalledWith(
+      2,
+      "imp1",
+      [DRAFT],
+      [],
+      undefined,
+      false,
+      true,
+      [],
+    );
   });
 
   it("discards the import and returns to the import page", async () => {

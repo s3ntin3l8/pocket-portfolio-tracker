@@ -225,6 +225,8 @@ describe("backfillPortfolioHistory vs computeBackfillSnapshots — valuation-sou
       prices: { [instr.id]: { price: REAL_CANDLES[LAST_REAL_CANDLE]!, currency: "IDR" } },
       displayCurrency: "IDR",
       cashCounted: true,
+      // Single-currency fixture — the rate function is required (never defaulted to 1:1).
+      fx: () => "1",
     });
     return { backfilled: Number(snap!.netWorth), live: Number(live.netWorth) };
   }

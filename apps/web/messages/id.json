@@ -9,7 +9,9 @@
     "row": "{name} · {action} · {date} (sudah diimpor dari {source})",
     "importAnyway": "Tetap impor",
     "enrichExisting": "Perkaya yang ada",
-    "more": "+{count} lainnya"
+    "more": "+{count} lainnya",
+    "skipExisting": "Lewati",
+    "pendingRow": "draf belum dikonfirmasi sudah mencakup ini"
   },
   "Install": {
     "title": "Tambahkan Pocket ke layar utama",
@@ -767,11 +769,13 @@
       "filesLabel": "{count, plural, one {# berkas} other {# berkas}}",
       "success": "{count, plural, one {# transaksi diimpor} other {# transaksi diimpor}}",
       "successOfTotal": "Mengimpor {count} dari {total} transaksi",
-      "excluded": "{count, plural, one {# pergerakan kas dikecualikan} other {# pergerakan kas dikecualikan}} — kas berada di luar batas portofolio ini.",
       "enriched": "{count, plural, one {# cocok dengan transaksi yang sudah ada — detail digabungkan} other {# cocok dengan transaksi yang sudah ada — detail digabungkan}}",
       "skipped": "{count, plural, one {# duplikat dilewati} other {# duplikat dilewati}}",
       "error": "Impor gagal",
       "retry": "Coba lagi",
+      "duplicates": "{count, plural, one {# transaksi terpilih} other {# transaksi terpilih}} sudah diimpor dari sumber lain. Mengimpor lagi akan membuat duplikat.",
+      "importAnyway": "Tetap impor",
+      "skipDuplicates": "Lewati duplikatnya",
       "viewTransactions": "Lihat"
     },
     "steps": {
@@ -1607,7 +1611,7 @@
       "chipIncome": "Pendapatan",
       "chipIssues": "Perlu ditinjau · {count}",
       "allTime": "Sepanjang waktu",
-      "incomeBasis": "Semua jenis pendapatan, setelah biaya dan baris pajak"
+      "incomeBasis": "Dividen, kupon, bunga, dan bonus broker, setelah biaya dan baris pajak"
     },
     "transactionCol": "Transaksi",
     "price": "Harga",
@@ -1869,7 +1873,7 @@
     "scope": {
       "title": "Apa yang diimpor",
       "cashInside": "Portofolio tabungan: semua aktivitas diimpor — perdagangan, dividen, bunga, aksi korporasi, dan pergerakan kas (setoran, penarikan, dan belanja kartu).",
-      "cashOutside": "Portofolio khusus investasi: perdagangan, dividen, bunga, dan aksi korporasi diimpor. Pergerakan kas (setoran, penarikan, belanja kartu) dikecualikan agar batas kas tetap bersih. Ubah ini pada pengaturan “Kas termasuk bagian portofolio ini”."
+      "cashOutside": "Portofolio khusus investasi: semuanya diimpor, termasuk pergerakan kas (setoran, penarikan, belanja kartu). Kas dicatat tetapi tidak dihitung dalam nilai dan kontribusi portofolio, dan disembunyikan dari daftar transaksi — nyalakan “Kas termasuk bagian portofolio ini” untuk menghitung dan menampilkannya."
     },
     "reconcile": {
       "title": "Rekonsiliasi kas",
@@ -2326,6 +2330,7 @@
     "reconciliationPositionTitle": "Posisi tidak sesuai",
     "viewHolding": "Lihat kepemilikan",
     "openConnection": "Buka koneksi",
+    "dismissForNow": "Sembunyikan sementara",
     "portfolioTag": "Portofolio"
   },
   "PeriodSelector": {
@@ -2625,7 +2630,7 @@
     "fieldRealized": "Keuntungan terealisasi",
     "fieldRealizedDef": "Keuntungan yang sudah terkunci melalui penjualan.",
     "fieldIncome": "Pendapatan",
-    "fieldIncomeDef": "Dividen, kupon, dan bunga yang diterima. Dihitung sebagai imbal hasil, bukan kontribusi.",
+    "fieldIncomeDef": "Dividen, kupon, bunga, dan bonus broker yang diterima, setelah biaya dan baris pajak tersendiri. Dihitung sebagai imbal hasil, bukan kontribusi.",
     "boundaryInside": "Kas dihitung dalam cakupan ini. Kontribusi adalah setoran dikurangi penarikan, dan nilai mencakup kas.",
     "boundaryOutside": "Kas berada di luar cakupan ini. Kontribusi adalah modal investasi bersih, dan nilai hanya mencakup sekuritas.",
     "boundaryMixed": "Cakupan ini menggabungkan portofolio dengan batas kas yang berbeda. Setiap portofolio memasangkan nilai dan kontribusinya pada batasnya sendiri sebelum dijumlahkan.",

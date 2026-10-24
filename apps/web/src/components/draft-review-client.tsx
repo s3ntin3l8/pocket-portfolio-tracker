@@ -1,7 +1,7 @@
 "use client";
 
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,7 @@ export function DraftReviewClient({
     pendingAcknowledgeMismatch,
     confirm,
     enrichOneDuplicate,
+    resolveDuplicate,
   } = useImportConfirm({
     importId,
     drafts,
@@ -95,6 +96,28 @@ export function DraftReviewClient({
         ? ti("errors.transferCostBasisRequired")
         : t("reviewError"),
   });
+
+  // The advisory duplicate annotations are computed against a portfolio — and the
+  // portfolio the user ends up confirming into may not be the one the upload was
+  // annotated for. Re-fetch them for the effective target so the badges (and the
+  // "confirm all" filter that uses them) always describe the portfolio the import
+  // actually goes into.
+  useEffect(() => {
+    if (!portfolioId) return;
+    let cancelled = false;
+    void api
+      .checkImportDuplicates(importId, portfolioId)
+      .then(({ annotations }) => {
+        if (!cancelled) applyAnnotations(annotations);
+      })
+      .catch(() => {
+        // Advisory only — the confirm gate is authoritative.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importId, portfolioId]);
 
   function updateDraft(uid: string, patch: Partial<ImportDraft>) {
     setDrafts((ds) => ds.map((d) => (d.uid === uid ? { ...d, ...patch } : d)));
@@ -179,6 +202,7 @@ export function DraftReviewClient({
         <DuplicateConflictBanner
           conflict={duplicateConflict}
           onEnrich={(d) => void enrichOneDuplicate(d)}
+          onResolve={(d, action) => void resolveDuplicate(d, action)}
           onImportAnyway={() =>
             void confirm(
               pendingSubset.current.map((d) => d.uid),

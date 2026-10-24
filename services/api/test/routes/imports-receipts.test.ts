@@ -110,7 +110,7 @@ async function setup(sub: string, documentRetention = false) {
     method: "POST",
     url: "/portfolios",
     headers: auth(t),
-    payload: { name: "Test", baseCurrency: "IDR", documentRetention },
+    payload: { name: "Test", baseCurrency: "IDR", documentRetention, cashCounted: true },
   });
   expect(portRes.statusCode).toBe(201);
   const portfolio = portRes.json() as { id: string; documentRetention: boolean };

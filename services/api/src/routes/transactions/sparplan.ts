@@ -276,15 +276,17 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       // We sum unrealizedAdjusted for each instrument that has a sell action,
       // clamped to the remaining allowance.
       const sellKeys = new Set(tradeActions.filter((a) => a.side === "sell").map((a) => a.key));
-      let allowanceUsedNum = 0;
+      // Decimal throughout — money is never a float. The clamped value has to agree with
+      // `usage.remaining` to the last cent, and a float sum drifted by a cent against it.
+      let allowanceUsedNum = new Decimal(0);
       for (const s of suggestions) {
         if (sellKeys.has(s.instrumentId)) {
-          allowanceUsedNum += Number(s.unrealizedAdjusted);
+          allowanceUsedNum = allowanceUsedNum.plus(new Decimal(s.unrealizedAdjusted));
         }
       }
       // Clamp to remaining allowance so the display never exceeds the budget.
-      const remainingNum = Number(usage.remaining);
-      const allowanceUsed = String(Math.min(allowanceUsedNum, remainingNum).toFixed(2));
+      const remainingNum = new Decimal(usage.remaining);
+      const allowanceUsed = Decimal.min(allowanceUsedNum, remainingNum).toFixed(2);
 
       request.timingMeta = {
         portfolioId,

@@ -275,11 +275,30 @@ export function registerCrudRoutes(app: FastifyInstance) {
             .send({ error: "transfer_cost_basis_required", transactionIds: [blocked.id] });
         }
       }
-      const [updated] = await app.db
-        .update(transactions)
-        .set({ status })
-        .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
-        .returning();
+      // Promoting a draft to a counting status is a confirm — it must record the broker
+      // event in the resolved-events ledger, exactly like `resolve-drafts` does. Without it
+      // the event was only seeded at the next sync, so deleting the row before that sync
+      // re-surfaced the trade.
+      const updated = await app.db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(transactions)
+          .set({ status })
+          .where(and(eq(transactions.id, txId), eq(transactions.portfolioId, portfolioId)))
+          .returning();
+        if (!row) return null;
+        if ((row.source === "pytr" || row.source === "ibkr") && row.externalId) {
+          await tx
+            .insert(trResolvedEvents)
+            .values({
+              portfolioId,
+              source: row.source as "pytr" | "ibkr",
+              eventId: row.externalId,
+              resolution: status === "archived" ? "discarded" : "confirmed",
+            })
+            .onConflictDoNothing();
+        }
+        return row;
+      });
       if (!updated) {
         return reply.code(404).send({ error: "transaction_not_found" });
       }
@@ -370,34 +389,40 @@ export function registerCrudRoutes(app: FastifyInstance) {
       const nextStatus = action === "confirm" ? "normal" : "archived";
       const resolution = action === "confirm" ? "confirmed" : "discarded";
 
-      const updated = await app.db
-        .update(transactions)
-        .set({ status: nextStatus })
-        .where(
-          and(
-            eq(transactions.portfolioId, portfolioId),
-            eq(transactions.status, "draft"),
-            inArray(transactions.id, ids),
-          ),
-        )
-        .returning({
-          id: transactions.id,
-          source: transactions.source,
-          externalId: transactions.externalId,
-          executedAt: transactions.executedAt,
-        });
+      // The status change and the ledger entry are one transaction: a crash between them
+      // used to leave a `normal` row with no ledger entry, so the broker event re-surfaced
+      // on the next sync and the trade was imported twice.
+      const updated = await app.db.transaction(async (tx) => {
+        const rows = await tx
+          .update(transactions)
+          .set({ status: nextStatus })
+          .where(
+            and(
+              eq(transactions.portfolioId, portfolioId),
+              eq(transactions.status, "draft"),
+              inArray(transactions.id, ids),
+            ),
+          )
+          .returning({
+            id: transactions.id,
+            source: transactions.source,
+            externalId: transactions.externalId,
+            executedAt: transactions.executedAt,
+          });
 
-      const ledgerRows = updated
-        .filter((r) => (r.source === "pytr" || r.source === "ibkr") && r.externalId)
-        .map((r) => ({
-          portfolioId,
-          source: r.source as "pytr" | "ibkr",
-          eventId: r.externalId as string,
-          resolution,
-        }));
-      if (ledgerRows.length > 0) {
-        await app.db.insert(trResolvedEvents).values(ledgerRows).onConflictDoNothing();
-      }
+        const ledgerRows = rows
+          .filter((r) => (r.source === "pytr" || r.source === "ibkr") && r.externalId)
+          .map((r) => ({
+            portfolioId,
+            source: r.source as "pytr" | "ibkr",
+            eventId: r.externalId as string,
+            resolution,
+          }));
+        if (ledgerRows.length > 0) {
+          await tx.insert(trResolvedEvents).values(ledgerRows).onConflictDoNothing();
+        }
+        return rows;
+      });
 
       const days = new Set(updated.map((r) => toDateKey(r.executedAt)));
       for (const day of days) await enqueueRecompute(portfolioId, day);

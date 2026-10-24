@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { screenshotImports, transactions } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb, getDb } from "../../src/db/client.js";
-import { classifyMatch, parserToTxSource } from "../../src/services/parsers/dedup.js";
+import { classifyMatchByParser, parserToTxSource } from "../../src/services/parsers/dedup.js";
 
 const ISSUER = "https://auth.test/application/o/portfolio/";
 const AUDIENCE = "portfolio-tracker";
@@ -341,7 +341,7 @@ describe("source mapping", () => {
   it("treats an AI proposal as a manual entry that can never enrich another source", () => {
     expect(parserToTxSource("ai")).toBe("manual");
     for (const matched of ["csv", "pdf", "pytr", "ibkr", "manual", "screenshot"]) {
-      expect(classifyMatch("ai", matched, false)).toBe("duplicate");
+      expect(classifyMatchByParser("ai", matched, false)).toBe("duplicate");
     }
   });
 });

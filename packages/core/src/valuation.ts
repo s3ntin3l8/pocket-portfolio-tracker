@@ -1,6 +1,6 @@
 import { Decimal } from "decimal.js";
 import { computeHoldings, marketValue } from "./holdings.js";
-import { cashBalances, cashFlow, isCashAccountMovement } from "./cash.js";
+import { cashBalances, incomeFlow, isCashAccountMovement } from "./cash.js";
 import { netWorth, convert, fxAvailable, type FxRateFn } from "./networth.js";
 import { financingByInstrument, liabilityBalances } from "./loans.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
@@ -95,7 +95,7 @@ export interface PortfolioSummary {
   totalRealizedPnL: string;
   /** Outstanding loan liabilities in the display currency (subtracted from net worth). */
   totalLiabilities: string;
-  /** Cash income received — dividends, bond coupons and cash interest, net of fees (via `cashFlow()`; don't subtract fees again) — in the display currency. */
+  /** Cash income received — dividends, bond coupons, interest and broker bonuses, net of fees and of standalone tax debits (via `incomeFlow()`; don't subtract fees again) — in the display currency. */
   totalIncome: string;
   /** Sum of per-holding day change, in the display currency. */
   totalDayChange: string;
@@ -122,7 +122,7 @@ export interface SummarizeInput {
   /** Latest price + currency (+ prior close) keyed by instrument id. */
   prices: Record<string, { price: string; currency: string; previousClose?: string | null }>;
   displayCurrency: string;
-  fx?: FxRateFn;
+  fx: FxRateFn;
   /** Cost-basis presentation for financed holdings. Defaults to "purchase_price". */
   costBasisMode?: CostBasisMode;
   /**
@@ -197,7 +197,7 @@ export function netWorthInputs(args: NetWorthInputsArgs): NetWorthInputs {
  * Holdings without a price are returned but excluded from market-value totals.
  */
 export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
-  const fx: FxRateFn = input.fx ?? (() => "1");
+  const fx: FxRateFn = input.fx;
   const holdings = computeHoldings(input.transactions, input.corporateActions);
 
   // Audit B2: a currency with no known rate into the display currency is never
@@ -417,14 +417,16 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
     liabilities,
   });
 
+  // One income definition (packages/core/src/cash.ts `incomeFlow`) — the same rule the
+  // transactions list's summary uses, so the two surfaces can never disagree.
   let totalIncome = new Decimal(0);
   for (const tx of input.transactions) {
-    const isDivOrCoup = tx.type === "dividend" || tx.type === "coupon" || tx.type === "interest";
-    if (isDivOrCoup && canConvert(tx.currency)) {
-      totalIncome = totalIncome.add(
-        convert(cashFlow(tx).toString(), tx.currency, input.displayCurrency, fx),
-      );
-    }
+    if (!canConvert(tx.currency)) continue;
+    const amount = incomeFlow(tx);
+    if (amount.isZero()) continue;
+    totalIncome = totalIncome.add(
+      convert(amount.toString(), tx.currency, input.displayCurrency, fx),
+    );
   }
 
   return {

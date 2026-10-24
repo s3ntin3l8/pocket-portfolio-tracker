@@ -19,13 +19,19 @@ function makeDuplicate(overrides?: Partial<DuplicateMatch>): DuplicateMatch {
   };
 }
 
-function renderBanner(conflict: DuplicateConflict, onEnrich = vi.fn(), onImportAnyway = vi.fn()) {
+function renderBanner(
+  conflict: DuplicateConflict,
+  onEnrich = vi.fn(),
+  onImportAnyway = vi.fn(),
+  onResolve = vi.fn(),
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <DuplicateConflictBanner
         conflict={conflict}
         onEnrich={onEnrich}
         onImportAnyway={onImportAnyway}
+        onResolve={onResolve}
       />
     </NextIntlClientProvider>,
   );
@@ -79,5 +85,33 @@ describe("DuplicateConflictBanner", () => {
     const duplicates = Array.from({ length: 5 }, (_, i) => makeDuplicate({ draftIndex: i }));
     renderBanner({ count: 5, duplicates });
     expect(screen.queryByText(/more/i)).toBeNull();
+  });
+
+  // The per-row resolution is what makes "import the new trades, skip the ones I already
+  // have" expressible — before, the only options were "enrich everything" or "import
+  // everything", and the latter wrote the duplicate a second time.
+  it("offers a per-row 'Skip' action", () => {
+    const onResolve = vi.fn();
+    const duplicate = makeDuplicate();
+    renderBanner({ count: 1, duplicates: [duplicate] }, vi.fn(), vi.fn(), onResolve);
+
+    expect(
+      screen.getByRole("button", { name: messages.Duplicates.skipExisting }),
+    ).toBeInTheDocument();
+  });
+
+  it("fires onResolve with the duplicate and the 'skip' action", () => {
+    const onResolve = vi.fn();
+    const duplicate = makeDuplicate();
+    renderBanner({ count: 1, duplicates: [duplicate] }, vi.fn(), vi.fn(), onResolve);
+
+    fireEvent.click(screen.getByRole("button", { name: messages.Duplicates.skipExisting }));
+    expect(onResolve).toHaveBeenCalledWith(duplicate, "skip");
+  });
+
+  it("marks a duplicate of an unconfirmed row", () => {
+    const duplicate = makeDuplicate({ pending: true });
+    renderBanner({ count: 1, duplicates: [duplicate] });
+    expect(screen.getByText(/unconfirmed draft already covers this/i)).toBeInTheDocument();
   });
 });

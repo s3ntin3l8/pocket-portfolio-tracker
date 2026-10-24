@@ -1,11 +1,13 @@
 export {
   actionClass,
   parseLooseDecimal,
+  decimalCandidates,
   decimalsClose,
   withinDayTolerance,
   parserToTxSource,
   isEuParser,
-  classifyMatch,
+  classifyMatchBySource,
+  classifyMatchByParser,
 } from "./dedup/matcher.js";
 export type { DedupCandidate } from "./dedup/matcher.js";
 export { findCrossSourceDuplicates } from "./dedup/matcher.js";

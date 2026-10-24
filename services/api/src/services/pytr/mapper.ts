@@ -26,11 +26,7 @@ import {
 } from "./mapper/taxonomy.js";
 
 import type { MapResult } from "./mapper/classification.js";
-export {
-  categoryForEventType,
-  isCashMovementEvent,
-  isCashMovementAction,
-} from "./mapper/classification.js";
+export { categoryForEventType } from "./mapper/classification.js";
 export type { ImportCategory, MapResult } from "./mapper/classification.js";
 export type { ReportDocumentRef } from "./mapper/reports.js";
 export { extractReportDocuments } from "./mapper/reports.js";
