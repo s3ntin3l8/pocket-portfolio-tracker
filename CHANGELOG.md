@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.5...v0.2.6) (2026-10-24)
+
+
+### Features
+
+* **tax-de:** credit Indonesian income withholding against the German estimate ([#1088](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1088)) ([8974b20](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8974b2000b294fb99be548365fac71f1eb383225)), closes [#1084](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1084)
+* **tax-id:** PPh 22 on a gold-bar sale above Rp10 million ([#1089](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1089)) ([a1fa47d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a1fa47d7442b1f4e65942d7e9a5881b9cdae880c)), closes [#1085](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1085)
+
+
+### Bug Fixes
+
+* **import:** classify duplicates by transaction source and scope the cash boundary ([#1093](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1093)) ([149bcea](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/149bceae36b39049905847d2a967f674831ab506))
+* **tax-id:** convert Indonesian tax amounts at the payment date ([#1086](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1086)) ([5f46b21](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5f46b219399644a2dc655a53964d815b236fc545)), closes [#1083](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1083)
+
 ## [0.2.5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.4...v0.2.5) (2026-10-20)
 
 
