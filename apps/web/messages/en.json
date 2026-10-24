@@ -775,6 +775,7 @@
       "retry": "Retry",
       "duplicates": "{count, plural, one {# selected transaction was} other {# selected transactions were}} already imported from another source. Importing again will create duplicates.",
       "importAnyway": "Import anyway",
+      "skipDuplicates": "Skip the duplicates",
       "viewTransactions": "View"
     },
     "steps": {

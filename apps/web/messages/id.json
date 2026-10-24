@@ -775,6 +775,7 @@
       "retry": "Coba lagi",
       "duplicates": "{count, plural, one {# transaksi terpilih} other {# transaksi terpilih}} sudah diimpor dari sumber lain. Mengimpor lagi akan membuat duplikat.",
       "importAnyway": "Tetap impor",
+      "skipDuplicates": "Lewati duplikatnya",
       "viewTransactions": "Lihat"
     },
     "steps": {

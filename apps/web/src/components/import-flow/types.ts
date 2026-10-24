@@ -159,11 +159,14 @@ export interface ImportTask {
   /** Clears a duplicate-409 — the user consciously chose to import the duplicates. */
   acknowledgeDuplicates?: boolean;
   /**
-   * Per-row dispositions for the duplicates the server reported (skip / import / enrich).
-   * The materialise path reads its drafts from the server, so the indices it reports are
-   * stable across the retry — unlike the confirm path, where the client re-sends a subset.
+   * Per-row dispositions for the duplicates the server reported (skip / import / enrich),
+   * **per import**. The draft indices are relative to one import's draft array, so a
+   * multi-file task must not hand one file's indices to another file.
    */
-  resolutions?: Array<{ draftIndex: number; action: "skip" | "import" | "enrich" }>;
+  resolutions?: Array<{
+    importId: string;
+    resolutions: Array<{ draftIndex: number; action: "skip" | "import" | "enrich" }>;
+  }>;
   expectedCount?: number;
   units?: MaterializeUnit[];
   importId?: string;

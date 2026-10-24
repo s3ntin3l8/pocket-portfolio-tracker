@@ -45,7 +45,10 @@ export type DuplicateDecisions = {
  * 3. A **pending** duplicate (the match is an unconfirmed transaction row) always blocks.
  *    The blanket flag must not decide what happens to an unconfirmed row — the user does.
  * 4. An explicit per-row resolution always wins over the blanket flag:
- *    - `"skip"` — the draft is neither written nor folded into anything.
+ *    - `"skip"` — the draft is neither written nor folded into anything. The confirm
+ *      path expresses this by not sending the draft at all; the materialise path sends it
+ *      with this disposition, because there the draft array is the server's own and stays
+ *      stable across the retry.
  *    - `"import"` — the draft is written even though it duplicates an existing trade.
  *    - `"enrich"` — the draft is folded into the matched transaction.
  *

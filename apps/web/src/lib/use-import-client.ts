@@ -53,12 +53,14 @@ export function useImportClient(): ImportClient {
         portfolioId,
         acknowledgeAccountMismatch,
         acknowledgeDuplicates,
+        resolutions,
       ) =>
         api.materializeImport(
           importId,
           portfolioId,
           acknowledgeAccountMismatch,
           acknowledgeDuplicates,
+          resolutions,
         ),
       checkAccounts: (units) => api.checkAccounts(units),
       uploadDocument: (file, opts) => api.uploadDocument(file, opts),

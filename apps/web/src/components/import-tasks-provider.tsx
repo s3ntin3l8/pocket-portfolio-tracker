@@ -58,6 +58,8 @@ class PartialWriteError extends Error {
   constructor(
     readonly underlying: unknown,
     readonly progress: WriteProgress,
+    /** The unit that failed — the duplicate draft indices belong to *its* draft array. */
+    readonly failedImportId?: string,
   ) {
     super("partial_write");
     this.name = "PartialWriteError";
@@ -80,6 +82,10 @@ async function materializeUnits(
   startedDone: number,
   onProgress: (totalDone: number, addedThisPass: number) => void,
 ) {
+  // The draft indices are relative to one import's draft array — a multi-file task must
+  // not hand one file's indices to another file, where the same index is a different row.
+  const resolutionsFor = (importId: string) =>
+    resolutions?.find((r) => r.importId === importId)?.resolutions;
   let completed = 0;
   let added = 0;
   const outcomes = await mapPool(units, IMPORT_CONCURRENCY, async (unit) => {
@@ -89,7 +95,7 @@ async function materializeUnits(
         unit.portfolioId,
         acknowledge,
         acknowledgeDuplicates,
-        resolutions,
+        resolutionsFor(unit.importId),
       );
       completed++;
       added += r.materializedCount;
@@ -111,7 +117,7 @@ async function materializeUnits(
   const doneImportIds = ok.map((o) => o.importId);
   const failed = outcomes.find((o) => !o.ok);
   if (failed && !failed.ok) {
-    throw new PartialWriteError(failed.err, { doneImportIds, count, enriched });
+    throw new PartialWriteError(failed.err, { doneImportIds, count, enriched }, failed.importId);
   }
   return { count, enriched, doneImportIds };
 }
@@ -177,7 +183,7 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             task.portfolioId,
             task.acknowledge,
             task.acknowledgeDuplicates,
-            task.resolutions,
+            task.resolutions?.find((r) => r.importId === (task.importId ?? ""))?.resolutions,
           );
           count += r.confirmed;
           enriched += r.enriched ?? 0;
@@ -234,7 +240,7 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             description: t("toast.duplicates", { count: duplicates.count }),
             duration: Infinity, // keep it up until the user decides
             action: {
-              label: t("toast.importAnyway"),
+              label: t("toast.skipDuplicates"),
               // Skip the rows that are already in the portfolio and import the rest. The
               // blanket acknowledgement would write the duplicates a second time, and it
               // cannot clear a duplicate of a *pending* row at all — a per-row "skip" is the
@@ -243,10 +249,18 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
                 void execute(
                   {
                     ...task,
-                    resolutions: duplicates.duplicates.map((d) => ({
-                      draftIndex: d.draftIndex,
-                      action: "skip" as const,
-                    })),
+                    resolutions: [
+                      ...(task.resolutions ?? []).filter(
+                        (r) => r.importId !== (partial?.failedImportId ?? task.importId ?? ""),
+                      ),
+                      {
+                        importId: partial?.failedImportId ?? task.importId ?? "",
+                        resolutions: duplicates.duplicates.map((d) => ({
+                          draftIndex: d.draftIndex,
+                          action: "skip" as const,
+                        })),
+                      },
+                    ],
                   },
                   id,
                   nextCarry,
