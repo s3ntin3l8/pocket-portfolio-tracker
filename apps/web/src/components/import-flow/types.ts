@@ -133,6 +133,7 @@ export interface ImportClient {
     portfolioId: string,
     acknowledgeAccountMismatch?: boolean,
     acknowledgeDuplicates?: boolean,
+    resolutions?: Array<{ draftIndex: number; action: "skip" | "import" | "enrich" }>,
   ): Promise<{
     materializedCount: number;
     enrichedCount: number;
@@ -157,6 +158,12 @@ export interface ImportTask {
   acknowledge: boolean;
   /** Clears a duplicate-409 — the user consciously chose to import the duplicates. */
   acknowledgeDuplicates?: boolean;
+  /**
+   * Per-row dispositions for the duplicates the server reported (skip / import / enrich).
+   * The materialise path reads its drafts from the server, so the indices it reports are
+   * stable across the retry — unlike the confirm path, where the client re-sends a subset.
+   */
+  resolutions?: Array<{ draftIndex: number; action: "skip" | "import" | "enrich" }>;
   expectedCount?: number;
   units?: MaterializeUnit[];
   importId?: string;

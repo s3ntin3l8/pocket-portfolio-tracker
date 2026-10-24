@@ -95,11 +95,11 @@ export function cashFlow(tx: CoreTransaction): Decimal {
  * reduces it. That is exactly `cashFlow()` over those rows.
  */
 export function incomeFlow(tx: CoreTransaction): Decimal {
-  if (
-    (INCOME_TYPES as readonly string[]).includes(tx.type) ||
-    tx.type === "tax" ||
-    tx.type === "fee"
-  ) {
+  // The same set the transactions list's summary uses: the four income types, plus a
+  // standalone `tax` debit (the Vorabpauschale) which reduces the total. A standalone
+  // `fee` row is NOT part of it — the list's income summary doesn't count it either, and
+  // counting it here would make the total disagree with the tile above it.
+  if ((INCOME_TYPES as readonly string[]).includes(tx.type) || tx.type === "tax") {
     return cashFlow(tx);
   }
   return new Decimal(0);

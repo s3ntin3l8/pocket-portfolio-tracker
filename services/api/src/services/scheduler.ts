@@ -267,11 +267,13 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
           }
         } finally {
           if (!targetId) {
-            // Release the claim so the frontend poller sees a terminal state.
+            // Release the claim so the frontend poller sees a terminal state — but only if
+            // we still hold it. The lease can expire mid-run and another worker can claim
+            // the connection; clearing `syncing` then would release *their* claim.
             await getDb()
               .update(trConnections)
               .set({ syncing: false, updatedAt: new Date() })
-              .where(eq(trConnections.id, conn.id));
+              .where(and(eq(trConnections.id, conn.id), eq(trConnections.syncing, true)));
           }
         }
       }

@@ -504,6 +504,59 @@ describe("import dedup regressions", () => {
     expect(rows.map((r) => r.externalId).sort()).toEqual(["pdf:other", "pdf:x"]);
   });
 
+  it("a per-row 'skip' resolution targets the draft at that index, not the first", async () => {
+    // The duplicate sits in the middle of the submitted array: a resolution that landed on
+    // the wrong index would drop a *good* trade instead of the duplicate.
+    const t = await token("reg-skip-middle");
+    const pid = await makePortfolio(t);
+    const uid = await userIdFor(pid);
+    await commitTrade({
+      t,
+      userId: uid,
+      portfolioId: pid,
+      draft: { ...TRADE_WITH_TAX, externalId: "pdf:x" },
+    });
+
+    const first: ParsedTransaction = {
+      ...TRADE,
+      isin: "DE0007236101",
+      name: "Siemens",
+      quantity: "10",
+      price: "100",
+      externalId: "pdf:first",
+    };
+    const dup = { ...TRADE_WITH_TAX, externalId: "pdf:x" };
+    const last: ParsedTransaction = {
+      ...TRADE,
+      isin: "FR0000120271",
+      name: "Total",
+      quantity: "7",
+      price: "50",
+      externalId: "pdf:last",
+    };
+
+    const importId = await stageImport({
+      userId: uid,
+      portfolioId: pid,
+      parser: "dkb-pdf",
+      drafts: [first, dup, last],
+    });
+    const res = await confirmImport({
+      t,
+      importId,
+      portfolioId: pid,
+      transactions: [first, dup, last],
+      resolutions: [{ draftIndex: 1, action: "skip" }],
+    });
+
+    expect(res.statusCode).toBe(201);
+    // The duplicate is skipped and the two good drafts are written.
+    expect(res.json().confirmed).toBe(2);
+    const rows = await rowsIn(pid);
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.externalId).sort()).toEqual(["pdf:first", "pdf:last", "pdf:x"]);
+  });
+
   it("a per-row 'import' resolution writes the duplicate as its own transaction", async () => {
     const t = await token("reg-import");
     const pid = await makePortfolio(t);

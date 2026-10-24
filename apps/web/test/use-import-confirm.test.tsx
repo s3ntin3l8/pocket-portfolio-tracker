@@ -36,6 +36,12 @@ const DRAFT_B: ImportDraft = {
   externalId: "draft-b",
 };
 
+const DRAFT_C: ImportDraft = {
+  ...DRAFT_A,
+  name: "Total",
+  externalId: "draft-c",
+};
+
 function makeClient() {
   return {
     confirmImport: vi.fn().mockResolvedValue({ confirmed: 1 }),
@@ -126,13 +132,49 @@ describe("useImportConfirm — duplicate resolution", () => {
     });
 
     await waitFor(() => expect(client.confirmImport).toHaveBeenCalledTimes(2));
-    // The re-confirm after the skip sends only the remaining draft, and records the
-    // per-row resolution so the server drops the skipped one.
+    // The re-confirm after the skip sends only the remaining draft: the skipped one is
+    // simply not part of the import, so it cannot be written — and no resolution is left
+    // pointing at another draft.
     const last = client.confirmImport.mock.calls.at(-1) as unknown[];
     const sent = last[1] as Array<{ name?: string }>;
     expect(sent.map((d) => d.name)).not.toContain("Siemens");
-    expect(last[last.length - 1]).toEqual([{ draftIndex: 1, action: "skip" }]);
+    expect(last[last.length - 1]).toEqual([]);
     expect(client.enrichImport).not.toHaveBeenCalled();
+  });
+
+  it("a skip in the middle never lands on the next draft", async () => {
+    // The regression: the resolution was recorded as an index into the array that was sent
+    // *before* the decision, then applied to the array sent *after* it — so skipping the
+    // middle draft of [A, B, C] dropped C instead. Resolutions are held by identity and
+    // translated to the index of the array actually sent.
+    const client = makeClient();
+    const { result } = makeHook([DRAFT_A, DRAFT_B, DRAFT_C], client);
+
+    const duplicate: DuplicateMatch = {
+      name: "Siemens",
+      action: "buy",
+      quantity: "3",
+      executedAt: "2026-03-01",
+      matchedSource: "csv",
+      matchedExecutedAt: "2026-03-01",
+      draftIndex: 1,
+      externalId: "draft-b",
+      matchedTransactionId: "tx-1",
+    };
+
+    await act(async () => {
+      await result.current.confirm();
+    });
+    await act(async () => {
+      await result.current.skipOneDuplicate(duplicate);
+    });
+
+    await waitFor(() => expect(client.confirmImport).toHaveBeenCalledTimes(2));
+    const [, sent, , , , , resolutions] = client.confirmImport.mock.calls[1] as unknown[];
+    // The skipped draft is gone; the other two are still sent.
+    expect((sent as Array<{ name?: string }>).map((d) => d.name)).toEqual(["Apple", "Total"]);
+    // …and no resolution points at the wrong draft.
+    expect(resolutions).toEqual([]);
   });
 
   it("sends the per-row resolutions with the confirm", async () => {

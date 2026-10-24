@@ -76,6 +76,7 @@ async function materializeUnits(
   units: { importId: string; portfolioId: string }[],
   acknowledge: boolean,
   acknowledgeDuplicates: boolean | undefined,
+  resolutions: ImportTask["resolutions"],
   startedDone: number,
   onProgress: (totalDone: number, addedThisPass: number) => void,
 ) {
@@ -88,6 +89,7 @@ async function materializeUnits(
         unit.portfolioId,
         acknowledge,
         acknowledgeDuplicates,
+        resolutions,
       );
       completed++;
       added += r.materializedCount;
@@ -147,6 +149,7 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             remaining,
             task.acknowledge,
             task.acknowledgeDuplicates,
+            task.resolutions,
             carry.doneImportIds.length,
             (totalDone, addedThisPass) => {
               // Live per-file progress only makes sense for a multi-file import.
@@ -174,6 +177,7 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             task.portfolioId,
             task.acknowledge,
             task.acknowledgeDuplicates,
+            task.resolutions,
           );
           count += r.confirmed;
           enriched += r.enriched ?? 0;
@@ -231,7 +235,22 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             duration: Infinity, // keep it up until the user decides
             action: {
               label: t("toast.importAnyway"),
-              onClick: () => void execute({ ...task, acknowledgeDuplicates: true }, id, nextCarry),
+              // Skip the rows that are already in the portfolio and import the rest. The
+              // blanket acknowledgement would write the duplicates a second time, and it
+              // cannot clear a duplicate of a *pending* row at all — a per-row "skip" is the
+              // only resolution that works for both.
+              onClick: () =>
+                void execute(
+                  {
+                    ...task,
+                    resolutions: duplicates.duplicates.map((d) => ({
+                      draftIndex: d.draftIndex,
+                      action: "skip" as const,
+                    })),
+                  },
+                  id,
+                  nextCarry,
+                ),
             },
           });
         } else {

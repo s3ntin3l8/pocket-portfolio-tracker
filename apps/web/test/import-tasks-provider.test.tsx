@@ -114,8 +114,22 @@ describe("ImportTasksProvider", () => {
     );
 
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp-a", "p1", false, undefined);
-    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp-b", "p2", false, undefined);
+    expect(materializeImport).toHaveBeenNthCalledWith(
+      1,
+      "imp-a",
+      "p1",
+      false,
+      undefined,
+      undefined,
+    );
+    expect(materializeImport).toHaveBeenNthCalledWith(
+      2,
+      "imp-b",
+      "p2",
+      false,
+      undefined,
+      undefined,
+    );
     // 2 + 3 = 5 imported.
     const [msg, opts] = h.success.mock.calls[0]! as [string, { id?: string | number }];
     expect(msg).toContain("5");
@@ -206,7 +220,7 @@ describe("ImportTasksProvider", () => {
     // Retry replays the same task (no acknowledge change) and resolves to success.
     opts.action!.onClick();
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", false, undefined);
+    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", false, undefined, undefined);
   });
 
   it("session-expiry 401 → 'session expired' description (not opaque generic)", async () => {
@@ -320,8 +334,8 @@ describe("ImportTasksProvider", () => {
     // Invoking the action replays the same task acknowledged.
     opts.action!.onClick();
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp1", "p1", false, undefined);
-    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", true, undefined);
+    expect(materializeImport).toHaveBeenNthCalledWith(1, "imp1", "p1", false, undefined, undefined);
+    expect(materializeImport).toHaveBeenNthCalledWith(2, "imp1", "p1", true, undefined, undefined);
   });
 
   it("confirm (gold contract) path → count comes from `confirmed`", async () => {
@@ -339,7 +353,7 @@ describe("ImportTasksProvider", () => {
     });
 
     await waitFor(() => expect(h.success).toHaveBeenCalled());
-    expect(confirmImport).toHaveBeenCalledWith("imp-c", [], [], "p1", false, undefined);
+    expect(confirmImport).toHaveBeenCalledWith("imp-c", [], [], "p1", false, undefined, undefined);
     expect(h.refresh).toHaveBeenCalledTimes(1);
   });
 });

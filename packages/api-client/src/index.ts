@@ -3498,6 +3498,7 @@ export function createApiClient(config: ApiClientConfig) {
       portfolioId: string,
       acknowledgeAccountMismatch = false,
       acknowledgeDuplicates = false,
+      resolutions: DuplicateResolution[] = [],
     ) =>
       request<{
         importId: string;
@@ -3509,6 +3510,7 @@ export function createApiClient(config: ApiClientConfig) {
         portfolioId,
         acknowledgeAccountMismatch,
         acknowledgeDuplicates,
+        resolutions,
       }),
     /**
      * Read-only pre-flight for the upload modal's Confirm: for each (importId, portfolioId)

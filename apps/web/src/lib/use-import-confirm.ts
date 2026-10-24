@@ -6,7 +6,6 @@ import {
   duplicatesFromError,
   type DuplicateConflict,
   type DuplicateMatch,
-  type DuplicateResolution,
   type DuplicateResolutionAction,
   type AccountMismatch,
 } from "@portfolio/api-client";
@@ -81,8 +80,14 @@ export interface UseImportConfirmResult {
   pendingSubset: React.MutableRefObject<ReviewDraft[]>;
   /** The acknowledge-mismatch flag from the last confirm call — used when re-confirming after enrich. */
   pendingAcknowledgeMismatch: React.MutableRefObject<boolean>;
-  /** Per-row decisions taken since the last confirm — replayed on the next confirm. */
-  pendingResolutions: React.MutableRefObject<DuplicateResolution[]>;
+  /**
+   * Per-row decisions taken since the last confirm, held by the draft's **identity** (its
+   * uid) and translated to the index the server receives — a recorded index would refer to
+   * the wrong draft as soon as one resolution changes the array that is sent.
+   */
+  pendingResolutions: React.MutableRefObject<
+    Array<{ uid: string; action: DuplicateResolutionAction }>
+  >;
   confirm: (
     uids?: string[],
     acknowledgeMismatch?: boolean,
@@ -115,7 +120,7 @@ export function useImportConfirm({
   const [accountMismatch, setAccountMismatch] = useState<AccountMismatch | null>(null);
   const pendingSubset = useRef<ReviewDraft[]>([]);
   const pendingAcknowledgeMismatch = useRef(false);
-  const pendingResolutions = useRef<DuplicateResolution[]>([]);
+  const pendingResolutions = useRef<Array<{ uid: string; action: DuplicateResolutionAction }>>([]);
 
   /**
    * Find the draft a conflict refers to.
@@ -151,6 +156,20 @@ export function useImportConfirm({
         : drafts.filter((d) => d.likelyDuplicate?.kind !== "duplicate");
     pendingSubset.current = subset;
 
+    // The resolutions are held by the draft's *identity* (its uid), and translated to the
+    // index the server will see — the index into the array we are sending right now.
+    //
+    // Recording an index when the decision was taken would be wrong: resolving one
+    // duplicate re-sends a *different* array (the resolved draft is gone), so every
+    // recorded index after that point refers to the wrong draft — a skip would land on the
+    // next draft and silently lose it.
+    const resolutions = pendingResolutions.current
+      .map((r) => {
+        const draftIndex = subset.findIndex((d) => d.uid === r.uid);
+        return draftIndex >= 0 ? { draftIndex, action: r.action } : null;
+      })
+      .filter((r): r is { draftIndex: number; action: DuplicateResolutionAction } => r !== null);
+
     onBeforeConfirm?.();
 
     try {
@@ -161,7 +180,7 @@ export function useImportConfirm({
         getPortfolioId(),
         acknowledgeMismatch,
         acknowledgeDup,
-        pendingResolutions.current,
+        resolutions,
       );
       setDuplicateConflict(null);
       setAccountMismatch(null);
@@ -234,10 +253,11 @@ export function useImportConfirm({
     if (!found) return;
     const { draft, index } = found;
 
-    // Record the decision so the server applies it on the next confirm.
+    // Record the decision by the draft's identity — the index is derived later, against the
+    // array the server actually receives.
     pendingResolutions.current = [
-      ...pendingResolutions.current.filter((r) => r.draftIndex !== index),
-      { draftIndex: index, action: "skip" },
+      ...pendingResolutions.current.filter((r) => r.uid !== draft.uid),
+      { uid: draft.uid, action: "skip" },
     ];
 
     // Drop it from the pending set and re-confirm the rest.
@@ -263,10 +283,10 @@ export function useImportConfirm({
     // disposition; the blanket acknowledgement is not used for it.
     const found = resolveDraft(d);
     if (!found) return;
-    const { index } = found;
+    const { draft } = found;
     pendingResolutions.current = [
-      ...pendingResolutions.current.filter((r) => r.draftIndex !== index),
-      { draftIndex: index, action: "import" },
+      ...pendingResolutions.current.filter((r) => r.uid !== draft.uid),
+      { uid: draft.uid, action: "import" },
     ];
     setDuplicateConflict(null);
     await confirm(

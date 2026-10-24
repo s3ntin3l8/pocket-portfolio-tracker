@@ -21,6 +21,17 @@ const materializeBodySchema = z.object({
   // A duplicate of a *pending* row still needs a per-row decision — the blanket flag never
   // clears those.
   acknowledgeDuplicates: z.boolean().default(false),
+  // Per-draft dispositions for the duplicates the server reported — the same vocabulary
+  // the confirm route accepts, so a conflict that cannot be cleared by the blanket flag
+  // (a pending row) can still be resolved here.
+  resolutions: z
+    .array(
+      z.object({
+        draftIndex: z.number().int().nonnegative(),
+        action: z.enum(["skip", "import", "enrich"]),
+      }),
+    )
+    .default([]),
 });
 
 const accountCheckBodySchema = z.object({
@@ -34,6 +45,7 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
     parserTag: string;
     targetPortfolioId: string;
     acknowledgeDuplicates?: boolean;
+    resolutions?: Array<{ draftIndex: number; action: "skip" | "import" | "enrich" }>;
   }): Promise<
     | { kind: "duplicate"; plainDuplicates: DuplicateMatch[]; pendingDuplicates: DuplicateMatch[] }
     | {
@@ -43,7 +55,7 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
         matchedTransactionIds: string[];
       }
   > {
-    const { imp, drafts, parserTag, targetPortfolioId, acknowledgeDuplicates } = opts;
+    const { imp, drafts, parserTag, targetPortfolioId, acknowledgeDuplicates, resolutions } = opts;
     const [pf] = await app.db
       .select({
         documentRetention: portfolios.documentRetention,
@@ -66,6 +78,7 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
       euWhenIsin: parserTag === "ai",
       mode: "user",
       acknowledgeDuplicates,
+      resolutions,
     });
 
     // A duplicate that needs a decision blocks the import — exactly like the confirm
@@ -148,7 +161,7 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const id = request.userId;
-      const { portfolioId, acknowledgeAccountMismatch, acknowledgeDuplicates } =
+      const { portfolioId, acknowledgeAccountMismatch, acknowledgeDuplicates, resolutions } =
         materializeBodySchema.parse(request.body);
 
       const [imp] = await app.db
@@ -199,6 +212,7 @@ export function registerMaterializeRoutes(app: FastifyInstance) {
         parserTag: imp.parser ?? "csv",
         targetPortfolioId: portfolioId,
         acknowledgeDuplicates,
+        resolutions,
       });
       if (mat.kind === "duplicate") {
         // Same 409 shape as the confirm path, so the client handles both entry points

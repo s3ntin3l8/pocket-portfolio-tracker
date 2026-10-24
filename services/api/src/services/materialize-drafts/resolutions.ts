@@ -9,8 +9,6 @@ export type DuplicateAction = "skip" | "import" | "enrich";
 export type DuplicateResolution = { draftIndex: number; action: DuplicateAction };
 
 export type DuplicateDecisions = {
-  /** Drafts to write as new transactions. */
-  writeIndices: Set<number>;
   /** Drafts to fold into a matched transaction: draft index → matched transaction id. */
   enrichmentMatches: Array<{ draftIndex: number; matchedTransactionId: string }>;
   /** Drafts the user explicitly skipped — neither written nor folded into anything. */
@@ -19,7 +17,17 @@ export type DuplicateDecisions = {
   blockedPlain: DuplicateMatch[];
   blockedPending: DuplicateMatch[];
   /** Counts for the response/log. */
-  counts: { duplicates: number; pending: number; enrichments: number; skipped: number };
+  counts: {
+    /**
+     * The plain duplicates found — *before* the blanket acknowledgement cleared them. The
+     * response reports how many duplicates the import hit, not how many are still blocking.
+     */
+    duplicates: number;
+    /** Duplicates of an unconfirmed row — these always need an explicit decision. */
+    pending: number;
+    enrichments: number;
+    skipped: number;
+  };
 };
 
 /**
@@ -103,6 +111,7 @@ export function decideDuplicates(args: {
 
   // A plain duplicate can be cleared by the blanket acknowledgement (historical
   // behaviour). A pending duplicate can not: it needs an explicit per-row decision.
+  const plainDuplicateCount = plainByIndex.size;
   let blockedPlain = acknowledgeDuplicates ? [] : [...plainByIndex.values()];
 
   // Sync mode: merge a cross-source match into the confirmed row it matches instead of
@@ -122,13 +131,12 @@ export function decideDuplicates(args: {
   const blockedPending = [...pendingByIndex.values()];
 
   return {
-    writeIndices: new Set<number>(),
     enrichmentMatches,
     skippedIndices,
     blockedPlain,
     blockedPending,
     counts: {
-      duplicates: blockedPlain.length,
+      duplicates: plainDuplicateCount,
       pending: blockedPending.length,
       enrichments: enrichmentMatches.length,
       skipped: skippedIndices.size,
