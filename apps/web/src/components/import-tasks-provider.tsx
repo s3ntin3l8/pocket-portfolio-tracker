@@ -245,16 +245,19 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
               // blanket acknowledgement would write the duplicates a second time, and it
               // cannot clear a duplicate of a *pending* row at all — a per-row "skip" is the
               // only resolution that works for both.
-              onClick: () =>
+              onClick: () => {
+                // The import the conflict belongs to. Both sources can be absent in
+                // principle — in that case there is nothing to attach the resolutions to,
+                // and recording them under a sentinel id would silently drop them.
+                const failingImportId = partial?.failedImportId ?? task.importId;
+                if (!failingImportId) return;
                 void execute(
                   {
                     ...task,
                     resolutions: [
-                      ...(task.resolutions ?? []).filter(
-                        (r) => r.importId !== (partial?.failedImportId ?? task.importId ?? ""),
-                      ),
+                      ...(task.resolutions ?? []).filter((r) => r.importId !== failingImportId),
                       {
-                        importId: partial?.failedImportId ?? task.importId ?? "",
+                        importId: failingImportId,
                         resolutions: duplicates.duplicates.map((d) => ({
                           draftIndex: d.draftIndex,
                           action: "skip" as const,
@@ -264,7 +267,8 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
                   },
                   id,
                   nextCarry,
-                ),
+                );
+              },
             },
           });
         } else {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { ApiError } from "@portfolio/api-client";
 import { ImportTasksProvider, useImportTasks } from "../src/components/import-tasks-provider";
@@ -194,6 +194,80 @@ describe("ImportTasksProvider", () => {
     const opts = h.success.mock.calls[0]![1] as { description?: string };
     expect(opts.description).toBeTruthy();
     expect(opts.description).toContain("2");
+  });
+
+  it("gives each unit only its own resolutions", async () => {
+    // The draft indices are relative to one import's draft array: a multi-file task must
+    // not hand one file's indices to another file, where the same index is a different
+    // trade. The failing unit's import travels with the error and each unit is then
+    // resolved with its own entries.
+    const materializeImport = vi.fn(
+      async (
+        importId: string,
+        _portfolioId?: string,
+        _acknowledge?: boolean,
+        _acknowledgeDuplicates?: boolean,
+        _resolutions?: Array<{ draftIndex: number; action: string }>,
+      ) => {
+        if (importId === "imp-a") {
+          throw new ApiError(
+            409,
+            JSON.stringify({
+              error: "duplicate_transactions",
+              count: 1,
+              duplicates: [
+                {
+                  name: "Apple",
+                  action: "buy",
+                  quantity: "3",
+                  executedAt: "2026-03-01",
+                  matchedSource: "csv",
+                  matchedExecutedAt: "2026-03-01",
+                  draftIndex: 2,
+                  matchedTransactionId: "tx-1",
+                },
+              ],
+            }),
+          );
+        }
+        throw new Error("boom");
+      },
+    );
+    h.client = makeClient({
+      materializeImport: materializeImport as unknown as ImportClient["materializeImport"],
+    });
+
+    renderRunner(
+      materializeTask({
+        units: [
+          { importId: "imp-a", portfolioId: "p1" },
+          { importId: "imp-b", portfolioId: "p2" },
+        ],
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "run" }));
+    await waitFor(() => expect(h.error).toHaveBeenCalled());
+
+    // The toast action replays the task with the duplicates skipped.
+    const action = h.error.mock.calls.at(-1)?.[1]?.action as
+      { label: string; onClick: () => void } | undefined;
+    expect(action).toBeTruthy();
+    act(() => action!.onClick());
+
+    await waitFor(() =>
+      expect(materializeImport.mock.calls.some((c) => c[0] === "imp-a" && c[4] !== undefined)).toBe(
+        true,
+      ),
+    );
+
+    // The retry passes each unit its own resolutions — imp-a gets the skip, imp-b gets
+    // none (its indices would be a different trade's).
+    const calls = materializeImport.mock.calls;
+    const retryA = calls.filter((c) => c[0] === "imp-a").at(-1);
+    const retryB = calls.filter((c) => c[0] === "imp-b").at(-1);
+    expect(retryA?.[4]).toEqual([{ draftIndex: 2, action: "skip" }]);
+    expect(retryB?.[4]).toBeUndefined();
   });
 
   it("generic error → error toast with the mapped reason and a Retry action", async () => {
