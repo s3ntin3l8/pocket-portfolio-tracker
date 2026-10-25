@@ -18,6 +18,12 @@ import { startReportsLoads } from "@/components/reports/reports-data";
  * behind its own `<Suspense>`, so a slow endpoint (tax, trades) no longer holds back the
  * rest. All loaders are started up-front (request-cached, see reports-data) so the cards
  * overlap rather than waterfall. A card with no data renders nothing once it resolves.
+ *
+ * The cards follow the SELECTED scope, exactly like the neighbouring pages: every loader in
+ * `reports-data.ts` resolves the scope itself (`getSelectedPortfolioId()` → the portfolio
+ * endpoint, `resolveHolderScope()` → the holder endpoint, neither → the all-portfolio one).
+ * So the page states no scope of its own — the shell's `PortfolioSwitcher` is the scope
+ * control here, and a hard-coded scope line would be false for every scoped page.
  */
 export default async function ReportsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

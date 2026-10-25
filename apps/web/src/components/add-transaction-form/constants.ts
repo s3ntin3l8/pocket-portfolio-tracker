@@ -1,3 +1,5 @@
+import { percentToFraction } from "@/lib/tax-rate";
+
 export const ACQUISITION_TYPES = ["buy", "sell", "savings_plan"] as const;
 /** No longer offered in the manual form (Add Transaction v2 moves splits/bonus shares/
  *  rights to the "Instrument event" destination's admin-gated, instrument-global Corporate
@@ -101,8 +103,14 @@ export function goldSymbolFromLabel(label: string): string {
 }
 
 /** Percent-in ("6.35") -> fraction-out ("0.0635"), the bond coupon-rate convention
- *  documented in instrument-field.tsx. Blank/non-numeric input yields undefined. */
+ *  documented in instrument-field.tsx. Blank/non-numeric input yields undefined.
+ *
+ *  Exact decimal arithmetic, never a float: the rate multiplies the nominal to produce
+ *  the coupon amount, so a binary-float rounding error here would land in money. The
+ *  shared `percentToFraction` also rejects a rate outside 0–100 % — a coupon rate above
+ *  100 % is a percent/fraction mix-up, not a rate. */
 export function couponRatePercentToFraction(percent: string): string | undefined {
-  const n = Number(percent);
-  return percent.trim() === "" || !Number.isFinite(n) ? undefined : String(n / 100);
+  const trimmed = percent.trim();
+  if (trimmed === "") return undefined;
+  return percentToFraction(trimmed) ?? undefined;
 }

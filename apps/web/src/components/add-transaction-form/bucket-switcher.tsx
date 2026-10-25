@@ -17,9 +17,15 @@ export function BucketSwitcher({
 }: {
   bucket: Bucket | null;
   onSelect: (b: Bucket) => void;
-  t: (key: string) => string;
+  /** The `Manage.tx` translator. `has` (next-intl's translator has it) lets an unknown
+   *  bucket fall back to a catalogue key instead of rendering the key path. */
+  t: ((key: string) => string) & { has?: (key: string) => boolean };
 }) {
   const activeIndex = bucket ? BUCKETS.indexOf(bucket) : -1;
+  const bucketLabel = (b: Bucket) => {
+    const key = `bucket${b.charAt(0).toUpperCase()}${b.slice(1)}`;
+    return t.has && !t.has(key) ? t("bucketLabel") : t(key);
+  };
 
   return (
     <ToggleGroup
@@ -52,7 +58,7 @@ export function BucketSwitcher({
             bucket === b ? "font-bold text-foreground" : "font-semibold text-text-2",
           )}
         >
-          {t(`bucket${b.charAt(0).toUpperCase()}${b.slice(1)}`)}
+          {bucketLabel(b)}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

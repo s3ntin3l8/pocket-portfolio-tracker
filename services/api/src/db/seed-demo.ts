@@ -62,6 +62,26 @@ function daysAgo(n: number, hour = 10): Date {
 
 const isoDate = toDateKey;
 
+/**
+ * The 10th of the month `offsetMonths` from NOW — Indonesian retail floating-rate
+ * bonds (SBR/ST) pay their monthly coupon on the 10th.
+ */
+function couponDateTime(offsetMonths: number, hour = 9): Date {
+  const d = new Date(NOW);
+  // Pin the day to 1 before shifting the month: `setUTCMonth` on a 31st overflows into
+  // the next month (Jan 31 → Mar 3), which would move the coupon date off the 10th.
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + offsetMonths);
+  d.setUTCDate(10);
+  d.setUTCHours(hour, 0, 0, 0);
+  return d;
+}
+
+/** The same date as a `YYYY-MM-DD` key. */
+function couponDate(offsetMonths: number): string {
+  return toDateKey(couponDateTime(offsetMonths));
+}
+
 function dec(n: number, digits = 2): string {
   return n.toFixed(digits);
 }
@@ -407,6 +427,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     "ORI020",
     "ORI023",
     "GSRT",
+    "SBR015T2",
     "VWCE",
     "IWDA",
     "VFV",
@@ -428,6 +449,7 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     ori020,
     ori023,
     gsrt,
+    sbr015t2,
     vwce,
     iwda,
     vfv,
@@ -526,6 +548,32 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
         couponRate: "0.065",
         couponSchedule: "semiannual",
         maturityDate: isoDate(daysAgo(500)),
+      },
+      {
+        // A FLOATING-rate retail bond: the coupon rate resets every three months off
+        // the BI reference rate while the payments stay monthly. `couponSchedule` is the
+        // PAYMENT frequency, `couponRateSchedule` the RATE schedule — two independent
+        // axes. The announced effective rates below already bake in
+        // `max(reference + spread, floor)`; `floorRate` covers a period whose rate has
+        // not been announced yet.
+        symbol: "SBR015T2",
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        name: "Surat Berharga Negara SBR015T2",
+        displayName: "SBR015T2 Savings Bond",
+        faceValue: "1000000",
+        couponSchedule: "monthly",
+        maturityDate: couponDate(24),
+        couponRateSchedule: {
+          floorRate: "0.0675",
+          periods: [
+            { from: couponDate(-3), to: couponDate(0), rate: "0.0675" },
+            { from: couponDate(0), to: couponDate(3), rate: "0.07" },
+            { from: couponDate(3), rate: "0.0725" },
+          ],
+        },
       },
       {
         symbol: "VWCE",
@@ -1105,6 +1153,42 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       fees: "0",
       currency: "IDR",
       executedAt: daysAgo(550),
+    },
+  );
+
+  // --- SBR015T2 (Savings Bond, FLOATING rate) — still running ---
+  txRows.push(
+    // Bought at issuance
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: sbr015t2.id,
+      type: "buy",
+      quantity: "10",
+      price: "1000000",
+      fees: "0",
+      currency: "IDR",
+      executedAt: couponDateTime(-4),
+    },
+    // Monthly coupons at the rate of the period they fall in:
+    // 10 units × 1,000,000 × 6.75% / 12 = 562,500 IDR each (the first announced
+    // period's rate — the one the schedule has applied since the reset before it).
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: sbr015t2.id,
+      type: "coupon",
+      quantity: "0",
+      price: "562500",
+      currency: "IDR",
+      executedAt: couponDateTime(-2),
+    },
+    {
+      portfolioId: idPortfolio.id,
+      instrumentId: sbr015t2.id,
+      type: "coupon",
+      quantity: "0",
+      price: "562500",
+      currency: "IDR",
+      executedAt: couponDateTime(-1),
     },
   );
 
@@ -1898,6 +1982,13 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
     { instrumentId: ori020.id, price: "1000000", previousClose: "1000000", currency: "IDR", asOf },
     { instrumentId: ori023.id, price: "1005000", previousClose: "1004200", currency: "IDR", asOf },
     { instrumentId: gsrt.id, price: "1000000", previousClose: "1000000", currency: "IDR", asOf },
+    {
+      instrumentId: sbr015t2.id,
+      price: "1000000",
+      previousClose: "1000000",
+      currency: "IDR",
+      asOf,
+    },
     { instrumentId: vwce.id, price: "118.40", previousClose: "117.10", currency: "EUR", asOf },
     { instrumentId: iwda.id, price: "89.75", previousClose: "89.20", currency: "EUR", asOf },
     { instrumentId: vfv.id, price: "142.50", previousClose: "141.20", currency: "CAD", asOf },

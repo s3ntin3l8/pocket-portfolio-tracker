@@ -114,7 +114,14 @@ export function SettingsShell({
       <div className="md:grid md:grid-cols-[270px_1fr] md:gap-6 md:items-start">
         <div className="hidden md:sticky md:top-[calc(var(--topbar-h)+0.5rem)] md:flex md:flex-col md:gap-3 md:self-start">
           {railTop}
-          <nav className={cn("divide-y divide-line rounded-xl bg-card p-2", CARD_SHADOW)}>
+          <nav
+            // The rail's landmark needs a name: the app has two "Main navigation"
+            // navs (desktop sidebar, mobile bottom bar), and an unnamed third one
+            // makes landmark navigation ambiguous (audit R4-D12). `title` is the
+            // page's own (already localized) name — "Settings" / "Admin".
+            aria-label={title}
+            className={cn("divide-y divide-line rounded-xl bg-card p-2", CARD_SHADOW)}
+          >
             {railLinks}
             {railExtra}
           </nav>

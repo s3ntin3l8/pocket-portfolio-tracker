@@ -30,7 +30,7 @@ export function InstrumentLotsTable({ lots, currency }: { lots: LotView[]; curre
   return (
     <>
       <div className="hidden lg:block">
-        <Table>
+        <Table caption={t("openLots")}>
           <TableHeader>
             <TableRow>
               <SortableTableHead

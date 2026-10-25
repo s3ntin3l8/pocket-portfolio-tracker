@@ -50,8 +50,14 @@ export function DividendsTable({
   const joinTotals = (field: "gross" | "tax" | "net") =>
     totalsByCurrency.map((tc) => fmt(tc[field], tc.currency)).join(" · ");
   // Cash income with nothing to name it by reads "Cash interest · EUR", not the type key.
-  const sourceLabel = (r: TaxDividendRow) =>
-    r.cashType ? t(`cashSource.${r.cashType}`, { currency: r.currency.toUpperCase() }) : r.symbol;
+  const sourceLabel = (r: TaxDividendRow) => {
+    if (!r.cashType) return r.symbol;
+    const key = `cashSource.${r.cashType}`;
+    const values = { currency: r.currency.toUpperCase() };
+    // The cash-source type is dynamic: an unknown one falls back to a catalogue key, never
+    // to the key path.
+    return t.has(key) ? t(key, values) : t("cashSourceOther", values);
+  };
   const { sortKey, sortDir, toggle, sort } = useTableSort<TaxDividendRow>(
     dividendCols(sourceLabel),
   );
@@ -68,7 +74,7 @@ export function DividendsTable({
             {t("dividendsTable.empty", { year })}
           </p>
         ) : (
-          <Table edgeAffordance className="min-w-[640px]">
+          <Table caption={t("dividendsTable.title")} edgeAffordance className="min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <SortableTableHead

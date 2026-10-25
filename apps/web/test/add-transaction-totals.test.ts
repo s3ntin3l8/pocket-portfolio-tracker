@@ -65,10 +65,15 @@ describe("computeTxTotal", () => {
 
 describe("formatMoney", () => {
   it("IDR has no decimal places", () => {
-    expect(formatMoney(1234, "IDR")).toBe("IDR 1,234");
+    // Intl separates a currency code/symbol from the digits with a non-breaking space.
+    expect(formatMoney(1234, "IDR")).toBe("IDR 1,234");
   });
   it("other currencies show 2 decimal places", () => {
-    expect(formatMoney(1234.5, "USD")).toBe("USD 1,234.50");
+    expect(formatMoney(1234.5, "USD")).toBe("$1,234.50");
+  });
+  it("groups the digits the way the app locale does", () => {
+    expect(formatMoney(1234.56, "USD", "en")).toBe("$1,234.56");
+    expect(formatMoney(1234.56, "USD", "id")).toBe("US$1.234,56");
   });
   it("returns an empty string for non-finite input", () => {
     expect(formatMoney(NaN, "USD")).toBe("");

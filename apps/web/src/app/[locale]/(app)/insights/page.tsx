@@ -22,7 +22,7 @@ import {
   getSelectedPortfolioId,
 } from "@/lib/server-api";
 import { bestAndWorst, periodToMover } from "@/lib/movers";
-import { cn, formatPercent } from "@/lib/utils";
+import { cn, formatPercent, formatPercentPoints } from "@/lib/utils";
 import { signToneClass } from "@/lib/tone";
 import { Card, CardLabel } from "@/components/ui/card";
 import { isIntradayPoint } from "@portfolio/api-client";
@@ -145,7 +145,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
               <Card className="p-4">
                 <CardLabel>{t("concentration.label")}</CardLabel>
                 <p className="tabular mt-1 text-heading font-bold leading-none">
-                  {allocation.concentration.top1Pct.toFixed(0)}%
+                  {formatPercentPoints(allocation.concentration.top1Pct, locale, 1)}
                 </p>
                 {topClass && (
                   <CardLabel className="mt-1">
@@ -232,7 +232,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
           {insightsData && (
             <>
               <DrawdownCard drawdown={insightsData.drawdown} locale={locale} />
-              <VolatilityCard volatility={insightsData.volatility} />
+              <VolatilityCard volatility={insightsData.volatility} locale={locale} />
               <StreaksCard streaks={insightsData.streaks} locale={locale} />
               <BenchmarkCard
                 benchmark={insightsData.benchmark ?? null}
@@ -272,7 +272,7 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
           )}
 
           {insightsData && insightsData.concentrationTrend.length > 0 && (
-            <ConcentrationTrendCard trend={insightsData.concentrationTrend} />
+            <ConcentrationTrendCard trend={insightsData.concentrationTrend} locale={locale} />
           )}
         </div>
       </PageWithRail>

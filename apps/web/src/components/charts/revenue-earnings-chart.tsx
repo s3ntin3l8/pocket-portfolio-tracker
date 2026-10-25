@@ -61,12 +61,19 @@ export function RevenueEarningsChart({
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const t = useTranslations("Instrument");
+  const tA11y = useTranslations("A11y");
   const money = (v: number) => formatMoneyCompact(v, currency, locale);
 
   return (
     <div className="h-[180px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <BarChart
+          data={data}
+          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          title={tA11y("chartRevenueTitle")}
+          desc={tA11y("chartRevenueDesc", { count: data.length })}
+          role="img"
+        >
           <XAxis
             dataKey="year"
             tick={CHART_AXIS_TICK}

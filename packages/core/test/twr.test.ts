@@ -3,6 +3,7 @@ import {
   buildDailyValueFlows,
   chainIndex,
   aggregateValueFlows,
+  twrFields,
   splitAdjustmentFactor,
   computeHoldings,
   type DailyValueFlow,
@@ -1153,5 +1154,31 @@ describe("buildDailyValueFlows onHoldings", () => {
     for (const date of dates) {
       expect(seen.get(date)).toEqual(computeHoldings(txns, cas, new Date(`${date}T23:59:59.999Z`)));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// twrFields — a missing percentage is not 0 % (audit R4-E5)
+// ---------------------------------------------------------------------------
+
+describe("twrFields", () => {
+  const point = { date: "2026-01-02", index: "101.5", pct: "1.5" };
+
+  it("returns the index and the percentage of a date that has one", () => {
+    const indexById = new Map([[point.date, point]]);
+    expect(twrFields(indexById, point.date)).toEqual({ index: "101.5", pct: "1.5" });
+  });
+
+  it("leaves both fields off for a date that has no index point", () => {
+    // The point that matters: no "0" percentage and no "100" index. A fabricated 0 % is
+    // drawn as a −100 % cliff on a base-100 rebased chart (audit R4-E5).
+    const indexById = new Map([[point.date, point]]);
+    expect(twrFields(indexById, "2026-01-03")).toEqual({});
+    expect(twrFields(indexById, "2026-01-03")).not.toHaveProperty("pct");
+    expect(twrFields(indexById, "2026-01-03")).not.toHaveProperty("index");
+  });
+
+  it("returns nothing at all for an empty index map", () => {
+    expect(twrFields(new Map(), "2026-01-02")).toEqual({});
   });
 });

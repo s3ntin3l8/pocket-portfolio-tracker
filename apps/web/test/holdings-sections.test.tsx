@@ -7,14 +7,29 @@ vi.mock("next-intl/server", () => ({
   getTranslations: async () => (key: string) => key,
 }));
 
-const loaders = vi.hoisted(() => ({
-  loadHasIntraday: vi.fn(),
-  loadNetWorthHistory: vi.fn(),
-  loadNetWorthHolderScope: vi.fn(),
-  getSelectedPortfolioId: vi.fn(),
-  loadAnomalies: vi.fn(),
-  loadNetworthAnomalies: vi.fn(),
-}));
+const loaders = vi.hoisted(() => {
+  const loadAnomalies = vi.fn();
+  const loadNetworthAnomalies = vi.fn();
+  const loadHolderAnomalies = vi.fn();
+  return {
+    loadHasIntraday: vi.fn(),
+    loadNetWorthHistory: vi.fn(),
+    loadNetWorthHolderScope: vi.fn(),
+    getSelectedPortfolioId: vi.fn(),
+    loadAnomalies,
+    loadNetworthAnomalies,
+    loadHolderAnomalies,
+    // Mirrors the real scope-aware entry point: one portfolio, one holder's portfolios,
+    // or the all-portfolios aggregate.
+    loadScopeAnomalies: vi.fn(
+      async (scope: { kind: string; portfolioId?: string; holderId?: string }) => {
+        if (scope.kind === "portfolio") return loadAnomalies(scope.portfolioId);
+        if (scope.kind === "holder") return loadHolderAnomalies(scope.holderId);
+        return loadNetworthAnomalies();
+      },
+    ),
+  };
+});
 vi.mock("@/lib/server-api", () => loaders);
 
 // Client children are out of scope — stub them with markers that expose the props we care about.
@@ -153,8 +168,10 @@ describe("HoldingsHeroSection", () => {
 });
 
 describe("HoldingsAnomalySection", () => {
-  it("uses the aggregate endpoint without a portfolio override and renders nothing when clean", async () => {
-    const { container } = render(await HoldingsAnomalySection({ locale: "en" }));
+  it("uses the aggregate endpoint for the all-portfolios scope and renders nothing when clean", async () => {
+    const { container } = render(
+      await HoldingsAnomalySection({ locale: "en", scope: { kind: "all" } }),
+    );
     expect(loaders.loadNetworthAnomalies).toHaveBeenCalled();
     expect(loaders.loadAnomalies).not.toHaveBeenCalled();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -165,7 +182,12 @@ describe("HoldingsAnomalySection", () => {
     loaders.loadAnomalies.mockResolvedValue([
       { code: "oversell", severity: "error", transactionId: "t1" },
     ]);
-    render(await HoldingsAnomalySection({ locale: "en", portfolioParam: "p1" }));
+    render(
+      await HoldingsAnomalySection({
+        locale: "en",
+        scope: { kind: "portfolio", portfolioId: "p1" },
+      }),
+    );
     expect(loaders.loadAnomalies).toHaveBeenCalledWith("p1");
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("bannerError");
@@ -175,11 +197,26 @@ describe("HoldingsAnomalySection", () => {
     );
   });
 
+  it("uses the holder's own anomalies under a holder scope, never the aggregate", async () => {
+    // The positions table under a holder scope shows that holder's portfolios, so the
+    // banners over them must be the holder's anomalies too — the all-portfolios set would
+    // be a second scope on one screen.
+    loaders.loadHolderAnomalies.mockResolvedValue([]);
+    render(
+      await HoldingsAnomalySection({ locale: "en", scope: { kind: "holder", holderId: "h1" } }),
+    );
+    expect(loaders.loadHolderAnomalies).toHaveBeenCalledWith("h1");
+    expect(loaders.loadNetworthAnomalies).not.toHaveBeenCalled();
+    expect(loaders.loadAnomalies).not.toHaveBeenCalled();
+  });
+
   it("uses the warning variant when there are only warnings, and the combined one for both", async () => {
     loaders.loadNetworthAnomalies.mockResolvedValue([
       { code: "x", severity: "warning", transactionId: "t1" },
     ]);
-    const { unmount } = render(await HoldingsAnomalySection({ locale: "en" }));
+    const { unmount } = render(
+      await HoldingsAnomalySection({ locale: "en", scope: { kind: "all" } }),
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("bannerWarning");
     unmount();
 
@@ -187,7 +224,7 @@ describe("HoldingsAnomalySection", () => {
       { code: "x", severity: "warning", transactionId: "t1" },
       { code: "y", severity: "error", transactionId: "t2" },
     ]);
-    render(await HoldingsAnomalySection({ locale: "en" }));
+    render(await HoldingsAnomalySection({ locale: "en", scope: { kind: "all" } }));
     expect(screen.getByRole("alert")).toHaveTextContent("bannerBoth");
   });
 
@@ -195,7 +232,7 @@ describe("HoldingsAnomalySection", () => {
     loaders.loadNetworthAnomalies.mockResolvedValue([
       { code: "reconciliation_gap", severity: "warning", meta: {} },
     ]);
-    render(await HoldingsAnomalySection({ locale: "en" }));
+    render(await HoldingsAnomalySection({ locale: "en", scope: { kind: "all" } }));
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("recon")).toHaveTextContent("1");
   });

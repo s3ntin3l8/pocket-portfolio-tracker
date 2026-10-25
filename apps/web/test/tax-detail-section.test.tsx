@@ -161,7 +161,7 @@ describe("totals row hover", () => {
     const { Table, TableHeader, TableHead, TableFooter, TableRow, TableCell } =
       await import("../src/components/ui/table");
     const { container } = render(
-      <Table edgeAffordance>
+      <Table caption="Test table" edgeAffordance>
         <TableHeader>
           <TableRow>
             <TableHead>Source</TableHead>

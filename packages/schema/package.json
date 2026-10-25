@@ -23,6 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "decimal.js": "^10.4.3",
     "zod": "^4.6.7"
   }
 }

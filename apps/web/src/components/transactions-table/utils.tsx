@@ -19,16 +19,21 @@ export function SourceChips({
   chipClassName,
 }: {
   tx: TxRow;
-  t: (key: `sources.${string}`) => string;
+  /** The `Transactions` translator. `has` (next-intl's translator has it) lets an unknown
+   *  source type fall back to a catalogue key instead of rendering the key path. */
+  t: ((key: string) => string) & { has?: (key: string) => boolean };
   chipClassName: string;
 }) {
   return (
     <>
-      {sourceTypesFor(tx).map((type) => (
-        <span key={type} className={chipClassName} style={SRC_TONES[type] ?? SRC_TONES.manual}>
-          {t(`sources.${type}`)}
-        </span>
-      ))}
+      {sourceTypesFor(tx).map((type) => {
+        const key = `sources.${type}`;
+        return (
+          <span key={type} className={chipClassName} style={SRC_TONES[type] ?? SRC_TONES.manual}>
+            {t.has && !t.has(key) ? t("sourcesOther") : t(key)}
+          </span>
+        );
+      })}
     </>
   );
 }

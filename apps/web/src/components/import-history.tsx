@@ -169,7 +169,7 @@ export function ImportHistory({
       />
       <CardContent className="p-0">
         <div className="hidden lg:block">
-          <Table>
+          <Table caption={t("title")}>
             <TableHeader>
               <TableRow>
                 <TableCell className="h-10 w-16 px-3 align-middle">
@@ -230,7 +230,7 @@ export function ImportHistory({
                   Timestamp
                 </SortableTableHead>
                 <TableCell className="h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground">
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">{t("actions")}</span>
                 </TableCell>
               </TableRow>
             </TableHeader>

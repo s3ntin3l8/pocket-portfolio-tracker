@@ -68,7 +68,6 @@
     "deniedBody": "You didn't approve the sign-in request. Try again to continue."
   },
   "Nav": {
-    "dashboard": "Dashboard",
     "holdings": "Holdings",
     "transactions": "Transactions",
     "income": "Income",
@@ -77,12 +76,11 @@
     "settings": "Settings",
     "admin": "Admin",
     "signOut": "Sign out",
-    "trades": "Trades",
+    "trades": "Realized P&L",
     "tax": "Tax",
     "activity": "Activity",
     "reports": "Reports",
     "insights": "Insights",
-    "profile": "Profile",
     "netWorth": "Net worth",
     "allTime": "all-time",
     "version": "Version {version} — release notes"
@@ -202,7 +200,7 @@
     "rebalancingCard": {
       "title": "Rebalancing",
       "edit": "Edit",
-      "drift": "Drift {pct}%",
+      "drift": "Drift {pct}",
       "subtitle": "Current vs. target weights · {status}",
       "editSubtitle": "Adjust target weights",
       "statusOnTarget": "on target",
@@ -263,8 +261,7 @@
       "headerPortfolioXirr": "Portfolio XIRR",
       "headerActiveReturn": "Active vs {symbol}",
       "noData": "—",
-      "insufficientData": "Not enough data for a per-year breakdown yet — keep using the app and check back in a few days.",
-      "emptyBenchmarks": "Add a benchmark to see how your returns compare to the market each year."
+      "insufficientData": "Not enough data for a per-year breakdown yet — keep using the app and check back in a few days."
     },
     "benchmark": {
       "activeReturn": "Active return",
@@ -291,7 +288,8 @@
       "top1Trend": "Top 1%",
       "samples": "{count} monthly samples · {classes} asset classes",
       "insufficientData": "Insufficient data",
-      "note": "HHI (Herfindahl-Hirschman Index) sums the squared weight of every holding, from 0 (perfectly spread out) to 1.0 (a single holding). Rising HHI or Top 1% means your portfolio is concentrating into fewer positions."
+      "note": "HHI (Herfindahl-Hirschman Index) sums the squared weight of every holding, from 0 (perfectly spread out) to 1.0 (a single holding). Rising HHI or Top 1% means your portfolio is concentrating into fewer positions.",
+      "hhiChange": "({delta} since {date})"
     }
   },
   "Admin": {
@@ -378,7 +376,6 @@
     "jobs": "Background jobs",
     "jobsHint": "Scheduled background tasks. Use \"Run now\" to trigger a job immediately instead of waiting for its next cron tick. Note: cache invalidation only applies to this replica.",
     "schedulerUnavailable": "Scheduler not running (pg-boss requires an external Postgres; not available in this environment).",
-    "jobName": "Job",
     "jobSchedule": "Schedule",
     "jobLastRun": "Last run",
     "jobStatus": "Status",
@@ -398,7 +395,6 @@
     "providerName": "Provider",
     "enabledHeader": "Enabled",
     "apiCalls": "API calls",
-    "apiKey": "API key",
     "keyNone": "none",
     "keyNotNeeded": "Not needed",
     "reorder": "Reorder",
@@ -448,7 +444,6 @@
     "deleteUserConfirm": "Permanently delete {email} and all their data? This cannot be undone.",
     "deleteUserDone": "User deleted.",
     "usersNoUsers": "No users registered yet.",
-    "usersEmail": "Email",
     "usersName": "Name",
     "usersSignupDate": "Signed up",
     "usersPortfolios": "Portfolios",
@@ -597,7 +592,7 @@
     "emptyBody": "Record deposits or savings-plan purchases and your saving progress appears here.",
     "sparplanTitle": "Savings plans",
     "detectedMonthly": "Active monthly total",
-    "nowPct": "{pct}% now",
+    "nowPct": "{pct} now",
     "activeCount": "{count, plural, one {# active} other {# active}}",
     "cadenceMonthly": "/month",
     "cadenceMonthlyShort": "mo",
@@ -638,7 +633,7 @@
     "driftOverRest": " Ease off top-ups here until it's back within the {target} band.",
     "targetAllocation": "Target allocation",
     "targetHelper": "A target weight per plan. Must total 100%.",
-    "targetTotal": "Total {pct}%",
+    "targetTotal": "Total {pct}",
     "targetMustEqual": " · must equal 100%",
     "targetCancel": "Cancel",
     "targetSave": "Save targets",
@@ -752,11 +747,7 @@
     "connectionAwaiting": "Awaiting approval",
     "connectionAttention": "Needs attention",
     "connectionNotConnected": "Not connected",
-    "done": "Done",
-    "sectionBasics": "Basics",
-    "sectionOwnership": "Ownership",
-    "sectionAccount": "Account",
-    "sectionAccounting": "Accounting options"
+    "done": "Done"
   },
   "Import": {
     "title": "Import transactions",
@@ -783,6 +774,7 @@
       "review": "Confirm",
       "done": "Done"
     },
+    "stepsOther": "Step",
     "targetPortfolio": "Import into",
     "menu": {
       "manual": "Manual entry",
@@ -804,6 +796,7 @@
       "done": "Done",
       "failed": "Failed"
     },
+    "fileStatusOther": "Unknown",
     "group": {
       "collapse": "Collapse",
       "expand": "Expand",
@@ -852,6 +845,8 @@
       "discard": "Discard"
     },
     "draftCount": "{count, plural, one {# draft} other {# drafts}}",
+    "filesTable": "Imported files",
+    "draftsTable": "Imported drafts",
     "confidence": "{pct}% sure",
     "remove": "Remove",
     "fields": {
@@ -1012,7 +1007,8 @@
     "batchLabel": "Upload · {count, plural, one {# file} other {# files}}",
     "selectedCount": "{count, plural, one {# selected} other {# selected}}",
     "deleteSelected": "Delete selected",
-    "bulkConfirmPrompt": "Removes {count, plural, one {# transaction} other {# transactions}} from confirmed imports."
+    "bulkConfirmPrompt": "Removes {count, plural, one {# transaction} other {# transactions}} from confirmed imports.",
+    "actions": "Actions"
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -1074,12 +1070,6 @@
     "title": "Page not found",
     "body": "The page you're looking for doesn't exist or has moved.",
     "backHome": "Back to dashboard"
-  },
-  "Gold": {
-    "title": "Gold spot",
-    "perGram": "per gram, 24k",
-    "asOf": "as of {time}",
-    "live": "Live"
   },
   "Instrument": {
     "priceHistory": "Price history",
@@ -1181,6 +1171,29 @@
       "hold": "Hold",
       "sell": "Sell",
       "strong_sell": "Strong sell"
+    },
+    "recommendationOther": "No recommendation"
+  },
+  "BondTerms": {
+    "floatingRateLabel": "Floating rate (SBR/ST)",
+    "floatingRateHint": "The coupon rate resets every few months while the payments keep their own schedule.",
+    "floorRateLabel": "Floor rate (% p.a.)",
+    "floorRateHint": "The minimum rate for the whole tenor — used for any period whose rate has not been announced yet.",
+    "ratePeriodsLabel": "Announced rate periods",
+    "ratePeriodsEmpty": "No rate period yet. Add the periods whose rate the issuer has announced.",
+    "ratePeriodFrom": "From",
+    "ratePeriodTo": "To (exclusive)",
+    "ratePeriodRate": "Rate % p.a.",
+    "addRatePeriod": "Add period",
+    "removeRatePeriod": "Remove period",
+    "floatingBadge": "floating",
+    "issue": {
+      "floorMissing": "Enter the floor rate as a percentage (e.g. 6.75).",
+      "noPeriods": "Add at least one rate period.",
+      "periodIncomplete": "Every period needs a start date and a rate; the end date is optional.",
+      "periodOverlaps": "Rate periods must not overlap.",
+      "floorAboveRate": "The floor rate cannot be above an announced rate.",
+      "generic": "The rate schedule could not be accepted."
     }
   },
   "CorpAction": {
@@ -1220,6 +1233,7 @@
     "cancel": "Cancel",
     "savedResults": "Your portfolios",
     "discoveredResults": "Market discovery",
+    "actionsTable": "Corporate actions",
     "notInPortfolios": "{symbol} was found in market data but is not in your portfolios yet. Import a transaction for it first.",
     "adminOnly": "Corporate actions can only be managed by administrators.",
     "saveError": "Failed to save the corporate action.",
@@ -1230,6 +1244,7 @@
   },
   "Search": {
     "triggerLabel": "Search",
+    "inputLabel": "Search or run a command",
     "placeholder": "Search or run a command…",
     "searching": "Searching…",
     "noResults": "No results.",
@@ -1237,7 +1252,6 @@
     "groupInstruments": "Instruments",
     "groupTransactions": "Transactions",
     "catalogBadge": "catalog",
-    "shortcutHint": "⌘K",
     "groupRecent": "Recent",
     "groupNavigate": "Go to",
     "groupActions": "Actions",
@@ -1357,7 +1371,7 @@
     "mcpHint": "Let Claude (or any MCP client) read your portfolio — read-only. Create a read-only access token above, then add Pocket as an MCP server. Account numbers and IBANs are never shared. Each tool call counts 1–2 requests against that token’s rate limit.",
     "mcpClaudeCode": "Claude Code",
     "mcpClaudeDesktop": "Claude Desktop (claude_desktop_config.json)",
-    "mcpPlaceholders": "Replace <your-pocket-api-url> with the public address of your Pocket API and <token> with the token you created.",
+    "mcpPlaceholders": "Replace '<your-pocket-api-url>' with the public address of your Pocket API and '<token>' with the token you created.",
     "signOut": "Sign out",
     "navAccount": "Account",
     "navAccountSub": "Currency, language & appearance",
@@ -1483,8 +1497,6 @@
     "filterLabel": "Filters",
     "filterClearAll": "Clear all",
     "filterYear": "Year",
-    "allTypes": "All types",
-    "allInstruments": "All instruments",
     "allYears": "All years",
     "date": "Date",
     "type": "Type",
@@ -1520,6 +1532,7 @@
       "pdf": "PDF",
       "ibkr": "Interactive Brokers"
     },
+    "sourcesOther": "Other source",
     "sourcesSection": {
       "title": "Data sources",
       "download": "Download source file",
@@ -1581,7 +1594,8 @@
         "different_instrument": "These can't be merged: different instruments.",
         "incompatible_type": "These can't be merged: incompatible transaction types.",
         "loan_linked": "These can't be merged: one is linked to a financing loan."
-      }
+      },
+      "blockedOther": "These two transactions can't be merged."
     },
     "banners": {
       "invested": "Invested",
@@ -1851,6 +1865,7 @@
       "expired": "Session expired",
       "error": "Error"
     },
+    "statusOther": "Unknown status",
     "phone": "Phone number",
     "pin": "PIN",
     "advanced": "Advanced",
@@ -1915,6 +1930,7 @@
       "expired": "Token expired",
       "error": "Error"
     },
+    "statusOther": "Unknown status",
     "flexToken": "Flex Token",
     "flexTokenPlaceholder": "Your Flex Web Service token",
     "queryId": "Query ID",
@@ -1951,6 +1967,7 @@
   "Trades": {
     "title": "Realized P&L",
     "subtitle": "Closed trades & performance",
+    "methodGroup": "Cost basis method",
     "methodAverage": "Average cost",
     "methodFifo": "FIFO",
     "filter_all": "All",
@@ -1962,6 +1979,7 @@
     "allYears": "All years",
     "status_open": "Open",
     "status_closed": "Closed",
+    "statusOther": "Unknown",
     "searchPlaceholder": "Search trades…",
     "searchClear": "Clear search",
     "noMatches": "No trades match your filters.",
@@ -1988,8 +2006,6 @@
     "realizedByYearChartTitle": "Realized P&L per year",
     "winLossTitle": "Win / loss",
     "winLossSubtitle": "{winners} of {total} closed",
-    "winners": "Winners",
-    "losers": "Losers",
     "realizedByYear": "Realized gains by year",
     "dividendsByYear": "Investment income by year",
     "bonusesByYear": "Bonuses by year",
@@ -2071,6 +2087,7 @@
       "coupon": "Cash coupon · {currency}",
       "interest": "Cash interest · {currency}"
     },
+    "cashSourceOther": "Cash income · {currency}",
     "title": "Tax",
     "subtitle": "Capital gains & tax-free harvest suggestions",
     "defaultHolderName": "All portfolios",
@@ -2081,22 +2098,14 @@
     "distribution": {
       "title": "FSA distribution across depots",
       "cap": "Allowance cap",
-      "capDesc": "Per-person Sparer\u00adpausch\u00adbetrag",
+      "capDesc": "Per-person Sparer­pausch­betrag",
       "allocated": "Allocated",
       "remaining": "Still to distribute",
       "remainingDesc": "Unallocated to a depot",
       "overAllocated": "Total depot allocation exceeds the personal cap. The excess withholding will be reconciled at year-end via Anlage KAP."
     },
     "allowance": {
-      "annual": "Annual allowance",
-      "annualDesc": "Sparerpauschbetrag per year",
-      "used": "Used YTD",
-      "usedDesc": "Tf-adjusted gains + income",
-      "remaining": "Remaining",
-      "taxSaving": "Tax saving available",
-      "usedPct": "{pct}% used",
-      "gains": "gains",
-      "income": "income"
+      "taxSaving": "Tax saving available"
     },
     "forecast": {
       "label": "Expected dividends & coupons",
@@ -2221,6 +2230,7 @@
         "deposit_interest": "Bank interest",
         "fund_distribution": "Fund distribution"
       },
+      "categoryOther": "Other income",
       "exemption": {
         "small_balance": "exempt (balance ≤ Rp7.5M)",
         "negative_discount": "below cost (does not offset coupons)",
@@ -2233,6 +2243,7 @@
         "deposit_interest": "Interest from a bank in Indonesia, in any currency: 20% final, withheld by the bank. A portfolio counts as Indonesian when its country is set to Indonesia, or, with no country set, when the interest is in IDR. Interest is exempt while the deposit and savings balance at that bank is at most Rp7.5 million. Pocket approximates this by treating one portfolio as one bank: it checks the portfolio's cash just before each payment, in all currencies converted to rupiah. Where a withholding is recorded on the transaction, that amount is used.",
         "fund_distribution": "Reksa dana and ETF distributions aren't taxable for unit holders."
       },
+      "notesOther": "Other Indonesian investment income.",
       "foreignTable": {
         "title": "Foreign income · not in the estimate",
         "source": "Source",
@@ -2303,7 +2314,10 @@
       "save": "Save",
       "saving": "Saving…",
       "success": "Loss carry-forward saved",
-      "error": "Couldn't save. Please try again."
+      "error": "Couldn't save. Please try again.",
+      "loading": "Loading the carry-forward…",
+      "loadError": "Couldn't load your loss carry-forward. The amounts below are unknown — nothing has been changed.",
+      "negativeIgnored": "Negative amounts aren't accepted — the amount is used as a positive figure."
     }
   },
   "Anomalies": {
@@ -2321,10 +2335,9 @@
       "zero_price": "Zero price: buy or sell recorded at €0",
       "reconciliation_gap": "Cash reconciliation gap vs. broker ({currency}: reported {reported}, derived {derived})",
       "reconciliation_drift": "New cash reconciliation drift vs. broker ({currency}: reported {reported}, derived {derived})",
-      "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})"
+      "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})",
+      "unknown": "Unknown data issue"
     },
-    "noneTitle": "No data issues found",
-    "noneBody": "All transactions are consistent.",
     "dismiss": "Dismiss warning",
     "reconciliationTitle": "Cash doesn't reconcile",
     "reconciliationPositionTitle": "Position doesn't reconcile",
@@ -2332,12 +2345,6 @@
     "openConnection": "Open connection",
     "dismissForNow": "Hide for now",
     "portfolioTag": "Portfolio"
-  },
-  "PeriodSelector": {
-    "ytd": "YTD",
-    "1y": "1Y",
-    "5y": "5Y",
-    "max": "Max"
   },
   "KpiPicker": {
     "title": "Customize dashboard",
@@ -2447,7 +2454,7 @@
     },
     "welcome": {
       "previewLabel": "Net worth",
-      "previewValue": "€42.500",
+      "previewValue": "€42,500",
       "previewPill": "Preview",
       "previewCaption": "A preview of your dashboard — once your data's in.",
       "tourSectionLabel": "What you'll find inside",
@@ -2534,8 +2541,8 @@
       "getStarted": "Get started",
       "haveAccount": "I already have an account",
       "netWorthLabel": "Net worth",
-      "netWorthValue": "€42.500",
-      "netWorthPill": "+3,2%",
+      "netWorthValue": "€42,500",
+      "netWorthPill": "+3.2%",
       "slide1": {
         "headline": "Every asset, one clear number.",
         "sub": "Stocks, funds, gold and cash — tracked in one honest figure, wherever you're taxed.",
@@ -2589,7 +2596,11 @@
     "signIn": "Sign in",
     "rateLimitedTitle": "Too many requests",
     "rateLimitedBody": "The server asked us to slow down. You can retry in {seconds} seconds.",
-    "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry."
+    "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry.",
+    "healthProbe": "health: {path} \u2192 HTTP {status}",
+    "healthProbeService": "health: {path} \u2192 HTTP {status}, service={service}",
+    "healthProbeForeign": "health: {path} \u2192 HTTP {status}, service={service} (expected {expected})",
+    "healthProbeNoResponse": "health: {path} \u2192 no response"
   },
   "FxMissing": {
     "title": "Exchange rate missing.",
@@ -2604,11 +2615,38 @@
     "primaryNav": "Main navigation",
     "needsReview": "{count, plural, one {# item needs review} other {# items need review}}",
     "search": "Search",
+    "loading": "Loading…",
+    "table": "Table",
     "toggleTheme": "Toggle theme",
     "moreOptions": "More options",
     "previous": "Previous",
     "next": "Next",
-    "goToSlide": "Go to slide {n}"
+    "goToSlide": "Go to slide {n}",
+    "chartAllocationTitle": "Allocation chart",
+    "chartAllocationDesc": "{count} categories, {total} in total.",
+    "chartContributionsTitle": "Contributions and portfolio value",
+    "chartContributionsDesc": "Contributed and portfolio value over {count} days.",
+    "chartEpsTitle": "Quarterly earnings per share",
+    "chartEpsDesc": "Reported and estimated earnings per share over {count} quarters.",
+    "chartForecastTitle": "Savings forecast",
+    "chartForecastDesc": "Projected value and contributions over {count} years.",
+    "chartIncomeTitle": "Income per year",
+    "chartIncomeDesc": "Received and projected income over {count} years.",
+    "chartPerformanceTitle": "Portfolio performance",
+    "chartPerformanceDesc": "Portfolio and benchmark over {count} points.",
+    "chartPriceTitle": "Price history",
+    "chartPriceDesc": "Closing price over {count} points.",
+    "chartRevenueTitle": "Revenue and earnings",
+    "chartRevenueDesc": "Revenue and earnings over {count} years.",
+    "chartValueTitle": "Portfolio value",
+    "chartValueDesc": "Portfolio value over {count} points.",
+    "chartYearlyReturnsTitle": "Per-year returns",
+    "chartYearlyReturnsDesc": "Portfolio and benchmark returns over {count} years.",
+    "chartSummaryTitle": "Series summary",
+    "chartSummaryFirst": "First",
+    "chartSummaryLast": "Last",
+    "chartSummaryMin": "Lowest",
+    "chartSummaryMax": "Highest"
   },
   "UiText": {
     "streakMonths": "{count}mo"

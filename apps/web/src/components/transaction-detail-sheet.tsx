@@ -287,7 +287,7 @@ export function TransactionDetailSheet({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-body-sm font-bold text-foreground">
-                  {t(`sources.${tx.source}`)}
+                  {t.has(`sources.${tx.source}`) ? t(`sources.${tx.source}`) : t("sourcesOther")}
                 </p>
                 <p className="mt-0.5 text-xs font-medium text-text-2">
                   {t("sourcesSection.autoParsedRetained")}

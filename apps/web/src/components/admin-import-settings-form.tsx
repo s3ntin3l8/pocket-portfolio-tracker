@@ -91,9 +91,15 @@ export function AdminImportSettingsForm({
                 {active && <span className="size-[11px] rounded-full bg-primary" />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold">{t(`importStrategyOption_${s}`)}</span>
+                <span className="block text-sm font-bold">
+                  {t.has(`importStrategyOption_${s}`)
+                    ? t(`importStrategyOption_${s}`)
+                    : t("importStrategy")}
+                </span>
                 <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                  {t(`importStrategyHint_${s}`)}
+                  {t.has(`importStrategyHint_${s}`)
+                    ? t(`importStrategyHint_${s}`)
+                    : t("importStrategyHint")}
                 </span>
               </span>
               {busy && active && <Spinner size="sm" className="mt-0.5 shrink-0" />}

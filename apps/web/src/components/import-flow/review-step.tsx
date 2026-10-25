@@ -119,7 +119,9 @@ export function ReviewStep({
             {skipped.map((s) => (
               <li key={s.file} className="flex flex-wrap items-center gap-2">
                 <span className="flex-1">
-                  {t(`skipped.${s.reason}`, { file: s.file, provider: s.provider ?? "" })}
+                  {t.has(`skipped.${s.reason}`)
+                    ? t(`skipped.${s.reason}`, { file: s.file, provider: s.provider ?? "" })
+                    : t("skipped.generic", { file: s.file, provider: s.provider ?? "" })}
                 </span>
                 {s.reason === "alreadyConfirmed" && s.originalFile && (
                   <Button

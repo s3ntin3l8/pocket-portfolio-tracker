@@ -15,7 +15,7 @@ function renderNav(props?: { anomalyCount?: number; anomalyError?: boolean }) {
 describe("BottomNav", () => {
   it("renders all five Pocket destinations", () => {
     renderNav();
-    for (const label of ["Holdings", "Activity", "Reports", "Insights", "Profile"]) {
+    for (const label of ["Holdings", "Activity", "Reports", "Insights", "Settings"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });

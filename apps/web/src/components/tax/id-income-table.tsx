@@ -21,10 +21,14 @@ type SourceLabel = (r: IdIncomeTax) => string;
  *  translated type and own currency ("Cash interest · EUR") — never the API's fallback. */
 function useSourceLabel(): SourceLabel {
   const t = useTranslations("Tax");
-  return (r) =>
-    r.cashSource
-      ? t(`cashSource.${r.cashSource.type}`, { currency: r.cashSource.currency })
-      : r.symbol;
+  return (r) => {
+    if (!r.cashSource) return r.symbol;
+    const key = `cashSource.${r.cashSource.type}`;
+    const values = { currency: r.cashSource.currency };
+    // The cash-source type is dynamic: an unknown one falls back to a catalogue key, never
+    // to the key path.
+    return t.has(key) ? t(key, values) : t("cashSourceOther", values);
+  };
 }
 
 // Sorting by Source follows the label the reader sees, so the columns take it as an argument.
@@ -92,6 +96,18 @@ export function IdIncomeTable({
     return null;
   };
 
+  // The category and the exemption are dynamic keys: an unknown one falls back to a
+  // catalogue key, never to the key path.
+  const categoryLabel = (r: IdIncomeTax): string => {
+    const key = `id.category.${r.category}`;
+    return t.has(key) ? t(key) : t("id.categoryOther");
+  };
+  const exemptionLabel = (r: IdIncomeTax): string | null => {
+    if (!r.exemption) return null;
+    const key = `id.exemption.${r.exemption}`;
+    return t.has(key) ? t(key) : t("id.incomeTable.exempt");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -104,7 +120,7 @@ export function IdIncomeTable({
           </p>
         ) : (
           <>
-            <Table edgeAffordance className="min-w-[720px]">
+            <Table caption={t("id.incomeTable.title")} edgeAffordance className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
                   <SortableTableHead
@@ -155,14 +171,15 @@ export function IdIncomeTable({
               <TableBody>
                 {sorted.map((r, i) => {
                   const note = taxNote(r);
+                  const exemption = exemptionLabel(r);
                   return (
                     // Merged holder payloads can repeat an instrument: the index keeps keys unique.
                     <TableRow key={`${r.instrumentId ?? sourceLabel(r)}:${r.category}:${i}`}>
                       <TableCell className="font-medium">{sourceLabel(r)}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {t(`id.category.${r.category}`)}
-                        {r.exemption
-                          ? ` · ${t(`id.exemption.${r.exemption}`)}`
+                        {categoryLabel(r)}
+                        {exemption
+                          ? ` · ${exemption}`
                           : r.rate !== null && ` · ${rateLabel(r.rate, locale)}`}
                       </TableCell>
                       <TableCell numeric className="text-muted-foreground">
@@ -203,7 +220,7 @@ export function IdIncomeTable({
             </Table>
             <ul className="mt-3 space-y-1 px-6 text-xs leading-relaxed text-muted-foreground">
               {notes.map((c) => (
-                <li key={c}>{t(`id.notes.${c}`)}</li>
+                <li key={c}>{t.has(`id.notes.${c}`) ? t(`id.notes.${c}`) : t("id.notesOther")}</li>
               ))}
             </ul>
           </>
@@ -244,7 +261,7 @@ export function IdForeignIncomeTable({
         <CardTitle className="text-base">{t("id.foreignTable.title")}</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pt-0">
-        <Table edgeAffordance className="min-w-[480px]">
+        <Table caption={t("id.foreignTable.title")} edgeAffordance className="min-w-[480px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead

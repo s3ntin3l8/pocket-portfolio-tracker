@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
-import { formatPercent } from "@/lib/utils";
+import { formatPercent, formatPercentPoints } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import type { BenchmarkSymbolEntry, YearlyReturnRow } from "@portfolio/api-client";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -37,6 +37,7 @@ interface YearlyReturnsCardProps {
 export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyReturnsCardProps) {
   const reducedMotion = useReducedMotion();
   const t = useTranslations("Insights.yearlyReturns");
+  const tA11y = useTranslations("A11y");
 
   // Chart data: one row per year, one numeric series per benchmark (decimal fraction × 100).
   // The portfolio series is included so the user can compare at a glance without reading
@@ -89,14 +90,20 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
 
       <div className="mt-3 h-44 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+          <BarChart
+            data={chartData}
+            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+            title={tA11y("chartYearlyReturnsTitle")}
+            desc={tA11y("chartYearlyReturnsDesc", { count: chartData.length })}
+            role="img"
+          >
             <CartesianGrid {...CHART_GRID} />
             <XAxis dataKey="year" tick={CHART_AXIS_TICK} tickLine={false} axisLine={false} />
             <YAxis
               tick={CHART_AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+              tickFormatter={(v: number) => formatPercentPoints(v, locale, 0)}
               width="auto"
             />
             <Tooltip
@@ -162,7 +169,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
       </div>
 
       <div className="mt-3">
-        <Table>
+        <Table caption={t("title")}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="text-left h-auto px-2 py-1.5 first:pl-2 last:pr-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type {
   ApiClient,
@@ -8,9 +8,11 @@ import type {
   LoanOption,
   Instrument,
   InstrumentSearchResult,
+  BondCouponRateSchedule,
 } from "@portfolio/api-client";
-import { apiErrorCode } from "@portfolio/api-client";
+import { apiErrorCode, apiErrorIssues } from "@portfolio/api-client";
 import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
+import { clearFieldError, clearFieldErrors, publishFieldErrors } from "@/components/ui/form-field";
 import {
   INCOME_TYPES,
   CASH_TYPES,
@@ -28,6 +30,11 @@ import {
   goldSymbolFromLabel,
   couponRatePercentToFraction,
 } from "./constants";
+import {
+  EMPTY_RATE_SCHEDULE_DRAFT,
+  checkRateScheduleDraft,
+  type RateScheduleDraft,
+} from "@/lib/bond-rate";
 
 export type { SelectableType, TxType };
 
@@ -79,6 +86,79 @@ export interface AddTransactionInitial {
 /** An installment/payoff booked by the schedule itself — its link to the loan is fixed. */
 const AUTO_BOOKED_LEG = /^loan:[^:]+:(inst:\d+|payoff)$/;
 
+/**
+ * The form's fields: the API's input field name, the ids of the controls that carry the
+ * value, and which of them is on screen right now.
+ *
+ * ONE table for both consumers — the setter that drops a published message and the
+ * mapping that publishes it. They drifted apart once: the tax rate is rendered twice
+ * (inline for an income, in the extras panel for a sale), and a message published onto
+ * the copy that was not on screen reached nobody at all.
+ */
+type FieldControls = {
+  /** The API's input field name (see `transactionInputSchema`). */
+  api: string;
+  /** Every control id of the field — the setter drops the message on all of them. */
+  ids: readonly string[];
+  /**
+   * The control a message for this field belongs to: the one that is on screen.
+   * `null` when the form has no visible control for the field — the message then falls
+   * back to the generic banner instead of disappearing.
+   */
+  visible: (shown: ShownControls) => string | null;
+};
+
+/** The controls the form shows right now — what a field's visibility depends on. */
+type ShownControls = {
+  quantity: boolean;
+  fees: boolean;
+  tax: boolean;
+  inlineTax: boolean;
+};
+
+const FIELD_CONTROLS: Record<string, FieldControls> = {
+  kind: { api: "kind", ids: ["tx-sub-type"], visible: () => "tx-sub-type" },
+  currency: { api: "currency", ids: ["tx-currency"], visible: () => "tx-currency" },
+  date: { api: "executedAt", ids: ["tx-date"], visible: () => "tx-date" },
+  quantity: {
+    api: "quantity",
+    ids: ["tx-qty"],
+    visible: (shown) => (shown.quantity ? "tx-qty" : null),
+  },
+  price: { api: "price", ids: ["tx-price"], visible: () => "tx-price" },
+  fees: { api: "fees", ids: ["tx-fees"], visible: (shown) => (shown.fees ? "tx-fees" : null) },
+  tax: {
+    api: "tax",
+    ids: ["tx-tax", "tx-tax-extra"],
+    // The tax rate is rendered twice: inline for an income, in the extras panel for a
+    // sale. A type that withholds no tax (a deposit) has neither — and a message for a
+    // control that does not exist would reach nobody while the banner is suppressed.
+    visible: (shown) => (shown.inlineTax ? "tx-tax" : shown.tax ? "tx-tax-extra" : null),
+  },
+  fxRate: { api: "fxRate", ids: ["tx-fx-rate"], visible: () => "tx-fx-rate" },
+  shares: { api: "shares", ids: ["tx-shares"], visible: () => "tx-shares" },
+  perShare: { api: "perShare", ids: ["tx-per-share"], visible: () => "tx-per-share" },
+  nativeCurrency: {
+    api: "nativeCurrency",
+    ids: ["tx-native-currency"],
+    visible: () => "tx-native-currency",
+  },
+  grossNative: {
+    api: "grossNative",
+    ids: ["tx-gross-native"],
+    visible: () => "tx-gross-native",
+  },
+  description: { api: "description", ids: ["tx-notes"], visible: () => "tx-notes" },
+  tags: { api: "tags", ids: ["tx-tags"], visible: () => "tx-tags" },
+  loanId: { api: "loanId", ids: ["tx-loan"], visible: () => "tx-loan" },
+  installmentN: { api: "installmentN", ids: ["tx-installment"], visible: () => "tx-installment" },
+};
+
+/** The API's input field name → the field's control mapping. */
+const CONTROL_BY_API_FIELD = new Map(
+  Object.entries(FIELD_CONTROLS).map(([, field]) => [field.api, field]),
+);
+
 export function useTransactionForm({
   client,
   portfolioId,
@@ -95,6 +175,9 @@ export function useTransactionForm({
   const t = useTranslations("Manage.tx");
   const tt = useTranslations("TxType");
   const tc = useTranslations("AssetClass");
+  // The floating-rate schedule strings live in their own namespace so the create form
+  // and the admin instrument-edit dialog share one set of labels.
+  const tb = useTranslations("BondTerms");
 
   const isEdit = Boolean(transactionId);
   const [type, setType] = useState<TxType>(() => (initial?.type as TxType) ?? "buy");
@@ -133,6 +216,22 @@ export function useTransactionForm({
   const [results, setResults] = useState<Instrument[]>([]);
   const [discovered, setDiscovered] = useState<InstrumentSearchResult[]>([]);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clear the pending lookup when the form goes away: a debounce that outlives the
+  // component fires into a torn-down environment and updates state on a component that
+  // is gone (see `useTimeout` for the same guard in hook form).
+  //
+  // The flag covers the other half: a lookup that is already in flight resolves after
+  // the form is gone, and its continuation would update state on a component that is
+  // no longer there.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (lookupTimer.current) clearTimeout(lookupTimer.current);
+      lookupTimer.current = null;
+    };
+  }, []);
   const [selected, setSelected] = useState<Instrument | null>(() =>
     initial?.instrument && initial.instrumentId
       ? {
@@ -166,6 +265,14 @@ export function useTransactionForm({
   const [couponRatePercent, setCouponRatePercent] = useState("");
   const [couponSchedule, setCouponSchedule] = useState("monthly");
   const [maturityDate, setMaturityDate] = useState("");
+  // Floating-rate bonds (Indonesian retail SBR/ST): the coupon rate RESETS every few
+  // months while the payments stay monthly. The rate schedule is a separate axis from
+  // `couponSchedule` and replaces the flat `couponRate` when it is filled in.
+  const [floatingRate, setFloatingRate] = useState(false);
+  const [rateSchedule, setRateSchedule] = useState<RateScheduleDraft>({
+    ...EMPTY_RATE_SCHEDULE_DRAFT,
+    periods: [],
+  });
 
   // "Can't find it? Add a custom instrument" collapsible (instrument-field.tsx) — closed
   // by default, per the v2 design; opened automatically when editing an existing
@@ -191,6 +298,56 @@ export function useTransactionForm({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The published field messages belong to this form instance — drop them when it goes.
+  useEffect(() => () => clearFieldErrors(), []);
+
+  /**
+   * The field setters the form exposes. Each one also drops the validation message
+   * published for that field: the user is on it, and a stale "invalid" message under a
+   * corrected value is worse than no message at all.
+   *
+   * They are built ONCE: the raw `useState` setters are stable and the id lists are
+   * module constants, so the wrappers keep their identity between renders — a child
+   * effect keyed on one of them does not re-run on every render.
+   */
+  const fieldSetters = useMemo(() => {
+    const wrap = (ids: readonly string[], set: (value: string) => void) => (value: string) => {
+      set(value);
+      for (const id of ids) clearFieldError(id);
+    };
+    return {
+      setKind: wrap(FIELD_CONTROLS.kind.ids, setKind),
+      setCurrency: wrap(FIELD_CONTROLS.currency.ids, setCurrency),
+      setDate: wrap(FIELD_CONTROLS.date.ids, setDate),
+      setQuantity: wrap(FIELD_CONTROLS.quantity.ids, setQuantity),
+      setPrice: wrap(FIELD_CONTROLS.price.ids, setPrice),
+      setFees: wrap(FIELD_CONTROLS.fees.ids, setFees),
+      setTax: wrap(FIELD_CONTROLS.tax.ids, setTax),
+      setFxRate: wrap(FIELD_CONTROLS.fxRate.ids, setFxRate),
+      setShares: wrap(FIELD_CONTROLS.shares.ids, setShares),
+      setPerShare: wrap(FIELD_CONTROLS.perShare.ids, setPerShare),
+      setNativeCurrency: wrap(FIELD_CONTROLS.nativeCurrency.ids, setNativeCurrency),
+      setGrossNative: wrap(FIELD_CONTROLS.grossNative.ids, setGrossNative),
+      setDescription: wrap(FIELD_CONTROLS.description.ids, setDescription),
+      setTags: wrap(FIELD_CONTROLS.tags.ids, setTags),
+    };
+  }, [
+    setKind,
+    setCurrency,
+    setDate,
+    setQuantity,
+    setPrice,
+    setFees,
+    setTax,
+    setFxRate,
+    setShares,
+    setPerShare,
+    setNativeCurrency,
+    setGrossNative,
+    setDescription,
+    setTags,
+  ]);
 
   const isTrade = isTradeType(type);
   const isShareReceipt = isShareReceiptType(type);
@@ -256,11 +413,14 @@ export function useTransactionForm({
   function setLoanId(id: string) {
     setLoanIdState(id);
     setInstallmentN(null);
+    clearFieldError("tx-loan");
+    clearFieldError("tx-installment");
     const loan = (loans ?? []).find((l) => l.loanId === id);
     if (loan) setCurrency(loan.currency);
   }
   function selectInstallment(n: number | null) {
     setInstallmentN(n);
+    clearFieldError("tx-installment");
     const row = selectedLoan?.installments.find((i) => i.n === n);
     // Prefill what the schedule says is due, but never overwrite what the user typed.
     if (row) {
@@ -317,13 +477,21 @@ export function useTransactionForm({
     }
     void client
       .searchInstruments(trimmed)
-      .then(setResults)
-      .catch(() => setResults([]));
+      .then((r) => {
+        if (mountedRef.current) setResults(r);
+      })
+      .catch(() => {
+        if (mountedRef.current) setResults([]);
+      });
     lookupTimer.current = setTimeout(() => {
       void client
         .lookupInstruments(trimmed)
-        .then(setDiscovered)
-        .catch(() => setDiscovered([]));
+        .then((r) => {
+          if (mountedRef.current) setDiscovered(r);
+        })
+        .catch(() => {
+          if (mountedRef.current) setDiscovered([]);
+        });
     }, 300);
   }
 
@@ -352,7 +520,17 @@ export function useTransactionForm({
     setDiscovered([]);
   }
 
-  async function resolveInstrumentId(): Promise<string | null> {
+  // A floating-rate schedule is only ever SENT when a NEW instrument is created from the
+  // custom panel. A picked, already-saved instrument keeps the schedule it was created
+  // with, and a cash transaction carries none — so on those paths the draft is
+  // irrelevant and must not block an ordinary trade. The guard below has to ask the
+  // same question the payload does.
+  const createsBondWithSchedule =
+    hasInstrument && !selected && assetClass === "bond" && floatingRate;
+
+  async function resolveInstrumentId(
+    bondSchedule?: BondCouponRateSchedule,
+  ): Promise<string | null> {
     if (!hasInstrument) return null;
     if (selected) return selected.id;
     if (assetClass === "gold") {
@@ -381,7 +559,13 @@ export function useTransactionForm({
       ...(assetClass === "bond"
         ? {
             faceValue: faceValue.trim() || undefined,
-            couponRate: couponRatePercentToFraction(couponRatePercent),
+            // A floating-rate bond carries its rate in the schedule, not in a single
+            // `couponRate` — sending both would leave the flat rate as a stale fallback.
+            // The same condition the submit-time guard uses decides this branch, so the
+            // payload and the guard can never disagree.
+            ...(createsBondWithSchedule
+              ? { couponRateSchedule: bondSchedule }
+              : { couponRate: couponRatePercentToFraction(couponRatePercent) }),
             couponSchedule: couponSchedule as
               "monthly" | "quarterly" | "semiannual" | "annual" | undefined,
             maturityDate: maturityDate || undefined,
@@ -389,6 +573,40 @@ export function useTransactionForm({
         : {}),
     });
     return created.id;
+  }
+
+  /**
+   * The API's input field names (see `transactionInputSchema`) → the ids of the form's
+   * controls. `null` means the form has no visible control for that field, so its message
+   * falls back to the generic banner instead of disappearing.
+   */
+  function fieldIdFor(apiField: string): string | null {
+    const field = CONTROL_BY_API_FIELD.get(apiField);
+    if (!field) return null;
+    return field.visible({
+      quantity: showQuantity,
+      fees: showFees,
+      tax: showTax,
+      inlineTax: showInlineTax,
+    });
+  }
+
+  /** Open the disclosure that hides an offending field, so its message is visible. */
+  function revealField(fieldId: string) {
+    if (fieldId === "tx-fees" || fieldId === "tx-tax-extra") {
+      setExtrasOpen(true);
+      return;
+    }
+    if (
+      fieldId === "tx-fx-rate" ||
+      fieldId === "tx-sub-type" ||
+      fieldId === "tx-shares" ||
+      fieldId === "tx-per-share" ||
+      fieldId === "tx-native-currency" ||
+      fieldId === "tx-gross-native"
+    ) {
+      setAdvancedOpen(true);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -402,10 +620,26 @@ export function useTransactionForm({
       setError(t("loanRequired"));
       return;
     }
+    // A floating-rate bond whose schedule is not filled in yet must not be created:
+    // it would carry no rate at all and silently drop out of the income/tax forecast.
+    // The editor already shows the reason inline; this is the submit-time guard. The
+    // checked schedule is handed to `resolveInstrumentId` below, so the payload is
+    // exactly the one the check produced.
+    let bondSchedule: BondCouponRateSchedule | undefined;
+    if (createsBondWithSchedule) {
+      const check = checkRateScheduleDraft(rateSchedule);
+      if (!check.ok) {
+        // The issue code is a closed set, but a code added without a catalogue
+        // entry would throw at runtime — so the lookup is guarded (R4-F7).
+        setError(tb.has(`issue.${check.issue}`) ? tb(`issue.${check.issue}`) : tb("issue.generic"));
+        return;
+      }
+      bondSchedule = check.schedule;
+    }
     setBusy(true);
     setError(null);
     try {
-      const instrumentId = await resolveInstrumentId();
+      const instrumentId = await resolveInstrumentId(bondSchedule);
       const parsedTags = tags
         .split(",")
         .map((t) => t.trim())
@@ -450,11 +684,35 @@ export function useTransactionForm({
       } else {
         await client.createTransaction(portfolioId, payload);
       }
+      clearFieldErrors();
       onSuccess?.();
     } catch (err) {
       // The API's loan-link rejections (a race with the installment job) get their own message.
       const code = apiErrorCode(err);
-      setError(code && t.has(`loanErrors.${code}`) ? t(`loanErrors.${code}`) : t("error"));
+      // A validation failure names the offending field per issue — show the API's own
+      // message there instead of one generic banner.
+      const messages: Record<string, string> = {};
+      let unmapped = 0;
+      for (const issue of apiErrorIssues(err)) {
+        const fieldId = fieldIdFor(issue.path[0] ?? "");
+        if (!fieldId) {
+          unmapped++;
+          continue;
+        }
+        if (!(fieldId in messages)) messages[fieldId] = issue.message;
+      }
+      publishFieldErrors(messages);
+      for (const fieldId of Object.keys(messages)) revealField(fieldId);
+      const hasFieldError = Object.keys(messages).length > 0;
+      // The banner stays for failures that are not field-level (network, 5xx, an unknown
+      // code) and for issues the form has no control for.
+      setError(
+        hasFieldError && unmapped === 0
+          ? null
+          : code && t.has(`loanErrors.${code}`)
+            ? t(`loanErrors.${code}`)
+            : t("error"),
+      );
     } finally {
       setBusy(false);
     }
@@ -464,6 +722,7 @@ export function useTransactionForm({
     t,
     tt,
     tc,
+    tb,
     isEdit,
     type,
     setType,
@@ -480,33 +739,33 @@ export function useTransactionForm({
     installmentN,
     selectInstallment,
     kind,
-    setKind,
+    setKind: fieldSetters.setKind,
     currency,
-    setCurrency,
+    setCurrency: fieldSetters.setCurrency,
     date,
-    setDate,
+    setDate: fieldSetters.setDate,
     quantity,
-    setQuantity,
+    setQuantity: fieldSetters.setQuantity,
     price,
-    setPrice,
+    setPrice: fieldSetters.setPrice,
     fees,
-    setFees,
+    setFees: fieldSetters.setFees,
     tax,
-    setTax,
+    setTax: fieldSetters.setTax,
     fxRate,
-    setFxRate,
+    setFxRate: fieldSetters.setFxRate,
     shares,
-    setShares,
+    setShares: fieldSetters.setShares,
     perShare,
-    setPerShare,
+    setPerShare: fieldSetters.setPerShare,
     nativeCurrency,
-    setNativeCurrency,
+    setNativeCurrency: fieldSetters.setNativeCurrency,
     grossNative,
-    setGrossNative,
+    setGrossNative: fieldSetters.setGrossNative,
     description,
-    setDescription,
+    setDescription: fieldSetters.setDescription,
     tags,
-    setTags,
+    setTags: fieldSetters.setTags,
     idReinvested,
     setIdReinvested,
     query,
@@ -537,6 +796,10 @@ export function useTransactionForm({
     setCouponSchedule,
     maturityDate,
     setMaturityDate,
+    floatingRate,
+    setFloatingRate,
+    rateSchedule,
+    setRateSchedule,
     busy,
     error,
     isTrade,

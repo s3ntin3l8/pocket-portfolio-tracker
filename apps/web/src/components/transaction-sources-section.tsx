@@ -77,13 +77,10 @@ export function TransactionSourcesSection({
           const Icon = style.icon;
           const tc = src.taxComponents;
           const tcEntries = tc ? Object.entries(tc).filter(([, v]) => v && Number(v) !== 0) : [];
-          // Prefer the localized source name ("PDF", "Trade Republic"…); fall back to raw.
-          let label = src.sourceType;
-          try {
-            label = t(`sources.${src.sourceType}`);
-          } catch {
-            /* unknown source type — keep the raw value */
-          }
+          // The localized source name ("PDF", "Trade Republic"…); an unknown source type falls
+          // back to a catalogue key — never to the raw key path.
+          const sourceKey = `sources.${src.sourceType}`;
+          const label = t.has(sourceKey) ? t(sourceKey) : t("sourcesOther");
           return (
             <div key={src.id} className="flex items-center gap-3 px-[15px] py-[13px]">
               <span

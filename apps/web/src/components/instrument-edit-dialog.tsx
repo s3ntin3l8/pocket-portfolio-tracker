@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
-import type { Instrument } from "@portfolio/api-client";
+import type { BondCouponRateSchedule, Instrument } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
 import { defaultPartialExemptionRate } from "@portfolio/core";
 import { fractionToPercent, percentToFraction } from "@/lib/tax-rate";
@@ -13,6 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useApiClient } from "@/lib/api";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BondRateScheduleEditor } from "./add-transaction-form/bond-rate-schedule-editor";
+import {
+  checkRateScheduleDraft,
+  rateScheduleToDraft,
+  type RateScheduleDraft,
+} from "@/lib/bond-rate";
 import { useRouter } from "@/i18n/navigation";
 import { toast } from "sonner";
 
@@ -37,6 +44,7 @@ export function InstrumentEditDialog({
 }) {
   const t = useTranslations("Instrument");
   const tc = useTranslations("AssetClass");
+  const tb = useTranslations("BondTerms");
   const api = useApiClient();
   const router = useRouter();
   const formId = useId();
@@ -51,6 +59,13 @@ export function InstrumentEditDialog({
   const [assetClass, setAssetClass] = useState(instrument.assetClass);
   const [market, setMarket] = useState(instrument.market);
   const [tfPercent, setTfPercent] = useState(fractionToPercent(instrument.partialExemptionRate));
+  // Floating-rate bond (SBR/ST): the coupon rate resets, the payments don't. The
+  // schedule is edited here because `instruments` is shared reference data — only an
+  // admin may change the terms every holder's projection depends on.
+  const [floatingRate, setFloatingRate] = useState(instrument.couponRateSchedule != null);
+  const [rateSchedule, setRateSchedule] = useState<RateScheduleDraft>(() =>
+    rateScheduleToDraft(instrument.couponRateSchedule),
+  );
 
   function reset() {
     setIsin(instrument.isin ?? "");
@@ -60,6 +75,8 @@ export function InstrumentEditDialog({
     setAssetClass(instrument.assetClass);
     setMarket(instrument.market);
     setTfPercent(fractionToPercent(instrument.partialExemptionRate));
+    setFloatingRate(instrument.couponRateSchedule != null);
+    setRateSchedule(rateScheduleToDraft(instrument.couponRateSchedule));
   }
 
   async function submit(e: React.FormEvent) {
@@ -71,6 +88,29 @@ export function InstrumentEditDialog({
     if (isFund && tfPercent.trim() !== "" && tfFraction === null) {
       toast.error(t("tfInvalid"));
       return;
+    }
+    // An unusable schedule must NOT be sent as `null`: that would clear the shared
+    // rate schedule for every holder of the series (and the bond would fall out of
+    // the income/tax forecast entirely). A half-filled draft is a mistake to report,
+    // not a request to delete the schedule — the same shape as the `tfInvalid` guard
+    // above. `null` is sent only when the toggle was deliberately switched off.
+    let couponRateSchedule: BondCouponRateSchedule | null | undefined;
+    if (assetClass === "bond" && floatingRate) {
+      // Validate AND convert in one step: the schedule that goes out is the one the
+      // check produced, so an unusable draft can never be turned into a `null` —
+      // which is what would wipe the shared schedule.
+      const check = checkRateScheduleDraft(rateSchedule);
+      if (!check.ok) {
+        // The issue code is a closed set, but a code added without a catalogue
+        // entry would throw at runtime — so the lookup is guarded (R4-F7).
+        toast.error(
+          tb.has(`issue.${check.issue}`) ? tb(`issue.${check.issue}`) : tb("issue.generic"),
+        );
+        return;
+      }
+      couponRateSchedule = check.schedule;
+    } else if (assetClass === "bond" && instrument.couponRateSchedule != null) {
+      couponRateSchedule = null;
     }
     setBusy(true);
     try {
@@ -90,6 +130,12 @@ export function InstrumentEditDialog({
           : instrument.partialExemptionRate != null
             ? { partialExemptionRate: null }
             : {}),
+        // Only touch the rate schedule when the instrument is a bond AND the floating
+        // toggle actually changed something — an admin renaming a bond must not clear
+        // the schedule behind their back.
+        ...(assetClass === "bond" && couponRateSchedule !== undefined
+          ? { couponRateSchedule }
+          : {}),
       });
       router.refresh();
       toast.success(t("editSaved"));
@@ -181,6 +227,31 @@ export function InstrumentEditDialog({
                 required
               />
             </div>
+            {assetClass === "bond" && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id={`${uid}-floating`}
+                    checked={floatingRate}
+                    onCheckedChange={(v) => setFloatingRate(v === true)}
+                  />
+                  <div className="space-y-0.5">
+                    <Label htmlFor={`${uid}-floating`} className="text-sm">
+                      {tb("floatingRateLabel")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">{tb("floatingRateHint")}</p>
+                  </div>
+                </div>
+                {floatingRate && (
+                  <BondRateScheduleEditor
+                    value={rateSchedule}
+                    onChange={setRateSchedule}
+                    t={tb}
+                    idPrefix={`${uid}-rate`}
+                  />
+                )}
+              </div>
+            )}
             {FUND_CLASSES.has(assetClass) && (
               <div className="space-y-1.5">
                 <Label htmlFor={`${uid}-tf`}>{t("tfRate")}</Label>

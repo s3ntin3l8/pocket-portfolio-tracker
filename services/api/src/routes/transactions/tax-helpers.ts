@@ -48,6 +48,7 @@ import {
   type FxProvider,
 } from "../../services/fx.js";
 import type { InstrumentMeta } from "../../services/valuation.js";
+import { parseCouponRateSchedule } from "../../services/instruments.js";
 
 /** English label of income with no paying instrument, for the ID payload's `symbol`. Keyed by
  *  core's cash income types, so a type added there fails to compile until it has a label. */
@@ -254,16 +255,20 @@ export async function restOfYearForecastGross(
           .where(and(inArray(instruments.id, heldIds), eq(instruments.assetClass, "bond")))
       : [];
   const qtyById = new Map(summary.holdings.map((h) => [h.instrumentId, h.quantity]));
+  // Same rule as the income forecast: a floating-rate bond (SBR/ST) may carry no flat
+  // coupon rate — its schedule's floor rate is then the base rate.
   const bondPositions = bondRows
-    .filter((b) => b.faceValue && b.couponRate && b.maturityDate)
-    .map((b) => ({
+    .map((b) => ({ b, schedule: parseCouponRateSchedule(b.couponRateSchedule) }))
+    .filter(({ b, schedule }) => b.faceValue && b.maturityDate && (b.couponRate || schedule))
+    .map(({ b, schedule }) => ({
       instrumentId: b.id,
       symbol: b.symbol,
       name: b.name,
       quantity: qtyById.get(b.id) ?? "0",
       faceValue: b.faceValue as string,
-      couponRate: b.couponRate as string,
+      couponRate: (b.couponRate ?? schedule?.floorRate) as string,
       couponSchedule: b.couponSchedule,
+      couponRateSchedule: schedule,
       maturityDate: b.maturityDate as string,
       currency: b.currency,
     }));

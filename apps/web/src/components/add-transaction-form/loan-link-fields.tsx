@@ -1,8 +1,10 @@
 "use client";
 
 import type { LoanOption } from "@portfolio/api-client";
+import { useLocale } from "next-intl";
 import { Select } from "@/components/ui/select";
 import { FormField } from "@/components/ui/form-field";
+import { formatDate } from "@/lib/utils";
 
 const loanLabel = (l: LoanOption) =>
   [l.provider, l.contractNo].filter(Boolean).join(" · ") || l.loanId.slice(0, 8);
@@ -31,6 +33,7 @@ export function LoanLinkFields({
   locked: boolean;
   t: (key: string, values?: Record<string, string | number>) => string;
 }) {
+  const locale = useLocale();
   // A row being edited may belong to a loan that has since been paid off.
   const options = selectedLoan && !loans.includes(selectedLoan) ? [selectedLoan, ...loans] : loans;
   const installmentOptions = (selectedLoan?.installments ?? []).filter(
@@ -68,7 +71,7 @@ export function LoanLinkFields({
           <option value="">{t("installmentNone")}</option>
           {installmentOptions.map((i) => (
             <option key={i.n} value={i.n}>
-              {t("installmentOption", { n: i.n, date: i.dueDate })}
+              {t("installmentOption", { n: i.n, date: formatDate(i.dueDate, locale) })}
             </option>
           ))}
         </Select>

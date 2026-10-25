@@ -1,0 +1,1 @@
+ALTER TABLE "instruments" ADD COLUMN "coupon_rate_schedule" jsonb;

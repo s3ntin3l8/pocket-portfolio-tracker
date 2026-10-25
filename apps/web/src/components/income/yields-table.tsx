@@ -38,7 +38,7 @@ export function YieldsTable({ rows }: { rows: InstrumentYield[] }) {
     <>
       {/* Desktop: 5-column table. CSS hides it below the Card's container `md` query. */}
       <div className="hidden @md:block">
-        <Table>
+        <Table caption={t("yieldTitle")}>
           <TableHeader>
             <TableRow>
               <SortableTableHead

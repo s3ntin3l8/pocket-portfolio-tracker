@@ -47,7 +47,7 @@ export function MobileRow({
               {tr.instrument?.symbol ?? "—"}
             </ScopeLink>
             <Badge variant={tr.status === "open" ? "default" : "outline"}>
-              {t(`status_${tr.status}`)}
+              {t.has(`status_${tr.status}`) ? t(`status_${tr.status}`) : t("statusOther")}
             </Badge>
           </div>
           <div className={cn(TABLE_SUBLABEL, "truncate")}>

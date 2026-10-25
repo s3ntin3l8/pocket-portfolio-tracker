@@ -53,7 +53,12 @@ export function AccountHoldersManager({ holders }: { holders: AccountHolder[] })
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{h.name}</p>
                 <p className="truncate text-xs font-medium text-text-2">
-                  {tf(`holderType${capitalize(h.type)}`)}
+                  {/* The holder type is a closed set, but a type added without a
+                      catalogue entry would throw at runtime — so the lookup is
+                      guarded (R4-F7). */}
+                  {tf.has(`holderType${capitalize(h.type)}`)
+                    ? tf(`holderType${capitalize(h.type)}`)
+                    : tf("holderType")}
                   {h.birthYear != null ? ` · ${h.birthYear}` : ""}
                 </p>
               </div>

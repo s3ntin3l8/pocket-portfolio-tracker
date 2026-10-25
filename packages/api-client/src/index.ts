@@ -20,6 +20,7 @@ import type {
   StorageSettingsUpdate,
   StorageSecretInput,
   DocumentCategory,
+  BondCouponRateSchedule,
 } from "@portfolio/schema";
 
 import {
@@ -30,6 +31,7 @@ import {
 } from "@portfolio/schema";
 
 export { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/schema";
+export type { BondCouponRateSchedule, BondRatePeriod } from "@portfolio/schema";
 export type { ImportIssue, ParsedGoldContract, ProviderCredentialInput } from "@portfolio/schema";
 export type { ImportStrategy, ImportSettingsUpdate } from "@portfolio/schema";
 export type { StorageSettingsUpdate, StorageSecretInput } from "@portfolio/schema";
@@ -839,6 +841,11 @@ export interface Instrument {
   faceValue?: string | null;
   couponRate?: string | null;
   couponSchedule?: string | null;
+  /** Floating-rate coupon schedule (SBR/ST-style bonds). When present it OVERRIDES
+   *  `couponRate` for the dates its periods cover; `couponRate` stays the fallback.
+   *  `couponSchedule` is the PAYMENT frequency — a separate axis from the rate
+   *  schedule's reset periods. */
+  couponRateSchedule?: BondCouponRateSchedule | null;
   maturityDate?: string | null;
   /** User-maintained current price (absolute, per-unit, instrument currency) — the
    *  substitute for a live market-data provider on asset classes none serve. Overrides
@@ -2333,6 +2340,47 @@ export function apiErrorCode(err: unknown): string | null {
   return null;
 }
 
+/** One field-level validation issue from the API's `validation_error` response. */
+export interface ApiErrorIssue {
+  /** The field path the issue belongs to (e.g. `["price"]`). Empty for a form-level issue. */
+  path: string[];
+  /** The API's own message for that field. */
+  message: string;
+}
+
+/**
+ * Extract the field-level validation issues from a thrown error. The API answers an invalid
+ * write with `400 { error: "validation_error", issues: [{ path, message }] }` — a pathed list
+ * a form can attach to the offending control instead of showing one generic message.
+ * Returns `[]` for anything that isn't such a body (a different error code, no issues, a
+ * body that isn't JSON, or an error that isn't an `ApiError`).
+ */
+export function apiErrorIssues(err: unknown): ApiErrorIssue[] {
+  if (!(err instanceof ApiError)) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(err.body);
+  } catch {
+    // body wasn't JSON — no issues to report
+    return [];
+  }
+  if (!parsed || typeof parsed !== "object") return [];
+  const { error, issues } = parsed as { error?: unknown; issues?: unknown };
+  if (error !== "validation_error" || !Array.isArray(issues)) return [];
+  const out: ApiErrorIssue[] = [];
+  for (const raw of issues) {
+    if (!raw || typeof raw !== "object") continue;
+    const { path, message } = raw as { path?: unknown; message?: unknown };
+    if (typeof message !== "string") continue;
+    // A path segment may be a number (an array index) — normalise it to a string.
+    out.push({
+      path: Array.isArray(path) ? path.map((segment) => String(segment)) : [],
+      message,
+    });
+  }
+  return out;
+}
+
 /** The vision-provider failure detail carried by a 502 `screenshot_parse_failed` response. */
 export interface VisionProviderError {
   /** Which provider failed ("claude" | "gemini" | "openrouter" | "ollama"), or null if absent. */
@@ -3282,6 +3330,8 @@ export function createApiClient(config: ApiClientConfig) {
         faceValue?: string | null;
         couponRate?: string | null;
         couponSchedule?: string | null;
+        /** Floating-rate coupon schedule; null clears it. */
+        couponRateSchedule?: BondCouponRateSchedule | null;
         maturityDate?: string | null;
         /** Fraction 0–1; null clears the override. */
         partialExemptionRate?: string | null;

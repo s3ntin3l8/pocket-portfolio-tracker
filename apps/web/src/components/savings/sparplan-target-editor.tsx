@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
-import { cn } from "@/lib/utils";
+import { cn, formatPercentPoints } from "@/lib/utils";
 import type { TargetWeight } from "@portfolio/api-client";
 
 export interface TargetSleeve {
@@ -33,6 +33,7 @@ export function SparplanTargetEditor({
   onClose: () => void;
 }) {
   const t = useTranslations("Savings");
+  const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
 
@@ -132,7 +133,7 @@ export function SparplanTargetEditor({
               sumOk ? "text-text-2" : "text-destructive",
             )}
           >
-            {t("targetTotal", { pct: total.toFixed(1) })}
+            {t("targetTotal", { pct: formatPercentPoints(total, locale, 1) })}
             {!sumOk && t("targetMustEqual")}
           </p>
 

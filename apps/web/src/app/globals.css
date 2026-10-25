@@ -475,12 +475,21 @@
     font-variant-numeric: tabular-nums;
   }
   /* Recharts (e.g. AllocationDonut) attaches an onClick to each Pie sector, making the
-     SVG path focusable — tapping a slice then shows the browser's default focus ring as
-     a white box around the sector's bounding box. Scoped to recharts so we don't strip
-     focus rings app-wide. */
-  .recharts-wrapper :focus,
-  .recharts-wrapper :focus-visible {
+     SVG group focusable — tapping a slice then shows the browser's default focus ring as
+     a white box around the sector's bounding box (a rectangle, not the slice shape).
+     Scoped to those clickable sectors ONLY: the chart surface (the focusable <svg> that
+     drives the keyboard tooltip) and everything else inside a chart keep their focus
+     ring — stripping it from the whole chart left keyboard users with no indication of
+     where they were. */
+  .recharts-wrapper .recharts-pie-sector:focus,
+  .recharts-wrapper .recharts-pie-sector:focus-visible {
     outline: none;
+  }
+  /* …and the sector still says where the focus is: a ring drawn along the slice itself. */
+  .recharts-wrapper .recharts-pie-sector:focus .recharts-sector,
+  .recharts-wrapper .recharts-pie-sector:focus-visible .recharts-sector {
+    stroke: var(--color-ring);
+    stroke-width: 2px;
   }
 }
 

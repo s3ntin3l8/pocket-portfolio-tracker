@@ -96,10 +96,15 @@ export function AddTransactionForm({
       setCouponSchedule={form.setCouponSchedule}
       maturityDate={form.maturityDate}
       setMaturityDate={form.setMaturityDate}
+      floatingRate={form.floatingRate}
+      setFloatingRate={form.setFloatingRate}
+      rateSchedule={form.rateSchedule}
+      setRateSchedule={form.setRateSchedule}
       customOpen={form.customOpen}
       onToggleCustom={() => form.setCustomOpen((o) => !o)}
       t={form.t}
       tc={form.tc}
+      tb={form.tb}
     />
   );
 
@@ -165,7 +170,7 @@ export function AddTransactionForm({
         showExtrasBtn={form.showExtrasBtn}
         extrasLabelKey={form.extrasLabelKey}
         feesLabelKey={form.feesLabelKey}
-        onOpenExtras={() => form.setExtrasOpen(true)}
+        onToggleExtras={() => form.setExtrasOpen(!form.extrasOpen)}
         showFees={form.showFees}
         showTax={form.showTax}
         priceLabelKey={form.priceLabel}

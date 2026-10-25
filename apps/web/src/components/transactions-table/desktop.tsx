@@ -94,7 +94,7 @@ export function DesktopTable({
 
   return (
     <Card className="hidden lg:block">
-      <Table stickyHeader onStickyChange={onHeaderPinChange}>
+      <Table stickyHeader caption={t("title")} onStickyChange={onHeaderPinChange}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-16">

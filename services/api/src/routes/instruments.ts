@@ -4,12 +4,15 @@ import { asc, eq, ilike, or, count } from "drizzle-orm";
 import { instruments, providerSettings } from "@portfolio/db";
 import {
   assetClassSchema,
+  bondCouponRateScheduleSchema,
   couponScheduleSchema,
   decimalString,
   instrumentInputSchema,
+  type BondCouponRateSchedule,
 } from "@portfolio/schema";
 import {
   findOrCreateInstrument,
+  parseCouponRateSchedule,
   setManualPrice,
   updateInstrument,
 } from "../services/instruments.js";
@@ -27,6 +30,21 @@ const instrumentsCache = createStore<{
   rows: (typeof instruments.$inferSelect)[];
   total: number;
 }>();
+
+/**
+ * Every instrument row leaves the API with its coupon-rate schedule validated.
+ *
+ * `instruments.coupon_rate_schedule` is untyped jsonb (see `loans.schedule` for the same
+ * pattern), so the shape is checked on the way out: a malformed row degrades to "no
+ * schedule" instead of reaching the client as an arbitrary object. The list endpoints and
+ * the by-id route go through this one helper, so the same row always gets the same answer
+ * whichever endpoint asked for it.
+ */
+function withValidatedSchedule<T extends { couponRateSchedule?: unknown }>(
+  row: T,
+): T & { couponRateSchedule: BondCouponRateSchedule | null } {
+  return { ...row, couponRateSchedule: parseCouponRateSchedule(row.couponRateSchedule) };
+}
 
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
@@ -62,6 +80,9 @@ const patchInstrumentSchema = z.object({
   faceValue: z.string().nullable().optional(),
   couponRate: z.string().nullable().optional(),
   couponSchedule: couponScheduleSchema.nullable().optional(),
+  // Floating-rate coupon schedule — nullable so an admin can clear it (the bond then
+  // falls back to its flat couponRate, or is not projected at all).
+  couponRateSchedule: bondCouponRateScheduleSchema.nullable().optional(),
   maturityDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")
@@ -126,10 +147,12 @@ export async function instrumentsRoute(app: FastifyInstance) {
                 .limit(pageSize)
                 .offset((page - 1) * pageSize),
         ]);
-        return { rows: _rows, total: cnt };
+        return { rows: _rows.map(withValidatedSchedule), total: cnt };
       });
       request.timingName = "GET /instruments (paginated)";
       request.timingMeta = { q, page, pageSize, total };
+      // The cached loader already mapped the rows — validating again here would only
+      // repeat the same idempotent check.
       return { rows, total };
     }
 
@@ -147,7 +170,7 @@ export async function instrumentsRoute(app: FastifyInstance) {
       : await app.db.select().from(instruments).orderBy(asc(instruments.symbol));
     request.timingName = "GET /instruments";
     request.timingMeta = { q, rowCount: rows.length };
-    return rows;
+    return rows.map(withValidatedSchedule);
   });
 
   // Discover instruments from market-data providers (ticker/name search or ISIN
@@ -191,7 +214,10 @@ export async function instrumentsRoute(app: FastifyInstance) {
       request.timingName = "GET /instruments/:id";
       request.timingMeta = { instrumentId: request.params.id };
       if (!inst) return reply.code(404).send({ error: "instrument_not_found" });
-      return inst;
+      // The coupon-rate schedule is untyped jsonb (see instruments.coupon_rate_schedule):
+      // validate it on the way out so a malformed row degrades to "no schedule" instead
+      // of reaching the client as an arbitrary object.
+      return withValidatedSchedule(inst);
     },
   );
 

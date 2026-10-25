@@ -84,7 +84,7 @@ export function ImportTable({
 
   return (
     <Card className="hidden lg:block">
-      <Table>
+      <Table caption={t("draftsTable")}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">

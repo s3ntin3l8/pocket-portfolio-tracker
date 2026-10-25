@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import {
   AddTransactionForm,
   type AddTransactionClient,
 } from "../src/components/add-transaction-form";
 import { ApiError, type Instrument, type SourceSummary } from "@portfolio/api-client";
+import { useTransactionForm } from "../src/components/add-transaction-form/use-transaction-form";
 import messages from "../messages/en.json";
 
 const getSourceDocumentUrl = vi.fn(async () => ({
@@ -244,6 +245,157 @@ describe("AddTransactionForm", () => {
     expect(await screen.findByText(m.symbolRequired)).toBeInTheDocument();
     expect(client.createInstrument).not.toHaveBeenCalled();
     expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it("shows the API's field-level validation message on the offending field", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "Bank Central Asia" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The message sits under the price field, and the field announces that it is invalid.
+    const price = await screen.findByLabelText(m.price);
+    await waitFor(() => expect(price).toHaveAttribute("aria-invalid", "true"));
+    const describedBy = price.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const message = describedBy ? document.getElementById(describedBy) : null;
+    expect(message).toHaveTextContent("Expected a decimal string");
+    // A field-level failure replaces the generic banner — the field says it all.
+    expect(screen.queryByText(m.error)).toBeNull();
+  });
+
+  it("clears a field's validation message once the field is edited", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    expect(await screen.findByText("Expected a decimal string")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9600" } });
+    await waitFor(() => expect(screen.queryByText("Expected a decimal string")).toBeNull());
+  });
+
+  it("keeps the generic banner for a validation issue the form has no field for", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["type"], message: "Invalid enum value" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    expect(await screen.findByText(m.error)).toBeInTheDocument();
+  });
+
+  it("keeps the generic banner for a tax issue on a form that shows no tax control", async () => {
+    // A cash deposit withholds no tax, so the form has no tax control at all. The tax
+    // value is still submitted (a legacy deposit may carry one), so the API can answer
+    // with a tax issue — and a message published onto a control that is not on screen
+    // reaches nobody while the banner is suppressed. The failure has to be visible.
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["tax"], message: "Tax must not be negative" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    selectBucket(messages.Manage.tx.bucketCash);
+    expect(screen.queryByLabelText(m.tax)).toBeNull();
+    fireEvent.change(screen.getByLabelText(m.amount), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The generic banner carries the failure — the field-level path cannot.
+    expect(await screen.findByText(m.error)).toBeInTheDocument();
+  });
+
+  it("announces a field-level failure and puts the focus on the offending control", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The message is a live region: it is announced when it appears.
+    const message = await screen.findByText("Expected a decimal string");
+    expect(message).toHaveAttribute("role", "alert");
+    // And the focus moves to the control that has to be fixed — the submit button keeps
+    // it otherwise, which tells a screen-reader user nothing.
+    const price = screen.getByLabelText(m.price);
+    await waitFor(() => expect(price).toHaveFocus());
   });
 
   it("records a cash deposit without an instrument", async () => {
@@ -1218,5 +1370,243 @@ describe("TransactionSourcesSection (edit mode, #230)", () => {
     renderForm(makeClient());
     const submit = screen.getByRole("button", { name: m.submit });
     expect(submit.closest(".sticky")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Floating-rate bonds (Indonesian retail SBR/ST): the coupon rate RESETS every few
+// months while the PAYMENTS keep their own schedule. The toggle swaps the single rate
+// for a rate schedule — two independent axes, never merged.
+// ---------------------------------------------------------------------------
+
+describe("AddTransactionForm — floating-rate bond terms", () => {
+  const tb = messages.BondTerms;
+
+  function openBondForm() {
+    const client = makeClient();
+    renderForm(client);
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    return client;
+  }
+
+  it("hides the rate schedule until the floating-rate toggle is on", () => {
+    openBondForm();
+    // The flat rate field is the default.
+    expect(screen.getByLabelText(m.bondCouponRateLabel)).toBeTruthy();
+    expect(screen.queryByLabelText(tb.floorRateLabel)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+
+    // The flat rate field gives way to the schedule editor.
+    expect(screen.queryByLabelText(m.bondCouponRateLabel)).toBeNull();
+    expect(screen.getByLabelText(tb.floorRateLabel)).toBeTruthy();
+  });
+
+  it("creates a floating bond with the rate schedule — percent-in rates convert to fractions", async () => {
+    const bondInstrument: Instrument = {
+      ...INSTRUMENT,
+      id: "sbr1",
+      symbol: "SBR015T2",
+      market: "IDX",
+      assetClass: "bond",
+      unit: "units",
+      name: "SBR015T2",
+      faceValue: "1000000",
+      couponSchedule: "monthly",
+      maturityDate: "2028-07-10",
+    };
+    const client = makeClient({ createInstrument: vi.fn(async () => bondInstrument) });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "SBR015T2" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "SBR015T2" } });
+    fireEvent.change(screen.getByLabelText(m.bondFaceValueLabel), {
+      target: { value: "1000000" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondCouponSchedule), {
+      target: { value: "monthly" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondMaturityDate), {
+      target: { value: "2028-07-10" },
+    });
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+    fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "6.75" } });
+    fireEvent.click(screen.getByRole("button", { name: tb.addRatePeriod }));
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-10" } });
+    fireEvent.change(screen.getByLabelText("To (exclusive)"), {
+      target: { value: "2026-04-10" },
+    });
+    fireEvent.change(screen.getByLabelText("Rate % p.a."), { target: { value: "6.75" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createInstrument).toHaveBeenCalled());
+    // The percent→fraction inverse is the assertion that matters: "6.75" in the
+    // percent-labelled field must be sent as "0.0675", never "6.75" or "675".
+    expect(client.createInstrument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: "SBR015T2",
+        assetClass: "bond",
+        faceValue: "1000000",
+        couponSchedule: "monthly",
+        maturityDate: "2028-07-10",
+        couponRateSchedule: {
+          floorRate: "0.0675",
+          periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
+        },
+      }),
+    );
+    // A floating bond carries no flat rate — the schedule replaces it.
+    const payload = vi.mocked(client.createInstrument).mock.calls[0][0];
+    expect(payload.couponRate).toBeUndefined();
+  });
+
+  it("blocks the submit when the schedule is half-filled, instead of creating a bond with no rate", async () => {
+    const client = makeClient();
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "SBR015T2" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "SBR015T2" } });
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+    // The floor rate is filled but no period is — the schedule is not ready yet.
+    fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "6.75" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // Nothing is created: a bond with a half-filled schedule would carry no rate at
+    // all and silently drop out of the income/tax forecast.
+    // The form's error banner and the editor's inline hint both surface the reason.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").some((a) => a.textContent === tb.issue.noPeriods)).toBe(
+        true,
+      ),
+    );
+    expect(client.createInstrument).not.toHaveBeenCalled();
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it("does not demand a rate schedule when a SAVED instrument is selected", async () => {
+    // The floating-rate draft only matters when a NEW instrument is created from it. A
+    // picked instrument keeps the schedule it was created with, so an empty draft must
+    // not block an ordinary trade — the guard has to ask the same question the payload
+    // does.
+    const savedBond: Instrument = {
+      ...INSTRUMENT,
+      id: "sbr1",
+      symbol: "SBR015T2",
+      market: "IDX",
+      assetClass: "bond",
+      unit: "units",
+      name: "SBR015T2",
+      faceValue: "1000000",
+      couponSchedule: "monthly",
+      maturityDate: "2028-07-10",
+    };
+    const client = makeClient({
+      searchInstruments: vi.fn(async () => [savedBond]),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    // The floating toggle is on, but no schedule is filled in.
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+
+    // …and then a saved instrument is picked. No instrument is created, so no schedule
+    // is sent — the half-filled draft is irrelevant on this path.
+    fireEvent.change(screen.getByLabelText(m.search), { target: { value: "sbr" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /SBR015T2/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /SBR015T2/ }));
+
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createTransaction).toHaveBeenCalled());
+    expect(client.createInstrument).not.toHaveBeenCalled();
+    expect(client.createTransaction).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({ instrumentId: "sbr1" }),
+    );
+  });
+});
+
+describe("AddTransactionForm — the debounced instrument lookup", () => {
+  it("does not run the pending lookup after the form unmounts", async () => {
+    // A debounce that outlives the form fires into a torn-down environment: it updates
+    // state on a component that is gone, and in the test suite it raises an unhandled
+    // "window is not defined" that fails the whole run.
+    vi.useFakeTimers();
+    try {
+      const lookupInstruments = vi.fn(async () => []);
+      const client = makeClient({ lookupInstruments });
+      renderForm(client);
+
+      fireEvent.change(screen.getByLabelText(m.search), { target: { value: "sbr" } });
+      cleanup(); // unmount the form with the lookup still pending
+
+      await act(async () => {
+        vi.advanceTimersByTime(400);
+      });
+      expect(lookupInstruments).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * The field setters the form exposes also drop the published validation message for the
+ * field they belong to. They are wrapped, so their identity has to survive a render —
+ * a child effect keyed on one of them must not re-run on every render.
+ */
+describe("the form's field setters", () => {
+  it("keep their identity between renders", () => {
+    // One identity per setter, per render — collected per render, so the assertion is
+    // about the property (the identity survives a render) and not about how many times
+    // React happens to render.
+    const byRender: Array<Array<unknown>> = [];
+
+    function Probe({ tick }: { tick: number }) {
+      const form = useTransactionForm({ client: makeClient(), portfolioId: "p1" });
+      byRender.push([form.setPrice, form.setQuantity, form.setTax]);
+      return <span>{tick}</span>;
+    }
+
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Probe tick={0} />
+      </NextIntlClientProvider>,
+    );
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Probe tick={1} />
+      </NextIntlClientProvider>,
+    );
+
+    const first = byRender[0];
+    const last = byRender[byRender.length - 1];
+    expect(first).toHaveLength(3);
+    // Three setters, two renders — one identity each.
+    expect(new Set(byRender.flat()).size).toBe(3);
+    expect(last).toEqual(first);
   });
 });

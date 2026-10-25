@@ -68,7 +68,6 @@
     "deniedBody": "Anda tidak menyetujui permintaan masuk. Coba lagi untuk melanjutkan."
   },
   "Nav": {
-    "dashboard": "Dasbor",
     "holdings": "Kepemilikan",
     "transactions": "Transaksi",
     "income": "Pendapatan",
@@ -77,12 +76,11 @@
     "settings": "Pengaturan",
     "admin": "Admin",
     "signOut": "Keluar",
-    "trades": "Catatan Dagang",
+    "trades": "P&L Terwujud",
     "tax": "Pajak",
     "activity": "Aktivitas",
     "reports": "Laporan",
     "insights": "Wawasan",
-    "profile": "Profil",
     "netWorth": "Kekayaan bersih",
     "allTime": "sepanjang masa",
     "version": "Versi {version} — catatan rilis"
@@ -102,7 +100,7 @@
       "tooltipForecast": "Perkiraan"
     },
     "trades": {
-      "title": "Laba/Rugi Terealisasi",
+      "title": "P&L Terwujud",
       "desc": "Transaksi tertutup & kinerja.",
       "trend": "{pct} tingkat menang",
       "caption": "Terealisasi tahun ini",
@@ -202,7 +200,7 @@
     "rebalancingCard": {
       "title": "Penyeimbangan",
       "edit": "Ubah",
-      "drift": "Penyimpangan {pct}%",
+      "drift": "Penyimpangan {pct}",
       "subtitle": "Bobot saat ini vs. target · {status}",
       "editSubtitle": "Sesuaikan bobot target",
       "statusOnTarget": "sesuai target",
@@ -263,8 +261,7 @@
       "headerPortfolioXirr": "XIRR Portofolio",
       "headerActiveReturn": "Aktif vs {symbol}",
       "noData": "—",
-      "insufficientData": "Belum cukup data untuk rincian per tahun — lanjutkan penggunaan dan cek lagi dalam beberapa hari.",
-      "emptyBenchmarks": "Tambahkan benchmark untuk membandingkan imbal hasil Anda dengan pasar tiap tahun."
+      "insufficientData": "Belum cukup data untuk rincian per tahun — lanjutkan penggunaan dan cek lagi dalam beberapa hari."
     },
     "benchmark": {
       "activeReturn": "Imbal hasil aktif",
@@ -291,7 +288,8 @@
       "top1Trend": "Top 1%",
       "samples": "{count} sampel bulanan · {classes} kelas aset",
       "insufficientData": "Data tidak mencukupi",
-      "note": "HHI (Indeks Herfindahl-Hirschman) menjumlahkan bobot kuadrat setiap holding, dari 0 (tersebar merata) hingga 1,0 (satu holding tunggal). HHI atau Top 1% yang naik berarti portofolio Anda makin terkonsentrasi pada lebih sedikit posisi."
+      "note": "HHI (Indeks Herfindahl-Hirschman) menjumlahkan bobot kuadrat setiap holding, dari 0 (tersebar merata) hingga 1,0 (satu holding tunggal). HHI atau Top 1% yang naik berarti portofolio Anda makin terkonsentrasi pada lebih sedikit posisi.",
+      "hhiChange": "({delta} sejak {date})"
     }
   },
   "Admin": {
@@ -378,7 +376,6 @@
     "jobs": "Pekerjaan latar belakang",
     "jobsHint": "Tugas terjadwal yang berjalan di latar belakang. Gunakan \"Jalankan sekarang\" untuk memicu pekerjaan secara langsung tanpa menunggu jadwal cron berikutnya. Catatan: invalidasi cache hanya berlaku untuk replika ini.",
     "schedulerUnavailable": "Scheduler tidak berjalan (pg-boss memerlukan Postgres eksternal; tidak tersedia di lingkungan ini).",
-    "jobName": "Pekerjaan",
     "jobSchedule": "Jadwal",
     "jobLastRun": "Terakhir dijalankan",
     "jobStatus": "Status",
@@ -398,7 +395,6 @@
     "providerName": "Penyedia",
     "enabledHeader": "Aktif",
     "apiCalls": "Panggilan API",
-    "apiKey": "Kunci API",
     "keyNone": "tidak ada",
     "keyNotNeeded": "Tidak diperlukan",
     "reorder": "Urutkan ulang",
@@ -448,7 +444,6 @@
     "deleteUserConfirm": "Hapus {email} dan semua data mereka secara permanen? Tindakan ini tidak dapat dibatalkan.",
     "deleteUserDone": "Pengguna dihapus.",
     "usersNoUsers": "Belum ada pengguna terdaftar.",
-    "usersEmail": "Email",
     "usersName": "Nama",
     "usersSignupDate": "Terdaftar",
     "usersPortfolios": "Portofolio",
@@ -597,7 +592,7 @@
     "emptyBody": "Catat setoran atau pembelian rencana tabungan, dan kemajuan menabung Anda muncul di sini.",
     "sparplanTitle": "Rencana tabungan",
     "detectedMonthly": "Total bulanan aktif",
-    "nowPct": "{pct}% sekarang",
+    "nowPct": "{pct} sekarang",
     "activeCount": "{count, plural, other {# aktif}}",
     "cadenceMonthly": "/bulan",
     "cadenceMonthlyShort": "bln",
@@ -638,7 +633,7 @@
     "driftOverRest": " Kurangi top-up di sini hingga kembali ke kisaran {target}.",
     "targetAllocation": "Alokasi target",
     "targetHelper": "Bobot target per rencana. Harus berjumlah 100%.",
-    "targetTotal": "Total {pct}%",
+    "targetTotal": "Total {pct}",
     "targetMustEqual": " · harus sama dengan 100%",
     "targetCancel": "Batal",
     "targetSave": "Simpan target",
@@ -752,11 +747,7 @@
     "connectionAwaiting": "Menunggu persetujuan",
     "connectionAttention": "Perlu perhatian",
     "connectionNotConnected": "Belum terhubung",
-    "done": "Selesai",
-    "sectionBasics": "Dasar",
-    "sectionOwnership": "Kepemilikan",
-    "sectionAccount": "Akun",
-    "sectionAccounting": "Opsi akuntansi"
+    "done": "Selesai"
   },
   "Import": {
     "title": "Impor transaksi",
@@ -783,6 +774,7 @@
       "review": "Konfirmasi",
       "done": "Selesai"
     },
+    "stepsOther": "Langkah",
     "targetPortfolio": "Impor ke",
     "menu": {
       "manual": "Input manual",
@@ -804,6 +796,7 @@
       "done": "Selesai",
       "failed": "Gagal"
     },
+    "fileStatusOther": "Tidak diketahui",
     "group": {
       "collapse": "Lipat",
       "expand": "Buka",
@@ -852,6 +845,8 @@
       "discard": "Buang"
     },
     "draftCount": "{count, plural, other {# draf}}",
+    "filesTable": "File yang diimpor",
+    "draftsTable": "Draf hasil impor",
     "confidence": "Yakin {pct}%",
     "remove": "Hapus",
     "fields": {
@@ -1012,7 +1007,8 @@
     "batchLabel": "Unggahan · {count, plural, other {# berkas}}",
     "selectedCount": "{count, plural, other {# dipilih}}",
     "deleteSelected": "Hapus pilihan",
-    "bulkConfirmPrompt": "Menghapus {count, plural, other {# transaksi}} dari impor terkonfirmasi."
+    "bulkConfirmPrompt": "Menghapus {count, plural, other {# transaksi}} dari impor terkonfirmasi.",
+    "actions": "Tindakan"
   },
   "Dashboard": {
     "title": "Dasbor",
@@ -1074,12 +1070,6 @@
     "title": "Halaman tidak ditemukan",
     "body": "Halaman yang Anda cari tidak ada atau telah dipindahkan.",
     "backHome": "Kembali ke dasbor"
-  },
-  "Gold": {
-    "title": "Harga emas",
-    "perGram": "per gram, 24k",
-    "asOf": "per {time}",
-    "live": "Langsung"
   },
   "Instrument": {
     "priceHistory": "Riwayat harga",
@@ -1181,6 +1171,29 @@
       "hold": "Tahan",
       "sell": "Jual",
       "strong_sell": "Jual kuat"
+    },
+    "recommendationOther": "Tidak ada rekomendasi"
+  },
+  "BondTerms": {
+    "floatingRateLabel": "Suku bunga mengambang (SBR/ST)",
+    "floatingRateHint": "Suku bunga kupon reset tiap beberapa bulan, sementara jadwal pembayaran tetap sendiri.",
+    "floorRateLabel": "Suku bunga dasar (% per tahun)",
+    "floorRateHint": "Suku bunga minimum untuk seluruh tenor — dipakai untuk periode yang rate-nya belum diumumkan.",
+    "ratePeriodsLabel": "Periode suku bunga yang diumumkan",
+    "ratePeriodsEmpty": "Belum ada periode. Tambahkan periode yang rate-nya sudah diumumkan penerbit.",
+    "ratePeriodFrom": "Dari",
+    "ratePeriodTo": "Sampai (tidak termasuk)",
+    "ratePeriodRate": "Rate % per tahun",
+    "addRatePeriod": "Tambah periode",
+    "removeRatePeriod": "Hapus periode",
+    "floatingBadge": "mengambang",
+    "issue": {
+      "floorMissing": "Masukkan suku bunga dasar dalam persen (mis. 6,75).",
+      "noPeriods": "Tambahkan minimal satu periode suku bunga.",
+      "periodIncomplete": "Setiap periode butuh tanggal mulai dan rate; tanggal akhir opsional.",
+      "periodOverlaps": "Periode suku bunga tidak boleh saling tumpang tindih.",
+      "floorAboveRate": "Suku bunga dasar tidak boleh lebih tinggi dari suku bunga yang diumumkan.",
+      "generic": "Jadwal suku bunga tidak dapat diterima."
     }
   },
   "CorpAction": {
@@ -1220,6 +1233,7 @@
     "cancel": "Batal",
     "savedResults": "Portofolio Anda",
     "discoveredResults": "Pencarian pasar",
+    "actionsTable": "Aksi korporasi",
     "notInPortfolios": "{symbol} ditemukan di data pasar tetapi belum ada di portofolio Anda. Import transaksi untuk instrumen ini terlebih dahulu.",
     "adminOnly": "Aksi korporasi hanya dapat dikelola oleh administrator.",
     "saveError": "Gagal menyimpan aksi korporasi.",
@@ -1230,6 +1244,7 @@
   },
   "Search": {
     "triggerLabel": "Cari",
+    "inputLabel": "Cari atau jalankan perintah",
     "placeholder": "Cari atau jalankan perintah…",
     "searching": "Mencari…",
     "noResults": "Tidak ada hasil.",
@@ -1237,7 +1252,6 @@
     "groupInstruments": "Instrumen",
     "groupTransactions": "Transaksi",
     "catalogBadge": "katalog",
-    "shortcutHint": "⌘K",
     "groupRecent": "Terbaru",
     "groupNavigate": "Buka",
     "groupActions": "Tindakan",
@@ -1357,7 +1371,7 @@
     "mcpHint": "Izinkan Claude (atau klien MCP lain) membaca portofolio Anda — hanya-baca. Buat token akses hanya-baca di atas, lalu tambahkan Pocket sebagai server MCP. Nomor rekening dan IBAN tidak pernah dibagikan. Setiap pemanggilan alat dihitung 1–2 permintaan terhadap batas laju token tersebut.",
     "mcpClaudeCode": "Claude Code",
     "mcpClaudeDesktop": "Claude Desktop (claude_desktop_config.json)",
-    "mcpPlaceholders": "Ganti <your-pocket-api-url> dengan alamat publik API Pocket Anda dan <token> dengan token yang Anda buat.",
+    "mcpPlaceholders": "Ganti '<your-pocket-api-url>' dengan alamat publik API Pocket Anda dan '<token>' dengan token yang Anda buat.",
     "signOut": "Keluar",
     "navAccount": "Akun",
     "navAccountSub": "Mata uang, bahasa & tampilan",
@@ -1483,8 +1497,6 @@
     "filterLabel": "Filter",
     "filterClearAll": "Hapus semua",
     "filterYear": "Tahun",
-    "allTypes": "Semua jenis",
-    "allInstruments": "Semua instrumen",
     "allYears": "Semua tahun",
     "date": "Tanggal",
     "type": "Jenis",
@@ -1520,6 +1532,7 @@
       "pdf": "PDF",
       "ibkr": "Interactive Brokers"
     },
+    "sourcesOther": "Sumber lain",
     "sourcesSection": {
       "title": "Sumber data",
       "download": "Unduh berkas sumber",
@@ -1581,7 +1594,8 @@
         "different_instrument": "Tidak dapat digabungkan: instrumen berbeda.",
         "incompatible_type": "Tidak dapat digabungkan: jenis transaksi tidak cocok.",
         "loan_linked": "Tidak dapat digabungkan: salah satunya terkait pinjaman pembiayaan."
-      }
+      },
+      "blockedOther": "Kedua transaksi ini tidak dapat digabungkan."
     },
     "banners": {
       "invested": "Diinvestasikan",
@@ -1851,6 +1865,7 @@
       "expired": "Sesi kedaluwarsa",
       "error": "Kesalahan"
     },
+    "statusOther": "Status tidak diketahui",
     "phone": "Nomor telepon",
     "pin": "PIN",
     "advanced": "Lanjutan",
@@ -1915,6 +1930,7 @@
       "expired": "Token kedaluwarsa",
       "error": "Kesalahan"
     },
+    "statusOther": "Status tidak diketahui",
     "flexToken": "Token Flex",
     "flexTokenPlaceholder": "Token Flex Web Service Anda",
     "queryId": "ID Kueri",
@@ -1951,6 +1967,7 @@
   "Trades": {
     "title": "P&L Terwujud",
     "subtitle": "Posisi tertutup & kinerja",
+    "methodGroup": "Metode basis biaya",
     "methodAverage": "Biaya rata-rata",
     "methodFifo": "FIFO",
     "filter_all": "Semua",
@@ -1962,6 +1979,7 @@
     "allYears": "Semua tahun",
     "status_open": "Terbuka",
     "status_closed": "Tertutup",
+    "statusOther": "Tidak diketahui",
     "searchPlaceholder": "Cari transaksi…",
     "searchClear": "Hapus pencarian",
     "noMatches": "Tidak ada transaksi yang cocok dengan filter Anda.",
@@ -1988,8 +2006,6 @@
     "realizedByYearChartTitle": "Untung/rugi terealisasi per tahun",
     "winLossTitle": "Menang / kalah",
     "winLossSubtitle": "{winners} dari {total} ditutup",
-    "winners": "Menang",
-    "losers": "Kalah",
     "realizedByYear": "Keuntungan terealisasi per tahun",
     "dividendsByYear": "Pendapatan investasi per tahun",
     "bonusesByYear": "Bonus per tahun",
@@ -2071,6 +2087,7 @@
       "coupon": "Kupon tunai · {currency}",
       "interest": "Bunga tunai · {currency}"
     },
+    "cashSourceOther": "Pendapatan tunai · {currency}",
     "title": "Pajak",
     "subtitle": "Keuntungan modal & saran panen bebas pajak",
     "defaultHolderName": "Semua portofolio",
@@ -2081,22 +2098,14 @@
     "distribution": {
       "title": "Distribusi FSA di seluruh depot",
       "cap": "Plafon tunjangan",
-      "capDesc": "Sparer\u00adpausch\u00adbetrag per orang",
+      "capDesc": "Sparer­pausch­betrag per orang",
       "allocated": "Dialokasikan",
       "remaining": "Belum didistribusikan",
       "remainingDesc": "Belum dialokasikan ke depot",
       "overAllocated": "Total alokasi depot melebihi plafon pribadi. Kelebihan pemotongan akan direkonsiliasi akhir tahun melalui Anlage KAP."
     },
     "allowance": {
-      "annual": "Batas tahunan",
-      "annualDesc": "Sparerpauschbetrag per tahun",
-      "used": "Terpakai YTD",
-      "usedDesc": "Keuntungan terkena Tf + pendapatan",
-      "remaining": "Sisa",
-      "taxSaving": "Penghematan pajak tersedia",
-      "usedPct": "{pct}% terpakai",
-      "gains": "keuntungan",
-      "income": "pendapatan"
+      "taxSaving": "Penghematan pajak tersedia"
     },
     "forecast": {
       "label": "Dividen & kupon yang diperkirakan",
@@ -2221,6 +2230,7 @@
         "deposit_interest": "Bunga bank",
         "fund_distribution": "Pembagian reksa dana"
       },
+      "categoryOther": "Pendapatan lain",
       "exemption": {
         "small_balance": "dikecualikan (saldo ≤ Rp7,5 juta)",
         "negative_discount": "di bawah harga perolehan (tidak mengurangi kupon)",
@@ -2233,6 +2243,7 @@
         "deposit_interest": "Bunga dari bank di Indonesia, dalam mata uang apa pun: final 20%, dipotong oleh bank. Portofolio dianggap dari Indonesia jika negaranya diatur ke Indonesia, atau, jika negara belum diatur, jika bunganya dalam rupiah. Bunga dikecualikan selama saldo deposito dan tabungan di bank tersebut paling banyak Rp7,5 juta. Pocket memperkirakannya dengan menganggap satu portofolio sebagai satu bank: saldo kas portofolio tepat sebelum setiap pembayaran, dalam semua mata uang yang dikonversi ke rupiah. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
         "fund_distribution": "Pembagian hasil reksa dana dan ETF bukan objek pajak bagi pemegang unit."
       },
+      "notesOther": "Penghasilan investasi Indonesia lainnya.",
       "foreignTable": {
         "title": "Penghasilan luar negeri · tidak termasuk estimasi",
         "source": "Sumber",
@@ -2303,7 +2314,10 @@
       "save": "Simpan",
       "saving": "Menyimpan…",
       "success": "Penangguhan kerugian tersimpan",
-      "error": "Tidak dapat menyimpan. Silakan coba lagi."
+      "error": "Tidak dapat menyimpan. Silakan coba lagi.",
+      "loading": "Memuat penangguhan kerugian…",
+      "loadError": "Tidak dapat memuat penangguhan kerugian Anda. Jumlah di bawah tidak diketahui — tidak ada yang diubah.",
+      "negativeIgnored": "Jumlah negatif tidak diterima — jumlah tersebut digunakan apa adanya (positif)."
     }
   },
   "Anomalies": {
@@ -2321,10 +2335,9 @@
       "zero_price": "Harga nol: beli atau jual dicatat dengan harga Rp0",
       "reconciliation_gap": "Selisih rekonsiliasi kas vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
       "reconciliation_drift": "Selisih rekonsiliasi kas baru vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
-      "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})"
+      "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})",
+      "unknown": "Masalah data tidak dikenal"
     },
-    "noneTitle": "Tidak ada masalah data",
-    "noneBody": "Semua transaksi konsisten.",
     "dismiss": "Tutup peringatan",
     "reconciliationTitle": "Kas tidak sesuai",
     "reconciliationPositionTitle": "Posisi tidak sesuai",
@@ -2332,12 +2345,6 @@
     "openConnection": "Buka koneksi",
     "dismissForNow": "Sembunyikan sementara",
     "portfolioTag": "Portofolio"
-  },
-  "PeriodSelector": {
-    "ytd": "YTD",
-    "1y": "1T",
-    "5y": "5T",
-    "max": "Maks"
   },
   "KpiPicker": {
     "title": "Sesuaikan dasbor",
@@ -2589,7 +2596,11 @@
     "signIn": "Masuk",
     "rateLimitedTitle": "Terlalu banyak permintaan",
     "rateLimitedBody": "Server meminta kami melambat. Anda dapat mencoba lagi dalam {seconds} detik.",
-    "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi."
+    "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi.",
+    "healthProbe": "health: {path} \u2192 HTTP {status}",
+    "healthProbeService": "health: {path} \u2192 HTTP {status}, service={service}",
+    "healthProbeForeign": "health: {path} \u2192 HTTP {status}, service={service} (diharapkan {expected})",
+    "healthProbeNoResponse": "health: {path} \u2192 tidak ada respons"
   },
   "FxMissing": {
     "title": "Kurs tidak tersedia.",
@@ -2604,11 +2615,38 @@
     "primaryNav": "Navigasi utama",
     "needsReview": "{count, plural, other {# item perlu ditinjau}}",
     "search": "Cari",
+    "loading": "Memuat…",
+    "table": "Tabel",
     "toggleTheme": "Ganti tema",
     "moreOptions": "Opsi lainnya",
     "previous": "Sebelumnya",
     "next": "Berikutnya",
-    "goToSlide": "Buka slide {n}"
+    "goToSlide": "Buka slide {n}",
+    "chartAllocationTitle": "Diagram alokasi",
+    "chartAllocationDesc": "{count} kategori, total {total}.",
+    "chartContributionsTitle": "Kontribusi dan nilai portofolio",
+    "chartContributionsDesc": "Kontribusi dan nilai portofolio selama {count} hari.",
+    "chartEpsTitle": "Laba per saham per kuartal",
+    "chartEpsDesc": "Laba per saham laporan dan estimasi selama {count} kuartal.",
+    "chartForecastTitle": "Proyeksi tabungan",
+    "chartForecastDesc": "Proyeksi nilai dan kontribusi selama {count} tahun.",
+    "chartIncomeTitle": "Pendapatan per tahun",
+    "chartIncomeDesc": "Pendapatan diterima dan proyeksi selama {count} tahun.",
+    "chartPerformanceTitle": "Kinerja portofolio",
+    "chartPerformanceDesc": "Portofolio dan pembanding selama {count} titik.",
+    "chartPriceTitle": "Riwayat harga",
+    "chartPriceDesc": "Harga penutupan selama {count} titik.",
+    "chartRevenueTitle": "Pendapatan dan laba",
+    "chartRevenueDesc": "Pendapatan dan laba selama {count} tahun.",
+    "chartValueTitle": "Nilai portofolio",
+    "chartValueDesc": "Nilai portofolio selama {count} titik.",
+    "chartYearlyReturnsTitle": "Imbal hasil per tahun",
+    "chartYearlyReturnsDesc": "Imbal hasil portofolio dan pembanding selama {count} tahun.",
+    "chartSummaryTitle": "Ringkasan deret",
+    "chartSummaryFirst": "Pertama",
+    "chartSummaryLast": "Terakhir",
+    "chartSummaryMin": "Terendah",
+    "chartSummaryMax": "Tertinggi"
   },
   "UiText": {
     "streakMonths": "{count} bln"

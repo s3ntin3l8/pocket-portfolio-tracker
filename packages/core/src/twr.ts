@@ -500,3 +500,19 @@ export function aggregateValueFlows(
 
 /** Alias: chain-index the summed aggregate flows. Same as chainIndex. */
 export const chainAggregateIndex = chainIndex;
+
+/**
+ * The TWR fields of one history row: the index level and the percentage, or **neither**
+ * when the date has no index point.
+ *
+ * A missing percentage is not 0 %. Substituting 0 draws a −100 % cliff on a base-100
+ * rebased chart — the number the row does not have, drawn as if it had it (audit R4-E5).
+ * Leaving the fields off says "no value here", and the chart breaks the line there.
+ */
+export function twrFields(
+  indexById: Map<string, IndexPoint>,
+  date: string,
+): { index?: string; pct?: string } {
+  const point = indexById.get(date);
+  return point ? { index: point.index, pct: point.pct } : {};
+}

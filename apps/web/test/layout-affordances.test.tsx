@@ -80,7 +80,7 @@ describe("money never truncates (audit G5)", () => {
 describe("tables never clip silently (audit G5)", () => {
   it("edgeAffordance opts a table into the scroll-shadow wrapper and pinned first column", () => {
     const { container } = render(
-      <Table edgeAffordance>
+      <Table caption="Test table" edgeAffordance>
         <tbody />
       </Table>,
     );
@@ -155,7 +155,7 @@ describe("auth label (audit G8)", () => {
 
 describe("Table stickyHeader", () => {
   const sticky = (
-    <Table stickyHeader>
+    <Table caption="Test table" stickyHeader>
       <TableHeader>
         <TableRow>
           <TableHead>A</TableHead>
@@ -189,7 +189,7 @@ describe("Table stickyHeader", () => {
   it("reports when the header starts pinning", () => {
     const onStickyChange = vi.fn();
     render(
-      <Table stickyHeader onStickyChange={onStickyChange}>
+      <Table caption="Test table" stickyHeader onStickyChange={onStickyChange}>
         <TableHeader>
           <TableRow>
             <TableHead>A</TableHead>
@@ -201,7 +201,7 @@ describe("Table stickyHeader", () => {
   });
 
   it("keeps the scrolling wrapper by default", () => {
-    const { container } = render(<Table />);
+    const { container } = render(<Table caption="Test table" />);
     expect((container.firstElementChild as HTMLElement).className).toContain("overflow-x-auto");
   });
 

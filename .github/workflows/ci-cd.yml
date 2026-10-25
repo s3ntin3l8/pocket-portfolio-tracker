@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
       - name: Install test deps
@@ -55,8 +55,80 @@ jobs:
       - name: Run pytest
         run: python -m pytest services/api/python
 
+  e2e:
+    # The Playwright suite (apps/web/e2e) drives a real browser against a real API +
+    # web stack on a throwaway PGlite database. It needs its own job: the shared
+    # reusable workflow is pinned by SHA in another repo and exposes no e2e input.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      # The API resolves @portfolio/core, @portfolio/db and the other workspace
+      # packages from their dist/ folder, so they must be built before the suite
+      # boots — `npm ci` alone leaves no dist/ at all. Same filter as the API
+      # Dockerfile. It also removes the tsx/dist emit race documented in CLAUDE.md.
+      - name: Build workspace packages
+        run: npx turbo run build --filter=@portfolio/api...
+      - name: Resolve the Playwright version
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('./package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+      # The cache step MUST come before the browser install: actions/cache restores
+      # when it runs, so a cache hit only saves the download if the download has not
+      # happened yet. With the install first, every run would pay the full download
+      # and the restore would then re-extract the archive over the fresh copy.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          # Keyed on the Playwright version, so bumping the dependency invalidates
+          # the cache instead of serving a browser build that doesn't match.
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Playwright browsers
+        # Skipped on a cache hit — the browsers are already there.
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+      - name: Install Playwright system dependencies
+        # Always: the browser binary and the OS packages it needs are cached
+        # separately, and the OS packages are cheap next to the download.
+        run: npx playwright install-deps chromium
+      - name: Run e2e
+        # Step-level timeout below the job's 30 minutes: a hang fails this step
+        # (the job keeps running), so the artifact upload below still fires with
+        # the traces that are the only diagnostic. A job-level timeout instead
+        # cancels the job and runs no further steps at all.
+        timeout-minutes: 20
+        run: npm run e2e --workspace @portfolio/web
+      - name: Upload e2e artifacts
+        # `!cancelled()` rather than `failure()`: the upload then also happens on
+        # a successful run, which is useful — the HTML report of a green run is
+        # the quickest way to see which specs ran. `always()` would additionally
+        # upload on a run cancelled from outside (a newer push, a manual cancel),
+        # but those artifacts are noise. A job killed by its own `timeout-minutes`
+        # runs no further steps at all — which is what the step-level timeout
+        # above is there to avoid.
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report
+          # Traces/screenshots of the failed specs (trace: "retain-on-failure") and
+          # the HTML report.
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7
+
   build-docker:
-    needs: [test-node, test-python]
+    needs: [test-node, test-python, e2e]
     # Only build/publish the image when something lands on main. PRs are validated by
     # the cheap test jobs alone; there's no need to run the slow multi-arch Docker
     # build (and nothing to publish) on every PR commit. Policy lives here in the
@@ -73,7 +145,7 @@ jobs:
     secrets: inherit
 
   build-docker-web:
-    needs: [test-node, test-python]
+    needs: [test-node, test-python, e2e]
     # Mirror of `build-docker` for the web app image (`apps/web/Dockerfile`). Runs in
     # parallel with the API build — the shared workflow namespaces cache/artifact paths
     # per image-name, so they don't collide. Both images publish to GHCR with the same

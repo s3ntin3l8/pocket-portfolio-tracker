@@ -100,6 +100,23 @@ export function GlobalSearch({
   const latestQueryRef = useRef<string>("");
   const scopesLoadedRef = useRef(false);
 
+  // Clear the pending search when the component goes away. A debounce timer that
+  // outlives the component fires into a torn-down environment: it updates state after
+  // unmount, and in the test suite it raises an unhandled "window is not defined" that
+  // fails the whole run — a flake that has nothing to do with the test that ran last.
+  //
+  // The flag covers the other half: a request that is already in flight resolves after
+  // the unmount, and its continuation would update state on a component that is gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+    };
+  }, []);
+
   // Reset state when palette closes.
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -158,18 +175,18 @@ export function GlobalSearch({
             holderId: holderId ?? undefined,
             limit: 10,
           });
-          // Drop stale responses.
-          if (latestQueryRef.current !== trimmed) return;
+          // Drop stale responses — and never touch state after the component is gone.
+          if (latestQueryRef.current !== trimmed || !mountedRef.current) return;
           setResults(data);
         } catch {
           // Surface the failure instead of silently leaving an empty list — otherwise
           // a 500 / network blip is indistinguishable from "no matches".
-          if (latestQueryRef.current === trimmed) {
+          if (latestQueryRef.current === trimmed && mountedRef.current) {
             setError(true);
             setResults(null);
           }
         } finally {
-          if (latestQueryRef.current === trimmed) setLoading(false);
+          if (latestQueryRef.current === trimmed && mountedRef.current) setLoading(false);
         }
       }, DEBOUNCE_MS);
     },
@@ -396,6 +413,9 @@ export function GlobalSearch({
             above; cmdk must not re-filter either. */}
         <Command shouldFilter={false}>
           <CommandInput
+            // The placeholder is not a name — it disappears on the first keystroke,
+            // leaving the combobox unnamed (audit R4-D10).
+            aria-label={t("inputLabel")}
             placeholder={t("placeholder")}
             value={query}
             onValueChange={handleQueryChange}

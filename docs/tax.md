@@ -498,6 +498,12 @@ an instrument's income. Then:
 4. a `dividend` → `domestic_dividend`;
 5. other interest → `deposit_interest`.
 
+A **floating-rate** retail bond (SBR/ST) is still a `bond`: its coupon rate resets every
+three months, so the _amount_ of a projected coupon varies per period, but the classification
+and the 10% rate above are unchanged. The rate schedule (`instruments.couponRateSchedule`)
+only changes the magnitude of the projected income, never how it is taxed — see
+[docs/data_providers.md](./data_providers.md#floating-rate-retail-bonds-sbrst).
+
 **Cash interest** (no instrument) is decided by the **portfolio's country**
 (`portfolios.country`, ISO 3166-1 alpha-2, set in the portfolio's settings; migration 0095) —
 where the account is held, which is what PMK 212/2018 looks at:

@@ -15,6 +15,7 @@ import {
   aggregateValueFlows,
   xirr,
   chainIndex,
+  twrFields,
   convert,
   fxAvailable,
   toDateKey,
@@ -173,8 +174,12 @@ export function registerHistoryRoutes(app: FastifyInstance) {
             date: r.date,
             netWorth: r.netWorth,
             marketValue: r.marketValue,
-            index: indexById.get(r.date)?.index ?? "100",
-            pct: indexById.get(r.date)?.pct ?? "0",
+            // A date without a TWR point has NO index and NO percentage — it does not have
+            // 0 % (audit R4-E5). The fields are left off the row instead of carrying a
+            // fabricated "100"/"0", and the chart breaks the line there (a missing value
+            // must not be drawn as a −100 % cliff). `chainIndex` emits a point per date,
+            // so this is the unreachable branch — but it is the one that would lie.
+            ...twrFields(indexById, r.date),
           }));
 
           // Benchmark enrichment — same pattern as /networth/history, except the target
@@ -472,8 +477,9 @@ export function registerHistoryRoutes(app: FastifyInstance) {
         date: p.date,
         netWorth: (nwByDate.get(p.date) ?? new Decimal(0)).toFixed(),
         marketValue: p.marketValue,
-        index: indexById.get(p.date)?.index ?? "100",
-        pct: indexById.get(p.date)?.pct ?? "0",
+        // No TWR point for the date → no index and no percentage (audit R4-E5). The
+        // fields are left off rather than carrying a fabricated "100"/"0".
+        ...twrFields(indexById, p.date),
       }));
 
       // Benchmark comparison: fetch prices and compute parallel TWR index.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { caretForDigits, digitsBefore, formatGrouped, sanitizeNumericInput } from "./number-format";
@@ -21,6 +21,8 @@ export function NumberField({ value, onValueChange, ...props }: NumberFieldProps
   const locale = useLocale();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
+  const fallbackId = useId();
+  const controlId = props.id ?? fallbackId;
 
   useLayoutEffect(() => {
     if (pendingCaret.current != null && inputRef.current) {
@@ -33,6 +35,7 @@ export function NumberField({ value, onValueChange, ...props }: NumberFieldProps
     <Input
       {...props}
       ref={inputRef}
+      id={controlId}
       inputMode="decimal"
       value={formatGrouped(value, locale)}
       onChange={(e) => {

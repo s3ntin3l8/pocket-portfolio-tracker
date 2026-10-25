@@ -117,4 +117,26 @@ describe("DatePicker", () => {
     );
     expect(container.querySelector("button")).toHaveClass("w-40");
   });
+
+  it("puts the invalid/description wiring on the trigger, not on the hidden input", () => {
+    // The hidden input is out of the tab order, so an invalid state or a message that
+    // points there is never announced — the trigger is the control the user reaches.
+    const { container } = renderPicker(
+      <DatePicker
+        id="tx-date"
+        value="2026-02-03"
+        onChange={() => {}}
+        label="Ex-date"
+        aria-invalid={true}
+        aria-describedby="tx-date-error"
+      />,
+    );
+    const button = screen.getByRole("button", { name: /ex-date/i });
+    // The message is announced when the trigger is reached…
+    expect(button).toHaveAttribute("aria-describedby", "tx-date-error");
+    // …and the invalid state stays on the real form field (`aria-invalid` is not
+    // supported on a button).
+    const input = getInput(container);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+  });
 });

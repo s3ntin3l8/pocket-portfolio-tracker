@@ -3,6 +3,7 @@ import {
   createApiClient,
   ApiError,
   apiErrorCode,
+  apiErrorIssues,
   accountMismatchFromError,
   duplicatesFromError,
   visionProviderErrorFromError,
@@ -182,6 +183,55 @@ describe("apiErrorCode", () => {
   it("returns null when the body is not JSON or has no string error field", () => {
     expect(apiErrorCode(new ApiError(500, "Internal Server Error"))).toBeNull();
     expect(apiErrorCode(new ApiError(400, JSON.stringify({ error: 42 })))).toBeNull();
+  });
+});
+
+describe("apiErrorIssues", () => {
+  it("returns the pathed issues of a validation_error body", () => {
+    const err = new ApiError(
+      400,
+      JSON.stringify({
+        error: "validation_error",
+        issues: [
+          { path: ["price"], message: "Expected a decimal string" },
+          { path: ["fees", 0], message: "Expected a decimal string" },
+        ],
+      }),
+    );
+    expect(apiErrorIssues(err)).toEqual([
+      { path: ["price"], message: "Expected a decimal string" },
+      // A numeric path segment (an array index) is normalised to a string.
+      { path: ["fees", "0"], message: "Expected a decimal string" },
+    ]);
+  });
+
+  it("returns an empty path for an issue without one", () => {
+    const err = new ApiError(
+      400,
+      JSON.stringify({ error: "validation_error", issues: [{ message: "Invalid input" }] }),
+    );
+    expect(apiErrorIssues(err)).toEqual([{ path: [], message: "Invalid input" }]);
+  });
+
+  it("returns [] for a body that is not a validation error", () => {
+    expect(
+      apiErrorIssues(new ApiError(500, JSON.stringify({ error: "pytr_not_available" }))),
+    ).toEqual([]);
+    expect(
+      apiErrorIssues(new ApiError(400, JSON.stringify({ error: "validation_error" }))),
+    ).toEqual([]);
+    expect(
+      apiErrorIssues(
+        new ApiError(400, JSON.stringify({ error: "validation_error", issues: "nope" })),
+      ),
+    ).toEqual([]);
+  });
+
+  it("returns [] for a missing, malformed or non-ApiError body", () => {
+    expect(apiErrorIssues(new ApiError(400, ""))).toEqual([]);
+    expect(apiErrorIssues(new ApiError(400, "<html>Bad Request</html>"))).toEqual([]);
+    expect(apiErrorIssues(new Error("boom"))).toEqual([]);
+    expect(apiErrorIssues(undefined)).toEqual([]);
   });
 });
 

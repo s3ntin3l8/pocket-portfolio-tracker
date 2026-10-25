@@ -105,7 +105,7 @@ export function HeroAmount({
           style={{ background: pill.bg, color: pill.fg }}
         >
           {SourceIcon && <SourceIcon className="size-3" />}
-          {t(`sources.${source}`)}
+          {t.has(`sources.${source}`) ? t(`sources.${source}`) : t("sourcesOther")}
         </span>
         {isDraft && (
           <span
@@ -271,7 +271,7 @@ export function DetailsCard({
         <DetailRow label={t("source")}>
           <span className="inline-flex items-center gap-1.5">
             {SourceIcon && <SourceIcon className="size-3.5" />}
-            {t(`sources.${source}`)}
+            {t.has(`sources.${source}`) ? t(`sources.${source}`) : t("sourcesOther")}
           </span>
         </DetailRow>
       )}

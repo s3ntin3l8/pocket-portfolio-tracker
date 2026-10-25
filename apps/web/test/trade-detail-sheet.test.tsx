@@ -120,7 +120,7 @@ describe("TradeDetailSheet", () => {
     // accessible DialogTitle shown at md:+ (CSS-hidden below it, not conditionally
     // rendered) — see the overlay chrome migration (#625) tests further down.
     expect(screen.getAllByText("BBNI").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Bank Negara Indonesia.*Closed 2026-05-18/)).toBeInTheDocument();
+    expect(screen.getByText(/Bank Negara Indonesia.*Closed May 18, 2026/)).toBeInTheDocument();
     expect(screen.getAllByText(messages.Trades.detail.realizedPnl).length).toBeGreaterThan(0);
     // Proceeds/cost derived from legs; realized P&L shown positive.
     expect(screen.getByText("IDR 1,640,000")).toBeInTheDocument();
@@ -142,8 +142,9 @@ describe("TradeDetailSheet", () => {
     renderSheet(CLOSED);
     expect(screen.getByText(messages.Trades.detail.tradeDetails)).toBeInTheDocument();
     expect(screen.getByText("300")).toBeInTheDocument();
-    expect(screen.getByText("2025-06-24")).toBeInTheDocument();
-    expect(screen.getByText("2026-05-18")).toBeInTheDocument();
+    // Dates are locale-formatted, not raw ISO strings.
+    expect(screen.getByText("Jun 24, 2025")).toBeInTheDocument();
+    expect(screen.getByText("May 18, 2026")).toBeInTheDocument();
   });
 
   it("colors a losing trade's realized P&L and return as negative, with no income section", () => {

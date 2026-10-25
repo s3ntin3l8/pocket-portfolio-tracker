@@ -95,7 +95,7 @@ export function AdminStorageForm({ initial }: AdminStorageFormProps) {
             const next = PROVIDER_OPTIONS.find((o) => o.value === e.target.value)?.value;
             if (next) setActiveProvider(next);
           }}
-          className="w-full appearance-none rounded-md border border-border bg-background px-3.5 py-3 text-sm font-semibold outline-none"
+          className="w-full appearance-none rounded-md border border-border bg-background px-3.5 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {PROVIDER_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>

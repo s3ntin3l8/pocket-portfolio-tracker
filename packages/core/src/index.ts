@@ -67,9 +67,12 @@ export {
 export { inferIntervalMonths, MIN_PAYMENTS_FOR_GROWTH, computeGrowthFactor } from "./growth.js";
 export {
   projectCoupons,
+  couponRateForDate,
   normalizeCouponSchedule,
   PERIODS_PER_YEAR,
   type BondPosition,
+  type BondCouponRateSchedule,
+  type BondRatePeriod,
   type ProjectedCoupon,
 } from "./coupons.js";
 export { projectDividends, projectNextYearDividends, type ProjectedDividend } from "./dividends.js";
@@ -115,6 +118,7 @@ export {
   chainIndex,
   chainAggregateIndex,
   aggregateValueFlows,
+  twrFields,
   splitAdjustmentFactor,
   isDepotTransfer,
   transferValueFlow,

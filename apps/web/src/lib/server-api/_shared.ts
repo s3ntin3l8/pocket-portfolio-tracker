@@ -8,6 +8,7 @@ import type {
   Portfolio,
   AccountHolder,
   User,
+  Anomaly,
   NetWorth,
   PortfolioSummary,
   PortfolioPerformance,
@@ -24,6 +25,8 @@ import {
   SCOPE_HEADER,
   resolveScope,
   qualifyingHolders,
+  parseScopeParam,
+  formatScopeParam,
   type ScopeSelection,
 } from "@/lib/portfolio-selection";
 import { toApiRange, type InstrumentPriceRange } from "@/lib/instrument-price-range";
@@ -35,21 +38,83 @@ import { classifyFailure, type DataFailure, type DataFailureStatus } from "@/lib
 export type Scope = ScopeSelection;
 
 /**
+ * The `?scope=` value the proxy surfaced as a request header (null when the URL carries no
+ * valid scope — loaders have no access to `searchParams`).
+ */
+async function scopeHeaderValue(): Promise<string | null> {
+  try {
+    return (await headers()).get(SCOPE_HEADER);
+  } catch {
+    // No request scope — fall through to the cookie.
+    return null;
+  }
+}
+
+/** The `pf` cookie: the default scope for scope-less URLs. */
+async function scopeCookieValue(): Promise<string | null> {
+  try {
+    return (await cookies()).get(SELECTED_PORTFOLIO_COOKIE)?.value ?? null;
+  } catch {
+    // No request context (e.g. a build-time render) — no cookie scope.
+    return null;
+  }
+}
+
+/**
  * The scope for this request: a valid `?scope=` URL param (surfaced by the proxy as a
  * request header — loaders have no access to `searchParams`) wins over the `pf` cookie,
  * which stays the default for scope-less URLs.
  */
 async function getRawScope(): Promise<Scope> {
-  let param: string | null = null;
-  try {
-    param = (await headers()).get(SCOPE_HEADER);
-  } catch {
-    // No request scope — fall through to the cookie.
-  }
-  return resolveScope({
-    param,
-    cookie: (await cookies()).get(SELECTED_PORTFOLIO_COOKIE)?.value,
-  });
+  return resolveScope({ param: await scopeHeaderValue(), cookie: await scopeCookieValue() });
+}
+
+/**
+ * The scope of the current request as a discriminated value (`all` | `portfolio` | `holder`).
+ *
+ * `getSelectedPortfolioId()` answers a narrower question ("which single portfolio?") and
+ * answers `null` for BOTH "all portfolios" and "a holder scope" — the conflation that let
+ * the Activity ledger aggregate a holder scope (audit R4-C1). Callers that must tell the
+ * three cases apart ask for the scope instead.
+ */
+export async function getScopeSelection(): Promise<Scope> {
+  return getRawScope();
+}
+
+/**
+ * The scope a page should actually render.
+ *
+ * A holder scope only counts for a holder that owns ≥2 portfolios (the switcher's rule):
+ * a single-portfolio holder is equivalent to that one portfolio, so a scope naming one
+ * falls back to the aggregate — exactly like every other scope-aware page.
+ */
+export async function resolveEffectiveScope(
+  portfolios: { accountHolderId?: string | null }[],
+): Promise<Scope> {
+  const scope = await getScopeSelection();
+  if (scope.kind !== "holder") return scope;
+  const count = portfolios.filter((p) => p.accountHolderId === scope.holderId).length;
+  return count >= 2 ? scope : { kind: "all" };
+}
+
+/**
+ * The `?scope=` value a legacy `?portfolio=<id>` deep link should be translated to.
+ *
+ * `?scope=p:<id>` is the documented encoding; `?portfolio=` was the Holdings page's own
+ * drill-in parameter, which overrode ONLY the positions table while the hero, the
+ * allocation and the sidebar net worth followed `?scope=` (audit R4-C2). A valid `?scope=`
+ * wins; otherwise the legacy parameter becomes `p:<id>`. Null when there is no legacy
+ * parameter to translate (nothing to redirect) or when it names no valid portfolio.
+ */
+export function legacyScopeValue(input: {
+  scope?: string | null;
+  portfolio?: string | null;
+}): string | null {
+  if (!input.portfolio) return null;
+  const explicit = parseScopeParam(input.scope);
+  if (explicit) return formatScopeParam(explicit);
+  const legacy = parseScopeParam(`p:${input.portfolio}`);
+  return legacy ? formatScopeParam(legacy) : null;
 }
 
 export async function getSelectedPortfolioId(): Promise<string | null> {
@@ -107,6 +172,7 @@ function normalizeCostBasis(
   return costBasis ?? "purchase_price";
 }
 
+/** The user's portfolios, fetched once per request. */
 const listPortfoliosCached = cache(async (): Promise<Portfolio[]> => {
   const api = await getServerApi();
   if (!api) return [];
@@ -200,18 +266,178 @@ export async function resolveSelection(): Promise<Selection> {
   }
 }
 
+/**
+ * The holder scope the aggregate views are filtered to (undefined when a single portfolio
+ * is selected or no multi-portfolio holder scope is active).
+ */
 export async function resolveHolderScope(
   portfolios: { accountHolderId?: string | null }[],
 ): Promise<string | undefined> {
-  const raw = await getRawScope();
-  if (raw.kind !== "holder") return undefined;
-  const { holderId } = raw;
-  const count = portfolios.filter((p) => p.accountHolderId === holderId).length;
-  return count >= 2 ? holderId : undefined;
+  const scope = await resolveEffectiveScope(portfolios);
+  return scope.kind === "holder" ? scope.holderId : undefined;
 }
 
 export interface TransactionWithPortfolio extends Transaction {
   portfolioName: string;
+}
+
+/**
+ * The anomalies of one portfolio — the "Needs review" set of a single-portfolio scope.
+ * `portfolioOverride` wins over the scope's own portfolio.
+ */
+export const loadAnomalies = cache(
+  async (portfolioOverride?: string): Promise<Anomaly[] | null> => {
+    const api = await getServerApi();
+    if (!api) return null;
+    const portfolioId = portfolioOverride ?? (await getSelectedPortfolioId());
+    if (!portfolioId) return null;
+    try {
+      const { anomalies } = await api.getAnomalies(portfolioId);
+      return anomalies;
+    } catch {
+      return null;
+    }
+  },
+);
+
+/**
+ * Aggregate variant of {@link loadAnomalies} for the all-portfolios Activity view (#562) —
+ * backs the "Needs review" banner/chip when no single portfolio is selected.
+ */
+export const loadNetworthAnomalies = cache(async (): Promise<Anomaly[] | null> => {
+  const api = await getServerApi();
+  if (!api) return null;
+  try {
+    const { anomalies } = await api.getNetworthAnomalies();
+    return anomalies;
+  } catch {
+    return null;
+  }
+});
+
+/**
+ * The anomalies of one account holder's portfolios — a holder scope's "Needs review" set.
+ *
+ * The aggregate `/networth/anomalies` endpoint has no holder filter, so a holder scope is
+ * composed from the holder's own portfolios: the same set the Activity ledger shows.
+ */
+export const loadHolderAnomalies = cache(async (holderId: string): Promise<Anomaly[] | null> => {
+  const portfolios = (await listPortfoliosCached()).filter((p) => p.accountHolderId === holderId);
+  if (portfolios.length === 0) return [];
+  const lists = await Promise.all(portfolios.map((p) => loadAnomalies(p.id)));
+  return lists.flatMap((list) => list ?? []);
+});
+
+/**
+ * The anomalies of a scope: one portfolio, one holder's portfolios, or the all-portfolios
+ * aggregate. The scope-aware entry point every "Needs review" surface uses, so the badge
+ * and the Activity page can never disagree about which anomalies are in scope.
+ */
+export async function loadScopeAnomalies(scope: Scope): Promise<Anomaly[] | null> {
+  if (scope.kind === "portfolio") return loadAnomalies(scope.portfolioId);
+  if (scope.kind === "holder") return loadHolderAnomalies(scope.holderId);
+  return loadNetworthAnomalies();
+}
+
+/** The API's page-size cap (`MAX_PAGE_SIZE`) — the largest list one read may return. */
+const HOLDER_PAGE_SIZE = 100;
+
+/** How many list pages of one portfolio are read at a time. */
+const PAGE_BATCH = 5;
+
+export interface HolderTransactionsOptions {
+  type?: string;
+  year?: string;
+  q?: string;
+  status?: "draft";
+  /** Currency the rows are converted into (the scope's display currency). */
+  convertTo?: string;
+}
+
+export interface HolderTransactionsView {
+  status: "ok" | DataFailureStatus;
+  /** Seconds to wait when `status` is `rate_limited` and the API said how long. */
+  retryAfter?: number | null;
+  rows: TransactionWithPortfolio[];
+  total: number;
+  years: string[];
+}
+
+/**
+ * The transactions of one account holder's portfolios — a holder scope's Activity ledger.
+ *
+ * The API's aggregate `/networth/transactions` is user-scoped: it has no holder filter, so
+ * a holder scope is composed here from the holder's own portfolios. Each portfolio's
+ * filtered list is read page by page (the API caps one page at 100 rows) and the rows are
+ * merged newest-first, tagged with the portfolio they belong to.
+ *
+ * The merged set is COMPLETE, not one page of it: the Activity table pages through the rows
+ * it was handed and only asks the server for more once it has shown them all — a partial
+ * set would send it back to the unscoped aggregate endpoint.
+ */
+export async function loadHolderTransactions(
+  holderId: string,
+  options: HolderTransactionsOptions = {},
+): Promise<HolderTransactionsView> {
+  const api = await getServerApi();
+  if (!api) return { status: "unauthorized", rows: [], total: 0, years: [] };
+  try {
+    const portfolios = (await listPortfoliosCached()).filter((p) => p.accountHolderId === holderId);
+    if (portfolios.length === 0) return { status: "ok", rows: [], total: 0, years: [] };
+    const nameById = new Map(portfolios.map((p) => [p.id, p.name]));
+    const perPortfolio = await Promise.all(
+      portfolios.map((p) => loadPortfolioTransactionRows(api, p.id, options)),
+    );
+    const rows = perPortfolio
+      .flat()
+      .map((row) => ({ ...row, portfolioName: nameById.get(row.portfolioId) ?? "" }))
+      .sort((a, b) => b.executedAt.localeCompare(a.executedAt));
+    const years = [...new Set(rows.map((r) => r.executedAt.slice(0, 4)))].sort((a, b) =>
+      b.localeCompare(a),
+    );
+    return { status: "ok", rows, total: rows.length, years };
+  } catch (err) {
+    const failure = classifyFailure(err);
+    return {
+      status: failure.status,
+      ...(failure.status === "rate_limited" ? { retryAfter: failure.retryAfter } : {}),
+      rows: [],
+      total: 0,
+      years: [],
+    };
+  }
+}
+
+/** Every row of one portfolio's filtered list, read page by page. */
+async function loadPortfolioTransactionRows(
+  api: ApiClient,
+  portfolioId: string,
+  options: HolderTransactionsOptions,
+): Promise<Transaction[]> {
+  const read = (page: number) =>
+    api.listTransactionsPaginated(
+      portfolioId,
+      page,
+      HOLDER_PAGE_SIZE,
+      options.convertTo,
+      options.type,
+      options.year,
+      options.q,
+      undefined,
+      undefined,
+      options.status,
+    );
+  const first = await read(1);
+  const rows = [...first.rows];
+  const pages = Math.ceil((first.total ?? 0) / HOLDER_PAGE_SIZE);
+  // The remaining pages in small batches — a long history must not fire 50 requests at once.
+  for (let start = 2; start <= pages; start += PAGE_BATCH) {
+    const batch: number[] = [];
+    for (let p = start; p < start + PAGE_BATCH && p <= pages; p++) batch.push(p);
+    const fetched = await Promise.all(batch.map(read));
+    for (const page of fetched) rows.push(...page.rows);
+  }
+  return rows;
 }
 
 export interface HoldingsView {

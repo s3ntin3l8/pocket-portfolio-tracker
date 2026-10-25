@@ -101,7 +101,9 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
               {objectStorage.objectCount !== undefined && (
                 <>
                   <dt className="text-text-2">{t("storageObjectCount")}</dt>
-                  <dd className="tabular-nums">{objectStorage.objectCount.toLocaleString()}</dd>
+                  <dd className="tabular-nums">
+                    {objectStorage.objectCount.toLocaleString(locale)}
+                  </dd>
                 </>
               )}
               {objectStorage.totalBytes !== undefined && (

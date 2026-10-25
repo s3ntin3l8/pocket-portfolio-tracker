@@ -2,6 +2,13 @@
 
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useTranslations } from "next-intl";
+
+/**
+ * The accessible name for a markdown table in the model's answer (audit R4-D5): a
+ * screen-reader user navigating by table must be able to tell it apart from the
+ * app's own data tables. The name is localized.
+ */
 
 /** Only links that go somewhere safe are made clickable. */
 const SAFE_HREF = /^(https?:\/\/|\/(?!\/))/i;
@@ -48,11 +55,6 @@ const components: Components = {
       {children}
     </blockquote>
   ),
-  table: ({ children }) => (
-    <div className="mb-2 overflow-x-auto last:mb-0">
-      <table className="w-full border-collapse text-xs">{children}</table>
-    </div>
-  ),
   th: ({ children }) => (
     <th className="border-b border-border px-2 py-1 text-left font-bold">{children}</th>
   ),
@@ -60,8 +62,25 @@ const components: Components = {
 };
 
 export function AssistantMarkdown({ text }: { text: string }) {
+  const t = useTranslations("A11y");
+  const tableLabel = t("table");
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} skipHtml>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        ...components,
+        // The table's accessible name (audit R4-D5) — the model output's own table
+        // is named, not just the app's data tables.
+        table: ({ children }) => (
+          <div className="mb-2 overflow-x-auto last:mb-0">
+            <table aria-label={tableLabel} className="w-full border-collapse text-xs">
+              {children}
+            </table>
+          </div>
+        ),
+      }}
+      skipHtml
+    >
       {text}
     </ReactMarkdown>
   );

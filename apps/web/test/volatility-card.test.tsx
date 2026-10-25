@@ -8,7 +8,7 @@ import messages from "../messages/en.json";
 function renderCard(volatility: InsightsVolatility) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <VolatilityCard volatility={volatility} />
+      <VolatilityCard volatility={volatility} locale="en" />
     </NextIntlClientProvider>,
   );
 }
