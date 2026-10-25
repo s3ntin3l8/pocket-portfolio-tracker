@@ -129,8 +129,18 @@ export default async function TradesPage({
   const winLossDenom = winnersTotal + Math.abs(losersTotal);
   const winPct = winLossDenom > 0 ? (winnersTotal / winLossDenom) * 100 : 0;
 
-  const maxAbsYear = Math.max(1, ...log.realizedByYear.map((r) => Math.abs(Number(r.amount))));
-  const maxDividendYear = Math.max(1, ...log.dividendsByYear.map((d) => Number(d.amount)));
+  // Bar scales use the REAL largest magnitude (no floor): the largest bar fills the plot
+  // area and a year without an amount renders NO bar at all. Both charts are drawn against
+  // a ZERO baseline, so a loss year grows DOWNWARD instead of being drawn as an upward bar
+  // of the same height as an equal gain — the sign is readable without relying on colour.
+  const realizedAmounts = log.realizedByYear.map((r) => Number(r.amount));
+  const realizedMaxAbs = Math.max(0, ...realizedAmounts.map((a) => Math.abs(a)));
+  const realizedHasPositive = realizedAmounts.some((a) => a > 0);
+  const realizedHasNegative = realizedAmounts.some((a) => a < 0);
+  const dividendAmounts = log.dividendsByYear.map((d) => Number(d.amount));
+  const dividendMaxAbs = Math.max(0, ...dividendAmounts.map((a) => Math.abs(a)));
+  const dividendHasPositive = dividendAmounts.some((a) => a > 0);
+  const dividendHasNegative = dividendAmounts.some((a) => a < 0);
 
   return (
     <div className="space-y-5">
@@ -151,35 +161,19 @@ export default async function TradesPage({
                 {log.realizedByYear.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t("noRealized")}</p>
                 ) : (
-                  <div
-                    className="flex items-end justify-between gap-2 overflow-hidden"
-                    style={{ height: 140 }}
-                  >
-                    {log.realizedByYear.map((r) => {
-                      const amount = Number(r.amount);
-                      const pct = Math.max(4, (Math.abs(amount) / maxAbsYear) * 100);
-                      return (
-                        <div
-                          key={r.year}
-                          className="flex h-full flex-1 flex-col items-center gap-1.5"
-                        >
-                          <span className={cn("tabular text-xs font-bold", signToneClass(amount))}>
-                            {formatSignedMoney(amount, currency, locale)}
-                          </span>
-                          <div className="flex w-full flex-1 items-end justify-center">
-                            <div
-                              className={cn(
-                                "w-full max-w-10 rounded-t-xs",
-                                toneBgClass(toneOf(amount)),
-                              )}
-                              style={{ height: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">{r.year}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <YearBars
+                    testId="realized-bar"
+                    rows={log.realizedByYear.map((r) => ({
+                      year: r.year,
+                      amount: Number(r.amount),
+                    }))}
+                    maxAbs={realizedMaxAbs}
+                    hasPositive={realizedHasPositive}
+                    hasNegative={realizedHasNegative}
+                    formatValue={(amount) => formatSignedMoney(amount, currency, locale)}
+                    valueClassName={(amount) => signToneClass(amount)}
+                    barClassName={(amount) => toneBgClass(toneOf(amount))}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -192,30 +186,18 @@ export default async function TradesPage({
                 {log.dividendsByYear.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t("noDividends")}</p>
                 ) : (
-                  <div
-                    className="flex items-end justify-between gap-2 overflow-hidden"
-                    style={{ height: 140 }}
-                  >
-                    {log.dividendsByYear.map((d) => {
-                      const amount = Number(d.amount);
-                      const pct = Math.max(4, (amount / maxDividendYear) * 100);
-                      return (
-                        <div
-                          key={d.year}
-                          className="flex h-full flex-1 flex-col items-center gap-1.5"
-                        >
-                          <span className="tabular text-xs font-bold">{money(d.amount)}</span>
-                          <div className="flex w-full flex-1 items-end justify-center">
-                            <div
-                              className="w-full max-w-10 rounded-t-xs bg-primary"
-                              style={{ height: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">{d.year}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <YearBars
+                    testId="dividend-bar"
+                    rows={log.dividendsByYear.map((d) => ({
+                      year: d.year,
+                      amount: Number(d.amount),
+                    }))}
+                    maxAbs={dividendMaxAbs}
+                    hasPositive={dividendHasPositive}
+                    hasNegative={dividendHasNegative}
+                    formatValue={(amount) => money(amount)}
+                    barClassName={(amount) => toneBgClass(toneOf(amount))}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -272,6 +254,93 @@ export default async function TradesPage({
           </div>
         </PageRail>
       </PageWithRail>
+    </div>
+  );
+}
+
+/**
+ * A year-by-year bar chart drawn against a ZERO baseline.
+ *
+ * Each column shows the year's amount on top, the bar in the middle and the year
+ * underneath. The bar's height is a share of the REAL largest magnitude (`maxAbs`, no
+ * floor), so the biggest bar fills the plot area and a year without an amount renders NO
+ * bar at all. A negative amount grows DOWNWARD from the baseline instead of being drawn
+ * as an upward bar of the same height as an equal gain — the sign is readable without
+ * relying on the colour alone.
+ *
+ * With gains and losses side by side the baseline sits in the middle of the plot area and
+ * both halves share ONE scale (the same number of pixels per currency unit); with only
+ * gains (or only losses) the baseline sits at the matching edge and that side gets the
+ * whole plot area.
+ */
+function YearBars({
+  rows,
+  maxAbs,
+  hasPositive,
+  hasNegative,
+  formatValue,
+  valueClassName,
+  barClassName,
+  testId,
+}: {
+  rows: { year: number; amount: number }[];
+  /** The real largest magnitude across `rows` (0 when there is nothing to scale). */
+  maxAbs: number;
+  hasPositive: boolean;
+  hasNegative: boolean;
+  formatValue: (amount: number) => string;
+  /** Extra classes for the amount label (tone). */
+  valueClassName?: (amount: number) => string;
+  /** Classes for the bar itself (tone). */
+  barClassName: (amount: number) => string;
+  /** Test hook: the rendered bars carry this `data-testid` plus year/direction. */
+  testId: string;
+}) {
+  const baselinePct = hasPositive && hasNegative ? 50 : hasNegative ? 100 : 0;
+  return (
+    <div className="flex items-end justify-between gap-2 overflow-hidden" style={{ height: 140 }}>
+      {rows.map((row) => {
+        const amount = row.amount;
+        // The share of the plot area this bar occupies — never negative, so a negative
+        // amount can never reach the `height` style as an invalid (negative) percentage.
+        const space = amount > 0 ? (hasNegative ? 50 : 100) : hasPositive ? 50 : 100;
+        const pct = amount === 0 || maxAbs <= 0 ? 0 : (Math.abs(amount) / maxAbs) * space;
+        const direction = amount > 0 ? "up" : amount < 0 ? "down" : "none";
+        return (
+          <div key={row.year} className="flex h-full flex-1 flex-col items-center gap-1.5">
+            <span className={cn("tabular text-xs font-bold", valueClassName?.(amount))}>
+              {formatValue(amount)}
+            </span>
+            {/* Plot area: the zero baseline, with gains above it and losses below it. */}
+            <div className="relative w-full flex-1">
+              <div
+                aria-hidden
+                className="absolute inset-x-0 border-t border-border"
+                style={{ bottom: `${baselinePct}%` }}
+              />
+              {direction !== "none" && (
+                <div
+                  data-testid={testId}
+                  data-year={String(row.year)}
+                  data-direction={direction}
+                  data-amount={String(amount)}
+                  className={cn(
+                    "absolute inset-x-0 mx-auto w-full max-w-10",
+                    direction === "up" ? "rounded-t-xs" : "rounded-b-xs",
+                    barClassName(amount),
+                  )}
+                  style={
+                    direction === "up"
+                      ? { bottom: `${baselinePct}%`, height: `${pct}%` }
+                      : { top: `${100 - baselinePct}%`, height: `${pct}%` }
+                  }
+                />
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">{row.year}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

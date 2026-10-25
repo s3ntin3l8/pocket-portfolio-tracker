@@ -11,10 +11,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useLocale } from "next-intl";
-import type { Candle } from "@portfolio/api-client";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
+
+/**
+ * One point of the plotted series. `close` is `null` when the source has no value for
+ * that point — the chart then breaks the line there instead of drawing a drop to zero.
+ * The API's `Candle` (a date + a decimal-string close) satisfies this shape.
+ */
+export interface PriceChartPoint {
+  date: string;
+  close: string | number | null;
+  currency?: string;
+}
 
 export function PriceChart({
   data,
@@ -24,7 +34,7 @@ export function PriceChart({
   showYAxis = true,
   height = 280,
 }: {
-  data: Candle[];
+  data: PriceChartPoint[];
   currency: string;
   unit?: "currency" | "percent";
   /** Hide axes/grid — just the area+line, for a compact sparkline (e.g. the Holdings hero). */
@@ -35,12 +45,16 @@ export function PriceChart({
 }) {
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
-  const points = data.map((d) => ({ date: d.date, close: Number(d.close) }));
+  // A missing value stays null so recharts breaks the line there (a 0 would draw a cliff).
+  const points = data.map((d) => ({
+    date: d.date,
+    close: d.close === null ? null : Number(d.close),
+  }));
   const gradientId = "price-fill";
   const lineColor = "var(--color-primary)";
 
   const formatValue = (v: number) =>
-    unit === "percent" ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : formatMoney(v, currency, locale);
+    unit === "percent" ? formatPercentPoints(v, locale, 2) : formatMoney(v, currency, locale);
 
   const dateLabelFmt = new Intl.DateTimeFormat(locale, {
     day: "numeric",
@@ -97,7 +111,10 @@ export function PriceChart({
             cursor={CHART_CURSOR}
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
-              const v = Number(payload[0]?.value);
+              const raw = payload[0]?.value;
+              // A missing point has no value to show — no tooltip row rather than a fake 0.
+              if (raw === null || raw === undefined) return null;
+              const v = Number(raw);
               if (!Number.isFinite(v)) return null;
               return (
                 <ChartTooltipPanel

@@ -17,7 +17,8 @@ import { formatMoney, formatPercent } from "@/lib/utils";
 
 export interface HeroOverlayPoint {
   date: string;
-  portfolio: number;
+  /** The portfolio series. `null` where the source has no value — the line breaks there. */
+  portfolio: number | null;
   benchmark: number | null;
 }
 
@@ -125,6 +126,9 @@ function HeroTooltip({
   const p = pointsData[0];
 
   const title = formatHeroDateLabel(p.date, isIntraday, dateLabelFmt);
+
+  // A point without a portfolio value has nothing to show (the line is broken there).
+  if (p.portfolio === null) return null;
 
   const rows = [
     {

@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "next-intl";
-import { formatMoney, formatPercentPoints } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact, formatPercentPoints } from "@/lib/utils";
 import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -50,14 +50,9 @@ export function AllocationDonut({
   const locale = useLocale();
   const sum = data.reduce((s, d) => s + d.value, 0);
   const displayTotal = total ?? sum;
-  const compact = (n: number) =>
-    new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency,
-      notation: "compact",
-      compactDisplay: "short",
-      maximumFractionDigits: currency === "IDR" ? 0 : 1,
-    }).format(n);
+  // ONE compact-money formatter for the whole app (lib/utils): the same amount must not
+  // render as "€1.2M" in this legend and "€1,234,567.89" in a report card.
+  const compact = (n: number) => formatMoneyCompact(n, currency, locale);
   // Server pct when given, else value / sum; a non-finite result (empty or zero-sum data)
   // renders as a dash rather than "NaN%".
   const pctOf = (d: DonutSlice): number | null => {

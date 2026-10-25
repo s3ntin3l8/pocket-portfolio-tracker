@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
-import { formatPercent } from "@/lib/utils";
+import { formatPercent, formatPercentPoints } from "@/lib/utils";
 import { benchmarkLabel } from "@/lib/benchmark-labels";
 import type { BenchmarkSymbolEntry, YearlyReturnRow } from "@portfolio/api-client";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -96,7 +96,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
               tick={CHART_AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+              tickFormatter={(v: number) => formatPercentPoints(v, locale, 0)}
               width="auto"
             />
             <Tooltip

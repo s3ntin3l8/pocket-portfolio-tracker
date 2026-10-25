@@ -14,6 +14,7 @@ import {
   HeroOverlayChartSsr as HeroOverlayChart,
   PriceChartSsr as PriceChart,
 } from "@/components/charts/lazy";
+import type { HeroOverlayPoint } from "@/components/charts/hero-overlay-chart";
 import { RangeToggle, type ChartRange } from "@/components/charts/range-toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { EmptyState } from "@/components/empty-state";
@@ -160,13 +161,15 @@ export function NetWorthHistoryChart({
 
   // Value lines plot `netWorth` — the same quantity as the headline — never `marketValue`, which is
   // 0 for a cash-only portfolio. The TWR (`pct`/`index`) is chained on `marketValue` server-side.
+  // A missing TWR percentage stays null: the line breaks there instead of dropping to 0
+  // (on a base-100 chart that would read as a −100 % cliff).
   const chartData = intraday
     ? data.filter(isIntradayPoint).map((p) => ({
         date: intradayLabelFmt.format(new Date(p.at)),
         close: p.netWorth,
       }))
     : effectiveMode === "performance"
-      ? data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.pct ?? "0" }))
+      ? data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.pct ?? null }))
       : data.filter(isDailyPoint).map((p) => ({ date: p.date, close: p.netWorth }));
 
   // Hero variant input. Intraday ranges emit absolute currency values for the
@@ -182,7 +185,7 @@ export function NetWorthHistoryChart({
         }))
       : data.filter(isDailyPoint).map((p) => ({
           date: p.date,
-          portfolio: Number(p.pct ?? "0"),
+          portfolio: p.pct === undefined ? null : Number(p.pct),
           benchmark: p.benchmarkPct === undefined ? null : Number(p.benchmarkPct),
         }))
     : null;
@@ -191,13 +194,18 @@ export function NetWorthHistoryChart({
   // pills + legend without re-walking the data. `benchmarkPct` carries the
   // final point's TWR % (stringified, as `chainIndex` produces — divide by 100
   // before formatting), or null when no benchmark is configured for this range.
+  // Points without a portfolio value are left out: they are gaps in the chart, and
+  // the parent's period delta is computed from the first and last VALUE.
   const heroSeriesSnapshot: HeroSeriesSnapshot | null =
     isHero && heroOverlayPoints
       ? (() => {
-          const last = heroOverlayPoints[heroOverlayPoints.length - 1];
+          const valued = heroOverlayPoints.filter(
+            (p): p is HeroOverlayPoint & { portfolio: number } => p.portfolio !== null,
+          );
+          const last = valued[valued.length - 1];
           const hasBenchmark = heroOverlayPoints.some((p) => p.benchmark !== null);
           return {
-            points: heroOverlayPoints.map((p) => ({ date: p.date, close: p.portfolio })),
+            points: valued.map((p) => ({ date: p.date, close: p.portfolio })),
             benchmarkPct: hasBenchmark && last?.benchmark != null ? String(last.benchmark) : null,
             hasBenchmark,
             isIntraday: intraday,
