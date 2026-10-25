@@ -142,6 +142,16 @@ export function useTransactionForm({
   const [results, setResults] = useState<Instrument[]>([]);
   const [discovered, setDiscovered] = useState<InstrumentSearchResult[]>([]);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clear the pending lookup when the form goes away: a debounce that outlives the
+  // component fires into a torn-down environment and updates state on a component that
+  // is gone (see `useTimeout` for the same guard in hook form).
+  useEffect(
+    () => () => {
+      if (lookupTimer.current) clearTimeout(lookupTimer.current);
+      lookupTimer.current = null;
+    },
+    [],
+  );
   const [selected, setSelected] = useState<Instrument | null>(() =>
     initial?.instrument && initial.instrumentId
       ? {

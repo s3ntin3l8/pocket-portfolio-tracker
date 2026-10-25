@@ -100,6 +100,18 @@ export function GlobalSearch({
   const latestQueryRef = useRef<string>("");
   const scopesLoadedRef = useRef(false);
 
+  // Clear the pending search when the component goes away. A debounce timer that
+  // outlives the component fires into a torn-down environment: it updates state after
+  // unmount, and in the test suite it raises an unhandled "window is not defined" that
+  // fails the whole run — a flake that has nothing to do with the test that ran last.
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+    },
+    [],
+  );
+
   // Reset state when palette closes.
   function handleOpenChange(next: boolean) {
     setOpen(next);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Search, X, Sparkles, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -47,6 +47,16 @@ export function EditBenchmarkDialog({
   const api = useApiClient();
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Clear the pending search when the dialog goes away: a debounce that outlives the
+  // component fires into a torn-down environment and updates state on a component that
+  // is gone (see `useTimeout` for the same guard in hook form).
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+    },
+    [],
+  );
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<InstrumentSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
