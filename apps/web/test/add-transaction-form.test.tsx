@@ -1316,7 +1316,7 @@ describe("AddTransactionForm — floating-rate bond terms", () => {
     expect(payload.couponRate).toBeUndefined();
   });
 
-  it("does not send a half-filled schedule", async () => {
+  it("blocks the submit when the schedule is half-filled, instead of creating a bond with no rate", async () => {
     const client = makeClient();
     renderForm(client);
 
@@ -1334,8 +1334,15 @@ describe("AddTransactionForm — floating-rate bond terms", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: m.submit }));
 
-    await waitFor(() => expect(client.createInstrument).toHaveBeenCalled());
-    const payload = vi.mocked(client.createInstrument).mock.calls[0][0];
-    expect(payload.couponRateSchedule).toBeUndefined();
+    // Nothing is created: a bond with a half-filled schedule would carry no rate at
+    // all and silently drop out of the income/tax forecast.
+    // The form's error banner and the editor's inline hint both surface the reason.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").some((a) => a.textContent === tb.issue.noPeriods)).toBe(
+        true,
+      ),
+    );
+    expect(client.createInstrument).not.toHaveBeenCalled();
+    expect(client.createTransaction).not.toHaveBeenCalled();
   });
 });

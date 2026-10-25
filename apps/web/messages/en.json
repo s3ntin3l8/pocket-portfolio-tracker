@@ -1195,7 +1195,6 @@
     "ratePeriodRate": "Rate % p.a.",
     "addRatePeriod": "Add period",
     "removeRatePeriod": "Remove period",
-    "effectiveRateLabel": "Effective rate today",
     "floatingBadge": "floating",
     "issue": {
       "floorMissing": "Enter the floor rate as a percentage (e.g. 6.75).",

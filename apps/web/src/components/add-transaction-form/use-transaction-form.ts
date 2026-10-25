@@ -31,6 +31,7 @@ import {
 import {
   EMPTY_RATE_SCHEDULE_DRAFT,
   rateScheduleDraftToApi,
+  validateRateScheduleDraft,
   type RateScheduleDraft,
 } from "@/lib/bond-rate";
 
@@ -421,6 +422,16 @@ export function useTransactionForm({
     if (isLoanRepaymentType && !isEdit && !loanId) {
       setError(t("loanRequired"));
       return;
+    }
+    // A floating-rate bond whose schedule is not filled in yet must not be created:
+    // it would carry no rate at all and silently drop out of the income/tax forecast.
+    // The editor already shows the reason inline; this is the submit-time guard.
+    if (assetClass === "bond" && floatingRate) {
+      const issue = validateRateScheduleDraft(rateSchedule);
+      if (issue) {
+        setError(tb(`issue.${issue}`));
+        return;
+      }
     }
     setBusy(true);
     setError(null);

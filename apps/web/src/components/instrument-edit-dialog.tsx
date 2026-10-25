@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/spinner";
-import type { Instrument } from "@portfolio/api-client";
+import type { BondCouponRateSchedule, Instrument } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
 import { defaultPartialExemptionRate } from "@portfolio/core";
 import { fractionToPercent, percentToFraction } from "@/lib/tax-rate";
@@ -18,6 +18,7 @@ import { BondRateScheduleEditor } from "./add-transaction-form/bond-rate-schedul
 import {
   rateScheduleDraftToApi,
   rateScheduleToDraft,
+  validateRateScheduleDraft,
   type RateScheduleDraft,
 } from "@/lib/bond-rate";
 import { useRouter } from "@/i18n/navigation";
@@ -89,6 +90,22 @@ export function InstrumentEditDialog({
       toast.error(t("tfInvalid"));
       return;
     }
+    // An unusable schedule must NOT be sent as `null`: that would clear the shared
+    // rate schedule for every holder of the series (and the bond would fall out of
+    // the income/tax forecast entirely). A half-filled draft is a mistake to report,
+    // not a request to delete the schedule — the same shape as the `tfInvalid` guard
+    // above. `null` is sent only when the toggle was deliberately switched off.
+    let couponRateSchedule: BondCouponRateSchedule | null | undefined;
+    if (assetClass === "bond" && floatingRate) {
+      const issue = validateRateScheduleDraft(rateSchedule);
+      if (issue) {
+        toast.error(tb(`issue.${issue}`));
+        return;
+      }
+      couponRateSchedule = rateScheduleDraftToApi(rateSchedule) ?? null;
+    } else if (assetClass === "bond" && instrument.couponRateSchedule != null) {
+      couponRateSchedule = null;
+    }
     setBusy(true);
     try {
       await api.updateInstrument(instrument.id, {
@@ -110,12 +127,8 @@ export function InstrumentEditDialog({
         // Only touch the rate schedule when the instrument is a bond AND the floating
         // toggle actually changed something — an admin renaming a bond must not clear
         // the schedule behind their back.
-        ...(assetClass === "bond"
-          ? floatingRate
-            ? { couponRateSchedule: rateScheduleDraftToApi(rateSchedule) ?? null }
-            : instrument.couponRateSchedule != null
-              ? { couponRateSchedule: null }
-              : {}
+        ...(assetClass === "bond" && couponRateSchedule !== undefined
+          ? { couponRateSchedule }
           : {}),
       });
       router.refresh();

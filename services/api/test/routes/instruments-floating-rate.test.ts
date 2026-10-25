@@ -317,6 +317,43 @@ describe("PATCH /instruments/:id — floating-rate schedule, admin-gated", () =>
   });
 });
 
+describe("GET /instruments/:id — the stored schedule is validated on the way out", () => {
+  it("degrades a malformed stored schedule to no schedule instead of returning it raw", async () => {
+    const t = await token("fr-read-1");
+    const created = await app.inject({
+      method: "POST",
+      url: "/instruments",
+      headers: auth(t),
+      payload: {
+        symbol: "FR-MALFORMED",
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        name: "FR-MALFORMED",
+        couponRateSchedule: SCHEDULE,
+      },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+
+    // A row written straight into the DB (or by an older shape) can hold anything —
+    // `coupon_rate_schedule` is untyped jsonb.
+    await app.db.execute(
+      `UPDATE instruments SET coupon_rate_schedule = '{"floorRate":"0.0675"}'::jsonb WHERE symbol = 'FR-MALFORMED'`,
+    );
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/instruments/${created.json().id}`,
+      headers: auth(t),
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    // The malformed schedule is dropped, not handed to the client — and the read does
+    // not fail either.
+    expect(res.json().couponRateSchedule).toBeNull();
+  });
+});
+
 describe("GET /portfolios/:id/income — floating-rate forecast coupons", () => {
   let t: string;
   let pf: string;

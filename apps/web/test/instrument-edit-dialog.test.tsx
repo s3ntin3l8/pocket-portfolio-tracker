@@ -227,6 +227,20 @@ describe("InstrumentEditDialog", () => {
       );
     });
 
+    it("blocks the save when the draft is unusable, instead of clearing the shared schedule", async () => {
+      renderDialog(BOND);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      // An empty floor rate makes the draft unconvertible.
+      fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalled());
+      expect(toast.error).toHaveBeenCalledWith(tb.issue.floorMissing);
+      // The schedule is shared reference data — an unusable draft must never be sent
+      // as `null`, which would delete it for every holder of the series.
+      expect(updateInstrument).not.toHaveBeenCalled();
+    });
+
     it("leaves the schedule alone for a bond that has none", async () => {
       const fixed = { ...BOND, couponRateSchedule: null } as Instrument;
       renderDialog(fixed);

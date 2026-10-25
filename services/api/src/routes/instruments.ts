@@ -11,6 +11,7 @@ import {
 } from "@portfolio/schema";
 import {
   findOrCreateInstrument,
+  parseCouponRateSchedule,
   setManualPrice,
   updateInstrument,
 } from "../services/instruments.js";
@@ -195,7 +196,10 @@ export async function instrumentsRoute(app: FastifyInstance) {
       request.timingName = "GET /instruments/:id";
       request.timingMeta = { instrumentId: request.params.id };
       if (!inst) return reply.code(404).send({ error: "instrument_not_found" });
-      return inst;
+      // The coupon-rate schedule is untyped jsonb (see instruments.coupon_rate_schedule):
+      // validate it on the way out so a malformed row degrades to "no schedule" instead
+      // of reaching the client as an arbitrary object.
+      return { ...inst, couponRateSchedule: parseCouponRateSchedule(inst.couponRateSchedule) };
     },
   );
 

@@ -1195,7 +1195,6 @@
     "ratePeriodRate": "Rate % per tahun",
     "addRatePeriod": "Tambah periode",
     "removeRatePeriod": "Hapus periode",
-    "effectiveRateLabel": "Suku bunga efektif hari ini",
     "floatingBadge": "mengambang",
     "issue": {
       "floorMissing": "Masukkan suku bunga dasar dalam persen (mis. 6,75).",

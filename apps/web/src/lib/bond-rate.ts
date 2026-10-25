@@ -1,4 +1,5 @@
 import type { BondCouponRateSchedule } from "@portfolio/api-client";
+import { couponRateForDate, type BondPosition } from "@portfolio/core";
 import { fractionToPercent, percentToFraction } from "./tax-rate";
 
 /**
@@ -41,14 +42,30 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export type RateScheduleIssue =
   "floorMissing" | "noPeriods" | "periodIncomplete" | "periodOverlaps" | null;
 
+/**
+ * The stored schedule, guarded.
+ *
+ * `instruments.coupon_rate_schedule` is untyped jsonb and the API's read path returns
+ * it as-is, so a malformed row must not throw here: the instrument page would 500
+ * instead of degrading to "no schedule". A schedule without a `periods` array is
+ * treated as no schedule at all.
+ */
+function safeSchedule(
+  schedule: BondCouponRateSchedule | null | undefined,
+): BondCouponRateSchedule | null {
+  if (!schedule || !Array.isArray(schedule.periods)) return null;
+  return schedule;
+}
+
 /** The stored schedule → the editable draft. Rates become percent strings. */
 export function rateScheduleToDraft(
   schedule: BondCouponRateSchedule | null | undefined,
 ): RateScheduleDraft {
-  if (!schedule) return { ...EMPTY_RATE_SCHEDULE_DRAFT, periods: [] };
+  const safe = safeSchedule(schedule);
+  if (!safe) return { ...EMPTY_RATE_SCHEDULE_DRAFT, periods: [] };
   return {
-    floorRatePercent: fractionToPercent(schedule.floorRate),
-    periods: schedule.periods.map((p) => ({
+    floorRatePercent: fractionToPercent(safe.floorRate),
+    periods: safe.periods.map((p) => ({
       from: p.from,
       to: p.to ?? "",
       ratePercent: fractionToPercent(p.rate),
@@ -112,17 +129,33 @@ export function rateScheduleDraftToApi(
 }
 
 /**
+ * The core resolver only reads the two rate fields, so a schedule-only position is
+ * enough here: the flat `couponRate` is empty, which means the resolver returns the
+ * announced period's rate or the floor — never a flat rate this display doesn't have.
+ */
+const SCHEDULE_ONLY_POSITION: BondPosition = {
+  instrumentId: "",
+  symbol: "",
+  quantity: "0",
+  faceValue: "0",
+  couponRate: "",
+  couponSchedule: null,
+  maturityDate: "",
+  currency: "",
+};
+
+/**
  * The rate that applies on a given day, for the *display* of a floating bond's current
- * terms. Same precedence as the projection: the announced period containing the day →
- * the floor.
+ * terms.
+ *
+ * This is the SAME resolution the projection uses — `couponRateForDate()` in
+ * @portfolio/core, not a second copy of the precedence rule.
  */
 export function effectiveRateForDate(
   schedule: BondCouponRateSchedule | null | undefined,
   dateKey: string,
 ): string | null {
-  if (!schedule) return null;
-  for (const p of schedule.periods) {
-    if (p.from <= dateKey && (p.to == null || dateKey < p.to)) return p.rate;
-  }
-  return schedule.floorRate || null;
+  const safe = safeSchedule(schedule);
+  if (!safe) return null;
+  return couponRateForDate({ ...SCHEDULE_ONLY_POSITION, couponRateSchedule: safe }, dateKey);
 }
