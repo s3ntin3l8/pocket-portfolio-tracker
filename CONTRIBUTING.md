@@ -74,9 +74,11 @@ npm run build
 Skipping it is the classic "column does not exist" / "cannot find module" failure — the
 compiled `dist/` and the checked-out migrations have to agree.)
 
-In CI the run additionally writes an HTML report to `apps/web/playwright-report/`. A run that
-does not succeed uploads it, together with the failure traces, as the `playwright-report`
-artifact — so a failed or timed-out job still leaves you the diagnostics.
+In CI the run additionally writes an HTML report to `apps/web/playwright-report/`, and every
+completed run uploads it — together with the failure traces — as the `playwright-report`
+artifact. The `e2e` step has its own 20-minute timeout (under the job's 30), so a hung
+suite fails that step instead of being cancelled: the job continues and the diagnostics
+are still uploaded.
 
 ## Branching
 
