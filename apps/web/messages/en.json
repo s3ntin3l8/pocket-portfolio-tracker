@@ -76,12 +76,11 @@
     "settings": "Settings",
     "admin": "Admin",
     "signOut": "Sign out",
-    "trades": "Trades",
+    "trades": "Realized P&L",
     "tax": "Tax",
     "activity": "Activity",
     "reports": "Reports",
     "insights": "Insights",
-    "profile": "Profile",
     "netWorth": "Net worth",
     "allTime": "all-time",
     "version": "Version {version} — release notes"

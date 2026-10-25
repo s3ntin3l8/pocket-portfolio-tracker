@@ -1,8 +1,10 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LineChart } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { DataState } from "@/components/data-state";
+import { BackLink } from "@/components/back-button";
 import { retryAfterOf } from "@/lib/data-status";
 import { InstrumentFundamentalsCard } from "@/components/instrument-fundamentals-card";
 import { InstrumentManualPriceCard } from "@/components/instrument-manual-price-card";
@@ -14,7 +16,7 @@ import {
   startInstrumentLoads,
   type InstrumentTxFilters,
 } from "@/components/instrument/instrument-data";
-import { InstrumentBackButton, InstrumentHeader } from "@/components/instrument/instrument-header";
+import { InstrumentHeader } from "@/components/instrument/instrument-header";
 import {
   InstrumentPriceSection,
   InstrumentLotsSection,
@@ -28,8 +30,66 @@ import {
   InstrumentTransactionsSkeleton,
 } from "@/components/instrument/instrument-skeletons";
 import { PageRail, PageWithRail } from "@/components/page-with-rail";
+import { routing } from "@/i18n/routing";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
+
+/**
+ * The app routes an instrument can be opened from (the holdings, income, transactions and
+ * trades tables, plus wherever the global search was opened). The `Referer` header is
+ * user-controlled, so only these known routes are accepted as a back target — the target
+ * is rebuilt from the matched route, never taken verbatim from the header, so the link
+ * can never leave the app.
+ */
+const BACK_TARGET_ROUTES = [
+  "/holdings",
+  "/dashboard",
+  "/transactions",
+  "/trades",
+  "/income",
+  "/reports",
+  "/insights",
+  "/tax",
+  "/savings",
+  "/settings",
+  "/portfolios",
+  "/admin",
+  "/corporate-actions",
+] as const;
+
+/** Where "Back" goes without a usable referrer: the tab that owns /instruments. */
+const DEFAULT_BACK_TARGET = "/holdings";
+
+/** The referring route's path (locale prefix stripped), or null when there is none. */
+function referringPath(referer: string | null | undefined): string | null {
+  if (!referer) return null;
+  let pathname: string;
+  try {
+    // The base only matters for a bare path (and normalizes ".."); an absolute referer
+    // ignores it.
+    pathname = new URL(referer, "http://referrer.invalid").pathname;
+  } catch {
+    return null;
+  }
+  const segments = pathname.split("/").filter(Boolean);
+  // Strip the locale prefix (/en/trades → /trades).
+  const locales = routing.locales as readonly string[];
+  if (segments.length > 1 && locales.includes(segments[0])) segments.shift();
+  return segments.length ? "/" + segments.join("/") : null;
+}
+
+/**
+ * The instrument detail is reachable from four different tables, so "Back" returns to the
+ * route the instrument was actually opened from (the `Referer` header) instead of always
+ * to /holdings. A direct link (no referrer) or a referrer to a route the app does not
+ * have falls back to /holdings — the tab that owns /instruments (see `navActiveKey`).
+ */
+function backTargetFrom(referer: string | null | undefined): string {
+  const path = referringPath(referer);
+  if (!path) return DEFAULT_BACK_TARGET;
+  const known = BACK_TARGET_ROUTES.some((route) => path === route || path.startsWith(route + "/"));
+  return known ? path : DEFAULT_BACK_TARGET;
+}
 
 export default async function InstrumentPage({
   params,
@@ -59,6 +119,15 @@ export default async function InstrumentPage({
     status: sp?.status === "draft" ? "draft" : undefined,
   };
 
+  // "Back" follows the route the instrument was opened from (the table the user clicked
+  // through); without a referrer it falls back to /holdings.
+  let backTarget = DEFAULT_BACK_TARGET;
+  try {
+    backTarget = backTargetFrom((await headers()).get("referer"));
+  } catch {
+    // No request context (e.g. a build-time render) — keep the default.
+  }
+
   // Blocking path: only what decides WHICH page this is (not found / error / instrument).
   // Every loader the streamed sections need is started NOW (not awaited) so they overlap
   // with this gate instead of waterfalling after it; each section then awaits its own
@@ -82,7 +151,7 @@ export default async function InstrumentPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <InstrumentBackButton className="md:flex" />
+          <BackLink href={backTarget} className="md:flex" />
         </div>
         <EmptyState icon={LineChart} title={t("notFound")} description={t("notFoundBody")} />
       </div>
@@ -94,7 +163,7 @@ export default async function InstrumentPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <InstrumentBackButton className="md:flex" />
+          <BackLink href={backTarget} className="md:flex" />
         </div>
         <DataState status={instrumentResult.status} retryAfter={retryAfterOf(instrumentResult)} />
       </div>
@@ -115,9 +184,14 @@ export default async function InstrumentPage({
 
   return (
     <div className="space-y-6">
-      <PageHeaderSetter title={heroName} backHref="/holdings" />
+      <PageHeaderSetter title={heroName} backHref={backTarget} />
       <InstrumentVisitTracker id={id} symbol={instrument.symbol} />
-      <InstrumentHeader instrument={instrument} heroName={heroName} isAdmin={isAdmin} />
+      <InstrumentHeader
+        instrument={instrument}
+        heroName={heroName}
+        isAdmin={isAdmin}
+        backHref={backTarget}
+      />
 
       <PageWithRail size="narrow">
         {/* ── Main column: price chart + fundamentals + lots + transactions ──

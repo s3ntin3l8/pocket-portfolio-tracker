@@ -22,7 +22,7 @@ import type { LucideIcon } from "lucide-react";
  *  - Activity  (/transactions)  — the transaction ledger + imports
  *  - Reports   (/reports)       — Income · Realized P&L · Savings · Tax hub
  *  - Insights  (/insights)      — XIRR, rebalancing, concentration
- *  - Profile   (/settings)      — account, portfolios, holders, admin
+ *  - Settings  (/settings)      — account, portfolios, holders, admin
  */
 export type NavItem = { href: string; icon: LucideIcon; key: string };
 
@@ -31,7 +31,7 @@ export const MAIN_NAV: readonly NavItem[] = [
   { href: "/transactions", icon: List, key: "activity" },
   { href: "/reports", icon: FileText, key: "reports" },
   { href: "/insights", icon: LineChart, key: "insights" },
-  { href: "/settings", icon: User, key: "profile" },
+  { href: "/settings", icon: User, key: "settings" },
 ] as const;
 
 export const ADMIN_NAV: NavItem = {
@@ -60,6 +60,8 @@ export const COMMAND_PAGES: readonly CommandPage[] = [
   { href: "/insights", icon: LineChart, labelKey: "insights", chord: "i" },
   { href: "/income", icon: Coins, labelKey: "income" },
   { href: "/tax", icon: Receipt, labelKey: "tax" },
+  // The palette label is the page's own name — one concept, one name (the /trades page
+  // is titled "Realized P&L", so `Nav.trades` carries that name too).
   { href: "/trades", icon: ArrowLeftRight, labelKey: "trades" },
   { href: "/savings", icon: PiggyBank, labelKey: "savings" },
   { href: "/portfolios", icon: Briefcase, labelKey: "portfolios" },
@@ -88,6 +90,6 @@ export function navActiveKey(pathname: string): string {
     return "reports";
   if (under("/insights")) return "insights";
   if (under("/admin")) return "admin";
-  if (under("/settings") || under("/portfolios")) return "profile";
+  if (under("/settings") || under("/portfolios")) return "settings";
   return "holdings";
 }
