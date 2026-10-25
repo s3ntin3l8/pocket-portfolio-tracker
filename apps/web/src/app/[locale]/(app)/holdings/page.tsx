@@ -25,10 +25,14 @@ import {
   loadNetWorth,
   loadPreferences,
   loadMe,
-  loadAnomalies,
-  loadNetworthAnomalies,
+  loadScopeAnomalies,
 } from "@/lib/server-api";
-import { getScopeSelection, legacyScopeValue } from "@/lib/server-api/_shared";
+import {
+  getScopeSelection,
+  legacyScopeValue,
+  listPortfoliosCached,
+  resolveEffectiveScope,
+} from "@/lib/server-api/_shared";
 import { PageHeader } from "@/components/page-header";
 import { PageWithRail } from "@/components/page-with-rail";
 
@@ -82,6 +86,14 @@ export default async function HoldingsPage({
   const scope = await getScopeSelection();
   const portfolioId = scope.kind === "portfolio" ? scope.portfolioId : undefined;
 
+  // A holder scope only counts for a holder that owns ≥2 portfolios (the switcher's rule) —
+  // the same qualification every other scope-aware page applies. The positions table
+  // resolves it the same way (its loader falls back to the aggregate for a
+  // single-portfolio holder), so the anomalies have to be qualified identically: otherwise
+  // the banners on this page would show one scope's anomalies over another scope's rows.
+  const effectiveScope =
+    scope.kind === "holder" ? await resolveEffectiveScope(await listPortfoliosCached()) : scope;
+
   // Blocking path: only what decides WHICH page this is (error / empty / table) plus the
   // net-worth payload — loadHoldings and loadNetWorth share one cached API call. Everything
   // else (hero history, anomalies, `me`) is independent and streams in behind <Suspense>
@@ -93,7 +105,7 @@ export default async function HoldingsPage({
   // promise prop, the anomalies via their request-`cache()`d loaders (the section's own
   // call returns the same in-flight promise).
   const heroData = startHoldingsHeroData(rangeParam);
-  void (portfolioId ? loadAnomalies(portfolioId) : loadNetworthAnomalies());
+  void loadScopeAnomalies(effectiveScope);
   const prefs = await loadPreferences();
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
@@ -277,7 +289,7 @@ export default async function HoldingsPage({
         {/* ── Main column: anomaly banners + tabs + table ── */}
         <div className="space-y-5">
           <Suspense fallback={null}>
-            <HoldingsAnomalySection portfolioParam={portfolioId} locale={locale} />
+            <HoldingsAnomalySection scope={effectiveScope} locale={locale} />
           </Suspense>
 
           <PositionsPanel

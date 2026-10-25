@@ -172,6 +172,7 @@ function normalizeCostBasis(
   return costBasis ?? "purchase_price";
 }
 
+/** The user's portfolios, fetched once per request. */
 const listPortfoliosCached = cache(async (): Promise<Portfolio[]> => {
   const api = await getServerApi();
   if (!api) return [];

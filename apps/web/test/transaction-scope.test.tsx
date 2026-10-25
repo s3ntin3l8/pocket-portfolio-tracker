@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import messages from "../messages/en.json";
 
 /**
@@ -234,6 +236,20 @@ describe("resolveEffectiveScope", () => {
 
     h.requestHeaders = {};
     expect(await resolveEffectiveScope(h.portfolios)).toEqual({ kind: "all" });
+  });
+});
+
+describe("the Holdings page resolves its anomalies through the scope (audit R4-C2)", () => {
+  it("never falls back to the all-portfolios anomaly set on that page", () => {
+    const source = readFileSync(
+      path.resolve(__dirname, "../src/app/[locale]/(app)/holdings/page.tsx"),
+      "utf8",
+    );
+    // The positions table under a holder scope is holder-filtered, so the anomaly banners
+    // over them have to be the holder's anomalies too — the aggregate set would put a
+    // second scope on one screen. The scope-aware entry point is the only way to get it.
+    expect(source).toContain("loadScopeAnomalies(effectiveScope)");
+    expect(source).not.toContain("loadNetworthAnomalies");
   });
 });
 
