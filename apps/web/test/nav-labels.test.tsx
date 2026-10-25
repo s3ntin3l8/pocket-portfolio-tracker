@@ -149,6 +149,23 @@ describe("message catalogues", () => {
     expect(enKeys.has("Reports.scopeAll")).toBe(false);
     expect(idKeys.has("Reports.scopeAll")).toBe(false);
   });
+
+  it("names the report cards like the pages they link to", () => {
+    // The report card is a THIRD surface for the same concept (nav, page, card). Leaving
+    // it outside the guard is how a second name comes back — the Indonesian card title
+    // drifted to "Laba/Rugi Terealisasi" while the page and the nav said "P&L Terwujud".
+    for (const card of Object.keys(messages.Reports)) {
+      const cardValue = (messages.Reports as Record<string, unknown>)[card];
+      if (typeof cardValue !== "object" || cardValue === null) continue;
+      const title = (cardValue as { title?: unknown }).title;
+      if (typeof title !== "string") continue;
+      const pageTitle = (messages.Trades as Record<string, unknown>)[card];
+      if (typeof pageTitle !== "string") continue;
+      expect({ card, title }).toEqual({ card, title: pageTitle });
+    }
+    // The Indonesian card title is the same one the page uses.
+    expect(idMessages.Reports.trades.title).toBe(idMessages.Trades.title);
+  });
 });
 
 // ── The pages that carry the names ───────────────────────────────────────────────────

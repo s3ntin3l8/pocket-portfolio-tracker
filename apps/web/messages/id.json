@@ -100,7 +100,7 @@
       "tooltipForecast": "Perkiraan"
     },
     "trades": {
-      "title": "Laba/Rugi Terealisasi",
+      "title": "P&L Terwujud",
       "desc": "Transaksi tertutup & kinerja.",
       "trend": "{pct} tingkat menang",
       "caption": "Terealisasi tahun ini",
