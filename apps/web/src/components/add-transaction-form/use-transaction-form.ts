@@ -87,27 +87,77 @@ export interface AddTransactionInitial {
 const AUTO_BOOKED_LEG = /^loan:[^:]+:(inst:\d+|payoff)$/;
 
 /**
- * The control ids whose published validation message a field's setter drops.
+ * The form's fields: the API's input field name, the ids of the controls that carry the
+ * value, and which of them is on screen right now.
  *
- * A field can own more than one control (the tax rate is rendered twice — inline and in
- * the extras panel), so the list is per field, not per control.
+ * ONE table for both consumers — the setter that drops a published message and the
+ * mapping that publishes it. They drifted apart once: the tax rate is rendered twice
+ * (inline for an income, in the extras panel for a sale), and a message published onto
+ * the copy that was not on screen reached nobody at all.
  */
-const FIELD_ERROR_IDS = {
-  kind: ["tx-sub-type"],
-  currency: ["tx-currency"],
-  date: ["tx-date"],
-  quantity: ["tx-qty"],
-  price: ["tx-price"],
-  fees: ["tx-fees"],
-  tax: ["tx-tax", "tx-tax-extra"],
-  fxRate: ["tx-fx-rate"],
-  shares: ["tx-shares"],
-  perShare: ["tx-per-share"],
-  nativeCurrency: ["tx-native-currency"],
-  grossNative: ["tx-gross-native"],
-  description: ["tx-notes"],
-  tags: ["tx-tags"],
-} as const satisfies Record<string, readonly string[]>;
+type FieldControls = {
+  /** The API's input field name (see `transactionInputSchema`). */
+  api: string;
+  /** Every control id of the field — the setter drops the message on all of them. */
+  ids: readonly string[];
+  /**
+   * The control a message for this field belongs to: the one that is on screen.
+   * `null` when the form has no visible control for the field — the message then falls
+   * back to the generic banner instead of disappearing.
+   */
+  visible: (shown: ShownControls) => string | null;
+};
+
+/** The controls the form shows right now — what a field's visibility depends on. */
+type ShownControls = {
+  quantity: boolean;
+  fees: boolean;
+  tax: boolean;
+  inlineTax: boolean;
+};
+
+const FIELD_CONTROLS: Record<string, FieldControls> = {
+  kind: { api: "kind", ids: ["tx-sub-type"], visible: () => "tx-sub-type" },
+  currency: { api: "currency", ids: ["tx-currency"], visible: () => "tx-currency" },
+  date: { api: "executedAt", ids: ["tx-date"], visible: () => "tx-date" },
+  quantity: {
+    api: "quantity",
+    ids: ["tx-qty"],
+    visible: (shown) => (shown.quantity ? "tx-qty" : null),
+  },
+  price: { api: "price", ids: ["tx-price"], visible: () => "tx-price" },
+  fees: { api: "fees", ids: ["tx-fees"], visible: (shown) => (shown.fees ? "tx-fees" : null) },
+  tax: {
+    api: "tax",
+    ids: ["tx-tax", "tx-tax-extra"],
+    // The tax rate is rendered twice: inline for an income, in the extras panel for a
+    // sale. A type that withholds no tax (a deposit) has neither — and a message for a
+    // control that does not exist would reach nobody while the banner is suppressed.
+    visible: (shown) => (shown.inlineTax ? "tx-tax" : shown.tax ? "tx-tax-extra" : null),
+  },
+  fxRate: { api: "fxRate", ids: ["tx-fx-rate"], visible: () => "tx-fx-rate" },
+  shares: { api: "shares", ids: ["tx-shares"], visible: () => "tx-shares" },
+  perShare: { api: "perShare", ids: ["tx-per-share"], visible: () => "tx-per-share" },
+  nativeCurrency: {
+    api: "nativeCurrency",
+    ids: ["tx-native-currency"],
+    visible: () => "tx-native-currency",
+  },
+  grossNative: {
+    api: "grossNative",
+    ids: ["tx-gross-native"],
+    visible: () => "tx-gross-native",
+  },
+  description: { api: "description", ids: ["tx-notes"], visible: () => "tx-notes" },
+  tags: { api: "tags", ids: ["tx-tags"], visible: () => "tx-tags" },
+  loanId: { api: "loanId", ids: ["tx-loan"], visible: () => "tx-loan" },
+  installmentN: { api: "installmentN", ids: ["tx-installment"], visible: () => "tx-installment" },
+};
+
+/** The API's input field name → the field's control mapping. */
+const CONTROL_BY_API_FIELD = new Map(
+  Object.entries(FIELD_CONTROLS).map(([, field]) => [field.api, field]),
+);
 
 export function useTransactionForm({
   client,
@@ -267,20 +317,20 @@ export function useTransactionForm({
       for (const id of ids) clearFieldError(id);
     };
     return {
-      setKind: wrap(FIELD_ERROR_IDS.kind, setKind),
-      setCurrency: wrap(FIELD_ERROR_IDS.currency, setCurrency),
-      setDate: wrap(FIELD_ERROR_IDS.date, setDate),
-      setQuantity: wrap(FIELD_ERROR_IDS.quantity, setQuantity),
-      setPrice: wrap(FIELD_ERROR_IDS.price, setPrice),
-      setFees: wrap(FIELD_ERROR_IDS.fees, setFees),
-      setTax: wrap(FIELD_ERROR_IDS.tax, setTax),
-      setFxRate: wrap(FIELD_ERROR_IDS.fxRate, setFxRate),
-      setShares: wrap(FIELD_ERROR_IDS.shares, setShares),
-      setPerShare: wrap(FIELD_ERROR_IDS.perShare, setPerShare),
-      setNativeCurrency: wrap(FIELD_ERROR_IDS.nativeCurrency, setNativeCurrency),
-      setGrossNative: wrap(FIELD_ERROR_IDS.grossNative, setGrossNative),
-      setDescription: wrap(FIELD_ERROR_IDS.description, setDescription),
-      setTags: wrap(FIELD_ERROR_IDS.tags, setTags),
+      setKind: wrap(FIELD_CONTROLS.kind.ids, setKind),
+      setCurrency: wrap(FIELD_CONTROLS.currency.ids, setCurrency),
+      setDate: wrap(FIELD_CONTROLS.date.ids, setDate),
+      setQuantity: wrap(FIELD_CONTROLS.quantity.ids, setQuantity),
+      setPrice: wrap(FIELD_CONTROLS.price.ids, setPrice),
+      setFees: wrap(FIELD_CONTROLS.fees.ids, setFees),
+      setTax: wrap(FIELD_CONTROLS.tax.ids, setTax),
+      setFxRate: wrap(FIELD_CONTROLS.fxRate.ids, setFxRate),
+      setShares: wrap(FIELD_CONTROLS.shares.ids, setShares),
+      setPerShare: wrap(FIELD_CONTROLS.perShare.ids, setPerShare),
+      setNativeCurrency: wrap(FIELD_CONTROLS.nativeCurrency.ids, setNativeCurrency),
+      setGrossNative: wrap(FIELD_CONTROLS.grossNative.ids, setGrossNative),
+      setDescription: wrap(FIELD_CONTROLS.description.ids, setDescription),
+      setTags: wrap(FIELD_CONTROLS.tags.ids, setTags),
     };
   }, [
     setKind,
@@ -527,48 +577,18 @@ export function useTransactionForm({
 
   /**
    * The API's input field names (see `transactionInputSchema`) → the ids of the form's
-   * controls. `null` means the form has no control for that field, so its message falls
-   * back to the generic banner instead of disappearing.
+   * controls. `null` means the form has no visible control for that field, so its message
+   * falls back to the generic banner instead of disappearing.
    */
   function fieldIdFor(apiField: string): string | null {
-    switch (apiField) {
-      case "quantity":
-        return showQuantity ? "tx-qty" : null;
-      case "price":
-        return "tx-price";
-      case "fees":
-        return showFees ? "tx-fees" : null;
-      case "tax":
-        // The inline tax field (income) and the one behind the "fees / tax" disclosure
-        // are two controls for the same value.
-        return showInlineTax ? "tx-tax" : "tx-tax-extra";
-      case "currency":
-        return "tx-currency";
-      case "executedAt":
-        return "tx-date";
-      case "description":
-        return "tx-notes";
-      case "tags":
-        return "tx-tags";
-      case "fxRate":
-        return "tx-fx-rate";
-      case "perShare":
-        return "tx-per-share";
-      case "shares":
-        return "tx-shares";
-      case "nativeCurrency":
-        return "tx-native-currency";
-      case "grossNative":
-        return "tx-gross-native";
-      case "kind":
-        return "tx-sub-type";
-      case "loanId":
-        return "tx-loan";
-      case "installmentN":
-        return "tx-installment";
-      default:
-        return null;
-    }
+    const field = CONTROL_BY_API_FIELD.get(apiField);
+    if (!field) return null;
+    return field.visible({
+      quantity: showQuantity,
+      fees: showFees,
+      tax: showTax,
+      inlineTax: showInlineTax,
+    });
   }
 
   /** Open the disclosure that hides an offending field, so its message is visible. */

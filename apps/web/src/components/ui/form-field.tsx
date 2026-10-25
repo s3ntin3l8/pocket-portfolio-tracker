@@ -22,9 +22,18 @@ import { cn } from "@/lib/utils";
 let published: Readonly<Record<string, string>> = {};
 const subscribers = new Set<() => void>();
 
+/**
+ * The control that should take the focus after a failed submit — the first field the
+ * user has to fix. It is set when the messages are published and stays put while the user
+ * works through them: a message that is dropped (the field was edited) must not move the
+ * focus to the next field while the user is still typing in the first one.
+ */
+let focusTarget: string | null = null;
+
 /** Publish the field-level messages of the form that is currently mounted. */
 export function publishFieldErrors(errors: Readonly<Record<string, string>>): void {
   published = errors;
+  focusTarget = Object.keys(errors)[0] ?? null;
   for (const notify of [...subscribers]) notify();
 }
 
@@ -33,12 +42,16 @@ export function clearFieldError(id: string): void {
   if (!(id in published)) return;
   const next = { ...published };
   delete next[id];
-  publishFieldErrors(next);
+  published = next;
+  // The focus target stays where it is — see `focusTarget`.
+  for (const notify of [...subscribers]) notify();
 }
 
 /** Drop every published message (a successful submit, or an unmounted form). */
 export function clearFieldErrors(): void {
-  publishFieldErrors({});
+  published = {};
+  focusTarget = null;
+  for (const notify of [...subscribers]) notify();
 }
 
 /** The message published for one control id, if any. */
@@ -49,6 +62,20 @@ export function useFieldError(id: string): string | undefined {
     subscribe,
     () => published[id],
     () => undefined,
+  );
+}
+
+/**
+ * Whether this control is the one that takes the focus after a failed submit.
+ *
+ * A failed submit leaves the focus on the button that was pressed; without this, a
+ * screen-reader user is never told that the submit failed.
+ */
+export function useIsFocusTarget(id: string): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => focusTarget === id,
+    () => false,
   );
 }
 
@@ -80,6 +107,14 @@ function withInvalidState(children: React.ReactNode, messageId: string): React.R
   return Array.isArray(children) ? next : next[0];
 }
 
+/**
+ * The control a field's message belongs to: the first focusable control inside the
+ * field. A composite control (the date picker's button) is the one the user can reach,
+ * so it wins over the hidden input behind it.
+ */
+const FOCUSABLE_CONTROL =
+  'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])';
+
 export function FormField({
   id,
   label,
@@ -96,14 +131,27 @@ export function FormField({
   // There is exactly one channel: a second, prop-based one would be a path nothing
   // publishes to.
   const message = useFieldError(id) ?? null;
+  const isFocusTarget = useIsFocusTarget(id);
   const messageId = `${id}-error`;
+  const fieldRef = React.useRef<HTMLDivElement>(null);
+
+  // A failed submit leaves the focus on the submit button. Move it to the first field
+  // that has to be fixed, so the failure is not silent for a keyboard or screen-reader
+  // user — the message is announced (it is a live region) and the control is reached.
+  React.useEffect(() => {
+    if (!message || !isFocusTarget) return;
+    const control = fieldRef.current?.querySelector<HTMLElement>(FOCUSABLE_CONTROL);
+    control?.focus();
+  }, [id, message, isFocusTarget]);
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div ref={fieldRef} className={cn("space-y-1.5", className)}>
       <Label htmlFor={id}>{label}</Label>
       {message ? withInvalidState(children, messageId) : children}
       {message && (
-        <p id={messageId} className="text-xs font-medium text-destructive-strong">
+        // A live region: the message is announced when it appears, which is what makes
+        // a field-level failure perceivable now that the generic banner is suppressed.
+        <p id={messageId} role="alert" className="text-xs font-medium text-destructive-strong">
           {message}
         </p>
       )}
