@@ -6,6 +6,7 @@ import {
   type AddTransactionClient,
 } from "../src/components/add-transaction-form";
 import { ApiError, type Instrument, type SourceSummary } from "@portfolio/api-client";
+import { useTransactionForm } from "../src/components/add-transaction-form/use-transaction-form";
 import messages from "../messages/en.json";
 
 const getSourceDocumentUrl = vi.fn(async () => ({
@@ -244,6 +245,157 @@ describe("AddTransactionForm", () => {
     expect(await screen.findByText(m.symbolRequired)).toBeInTheDocument();
     expect(client.createInstrument).not.toHaveBeenCalled();
     expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it("shows the API's field-level validation message on the offending field", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "Bank Central Asia" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The message sits under the price field, and the field announces that it is invalid.
+    const price = await screen.findByLabelText(m.price);
+    await waitFor(() => expect(price).toHaveAttribute("aria-invalid", "true"));
+    const describedBy = price.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const message = describedBy ? document.getElementById(describedBy) : null;
+    expect(message).toHaveTextContent("Expected a decimal string");
+    // A field-level failure replaces the generic banner — the field says it all.
+    expect(screen.queryByText(m.error)).toBeNull();
+  });
+
+  it("clears a field's validation message once the field is edited", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    expect(await screen.findByText("Expected a decimal string")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9600" } });
+    await waitFor(() => expect(screen.queryByText("Expected a decimal string")).toBeNull());
+  });
+
+  it("keeps the generic banner for a validation issue the form has no field for", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["type"], message: "Invalid enum value" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    expect(await screen.findByText(m.error)).toBeInTheDocument();
+  });
+
+  it("keeps the generic banner for a tax issue on a form that shows no tax control", async () => {
+    // A cash deposit withholds no tax, so the form has no tax control at all. The tax
+    // value is still submitted (a legacy deposit may carry one), so the API can answer
+    // with a tax issue — and a message published onto a control that is not on screen
+    // reaches nobody while the banner is suppressed. The failure has to be visible.
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["tax"], message: "Tax must not be negative" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    selectBucket(messages.Manage.tx.bucketCash);
+    expect(screen.queryByLabelText(m.tax)).toBeNull();
+    fireEvent.change(screen.getByLabelText(m.amount), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The generic banner carries the failure — the field-level path cannot.
+    expect(await screen.findByText(m.error)).toBeInTheDocument();
+  });
+
+  it("announces a field-level failure and puts the focus on the offending control", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The message is a live region: it is announced when it appears.
+    const message = await screen.findByText("Expected a decimal string");
+    expect(message).toHaveAttribute("role", "alert");
+    // And the focus moves to the control that has to be fixed — the submit button keeps
+    // it otherwise, which tells a screen-reader user nothing.
+    const price = screen.getByLabelText(m.price);
+    await waitFor(() => expect(price).toHaveFocus());
   });
 
   it("records a cash deposit without an instrument", async () => {
@@ -1418,5 +1570,43 @@ describe("AddTransactionForm — the debounced instrument lookup", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * The field setters the form exposes also drop the published validation message for the
+ * field they belong to. They are wrapped, so their identity has to survive a render —
+ * a child effect keyed on one of them must not re-run on every render.
+ */
+describe("the form's field setters", () => {
+  it("keep their identity between renders", () => {
+    // One identity per setter, per render — collected per render, so the assertion is
+    // about the property (the identity survives a render) and not about how many times
+    // React happens to render.
+    const byRender: Array<Array<unknown>> = [];
+
+    function Probe({ tick }: { tick: number }) {
+      const form = useTransactionForm({ client: makeClient(), portfolioId: "p1" });
+      byRender.push([form.setPrice, form.setQuantity, form.setTax]);
+      return <span>{tick}</span>;
+    }
+
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Probe tick={0} />
+      </NextIntlClientProvider>,
+    );
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Probe tick={1} />
+      </NextIntlClientProvider>,
+    );
+
+    const first = byRender[0];
+    const last = byRender[byRender.length - 1];
+    expect(first).toHaveLength(3);
+    // Three setters, two renders — one identity each.
+    expect(new Set(byRender.flat()).size).toBe(3);
+    expect(last).toEqual(first);
   });
 });

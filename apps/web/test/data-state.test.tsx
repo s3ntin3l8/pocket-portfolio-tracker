@@ -20,6 +20,17 @@ function renderState(props: React.ComponentProps<typeof DataState>) {
 
 beforeEach(() => {
   refresh.mockReset();
+  // The unavailable state probes the API's health endpoint on mount. A pending stub
+  // keeps the synchronous tests free of an out-of-act state update; the probe's own
+  // tests replace it with an answering stub.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => new Promise(() => {})),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("DataState", () => {
@@ -47,6 +58,35 @@ describe("DataState", () => {
     expect(screen.getByText(messages.Empty.unavailableTitle)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: messages.DataState.retry }));
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports our own API as the responder of the health probe", async () => {
+    const fetchMock = vi.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ status: "healthy", service: "pocket-api" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    renderState({ status: "unavailable" });
+
+    expect(await screen.findByText(/service=pocket-api/)).toBeInTheDocument();
+    // The probe goes through the same-origin proxy, never straight to the API's address.
+    expect(fetchMock).toHaveBeenCalledWith("/api/backend/health", expect.anything());
+  });
+
+  it("reports a foreign responder on the API's port", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        status: 200,
+        text: async () => JSON.stringify({ status: "healthy", service: "some-other-app" }),
+      })),
+    );
+    renderState({ status: "unavailable" });
+
+    // Not our API: the port is shadowed, which is what the empty request log means.
+    expect(
+      await screen.findByText(/service=some-other-app \(expected pocket-api\)/),
+    ).toBeInTheDocument();
   });
 
   it("renders unauthorized as a session-expired state, not 'can't reach the API'", () => {

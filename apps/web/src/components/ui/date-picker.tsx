@@ -22,7 +22,21 @@ type DatePickerProps = Omit<
  * so existing getByLabelText + fireEvent.change tests keep working unchanged.
  */
 export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(function DatePicker(
-  { value, onChange, className, id, disabled, label, ...rest },
+  {
+    value,
+    onChange,
+    className,
+    id,
+    disabled,
+    label,
+    // The description belongs to the control the user actually reaches — the button. The
+    // hidden input behind it is out of the tab order, so a message that points only
+    // there is never announced. `aria-invalid` stays on the input: it is the real form
+    // field, and the attribute is not supported on a button.
+    "aria-invalid": ariaInvalid,
+    "aria-describedby": ariaDescribedBy,
+    ...rest
+  },
   ref,
 ) {
   const t = useTranslations("Common");
@@ -65,6 +79,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
       <button
         type="button"
         aria-label={buttonAriaLabel}
+        aria-describedby={ariaDescribedBy}
         disabled={disabled}
         onClick={open}
         className={cn(
@@ -92,6 +107,8 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
         onChange={onChange}
         disabled={disabled}
         tabIndex={-1}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-base pointer-events-auto [@media(pointer:fine)]:sr-only [@media(pointer:fine)]:pointer-events-none"
         {...rest}
       />

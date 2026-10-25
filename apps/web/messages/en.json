@@ -2617,7 +2617,11 @@
     "signIn": "Sign in",
     "rateLimitedTitle": "Too many requests",
     "rateLimitedBody": "The server asked us to slow down. You can retry in {seconds} seconds.",
-    "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry."
+    "rateLimitedBodyNoTime": "The server asked us to slow down. Wait a moment, then retry.",
+    "healthProbe": "health: {path} \u2192 HTTP {status}",
+    "healthProbeService": "health: {path} \u2192 HTTP {status}, service={service}",
+    "healthProbeForeign": "health: {path} \u2192 HTTP {status}, service={service} (expected {expected})",
+    "healthProbeNoResponse": "health: {path} \u2192 no response"
   },
   "FxMissing": {
     "title": "Exchange rate missing.",

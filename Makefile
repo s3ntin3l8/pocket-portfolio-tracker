@@ -87,9 +87,21 @@ prod-logs: ## Follow logs from the production stack
 prod-ps: ## Show production stack container status (plain `docker compose ps` here only shows the dev stack)
 	$(COMPOSE_PROD) ps
 
+# The API binds 127.0.0.1 in local dev (HOST), so a service that squats on the loopback
+# address cannot shadow it: a more specific bind wins over the API's own *:3000, and the
+# app then talks to the wrong server — every page says "Can't reach the API" while the
+# API's request log stays empty (the requests never arrived). Production keeps 0.0.0.0:
+# the container network is the boundary there. `turbo.json` declares HOST in the dev
+# task's `env`, so turbo's env filter forwards it (it only forwards declared vars).
 dev: web-env ## Start all dev servers (API + web via Turbo)
+	@if lsof -nP -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1 || fuser 3000/tcp >/dev/null 2>&1; then \
+		echo "error: port 3000 is already in use — the API cannot bind it."; \
+		echo "Free it, then re-run 'make dev':"; \
+		echo "    lsof -ti:3000 | xargs kill        # or: fuser -k 3000/tcp"; \
+		exit 1; \
+	fi
 	fuser -k 3005/tcp 2>/dev/null || true
-	npm run dev
+	HOST=127.0.0.1 npm run dev
 
 dev-web: web-env ## Start only the web app dev server (mock data, no API needed)
 	fuser -k 3005/tcp 2>/dev/null || true

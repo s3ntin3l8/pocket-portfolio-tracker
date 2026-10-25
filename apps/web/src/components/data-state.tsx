@@ -3,6 +3,7 @@ import { Clock, LockKeyhole, ServerCrash, type LucideIcon } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { EmptyState } from "@/components/empty-state";
 import { DataStateRetry } from "@/components/data-state-retry";
+import { ApiHealthProbe } from "@/components/api-health-probe";
 import { Button } from "@/components/ui/button";
 
 export type DataStateStatus = "empty" | "unauthorized" | "rate_limited" | "unavailable";
@@ -89,7 +90,15 @@ export function DataState(props: DataStateProps) {
       icon={ServerCrash}
       title={t("unavailableTitle")}
       description={t("unavailableBody")}
-      action={<DataStateRetry />}
+      action={
+        <div className="flex flex-col items-center gap-2">
+          <DataStateRetry />
+          {/* Extra diagnostic: what answered the API's health endpoint? A foreign service
+              on the API's port is the difference between "the API is down" and "the
+              request went somewhere else" — the empty request log is the other tell. */}
+          <ApiHealthProbe />
+        </div>
+      }
     />
   );
 }

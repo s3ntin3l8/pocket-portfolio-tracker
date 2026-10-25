@@ -2617,7 +2617,11 @@
     "signIn": "Masuk",
     "rateLimitedTitle": "Terlalu banyak permintaan",
     "rateLimitedBody": "Server meminta kami melambat. Anda dapat mencoba lagi dalam {seconds} detik.",
-    "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi."
+    "rateLimitedBodyNoTime": "Server meminta kami melambat. Tunggu sebentar, lalu coba lagi.",
+    "healthProbe": "health: {path} \u2192 HTTP {status}",
+    "healthProbeService": "health: {path} \u2192 HTTP {status}, service={service}",
+    "healthProbeForeign": "health: {path} \u2192 HTTP {status}, service={service} (diharapkan {expected})",
+    "healthProbeNoResponse": "health: {path} \u2192 tidak ada respons"
   },
   "FxMissing": {
     "title": "Kurs tidak tersedia.",
