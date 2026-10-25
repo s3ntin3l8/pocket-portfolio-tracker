@@ -1968,6 +1968,7 @@
   "Trades": {
     "title": "P&L Terwujud",
     "subtitle": "Posisi tertutup & kinerja",
+    "methodGroup": "Metode basis biaya",
     "methodAverage": "Biaya rata-rata",
     "methodFifo": "FIFO",
     "filter_all": "Semua",

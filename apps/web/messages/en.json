@@ -1968,6 +1968,7 @@
   "Trades": {
     "title": "Realized P&L",
     "subtitle": "Closed trades & performance",
+    "methodGroup": "Cost basis method",
     "methodAverage": "Average cost",
     "methodFifo": "FIFO",
     "filter_all": "All",

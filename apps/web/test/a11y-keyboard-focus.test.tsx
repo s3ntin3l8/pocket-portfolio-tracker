@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
+import idMessages from "../messages/id.json";
 import {
   AddTransactionForm,
   type AddTransactionClient,
@@ -236,5 +239,25 @@ describe("route transition", () => {
     expect(document.activeElement).toBe(heading);
     // A heading is not focusable by default — the transition adds tabindex="-1".
     expect(heading).toHaveAttribute("tabindex", "-1");
+  });
+});
+
+/**
+ * The cost-basis radio group's items are named ("Average cost" / "FIFO"), but the GROUP
+ * needs a name of its own — an unnamed `radiogroup` is the first thing a screen reader
+ * meets when it lands on the control.
+ */
+describe("the cost-basis radio group is named at its call site", () => {
+  it("the trades page passes the group's accessible name", () => {
+    const source = readFileSync(
+      path.resolve(__dirname, "../src/app/[locale]/(app)/trades/page.tsx"),
+      "utf8",
+    );
+    expect(source).toContain('aria-label={t("methodGroup")}');
+  });
+
+  it("the name exists in both catalogues", () => {
+    expect(messages.Trades.methodGroup).toBeTruthy();
+    expect(idMessages.Trades.methodGroup).toBeTruthy();
   });
 });
