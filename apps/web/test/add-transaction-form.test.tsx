@@ -1345,4 +1345,54 @@ describe("AddTransactionForm — floating-rate bond terms", () => {
     expect(client.createInstrument).not.toHaveBeenCalled();
     expect(client.createTransaction).not.toHaveBeenCalled();
   });
+
+  it("does not demand a rate schedule when a SAVED instrument is selected", async () => {
+    // The floating-rate draft only matters when a NEW instrument is created from it. A
+    // picked instrument keeps the schedule it was created with, so an empty draft must
+    // not block an ordinary trade — the guard has to ask the same question the payload
+    // does.
+    const savedBond: Instrument = {
+      ...INSTRUMENT,
+      id: "sbr1",
+      symbol: "SBR015T2",
+      market: "IDX",
+      assetClass: "bond",
+      unit: "units",
+      name: "SBR015T2",
+      faceValue: "1000000",
+      couponSchedule: "monthly",
+      maturityDate: "2028-07-10",
+    };
+    const client = makeClient({
+      searchInstruments: vi.fn(async () => [savedBond]),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    // The floating toggle is on, but no schedule is filled in.
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+
+    // …and then a saved instrument is picked. No instrument is created, so no schedule
+    // is sent — the half-filled draft is irrelevant on this path.
+    fireEvent.change(screen.getByLabelText(m.search), { target: { value: "sbr" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /SBR015T2/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /SBR015T2/ }));
+
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createTransaction).toHaveBeenCalled());
+    expect(client.createInstrument).not.toHaveBeenCalled();
+    expect(client.createTransaction).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({ instrumentId: "sbr1" }),
+    );
+  });
 });

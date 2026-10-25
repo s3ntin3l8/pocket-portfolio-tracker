@@ -120,7 +120,8 @@ export function validateRateScheduleDraft(draft: RateScheduleDraft): RateSchedul
  * produced, and an unusable draft only ever carries its reason.
  */
 export type RateScheduleCheck =
-  { ok: true; schedule: BondCouponRateSchedule } | { ok: false; issue: RateScheduleIssue };
+  | { ok: true; schedule: BondCouponRateSchedule }
+  | { ok: false; issue: Exclude<RateScheduleIssue, null> };
 
 /**
  * The editable draft → the API payload, or the reason the draft is not usable yet.

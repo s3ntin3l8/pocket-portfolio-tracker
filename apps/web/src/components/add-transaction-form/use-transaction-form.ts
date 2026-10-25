@@ -369,6 +369,14 @@ export function useTransactionForm({
     setDiscovered([]);
   }
 
+  // A floating-rate schedule is only ever SENT when a NEW instrument is created from the
+  // custom panel. A picked, already-saved instrument keeps the schedule it was created
+  // with, and a cash transaction carries none — so on those paths the draft is
+  // irrelevant and must not block an ordinary trade. The guard below has to ask the
+  // same question the payload does.
+  const createsBondWithSchedule =
+    hasInstrument && !selected && assetClass === "bond" && floatingRate;
+
   async function resolveInstrumentId(
     bondSchedule?: BondCouponRateSchedule,
   ): Promise<string | null> {
@@ -402,7 +410,9 @@ export function useTransactionForm({
             faceValue: faceValue.trim() || undefined,
             // A floating-rate bond carries its rate in the schedule, not in a single
             // `couponRate` — sending both would leave the flat rate as a stale fallback.
-            ...(floatingRate
+            // The same condition the submit-time guard uses decides this branch, so the
+            // payload and the guard can never disagree.
+            ...(createsBondWithSchedule
               ? { couponRateSchedule: bondSchedule }
               : { couponRate: couponRatePercentToFraction(couponRatePercent) }),
             couponSchedule: couponSchedule as
@@ -431,7 +441,7 @@ export function useTransactionForm({
     // checked schedule is handed to `resolveInstrumentId` below, so the payload is
     // exactly the one the check produced.
     let bondSchedule: BondCouponRateSchedule | undefined;
-    if (assetClass === "bond" && floatingRate) {
+    if (createsBondWithSchedule) {
       const check = checkRateScheduleDraft(rateSchedule);
       if (!check.ok) {
         setError(tb(`issue.${check.issue}`));
