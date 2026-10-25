@@ -111,10 +111,11 @@ jobs:
       - name: Upload e2e artifacts
         # `!cancelled()` rather than `failure()`: the upload then also happens on
         # a successful run, which is useful — the HTML report of a green run is
-        # the quickest way to see which specs ran. It is deliberately NOT
-        # `always()`: on a cancelled job (including a job-level timeout) GitHub
-        # runs no further steps, so no condition can rescue the artifacts there.
-        # The step-level timeout above is what makes the timeout case covered.
+        # the quickest way to see which specs ran. `always()` would additionally
+        # upload on a run cancelled from outside (a newer push, a manual cancel),
+        # but those artifacts are noise. A job killed by its own `timeout-minutes`
+        # runs no further steps at all — which is what the step-level timeout
+        # above is there to avoid.
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
