@@ -21,7 +21,9 @@ interface PricingFieldsProps {
   showExtrasBtn: boolean;
   extrasLabelKey: string;
   feesLabelKey: string;
-  onOpenExtras: () => void;
+  /** Opens OR closes the extras panel — the disclosure advertises `aria-expanded`, so it
+   *  has to be able to collapse what it expanded. */
+  onToggleExtras: () => void;
   showFees: boolean;
   showTax: boolean;
   priceLabelKey: string;
@@ -54,7 +56,7 @@ export function PricingFields({
   showExtrasBtn,
   extrasLabelKey,
   feesLabelKey,
-  onOpenExtras,
+  onToggleExtras,
   showFees,
   showTax,
   priceLabelKey,
@@ -115,11 +117,13 @@ export function PricingFields({
 
       {/* The disclosure stays mounted while the panel is open, so its open/closed state is
           perceivable (the chevron rotates) — and the panel keeps its node (and its id)
-          either way, so `aria-controls` always points at an element that exists. */}
+          either way, so `aria-controls` always points at an element that exists. It is a
+          real toggle: a button that advertised `aria-expanded="true"` but could only
+          expand would be a control that lies about being operable. */}
       {(showExtrasBtn || showExtrasFields) && (
         <button
           type="button"
-          onClick={onOpenExtras}
+          onClick={onToggleExtras}
           aria-expanded={showExtrasFields}
           aria-controls="tx-extras-panel"
           className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-primary"

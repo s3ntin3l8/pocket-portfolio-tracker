@@ -170,7 +170,7 @@ export function AddTransactionForm({
         showExtrasBtn={form.showExtrasBtn}
         extrasLabelKey={form.extrasLabelKey}
         feesLabelKey={form.feesLabelKey}
-        onOpenExtras={() => form.setExtrasOpen(true)}
+        onToggleExtras={() => form.setExtrasOpen(!form.extrasOpen)}
         showFees={form.showFees}
         showTax={form.showTax}
         priceLabelKey={form.priceLabel}

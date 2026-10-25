@@ -171,6 +171,23 @@ describe("add-transaction disclosures", () => {
     expect(controlledPanel(toggle)).toBeInTheDocument();
     expect(toggle.querySelector("svg")?.getAttribute("class")).toContain("rotate-90");
   });
+
+  it("collapses the fees/tax disclosure again — the button that says it is expanded must be able to close it", () => {
+    renderForm();
+
+    const toggle =
+      screen.queryByRole("button", { name: m.extrasFeesTax }) ??
+      screen.getByRole("button", { name: m.extrasFees });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // The disclosure stays mounted while open, so it has to be a real toggle: a button
+    // that advertises `aria-expanded="true"` and can only expand lies about being operable.
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle.querySelector("svg")?.getAttribute("class")).not.toContain("rotate-90");
+  });
 });
 
 describe("holder-type chips", () => {
