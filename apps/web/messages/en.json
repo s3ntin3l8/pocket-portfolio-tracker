@@ -2324,7 +2324,9 @@
       "save": "Save",
       "saving": "Saving…",
       "success": "Loss carry-forward saved",
-      "error": "Couldn't save. Please try again."
+      "error": "Couldn't save. Please try again.",
+      "loadError": "Couldn't load your loss carry-forward. The amounts below are unknown — nothing has been changed.",
+      "negativeIgnored": "Negative amounts aren't accepted — the amount is used as a positive figure."
     }
   },
   "Anomalies": {
