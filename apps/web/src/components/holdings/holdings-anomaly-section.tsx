@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { AlertCircle, AlertTriangle } from "lucide-react";
 import { ScopeLink } from "@/components/scope-link";
 import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
-import { loadAnomalies, loadNetworthAnomalies } from "@/lib/server-api";
+import { loadScopeAnomalies, type Scope } from "@/lib/server-api";
 import {
   rowAnomalyCounts,
   bannerAnomalies,
@@ -23,18 +23,12 @@ import {
  * apps/web/src/lib/utils.ts `isRowAnomaly` for why this is a transactionId partition, not a
  * hardcoded code list).
  */
-export async function HoldingsAnomalySection({
-  portfolioParam,
-  locale,
-}: {
-  portfolioParam?: string;
-  locale: string;
-}) {
-  // The aggregate net-worth anomaly endpoint when no single portfolio is selected — matches
-  // how Activity/Transactions loads anomalies for the all-portfolios view. Per-portfolio
-  // anomalies only work with a specific ID.
+export async function HoldingsAnomalySection({ scope, locale }: { scope: Scope; locale: string }) {
+  // The anomalies of the page's scope — one portfolio, one holder's portfolios, or the
+  // all-portfolios aggregate. The scope-aware entry point, so the banners here can never
+  // show a different scope's anomalies than the rows underneath them.
   const [anomalies, ta] = await Promise.all([
-    portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies(),
+    loadScopeAnomalies(scope),
     getTranslations("Anomalies"),
   ]);
 
@@ -74,7 +68,12 @@ export async function HoldingsAnomalySection({
       )}
       <ReconciliationBannerGroup
         items={standaloneAnomalies.map((a) =>
-          reconciliationItem(a, ta as AnomalyTranslator, locale, portfolioParam ?? undefined),
+          reconciliationItem(
+            a,
+            ta as AnomalyTranslator,
+            locale,
+            scope.kind === "portfolio" ? scope.portfolioId : undefined,
+          ),
         )}
       />
     </>

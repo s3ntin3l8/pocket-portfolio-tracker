@@ -36,13 +36,19 @@ export {
   type TaxYearRow,
   type TaxYearDetail,
   type TaxSummaryHolderWithCarryForward,
+  type HolderTransactionsOptions,
+  type HolderTransactionsView,
   loadHoldings,
+  loadAnomalies,
+  loadNetworthAnomalies,
+  loadHolderAnomalies,
+  loadScopeAnomalies,
+  loadHolderTransactions,
 } from "./server-api/_shared";
 
 // Remaining functions not extracted into domain modules
 import { classifyFailure, type DataFailure } from "@/lib/data-status";
 import type {
-  Anomaly,
   PerformancePoint,
   ContributionStats,
   SparplanStats,
@@ -55,45 +61,27 @@ import {
   getServerApi,
   listPortfoliosCached,
   getSelectedPortfolioId,
+  getScopeSelection,
+  loadScopeAnomalies,
+  resolveEffectiveScope,
   resolveHolderScope,
 } from "./server-api/_shared";
 
-export const loadAnomalies = cache(
-  async (portfolioOverride?: string): Promise<Anomaly[] | null> => {
-    const api = await getServerApi();
-    if (!api) return null;
-    const portfolioId = portfolioOverride ?? (await getSelectedPortfolioId());
-    if (!portfolioId) return null;
-    try {
-      const { anomalies } = await api.getAnomalies(portfolioId);
-      return anomalies;
-    } catch {
-      return null;
-    }
-  },
-);
-
-/** Aggregate variant of {@link loadAnomalies} for the all-portfolios Activity view (#562) —
- *  backs the "Needs review" banner/chip when no single portfolio is selected. */
-export const loadNetworthAnomalies = cache(async (): Promise<Anomaly[] | null> => {
-  const api = await getServerApi();
-  if (!api) return null;
-  try {
-    const { anomalies } = await api.getNetworthAnomalies();
-    return anomalies;
-  } catch {
-    return null;
-  }
-});
-
 /** Summary for the Activity nav badge in the app layout: how many anomalies need review and
- *  whether any is error-severity (red vs. gold dot). Same scope as the Activity page (the
- *  selected portfolio, else the aggregate). Backed by the `cache()`d loaders above, so it costs
- *  one API call per request that the page itself then reuses — nothing is cached across
- *  requests. A failed fetch yields no badge rather than a misleading zero-with-error. */
+ *  whether any is error-severity (red vs. gold dot). Same scope as the Activity page — the
+ *  selected portfolio, the selected holder's portfolios, or the aggregate. Backed by the
+ *  scope's `cache()`d loaders, so it costs one API call per request that the page itself then
+ *  reuses — nothing is cached across requests. A failed fetch yields no badge rather than a
+ *  misleading zero-with-error. */
 export const loadAnomalyBadge = cache(async (): Promise<{ count: number; hasError: boolean }> => {
-  const selected = await getSelectedPortfolioId();
-  const anomalies = selected ? await loadAnomalies(selected) : await loadNetworthAnomalies();
+  const scope = await getScopeSelection();
+  // A holder scope only counts for a holder that owns ≥2 portfolios (the switcher's rule) —
+  // below that the page renders the aggregate, so the badge has to count the aggregate too.
+  // Counting the holder's own portfolio instead is how the badge and the page it labels came
+  // to disagree about what "needs review" means.
+  const effectiveScope =
+    scope.kind === "holder" ? await resolveEffectiveScope(await listPortfoliosCached()) : scope;
+  const anomalies = await loadScopeAnomalies(effectiveScope);
   if (!anomalies) return { count: 0, hasError: false };
   return { count: anomalies.length, hasError: anomalies.some((a) => a.severity === "error") };
 });

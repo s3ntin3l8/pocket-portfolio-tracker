@@ -14,15 +14,18 @@ import { PageHeader } from "@/components/page-header";
 import { PortfolioFormDialog } from "@/components/portfolio-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  getSelectedPortfolioId,
   loadImports,
   loadPortfolioList,
   loadNetworthTransactionsPaginated,
   loadTransactionsPaginated,
-  loadAnomalies,
-  loadNetworthAnomalies,
   loadMe,
 } from "@/lib/server-api";
+import {
+  getScopeSelection,
+  resolveEffectiveScope,
+  loadHolderTransactions,
+  loadScopeAnomalies,
+} from "@/lib/server-api/_shared";
 import type { Anomaly } from "@portfolio/api-client";
 
 const TIMING = typeof process !== "undefined" && process.env?.TIMING_ENABLED === "true";
@@ -49,9 +52,11 @@ export default async function TransactionsPage({
   const te = await getTranslations("Empty");
   const tf = await getTranslations("PortfolioForm");
 
-  // Aggregate across all portfolios unless one is selected in the global switcher.
-  const selectedId = await getSelectedPortfolioId();
-  const aggregate = selectedId === null;
+  // The scope of this ledger: one portfolio, one holder's portfolios, or the
+  // all-portfolios aggregate. It is resolved as a discriminated value — asking for "the
+  // selected portfolio" answers null for BOTH "all portfolios" and "a holder scope", and
+  // that conflation is what made this page aggregate a holder scope (audit R4-C1).
+  const scope = await getScopeSelection();
   const sp = await searchParams;
   const page = Math.max(1, Number(sp?.page ?? "1"));
   const typeFilter = (sp?.type as string) ?? undefined;
@@ -82,7 +87,62 @@ export default async function TransactionsPage({
   const me = await loadMe();
   const isAdmin = Boolean(me?.isAdmin);
 
-  if (aggregate) {
+  // A holder scope only counts for a holder that owns ≥2 portfolios (the switcher's rule) —
+  // the same qualification every other scope-aware page applies. Resolving it needs the
+  // portfolio list, so only this branch waits for it.
+  const effectiveScope =
+    scope.kind === "holder" ? await resolveEffectiveScope(await portfolioListPromise) : scope;
+
+  if (effectiveScope.kind === "portfolio") {
+    const [txResult, anomalyResult] = await Promise.all([
+      loadTransactionsPaginated(
+        effectiveScope.portfolioId,
+        page,
+        PAGE_SIZE,
+        undefined,
+        typeFilter,
+        yearFilter,
+        searchQuery,
+        undefined,
+        statusFilter,
+      ),
+      loadScopeAnomalies(effectiveScope),
+    ]);
+    status = txResult.status;
+    retryAfter = retryAfterOf(txResult);
+    if (txResult.status === "ok") {
+      rows = txResult.rows;
+      total = txResult.total;
+      txSummary = txResult.summary ?? null;
+      txYears = txResult.years ?? [];
+      draftCount = txResult.draftCount;
+    }
+    anomalies = anomalyResult;
+  } else if (effectiveScope.kind === "holder") {
+    // A holder scope lists the holder's own portfolios only — never the other holders'
+    // rows. The loader hands back the holder's COMPLETE filtered set (the table pages
+    // through it itself), so no unscoped request can slip into this ledger.
+    scopeCurrency = me?.displayCurrency ?? "IDR";
+    const [txResult, anomalyResult] = await Promise.all([
+      loadHolderTransactions(effectiveScope.holderId, {
+        type: typeFilter,
+        year: yearFilter,
+        q: searchQuery,
+        status: statusFilter,
+        convertTo: scopeCurrency,
+      }),
+      loadScopeAnomalies(effectiveScope),
+    ]);
+    status = txResult.status;
+    retryAfter = retryAfterOf(txResult);
+    if (txResult.status === "ok") {
+      rows = txResult.rows;
+      total = txResult.total;
+      txSummary = null;
+      txYears = txResult.years;
+    }
+    anomalies = anomalyResult;
+  } else {
     const [result, anomalyResult] = await Promise.all([
       loadNetworthTransactionsPaginated(
         page,
@@ -93,7 +153,7 @@ export default async function TransactionsPage({
         undefined,
         statusFilter,
       ),
-      loadNetworthAnomalies(),
+      loadScopeAnomalies(effectiveScope),
     ]);
     status = result.status;
     retryAfter = retryAfterOf(result);
@@ -106,31 +166,6 @@ export default async function TransactionsPage({
     }
     scopeCurrency = me?.displayCurrency ?? "IDR";
     anomalies = anomalyResult;
-  } else {
-    const [txResult, anomalyResult] = await Promise.all([
-      loadTransactionsPaginated(
-        selectedId!,
-        page,
-        PAGE_SIZE,
-        undefined,
-        typeFilter,
-        yearFilter,
-        searchQuery,
-        undefined,
-        statusFilter,
-      ),
-      loadAnomalies(),
-    ]);
-    status = txResult.status;
-    retryAfter = retryAfterOf(txResult);
-    if (txResult.status === "ok") {
-      rows = txResult.rows;
-      total = txResult.total;
-      txSummary = txResult.summary ?? null;
-      txYears = txResult.years ?? [];
-      draftCount = txResult.draftCount;
-    }
-    anomalies = anomalyResult;
   }
 
   // Newest first (already ordered by the backend for paginated queries).
@@ -138,7 +173,8 @@ export default async function TransactionsPage({
 
   // Portfolio metadata from the parallel-fetched list.
   const portfolioList = await portfolioListPromise;
-  if (!aggregate && portfolioList.length > 0) {
+  const selectedId = effectiveScope.kind === "portfolio" ? effectiveScope.portfolioId : null;
+  if (selectedId && portfolioList.length > 0) {
     const selected = portfolioList.find((p) => p.id === selectedId) ?? portfolioList[0];
     singlePortfolio = {
       id: selected.id,
@@ -147,6 +183,17 @@ export default async function TransactionsPage({
     };
     scopeCurrency = selected.baseCurrency;
   }
+
+  // The Portfolio column belongs to every scope that spans more than one portfolio: the
+  // aggregate and a holder with several portfolios.
+  const showPortfolio = effectiveScope.kind !== "portfolio";
+
+  // How many rows the server would still serve for this scope. It is 0 under a holder
+  // scope: the whole scope is loaded here, and the table's two client-side "give me more"
+  // paths — "load more" and "select all matching" — both ask the API for rows BEYOND what
+  // the table was handed. Those endpoints have no holder filter, so offering them would
+  // pull in other holders' transactions. The loaded set is complete, so nothing is lost.
+  const serverRemainder = effectiveScope.kind === "holder" ? 0 : total;
 
   // Import history is embedded here (the standalone /import route was retired). Shown as
   // a collapsed section whenever any imports exist — including for a portfolio that has
@@ -161,7 +208,7 @@ export default async function TransactionsPage({
         level: "info",
         msg: `[timing] TransactionsPage data fetch`,
         durationMs: Math.round(durationMs * 100) / 100,
-        aggregate,
+        scope: effectiveScope.kind,
         page,
         transactionCount: rows.length,
         total,
@@ -182,7 +229,7 @@ export default async function TransactionsPage({
     "Price",
     "Currency",
     "Source",
-    ...(aggregate ? ["Portfolio"] : []),
+    ...(showPortfolio ? ["Portfolio"] : []),
   ];
   const exportRows: (string | number)[][] = rows.map((r) => [
     r.executedAt.slice(0, 10),
@@ -193,7 +240,7 @@ export default async function TransactionsPage({
     r.price,
     r.currency,
     r.source,
-    ...(aggregate ? [r.portfolioName ?? ""] : []),
+    ...(showPortfolio ? [r.portfolioName ?? ""] : []),
   ]);
 
   // Export moved out of the heading into the table's filter toolbar (it exports the
@@ -294,7 +341,7 @@ export default async function TransactionsPage({
       <FxMissingBanner currencies={fxMissing} />
       <TransactionsTable
         rows={rows}
-        showPortfolio={aggregate}
+        showPortfolio={showPortfolio}
         anomalies={anomalies ?? []}
         portfolios={portfolioList}
         scopeCurrency={scopeCurrency}
@@ -304,7 +351,7 @@ export default async function TransactionsPage({
         yearFilter={yearFilter}
         searchQuery={searchQuery}
         portfolioId={singlePortfolio?.id ?? undefined}
-        total={total}
+        total={serverRemainder}
         statusFilter={statusFilter}
         draftCount={draftCount}
         actions={actions}
