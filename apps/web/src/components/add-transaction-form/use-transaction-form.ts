@@ -145,13 +145,19 @@ export function useTransactionForm({
   // Clear the pending lookup when the form goes away: a debounce that outlives the
   // component fires into a torn-down environment and updates state on a component that
   // is gone (see `useTimeout` for the same guard in hook form).
-  useEffect(
-    () => () => {
+  //
+  // The flag covers the other half: a lookup that is already in flight resolves after
+  // the form is gone, and its continuation would update state on a component that is
+  // no longer there.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       if (lookupTimer.current) clearTimeout(lookupTimer.current);
       lookupTimer.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
   const [selected, setSelected] = useState<Instrument | null>(() =>
     initial?.instrument && initial.instrumentId
       ? {
@@ -344,13 +350,21 @@ export function useTransactionForm({
     }
     void client
       .searchInstruments(trimmed)
-      .then(setResults)
-      .catch(() => setResults([]));
+      .then((r) => {
+        if (mountedRef.current) setResults(r);
+      })
+      .catch(() => {
+        if (mountedRef.current) setResults([]);
+      });
     lookupTimer.current = setTimeout(() => {
       void client
         .lookupInstruments(trimmed)
-        .then(setDiscovered)
-        .catch(() => setDiscovered([]));
+        .then((r) => {
+          if (mountedRef.current) setDiscovered(r);
+        })
+        .catch(() => {
+          if (mountedRef.current) setDiscovered([]);
+        });
     }, 300);
   }
 
