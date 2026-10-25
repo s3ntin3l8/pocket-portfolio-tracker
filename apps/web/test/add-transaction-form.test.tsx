@@ -6,6 +6,7 @@ import {
   type AddTransactionClient,
 } from "../src/components/add-transaction-form";
 import { ApiError, type Instrument, type SourceSummary } from "@portfolio/api-client";
+import { useTransactionForm } from "../src/components/add-transaction-form/use-transaction-form";
 import messages from "../messages/en.json";
 
 const getSourceDocumentUrl = vi.fn(async () => ({
@@ -1507,5 +1508,37 @@ describe("AddTransactionForm — the debounced instrument lookup", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * The field setters the form exposes also drop the published validation message for the
+ * field they belong to. They are wrapped, so their identity has to survive a render —
+ * a child effect keyed on one of them must not re-run on every render.
+ */
+describe("the form's field setters", () => {
+  it("keep their identity between renders", () => {
+    const identities: Array<unknown> = [];
+
+    function Probe({ tick }: { tick: number }) {
+      const form = useTransactionForm({ client: makeClient(), portfolioId: "p1" });
+      identities.push(form.setPrice, form.setQuantity, form.setTax);
+      return <span>{tick}</span>;
+    }
+
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Probe tick={0} />
+      </NextIntlClientProvider>,
+    );
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Probe tick={1} />
+      </NextIntlClientProvider>,
+    );
+
+    expect(identities.length).toBe(6);
+    // Three setters, two renders — one identity each.
+    expect(new Set(identities).size).toBe(3);
   });
 });

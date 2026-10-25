@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type {
   ApiClient,
@@ -85,6 +85,29 @@ export interface AddTransactionInitial {
 
 /** An installment/payoff booked by the schedule itself — its link to the loan is fixed. */
 const AUTO_BOOKED_LEG = /^loan:[^:]+:(inst:\d+|payoff)$/;
+
+/**
+ * The control ids whose published validation message a field's setter drops.
+ *
+ * A field can own more than one control (the tax rate is rendered twice — inline and in
+ * the extras panel), so the list is per field, not per control.
+ */
+const FIELD_ERROR_IDS = {
+  kind: ["tx-sub-type"],
+  currency: ["tx-currency"],
+  date: ["tx-date"],
+  quantity: ["tx-qty"],
+  price: ["tx-price"],
+  fees: ["tx-fees"],
+  tax: ["tx-tax", "tx-tax-extra"],
+  fxRate: ["tx-fx-rate"],
+  shares: ["tx-shares"],
+  perShare: ["tx-per-share"],
+  nativeCurrency: ["tx-native-currency"],
+  grossNative: ["tx-gross-native"],
+  description: ["tx-notes"],
+  tags: ["tx-tags"],
+} as const satisfies Record<string, readonly string[]>;
 
 export function useTransactionForm({
   client,
@@ -230,16 +253,51 @@ export function useTransactionForm({
   useEffect(() => () => clearFieldErrors(), []);
 
   /**
-   * A field setter that also drops the validation message published for that field: the
-   * user is on it, and a stale "invalid" message under a corrected value is worse than no
-   * message at all.
+   * The field setters the form exposes. Each one also drops the validation message
+   * published for that field: the user is on it, and a stale "invalid" message under a
+   * corrected value is worse than no message at all.
+   *
+   * They are built ONCE: the raw `useState` setters are stable and the id lists are
+   * module constants, so the wrappers keep their identity between renders — a child
+   * effect keyed on one of them does not re-run on every render.
    */
-  function editing(fieldIds: string[], set: (value: string) => void): (value: string) => void {
-    return (value: string) => {
+  const fieldSetters = useMemo(() => {
+    const wrap = (ids: readonly string[], set: (value: string) => void) => (value: string) => {
       set(value);
-      for (const id of fieldIds) clearFieldError(id);
+      for (const id of ids) clearFieldError(id);
     };
-  }
+    return {
+      setKind: wrap(FIELD_ERROR_IDS.kind, setKind),
+      setCurrency: wrap(FIELD_ERROR_IDS.currency, setCurrency),
+      setDate: wrap(FIELD_ERROR_IDS.date, setDate),
+      setQuantity: wrap(FIELD_ERROR_IDS.quantity, setQuantity),
+      setPrice: wrap(FIELD_ERROR_IDS.price, setPrice),
+      setFees: wrap(FIELD_ERROR_IDS.fees, setFees),
+      setTax: wrap(FIELD_ERROR_IDS.tax, setTax),
+      setFxRate: wrap(FIELD_ERROR_IDS.fxRate, setFxRate),
+      setShares: wrap(FIELD_ERROR_IDS.shares, setShares),
+      setPerShare: wrap(FIELD_ERROR_IDS.perShare, setPerShare),
+      setNativeCurrency: wrap(FIELD_ERROR_IDS.nativeCurrency, setNativeCurrency),
+      setGrossNative: wrap(FIELD_ERROR_IDS.grossNative, setGrossNative),
+      setDescription: wrap(FIELD_ERROR_IDS.description, setDescription),
+      setTags: wrap(FIELD_ERROR_IDS.tags, setTags),
+    };
+  }, [
+    setKind,
+    setCurrency,
+    setDate,
+    setQuantity,
+    setPrice,
+    setFees,
+    setTax,
+    setFxRate,
+    setShares,
+    setPerShare,
+    setNativeCurrency,
+    setGrossNative,
+    setDescription,
+    setTags,
+  ]);
 
   const isTrade = isTradeType(type);
   const isShareReceipt = isShareReceiptType(type);
@@ -659,33 +717,33 @@ export function useTransactionForm({
     installmentN,
     selectInstallment,
     kind,
-    setKind: editing(["tx-sub-type"], setKind),
+    setKind: fieldSetters.setKind,
     currency,
-    setCurrency: editing(["tx-currency"], setCurrency),
+    setCurrency: fieldSetters.setCurrency,
     date,
-    setDate: editing(["tx-date"], setDate),
+    setDate: fieldSetters.setDate,
     quantity,
-    setQuantity: editing(["tx-qty"], setQuantity),
+    setQuantity: fieldSetters.setQuantity,
     price,
-    setPrice: editing(["tx-price"], setPrice),
+    setPrice: fieldSetters.setPrice,
     fees,
-    setFees: editing(["tx-fees"], setFees),
+    setFees: fieldSetters.setFees,
     tax,
-    setTax: editing(["tx-tax", "tx-tax-extra"], setTax),
+    setTax: fieldSetters.setTax,
     fxRate,
-    setFxRate: editing(["tx-fx-rate"], setFxRate),
+    setFxRate: fieldSetters.setFxRate,
     shares,
-    setShares: editing(["tx-shares"], setShares),
+    setShares: fieldSetters.setShares,
     perShare,
-    setPerShare: editing(["tx-per-share"], setPerShare),
+    setPerShare: fieldSetters.setPerShare,
     nativeCurrency,
-    setNativeCurrency: editing(["tx-native-currency"], setNativeCurrency),
+    setNativeCurrency: fieldSetters.setNativeCurrency,
     grossNative,
-    setGrossNative: editing(["tx-gross-native"], setGrossNative),
+    setGrossNative: fieldSetters.setGrossNative,
     description,
-    setDescription: editing(["tx-notes"], setDescription),
+    setDescription: fieldSetters.setDescription,
     tags,
-    setTags: editing(["tx-tags"], setTags),
+    setTags: fieldSetters.setTags,
     idReinvested,
     setIdReinvested,
     query,

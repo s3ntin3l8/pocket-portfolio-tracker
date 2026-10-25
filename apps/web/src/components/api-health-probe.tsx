@@ -22,7 +22,9 @@ export function ApiHealthProbe() {
 
   useEffect(() => {
     let live = true;
-    fetch("/api/backend/health", { cache: "no-store" })
+    // The probe has to answer one way or the other: without a timeout a hanging request
+    // would leave the probe silent, which reads exactly like "there is no diagnostic".
+    fetch("/api/backend/health", { cache: "no-store", signal: AbortSignal.timeout(5000) })
       .then(async (res) => {
         const body = await res.text().catch(() => "");
         if (!live) return;

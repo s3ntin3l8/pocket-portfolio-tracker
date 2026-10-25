@@ -43,25 +43,21 @@ export function clearFieldErrors(): void {
 
 /** The message published for one control id, if any. */
 export function useFieldError(id: string): string | undefined {
+  // The subscribe function is module-scoped on purpose: an inline one would make React
+  // unsubscribe and resubscribe every control on every render.
   return useSyncExternalStore(
-    (onChange) => {
-      subscribers.add(onChange);
-      return () => {
-        subscribers.delete(onChange);
-      };
-    },
+    subscribe,
     () => published[id],
     () => undefined,
   );
 }
 
-/** The first element among `children` — the control a `FormField` labels. */
-function firstElement(children: React.ReactNode): React.ReactElement | null {
-  const list = Array.isArray(children) ? children : [children];
-  for (const child of list) {
-    if (React.isValidElement(child)) return child;
-  }
-  return null;
+/** Subscribe to the published field errors. Stable for the app's lifetime. */
+function subscribe(onChange: () => void): () => void {
+  subscribers.add(onChange);
+  return () => {
+    subscribers.delete(onChange);
+  };
 }
 
 /**
@@ -84,37 +80,22 @@ function withInvalidState(children: React.ReactNode, messageId: string): React.R
   return Array.isArray(children) ? next : next[0];
 }
 
-/** The message a control renders itself (it owns the element and therefore the id). */
-function ownError(children: React.ReactNode): string | null {
-  const child = firstElement(children);
-  if (!child) return null;
-  const { error } = child.props as { error?: unknown };
-  return typeof error === "string" && error ? error : null;
-}
-
 export function FormField({
   id,
   label,
   children,
   className,
-  error,
 }: {
   /** The id of the control inside `children` — the label is bound to it. */
   id: string;
   label: string;
   children: React.ReactNode;
   className?: string;
-  /**
-   * The field's validation message — the API's own text. It is rendered under the control
-   * and linked to it with `aria-describedby`, and the control is marked `aria-invalid`.
-   * Defaults to the message published for this field's id (see `publishFieldErrors`).
-   */
-  error?: string | null;
 }) {
-  const publishedError = useFieldError(id);
-  // A control that renders its own message owns it — the field must not add a second one.
-  const childOwnsMessage = ownError(children) !== null;
-  const message = childOwnsMessage ? null : (error ?? publishedError ?? null);
+  // The message is the one published for this field's id — see `publishFieldErrors`.
+  // There is exactly one channel: a second, prop-based one would be a path nothing
+  // publishes to.
+  const message = useFieldError(id) ?? null;
   const messageId = `${id}-error`;
 
   return (
