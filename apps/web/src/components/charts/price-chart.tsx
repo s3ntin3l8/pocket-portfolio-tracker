@@ -10,11 +10,22 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { useLocale } from "next-intl";
-import type { Candle } from "@portfolio/api-client";
-import { formatMoney } from "@/lib/utils";
+import { useLocale, useTranslations } from "next-intl";
+import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
+import { ChartSeriesSummary } from "@/components/charts/chart-series-summary";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
+
+/**
+ * One point of the plotted series. `close` is `null` when the source has no value for
+ * that point — the chart then breaks the line there instead of drawing a drop to zero.
+ * The API's `Candle` (a date + a decimal-string close) satisfies this shape.
+ */
+export interface PriceChartPoint {
+  date: string;
+  close: string | number | null;
+  currency?: string;
+}
 
 export function PriceChart({
   data,
@@ -23,8 +34,10 @@ export function PriceChart({
   minimal = false,
   showYAxis = true,
   height = 280,
+  title,
+  desc,
 }: {
-  data: Candle[];
+  data: PriceChartPoint[];
   currency: string;
   unit?: "currency" | "percent";
   /** Hide axes/grid — just the area+line, for a compact sparkline (e.g. the Holdings hero). */
@@ -32,15 +45,25 @@ export function PriceChart({
   /** Show Y-axis on the left. Disable on narrow viewports — the tooltip cursor already shows the price. */
   showYAxis?: boolean;
   height?: number;
+  /** The chart's accessible name (the SVG's `<title>`). Defaults to "Price history". */
+  title?: string;
+  /** The chart's accessible description (the SVG's `<desc>`). */
+  desc?: string;
 }) {
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
-  const points = data.map((d) => ({ date: d.date, close: Number(d.close) }));
+  const t = useTranslations("A11y");
+  // A missing value stays null so recharts breaks the line there (a 0 would draw a cliff).
+  const points = data.map((d) => ({
+    date: d.date,
+    close: d.close === null ? null : Number(d.close),
+  }));
   const gradientId = "price-fill";
   const lineColor = "var(--color-primary)";
+  const chartTitle = title ?? t("chartPriceTitle");
 
   const formatValue = (v: number) =>
-    unit === "percent" ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : formatMoney(v, currency, locale);
+    unit === "percent" ? formatPercentPoints(v, locale, 2) : formatMoney(v, currency, locale);
 
   const dateLabelFmt = new Intl.DateTimeFormat(locale, {
     day: "numeric",
@@ -66,6 +89,9 @@ export function PriceChart({
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height }}>
         <AreaChart
           data={points}
+          title={chartTitle}
+          desc={desc ?? t("chartPriceDesc", { count: points.length })}
+          role="img"
           margin={
             minimal
               ? { top: 4, right: 0, left: 0, bottom: 0 }
@@ -97,7 +123,10 @@ export function PriceChart({
             cursor={CHART_CURSOR}
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
-              const v = Number(payload[0]?.value);
+              const raw = payload[0]?.value;
+              // A missing point has no value to show — no tooltip row rather than a fake 0.
+              if (raw === null || raw === undefined) return null;
+              const v = Number(raw);
               if (!Number.isFinite(v)) return null;
               return (
                 <ChartTooltipPanel
@@ -117,6 +146,12 @@ export function PriceChart({
           />
         </AreaChart>
       </ResponsiveContainer>
+      {/* The text equivalent of the series (audit E8) — visually hidden. */}
+      <ChartSeriesSummary
+        values={points.map((p) => p.close)}
+        format={formatValue}
+        label={chartTitle}
+      />
     </div>
   );
 }

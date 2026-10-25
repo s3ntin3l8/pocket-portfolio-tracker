@@ -100,6 +100,7 @@ export function EpsActualEstimateChart({
 }) {
   const reducedMotion = useReducedMotion();
   const t = useTranslations("Instrument");
+  const tA11y = useTranslations("A11y");
   const rows: EpsChartRow[] = [...data];
   if (currentQuarterEstimate != null) {
     rows.push({
@@ -113,7 +114,13 @@ export function EpsActualEstimateChart({
   return (
     <div className="h-[180px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <BarChart
+          data={rows}
+          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          title={tA11y("chartEpsTitle")}
+          desc={tA11y("chartEpsDesc", { count: rows.length })}
+          role="img"
+        >
           <XAxis
             dataKey="period"
             tick={CHART_AXIS_TICK}

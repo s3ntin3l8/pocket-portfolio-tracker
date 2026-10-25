@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { ForecastPoint } from "@portfolio/core";
 import { formatMoney } from "@/lib/utils";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
+import { ChartSeriesSummary } from "@/components/charts/chart-series-summary";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
@@ -26,6 +27,7 @@ export function ForecastChart({
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const t = useTranslations("Savings");
+  const tA11y = useTranslations("A11y");
   const pv = Number(presentValue);
 
   const data = series.map((p) => ({
@@ -39,7 +41,13 @@ export function ForecastChart({
   return (
     <div className="h-[160px] w-full">
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 160 }}>
-        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+        <AreaChart
+          data={data}
+          margin={{ top: 4, right: 0, left: 0, bottom: 0 }}
+          title={tA11y("chartForecastTitle")}
+          desc={tA11y("chartForecastDesc", { count: data.length })}
+          role="img"
+        >
           <defs>
             <linearGradient id="forecast-value-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
@@ -88,6 +96,12 @@ export function ForecastChart({
           />
         </AreaChart>
       </ResponsiveContainer>
+      {/* The text equivalent of the series (audit E8) — visually hidden. */}
+      <ChartSeriesSummary
+        values={data.map((d) => d.value)}
+        format={money}
+        label={tA11y("chartForecastTitle")}
+      />
     </div>
   );
 }

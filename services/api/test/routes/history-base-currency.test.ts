@@ -177,6 +177,13 @@ describe("per-portfolio history after a baseCurrency change (#1031)", () => {
     expect(Number(body[2]!.index)).toBeCloseTo(Number(body[1]!.index), 8);
     expect(Number(body[3]!.index)).toBeCloseTo(101.594118 * 1.01, 4);
 
+    // The percentage is the CHAINED one, not a substituted 0 (audit R4-E5): an index of
+    // 101.594118 is +1.594118 %. A row whose date has no TWR point carries no percentage
+    // at all — never "0", which a base-100 chart would draw as a −100 % cliff.
+    expect(Number(body[1]!.pct)).toBeCloseTo(1.594118, 4);
+    expect(body[1]!.pct).not.toBe("0");
+    expect(body.every((p) => p.index !== undefined && p.pct !== undefined)).toBe(true);
+
     // Benchmark in the same currency (IDR): 4500 × 16000 → 4600 × 16200 is +3.5%,
     // not the USD-native +2.22%.
     expect(body[0]!.benchmarkPct).toBe("0");
