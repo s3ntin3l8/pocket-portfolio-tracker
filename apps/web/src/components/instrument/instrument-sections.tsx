@@ -20,6 +20,7 @@ import {
   type InstrumentTxFilters,
 } from "@/components/instrument/instrument-data";
 import { formatMoney, formatPercent, rowAnomalyCounts } from "@/lib/utils";
+import { effectiveRateForDate } from "@/lib/bond-rate";
 import { lastPriceInfo } from "@/lib/instrument-price";
 
 /*
@@ -91,8 +92,9 @@ export async function InstrumentLotsSection({ id }: { id: string }) {
  * renders), not a new aggregation.
  */
 export async function InstrumentIncomeSection({ id, locale }: SectionProps) {
-  const [t, data, incomeStatsResult] = await Promise.all([
+  const [t, tb, data, incomeStatsResult] = await Promise.all([
     getTranslations("Instrument"),
+    getTranslations("BondTerms"),
     loadInstrument(id),
     incomeStatsOnce(),
   ]);
@@ -101,6 +103,27 @@ export async function InstrumentIncomeSection({ id, locale }: SectionProps) {
   const incomeStats = incomeStatsResult.status === "ok" ? incomeStatsResult.data : null;
   const instrumentIncome = incomeStats?.byInstrument.find((i) => i.instrumentId === id) ?? null;
   const instrumentYield = incomeStats?.yields.find((y) => y.instrumentId === id) ?? null;
+  // A floating-rate bond (SBR/ST) carries no single `couponRate`: the rate that applies
+  // today comes from its schedule — the announced period containing today, else the
+  // contractual floor. A fixed-rate bond keeps showing its flat rate.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const effectiveRate = instrument.couponRateSchedule
+    ? effectiveRateForDate(instrument.couponRateSchedule, todayKey)
+    : instrument.couponRate;
+  const bondInfo =
+    instrument.assetClass === "bond" && effectiveRate != null && instrument.maturityDate != null
+      ? {
+          label: t("bondTermsLabel"),
+          couponRate:
+            formatPercent(Number(effectiveRate), locale) +
+            (instrument.couponRateSchedule ? ` · ${tb("floatingBadge")}` : ""),
+          maturityDate: new Date(`${instrument.maturityDate}T00:00:00`).toLocaleDateString(locale, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          }),
+        }
+      : null;
   return (
     <InstrumentIncomeCard
       title={t("incomeCardTitle")}
@@ -118,20 +141,7 @@ export async function InstrumentIncomeSection({ id, locale }: SectionProps) {
       }
       yieldTitle={t("yieldOnCostLabel")}
       yieldCaption={t("yieldOnCostCaption")}
-      bondInfo={
-        instrument.assetClass === "bond" &&
-        instrument.couponRate != null &&
-        instrument.maturityDate != null
-          ? {
-              label: t("bondTermsLabel"),
-              couponRate: formatPercent(Number(instrument.couponRate), locale),
-              maturityDate: new Date(`${instrument.maturityDate}T00:00:00`).toLocaleDateString(
-                locale,
-                { year: "numeric", month: "short", day: "numeric" },
-              ),
-            }
-          : null
-      }
+      bondInfo={bondInfo}
     />
   );
 }

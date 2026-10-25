@@ -8,6 +8,7 @@ import type {
   LoanOption,
   Instrument,
   InstrumentSearchResult,
+  BondCouponRateSchedule,
 } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
 import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
@@ -28,6 +29,11 @@ import {
   goldSymbolFromLabel,
   couponRatePercentToFraction,
 } from "./constants";
+import {
+  EMPTY_RATE_SCHEDULE_DRAFT,
+  checkRateScheduleDraft,
+  type RateScheduleDraft,
+} from "@/lib/bond-rate";
 
 export type { SelectableType, TxType };
 
@@ -95,6 +101,9 @@ export function useTransactionForm({
   const t = useTranslations("Manage.tx");
   const tt = useTranslations("TxType");
   const tc = useTranslations("AssetClass");
+  // The floating-rate schedule strings live in their own namespace so the create form
+  // and the admin instrument-edit dialog share one set of labels.
+  const tb = useTranslations("BondTerms");
 
   const isEdit = Boolean(transactionId);
   const [type, setType] = useState<TxType>(() => (initial?.type as TxType) ?? "buy");
@@ -166,6 +175,14 @@ export function useTransactionForm({
   const [couponRatePercent, setCouponRatePercent] = useState("");
   const [couponSchedule, setCouponSchedule] = useState("monthly");
   const [maturityDate, setMaturityDate] = useState("");
+  // Floating-rate bonds (Indonesian retail SBR/ST): the coupon rate RESETS every few
+  // months while the payments stay monthly. The rate schedule is a separate axis from
+  // `couponSchedule` and replaces the flat `couponRate` when it is filled in.
+  const [floatingRate, setFloatingRate] = useState(false);
+  const [rateSchedule, setRateSchedule] = useState<RateScheduleDraft>({
+    ...EMPTY_RATE_SCHEDULE_DRAFT,
+    periods: [],
+  });
 
   // "Can't find it? Add a custom instrument" collapsible (instrument-field.tsx) — closed
   // by default, per the v2 design; opened automatically when editing an existing
@@ -352,7 +369,17 @@ export function useTransactionForm({
     setDiscovered([]);
   }
 
-  async function resolveInstrumentId(): Promise<string | null> {
+  // A floating-rate schedule is only ever SENT when a NEW instrument is created from the
+  // custom panel. A picked, already-saved instrument keeps the schedule it was created
+  // with, and a cash transaction carries none — so on those paths the draft is
+  // irrelevant and must not block an ordinary trade. The guard below has to ask the
+  // same question the payload does.
+  const createsBondWithSchedule =
+    hasInstrument && !selected && assetClass === "bond" && floatingRate;
+
+  async function resolveInstrumentId(
+    bondSchedule?: BondCouponRateSchedule,
+  ): Promise<string | null> {
     if (!hasInstrument) return null;
     if (selected) return selected.id;
     if (assetClass === "gold") {
@@ -381,7 +408,13 @@ export function useTransactionForm({
       ...(assetClass === "bond"
         ? {
             faceValue: faceValue.trim() || undefined,
-            couponRate: couponRatePercentToFraction(couponRatePercent),
+            // A floating-rate bond carries its rate in the schedule, not in a single
+            // `couponRate` — sending both would leave the flat rate as a stale fallback.
+            // The same condition the submit-time guard uses decides this branch, so the
+            // payload and the guard can never disagree.
+            ...(createsBondWithSchedule
+              ? { couponRateSchedule: bondSchedule }
+              : { couponRate: couponRatePercentToFraction(couponRatePercent) }),
             couponSchedule: couponSchedule as
               "monthly" | "quarterly" | "semiannual" | "annual" | undefined,
             maturityDate: maturityDate || undefined,
@@ -402,10 +435,24 @@ export function useTransactionForm({
       setError(t("loanRequired"));
       return;
     }
+    // A floating-rate bond whose schedule is not filled in yet must not be created:
+    // it would carry no rate at all and silently drop out of the income/tax forecast.
+    // The editor already shows the reason inline; this is the submit-time guard. The
+    // checked schedule is handed to `resolveInstrumentId` below, so the payload is
+    // exactly the one the check produced.
+    let bondSchedule: BondCouponRateSchedule | undefined;
+    if (createsBondWithSchedule) {
+      const check = checkRateScheduleDraft(rateSchedule);
+      if (!check.ok) {
+        setError(tb(`issue.${check.issue}`));
+        return;
+      }
+      bondSchedule = check.schedule;
+    }
     setBusy(true);
     setError(null);
     try {
-      const instrumentId = await resolveInstrumentId();
+      const instrumentId = await resolveInstrumentId(bondSchedule);
       const parsedTags = tags
         .split(",")
         .map((t) => t.trim())
@@ -464,6 +511,7 @@ export function useTransactionForm({
     t,
     tt,
     tc,
+    tb,
     isEdit,
     type,
     setType,
@@ -537,6 +585,10 @@ export function useTransactionForm({
     setCouponSchedule,
     maturityDate,
     setMaturityDate,
+    floatingRate,
+    setFloatingRate,
+    rateSchedule,
+    setRateSchedule,
     busy,
     error,
     isTrade,

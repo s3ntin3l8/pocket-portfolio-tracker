@@ -18,6 +18,7 @@ import {
   excludeMissingFx,
 } from "@portfolio/core";
 import { getFxRates, makeFxRateFn } from "../../services/fx.js";
+import { parseCouponRateSchedule } from "../../services/instruments.js";
 import { corporateActionsFor, instrumentMeta } from "./shared.js";
 
 export async function buildIncomeStats(
@@ -122,16 +123,21 @@ export async function buildIncomeStats(
         .where(and(inArray(instruments.id, heldIds), eq(instruments.assetClass, "bond")))
     : [];
   const qtyById = new Map(summary.holdings.map((h) => [h.instrumentId, h.quantity]));
+  // A floating-rate bond (SBR/ST) may carry NO flat coupon rate at all — its schedule's
+  // floor rate is then the base rate. Bonds with neither are not projected (same as
+  // before #752).
   const positions = bondRows
-    .filter((b) => b.faceValue && b.couponRate && b.maturityDate)
-    .map((b) => ({
+    .map((b) => ({ b, schedule: parseCouponRateSchedule(b.couponRateSchedule) }))
+    .filter(({ b, schedule }) => b.faceValue && b.maturityDate && (b.couponRate || schedule))
+    .map(({ b, schedule }) => ({
       instrumentId: b.id,
       symbol: b.symbol,
       name: b.name,
       quantity: qtyById.get(b.id) ?? "0",
       faceValue: b.faceValue as string,
-      couponRate: b.couponRate as string,
+      couponRate: (b.couponRate ?? schedule?.floorRate) as string,
       couponSchedule: b.couponSchedule,
+      couponRateSchedule: schedule,
       maturityDate: b.maturityDate as string,
       currency: b.currency,
     }));

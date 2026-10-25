@@ -1220,3 +1220,179 @@ describe("TransactionSourcesSection (edit mode, #230)", () => {
     expect(submit.closest(".sticky")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Floating-rate bonds (Indonesian retail SBR/ST): the coupon rate RESETS every few
+// months while the PAYMENTS keep their own schedule. The toggle swaps the single rate
+// for a rate schedule — two independent axes, never merged.
+// ---------------------------------------------------------------------------
+
+describe("AddTransactionForm — floating-rate bond terms", () => {
+  const tb = messages.BondTerms;
+
+  function openBondForm() {
+    const client = makeClient();
+    renderForm(client);
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    return client;
+  }
+
+  it("hides the rate schedule until the floating-rate toggle is on", () => {
+    openBondForm();
+    // The flat rate field is the default.
+    expect(screen.getByLabelText(m.bondCouponRateLabel)).toBeTruthy();
+    expect(screen.queryByLabelText(tb.floorRateLabel)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+
+    // The flat rate field gives way to the schedule editor.
+    expect(screen.queryByLabelText(m.bondCouponRateLabel)).toBeNull();
+    expect(screen.getByLabelText(tb.floorRateLabel)).toBeTruthy();
+  });
+
+  it("creates a floating bond with the rate schedule — percent-in rates convert to fractions", async () => {
+    const bondInstrument: Instrument = {
+      ...INSTRUMENT,
+      id: "sbr1",
+      symbol: "SBR015T2",
+      market: "IDX",
+      assetClass: "bond",
+      unit: "units",
+      name: "SBR015T2",
+      faceValue: "1000000",
+      couponSchedule: "monthly",
+      maturityDate: "2028-07-10",
+    };
+    const client = makeClient({ createInstrument: vi.fn(async () => bondInstrument) });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "SBR015T2" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "SBR015T2" } });
+    fireEvent.change(screen.getByLabelText(m.bondFaceValueLabel), {
+      target: { value: "1000000" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondCouponSchedule), {
+      target: { value: "monthly" },
+    });
+    fireEvent.change(screen.getByLabelText(m.bondMaturityDate), {
+      target: { value: "2028-07-10" },
+    });
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+    fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "6.75" } });
+    fireEvent.click(screen.getByRole("button", { name: tb.addRatePeriod }));
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-10" } });
+    fireEvent.change(screen.getByLabelText("To (exclusive)"), {
+      target: { value: "2026-04-10" },
+    });
+    fireEvent.change(screen.getByLabelText("Rate % p.a."), { target: { value: "6.75" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createInstrument).toHaveBeenCalled());
+    // The percent→fraction inverse is the assertion that matters: "6.75" in the
+    // percent-labelled field must be sent as "0.0675", never "6.75" or "675".
+    expect(client.createInstrument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: "SBR015T2",
+        assetClass: "bond",
+        faceValue: "1000000",
+        couponSchedule: "monthly",
+        maturityDate: "2028-07-10",
+        couponRateSchedule: {
+          floorRate: "0.0675",
+          periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
+        },
+      }),
+    );
+    // A floating bond carries no flat rate — the schedule replaces it.
+    const payload = vi.mocked(client.createInstrument).mock.calls[0][0];
+    expect(payload.couponRate).toBeUndefined();
+  });
+
+  it("blocks the submit when the schedule is half-filled, instead of creating a bond with no rate", async () => {
+    const client = makeClient();
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "SBR015T2" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "SBR015T2" } });
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+    // The floor rate is filled but no period is — the schedule is not ready yet.
+    fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "6.75" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // Nothing is created: a bond with a half-filled schedule would carry no rate at
+    // all and silently drop out of the income/tax forecast.
+    // The form's error banner and the editor's inline hint both surface the reason.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").some((a) => a.textContent === tb.issue.noPeriods)).toBe(
+        true,
+      ),
+    );
+    expect(client.createInstrument).not.toHaveBeenCalled();
+    expect(client.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it("does not demand a rate schedule when a SAVED instrument is selected", async () => {
+    // The floating-rate draft only matters when a NEW instrument is created from it. A
+    // picked instrument keeps the schedule it was created with, so an empty draft must
+    // not block an ordinary trade — the guard has to ask the same question the payload
+    // does.
+    const savedBond: Instrument = {
+      ...INSTRUMENT,
+      id: "sbr1",
+      symbol: "SBR015T2",
+      market: "IDX",
+      assetClass: "bond",
+      unit: "units",
+      name: "SBR015T2",
+      faceValue: "1000000",
+      couponSchedule: "monthly",
+      maturityDate: "2028-07-10",
+    };
+    const client = makeClient({
+      searchInstruments: vi.fn(async () => [savedBond]),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.kind), { target: { value: "bond" } });
+    // The floating toggle is on, but no schedule is filled in.
+    fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+
+    // …and then a saved instrument is picked. No instrument is created, so no schedule
+    // is sent — the half-filled draft is irrelevant on this path.
+    fireEvent.change(screen.getByLabelText(m.search), { target: { value: "sbr" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /SBR015T2/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /SBR015T2/ }));
+
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "1000000" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    await waitFor(() => expect(client.createTransaction).toHaveBeenCalled());
+    expect(client.createInstrument).not.toHaveBeenCalled();
+    expect(client.createTransaction).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({ instrumentId: "sbr1" }),
+    );
+  });
+});

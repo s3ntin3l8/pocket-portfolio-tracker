@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { projectCoupons, normalizeCouponSchedule, type BondPosition } from "../src/index.js";
+import {
+  projectCoupons,
+  couponRateForDate,
+  normalizeCouponSchedule,
+  type BondPosition,
+  type BondCouponRateSchedule,
+} from "../src/index.js";
 
 const d = (iso: string) => new Date(iso);
 
@@ -126,5 +132,174 @@ describe("projectCoupons — monthly schedule (Indonesian retail SR/ORI conventi
     };
     const rows = projectCoupons([srBond], 12, new Date("2026-09-13T00:00:00.000Z"));
     expect(rows).toHaveLength(12);
+  });
+});
+
+describe("projectCoupons — floating-rate bonds (SBR/ST rate schedule)", () => {
+  // An SBR015T2-shaped position: Rp 1,000,000 nominal, MONTHLY payments, QUARTERLY rate
+  // resets, and no flat couponRate — the rate comes from the schedule.
+  const SBR_SCHEDULE: BondCouponRateSchedule = {
+    floorRate: "0.0675",
+    periods: [
+      { from: "2026-01-10", to: "2026-04-10", rate: "0.0675" },
+      { from: "2026-04-10", to: "2026-07-10", rate: "0.07" },
+      { from: "2026-07-10", rate: "0.0725" },
+    ],
+  };
+
+  function sbr(overrides: Partial<BondPosition> = {}): BondPosition {
+    return {
+      instrumentId: "sbr015t2",
+      symbol: "SBR015T2",
+      name: "SBR015T2",
+      quantity: "1",
+      faceValue: "1000000",
+      couponRate: "",
+      couponSchedule: "monthly",
+      couponRateSchedule: SBR_SCHEDULE,
+      maturityDate: "2028-07-10",
+      currency: "IDR",
+      ...overrides,
+    };
+  }
+
+  // Mid-period, so the ladder (which walks back from maturity) starts on 2026-03-10.
+  const NOW = new Date("2026-02-15T00:00:00.000Z");
+
+  const amountOn = (rows: { date: string; amount: string }[], date: string) =>
+    rows.find((r) => r.date === date)?.amount;
+
+  it("prices each coupon at the rate of the period it falls in", () => {
+    const rows = projectCoupons([sbr()], 12, NOW);
+    expect(rows).toHaveLength(12);
+    // 1,000,000 × 0.0675 / 12 = 5625 exactly
+    expect(amountOn(rows, "2026-03-10")).toBe("5625");
+    // 1,000,000 × 0.07 / 12 = 5833.3333333333333333
+    expect(amountOn(rows, "2026-04-10")).toBe("5833.3333333333333333");
+    // 1,000,000 × 0.0725 / 12 = 6041.6666666666666667
+    expect(amountOn(rows, "2026-07-10")).toBe("6041.6666666666666667");
+    // The open-ended period still covers the rest of the horizon.
+    expect(amountOn(rows, "2026-12-10")).toBe("6041.6666666666666667");
+  });
+
+  it("falls back to the floor rate for a date no announced period covers", () => {
+    const schedule: BondCouponRateSchedule = {
+      floorRate: "0.0675",
+      periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.07" }],
+    };
+    const rows = projectCoupons([sbr({ couponRateSchedule: schedule })], 12, NOW);
+    // Inside the announced period → the announced rate.
+    expect(amountOn(rows, "2026-03-10")).toBe("5833.3333333333333333");
+    // Outside it → the contractual floor, never zero.
+    expect(amountOn(rows, "2026-05-10")).toBe("5625");
+  });
+
+  it("treats a period's start as inclusive and its end as exclusive", () => {
+    const schedule: BondCouponRateSchedule = {
+      floorRate: "0.0675",
+      periods: [
+        { from: "2026-01-10", to: "2026-04-10", rate: "0.07" },
+        { from: "2026-04-10", rate: "0.0725" },
+      ],
+    };
+    const rows = projectCoupons([sbr({ couponRateSchedule: schedule })], 12, NOW);
+    // 2026-04-10 is the END of the first period and the START of the second — it must
+    // take the second period's rate.
+    expect(amountOn(rows, "2026-04-10")).toBe("6041.6666666666666667");
+    expect(amountOn(rows, "2026-03-10")).toBe("5833.3333333333333333");
+  });
+
+  it("covers a date with an open-ended period (no end date)", () => {
+    const schedule: BondCouponRateSchedule = {
+      floorRate: "0.0675",
+      periods: [{ from: "2026-01-10", rate: "0.0725" }],
+    };
+    const rows = projectCoupons([sbr({ couponRateSchedule: schedule })], 12, NOW);
+    expect(amountOn(rows, "2026-03-10")).toBe("6041.6666666666666667");
+    expect(amountOn(rows, "2027-01-10")).toBe("6041.6666666666666667");
+  });
+
+  it("lets the schedule win over a flat couponRate on the same instrument", () => {
+    // A bond that was first entered as fixed-rate (6.00 %) and later identified as
+    // floating: the schedule is authoritative for the dates it covers.
+    const rows = projectCoupons([sbr({ couponRate: "0.06" })], 12, NOW);
+    expect(amountOn(rows, "2026-03-10")).toBe("5625");
+    expect(amountOn(rows, "2026-04-10")).toBe("5833.3333333333333333");
+  });
+
+  it("emits no coupons at all when the position has neither a rate nor a schedule", () => {
+    const rows = projectCoupons([sbr({ couponRate: "", couponRateSchedule: null })], 12, NOW);
+    expect(rows).toEqual([]);
+  });
+
+  it("keeps the flat-rate path byte-identical (regression guard)", () => {
+    // No schedule → the amount is exactly what it has always been:
+    // faceValue × quantity × couponRate / periods.
+    const rows = projectCoupons([bond()], 24, NOW);
+    expect(amountOn(rows, TODAY_KEY)).toBe("60");
+    const monthly = projectCoupons(
+      [
+        bond({
+          faceValue: "1000000",
+          couponRate: "0.0635",
+          couponSchedule: "monthly",
+          maturityDate: "2027-09-10",
+        }),
+      ],
+      12,
+      new Date("2026-09-13T00:00:00.000Z"),
+    );
+    expect(amountOn(monthly, "2026-10-10")).toBe("5291.6666666666666667");
+  });
+
+  it("computes coupon amounts in decimal, never through a float", () => {
+    const schedule: BondCouponRateSchedule = {
+      floorRate: "0.0685",
+      periods: [{ from: "2026-01-10", rate: "0.0685" }],
+    };
+    const rows = projectCoupons([sbr({ couponRateSchedule: schedule })], 12, NOW);
+    // 1,000,000 × 0.0685 / 12 = 5708.3333333333333333 (20 significant digits — the
+    // float equivalent would be 5708.333333333333).
+    expect(amountOn(rows, "2026-03-10")).toBe("5708.3333333333333333");
+  });
+});
+
+describe("couponRateForDate", () => {
+  const position: BondPosition = {
+    instrumentId: "sbr015t2",
+    symbol: "SBR015T2",
+    quantity: "1",
+    faceValue: "1000000",
+    couponRate: "0.06",
+    couponSchedule: "monthly",
+    couponRateSchedule: {
+      floorRate: "0.0675",
+      periods: [
+        { from: "2026-01-10", to: "2026-04-10", rate: "0.0675" },
+        { from: "2026-04-10", rate: "0.07" },
+      ],
+    },
+    maturityDate: "2028-07-10",
+    currency: "IDR",
+  };
+
+  it("returns the announced rate of the period containing the date", () => {
+    expect(couponRateForDate(position, "2026-02-01")).toBe("0.0675");
+    expect(couponRateForDate(position, "2026-04-10")).toBe("0.07");
+  });
+
+  it("falls back to the floor outside the announced periods", () => {
+    expect(couponRateForDate(position, "2025-12-31")).toBe("0.0675");
+  });
+
+  it("returns the flat rate when the position has no schedule", () => {
+    const fixed = { ...position, couponRateSchedule: null };
+    expect(couponRateForDate(fixed, "2026-02-01")).toBe("0.06");
+  });
+
+  it("returns null when the position has neither a rate nor a schedule", () => {
+    expect(
+      couponRateForDate({ ...position, couponRate: "", couponRateSchedule: null }, "2026-02-01"),
+    ).toBeNull();
   });
 });

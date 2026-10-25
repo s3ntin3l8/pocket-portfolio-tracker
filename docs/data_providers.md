@@ -78,6 +78,40 @@ call `valuePortfolio()` and pick up the manual price going forward. A real live 
 should a schedulable source ever surface, would close both this gap and the
 manual-maintenance burden at once.
 
+### Floating-rate retail bonds (SBR/ST)
+
+Indonesian retail **floating-rate** government bonds (SBR/ST series) set their coupon rate
+off the **Bank Indonesia 7-Day Reverse Repo Rate plus a fixed spread**, floored at the
+first-period rate, and **reset every three months** while the **payments stay monthly**.
+Two independent axes, so they are stored separately on the instrument:
+
+| Field                            | Axis                                                                |
+| -------------------------------- | ------------------------------------------------------------------- |
+| `instruments.couponSchedule`     | **Payment** frequency (`monthly` for SBR)                           |
+| `instruments.couponRateSchedule` | **Rate** schedule — `{ floorRate, periods: [{ from, to?, rate }] }` |
+
+`from` is inclusive, `to` exclusive; an omitted `to` runs to maturity. The stored `rate` is
+the **announced effective** rate (it already bakes in `max(reference + spread, floor)`), and
+`floorRate` — the contractual minimum for the whole tenor — applies to any period whose rate
+has not been announced yet. Because an announced rate can therefore never sit below the
+floor, a floor above an announced rate is an inconsistent input: the schema rejects it and
+the editor refuses to submit it with that reason. The per-date resolution lives in exactly
+one place, `couponRateForDate()` in `packages/core/src/coupons.ts`; a fixed-rate bond (no
+schedule) keeps its flat `instruments.couponRate` and is projected exactly as before.
+
+There is **no BI rate provider in this repo**, so the schedule is entered by hand rather
+than derived from a live reference rate — a future BI provider could feed the unannounced
+periods, which is a separate piece of work. Two consequences to keep in mind:
+
+- The **payment ladder is unchanged**: it still walks back from the maturity date by the
+  payment interval, so a first coupon that is a _short_ or _long_ period (as an SBR series
+  can have) is approximated as a full monthly coupon. This is a pre-existing limitation
+  that applies to fixed-rate bonds identically.
+- The schedule lives on **shared reference data** (`instruments`), so it follows the same
+  one-way rule as every other bond term: an import may fill a `null` schedule, never
+  replace one another user set — corrections go through the admin-gated
+  `PATCH /instruments/:id`.
+
 ## Priority & fallback
 
 Default priorities come from `PROVIDER_REGISTRY` registration order

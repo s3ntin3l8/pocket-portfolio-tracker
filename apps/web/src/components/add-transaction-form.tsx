@@ -96,10 +96,15 @@ export function AddTransactionForm({
       setCouponSchedule={form.setCouponSchedule}
       maturityDate={form.maturityDate}
       setMaturityDate={form.setMaturityDate}
+      floatingRate={form.floatingRate}
+      setFloatingRate={form.setFloatingRate}
+      rateSchedule={form.rateSchedule}
+      setRateSchedule={form.setRateSchedule}
       customOpen={form.customOpen}
       onToggleCustom={() => form.setCustomOpen((o) => !o)}
       t={form.t}
       tc={form.tc}
+      tb={form.tb}
     />
   );
 

@@ -1183,6 +1183,27 @@
       "strong_sell": "Jual kuat"
     }
   },
+  "BondTerms": {
+    "floatingRateLabel": "Suku bunga mengambang (SBR/ST)",
+    "floatingRateHint": "Suku bunga kupon reset tiap beberapa bulan, sementara jadwal pembayaran tetap sendiri.",
+    "floorRateLabel": "Suku bunga dasar (% per tahun)",
+    "floorRateHint": "Suku bunga minimum untuk seluruh tenor — dipakai untuk periode yang rate-nya belum diumumkan.",
+    "ratePeriodsLabel": "Periode suku bunga yang diumumkan",
+    "ratePeriodsEmpty": "Belum ada periode. Tambahkan periode yang rate-nya sudah diumumkan penerbit.",
+    "ratePeriodFrom": "Dari",
+    "ratePeriodTo": "Sampai (tidak termasuk)",
+    "ratePeriodRate": "Rate % per tahun",
+    "addRatePeriod": "Tambah periode",
+    "removeRatePeriod": "Hapus periode",
+    "floatingBadge": "mengambang",
+    "issue": {
+      "floorMissing": "Masukkan suku bunga dasar dalam persen (mis. 6,75).",
+      "noPeriods": "Tambahkan minimal satu periode suku bunga.",
+      "periodIncomplete": "Setiap periode butuh tanggal mulai dan rate; tanggal akhir opsional.",
+      "periodOverlaps": "Periode suku bunga tidak boleh saling tumpang tindih.",
+      "floorAboveRate": "Suku bunga dasar tidak boleh lebih tinggi dari suku bunga yang diumumkan."
+    }
+  },
   "CorpAction": {
     "title": "Catat aksi korporasi",
     "subtitle": "Terapkan pemecahan, bonus, rights, atau merger pada instrumen.",
