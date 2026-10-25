@@ -13,13 +13,12 @@ import { StickyTableWrapper } from "@/components/ui/sticky-table-wrapper";
  *
  * `caption` names the table for assistive tech (audit R4-D5): a screen-reader user
  * navigating by table would otherwise meet several indistinguishable "table, 6
- * columns" entries on one page. Every app call site passes a localized name. It is
- * applied as the table's `aria-label` rather than a `<caption>` element: most of
- * these tables sit under a card whose visible heading already carries the same
- * words, and a second copy of that text in the DOM is noise (a `<caption>` would
- * also repeat the heading in every text query). The prop is optional in the type
- * only so the bare `<Table>` fixtures in the table unit tests keep compiling —
- * without one the table still gets a generic name, so no table is ever unnamed.
+ * columns" entries on one page. It is REQUIRED, so a new table cannot be added
+ * unnamed, and every call site passes a localized name. It is applied as the
+ * table's `aria-label` rather than a `<caption>` element: most of these tables sit
+ * under a card whose visible heading already carries the same words, and a second
+ * copy of that text in the DOM is noise (a `<caption>` would also repeat the heading
+ * in every text query).
  */
 function Table({
   className,
@@ -30,8 +29,8 @@ function Table({
   children,
   ...props
 }: React.ComponentProps<"table"> & {
-  /** The table's accessible name — localized. */
-  caption?: string;
+  /** The table's accessible name — localized. Required: a table must be nameable. */
+  caption: string;
   edgeAffordance?: boolean;
   stickyHeader?: boolean;
   /** With `stickyHeader`: called when the header starts or stops pinning (the table fits). */
@@ -43,7 +42,7 @@ function Table({
   );
   const element = (
     <table
-      aria-label={caption ?? "Table"}
+      aria-label={caption}
       className={cn(
         "w-full caption-bottom text-body-sm",
         edgeAffordance && "sticky-first-col",
