@@ -1200,7 +1200,8 @@
       "floorMissing": "Masukkan suku bunga dasar dalam persen (mis. 6,75).",
       "noPeriods": "Tambahkan minimal satu periode suku bunga.",
       "periodIncomplete": "Setiap periode butuh tanggal mulai dan rate; tanggal akhir opsional.",
-      "periodOverlaps": "Periode suku bunga tidak boleh saling tumpang tindih."
+      "periodOverlaps": "Periode suku bunga tidak boleh saling tumpang tindih.",
+      "floorAboveRate": "Suku bunga dasar tidak boleh lebih tinggi dari suku bunga yang diumumkan."
     }
   },
   "CorpAction": {

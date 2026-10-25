@@ -6,6 +6,8 @@
  *  - The schedule back-fills onto an existing bond row only while it is null — the
  *    one-way upgrade rule every other bond term follows.
  *  - PATCH /instruments/:id sets and clears the schedule and stays admin-gated.
+ *  - GET /instruments and GET /instruments/:id validate the stored schedule on the way out
+ *    — a malformed row degrades to "no schedule" instead of reaching the client raw.
  *  - GET /portfolios/:id/income prices each forecast coupon at the rate of the period
  *    it falls in, not at one flat rate for the whole tenor.
  */
@@ -351,6 +353,74 @@ describe("GET /instruments/:id — the stored schedule is validated on the way o
     // The malformed schedule is dropped, not handed to the client — and the read does
     // not fail either.
     expect(res.json().couponRateSchedule).toBeNull();
+  });
+});
+
+describe("GET /instruments — the list validates the schedule the same way", () => {
+  it("degrades a malformed stored schedule to no schedule in both list shapes", async () => {
+    const t = await token("fr-list-1");
+    const created = await app.inject({
+      method: "POST",
+      url: "/instruments",
+      headers: auth(t),
+      payload: {
+        symbol: "FR-MALFORMED-LIST",
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        name: "FR-MALFORMED-LIST",
+        couponRateSchedule: SCHEDULE,
+      },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+
+    await app.db.execute(
+      `UPDATE instruments SET coupon_rate_schedule = '{"floorRate":"0.0675"}'::jsonb WHERE symbol = 'FR-MALFORMED-LIST'`,
+    );
+
+    // The paginated shape...
+    const paged = await app.inject({
+      method: "GET",
+      url: "/instruments?page=1&pageSize=100",
+      headers: auth(t),
+    });
+    expect(paged.statusCode, paged.body).toBe(200);
+    const pagedRow = paged
+      .json()
+      .rows.find((r: { symbol: string }) => r.symbol === "FR-MALFORMED-LIST");
+    expect(pagedRow?.couponRateSchedule).toBeNull();
+
+    // ...and the legacy bare-array shape answer the same way for the same row.
+    const legacy = await app.inject({ method: "GET", url: "/instruments", headers: auth(t) });
+    expect(legacy.statusCode, legacy.body).toBe(200);
+    const legacyRow = legacy
+      .json()
+      .find((r: { symbol: string }) => r.symbol === "FR-MALFORMED-LIST");
+    expect(legacyRow?.couponRateSchedule).toBeNull();
+  });
+
+  it("returns a valid schedule unchanged", async () => {
+    const t = await token("fr-list-2");
+    await app.inject({
+      method: "POST",
+      url: "/instruments",
+      headers: auth(t),
+      payload: {
+        symbol: "FR-VALID-LIST",
+        market: "IDX",
+        assetClass: "bond",
+        unit: "units",
+        currency: "IDR",
+        name: "FR-VALID-LIST",
+        couponRateSchedule: SCHEDULE,
+      },
+    });
+
+    const res = await app.inject({ method: "GET", url: "/instruments", headers: auth(t) });
+    expect(res.statusCode, res.body).toBe(200);
+    const row = res.json().find((r: { symbol: string }) => r.symbol === "FR-VALID-LIST");
+    expect(row?.couponRateSchedule).toEqual(SCHEDULE);
   });
 });
 

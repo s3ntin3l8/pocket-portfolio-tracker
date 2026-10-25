@@ -1,5 +1,6 @@
 import type { BondCouponRateSchedule } from "@portfolio/api-client";
 import { couponRateForDate, type BondPosition } from "@portfolio/core";
+import Decimal from "decimal.js";
 import { fractionToPercent, percentToFraction } from "./tax-rate";
 
 /**
@@ -40,7 +41,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Why a draft can't be turned into a schedule yet — the editor shows the matching hint. */
 export type RateScheduleIssue =
-  "floorMissing" | "noPeriods" | "periodIncomplete" | "periodOverlaps" | null;
+  "floorMissing" | "noPeriods" | "periodIncomplete" | "periodOverlaps" | "floorAboveRate" | null;
 
 /**
  * The stored schedule, guarded.
@@ -75,15 +76,16 @@ export function rateScheduleToDraft(
 
 /**
  * What is wrong with the draft, if anything. Mirrors the API's own rules (a period must
- * be complete, periods must not overlap) so the form can say so BEFORE the request,
- * instead of bouncing a 400.
+ * be complete, periods must not overlap, an announced rate may not sit below the floor)
+ * so the form can say so BEFORE the request, instead of bouncing a 400.
  *
  * The periods are checked in chronological order, so an overlap is caught no matter which
  * order the user typed them in — the ORDER itself is not an error: the payload sorts the
  * periods by start date on the way out.
  */
 export function validateRateScheduleDraft(draft: RateScheduleDraft): RateScheduleIssue {
-  if (percentToFraction(draft.floorRatePercent.trim()) == null) return "floorMissing";
+  const floorRate = percentToFraction(draft.floorRatePercent.trim());
+  if (floorRate == null) return "floorMissing";
   if (draft.periods.length === 0) return "noPeriods";
 
   const sorted = [...draft.periods].sort((a, b) => a.from.localeCompare(b.from));
@@ -91,7 +93,13 @@ export function validateRateScheduleDraft(draft: RateScheduleDraft): RateSchedul
     if (!ISO_DATE.test(p.from.trim())) return "periodIncomplete";
     if (p.to.trim() !== "" && !ISO_DATE.test(p.to.trim())) return "periodIncomplete";
     if (p.to.trim() !== "" && p.to.trim() <= p.from.trim()) return "periodIncomplete";
-    if (percentToFraction(p.ratePercent.trim()) == null) return "periodIncomplete";
+    const rate = percentToFraction(p.ratePercent.trim());
+    if (rate == null) return "periodIncomplete";
+    // The announced rate is max(reference + spread, floor) — it can never sit below the
+    // floor, so a rate under it means the input is inconsistent. The API enforces the
+    // same rule (bondCouponRateScheduleSchema); catching it here shows the inline
+    // reason instead of a generic error toast.
+    if (new Decimal(rate).lt(floorRate)) return "floorAboveRate";
   }
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1];

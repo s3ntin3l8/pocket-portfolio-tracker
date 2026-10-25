@@ -8,6 +8,7 @@ import {
   couponScheduleSchema,
   decimalString,
   instrumentInputSchema,
+  type BondCouponRateSchedule,
 } from "@portfolio/schema";
 import {
   findOrCreateInstrument,
@@ -29,6 +30,21 @@ const instrumentsCache = createStore<{
   rows: (typeof instruments.$inferSelect)[];
   total: number;
 }>();
+
+/**
+ * Every instrument row leaves the API with its coupon-rate schedule validated.
+ *
+ * `instruments.coupon_rate_schedule` is untyped jsonb (see `loans.schedule` for the same
+ * pattern), so the shape is checked on the way out: a malformed row degrades to "no
+ * schedule" instead of reaching the client as an arbitrary object. The list endpoints and
+ * the by-id route go through this one helper, so the same row always gets the same answer
+ * whichever endpoint asked for it.
+ */
+function withValidatedSchedule<T extends { couponRateSchedule?: unknown }>(
+  row: T,
+): T & { couponRateSchedule: BondCouponRateSchedule | null } {
+  return { ...row, couponRateSchedule: parseCouponRateSchedule(row.couponRateSchedule) };
+}
 
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
@@ -131,11 +147,11 @@ export async function instrumentsRoute(app: FastifyInstance) {
                 .limit(pageSize)
                 .offset((page - 1) * pageSize),
         ]);
-        return { rows: _rows, total: cnt };
+        return { rows: _rows.map(withValidatedSchedule), total: cnt };
       });
       request.timingName = "GET /instruments (paginated)";
       request.timingMeta = { q, page, pageSize, total };
-      return { rows, total };
+      return { rows: rows.map(withValidatedSchedule), total };
     }
 
     // Legacy path: no pagination, return bare array.
@@ -152,7 +168,7 @@ export async function instrumentsRoute(app: FastifyInstance) {
       : await app.db.select().from(instruments).orderBy(asc(instruments.symbol));
     request.timingName = "GET /instruments";
     request.timingMeta = { q, rowCount: rows.length };
-    return rows;
+    return rows.map(withValidatedSchedule);
   });
 
   // Discover instruments from market-data providers (ticker/name search or ISIN
@@ -199,7 +215,7 @@ export async function instrumentsRoute(app: FastifyInstance) {
       // The coupon-rate schedule is untyped jsonb (see instruments.coupon_rate_schedule):
       // validate it on the way out so a malformed row degrades to "no schedule" instead
       // of reaching the client as an arbitrary object.
-      return { ...inst, couponRateSchedule: parseCouponRateSchedule(inst.couponRateSchedule) };
+      return withValidatedSchedule(inst);
     },
   );
 

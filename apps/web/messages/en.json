@@ -1200,7 +1200,8 @@
       "floorMissing": "Enter the floor rate as a percentage (e.g. 6.75).",
       "noPeriods": "Add at least one rate period.",
       "periodIncomplete": "Every period needs a start date and a rate; the end date is optional.",
-      "periodOverlaps": "Rate periods must not overlap."
+      "periodOverlaps": "Rate periods must not overlap.",
+      "floorAboveRate": "The floor rate cannot be above an announced rate."
     }
   },
   "CorpAction": {

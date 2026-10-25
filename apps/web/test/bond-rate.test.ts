@@ -85,6 +85,31 @@ describe("validateRateScheduleDraft", () => {
     ).toBe("periodOverlaps");
   });
 
+  it("reports an announced rate below the floor", () => {
+    // The announced rate is max(reference + spread, floor) — it can never sit below the
+    // floor. The API enforces the same rule, but catching it here shows the inline reason
+    // instead of a generic error toast.
+    expect(
+      validateRateScheduleDraft(
+        draft({
+          floorRatePercent: "8",
+          periods: [{ from: "2026-01-10", to: "", ratePercent: "6.75" }],
+        }),
+      ),
+    ).toBe("floorAboveRate");
+  });
+
+  it("accepts an announced rate exactly at the floor", () => {
+    expect(
+      validateRateScheduleDraft(
+        draft({
+          floorRatePercent: "6.75",
+          periods: [{ from: "2026-01-10", to: "", ratePercent: "6.75" }],
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it("does not treat the order the periods were typed in as an error", () => {
     // The payload sorts them by start date, so an out-of-order draft is still valid.
     expect(

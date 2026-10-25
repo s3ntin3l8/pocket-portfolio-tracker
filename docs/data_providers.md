@@ -93,9 +93,11 @@ Two independent axes, so they are stored separately on the instrument:
 `from` is inclusive, `to` exclusive; an omitted `to` runs to maturity. The stored `rate` is
 the **announced effective** rate (it already bakes in `max(reference + spread, floor)`), and
 `floorRate` — the contractual minimum for the whole tenor — applies to any period whose rate
-has not been announced yet. The per-date resolution lives in exactly one place,
-`couponRateForDate()` in `packages/core/src/coupons.ts`; a fixed-rate bond (no schedule)
-keeps its flat `instruments.couponRate` and is projected exactly as before.
+has not been announced yet. Because an announced rate can therefore never sit below the
+floor, a floor above an announced rate is an inconsistent input: the schema rejects it and
+the editor refuses to submit it with that reason. The per-date resolution lives in exactly
+one place, `couponRateForDate()` in `packages/core/src/coupons.ts`; a fixed-rate bond (no
+schedule) keeps its flat `instruments.couponRate` and is projected exactly as before.
 
 There is **no BI rate provider in this repo**, so the schedule is entered by hand rather
 than derived from a live reference rate — a future BI provider could feed the unannounced

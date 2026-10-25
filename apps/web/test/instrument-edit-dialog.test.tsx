@@ -197,7 +197,9 @@ describe("InstrumentEditDialog", () => {
     it("saves an edited rate schedule — percent-in converts to a fraction", async () => {
       renderDialog(BOND);
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "7" } });
+      // The floor stays below the announced rate of 6.75% — the API rejects a floor
+      // above an announced rate, so the editor refuses it before the request.
+      fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "6.5" } });
       fireEvent.click(screen.getByRole("button", { name: t.save }));
 
       await waitFor(() =>
@@ -205,7 +207,7 @@ describe("InstrumentEditDialog", () => {
           "b1",
           expect.objectContaining({
             couponRateSchedule: {
-              floorRate: "0.07",
+              floorRate: "0.065",
               periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
             },
           }),
@@ -238,6 +240,19 @@ describe("InstrumentEditDialog", () => {
       expect(toast.error).toHaveBeenCalledWith(tb.issue.floorMissing);
       // The schedule is shared reference data — an unusable draft must never be sent
       // as `null`, which would delete it for every holder of the series.
+      expect(updateInstrument).not.toHaveBeenCalled();
+    });
+
+    it("blocks the save with the inline reason when the floor is above an announced rate", async () => {
+      renderDialog(BOND);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      // The announced rate is 6.75%; a floor of 8% is inconsistent — the API would
+      // answer 400, so the editor says why instead of sending it.
+      fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "8" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalled());
+      expect(toast.error).toHaveBeenCalledWith(tb.issue.floorAboveRate);
       expect(updateInstrument).not.toHaveBeenCalled();
     });
 
