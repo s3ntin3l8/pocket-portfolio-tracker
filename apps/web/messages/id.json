@@ -2324,7 +2324,10 @@
       "save": "Simpan",
       "saving": "Menyimpan…",
       "success": "Penangguhan kerugian tersimpan",
-      "error": "Tidak dapat menyimpan. Silakan coba lagi."
+      "error": "Tidak dapat menyimpan. Silakan coba lagi.",
+      "loading": "Memuat penangguhan kerugian…",
+      "loadError": "Tidak dapat memuat penangguhan kerugian Anda. Jumlah di bawah tidak diketahui — tidak ada yang diubah.",
+      "negativeIgnored": "Jumlah negatif tidak diterima — jumlah tersebut digunakan apa adanya (positif)."
     }
   },
   "Anomalies": {
