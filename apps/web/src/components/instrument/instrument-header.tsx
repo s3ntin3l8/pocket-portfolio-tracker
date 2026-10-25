@@ -10,9 +10,28 @@ import { InstrumentEditDialog } from "@/components/instrument-edit-dialog";
 import { PageTitle } from "@/components/page-header";
 
 /** `className="md:flex"` keeps it visible on desktop for pages with no topbar title (error states). */
-export async function InstrumentBackButton({ className }: { className?: string }) {
+export async function InstrumentBackButton({
+  className,
+  backHref,
+}: {
+  className?: string;
+  /**
+   * Where "back" goes. Defaults to the tab that owns instruments (`/holdings`); a page that
+   * knows where the visitor came from passes that route instead, so the link returns them
+   * there rather than to the holdings tab (audit R4-G3).
+   */
+  backHref?: string;
+}) {
   const tA11y = await getTranslations("A11y");
-  return <BackLink href="/holdings" label={tA11y("backToHoldings")} className={className} />;
+  // The "Back to holdings" label only describes the default target - with another target
+  // the generic "Back" is the honest name.
+  return (
+    <BackLink
+      href={backHref ?? "/holdings"}
+      label={backHref ? tA11y("back") : tA11y("backToHoldings")}
+      className={className}
+    />
+  );
 }
 
 /**
@@ -26,15 +45,18 @@ export async function InstrumentHeader({
   instrument,
   heroName,
   isAdmin,
+  backHref,
 }: {
   instrument: Instrument;
   heroName: string;
   isAdmin: boolean;
+  /** The back target; see {@link InstrumentBackButton}. */
+  backHref?: string;
 }) {
   const [t, tc] = await Promise.all([getTranslations("Instrument"), getTranslations("AssetClass")]);
   return (
     <div className="flex items-start gap-3">
-      <InstrumentBackButton />
+      <InstrumentBackButton backHref={backHref} />
       <InstrumentLogo
         label={instrument.symbol}
         symbol={instrument.symbol}

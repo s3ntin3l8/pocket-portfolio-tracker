@@ -186,7 +186,12 @@ export default async function InstrumentPage({
     <div className="space-y-6">
       <PageHeaderSetter title={heroName} backHref={backTarget} />
       <InstrumentVisitTracker id={id} symbol={instrument.symbol} />
-      <InstrumentHeader instrument={instrument} heroName={heroName} isAdmin={isAdmin} />
+      <InstrumentHeader
+        instrument={instrument}
+        heroName={heroName}
+        isAdmin={isAdmin}
+        backHref={backTarget}
+      />
 
       <PageWithRail size="narrow">
         {/* ── Main column: price chart + fundamentals + lots + transactions ──

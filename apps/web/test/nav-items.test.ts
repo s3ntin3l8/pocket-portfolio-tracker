@@ -7,7 +7,7 @@ describe("navActiveKey", () => {
     expect(navActiveKey("/transactions")).toBe("activity");
     expect(navActiveKey("/reports")).toBe("reports");
     expect(navActiveKey("/insights")).toBe("insights");
-    expect(navActiveKey("/settings")).toBe("profile");
+    expect(navActiveKey("/settings")).toBe("settings");
   });
 
   it("maps leaf routes back onto their parent tab", () => {
@@ -17,7 +17,7 @@ describe("navActiveKey", () => {
     expect(navActiveKey("/tax")).toBe("reports");
     expect(navActiveKey("/savings")).toBe("reports");
     expect(navActiveKey("/trades")).toBe("reports");
-    expect(navActiveKey("/portfolios")).toBe("profile");
+    expect(navActiveKey("/portfolios")).toBe("settings");
     expect(navActiveKey("/admin")).toBe("admin");
   });
 
@@ -31,7 +31,7 @@ describe("navActiveKey", () => {
       "activity",
       "reports",
       "insights",
-      "profile",
+      "settings",
     ]);
   });
 });
