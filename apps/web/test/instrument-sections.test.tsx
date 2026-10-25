@@ -165,6 +165,60 @@ describe("Instrument sections", () => {
     expect(incomeProps.last?.bondInfo).toMatchObject({ label: "bondTermsLabel" });
   });
 
+  it("shows a floating bond's effective rate today, not a flat rate", async () => {
+    // A schedule whose periods bracket today from both sides: the rate that applies
+    // today is the announced one, and it is labelled as floating.
+    const today = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.UTC(2020, 0, 10)).toISOString().slice(0, 10);
+    const to = new Date(Date.UTC(2099, 0, 10)).toISOString().slice(0, 10);
+    expect(from <= today && today < to).toBe(true);
+    data.instrumentOnce.mockResolvedValue({
+      status: "ok",
+      data: {
+        instrument: {
+          ...instrument,
+          assetClass: "bond",
+          couponRate: null,
+          couponRateSchedule: {
+            floorRate: "0.0675",
+            periods: [{ from, to, rate: "0.07" }],
+          },
+          maturityDate: "2030-01-15",
+        },
+        history: [],
+        corporateActions: [],
+      },
+    });
+    render(await InstrumentIncomeSection({ id: "i1", locale: "en" }));
+    const bondInfo = incomeProps.last?.bondInfo as { couponRate: string } | null;
+    expect(bondInfo?.couponRate).toMatch(/7\.00%/);
+    expect(bondInfo?.couponRate).toMatch(/floatingBadge/);
+  });
+
+  it("shows the floor rate for a floating bond outside its announced periods", async () => {
+    const from = new Date(Date.UTC(2099, 0, 10)).toISOString().slice(0, 10);
+    data.instrumentOnce.mockResolvedValue({
+      status: "ok",
+      data: {
+        instrument: {
+          ...instrument,
+          assetClass: "bond",
+          couponRate: null,
+          couponRateSchedule: {
+            floorRate: "0.0675",
+            periods: [{ from, rate: "0.07" }],
+          },
+          maturityDate: "2030-01-15",
+        },
+        history: [],
+        corporateActions: [],
+      },
+    });
+    render(await InstrumentIncomeSection({ id: "i1", locale: "en" }));
+    const bondInfo = incomeProps.last?.bondInfo as { couponRate: string } | null;
+    expect(bondInfo?.couponRate).toMatch(/6\.75%/);
+  });
+
   it("transactions table gets the scope currency and only this instrument's anomalies", async () => {
     data.anomaliesOnce.mockResolvedValue([
       { code: "oversell", severity: "error", instrumentId: "i1", transactionId: "t1" },

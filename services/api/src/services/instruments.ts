@@ -2,10 +2,30 @@ import { and, eq } from "drizzle-orm";
 import { instruments, prices, transactions } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
 import { isIsin, isKnownMarket, PRICEABLE_FOREIGN_MARKETS } from "@portfolio/market-data";
-import type { InstrumentInput } from "@portfolio/schema";
+import {
+  bondCouponRateScheduleSchema,
+  type BondCouponRateSchedule,
+  type InstrumentInput,
+} from "@portfolio/schema";
 import type { DB } from "../db/client.js";
 
 type Instrument = typeof instruments.$inferSelect;
+
+/**
+ * The instrument's stored floating-rate coupon schedule, validated against the canonical
+ * schema.
+ *
+ * `instruments.coupon_rate_schedule` is untyped jsonb (like `loans.schedule`), so the
+ * shape is checked on the way out: a row written before the shape existed — or straight
+ * into the DB — can never feed the coupon projection a malformed schedule. An invalid
+ * schedule is treated as "no schedule" rather than as an error: the bond then falls back
+ * to its flat `couponRate` (or is not projected at all), which is the pre-#752 behaviour.
+ */
+export function parseCouponRateSchedule(raw: unknown): BondCouponRateSchedule | null {
+  if (raw == null) return null;
+  const parsed = bondCouponRateScheduleSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
 
 /**
  * Fields an existing instrument should adopt from a fresh `input` when the input is
@@ -37,6 +57,7 @@ function instrumentUpgrade(
       | "faceValue"
       | "couponRate"
       | "couponSchedule"
+      | "couponRateSchedule"
       | "maturityDate"
     >
   >;
@@ -55,6 +76,7 @@ function instrumentUpgrade(
       | "faceValue"
       | "couponRate"
       | "couponSchedule"
+      | "couponRateSchedule"
       | "maturityDate"
     >
   > = {};
@@ -112,6 +134,8 @@ function instrumentUpgrade(
       set.couponRate = input.couponRate;
     if (existing.couponSchedule == null && input.couponSchedule !== undefined)
       set.couponSchedule = input.couponSchedule;
+    if (existing.couponRateSchedule == null && input.couponRateSchedule !== undefined)
+      set.couponRateSchedule = input.couponRateSchedule;
     if (existing.maturityDate == null && input.maturityDate !== undefined)
       set.maturityDate = input.maturityDate;
   }
@@ -254,6 +278,7 @@ export async function findOrCreateInstrument(
             faceValue: input.faceValue ?? null,
             couponRate: input.couponRate ?? null,
             couponSchedule: input.couponSchedule ?? null,
+            couponRateSchedule: input.couponRateSchedule ?? null,
             maturityDate: input.maturityDate ?? null,
           }
         : {}),
@@ -279,6 +304,7 @@ export async function updateInstrument(
     faceValue?: string | null;
     couponRate?: string | null;
     couponSchedule?: string | null;
+    couponRateSchedule?: BondCouponRateSchedule | null;
     maturityDate?: string | null;
     partialExemptionRate?: string | null;
   },
@@ -314,6 +340,7 @@ export async function updateInstrument(
   if (patch.faceValue !== undefined) set.faceValue = patch.faceValue;
   if (patch.couponRate !== undefined) set.couponRate = patch.couponRate;
   if (patch.couponSchedule !== undefined) set.couponSchedule = patch.couponSchedule;
+  if (patch.couponRateSchedule !== undefined) set.couponRateSchedule = patch.couponRateSchedule;
   if (patch.maturityDate !== undefined) set.maturityDate = patch.maturityDate;
   if (patch.partialExemptionRate !== undefined)
     set.partialExemptionRate = patch.partialExemptionRate;

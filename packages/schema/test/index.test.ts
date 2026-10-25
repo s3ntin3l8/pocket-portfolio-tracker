@@ -10,6 +10,8 @@ import {
   portfolioInputSchema,
   accountHolderInputSchema,
   searchQuerySchema,
+  bondCouponRateScheduleSchema,
+  instrumentInputSchema,
 } from "../src/index.js";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
@@ -323,5 +325,132 @@ describe("searchQuerySchema", () => {
 
   it("rejects unknown transaction types in the types array", () => {
     expect(() => searchQuerySchema.parse({ q: "x", types: ["unknown_type"] })).toThrow();
+  });
+});
+
+describe("bondCouponRateScheduleSchema", () => {
+  const valid = {
+    floorRate: "0.0675",
+    periods: [
+      { from: "2026-01-10", to: "2026-04-10", rate: "0.0675" },
+      { from: "2026-04-10", rate: "0.07" },
+    ],
+  };
+
+  it("accepts a well-formed schedule", () => {
+    expect(bondCouponRateScheduleSchema.parse(valid)).toMatchObject({ floorRate: "0.0675" });
+  });
+
+  it("requires at least one period", () => {
+    expect(() =>
+      bondCouponRateScheduleSchema.parse({ floorRate: "0.0675", periods: [] }),
+    ).toThrow();
+  });
+
+  it("rejects a period whose end is not after its start", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "0.0675",
+      periods: [{ from: "2026-04-10", to: "2026-04-10", rate: "0.07" }],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects overlapping periods", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "0.0675",
+      periods: [
+        { from: "2026-01-10", to: "2026-06-10", rate: "0.07" },
+        { from: "2026-04-10", to: "2026-07-10", rate: "0.07" },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a period that starts inside an open-ended period", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "0.0675",
+      periods: [
+        { from: "2026-01-10", rate: "0.07" },
+        { from: "2026-04-10", rate: "0.07" },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects periods listed out of order", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "0.0675",
+      periods: [
+        { from: "2026-04-10", rate: "0.07" },
+        { from: "2026-01-10", rate: "0.0675" },
+      ],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a rate given as a percent instead of a fraction", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "6.75",
+      periods: [{ from: "2026-01-10", rate: "6.75" }],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a negative rate", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "-0.01",
+      periods: [{ from: "2026-01-10", rate: "0.07" }],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects an announced rate below the floor", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "0.07",
+      periods: [{ from: "2026-01-10", rate: "0.0675" }],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a non-ISO date", () => {
+    const r = bondCouponRateScheduleSchema.safeParse({
+      floorRate: "0.0675",
+      periods: [{ from: "10/01/2026", rate: "0.0675" }],
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("instrumentInputSchema — floating-rate bond terms", () => {
+  const schedule = {
+    floorRate: "0.0675",
+    periods: [{ from: "2026-01-10", rate: "0.0675" }],
+  };
+
+  it("accepts a bond with a rate schedule and no flat coupon rate", () => {
+    const parsed = instrumentInputSchema.parse({
+      symbol: "SBR015T2",
+      market: "IDX",
+      assetClass: "bond",
+      currency: "IDR",
+      name: "SBR015T2",
+      faceValue: "1000000",
+      couponSchedule: "monthly",
+      couponRateSchedule: schedule,
+      maturityDate: "2028-07-10",
+    });
+    expect(parsed.couponRateSchedule?.floorRate).toBe("0.0675");
+  });
+
+  it("rejects a rate schedule on a non-bond asset class", () => {
+    const r = instrumentInputSchema.safeParse({
+      symbol: "AAPL",
+      market: "XNAS",
+      assetClass: "equity",
+      currency: "USD",
+      name: "Apple",
+      couponRateSchedule: schedule,
+    });
+    expect(r.success).toBe(false);
   });
 });

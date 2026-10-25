@@ -1,0 +1,153 @@
+import { describe, it, expect } from "vitest";
+import {
+  EMPTY_RATE_SCHEDULE_DRAFT,
+  effectiveRateForDate,
+  rateScheduleDraftToApi,
+  rateScheduleToDraft,
+  validateRateScheduleDraft,
+  type RateScheduleDraft,
+} from "../src/lib/bond-rate";
+
+const SCHEDULE = {
+  floorRate: "0.0675",
+  periods: [
+    { from: "2026-01-10", to: "2026-04-10", rate: "0.0675" },
+    { from: "2026-04-10", rate: "0.07" },
+  ],
+};
+
+function draft(over: Partial<RateScheduleDraft> = {}): RateScheduleDraft {
+  return {
+    floorRatePercent: "6.75",
+    periods: [{ from: "2026-01-10", to: "2026-04-10", ratePercent: "6.75" }],
+    ...over,
+  };
+}
+
+describe("rateScheduleToDraft", () => {
+  it("turns a stored schedule into percent-in rows", () => {
+    expect(rateScheduleToDraft(SCHEDULE)).toEqual({
+      floorRatePercent: "6.75",
+      periods: [
+        { from: "2026-01-10", to: "2026-04-10", ratePercent: "6.75" },
+        { from: "2026-04-10", to: "", ratePercent: "7" },
+      ],
+    });
+  });
+
+  it("turns a missing schedule into an empty draft", () => {
+    expect(rateScheduleToDraft(null)).toEqual(EMPTY_RATE_SCHEDULE_DRAFT);
+    expect(rateScheduleToDraft(undefined)).toEqual(EMPTY_RATE_SCHEDULE_DRAFT);
+  });
+});
+
+describe("validateRateScheduleDraft", () => {
+  it("accepts a complete draft", () => {
+    expect(validateRateScheduleDraft(draft())).toBeNull();
+  });
+
+  it("reports a missing or malformed floor rate", () => {
+    expect(validateRateScheduleDraft(draft({ floorRatePercent: "" }))).toBe("floorMissing");
+    expect(validateRateScheduleDraft(draft({ floorRatePercent: "abc" }))).toBe("floorMissing");
+  });
+
+  it("reports an empty period list", () => {
+    expect(validateRateScheduleDraft(draft({ periods: [] }))).toBe("noPeriods");
+  });
+
+  it("reports an incomplete period", () => {
+    expect(
+      validateRateScheduleDraft(draft({ periods: [{ from: "", to: "", ratePercent: "6.75" }] })),
+    ).toBe("periodIncomplete");
+    expect(
+      validateRateScheduleDraft(
+        draft({ periods: [{ from: "2026-01-10", to: "", ratePercent: "" }] }),
+      ),
+    ).toBe("periodIncomplete");
+    // An end date that is not after the start date.
+    expect(
+      validateRateScheduleDraft(
+        draft({ periods: [{ from: "2026-04-10", to: "2026-04-10", ratePercent: "6.75" }] }),
+      ),
+    ).toBe("periodIncomplete");
+  });
+
+  it("reports overlapping periods", () => {
+    expect(
+      validateRateScheduleDraft(
+        draft({
+          periods: [
+            { from: "2026-01-10", to: "2026-06-10", ratePercent: "6.75" },
+            { from: "2026-04-10", to: "", ratePercent: "7" },
+          ],
+        }),
+      ),
+    ).toBe("periodOverlaps");
+  });
+
+  it("does not treat the order the periods were typed in as an error", () => {
+    // The payload sorts them by start date, so an out-of-order draft is still valid.
+    expect(
+      validateRateScheduleDraft(
+        draft({
+          periods: [
+            { from: "2026-04-10", to: "", ratePercent: "7" },
+            { from: "2026-01-10", to: "2026-04-10", ratePercent: "6.75" },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("rateScheduleDraftToApi", () => {
+  it("converts percent-in rows into fraction-out periods", () => {
+    expect(rateScheduleDraftToApi(draft())).toEqual({
+      floorRate: "0.0675",
+      periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
+    });
+  });
+
+  it("drops an empty end date (the period runs to maturity)", () => {
+    const api = rateScheduleDraftToApi(
+      draft({ periods: [{ from: "2026-04-10", to: "", ratePercent: "7" }] }),
+    );
+    expect(api?.periods[0]).toEqual({ from: "2026-04-10", rate: "0.07" });
+  });
+
+  it("sorts the periods by start date", () => {
+    const api = rateScheduleDraftToApi(
+      draft({
+        periods: [
+          { from: "2026-04-10", to: "", ratePercent: "7" },
+          { from: "2026-01-10", to: "2026-04-10", ratePercent: "6.75" },
+        ],
+      }),
+    );
+    expect(api?.periods.map((p) => p.from)).toEqual(["2026-01-10", "2026-04-10"]);
+  });
+
+  it("returns undefined for an unusable draft — a half-filled schedule is never sent", () => {
+    expect(rateScheduleDraftToApi(draft({ floorRatePercent: "" }))).toBeUndefined();
+    expect(rateScheduleDraftToApi(draft({ periods: [] }))).toBeUndefined();
+    expect(
+      rateScheduleDraftToApi(draft({ periods: [{ from: "2026-01-10", to: "", ratePercent: "" }] })),
+    ).toBeUndefined();
+  });
+});
+
+describe("effectiveRateForDate", () => {
+  it("returns the announced rate of the period containing the date", () => {
+    expect(effectiveRateForDate(SCHEDULE, "2026-02-01")).toBe("0.0675");
+    // `to` is exclusive, so the day it ends belongs to the next period.
+    expect(effectiveRateForDate(SCHEDULE, "2026-04-10")).toBe("0.07");
+  });
+
+  it("falls back to the floor outside the announced periods", () => {
+    expect(effectiveRateForDate(SCHEDULE, "2025-12-31")).toBe("0.0675");
+  });
+
+  it("returns null without a schedule", () => {
+    expect(effectiveRateForDate(null, "2026-02-01")).toBeNull();
+  });
+});

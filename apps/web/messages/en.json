@@ -1183,6 +1183,27 @@
       "strong_sell": "Strong sell"
     }
   },
+  "BondTerms": {
+    "floatingRateLabel": "Floating rate (SBR/ST)",
+    "floatingRateHint": "The coupon rate resets every few months while the payments keep their own schedule.",
+    "floorRateLabel": "Floor rate (% p.a.)",
+    "floorRateHint": "The minimum rate for the whole tenor — used for any period whose rate has not been announced yet.",
+    "ratePeriodsLabel": "Announced rate periods",
+    "ratePeriodsEmpty": "No rate period yet. Add the periods whose rate the issuer has announced.",
+    "ratePeriodFrom": "From",
+    "ratePeriodTo": "To (exclusive)",
+    "ratePeriodRate": "Rate % p.a.",
+    "addRatePeriod": "Add period",
+    "removeRatePeriod": "Remove period",
+    "effectiveRateLabel": "Effective rate today",
+    "floatingBadge": "floating",
+    "issue": {
+      "floorMissing": "Enter the floor rate as a percentage (e.g. 6.75).",
+      "noPeriods": "Add at least one rate period.",
+      "periodIncomplete": "Every period needs a start date and a rate; the end date is optional.",
+      "periodOverlaps": "Rate periods must not overlap."
+    }
+  },
   "CorpAction": {
     "title": "Record a corporate action",
     "subtitle": "Apply a split, bonus, rights issue, or merger to an instrument.",

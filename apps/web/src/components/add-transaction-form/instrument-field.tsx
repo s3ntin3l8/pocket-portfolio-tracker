@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InstrumentLogo } from "@/components/instrument-logo";
 import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { FormField } from "@/components/ui/form-field";
 import { unitForClass } from "./constants";
+import { BondRateScheduleEditor } from "./bond-rate-schedule-editor";
+import type { RateScheduleDraft } from "@/lib/bond-rate";
 
 const ASSET_CLASSES = ["equity", "gold", "bond", "mutual_fund", "etf", "crypto"] as const;
 const UNITS = ["shares", "grams", "units"] as const;
@@ -49,10 +52,17 @@ interface InstrumentFieldProps {
   setCouponSchedule: (v: string) => void;
   maturityDate: string;
   setMaturityDate: (v: string) => void;
+  /** Floating-rate bond (SBR/ST): the coupon rate resets, the payments don't. */
+  floatingRate: boolean;
+  setFloatingRate: (v: boolean) => void;
+  rateSchedule: RateScheduleDraft;
+  setRateSchedule: (v: RateScheduleDraft) => void;
   customOpen: boolean;
   onToggleCustom: () => void;
   t: (key: string) => string;
   tc: (key: string) => string;
+  /** Translator for the `BondTerms` namespace (the floating-rate schedule strings). */
+  tb: (key: string) => string;
 }
 
 /** The v2 design's "Instrument" section. In Add mode there's no enclosing card (just a
@@ -92,10 +102,15 @@ export function InstrumentField({
   setCouponSchedule,
   maturityDate,
   setMaturityDate,
+  floatingRate,
+  setFloatingRate,
+  rateSchedule,
+  setRateSchedule,
   customOpen,
   onToggleCustom,
   t,
   tc,
+  tb,
 }: InstrumentFieldProps) {
   if (!hasInstrument) return null;
 
@@ -301,15 +316,34 @@ export function InstrumentField({
                             placeholder={t("bondFaceValuePlaceholder")}
                           />
                         </FormField>
-                        <FormField label={t("bondCouponRateLabel")} id="tx-bond-coupon-rate">
-                          <Input
-                            id="tx-bond-coupon-rate"
-                            inputMode="decimal"
-                            value={couponRatePercent}
-                            onChange={(e) => setCouponRatePercent(e.target.value)}
-                            placeholder="6.35"
+                        {/* Floating-rate bonds (Indonesian retail SBR/ST) reset their
+                            coupon rate every few months while the PAYMENTS stay on the
+                            same schedule. The toggle swaps the single rate for a rate
+                            schedule — two independent axes, never merged. */}
+                        <div className="col-span-2 flex items-start gap-2">
+                          <Checkbox
+                            id="tx-bond-floating-rate"
+                            checked={floatingRate}
+                            onCheckedChange={(v) => setFloatingRate(v === true)}
                           />
-                        </FormField>
+                          <div className="space-y-0.5">
+                            <Label htmlFor="tx-bond-floating-rate" className="text-sm">
+                              {tb("floatingRateLabel")}
+                            </Label>
+                            <p className="text-xs text-text-2">{tb("floatingRateHint")}</p>
+                          </div>
+                        </div>
+                        {!floatingRate && (
+                          <FormField label={t("bondCouponRateLabel")} id="tx-bond-coupon-rate">
+                            <Input
+                              id="tx-bond-coupon-rate"
+                              inputMode="decimal"
+                              value={couponRatePercent}
+                              onChange={(e) => setCouponRatePercent(e.target.value)}
+                              placeholder="6.35"
+                            />
+                          </FormField>
+                        )}
                         <FormField label={t("bondCouponSchedule")} id="tx-bond-coupon-schedule">
                           <Select
                             id="tx-bond-coupon-schedule"
@@ -337,6 +371,14 @@ export function InstrumentField({
                             onChange={(e) => setMaturityDate(e.target.value)}
                           />
                         </FormField>
+                        {floatingRate && (
+                          <BondRateScheduleEditor
+                            value={rateSchedule}
+                            onChange={setRateSchedule}
+                            t={tb}
+                            idPrefix="tx-bond-rate"
+                          />
+                        )}
                         <p className="col-span-2 text-xs text-text-2">{t("bondNote")}</p>
                       </>
                     )}

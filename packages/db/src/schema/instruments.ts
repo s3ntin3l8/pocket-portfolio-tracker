@@ -39,6 +39,21 @@ export const instruments = pgTable(
     faceValue: numeric("face_value"),
     couponRate: numeric("coupon_rate"),
     couponSchedule: text("coupon_schedule"),
+    /**
+     * Floating-rate coupon schedule — `{ floorRate, periods: [{ from, to?, rate }] }`.
+     *
+     * For Indonesian retail floating-rate bonds (SBR/ST) the coupon rate resets every
+     * three months off the BI 7-Day Reverse Repo Rate plus a fixed spread, floored at
+     * the first-period rate, while the PAYMENTS stay monthly. `couponSchedule` carries
+     * the payment frequency; this carries the rate schedule — two independent axes.
+     *
+     * The stored rate is the ANNOUNCED EFFECTIVE rate (it already bakes in
+     * `max(reference + spread, floor)`); a period whose rate has not been announced yet
+     * falls back to `floorRate`. Untyped jsonb, like `loans.schedule` — the shape is
+     * defined by `bondCouponRateScheduleSchema` in @portfolio/schema and validated
+     * wherever it is read or written.
+     */
+    couponRateSchedule: jsonb("coupon_rate_schedule"),
     maturityDate: date("maturity_date"),
     partialExemptionRate: numeric("partial_exemption_rate"),
     /**

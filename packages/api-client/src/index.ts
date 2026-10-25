@@ -20,6 +20,7 @@ import type {
   StorageSettingsUpdate,
   StorageSecretInput,
   DocumentCategory,
+  BondCouponRateSchedule,
 } from "@portfolio/schema";
 
 import {
@@ -30,6 +31,7 @@ import {
 } from "@portfolio/schema";
 
 export { LOW_CONFIDENCE_THRESHOLD, transferNeedsCostBasis } from "@portfolio/schema";
+export type { BondCouponRateSchedule, BondRatePeriod } from "@portfolio/schema";
 export type { ImportIssue, ParsedGoldContract, ProviderCredentialInput } from "@portfolio/schema";
 export type { ImportStrategy, ImportSettingsUpdate } from "@portfolio/schema";
 export type { StorageSettingsUpdate, StorageSecretInput } from "@portfolio/schema";
@@ -839,6 +841,11 @@ export interface Instrument {
   faceValue?: string | null;
   couponRate?: string | null;
   couponSchedule?: string | null;
+  /** Floating-rate coupon schedule (SBR/ST-style bonds). When present it OVERRIDES
+   *  `couponRate` for the dates its periods cover; `couponRate` stays the fallback.
+   *  `couponSchedule` is the PAYMENT frequency — a separate axis from the rate
+   *  schedule's reset periods. */
+  couponRateSchedule?: BondCouponRateSchedule | null;
   maturityDate?: string | null;
   /** User-maintained current price (absolute, per-unit, instrument currency) — the
    *  substitute for a live market-data provider on asset classes none serve. Overrides
@@ -3282,6 +3289,8 @@ export function createApiClient(config: ApiClientConfig) {
         faceValue?: string | null;
         couponRate?: string | null;
         couponSchedule?: string | null;
+        /** Floating-rate coupon schedule; null clears it. */
+        couponRateSchedule?: BondCouponRateSchedule | null;
         maturityDate?: string | null;
         /** Fraction 0–1; null clears the override. */
         partialExemptionRate?: string | null;

@@ -4,6 +4,7 @@ import { asc, eq, ilike, or, count } from "drizzle-orm";
 import { instruments, providerSettings } from "@portfolio/db";
 import {
   assetClassSchema,
+  bondCouponRateScheduleSchema,
   couponScheduleSchema,
   decimalString,
   instrumentInputSchema,
@@ -62,6 +63,9 @@ const patchInstrumentSchema = z.object({
   faceValue: z.string().nullable().optional(),
   couponRate: z.string().nullable().optional(),
   couponSchedule: couponScheduleSchema.nullable().optional(),
+  // Floating-rate coupon schedule — nullable so an admin can clear it (the bond then
+  // falls back to its flat couponRate, or is not projected at all).
+  couponRateSchedule: bondCouponRateScheduleSchema.nullable().optional(),
   maturityDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD")

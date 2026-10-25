@@ -28,6 +28,11 @@ import {
   goldSymbolFromLabel,
   couponRatePercentToFraction,
 } from "./constants";
+import {
+  EMPTY_RATE_SCHEDULE_DRAFT,
+  rateScheduleDraftToApi,
+  type RateScheduleDraft,
+} from "@/lib/bond-rate";
 
 export type { SelectableType, TxType };
 
@@ -95,6 +100,9 @@ export function useTransactionForm({
   const t = useTranslations("Manage.tx");
   const tt = useTranslations("TxType");
   const tc = useTranslations("AssetClass");
+  // The floating-rate schedule strings live in their own namespace so the create form
+  // and the admin instrument-edit dialog share one set of labels.
+  const tb = useTranslations("BondTerms");
 
   const isEdit = Boolean(transactionId);
   const [type, setType] = useState<TxType>(() => (initial?.type as TxType) ?? "buy");
@@ -166,6 +174,14 @@ export function useTransactionForm({
   const [couponRatePercent, setCouponRatePercent] = useState("");
   const [couponSchedule, setCouponSchedule] = useState("monthly");
   const [maturityDate, setMaturityDate] = useState("");
+  // Floating-rate bonds (Indonesian retail SBR/ST): the coupon rate RESETS every few
+  // months while the payments stay monthly. The rate schedule is a separate axis from
+  // `couponSchedule` and replaces the flat `couponRate` when it is filled in.
+  const [floatingRate, setFloatingRate] = useState(false);
+  const [rateSchedule, setRateSchedule] = useState<RateScheduleDraft>({
+    ...EMPTY_RATE_SCHEDULE_DRAFT,
+    periods: [],
+  });
 
   // "Can't find it? Add a custom instrument" collapsible (instrument-field.tsx) — closed
   // by default, per the v2 design; opened automatically when editing an existing
@@ -381,7 +397,11 @@ export function useTransactionForm({
       ...(assetClass === "bond"
         ? {
             faceValue: faceValue.trim() || undefined,
-            couponRate: couponRatePercentToFraction(couponRatePercent),
+            // A floating-rate bond carries its rate in the schedule, not in a single
+            // `couponRate` — sending both would leave the flat rate as a stale fallback.
+            ...(floatingRate
+              ? { couponRateSchedule: rateScheduleDraftToApi(rateSchedule) }
+              : { couponRate: couponRatePercentToFraction(couponRatePercent) }),
             couponSchedule: couponSchedule as
               "monthly" | "quarterly" | "semiannual" | "annual" | undefined,
             maturityDate: maturityDate || undefined,
@@ -464,6 +484,7 @@ export function useTransactionForm({
     t,
     tt,
     tc,
+    tb,
     isEdit,
     type,
     setType,
@@ -537,6 +558,10 @@ export function useTransactionForm({
     setCouponSchedule,
     maturityDate,
     setMaturityDate,
+    floatingRate,
+    setFloatingRate,
+    rateSchedule,
+    setRateSchedule,
     busy,
     error,
     isTrade,

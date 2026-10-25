@@ -15,6 +15,7 @@ vi.mock("@/lib/api", () => ({ useApiClient: () => ({ updateInstrument }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const t = messages.Instrument;
+const tb = messages.BondTerms;
 
 const INSTRUMENT: Instrument = {
   id: "i1",
@@ -35,6 +36,24 @@ function renderDialog(instrument: Instrument = INSTRUMENT) {
     </NextIntlClientProvider>,
   );
 }
+
+const BOND: Instrument = {
+  id: "b1",
+  isin: null,
+  wkn: null,
+  symbol: "SBR015T2",
+  name: "SBR015T2",
+  assetClass: "bond",
+  market: "IDX",
+  currency: "IDR",
+  faceValue: "1000000",
+  couponSchedule: "monthly",
+  maturityDate: "2028-07-10",
+  couponRateSchedule: {
+    floorRate: "0.0675",
+    periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
+  },
+} as Instrument;
 
 describe("InstrumentEditDialog", () => {
   beforeEach(() => {
@@ -161,6 +180,63 @@ describe("InstrumentEditDialog", () => {
           expect.objectContaining({ partialExemptionRate: null }),
         ),
       );
+    });
+  });
+
+  // -- Floating-rate bond schedule (Indonesian retail SBR/ST) ----------------
+
+  describe("floating-rate schedule", () => {
+    it("pre-fills the floating-rate schedule of a bond", () => {
+      renderDialog(BOND);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      expect(screen.getByLabelText(tb.floorRateLabel)).toHaveValue("6.75");
+      expect(screen.getByLabelText("From")).toHaveValue("2026-01-10");
+      expect(screen.getByLabelText("Rate % p.a.")).toHaveValue("6.75");
+    });
+
+    it("saves an edited rate schedule — percent-in converts to a fraction", async () => {
+      renderDialog(BOND);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByLabelText(tb.floorRateLabel), { target: { value: "7" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+
+      await waitFor(() =>
+        expect(updateInstrument).toHaveBeenCalledWith(
+          "b1",
+          expect.objectContaining({
+            couponRateSchedule: {
+              floorRate: "0.07",
+              periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
+            },
+          }),
+        ),
+      );
+    });
+
+    it("clears the schedule when the floating-rate toggle is switched off", async () => {
+      renderDialog(BOND);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByLabelText(tb.floatingRateLabel));
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+
+      await waitFor(() =>
+        expect(updateInstrument).toHaveBeenCalledWith(
+          "b1",
+          expect.objectContaining({ couponRateSchedule: null }),
+        ),
+      );
+    });
+
+    it("leaves the schedule alone for a bond that has none", async () => {
+      const fixed = { ...BOND, couponRateSchedule: null } as Instrument;
+      renderDialog(fixed);
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByLabelText(t.symbol), { target: { value: "SBR015T2X" } });
+      fireEvent.click(screen.getByRole("button", { name: t.save }));
+
+      await waitFor(() => expect(updateInstrument).toHaveBeenCalled());
+      const patch = vi.mocked(updateInstrument).mock.calls[0][1] as Record<string, unknown>;
+      expect(patch).not.toHaveProperty("couponRateSchedule");
     });
   });
 
