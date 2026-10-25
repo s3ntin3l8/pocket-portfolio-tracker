@@ -129,13 +129,20 @@ export function IncomeBarChart({ data, currency }: { data: IncomeBar[]; currency
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
   const t = useTranslations("Income");
+  const tA11y = useTranslations("A11y");
   const money = (v: number) => formatMoney(v, currency, locale);
   const moneyCompact = (v: number) => formatMoneyCompact(v, currency, locale);
 
   return (
     <div className="h-[224px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+        <BarChart
+          data={data}
+          margin={{ top: 22, right: 8, left: 0, bottom: 0 }}
+          title={tA11y("chartIncomeTitle")}
+          desc={tA11y("chartIncomeDesc", { count: data.length })}
+          role="img"
+        >
           <defs>
             {/* Diagonal-stripe hatch for the "projected" (rest-of-year) segment. */}
             <pattern

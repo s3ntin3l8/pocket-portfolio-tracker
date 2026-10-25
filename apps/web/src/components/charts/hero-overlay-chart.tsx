@@ -13,6 +13,7 @@ import {
 import { useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
+import { ChartSeriesSummary } from "@/components/charts/chart-series-summary";
 import { formatMoney, formatPercent } from "@/lib/utils";
 
 export interface HeroOverlayPoint {
@@ -40,6 +41,8 @@ export function HeroOverlayChart({
   points,
   isIntraday,
   currency,
+  title,
+  desc,
 }: {
   points: HeroOverlayPoint[];
   /** True for 1D/7D ranges — points carry absolute currency, not TWR %. Controls
@@ -47,12 +50,24 @@ export function HeroOverlayChart({
    *  parsing (intraday labels like "14:30"/"3 Jul" pass through; ISO dates format). */
   isIntraday: boolean;
   currency: string;
+  /** The chart's accessible name (the SVG's `<title>`). */
+  title?: string;
+  /** The chart's accessible description (the SVG's `<desc>`). */
+  desc?: string;
 }) {
   const locale = useLocale();
+  const t = useTranslations("A11y");
+  const chartTitle = title ?? t("chartPerformanceTitle");
   return (
     <div data-testid="hero-overlay-chart" className="w-full" style={{ height: 96 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={points} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+        <ComposedChart
+          data={points}
+          margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+          title={chartTitle}
+          desc={desc ?? t("chartPerformanceDesc", { count: points.length })}
+          role="img"
+        >
           <defs>
             <linearGradient id="hero-portfolio-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
@@ -91,6 +106,14 @@ export function HeroOverlayChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      {/* The text equivalent of the series (audit E8) — visually hidden. */}
+      <ChartSeriesSummary
+        values={points.map((p) => p.portfolio)}
+        format={(v) =>
+          isIntraday ? formatMoney(v, currency, locale) : formatPercent(v / 100, locale)
+        }
+        label={chartTitle}
+      />
     </div>
   );
 }

@@ -10,9 +10,10 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
+import { ChartSeriesSummary } from "@/components/charts/chart-series-summary";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
@@ -33,6 +34,8 @@ export function PriceChart({
   minimal = false,
   showYAxis = true,
   height = 280,
+  title,
+  desc,
 }: {
   data: PriceChartPoint[];
   currency: string;
@@ -42,9 +45,14 @@ export function PriceChart({
   /** Show Y-axis on the left. Disable on narrow viewports — the tooltip cursor already shows the price. */
   showYAxis?: boolean;
   height?: number;
+  /** The chart's accessible name (the SVG's `<title>`). Defaults to "Price history". */
+  title?: string;
+  /** The chart's accessible description (the SVG's `<desc>`). */
+  desc?: string;
 }) {
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
+  const t = useTranslations("A11y");
   // A missing value stays null so recharts breaks the line there (a 0 would draw a cliff).
   const points = data.map((d) => ({
     date: d.date,
@@ -52,6 +60,7 @@ export function PriceChart({
   }));
   const gradientId = "price-fill";
   const lineColor = "var(--color-primary)";
+  const chartTitle = title ?? t("chartPriceTitle");
 
   const formatValue = (v: number) =>
     unit === "percent" ? formatPercentPoints(v, locale, 2) : formatMoney(v, currency, locale);
@@ -80,6 +89,9 @@ export function PriceChart({
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height }}>
         <AreaChart
           data={points}
+          title={chartTitle}
+          desc={desc ?? t("chartPriceDesc", { count: points.length })}
+          role="img"
           margin={
             minimal
               ? { top: 4, right: 0, left: 0, bottom: 0 }
@@ -134,6 +146,12 @@ export function PriceChart({
           />
         </AreaChart>
       </ResponsiveContainer>
+      {/* The text equivalent of the series (audit E8) — visually hidden. */}
+      <ChartSeriesSummary
+        values={points.map((p) => p.close)}
+        format={formatValue}
+        label={chartTitle}
+      />
     </div>
   );
 }

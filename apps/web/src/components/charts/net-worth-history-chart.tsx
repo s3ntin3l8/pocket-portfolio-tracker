@@ -89,6 +89,7 @@ export function NetWorthHistoryChart({
 }) {
   const te = useTranslations("Empty");
   const t = useTranslations("Chart");
+  const tA11y = useTranslations("A11y");
   const locale = useLocale();
   const api = useApiClient();
   const isHero = variant === "hero";
@@ -232,6 +233,16 @@ export function NetWorthHistoryChart({
     <p className="py-8 text-center text-sm text-muted-foreground">{t("collectingIntraday")}</p>
   );
 
+  // The chart's accessible name says WHICH quantity is plotted: the TWR performance in
+  // percent, or the absolute portfolio value. The hero has no mode toggle — it always
+  // plots the TWR % (its overlay series), except in the intraday ranges, which carry
+  // absolute values. The description adds the size of the range.
+  const plotsPerformance = isHero ? !intraday : effectiveMode === "performance";
+  const chartTitle = plotsPerformance ? tA11y("chartPerformanceTitle") : tA11y("chartValueTitle");
+  const chartDesc = plotsPerformance
+    ? tA11y("chartPerformanceDesc", { count: chartData.length })
+    : tA11y("chartValueDesc", { count: chartData.length });
+
   const chart = (
     <PriceChart
       data={chartData}
@@ -239,6 +250,8 @@ export function NetWorthHistoryChart({
       unit={effectiveMode === "performance" ? "percent" : "currency"}
       minimal={isHero}
       height={isHero ? 150 : 280}
+      title={chartTitle}
+      desc={chartDesc}
     />
   );
 
@@ -256,6 +269,8 @@ export function NetWorthHistoryChart({
             points={heroOverlayPoints ?? []}
             isIntraday={intraday}
             currency={currency}
+            title={chartTitle}
+            desc={chartDesc}
           />
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">{te("historyTitle")}</p>

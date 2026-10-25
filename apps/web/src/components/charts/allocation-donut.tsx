@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { formatMoney, formatMoneyCompact, formatPercentPoints } from "@/lib/utils";
 import { ASSET_CLASS_COLOR_PALETTE, assetClassColor } from "@/lib/asset-class-colors";
 import { ChartTooltipPanel } from "@/components/ui/chart-tooltip-panel";
@@ -48,6 +48,7 @@ export function AllocationDonut({
   const hatchId = useId().replace(/:/g, "");
   const reducedMotion = useReducedMotion();
   const locale = useLocale();
+  const t = useTranslations("A11y");
   const sum = data.reduce((s, d) => s + d.value, 0);
   const displayTotal = total ?? sum;
   // ONE compact-money formatter for the whole app (lib/utils): the same amount must not
@@ -116,7 +117,14 @@ export function AllocationDonut({
           height="100%"
           initialDimension={{ width: 128, height: 128 }}
         >
-          <PieChart>
+          <PieChart
+            title={t("chartAllocationTitle")}
+            desc={t("chartAllocationDesc", {
+              count: data.length,
+              total: formattedTotal ?? formatMoney(displayTotal, currency, locale),
+            })}
+            role="img"
+          >
             {hasAtCost && (
               <defs>
                 {data.map((d, i) =>

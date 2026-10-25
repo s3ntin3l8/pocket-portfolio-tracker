@@ -46,6 +46,7 @@ export function ContributionsChart({
 }) {
   const reducedMotion = useReducedMotion();
   const t = useTranslations("Savings");
+  const tA11y = useTranslations("A11y");
   const te = useTranslations("Empty");
   const locale = useLocale();
 
@@ -109,7 +110,13 @@ export function ContributionsChart({
         {/* Legend lives in the card header (right of the title) — see the Savings page. */}
         <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={overlayData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+            <ComposedChart
+              data={overlayData}
+              margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+              title={tA11y("chartContributionsTitle")}
+              desc={tA11y("chartContributionsDesc", { count: overlayData.length })}
+              role="img"
+            >
               <defs>
                 {/* Transparent base so the band starts at the lower of the two lines */}
                 <linearGradient id="cv-floor" x1="0" y1="0" x2="0" y2="1">
@@ -240,7 +247,12 @@ export function ContributionsChart({
 
   return (
     <div className="space-y-2">
-      <PriceChart data={degradedPoints} currency={currency} />
+      <PriceChart
+        data={degradedPoints}
+        currency={currency}
+        title={tA11y("chartContributionsTitle")}
+        desc={tA11y("chartContributionsDesc", { count: degradedPoints.length })}
+      />
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0" />
         {t("chartValueUnavailable")}
