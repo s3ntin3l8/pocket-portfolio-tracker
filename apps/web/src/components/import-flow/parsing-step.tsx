@@ -39,7 +39,9 @@ export function ParsingStep({ fileStatuses }: ParsingStepProps) {
                   {fs.filename}
                 </span>
                 <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                  {t(`fileStatus.${fs.status}`)}
+                  {t.has(`fileStatus.${fs.status}`)
+                    ? t(`fileStatus.${fs.status}`)
+                    : t("fileStatusOther")}
                 </span>
               </li>
             ))}

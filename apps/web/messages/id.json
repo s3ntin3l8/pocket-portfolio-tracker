@@ -775,6 +775,7 @@
       "review": "Konfirmasi",
       "done": "Selesai"
     },
+    "stepsOther": "Langkah",
     "targetPortfolio": "Impor ke",
     "menu": {
       "manual": "Input manual",
@@ -796,6 +797,7 @@
       "done": "Selesai",
       "failed": "Gagal"
     },
+    "fileStatusOther": "Tidak diketahui",
     "group": {
       "collapse": "Lipat",
       "expand": "Buka",
@@ -1170,7 +1172,8 @@
       "hold": "Tahan",
       "sell": "Jual",
       "strong_sell": "Jual kuat"
-    }
+    },
+    "recommendationOther": "Tidak ada rekomendasi"
   },
   "BondTerms": {
     "floatingRateLabel": "Suku bunga mengambang (SBR/ST)",
@@ -1529,6 +1532,7 @@
       "pdf": "PDF",
       "ibkr": "Interactive Brokers"
     },
+    "sourcesOther": "Sumber lain",
     "sourcesSection": {
       "title": "Sumber data",
       "download": "Unduh berkas sumber",
@@ -1590,7 +1594,8 @@
         "different_instrument": "Tidak dapat digabungkan: instrumen berbeda.",
         "incompatible_type": "Tidak dapat digabungkan: jenis transaksi tidak cocok.",
         "loan_linked": "Tidak dapat digabungkan: salah satunya terkait pinjaman pembiayaan."
-      }
+      },
+      "blockedOther": "Kedua transaksi ini tidak dapat digabungkan."
     },
     "banners": {
       "invested": "Diinvestasikan",
@@ -1971,6 +1976,7 @@
     "allYears": "Semua tahun",
     "status_open": "Terbuka",
     "status_closed": "Tertutup",
+    "statusOther": "Tidak diketahui",
     "searchPlaceholder": "Cari transaksi…",
     "searchClear": "Hapus pencarian",
     "noMatches": "Tidak ada transaksi yang cocok dengan filter Anda.",
@@ -2078,6 +2084,7 @@
       "coupon": "Kupon tunai · {currency}",
       "interest": "Bunga tunai · {currency}"
     },
+    "cashSourceOther": "Pendapatan tunai · {currency}",
     "title": "Pajak",
     "subtitle": "Keuntungan modal & saran panen bebas pajak",
     "defaultHolderName": "Semua portofolio",
@@ -2220,6 +2227,7 @@
         "deposit_interest": "Bunga bank",
         "fund_distribution": "Pembagian reksa dana"
       },
+      "categoryOther": "Pendapatan lain",
       "exemption": {
         "small_balance": "dikecualikan (saldo ≤ Rp7,5 juta)",
         "negative_discount": "di bawah harga perolehan (tidak mengurangi kupon)",
@@ -2232,6 +2240,7 @@
         "deposit_interest": "Bunga dari bank di Indonesia, dalam mata uang apa pun: final 20%, dipotong oleh bank. Portofolio dianggap dari Indonesia jika negaranya diatur ke Indonesia, atau, jika negara belum diatur, jika bunganya dalam rupiah. Bunga dikecualikan selama saldo deposito dan tabungan di bank tersebut paling banyak Rp7,5 juta. Pocket memperkirakannya dengan menganggap satu portofolio sebagai satu bank: saldo kas portofolio tepat sebelum setiap pembayaran, dalam semua mata uang yang dikonversi ke rupiah. Jika potongan pajak tercatat pada transaksi, jumlah itu yang dipakai.",
         "fund_distribution": "Pembagian hasil reksa dana dan ETF bukan objek pajak bagi pemegang unit."
       },
+      "notesOther": "Penghasilan investasi Indonesia lainnya.",
       "foreignTable": {
         "title": "Penghasilan luar negeri · tidak termasuk estimasi",
         "source": "Sumber",
@@ -2323,7 +2332,8 @@
       "zero_price": "Harga nol: beli atau jual dicatat dengan harga Rp0",
       "reconciliation_gap": "Selisih rekonsiliasi kas vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
       "reconciliation_drift": "Selisih rekonsiliasi kas baru vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
-      "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})"
+      "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})",
+      "unknown": "Masalah data tidak dikenal"
     },
     "dismiss": "Tutup peringatan",
     "reconciliationTitle": "Kas tidak sesuai",

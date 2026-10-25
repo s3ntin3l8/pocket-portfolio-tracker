@@ -59,7 +59,9 @@ interface InstrumentFieldProps {
   setRateSchedule: (v: RateScheduleDraft) => void;
   customOpen: boolean;
   onToggleCustom: () => void;
-  t: (key: string) => string;
+  /** The `Manage.tx` translator. `has` (next-intl's translator has it) lets an unknown unit
+   *  fall back to a catalogue key instead of rendering the key path. */
+  t: ((key: string) => string) & { has?: (key: string) => boolean };
   tc: (key: string) => string;
   /** Translator for the `BondTerms` namespace (the floating-rate schedule strings). */
   tb: (key: string) => string;
@@ -298,7 +300,7 @@ export function InstrumentField({
                         >
                           {UNITS.map((u) => (
                             <option key={u} value={u}>
-                              {t(`units.${u}`)}
+                              {t.has && !t.has(`units.${u}`) ? t("unit") : t(`units.${u}`)}
                             </option>
                           ))}
                         </Select>

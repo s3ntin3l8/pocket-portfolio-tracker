@@ -130,7 +130,29 @@ function reconciliationValues(
   return values;
 }
 
-export type AnomalyTranslator = (key: string, values?: Record<string, string>) => string;
+/**
+ * The `Anomalies` translator, narrowed to what `anomalyLabel` needs. `has` is next-intl's
+ * "does this key exist" check — optional, so a plain function (a test double, a caller
+ * outside the web tier) still satisfies the type.
+ */
+export type AnomalyTranslator = ((key: string, values?: Record<string, string>) => string) & {
+  has?: (key: string) => boolean;
+};
+
+/**
+ * The localized message for an anomaly code. The code is dynamic, so next-intl can't verify
+ * it at build time — and an unknown code (the API can grow one) would render the key path.
+ * A code that isn't in the catalogue falls back to `codes.unknown`.
+ */
+function anomalyCodeLabel(
+  ta: AnomalyTranslator,
+  code: string,
+  values?: Record<string, string>,
+): string {
+  const key = `codes.${code}`;
+  if (ta.has && !ta.has(key)) return ta("codes.unknown");
+  return ta(key, values);
+}
 
 /**
  * Localized label/tooltip for a transaction-scoped anomaly. For `negative_cash` it folds the
@@ -146,22 +168,26 @@ export function anomalyLabel(
 ): string {
   if (anomaly.code === "negative_cash" && anomaly.meta) {
     const currency = String(anomaly.meta.currency ?? "");
-    return ta("codes.negative_cash", {
+    return anomalyCodeLabel(ta, anomaly.code, {
       currency,
       balance: formatMoney(Number(anomaly.meta.balance), currency, locale),
     });
   }
   if (anomaly.meta && RECONCILIATION_CODES.has(anomaly.code)) {
-    return ta(`codes.${anomaly.code}`, reconciliationValues(anomaly.code, anomaly.meta, locale));
+    return anomalyCodeLabel(
+      ta,
+      anomaly.code,
+      reconciliationValues(anomaly.code, anomaly.meta, locale),
+    );
   }
   if (anomaly.meta) {
     const values: Record<string, string> = {};
     for (const [key, value] of Object.entries(anomaly.meta)) {
       values[key] = String(value);
     }
-    return ta(`codes.${anomaly.code}`, values);
+    return anomalyCodeLabel(ta, anomaly.code, values);
   }
-  return ta(`codes.${anomaly.code}`);
+  return anomalyCodeLabel(ta, anomaly.code);
 }
 
 /**

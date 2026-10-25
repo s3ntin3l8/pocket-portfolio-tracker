@@ -775,6 +775,7 @@
       "review": "Confirm",
       "done": "Done"
     },
+    "stepsOther": "Step",
     "targetPortfolio": "Import into",
     "menu": {
       "manual": "Manual entry",
@@ -796,6 +797,7 @@
       "done": "Done",
       "failed": "Failed"
     },
+    "fileStatusOther": "Unknown",
     "group": {
       "collapse": "Collapse",
       "expand": "Expand",
@@ -1170,7 +1172,8 @@
       "hold": "Hold",
       "sell": "Sell",
       "strong_sell": "Strong sell"
-    }
+    },
+    "recommendationOther": "No recommendation"
   },
   "BondTerms": {
     "floatingRateLabel": "Floating rate (SBR/ST)",
@@ -1529,6 +1532,7 @@
       "pdf": "PDF",
       "ibkr": "Interactive Brokers"
     },
+    "sourcesOther": "Other source",
     "sourcesSection": {
       "title": "Data sources",
       "download": "Download source file",
@@ -1590,7 +1594,8 @@
         "different_instrument": "These can't be merged: different instruments.",
         "incompatible_type": "These can't be merged: incompatible transaction types.",
         "loan_linked": "These can't be merged: one is linked to a financing loan."
-      }
+      },
+      "blockedOther": "These two transactions can't be merged."
     },
     "banners": {
       "invested": "Invested",
@@ -1971,6 +1976,7 @@
     "allYears": "All years",
     "status_open": "Open",
     "status_closed": "Closed",
+    "statusOther": "Unknown",
     "searchPlaceholder": "Search trades…",
     "searchClear": "Clear search",
     "noMatches": "No trades match your filters.",
@@ -2078,6 +2084,7 @@
       "coupon": "Cash coupon · {currency}",
       "interest": "Cash interest · {currency}"
     },
+    "cashSourceOther": "Cash income · {currency}",
     "title": "Tax",
     "subtitle": "Capital gains & tax-free harvest suggestions",
     "defaultHolderName": "All portfolios",
@@ -2220,6 +2227,7 @@
         "deposit_interest": "Bank interest",
         "fund_distribution": "Fund distribution"
       },
+      "categoryOther": "Other income",
       "exemption": {
         "small_balance": "exempt (balance ≤ Rp7.5M)",
         "negative_discount": "below cost (does not offset coupons)",
@@ -2232,6 +2240,7 @@
         "deposit_interest": "Interest from a bank in Indonesia, in any currency: 20% final, withheld by the bank. A portfolio counts as Indonesian when its country is set to Indonesia, or, with no country set, when the interest is in IDR. Interest is exempt while the deposit and savings balance at that bank is at most Rp7.5 million. Pocket approximates this by treating one portfolio as one bank: it checks the portfolio's cash just before each payment, in all currencies converted to rupiah. Where a withholding is recorded on the transaction, that amount is used.",
         "fund_distribution": "Reksa dana and ETF distributions aren't taxable for unit holders."
       },
+      "notesOther": "Other Indonesian investment income.",
       "foreignTable": {
         "title": "Foreign income · not in the estimate",
         "source": "Source",
@@ -2323,7 +2332,8 @@
       "zero_price": "Zero price: buy or sell recorded at €0",
       "reconciliation_gap": "Cash reconciliation gap vs. broker ({currency}: reported {reported}, derived {derived})",
       "reconciliation_drift": "New cash reconciliation drift vs. broker ({currency}: reported {reported}, derived {derived})",
-      "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})"
+      "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})",
+      "unknown": "Unknown data issue"
     },
     "dismiss": "Dismiss warning",
     "reconciliationTitle": "Cash doesn't reconcile",

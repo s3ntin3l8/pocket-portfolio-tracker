@@ -354,7 +354,11 @@ export function useImportFlow({
     if (mergedDrafts.length === 0 && pickedContracts.length === 0) {
       if (newSkipped.length === 1) {
         const s = newSkipped[0]!;
-        setError(t(`errors.${s.reason}`, { provider: s.provider ?? "" }));
+        setError(
+          t.has(`errors.${s.reason}`)
+            ? t(`errors.${s.reason}`, { provider: s.provider ?? "" })
+            : t("errors.generic"),
+        );
       } else {
         setError(t("errors.generic"));
       }

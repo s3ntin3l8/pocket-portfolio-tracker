@@ -29,10 +29,6 @@ const RECOMMENDATION_TONE: Record<string, "success" | "warning" | "destructive">
   strong_sell: "destructive",
 };
 
-/** Known Yahoo `recommendationKey` values we have a translation for. Anything else
- *  (Yahoo's set isn't formally documented) falls back to the raw string, untranslated. */
-const KNOWN_RECOMMENDATIONS = new Set(["strong_buy", "buy", "hold", "sell", "strong_sell"]);
-
 /**
  * The Instrument-detail "Fundamentals" card: market cap / PE / EPS / dividend yield /
  * 52-week range / beta / 1Y target stat grid, an intraday snapshot (prev close, day
@@ -247,9 +243,9 @@ export function InstrumentFundamentalsCard({ instrumentId }: { instrumentId: str
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {data.recommendationKey && (
                   <Badge variant={recommendationTone}>
-                    {KNOWN_RECOMMENDATIONS.has(data.recommendationKey)
+                    {t.has(`recommendation.${data.recommendationKey}`)
                       ? t(`recommendation.${data.recommendationKey}`)
-                      : data.recommendationKey}
+                      : t("recommendationOther")}
                   </Badge>
                 )}
                 {data.numberOfAnalystOpinions != null &&

@@ -24,7 +24,7 @@ export function ThemeSwitcher() {
             key={th}
             className="flex-1 rounded-sm py-[9px] text-center text-body-sm bg-background font-semibold text-text-2 select-none"
           >
-            {t(`appearanceOptions.${th}`)}
+            {t.has(`appearanceOptions.${th}`) ? t(`appearanceOptions.${th}`) : t("appearance")}
           </div>
         ))}
       </div>
@@ -49,7 +49,7 @@ export function ThemeSwitcher() {
               : "bg-background font-semibold text-foreground hover:bg-secondary",
           )}
         >
-          {t(`appearanceOptions.${th}`)}
+          {t.has(`appearanceOptions.${th}`) ? t(`appearanceOptions.${th}`) : t("appearance")}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

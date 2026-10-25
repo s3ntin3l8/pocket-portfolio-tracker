@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
+import { useLocale } from "next-intl";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,9 @@ export function PricingFields({
   isDesktop = false,
 }: PricingFieldsProps) {
   const total = computeTxTotal(type, quantity, price, fees, tax);
+  // The app's locale, so the running total speaks the same spelling as the amounts above
+  // it (and the Summary rail's desktop twin).
+  const locale = useLocale();
 
   return (
     <div className="border-t border-line pt-[18px]">
@@ -141,7 +145,7 @@ export function PricingFields({
             {t(totalLabelKey(total.kind))}
           </span>
           <span className="text-lg font-bold text-foreground">
-            {formatMoney(total.total, currency)}
+            {formatMoney(total.total, currency, locale)}
           </span>
         </div>
       )}
