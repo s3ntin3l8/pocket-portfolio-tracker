@@ -13,7 +13,7 @@ import messages from "../messages/en.json";
 const h = vi.hoisted(() => {
   // The auth env must be set BEFORE the server-api module is imported: `authConfigured` is
   // a module-level constant.
-  process.env.AUTH_SECRET = "test-secret";
+  process.env.AUTH_SECRET = "test-secret"; // pragma: allowlist secret
   process.env.AUTHENTIK_ISSUER = "https://auth.test/o/p/";
   return {
     accessToken: "tok" as string | null,
