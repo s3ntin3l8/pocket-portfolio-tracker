@@ -46,7 +46,9 @@ export function HolderTypeChips({
                 : "border border-border bg-card font-semibold text-foreground hover:bg-accent/50",
             )}
           >
-            {t(`holderType${tp.charAt(0).toUpperCase()}${tp.slice(1)}`)}
+            {t.has(`holderType${tp.charAt(0).toUpperCase()}${tp.slice(1)}`)
+              ? t(`holderType${tp.charAt(0).toUpperCase()}${tp.slice(1)}`)
+              : t("holderType")}
           </ToggleGroupItem>
         );
       })}
