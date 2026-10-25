@@ -186,7 +186,7 @@ export function NetWorthHistoryChart({
         }))
       : data.filter(isDailyPoint).map((p) => ({
           date: p.date,
-          portfolio: p.pct === undefined ? null : Number(p.pct),
+          portfolio: p.pct == null ? null : Number(p.pct),
           benchmark: p.benchmarkPct === undefined ? null : Number(p.benchmarkPct),
         }))
     : null;

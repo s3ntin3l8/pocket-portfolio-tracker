@@ -118,6 +118,7 @@ export {
   chainIndex,
   chainAggregateIndex,
   aggregateValueFlows,
+  twrFields,
   splitAdjustmentFactor,
   isDepotTransfer,
   transferValueFlow,
