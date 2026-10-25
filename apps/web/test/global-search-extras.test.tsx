@@ -7,6 +7,11 @@ const push = vi.fn();
 const assistantOpen = vi.fn();
 let assistantAvailable = false;
 
+// A stable handle on the search call, so a test can tell whether the debounce fired.
+const { globalSearch } = vi.hoisted(() => ({
+  globalSearch: vi.fn(() => Promise.resolve({ instruments: [], transactions: [] })),
+}));
+
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
   usePathname: () => "/holdings",
@@ -16,7 +21,7 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 vi.mock("@/lib/api", () => ({
   useApiClient: () => ({
-    globalSearch: vi.fn().mockResolvedValue({ instruments: [], transactions: [] }),
+    globalSearch,
   }),
 }));
 vi.mock("@/components/assistant/assistant-provider", () => ({
@@ -119,5 +124,57 @@ describe("GlobalSearch — shortcut opt-out", () => {
     expect(push).not.toHaveBeenCalled();
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
     expect(screen.getByPlaceholderText(s.placeholder)).toBeInTheDocument();
+  });
+});
+
+describe("GlobalSearch — the pending search does not outlive the component", () => {
+  const DEBOUNCE = 400; // the component debounces at 300ms
+
+  async function typeQuery(q: string) {
+    openPalette();
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText(s.placeholder), { target: { value: q } });
+    });
+  }
+
+  it("runs the debounced search while the component is mounted", async () => {
+    vi.useFakeTimers();
+    try {
+      globalSearch.mockClear();
+      renderSearch();
+      await typeQuery("bbca");
+      // Still debouncing.
+      expect(globalSearch).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(DEBOUNCE);
+      });
+      expect(globalSearch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the pending search on unmount", async () => {
+    // A debounce timer that survives the component fires into a torn-down environment:
+    // it updates state after unmount, and in the test suite it raises an unhandled
+    // "window is not defined" that fails the whole run — a flake with no connection to
+    // the test that happened to run last.
+    vi.useFakeTimers();
+    try {
+      globalSearch.mockClear();
+      const { unmount } = renderSearch();
+      await typeQuery("bbca");
+
+      unmount();
+
+      await act(async () => {
+        vi.advanceTimersByTime(DEBOUNCE);
+      });
+      // The pending timer must not survive the component.
+      expect(globalSearch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

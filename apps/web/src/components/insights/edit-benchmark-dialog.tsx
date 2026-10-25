@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Search, X, Sparkles, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -47,6 +47,22 @@ export function EditBenchmarkDialog({
   const api = useApiClient();
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Clear the pending search when the dialog goes away: a debounce that outlives the
+  // component fires into a torn-down environment and updates state on a component that
+  // is gone (see `useTimeout` for the same guard in hook form).
+  //
+  // The flag covers the other half: a lookup that is already in flight resolves after
+  // the dialog is gone, and its continuation would update state on a component that is
+  // no longer there.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timer.current);
+      timer.current = undefined;
+    };
+  }, []);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<InstrumentSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,21 +71,25 @@ export function EditBenchmarkDialog({
 
   const runSearch = useCallback(
     (q: string) => {
+      // Cancel the pending search FIRST: emptying the query must not leave the
+      // previous search's timer running.
+      clearTimeout(timer.current);
       const trimmed = q.trim();
       if (!trimmed) {
         setResults([]);
         return;
       }
       setLoading(true);
-      clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
         try {
           const res = await api.lookupInstruments(trimmed);
+          if (!mountedRef.current) return;
           setResults(res);
         } catch {
+          if (!mountedRef.current) return;
           setResults([]);
         } finally {
-          setLoading(false);
+          if (mountedRef.current) setLoading(false);
         }
       }, 300);
     },

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import {
   AddTransactionForm,
@@ -1394,5 +1394,29 @@ describe("AddTransactionForm — floating-rate bond terms", () => {
       "p1",
       expect.objectContaining({ instrumentId: "sbr1" }),
     );
+  });
+});
+
+describe("AddTransactionForm — the debounced instrument lookup", () => {
+  it("does not run the pending lookup after the form unmounts", async () => {
+    // A debounce that outlives the form fires into a torn-down environment: it updates
+    // state on a component that is gone, and in the test suite it raises an unhandled
+    // "window is not defined" that fails the whole run.
+    vi.useFakeTimers();
+    try {
+      const lookupInstruments = vi.fn(async () => []);
+      const client = makeClient({ lookupInstruments });
+      renderForm(client);
+
+      fireEvent.change(screen.getByLabelText(m.search), { target: { value: "sbr" } });
+      cleanup(); // unmount the form with the lookup still pending
+
+      await act(async () => {
+        vi.advanceTimersByTime(400);
+      });
+      expect(lookupInstruments).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
