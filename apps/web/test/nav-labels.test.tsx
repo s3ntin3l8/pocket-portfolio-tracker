@@ -44,6 +44,23 @@ const TAB_ROUTE: Record<string, string> = {
   settings: "/settings",
 };
 
+/**
+ * The report cards and the catalogue namespace of the page each one links to.
+ *
+ * The card is a THIRD surface for the same name (nav, page, card), so the card's title
+ * has to be the page's title — in both catalogues. The namespace is the page's own, not
+ * the card's: looking the card up in the wrong namespace is what made this guard assert
+ * nothing at all.
+ */
+const REPORT_CARD_PAGE: Record<string, string> = {
+  income: "Income",
+  trades: "Trades",
+  savings: "Savings",
+  tax: "Tax",
+  gold: "GoldReport",
+  documents: "TaxReports",
+};
+
 function navLabel(catalogue: Catalogue, key: string): string {
   return catalogue.Nav[key];
 }
@@ -154,17 +171,34 @@ describe("message catalogues", () => {
     // The report card is a THIRD surface for the same concept (nav, page, card). Leaving
     // it outside the guard is how a second name comes back — the Indonesian card title
     // drifted to "Laba/Rugi Terealisasi" while the page and the nav said "P&L Terwujud".
-    for (const card of Object.keys(messages.Reports)) {
-      const cardValue = (messages.Reports as Record<string, unknown>)[card];
-      if (typeof cardValue !== "object" || cardValue === null) continue;
-      const title = (cardValue as { title?: unknown }).title;
-      if (typeof title !== "string") continue;
-      const pageTitle = (messages.Trades as Record<string, unknown>)[card];
-      if (typeof pageTitle !== "string") continue;
-      expect({ card, title }).toEqual({ card, title: pageTitle });
+    for (const locale of ["en", "id"] as const) {
+      const catalogue = catalogues[locale];
+      // The Reports namespace holds a title of its own and one object per card.
+      const reports = catalogue.Reports as unknown as Record<string, unknown>;
+
+      // Every card that carries a title is guarded — a card added without a mapping
+      // would otherwise be silently outside the guard.
+      const titledCards = Object.keys(reports).filter((key) => {
+        const value = reports[key];
+        return (
+          typeof value === "object" &&
+          value !== null &&
+          typeof (value as { title?: unknown }).title === "string"
+        );
+      });
+      expect(titledCards.sort(), `${locale}: a report card without a page mapping`).toEqual(
+        Object.keys(REPORT_CARD_PAGE).sort(),
+      );
+
+      for (const [card, namespace] of Object.entries(REPORT_CARD_PAGE)) {
+        const cardTitle = (reports[card] as { title?: unknown } | undefined)?.title;
+        expect(cardTitle, `${locale}: the ${card} card has no title`).toBeTruthy();
+        expect(
+          cardTitle,
+          `${locale}: the ${card} card and the ${namespace} page must carry the same name`,
+        ).toBe(pageTitle(catalogue, namespace));
+      }
     }
-    // The Indonesian card title is the same one the page uses.
-    expect(idMessages.Reports.trades.title).toBe(idMessages.Trades.title);
   });
 });
 
