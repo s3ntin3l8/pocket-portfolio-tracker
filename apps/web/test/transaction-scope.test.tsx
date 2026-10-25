@@ -140,7 +140,15 @@ beforeEach(() => {
     },
     getNetworthAnomalies: async () => {
       h.calls.networthAnomalyReads += 1;
-      return { anomalies: [] };
+      // The aggregate set is deliberately different from any single portfolio's: two
+      // anomalies, one of them error-severity. A badge that counted the wrong scope is
+      // therefore visible in the count AND in the error flag.
+      return {
+        anomalies: [
+          { code: "negative_cash", severity: "warning", scope: "transaction" },
+          { code: "duplicate_transaction", severity: "error", scope: "transaction" },
+        ],
+      };
     },
   };
 });
@@ -171,16 +179,6 @@ describe("the Activity ledger follows the scope it is in (audit R4-C1)", () => {
 
     expect(h.calls.anomalyReads.sort()).toEqual(["p1", "p2"]);
     expect(h.calls.networthAnomalyReads).toBe(0);
-  });
-
-  it("counts the holder's anomalies in the Activity badge", async () => {
-    h.requestHeaders = { "x-pocket-scope": "h:h1" };
-
-    const badge = await loadAnomalyBadge();
-
-    expect(h.calls.anomalyReads.sort()).toEqual(["p1", "p2"]);
-    expect(h.calls.networthAnomalyReads).toBe(0);
-    expect(badge.count).toBe(2);
   });
 
   it("reads the selected portfolio under a portfolio scope", async () => {
@@ -250,6 +248,43 @@ describe("the Holdings page resolves its anomalies through the scope (audit R4-C
     // second scope on one screen. The scope-aware entry point is the only way to get it.
     expect(source).toContain("loadScopeAnomalies(effectiveScope)");
     expect(source).not.toContain("loadNetworthAnomalies");
+  });
+});
+
+describe("the Activity badge counts the scope the page renders", () => {
+  it("counts the holder's own portfolios when the holder owns several", async () => {
+    h.requestHeaders = { "x-pocket-scope": "h:h1" };
+
+    const badge = await loadAnomalyBadge();
+
+    expect(h.calls.anomalyReads.sort()).toEqual(["p1", "p2"]);
+    expect(h.calls.networthAnomalyReads).toBe(0);
+    expect(badge.count).toBe(2);
+  });
+
+  it("counts the aggregate for a holder that owns a single portfolio", async () => {
+    // h2 owns exactly one portfolio (p3). The switcher's rule collapses such a holder
+    // scope to the aggregate, so the Activity page renders the aggregate — the badge has
+    // to count the aggregate too, or it labels a different set than the page shows.
+    h.requestHeaders = { "x-pocket-scope": "h:h2" };
+
+    const badge = await loadAnomalyBadge();
+
+    expect(h.calls.networthAnomalyReads).toBe(1);
+    expect(h.calls.anomalyReads).toEqual([]);
+    // The aggregate's two anomalies — not the single portfolio's one.
+    expect(badge.count).toBe(2);
+    expect(badge.hasError).toBe(true);
+  });
+
+  it("renders the aggregate on the Activity page for the same single-portfolio holder", async () => {
+    h.requestHeaders = { "x-pocket-scope": "h:h2" };
+
+    await TransactionsPage({ params: Promise.resolve({ locale: "en" }) });
+
+    // The page and the badge now read the very same set.
+    expect(h.calls.networthAnomalyReads).toBe(1);
+    expect(h.calls.anomalyReads).toEqual([]);
   });
 });
 

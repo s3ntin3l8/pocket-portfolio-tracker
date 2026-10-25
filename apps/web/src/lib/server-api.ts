@@ -63,6 +63,7 @@ import {
   getSelectedPortfolioId,
   getScopeSelection,
   loadScopeAnomalies,
+  resolveEffectiveScope,
   resolveHolderScope,
 } from "./server-api/_shared";
 
@@ -73,7 +74,14 @@ import {
  *  reuses — nothing is cached across requests. A failed fetch yields no badge rather than a
  *  misleading zero-with-error. */
 export const loadAnomalyBadge = cache(async (): Promise<{ count: number; hasError: boolean }> => {
-  const anomalies = await loadScopeAnomalies(await getScopeSelection());
+  const scope = await getScopeSelection();
+  // A holder scope only counts for a holder that owns ≥2 portfolios (the switcher's rule) —
+  // below that the page renders the aggregate, so the badge has to count the aggregate too.
+  // Counting the holder's own portfolio instead is how the badge and the page it labels came
+  // to disagree about what "needs review" means.
+  const effectiveScope =
+    scope.kind === "holder" ? await resolveEffectiveScope(await listPortfoliosCached()) : scope;
+  const anomalies = await loadScopeAnomalies(effectiveScope);
   if (!anomalies) return { count: 0, hasError: false };
   return { count: anomalies.length, hasError: anomalies.some((a) => a.severity === "error") };
 });
