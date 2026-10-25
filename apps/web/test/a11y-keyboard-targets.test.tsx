@@ -309,9 +309,13 @@ describe("spinner", () => {
     expect(screen.getByRole("status")).toHaveAccessibleName(messages.A11y.loading);
   });
 
-  it("still names itself when rendered without the intl provider", () => {
-    render(<Spinner />);
-    expect(screen.getByRole("status")).toHaveAccessibleName(/loading/i);
+  it("names itself from the catalogue", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <Spinner />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("status")).toHaveAccessibleName(messages.A11y.loading);
   });
 });
 

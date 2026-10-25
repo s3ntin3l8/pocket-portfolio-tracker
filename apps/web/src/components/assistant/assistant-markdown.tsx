@@ -7,20 +7,8 @@ import { useTranslations } from "next-intl";
 /**
  * The accessible name for a markdown table in the model's answer (audit R4-D5): a
  * screen-reader user navigating by table must be able to tell it apart from the
- * app's own data tables. The name is localized — `useTranslations` needs the intl
- * provider, which the app always mounts, but this component is also rendered in
- * isolation (no provider), where the plain English name is the fallback.
+ * app's own data tables. The name is localized.
  */
-function useTableLabel(): string {
-  let label = "Table";
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- guarded lookup; the provider's presence is fixed per tree (see above)
-    label = useTranslations("A11y")("table");
-  } catch {
-    // No intl provider in this render — keep the plain English fallback.
-  }
-  return label;
-}
 
 /** Only links that go somewhere safe are made clickable. */
 const SAFE_HREF = /^(https?:\/\/|\/(?!\/))/i;
@@ -74,7 +62,8 @@ const components: Components = {
 };
 
 export function AssistantMarkdown({ text }: { text: string }) {
-  const tableLabel = useTableLabel();
+  const t = useTranslations("A11y");
+  const tableLabel = t("table");
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
