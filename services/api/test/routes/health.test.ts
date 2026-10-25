@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { buildApp } from "../../src/app.js";
 
 describe("GET /health", () => {
-  it("returns healthy status", async () => {
+  it("returns healthy status and the service identity", async () => {
     const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/health" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: "healthy" });
+    expect(response.json()).toEqual({ status: "healthy", service: "pocket-api" });
     await app.close();
   });
 });

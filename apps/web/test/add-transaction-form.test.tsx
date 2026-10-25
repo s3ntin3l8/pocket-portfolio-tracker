@@ -246,6 +246,95 @@ describe("AddTransactionForm", () => {
     expect(client.createTransaction).not.toHaveBeenCalled();
   });
 
+  it("shows the API's field-level validation message on the offending field", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.name), { target: { value: "Bank Central Asia" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    // The message sits under the price field, and the field announces that it is invalid.
+    const price = await screen.findByLabelText(m.price);
+    await waitFor(() => expect(price).toHaveAttribute("aria-invalid", "true"));
+    const describedBy = price.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const message = describedBy ? document.getElementById(describedBy) : null;
+    expect(message).toHaveTextContent("Expected a decimal string");
+    // A field-level failure replaces the generic banner — the field says it all.
+    expect(screen.queryByText(m.error)).toBeNull();
+  });
+
+  it("clears a field's validation message once the field is edited", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["price"], message: "Expected a decimal string" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    expect(await screen.findByText("Expected a decimal string")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9600" } });
+    await waitFor(() => expect(screen.queryByText("Expected a decimal string")).toBeNull());
+  });
+
+  it("keeps the generic banner for a validation issue the form has no field for", async () => {
+    const client = makeClient({
+      createTransaction: vi.fn(async () => {
+        throw new ApiError(
+          400,
+          JSON.stringify({
+            error: "validation_error",
+            issues: [{ path: ["type"], message: "Invalid enum value" }],
+          }),
+        );
+      }),
+    });
+    renderForm(client);
+
+    openCustomInstrument();
+    fireEvent.change(screen.getByLabelText(m.symbol), { target: { value: "bbca" } });
+    fireEvent.change(screen.getByLabelText(m.quantity), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(m.price), { target: { value: "9500" } });
+    fireEvent.change(screen.getByLabelText(m.date, { selector: "input" }), {
+      target: { value: "2026-02-03" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: m.submit }));
+
+    expect(await screen.findByText(m.error)).toBeInTheDocument();
+  });
+
   it("records a cash deposit without an instrument", async () => {
     const client = makeClient();
     renderForm(client);

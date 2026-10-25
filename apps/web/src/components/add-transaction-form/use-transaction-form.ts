@@ -10,8 +10,9 @@ import type {
   InstrumentSearchResult,
   BondCouponRateSchedule,
 } from "@portfolio/api-client";
-import { apiErrorCode } from "@portfolio/api-client";
+import { apiErrorCode, apiErrorIssues } from "@portfolio/api-client";
 import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
+import { clearFieldError, clearFieldErrors, publishFieldErrors } from "@/components/ui/form-field";
 import {
   INCOME_TYPES,
   CASH_TYPES,
@@ -225,6 +226,21 @@ export function useTransactionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The published field messages belong to this form instance — drop them when it goes.
+  useEffect(() => () => clearFieldErrors(), []);
+
+  /**
+   * A field setter that also drops the validation message published for that field: the
+   * user is on it, and a stale "invalid" message under a corrected value is worse than no
+   * message at all.
+   */
+  function editing(fieldIds: string[], set: (value: string) => void): (value: string) => void {
+    return (value: string) => {
+      set(value);
+      for (const id of fieldIds) clearFieldError(id);
+    };
+  }
+
   const isTrade = isTradeType(type);
   const isShareReceipt = isShareReceiptType(type);
   const isTransfer = isTransferType(type);
@@ -289,11 +305,14 @@ export function useTransactionForm({
   function setLoanId(id: string) {
     setLoanIdState(id);
     setInstallmentN(null);
+    clearFieldError("tx-loan");
+    clearFieldError("tx-installment");
     const loan = (loans ?? []).find((l) => l.loanId === id);
     if (loan) setCurrency(loan.currency);
   }
   function selectInstallment(n: number | null) {
     setInstallmentN(n);
+    clearFieldError("tx-installment");
     const row = selectedLoan?.installments.find((i) => i.n === n);
     // Prefill what the schedule says is due, but never overwrite what the user typed.
     if (row) {
@@ -448,6 +467,70 @@ export function useTransactionForm({
     return created.id;
   }
 
+  /**
+   * The API's input field names (see `transactionInputSchema`) → the ids of the form's
+   * controls. `null` means the form has no control for that field, so its message falls
+   * back to the generic banner instead of disappearing.
+   */
+  function fieldIdFor(apiField: string): string | null {
+    switch (apiField) {
+      case "quantity":
+        return showQuantity ? "tx-qty" : null;
+      case "price":
+        return "tx-price";
+      case "fees":
+        return showFees ? "tx-fees" : null;
+      case "tax":
+        // The inline tax field (income) and the one behind the "fees / tax" disclosure
+        // are two controls for the same value.
+        return showInlineTax ? "tx-tax" : "tx-tax-extra";
+      case "currency":
+        return "tx-currency";
+      case "executedAt":
+        return "tx-date";
+      case "description":
+        return "tx-notes";
+      case "tags":
+        return "tx-tags";
+      case "fxRate":
+        return "tx-fx-rate";
+      case "perShare":
+        return "tx-per-share";
+      case "shares":
+        return "tx-shares";
+      case "nativeCurrency":
+        return "tx-native-currency";
+      case "grossNative":
+        return "tx-gross-native";
+      case "kind":
+        return "tx-sub-type";
+      case "loanId":
+        return "tx-loan";
+      case "installmentN":
+        return "tx-installment";
+      default:
+        return null;
+    }
+  }
+
+  /** Open the disclosure that hides an offending field, so its message is visible. */
+  function revealField(fieldId: string) {
+    if (fieldId === "tx-fees" || fieldId === "tx-tax-extra") {
+      setExtrasOpen(true);
+      return;
+    }
+    if (
+      fieldId === "tx-fx-rate" ||
+      fieldId === "tx-sub-type" ||
+      fieldId === "tx-shares" ||
+      fieldId === "tx-per-share" ||
+      fieldId === "tx-native-currency" ||
+      fieldId === "tx-gross-native"
+    ) {
+      setAdvancedOpen(true);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -521,11 +604,35 @@ export function useTransactionForm({
       } else {
         await client.createTransaction(portfolioId, payload);
       }
+      clearFieldErrors();
       onSuccess?.();
     } catch (err) {
       // The API's loan-link rejections (a race with the installment job) get their own message.
       const code = apiErrorCode(err);
-      setError(code && t.has(`loanErrors.${code}`) ? t(`loanErrors.${code}`) : t("error"));
+      // A validation failure names the offending field per issue — show the API's own
+      // message there instead of one generic banner.
+      const messages: Record<string, string> = {};
+      let unmapped = 0;
+      for (const issue of apiErrorIssues(err)) {
+        const fieldId = fieldIdFor(issue.path[0] ?? "");
+        if (!fieldId) {
+          unmapped++;
+          continue;
+        }
+        if (!(fieldId in messages)) messages[fieldId] = issue.message;
+      }
+      publishFieldErrors(messages);
+      for (const fieldId of Object.keys(messages)) revealField(fieldId);
+      const hasFieldError = Object.keys(messages).length > 0;
+      // The banner stays for failures that are not field-level (network, 5xx, an unknown
+      // code) and for issues the form has no control for.
+      setError(
+        hasFieldError && unmapped === 0
+          ? null
+          : code && t.has(`loanErrors.${code}`)
+            ? t(`loanErrors.${code}`)
+            : t("error"),
+      );
     } finally {
       setBusy(false);
     }
@@ -552,33 +659,33 @@ export function useTransactionForm({
     installmentN,
     selectInstallment,
     kind,
-    setKind,
+    setKind: editing(["tx-sub-type"], setKind),
     currency,
-    setCurrency,
+    setCurrency: editing(["tx-currency"], setCurrency),
     date,
-    setDate,
+    setDate: editing(["tx-date"], setDate),
     quantity,
-    setQuantity,
+    setQuantity: editing(["tx-qty"], setQuantity),
     price,
-    setPrice,
+    setPrice: editing(["tx-price"], setPrice),
     fees,
-    setFees,
+    setFees: editing(["tx-fees"], setFees),
     tax,
-    setTax,
+    setTax: editing(["tx-tax", "tx-tax-extra"], setTax),
     fxRate,
-    setFxRate,
+    setFxRate: editing(["tx-fx-rate"], setFxRate),
     shares,
-    setShares,
+    setShares: editing(["tx-shares"], setShares),
     perShare,
-    setPerShare,
+    setPerShare: editing(["tx-per-share"], setPerShare),
     nativeCurrency,
-    setNativeCurrency,
+    setNativeCurrency: editing(["tx-native-currency"], setNativeCurrency),
     grossNative,
-    setGrossNative,
+    setGrossNative: editing(["tx-gross-native"], setGrossNative),
     description,
-    setDescription,
+    setDescription: editing(["tx-notes"], setDescription),
     tags,
-    setTags,
+    setTags: editing(["tx-tags"], setTags),
     idReinvested,
     setIdReinvested,
     query,
