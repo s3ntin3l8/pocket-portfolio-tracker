@@ -1,8 +1,9 @@
 "use client";
 
 import type { DriftRow } from "@portfolio/api-client";
-import type { useTranslations } from "next-intl";
+import { useLocale, type useTranslations } from "next-intl";
 import { tintStyle } from "@/lib/tint";
+import { formatFixed, formatPercentPoints } from "@/lib/utils";
 
 const DRIFT_BADGE_STYLE: Record<DriftRow["status"], { color: string; background: string }> = {
   on_target: tintStyle("primary"),
@@ -19,14 +20,11 @@ export function DriftBadge({
   t: ReturnType<typeof useTranslations>;
   td: ReturnType<typeof useTranslations>;
 }) {
+  const locale = useLocale();
   const { driftPct, status } = driftRow;
-  const absPct = Math.abs(driftPct).toFixed(1);
+  const absPct = formatFixed(Math.abs(driftPct), locale, 1);
   const label =
-    status === "on_target"
-      ? t("driftOnTarget")
-      : status === "over"
-        ? `+${absPct}pp`
-        : `−${absPct}pp`;
+    status === "on_target" ? t("driftOnTarget") : formatPercentPoints(driftPct, locale, 1, "pp");
   return (
     <span
       className="shrink-0 rounded-xs px-1.5 py-0.5 text-micro font-bold"

@@ -2,6 +2,7 @@ import { signToneClass } from "@/lib/tone";
 import { useTranslations } from "next-intl";
 import { Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { formatFixed, formatMonth, formatPercentPoints } from "@/lib/utils";
 import type { ConcentrationPoint } from "@portfolio/api-client";
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
@@ -29,7 +30,13 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-export function ConcentrationTrendCard({ trend }: { trend: ConcentrationPoint[] }) {
+export function ConcentrationTrendCard({
+  trend,
+  locale,
+}: {
+  trend: ConcentrationPoint[];
+  locale: string;
+}) {
   const t = useTranslations("Insights.concentrationTrend");
   const latest = trend.length > 0 ? trend[trend.length - 1] : null;
   const first = trend.length > 0 ? trend[0] : null;
@@ -42,15 +49,21 @@ export function ConcentrationTrendCard({ trend }: { trend: ConcentrationPoint[] 
       {latest ? (
         <>
           <p className="tabular mt-1 text-heading font-bold leading-none">
-            {latest.top1Pct.toFixed(1)}%
+            {formatPercentPoints(latest.top1Pct, locale, 1)}
           </p>
           <p className="mt-1 text-xs font-medium text-text-2">
-            {t("topHolding", { hhi: (latest.hhi * 100).toFixed(1) })}
+            {t("topHolding", { hhi: formatFixed(latest.hhi * 100, locale, 1) })}
             {first && first.hhi !== latest.hhi && (
               <span className={signToneClass(first.hhi - latest.hhi)}>
                 {" "}
-                ({latest.hhi > first.hhi ? "+" : ""}
-                {((latest.hhi - first.hhi) * 100).toFixed(2)} since {first.date})
+                {t("hhiChange", {
+                  delta: `${latest.hhi > first.hhi ? "+" : ""}${formatFixed(
+                    (latest.hhi - first.hhi) * 100,
+                    locale,
+                    2,
+                  )}`,
+                  date: formatMonth(first.date, locale),
+                })}
               </span>
             )}
           </p>

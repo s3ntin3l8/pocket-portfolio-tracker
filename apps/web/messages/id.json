@@ -68,7 +68,6 @@
     "deniedBody": "Anda tidak menyetujui permintaan masuk. Coba lagi untuk melanjutkan."
   },
   "Nav": {
-    "dashboard": "Dasbor",
     "holdings": "Kepemilikan",
     "transactions": "Transaksi",
     "income": "Pendapatan",
@@ -202,7 +201,7 @@
     "rebalancingCard": {
       "title": "Penyeimbangan",
       "edit": "Ubah",
-      "drift": "Penyimpangan {pct}%",
+      "drift": "Penyimpangan {pct}",
       "subtitle": "Bobot saat ini vs. target · {status}",
       "editSubtitle": "Sesuaikan bobot target",
       "statusOnTarget": "sesuai target",
@@ -263,8 +262,7 @@
       "headerPortfolioXirr": "XIRR Portofolio",
       "headerActiveReturn": "Aktif vs {symbol}",
       "noData": "—",
-      "insufficientData": "Belum cukup data untuk rincian per tahun — lanjutkan penggunaan dan cek lagi dalam beberapa hari.",
-      "emptyBenchmarks": "Tambahkan benchmark untuk membandingkan imbal hasil Anda dengan pasar tiap tahun."
+      "insufficientData": "Belum cukup data untuk rincian per tahun — lanjutkan penggunaan dan cek lagi dalam beberapa hari."
     },
     "benchmark": {
       "activeReturn": "Imbal hasil aktif",
@@ -291,7 +289,8 @@
       "top1Trend": "Top 1%",
       "samples": "{count} sampel bulanan · {classes} kelas aset",
       "insufficientData": "Data tidak mencukupi",
-      "note": "HHI (Indeks Herfindahl-Hirschman) menjumlahkan bobot kuadrat setiap holding, dari 0 (tersebar merata) hingga 1,0 (satu holding tunggal). HHI atau Top 1% yang naik berarti portofolio Anda makin terkonsentrasi pada lebih sedikit posisi."
+      "note": "HHI (Indeks Herfindahl-Hirschman) menjumlahkan bobot kuadrat setiap holding, dari 0 (tersebar merata) hingga 1,0 (satu holding tunggal). HHI atau Top 1% yang naik berarti portofolio Anda makin terkonsentrasi pada lebih sedikit posisi.",
+      "hhiChange": "({delta} sejak {date})"
     }
   },
   "Admin": {
@@ -378,7 +377,6 @@
     "jobs": "Pekerjaan latar belakang",
     "jobsHint": "Tugas terjadwal yang berjalan di latar belakang. Gunakan \"Jalankan sekarang\" untuk memicu pekerjaan secara langsung tanpa menunggu jadwal cron berikutnya. Catatan: invalidasi cache hanya berlaku untuk replika ini.",
     "schedulerUnavailable": "Scheduler tidak berjalan (pg-boss memerlukan Postgres eksternal; tidak tersedia di lingkungan ini).",
-    "jobName": "Pekerjaan",
     "jobSchedule": "Jadwal",
     "jobLastRun": "Terakhir dijalankan",
     "jobStatus": "Status",
@@ -398,7 +396,6 @@
     "providerName": "Penyedia",
     "enabledHeader": "Aktif",
     "apiCalls": "Panggilan API",
-    "apiKey": "Kunci API",
     "keyNone": "tidak ada",
     "keyNotNeeded": "Tidak diperlukan",
     "reorder": "Urutkan ulang",
@@ -448,7 +445,6 @@
     "deleteUserConfirm": "Hapus {email} dan semua data mereka secara permanen? Tindakan ini tidak dapat dibatalkan.",
     "deleteUserDone": "Pengguna dihapus.",
     "usersNoUsers": "Belum ada pengguna terdaftar.",
-    "usersEmail": "Email",
     "usersName": "Nama",
     "usersSignupDate": "Terdaftar",
     "usersPortfolios": "Portofolio",
@@ -597,7 +593,7 @@
     "emptyBody": "Catat setoran atau pembelian rencana tabungan, dan kemajuan menabung Anda muncul di sini.",
     "sparplanTitle": "Rencana tabungan",
     "detectedMonthly": "Total bulanan aktif",
-    "nowPct": "{pct}% sekarang",
+    "nowPct": "{pct} sekarang",
     "activeCount": "{count, plural, other {# aktif}}",
     "cadenceMonthly": "/bulan",
     "cadenceMonthlyShort": "bln",
@@ -638,7 +634,7 @@
     "driftOverRest": " Kurangi top-up di sini hingga kembali ke kisaran {target}.",
     "targetAllocation": "Alokasi target",
     "targetHelper": "Bobot target per rencana. Harus berjumlah 100%.",
-    "targetTotal": "Total {pct}%",
+    "targetTotal": "Total {pct}",
     "targetMustEqual": " · harus sama dengan 100%",
     "targetCancel": "Batal",
     "targetSave": "Simpan target",
@@ -752,11 +748,7 @@
     "connectionAwaiting": "Menunggu persetujuan",
     "connectionAttention": "Perlu perhatian",
     "connectionNotConnected": "Belum terhubung",
-    "done": "Selesai",
-    "sectionBasics": "Dasar",
-    "sectionOwnership": "Kepemilikan",
-    "sectionAccount": "Akun",
-    "sectionAccounting": "Opsi akuntansi"
+    "done": "Selesai"
   },
   "Import": {
     "title": "Impor transaksi",
@@ -1014,7 +1006,8 @@
     "batchLabel": "Unggahan · {count, plural, other {# berkas}}",
     "selectedCount": "{count, plural, other {# dipilih}}",
     "deleteSelected": "Hapus pilihan",
-    "bulkConfirmPrompt": "Menghapus {count, plural, other {# transaksi}} dari impor terkonfirmasi."
+    "bulkConfirmPrompt": "Menghapus {count, plural, other {# transaksi}} dari impor terkonfirmasi.",
+    "actions": "Tindakan"
   },
   "Dashboard": {
     "title": "Dasbor",
@@ -1076,12 +1069,6 @@
     "title": "Halaman tidak ditemukan",
     "body": "Halaman yang Anda cari tidak ada atau telah dipindahkan.",
     "backHome": "Kembali ke dasbor"
-  },
-  "Gold": {
-    "title": "Harga emas",
-    "perGram": "per gram, 24k",
-    "asOf": "per {time}",
-    "live": "Langsung"
   },
   "Instrument": {
     "priceHistory": "Riwayat harga",
@@ -1262,7 +1249,6 @@
     "groupInstruments": "Instrumen",
     "groupTransactions": "Transaksi",
     "catalogBadge": "katalog",
-    "shortcutHint": "⌘K",
     "groupRecent": "Terbaru",
     "groupNavigate": "Buka",
     "groupActions": "Tindakan",
@@ -1382,7 +1368,7 @@
     "mcpHint": "Izinkan Claude (atau klien MCP lain) membaca portofolio Anda — hanya-baca. Buat token akses hanya-baca di atas, lalu tambahkan Pocket sebagai server MCP. Nomor rekening dan IBAN tidak pernah dibagikan. Setiap pemanggilan alat dihitung 1–2 permintaan terhadap batas laju token tersebut.",
     "mcpClaudeCode": "Claude Code",
     "mcpClaudeDesktop": "Claude Desktop (claude_desktop_config.json)",
-    "mcpPlaceholders": "Ganti <your-pocket-api-url> dengan alamat publik API Pocket Anda dan <token> dengan token yang Anda buat.",
+    "mcpPlaceholders": "Ganti '<your-pocket-api-url>' dengan alamat publik API Pocket Anda dan '<token>' dengan token yang Anda buat.",
     "signOut": "Keluar",
     "navAccount": "Akun",
     "navAccountSub": "Mata uang, bahasa & tampilan",
@@ -1508,8 +1494,6 @@
     "filterLabel": "Filter",
     "filterClearAll": "Hapus semua",
     "filterYear": "Tahun",
-    "allTypes": "Semua jenis",
-    "allInstruments": "Semua instrumen",
     "allYears": "Semua tahun",
     "date": "Tanggal",
     "type": "Jenis",
@@ -2013,8 +1997,6 @@
     "realizedByYearChartTitle": "Untung/rugi terealisasi per tahun",
     "winLossTitle": "Menang / kalah",
     "winLossSubtitle": "{winners} dari {total} ditutup",
-    "winners": "Menang",
-    "losers": "Kalah",
     "realizedByYear": "Keuntungan terealisasi per tahun",
     "dividendsByYear": "Pendapatan investasi per tahun",
     "bonusesByYear": "Bonus per tahun",
@@ -2106,22 +2088,14 @@
     "distribution": {
       "title": "Distribusi FSA di seluruh depot",
       "cap": "Plafon tunjangan",
-      "capDesc": "Sparer\u00adpausch\u00adbetrag per orang",
+      "capDesc": "Sparer­pausch­betrag per orang",
       "allocated": "Dialokasikan",
       "remaining": "Belum didistribusikan",
       "remainingDesc": "Belum dialokasikan ke depot",
       "overAllocated": "Total alokasi depot melebihi plafon pribadi. Kelebihan pemotongan akan direkonsiliasi akhir tahun melalui Anlage KAP."
     },
     "allowance": {
-      "annual": "Batas tahunan",
-      "annualDesc": "Sparerpauschbetrag per tahun",
-      "used": "Terpakai YTD",
-      "usedDesc": "Keuntungan terkena Tf + pendapatan",
-      "remaining": "Sisa",
-      "taxSaving": "Penghematan pajak tersedia",
-      "usedPct": "{pct}% terpakai",
-      "gains": "keuntungan",
-      "income": "pendapatan"
+      "taxSaving": "Penghematan pajak tersedia"
     },
     "forecast": {
       "label": "Dividen & kupon yang diperkirakan",
@@ -2351,8 +2325,6 @@
       "reconciliation_drift": "Selisih rekonsiliasi kas baru vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
       "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})"
     },
-    "noneTitle": "Tidak ada masalah data",
-    "noneBody": "Semua transaksi konsisten.",
     "dismiss": "Tutup peringatan",
     "reconciliationTitle": "Kas tidak sesuai",
     "reconciliationPositionTitle": "Posisi tidak sesuai",
@@ -2360,12 +2332,6 @@
     "openConnection": "Buka koneksi",
     "dismissForNow": "Sembunyikan sementara",
     "portfolioTag": "Portofolio"
-  },
-  "PeriodSelector": {
-    "ytd": "YTD",
-    "1y": "1T",
-    "5y": "5T",
-    "max": "Maks"
   },
   "KpiPicker": {
     "title": "Sesuaikan dasbor",

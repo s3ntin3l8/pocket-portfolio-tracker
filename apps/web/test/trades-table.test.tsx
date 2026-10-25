@@ -153,7 +153,7 @@ describe("TradesTable", () => {
     // per breakpoint). Click the mobile card's detail button (second match).
     const detailButtons = screen.getAllByRole("button", { name: /detail/i });
     fireEvent.click(detailButtons[detailButtons.length - 1]);
-    expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
+    expect(screen.getByText(/Closed Jun 1, 2021/)).toBeInTheDocument();
   });
 
   it("opens the trade detail sheet from the mobile card for an open trade", () => {
@@ -161,7 +161,7 @@ describe("TradesTable", () => {
     const detailButtons = screen.getAllByRole("button", { name: /detail/i });
     fireEvent.click(detailButtons[detailButtons.length - 1]);
     // Header reads "Open since {entryDate}" for open trades.
-    expect(screen.getByText(/Open since 2021-02-01/)).toBeInTheDocument();
+    expect(screen.getByText(/Open since Feb 1, 2021/)).toBeInTheDocument();
   });
 
   describe("status chips + search", () => {
@@ -218,14 +218,14 @@ describe("TradesTable", () => {
     it("opens the trade detail sheet via a keyboard-reachable button for a closed trade", () => {
       renderTable([closed]);
       fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
-      expect(screen.getByText(/Closed 2021-06-01/)).toBeInTheDocument();
+      expect(screen.getByText(/Closed Jun 1, 2021/)).toBeInTheDocument();
     });
 
     it("opens the trade detail sheet for an open trade via the same button", () => {
       renderTable([open]);
       fireEvent.click(screen.getAllByRole("button", { name: /detail/i })[0]);
       // Open-trade header reads "Open since {entryDate}" (no realized exit).
-      expect(screen.getByText(/Open since 2021-02-01/)).toBeInTheDocument();
+      expect(screen.getByText(/Open since Feb 1, 2021/)).toBeInTheDocument();
     });
 
     it("does not render a leg-expand button for any trade (leg expansion was removed)", () => {

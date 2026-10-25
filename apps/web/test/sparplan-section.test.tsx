@@ -144,7 +144,7 @@ describe("SparplanSection", () => {
     });
 
     // Deviation badge (under target → signed pp).
-    expect(screen.getByText("−8.0pp")).toBeInTheDocument();
+    expect(screen.getByText("-8.0 pp")).toBeInTheDocument();
     // Allocation section heading + target/now legend + recommended top-up.
     expect(screen.getByText("Allocation · target vs actual")).toBeInTheDocument();
     expect(screen.getByText("target 60%")).toBeInTheDocument();

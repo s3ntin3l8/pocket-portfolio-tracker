@@ -52,8 +52,8 @@ describe("RebalancingCard", () => {
     renderCard(DRIFT);
     expect(screen.getByText("Rebalancing")).toBeInTheDocument();
     expect(screen.getByText("62.0%")).toBeInTheDocument();
-    expect(screen.getByText("+7.0pp")).toBeInTheDocument();
-    expect(screen.getByText("-7.0pp")).toBeInTheDocument();
+    expect(screen.getByText("+7.0 pp")).toBeInTheDocument();
+    expect(screen.getByText("-7.0 pp")).toBeInTheDocument();
     expect(screen.getByText("Drift 7.0%")).toBeInTheDocument();
   });
 

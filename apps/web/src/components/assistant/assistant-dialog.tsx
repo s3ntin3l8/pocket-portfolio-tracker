@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, CircleAlert, History, RotateCcw, Send, Square, Trash2 } from "lucide-react";
 import type { AssistantConversationSummary, AssistantStatus } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { AssistantMarkdown } from "@/components/assistant/assistant-markdown";
 import { MAX_MESSAGE_CHARS, displayText, type ChatTurn, type ToolStep } from "@/lib/assistant-chat";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 export interface AssistantChatApi {
   turns: ChatTurn[];
@@ -91,7 +91,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
         {text && <AssistantMarkdown text={text} />}
         {turn.error && (
           <p role="alert" className="text-xs font-semibold text-destructive">
-            {t(`errors.${turn.error}`)}
+            {t.has(`errors.${turn.error}`) ? t(`errors.${turn.error}`) : t("errors.generic")}
           </p>
         )}
       </div>
@@ -108,6 +108,7 @@ function HistoryPanel({
   onOpened: () => void;
 }) {
   const t = useTranslations("Assistant");
+  const locale = useLocale();
   const [items, setItems] = useState<AssistantConversationSummary[] | null>(null);
   const [error, setError] = useState<"load" | "open" | "delete" | null>(null);
 
@@ -155,7 +156,7 @@ function HistoryPanel({
               >
                 <span className="block truncate text-sm font-semibold">{c.title}</span>
                 <span className="block text-micro text-text-2">
-                  {new Date(c.updatedAt).toLocaleDateString()}
+                  {formatDateTime(c.updatedAt, locale)}
                 </span>
               </button>
               <Button
@@ -216,6 +217,10 @@ export function AssistantDialog({
   const disclosure = status?.local
     ? t("disclosureLocal")
     : t("disclosureCloud", { provider: status?.label ?? "" });
+
+  // A missing suggestion key must never render the key path — fall back to the id.
+  const suggestionLabel = (key: string) =>
+    t.has(`suggestions.${key}`) ? t(`suggestions.${key}`) : key;
 
   const composer = (
     <form
@@ -328,9 +333,9 @@ export function AssistantDialog({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => chat.send(t(`suggestions.${key}`))}
+                    onClick={() => chat.send(suggestionLabel(key))}
                   >
-                    {t(`suggestions.${key}`)}
+                    {suggestionLabel(key)}
                   </Button>
                 ))}
               </div>

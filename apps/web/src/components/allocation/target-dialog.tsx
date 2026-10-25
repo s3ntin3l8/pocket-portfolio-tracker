@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Target } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useApiClient } from "@/lib/api";
+import { formatPercentPoints } from "@/lib/utils";
 import { useRouter } from "@/i18n/navigation";
 import type { TargetWeight } from "@portfolio/api-client";
 
@@ -70,6 +71,7 @@ function sum(rows: { targetPct: number }[]): number {
  */
 export function TargetDialog({ portfolioId, dimension, dimensionLabel, slices, trigger }: Props) {
   const t = useTranslations("TargetDialog");
+  const locale = useLocale();
   const api = useApiClient();
   const router = useRouter();
 
@@ -198,7 +200,7 @@ export function TargetDialog({ portfolioId, dimension, dimensionLabel, slices, t
                 sumOk ? "text-muted-foreground" : "text-destructive font-medium"
               }`}
             >
-              {t("total")}: {total.toFixed(1)}% {!sumOk && t("mustEqual100")}
+              {t("total")}: {formatPercentPoints(total, locale, 1)} {!sumOk && t("mustEqual100")}
             </div>
           )}
 

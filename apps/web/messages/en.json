@@ -68,7 +68,6 @@
     "deniedBody": "You didn't approve the sign-in request. Try again to continue."
   },
   "Nav": {
-    "dashboard": "Dashboard",
     "holdings": "Holdings",
     "transactions": "Transactions",
     "income": "Income",
@@ -202,7 +201,7 @@
     "rebalancingCard": {
       "title": "Rebalancing",
       "edit": "Edit",
-      "drift": "Drift {pct}%",
+      "drift": "Drift {pct}",
       "subtitle": "Current vs. target weights · {status}",
       "editSubtitle": "Adjust target weights",
       "statusOnTarget": "on target",
@@ -263,8 +262,7 @@
       "headerPortfolioXirr": "Portfolio XIRR",
       "headerActiveReturn": "Active vs {symbol}",
       "noData": "—",
-      "insufficientData": "Not enough data for a per-year breakdown yet — keep using the app and check back in a few days.",
-      "emptyBenchmarks": "Add a benchmark to see how your returns compare to the market each year."
+      "insufficientData": "Not enough data for a per-year breakdown yet — keep using the app and check back in a few days."
     },
     "benchmark": {
       "activeReturn": "Active return",
@@ -291,7 +289,8 @@
       "top1Trend": "Top 1%",
       "samples": "{count} monthly samples · {classes} asset classes",
       "insufficientData": "Insufficient data",
-      "note": "HHI (Herfindahl-Hirschman Index) sums the squared weight of every holding, from 0 (perfectly spread out) to 1.0 (a single holding). Rising HHI or Top 1% means your portfolio is concentrating into fewer positions."
+      "note": "HHI (Herfindahl-Hirschman Index) sums the squared weight of every holding, from 0 (perfectly spread out) to 1.0 (a single holding). Rising HHI or Top 1% means your portfolio is concentrating into fewer positions.",
+      "hhiChange": "({delta} since {date})"
     }
   },
   "Admin": {
@@ -378,7 +377,6 @@
     "jobs": "Background jobs",
     "jobsHint": "Scheduled background tasks. Use \"Run now\" to trigger a job immediately instead of waiting for its next cron tick. Note: cache invalidation only applies to this replica.",
     "schedulerUnavailable": "Scheduler not running (pg-boss requires an external Postgres; not available in this environment).",
-    "jobName": "Job",
     "jobSchedule": "Schedule",
     "jobLastRun": "Last run",
     "jobStatus": "Status",
@@ -398,7 +396,6 @@
     "providerName": "Provider",
     "enabledHeader": "Enabled",
     "apiCalls": "API calls",
-    "apiKey": "API key",
     "keyNone": "none",
     "keyNotNeeded": "Not needed",
     "reorder": "Reorder",
@@ -448,7 +445,6 @@
     "deleteUserConfirm": "Permanently delete {email} and all their data? This cannot be undone.",
     "deleteUserDone": "User deleted.",
     "usersNoUsers": "No users registered yet.",
-    "usersEmail": "Email",
     "usersName": "Name",
     "usersSignupDate": "Signed up",
     "usersPortfolios": "Portfolios",
@@ -597,7 +593,7 @@
     "emptyBody": "Record deposits or savings-plan purchases and your saving progress appears here.",
     "sparplanTitle": "Savings plans",
     "detectedMonthly": "Active monthly total",
-    "nowPct": "{pct}% now",
+    "nowPct": "{pct} now",
     "activeCount": "{count, plural, one {# active} other {# active}}",
     "cadenceMonthly": "/month",
     "cadenceMonthlyShort": "mo",
@@ -638,7 +634,7 @@
     "driftOverRest": " Ease off top-ups here until it's back within the {target} band.",
     "targetAllocation": "Target allocation",
     "targetHelper": "A target weight per plan. Must total 100%.",
-    "targetTotal": "Total {pct}%",
+    "targetTotal": "Total {pct}",
     "targetMustEqual": " · must equal 100%",
     "targetCancel": "Cancel",
     "targetSave": "Save targets",
@@ -752,11 +748,7 @@
     "connectionAwaiting": "Awaiting approval",
     "connectionAttention": "Needs attention",
     "connectionNotConnected": "Not connected",
-    "done": "Done",
-    "sectionBasics": "Basics",
-    "sectionOwnership": "Ownership",
-    "sectionAccount": "Account",
-    "sectionAccounting": "Accounting options"
+    "done": "Done"
   },
   "Import": {
     "title": "Import transactions",
@@ -1014,7 +1006,8 @@
     "batchLabel": "Upload · {count, plural, one {# file} other {# files}}",
     "selectedCount": "{count, plural, one {# selected} other {# selected}}",
     "deleteSelected": "Delete selected",
-    "bulkConfirmPrompt": "Removes {count, plural, one {# transaction} other {# transactions}} from confirmed imports."
+    "bulkConfirmPrompt": "Removes {count, plural, one {# transaction} other {# transactions}} from confirmed imports.",
+    "actions": "Actions"
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -1076,12 +1069,6 @@
     "title": "Page not found",
     "body": "The page you're looking for doesn't exist or has moved.",
     "backHome": "Back to dashboard"
-  },
-  "Gold": {
-    "title": "Gold spot",
-    "perGram": "per gram, 24k",
-    "asOf": "as of {time}",
-    "live": "Live"
   },
   "Instrument": {
     "priceHistory": "Price history",
@@ -1262,7 +1249,6 @@
     "groupInstruments": "Instruments",
     "groupTransactions": "Transactions",
     "catalogBadge": "catalog",
-    "shortcutHint": "⌘K",
     "groupRecent": "Recent",
     "groupNavigate": "Go to",
     "groupActions": "Actions",
@@ -1382,7 +1368,7 @@
     "mcpHint": "Let Claude (or any MCP client) read your portfolio — read-only. Create a read-only access token above, then add Pocket as an MCP server. Account numbers and IBANs are never shared. Each tool call counts 1–2 requests against that token’s rate limit.",
     "mcpClaudeCode": "Claude Code",
     "mcpClaudeDesktop": "Claude Desktop (claude_desktop_config.json)",
-    "mcpPlaceholders": "Replace <your-pocket-api-url> with the public address of your Pocket API and <token> with the token you created.",
+    "mcpPlaceholders": "Replace '<your-pocket-api-url>' with the public address of your Pocket API and '<token>' with the token you created.",
     "signOut": "Sign out",
     "navAccount": "Account",
     "navAccountSub": "Currency, language & appearance",
@@ -1508,8 +1494,6 @@
     "filterLabel": "Filters",
     "filterClearAll": "Clear all",
     "filterYear": "Year",
-    "allTypes": "All types",
-    "allInstruments": "All instruments",
     "allYears": "All years",
     "date": "Date",
     "type": "Type",
@@ -2013,8 +1997,6 @@
     "realizedByYearChartTitle": "Realized P&L per year",
     "winLossTitle": "Win / loss",
     "winLossSubtitle": "{winners} of {total} closed",
-    "winners": "Winners",
-    "losers": "Losers",
     "realizedByYear": "Realized gains by year",
     "dividendsByYear": "Investment income by year",
     "bonusesByYear": "Bonuses by year",
@@ -2106,22 +2088,14 @@
     "distribution": {
       "title": "FSA distribution across depots",
       "cap": "Allowance cap",
-      "capDesc": "Per-person Sparer\u00adpausch\u00adbetrag",
+      "capDesc": "Per-person Sparer­pausch­betrag",
       "allocated": "Allocated",
       "remaining": "Still to distribute",
       "remainingDesc": "Unallocated to a depot",
       "overAllocated": "Total depot allocation exceeds the personal cap. The excess withholding will be reconciled at year-end via Anlage KAP."
     },
     "allowance": {
-      "annual": "Annual allowance",
-      "annualDesc": "Sparerpauschbetrag per year",
-      "used": "Used YTD",
-      "usedDesc": "Tf-adjusted gains + income",
-      "remaining": "Remaining",
-      "taxSaving": "Tax saving available",
-      "usedPct": "{pct}% used",
-      "gains": "gains",
-      "income": "income"
+      "taxSaving": "Tax saving available"
     },
     "forecast": {
       "label": "Expected dividends & coupons",
@@ -2351,8 +2325,6 @@
       "reconciliation_drift": "New cash reconciliation drift vs. broker ({currency}: reported {reported}, derived {derived})",
       "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})"
     },
-    "noneTitle": "No data issues found",
-    "noneBody": "All transactions are consistent.",
     "dismiss": "Dismiss warning",
     "reconciliationTitle": "Cash doesn't reconcile",
     "reconciliationPositionTitle": "Position doesn't reconcile",
@@ -2360,12 +2332,6 @@
     "openConnection": "Open connection",
     "dismissForNow": "Hide for now",
     "portfolioTag": "Portfolio"
-  },
-  "PeriodSelector": {
-    "ytd": "YTD",
-    "1y": "1Y",
-    "5y": "5Y",
-    "max": "Max"
   },
   "KpiPicker": {
     "title": "Customize dashboard",
@@ -2475,7 +2441,7 @@
     },
     "welcome": {
       "previewLabel": "Net worth",
-      "previewValue": "€42.500",
+      "previewValue": "€42,500",
       "previewPill": "Preview",
       "previewCaption": "A preview of your dashboard — once your data's in.",
       "tourSectionLabel": "What you'll find inside",
@@ -2562,8 +2528,8 @@
       "getStarted": "Get started",
       "haveAccount": "I already have an account",
       "netWorthLabel": "Net worth",
-      "netWorthValue": "€42.500",
-      "netWorthPill": "+3,2%",
+      "netWorthValue": "€42,500",
+      "netWorthPill": "+3.2%",
       "slide1": {
         "headline": "Every asset, one clear number.",
         "sub": "Stocks, funds, gold and cash — tracked in one honest figure, wherever you're taxed.",

@@ -5,7 +5,14 @@ import { useLocale, useTranslations } from "next-intl";
 import type { Trade } from "@portfolio/api-client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { monogram, tintFor } from "@/lib/brokerages";
-import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
+import {
+  formatMoney,
+  formatPercent,
+  formatSignedMoney,
+  formatQuantity,
+  formatDate,
+  cn,
+} from "@/lib/utils";
 
 interface TradeDetailSheetProps {
   /** The trade to show detail for; null renders nothing. Accepts both open and closed
@@ -134,8 +141,10 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
           <p className="mb-4 text-sm text-muted-foreground">
             {name ? `${name} · ` : ""}
             {isOpen
-              ? t("detail.openSince", { date: trade.entryDate })
-              : t("detail.closed", { date: trade.exitDate ?? "—" })}
+              ? t("detail.openSince", { date: formatDate(trade.entryDate, locale) })
+              : t("detail.closed", {
+                  date: trade.exitDate ? formatDate(trade.exitDate, locale) : "—",
+                })}
           </p>
 
           {/* Hero — realized P&L for closed, total return for open (unrealized + dividends) */}
@@ -229,12 +238,16 @@ export function TradeDetailSheet({ trade, currency, open, onOpenChange }: TradeD
                   }
                   divider
                 />
-                <Row label={t("detail.sold")} value={trade.exitDate ?? "—"} divider />
+                <Row
+                  label={t("detail.sold")}
+                  value={trade.exitDate ? formatDate(trade.exitDate, locale) : "—"}
+                  divider
+                />
                 <Row label={t("detail.return")} value={pct(heroPct)} tone={tone} divider />
                 <Row label={t("annualized")} value={pct(trade.annualizedPct)} tone={tone} divider />
               </>
             )}
-            <Row label={t("detail.bought")} value={trade.entryDate} divider />
+            <Row label={t("detail.bought")} value={formatDate(trade.entryDate, locale)} divider />
             <Row label={t("detail.holdingPeriod")} value={heldLabel(trade.holdingDays)} divider />
           </div>
 

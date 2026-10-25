@@ -134,7 +134,7 @@ export function RebalancingCard({
                 editing ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warn-strong",
               )}
             >
-              {t("drift", { pct: maxAbsDrift.toFixed(1) })}
+              {t("drift", { pct: formatPercentPoints(maxAbsDrift, locale, 1) })}
             </span>
           )}
           <Button
@@ -208,7 +208,8 @@ export function RebalancingCard({
                     sumOk ? "text-muted-foreground" : "font-medium text-destructive",
                   )}
                 >
-                  {td("total")}: {total.toFixed(1)}% {!sumOk && td("mustEqual100")}
+                  {td("total")}: {formatPercentPoints(total, locale, 1)}{" "}
+                  {!sumOk && td("mustEqual100")}
                 </span>
               </div>
 
@@ -258,7 +259,9 @@ export function RebalancingCard({
                 {d && (
                   <>
                     <span className="text-muted-foreground">→</span>
-                    <span className="tabular text-muted-foreground">{d.targetPct.toFixed(0)}%</span>
+                    <span className="tabular text-muted-foreground">
+                      {formatPercentPoints(d.targetPct, locale, 1)}
+                    </span>
                     <span
                       className={cn(
                         "tabular w-14 text-right font-medium",
@@ -267,8 +270,7 @@ export function RebalancingCard({
                         d.status === "on_target" && "text-success",
                       )}
                     >
-                      {d.driftPct > 0 ? "+" : ""}
-                      {d.driftPct.toFixed(1)}pp
+                      {formatPercentPoints(d.driftPct, locale, 1, "pp")}
                     </span>
                   </>
                 )}

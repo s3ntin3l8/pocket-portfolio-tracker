@@ -1,9 +1,16 @@
 import { useTranslations } from "next-intl";
 import { Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { formatPercentPoints } from "@/lib/utils";
 import type { InsightsVolatility } from "@portfolio/api-client";
 
-export function VolatilityCard({ volatility }: { volatility: InsightsVolatility }) {
+export function VolatilityCard({
+  volatility,
+  locale,
+}: {
+  volatility: InsightsVolatility;
+  locale: string;
+}) {
   const t = useTranslations("Insights.volatility");
   const vol = volatility.annualizedVolatility ? Number(volatility.annualizedVolatility) : null;
   const sharpe = volatility.sharpeRatio ? Number(volatility.sharpeRatio) : null;
@@ -14,7 +21,7 @@ export function VolatilityCard({ volatility }: { volatility: InsightsVolatility 
       <p className="text-xs font-semibold text-text-2">{t("title")}</p>
       {vol !== null ? (
         <p className="tabular mt-1 text-heading font-bold leading-none">
-          {(vol * 100).toFixed(1)}%
+          {formatPercentPoints(vol * 100, locale, 1)}
         </p>
       ) : (
         <p className="mt-1 text-heading font-bold leading-none text-text-2">—</p>
