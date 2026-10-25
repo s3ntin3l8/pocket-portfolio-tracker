@@ -2,10 +2,14 @@ import { defineConfig, devices } from "@playwright/test";
 import { apiPort, stackEnv, webPort, webUrl } from "./e2e/stack-env.mjs";
 
 /**
- * Local-only e2e (not wired into CI — see CONTRIBUTING.md "Web e2e"). Boots a
- * `make dev`-equivalent stack: the API on a throwaway PGlite database seeded with the demo
- * dataset, and `next dev`, with the DEV_AUTH_TOKEN bypass (no Authentik). Ports default to
- * 3101 (API) / 3105 (web); override with E2E_API_PORT / E2E_WEB_PORT.
+ * The web e2e suite (real browser, real API). Boots a `make dev`-equivalent stack: the
+ * API on a throwaway PGlite database seeded with the demo dataset, and `next dev`, with
+ * the DEV_AUTH_TOKEN bypass (no Authentik). Ports default to 3101 (API) / 3105 (web);
+ * override with E2E_API_PORT / E2E_WEB_PORT.
+ *
+ * Runs locally (`npm run e2e --workspace @portfolio/web`) AND in CI — the `e2e` job in
+ * .github/workflows/ci-cd.yml. The CI job builds the workspace packages first: the API
+ * resolves them from dist/, so there is no dist/ to run against otherwise.
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -17,7 +21,9 @@ export default defineConfig({
   retries: 0,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [["list"]],
+  // Locally the list reporter is all you need; in CI the HTML report is written to
+  // apps/web/playwright-report/ and uploaded as a job artifact.
+  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL: webUrl,
     trace: "retain-on-failure",
