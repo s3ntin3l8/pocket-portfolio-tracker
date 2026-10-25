@@ -55,8 +55,57 @@ jobs:
       - name: Run pytest
         run: python -m pytest services/api/python
 
+  e2e:
+    # The Playwright suite (apps/web/e2e) drives a real browser against a real API +
+    # web stack on a throwaway PGlite database. It needs its own job: the shared
+    # reusable workflow is pinned by SHA in another repo and exposes no e2e input.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      # The API resolves @portfolio/core, @portfolio/db and the other workspace
+      # packages from their dist/ folder, so they must be built before the suite
+      # boots — `npm ci` alone leaves no dist/ at all. Same filter as the API
+      # Dockerfile. It also removes the tsx/dist emit race documented in CLAUDE.md.
+      - name: Build workspace packages
+        run: npx turbo run build --filter=@portfolio/api...
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Resolve the Playwright version
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('./package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          # Keyed on the Playwright version, so bumping the dependency invalidates
+          # the cache instead of serving a browser build that doesn't match.
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Run e2e
+        run: npm run e2e --workspace @portfolio/web
+      - name: Upload e2e artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report
+          # Traces/screenshots of the failed specs (trace: "retain-on-failure") and
+          # the HTML report.
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7
+
   build-docker:
-    needs: [test-node, test-python]
+    needs: [test-node, test-python, e2e]
     # Only build/publish the image when something lands on main. PRs are validated by
     # the cheap test jobs alone; there's no need to run the slow multi-arch Docker
     # build (and nothing to publish) on every PR commit. Policy lives here in the
@@ -73,7 +122,7 @@ jobs:
     secrets: inherit
 
   build-docker-web:
-    needs: [test-node, test-python]
+    needs: [test-node, test-python, e2e]
     # Mirror of `build-docker` for the web app image (`apps/web/Dockerfile`). Runs in
     # parallel with the API build — the shared workflow namespaces cache/artifact paths
     # per image-name, so they don't collide. Both images publish to GHCR with the same

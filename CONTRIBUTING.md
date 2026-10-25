@@ -43,11 +43,13 @@ The templates enforce checking all guidelines (lint, typecheck, test,
 format-check, migrations) before submission. Fill them in rather than
 skipping them.
 
-## Web e2e (Playwright, local only)
+## Web e2e (Playwright)
 
 `apps/web/e2e/` holds real-browser specs (currently the command bar: palette, `g` chords,
 `n`/`?`, focus restore, `?entry=` deep links, Android back). They are **not** part of
-`npm test` or CI yet. One-time: `npx playwright install chromium`. Then, from the repo root:
+`npm test` — they are a separate suite that runs in its own CI job (the `e2e` job in
+`.github/workflows/ci-cd.yml`). One-time: `npx playwright install chromium`. Then, from the
+repo root:
 
 ```bash
 npm run e2e --workspace @portfolio/web
@@ -59,6 +61,21 @@ database (`.pglite-e2e/`, wiped and re-seeded with the demo dataset on every run
 `next dev`, with the `DEV_AUTH_TOKEN` bypass. No `.env` is needed, and it does not touch
 your normal dev database. The first run compiles routes in `next dev`, so allow a few
 minutes. Failure traces land in `apps/web/test-results/`.
+
+**Build the workspace packages first** — the API resolves `@portfolio/core`,
+`@portfolio/db` and the other workspace packages from their `dist/` folder, so a fresh
+checkout has no `dist/` to run against:
+
+```bash
+npm run build
+```
+
+(That is what the CI job does too, with `npx turbo run build --filter=@portfolio/api...`.
+Skipping it is the classic "column does not exist" / "cannot find module" failure — the
+compiled `dist/` and the checked-out migrations have to agree.)
+
+In CI the run writes an HTML report to `apps/web/playwright-report/` and uploads it, with
+the failure traces, as the `playwright-report` artifact.
 
 ## Branching
 

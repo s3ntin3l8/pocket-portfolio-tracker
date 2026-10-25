@@ -327,9 +327,12 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   (`app/**`, `proxy.ts`, `i18n/**`, configs, `*.d.ts`).
 - **API/packages:** Node env. The API uses embedded **PGlite** (`pglite://` URLs) so
   tests need no external Postgres; routes use `app.inject()`.
-- **Web e2e (local only, not in CI):** Playwright specs in `apps/web/e2e/`, run with `npm run e2e
+- **Web e2e (Playwright):** specs in `apps/web/e2e/`, run with `npm run e2e
 --workspace @portfolio/web` (boots PGlite + demo seed + `next dev` on ports 3101/3105, see
-  CONTRIBUTING.md). Excluded from Vitest; `turbo test` never runs it.
+  CONTRIBUTING.md). Excluded from Vitest; `turbo test` never runs it. It runs in its own CI
+  job (`e2e` in `.github/workflows/ci-cd.yml`) — which **builds the workspace packages
+  first**: the API resolves them from `dist/`, so a fresh checkout has no `dist/` to run
+  against.
 - **Python (pytr):** the vendored Trade Republic entrypoints in `services/api/python`
   have **pytest** unit tests (`test_tr_export.py`) for the detail-extraction heuristics —
   the part not exercised by the Node mapper tests. Run with `npm run test:py --workspace
@@ -346,11 +349,13 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
 
 `.github/workflows/` are thin callers of the reusable workflows in
 [`s3ntin3l8/.github`](https://github.com/s3ntin3l8/.github): `ci-cd.yml` runs
-**ci-node** at the root (so root scripts fan out via Turbo: lint, typecheck, build)
-plus a self-contained **test-python** job (pytest over `services/api/python`, the
-vendored pytr extraction tests — not covered by ci-node), then two parallel
+**ci-node** at the root (so root scripts fan out via Turbo: lint, typecheck, build),
+plus two self-contained jobs — **test-python** (pytest over `services/api/python`, the
+vendored pytr extraction tests — not covered by ci-node) and **e2e** (the Playwright
+suite in `apps/web/e2e/`, which needs its own job because the shared reusable workflow is
+pinned by SHA in another repo and exposes no e2e input) — then two parallel
 **docker-publish** jobs (root `Dockerfile` → `@portfolio/api`, and `apps/web/Dockerfile`
-→ `@portfolio/web`) once both test jobs pass. `release-please.yml` mirrors the same
+→ `@portfolio/web`) once all three test jobs pass. `release-please.yml` mirrors the same
 two-image publish on releases. Tests run
 **sharded 4-way** (`test-shards: "4"`) via `test:coverage:sharded` — the same Vitest
 coverage run as `test:coverage`, but with `coverage.thresholds` disabled per-shard
