@@ -87,7 +87,6 @@
   },
   "Reports": {
     "title": "Reports",
-    "scopeAll": "All portfolios",
     "open": "Open",
     "income": {
       "title": "Income",

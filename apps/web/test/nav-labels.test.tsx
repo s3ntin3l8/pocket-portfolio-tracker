@@ -141,12 +141,12 @@ describe("message catalogues", () => {
     expect(idKeys.has("Nav.profile")).toBe(false);
   });
 
-  it("adds the reports scope line to both catalogues", () => {
-    expect(enKeys.has("Reports.scopeAll")).toBe(true);
-    expect(idKeys.has("Reports.scopeAll")).toBe(true);
-    // The hub says what the scope switcher calls the same thing.
-    expect(messages.Reports.scopeAll).toBe(messages.PortfolioSwitcher.all);
-    expect(idMessages.Reports.scopeAll).toBe(idMessages.PortfolioSwitcher.all);
+  it("keeps the reports hub free of a scope claim of its own", () => {
+    // The hub's cards follow the SELECTED scope — every loader in `reports-data.ts`
+    // resolves it — so a fixed scope line on the page would be false for every scoped
+    // page. The shell's `PortfolioSwitcher` is the scope control here.
+    expect(enKeys.has("Reports.scopeAll")).toBe(false);
+    expect(idKeys.has("Reports.scopeAll")).toBe(false);
   });
 });
 
@@ -220,10 +220,15 @@ import InstrumentPage from "../src/app/[locale]/(app)/instruments/[id]/page";
 import ReportsPage from "../src/app/[locale]/(app)/reports/page";
 
 describe("/reports hub", () => {
-  it("states that its cards cover all portfolios", async () => {
+  it("states no scope of its own — its cards follow the selected scope", async () => {
+    // Audit R4-G4 was filed as "the hub's cards are aggregate while its neighbours are
+    // scoped". Re-reading the loaders showed the opposite: they resolve the selected
+    // scope, so a scope line here would be false. The hub must not claim one.
     const ui = await ReportsPage({ params: Promise.resolve({ locale: "en" }) });
     render(ui);
-    expect(screen.getByText(messages.Reports.scopeAll)).toBeInTheDocument();
+    expect(screen.getByText(messages.Reports.title)).toBeInTheDocument();
+    // The switcher's own label for the unscoped case must not leak onto the page.
+    expect(screen.queryByText(messages.PortfolioSwitcher.all)).not.toBeInTheDocument();
   });
 });
 
