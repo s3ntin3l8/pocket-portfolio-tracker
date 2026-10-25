@@ -413,6 +413,9 @@ export function GlobalSearch({
             above; cmdk must not re-filter either. */}
         <Command shouldFilter={false}>
           <CommandInput
+            // The placeholder is not a name — it disappears on the first keystroke,
+            // leaving the combobox unnamed (audit R4-D10).
+            aria-label={t("inputLabel")}
             placeholder={t("placeholder")}
             value={query}
             onValueChange={handleQueryChange}

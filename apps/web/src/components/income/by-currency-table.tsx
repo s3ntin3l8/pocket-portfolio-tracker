@@ -34,7 +34,7 @@ export function ByCurrencyTable({ rows, displayCurrency }: ByCurrencyTableProps)
   const { sortKey, sortDir, toggle, sort } = useTableSort<CurrencyIncome>(COLS);
 
   return (
-    <Table>
+    <Table caption={t("currencyTitle")}>
       <TableHeader>
         <TableRow>
           <SortableTableHead

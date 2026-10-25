@@ -852,6 +852,8 @@
       "discard": "Discard"
     },
     "draftCount": "{count, plural, one {# draft} other {# drafts}}",
+    "filesTable": "Imported files",
+    "draftsTable": "Imported drafts",
     "confidence": "{pct}% sure",
     "remove": "Remove",
     "fields": {
@@ -1241,6 +1243,7 @@
     "cancel": "Cancel",
     "savedResults": "Your portfolios",
     "discoveredResults": "Market discovery",
+    "actionsTable": "Corporate actions",
     "notInPortfolios": "{symbol} was found in market data but is not in your portfolios yet. Import a transaction for it first.",
     "adminOnly": "Corporate actions can only be managed by administrators.",
     "saveError": "Failed to save the corporate action.",
@@ -1251,6 +1254,7 @@
   },
   "Search": {
     "triggerLabel": "Search",
+    "inputLabel": "Search or run a command",
     "placeholder": "Search or run a command…",
     "searching": "Searching…",
     "noResults": "No results.",
@@ -2625,6 +2629,8 @@
     "primaryNav": "Main navigation",
     "needsReview": "{count, plural, one {# item needs review} other {# items need review}}",
     "search": "Search",
+    "loading": "Loading…",
+    "table": "Table",
     "toggleTheme": "Toggle theme",
     "moreOptions": "More options",
     "previous": "Previous",

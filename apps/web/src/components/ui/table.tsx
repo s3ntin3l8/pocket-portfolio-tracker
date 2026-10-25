@@ -10,14 +10,28 @@ import { StickyTableWrapper } from "@/components/ui/sticky-table-wrapper";
  * `stickyHeader` pins the header row under the topbar while the shell scrolls. While the table
  * fits its column the wrapper clips instead of scrolling (see `StickyTableWrapper`); when it does
  * not fit it scrolls horizontally and the header scrolls with the page. Do not combine with `edgeAffordance`: the sticky wrapper has its own shadows.
+ *
+ * `caption` names the table for assistive tech (audit R4-D5): a screen-reader user
+ * navigating by table would otherwise meet several indistinguishable "table, 6
+ * columns" entries on one page. Every app call site passes a localized name. It is
+ * applied as the table's `aria-label` rather than a `<caption>` element: most of
+ * these tables sit under a card whose visible heading already carries the same
+ * words, and a second copy of that text in the DOM is noise (a `<caption>` would
+ * also repeat the heading in every text query). The prop is optional in the type
+ * only so the bare `<Table>` fixtures in the table unit tests keep compiling —
+ * without one the table still gets a generic name, so no table is ever unnamed.
  */
 function Table({
   className,
+  caption,
   edgeAffordance = false,
   stickyHeader = false,
   onStickyChange,
+  children,
   ...props
 }: React.ComponentProps<"table"> & {
+  /** The table's accessible name — localized. */
+  caption?: string;
   edgeAffordance?: boolean;
   stickyHeader?: boolean;
   /** With `stickyHeader`: called when the header starts or stops pinning (the table fits). */
@@ -29,6 +43,7 @@ function Table({
   );
   const element = (
     <table
+      aria-label={caption ?? "Table"}
       className={cn(
         "w-full caption-bottom text-body-sm",
         edgeAffordance && "sticky-first-col",
@@ -37,7 +52,9 @@ function Table({
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+    </table>
   );
   return stickyHeader ? (
     <StickyTableWrapper className={wrapperClass} onFitChange={onStickyChange}>

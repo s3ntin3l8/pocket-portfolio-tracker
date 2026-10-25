@@ -852,6 +852,8 @@
       "discard": "Buang"
     },
     "draftCount": "{count, plural, other {# draf}}",
+    "filesTable": "File yang diimpor",
+    "draftsTable": "Draf hasil impor",
     "confidence": "Yakin {pct}%",
     "remove": "Hapus",
     "fields": {
@@ -1241,6 +1243,7 @@
     "cancel": "Batal",
     "savedResults": "Portofolio Anda",
     "discoveredResults": "Pencarian pasar",
+    "actionsTable": "Aksi korporasi",
     "notInPortfolios": "{symbol} ditemukan di data pasar tetapi belum ada di portofolio Anda. Import transaksi untuk instrumen ini terlebih dahulu.",
     "adminOnly": "Aksi korporasi hanya dapat dikelola oleh administrator.",
     "saveError": "Gagal menyimpan aksi korporasi.",
@@ -1251,6 +1254,7 @@
   },
   "Search": {
     "triggerLabel": "Cari",
+    "inputLabel": "Cari atau jalankan perintah",
     "placeholder": "Cari atau jalankan perintah…",
     "searching": "Mencari…",
     "noResults": "Tidak ada hasil.",
@@ -2625,6 +2629,8 @@
     "primaryNav": "Navigasi utama",
     "needsReview": "{count, plural, other {# item perlu ditinjau}}",
     "search": "Cari",
+    "loading": "Memuat…",
+    "table": "Tabel",
     "toggleTheme": "Ganti tema",
     "moreOptions": "Opsi lainnya",
     "previous": "Sebelumnya",

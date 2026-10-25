@@ -107,7 +107,7 @@ export function ImportFilesTable({
       )}
 
       <Card>
-        <Table>
+        <Table caption={t("filesTable")}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">

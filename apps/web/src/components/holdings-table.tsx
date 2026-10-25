@@ -141,7 +141,7 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
       <div className="hidden lg:block">
         {/* min-w-[720px] is the natural six-column minimum; it is load-bearing for
             scroll-shadow-x, which only shows when the table actually overflows its wrapper. */}
-        <Table edgeAffordance className="min-w-[720px]">
+        <Table caption={t("title")} edgeAffordance className="min-w-[720px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead

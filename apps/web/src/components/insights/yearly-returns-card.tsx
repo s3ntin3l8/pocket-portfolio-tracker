@@ -162,7 +162,7 @@ export function YearlyReturnsCard({ rows, symbols, currency, locale }: YearlyRet
       </div>
 
       <div className="mt-3">
-        <Table>
+        <Table caption={t("title")}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="text-left h-auto px-2 py-1.5 first:pl-2 last:pr-2">

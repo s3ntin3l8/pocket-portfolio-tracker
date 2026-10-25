@@ -161,7 +161,7 @@ export function GoldPlanCard({
               {t("scheduleToggle")}
             </summary>
             <div className="mt-2 overflow-x-auto">
-              <Table>
+              <Table caption={t("plansTitle")}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t("colNumber")}</TableHead>

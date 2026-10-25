@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getSessionState } from "@/lib/session-token";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 
@@ -32,5 +32,22 @@ export default async function OnboardingPage({ params }: { params: Promise<{ loc
     }
   }
 
-  return <OnboardingFlow />;
+  // Onboarding is a sibling of `(app)`, so it inherits neither the AppShell's
+  // `<main>` landmark nor its skip link — it brings its own (audit R4-D13).
+  const tA = await getTranslations({ locale, namespace: "A11y" });
+
+  return (
+    <>
+      {/* Skip link: first focusable element; jumps past the intro to <main>. */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-foreground focus:shadow-card focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        {tA("skipToContent")}
+      </a>
+      <main id="main" tabIndex={-1} className="focus:outline-none">
+        <OnboardingFlow />
+      </main>
+    </>
+  );
 }
