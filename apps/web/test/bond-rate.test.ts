@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   EMPTY_RATE_SCHEDULE_DRAFT,
+  checkRateScheduleDraft,
   effectiveRateForDate,
-  rateScheduleDraftToApi,
   rateScheduleToDraft,
   validateRateScheduleDraft,
   type RateScheduleDraft,
@@ -125,23 +125,25 @@ describe("validateRateScheduleDraft", () => {
   });
 });
 
-describe("rateScheduleDraftToApi", () => {
+describe("checkRateScheduleDraft", () => {
   it("converts percent-in rows into fraction-out periods", () => {
-    expect(rateScheduleDraftToApi(draft())).toEqual({
+    const check = checkRateScheduleDraft(draft());
+    expect(check.ok).toBe(true);
+    expect(check.ok && check.schedule).toEqual({
       floorRate: "0.0675",
       periods: [{ from: "2026-01-10", to: "2026-04-10", rate: "0.0675" }],
     });
   });
 
   it("drops an empty end date (the period runs to maturity)", () => {
-    const api = rateScheduleDraftToApi(
+    const check = checkRateScheduleDraft(
       draft({ periods: [{ from: "2026-04-10", to: "", ratePercent: "7" }] }),
     );
-    expect(api?.periods[0]).toEqual({ from: "2026-04-10", rate: "0.07" });
+    expect(check.ok && check.schedule.periods[0]).toEqual({ from: "2026-04-10", rate: "0.07" });
   });
 
   it("sorts the periods by start date", () => {
-    const api = rateScheduleDraftToApi(
+    const check = checkRateScheduleDraft(
       draft({
         periods: [
           { from: "2026-04-10", to: "", ratePercent: "7" },
@@ -149,15 +151,34 @@ describe("rateScheduleDraftToApi", () => {
         ],
       }),
     );
-    expect(api?.periods.map((p) => p.from)).toEqual(["2026-01-10", "2026-04-10"]);
+    expect(check.ok && check.schedule.periods.map((p) => p.from)).toEqual([
+      "2026-01-10",
+      "2026-04-10",
+    ]);
   });
 
-  it("returns undefined for an unusable draft — a half-filled schedule is never sent", () => {
-    expect(rateScheduleDraftToApi(draft({ floorRatePercent: "" }))).toBeUndefined();
-    expect(rateScheduleDraftToApi(draft({ periods: [] }))).toBeUndefined();
+  it("reports the reason instead of an unusable draft — never a schedule", () => {
+    // The result carries the reason, NOT an undefined schedule: a caller can therefore
+    // never read an unusable draft as "no schedule" and clear the shared one.
+    expect(checkRateScheduleDraft(draft({ floorRatePercent: "" }))).toEqual({
+      ok: false,
+      issue: "floorMissing",
+    });
+    expect(checkRateScheduleDraft(draft({ periods: [] }))).toEqual({
+      ok: false,
+      issue: "noPeriods",
+    });
     expect(
-      rateScheduleDraftToApi(draft({ periods: [{ from: "2026-01-10", to: "", ratePercent: "" }] })),
-    ).toBeUndefined();
+      checkRateScheduleDraft(draft({ periods: [{ from: "2026-01-10", to: "", ratePercent: "" }] })),
+    ).toEqual({ ok: false, issue: "periodIncomplete" });
+    expect(
+      checkRateScheduleDraft(
+        draft({
+          floorRatePercent: "8",
+          periods: [{ from: "2026-01-10", to: "", ratePercent: "6.75" }],
+        }),
+      ),
+    ).toEqual({ ok: false, issue: "floorAboveRate" });
   });
 });
 

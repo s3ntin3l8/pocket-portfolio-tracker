@@ -16,9 +16,8 @@ import { useApiClient } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BondRateScheduleEditor } from "./add-transaction-form/bond-rate-schedule-editor";
 import {
-  rateScheduleDraftToApi,
+  checkRateScheduleDraft,
   rateScheduleToDraft,
-  validateRateScheduleDraft,
   type RateScheduleDraft,
 } from "@/lib/bond-rate";
 import { useRouter } from "@/i18n/navigation";
@@ -97,12 +96,15 @@ export function InstrumentEditDialog({
     // above. `null` is sent only when the toggle was deliberately switched off.
     let couponRateSchedule: BondCouponRateSchedule | null | undefined;
     if (assetClass === "bond" && floatingRate) {
-      const issue = validateRateScheduleDraft(rateSchedule);
-      if (issue) {
-        toast.error(tb(`issue.${issue}`));
+      // Validate AND convert in one step: the schedule that goes out is the one the
+      // check produced, so an unusable draft can never be turned into a `null` —
+      // which is what would wipe the shared schedule.
+      const check = checkRateScheduleDraft(rateSchedule);
+      if (!check.ok) {
+        toast.error(tb(`issue.${check.issue}`));
         return;
       }
-      couponRateSchedule = rateScheduleDraftToApi(rateSchedule) ?? null;
+      couponRateSchedule = check.schedule;
     } else if (assetClass === "bond" && instrument.couponRateSchedule != null) {
       couponRateSchedule = null;
     }

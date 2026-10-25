@@ -110,18 +110,30 @@ export function validateRateScheduleDraft(draft: RateScheduleDraft): RateSchedul
 }
 
 /**
- * The editable draft → the API payload, or undefined when the draft is not yet usable.
+ * The outcome of validating AND converting a draft, in one pass.
+ *
+ * A discriminated union on purpose. A plain converter that returns `undefined` for an
+ * unusable draft cannot say WHY it is unusable, and a caller that reads `undefined` as
+ * "no schedule" would CLEAR the shared rate schedule for every holder of the series —
+ * the bond would then carry no rate and drop out of the income/tax forecast. This shape
+ * makes that mistake impossible: the schedule a caller sends is the one the check
+ * produced, and an unusable draft only ever carries its reason.
+ */
+export type RateScheduleCheck =
+  { ok: true; schedule: BondCouponRateSchedule } | { ok: false; issue: RateScheduleIssue };
+
+/**
+ * The editable draft → the API payload, or the reason the draft is not usable yet.
  *
  * An incomplete form must never send a half-filled schedule: the bond would silently
  * lose its rate projection. The periods are sorted by start date on the way out (the
  * API requires ascending order), so the user can type them in any order.
  */
-export function rateScheduleDraftToApi(
-  draft: RateScheduleDraft,
-): BondCouponRateSchedule | undefined {
-  if (validateRateScheduleDraft(draft) !== null) return undefined;
+export function checkRateScheduleDraft(draft: RateScheduleDraft): RateScheduleCheck {
+  const issue = validateRateScheduleDraft(draft);
+  if (issue) return { ok: false, issue };
   const floorRate = percentToFraction(draft.floorRatePercent.trim());
-  if (floorRate == null) return undefined;
+  if (floorRate == null) return { ok: false, issue: "floorMissing" };
   const periods = [...draft.periods]
     .sort((a, b) => a.from.localeCompare(b.from))
     .map((p) => {
@@ -133,7 +145,7 @@ export function rateScheduleDraftToApi(
       if (to !== "") period.to = to;
       return period;
     });
-  return { floorRate, periods };
+  return { ok: true, schedule: { floorRate, periods } };
 }
 
 /**

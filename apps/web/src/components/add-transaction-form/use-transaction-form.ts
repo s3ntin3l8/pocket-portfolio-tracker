@@ -8,6 +8,7 @@ import type {
   LoanOption,
   Instrument,
   InstrumentSearchResult,
+  BondCouponRateSchedule,
 } from "@portfolio/api-client";
 import { apiErrorCode } from "@portfolio/api-client";
 import { isTradeType, isShareReceiptType, isTransferType } from "@portfolio/core";
@@ -30,8 +31,7 @@ import {
 } from "./constants";
 import {
   EMPTY_RATE_SCHEDULE_DRAFT,
-  rateScheduleDraftToApi,
-  validateRateScheduleDraft,
+  checkRateScheduleDraft,
   type RateScheduleDraft,
 } from "@/lib/bond-rate";
 
@@ -369,7 +369,9 @@ export function useTransactionForm({
     setDiscovered([]);
   }
 
-  async function resolveInstrumentId(): Promise<string | null> {
+  async function resolveInstrumentId(
+    bondSchedule?: BondCouponRateSchedule,
+  ): Promise<string | null> {
     if (!hasInstrument) return null;
     if (selected) return selected.id;
     if (assetClass === "gold") {
@@ -401,7 +403,7 @@ export function useTransactionForm({
             // A floating-rate bond carries its rate in the schedule, not in a single
             // `couponRate` — sending both would leave the flat rate as a stale fallback.
             ...(floatingRate
-              ? { couponRateSchedule: rateScheduleDraftToApi(rateSchedule) }
+              ? { couponRateSchedule: bondSchedule }
               : { couponRate: couponRatePercentToFraction(couponRatePercent) }),
             couponSchedule: couponSchedule as
               "monthly" | "quarterly" | "semiannual" | "annual" | undefined,
@@ -425,18 +427,22 @@ export function useTransactionForm({
     }
     // A floating-rate bond whose schedule is not filled in yet must not be created:
     // it would carry no rate at all and silently drop out of the income/tax forecast.
-    // The editor already shows the reason inline; this is the submit-time guard.
+    // The editor already shows the reason inline; this is the submit-time guard. The
+    // checked schedule is handed to `resolveInstrumentId` below, so the payload is
+    // exactly the one the check produced.
+    let bondSchedule: BondCouponRateSchedule | undefined;
     if (assetClass === "bond" && floatingRate) {
-      const issue = validateRateScheduleDraft(rateSchedule);
-      if (issue) {
-        setError(tb(`issue.${issue}`));
+      const check = checkRateScheduleDraft(rateSchedule);
+      if (!check.ok) {
+        setError(tb(`issue.${check.issue}`));
         return;
       }
+      bondSchedule = check.schedule;
     }
     setBusy(true);
     setError(null);
     try {
-      const instrumentId = await resolveInstrumentId();
+      const instrumentId = await resolveInstrumentId(bondSchedule);
       const parsedTags = tags
         .split(",")
         .map((t) => t.trim())

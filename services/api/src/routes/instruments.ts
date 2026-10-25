@@ -151,7 +151,9 @@ export async function instrumentsRoute(app: FastifyInstance) {
       });
       request.timingName = "GET /instruments (paginated)";
       request.timingMeta = { q, page, pageSize, total };
-      return { rows: rows.map(withValidatedSchedule), total };
+      // The cached loader already mapped the rows — validating again here would only
+      // repeat the same idempotent check.
+      return { rows, total };
     }
 
     // Legacy path: no pagination, return bare array.
