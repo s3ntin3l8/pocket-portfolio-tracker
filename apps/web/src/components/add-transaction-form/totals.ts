@@ -1,4 +1,5 @@
 import { isTradeType, isTransferType } from "@portfolio/core";
+import { formatMoney as formatMoneyCanonical } from "@/lib/utils";
 import { INCOME_TYPES } from "./constants";
 
 export type TxTotalKind = "trade-buy" | "trade-sell" | "transfer" | "income";
@@ -77,13 +78,18 @@ export function totalLabelKey(
   }
 }
 
-/** `1234.5, "USD"` → `"USD 1,234.50"`. IDR has no decimals; everything else shows 2. */
-export function formatMoney(n: number, currency: string): string {
+/**
+ * Money for the add-transaction totals — the canonical locale-aware formatter from
+ * `@/lib/utils`, so the total speaks the SAME spelling as the rest of the app (and groups
+ * its digits the way the amount field above it does). The locale is the app's.
+ */
+export function formatMoney(n: number, currency: string, locale = "en"): string {
   if (!isFinite(n)) return "";
-  const dec = currency === "IDR" ? 0 : 2;
-  const formatted = n.toLocaleString("en-US", {
-    minimumFractionDigits: dec,
-    maximumFractionDigits: dec,
-  });
-  return currency ? `${currency} ${formatted}` : formatted;
+  try {
+    return formatMoneyCanonical(n, currency, locale);
+  } catch {
+    // Intl throws on an empty/invalid currency code — show the bare number instead of
+    // breaking the totals rail.
+    return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
+  }
 }

@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import type { ApiClient, ApiToken } from "@portfolio/api-client";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { copyToClipboard } from "@/lib/copy";
 import { useTimeout } from "@/lib/use-timeout";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 const EXPIRY_OPTIONS = [
   { value: "30", labelKey: "tokensExpiry30" },
@@ -50,6 +50,7 @@ export function ApiTokensManager({
   initialTokens: ApiToken[];
 }) {
   const t = useTranslations("Settings");
+  const locale = useLocale();
   const [tokens, setTokens] = useState<ApiToken[]>(initialTokens);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
@@ -130,7 +131,7 @@ export function ApiTokensManager({
                 <p className="truncate font-mono text-xs text-muted-foreground">
                   {tok.tokenPrefix}…{" · "}
                   {tok.lastUsedAt
-                    ? t("tokensUsedOn", { date: tok.lastUsedAt.slice(0, 10) })
+                    ? t("tokensUsedOn", { date: formatDateTime(tok.lastUsedAt, locale) })
                     : t("tokensNever")}
                 </p>
               </div>

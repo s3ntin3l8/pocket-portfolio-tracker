@@ -297,7 +297,9 @@ export function ImportTasksProvider({ children }: { children: React.ReactNode })
             const detail = info.reason === "generic" ? importErrorDetail(info) : null;
             const description = detail
               ? t("errors.genericDetailed", { detail })
-              : t(`errors.${info.reason}`, { provider: info.provider ?? "" });
+              : t.has(`errors.${info.reason}`)
+                ? t(`errors.${info.reason}`, { provider: info.provider ?? "" })
+                : t("errors.generic");
             const retry = async () => {
               // A session-expiry retry must force a token refresh first: replaying immediately would
               // re-send the same stale token, because SessionProvider's focus-refetch may not have

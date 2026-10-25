@@ -66,10 +66,18 @@ export default async function SettingsPortfoliosPage({
               const isIbkrConnected = isIbkrBound && ibkrConn?.status === "connected";
               const isSyncing =
                 (isTrBound && connection?.syncing) || (isIbkrBound && ibkrConn?.syncing);
+              // A status the catalogue doesn't know yet must not render the key path
+              // (or throw) — fall back to a real, translatable label (R4-F7).
               const statusLabel = isTrBound
-                ? connection && ttr(`status.${connection.status}`)
+                ? connection &&
+                  (ttr.has(`status.${connection.status}`)
+                    ? ttr(`status.${connection.status}`)
+                    : ttr("statusOther"))
                 : isIbkrBound
-                  ? ibkrConn && tibkr(`status.${ibkrConn.status}`)
+                  ? ibkrConn &&
+                    (tibkr.has(`status.${ibkrConn.status}`)
+                      ? tibkr(`status.${ibkrConn.status}`)
+                      : tibkr("statusOther"))
                   : null;
 
               const flags: string[] = [];

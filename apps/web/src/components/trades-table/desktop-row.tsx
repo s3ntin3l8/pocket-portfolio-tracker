@@ -58,7 +58,7 @@ export function DesktopRow({
                 {tr.instrument?.symbol ?? "—"}
               </ScopeLink>
               <Badge variant={tr.status === "open" ? "default" : "outline"} className="shrink-0">
-                {t(`status_${tr.status}`)}
+                {t.has(`status_${tr.status}`) ? t(`status_${tr.status}`) : t("statusOther")}
               </Badge>
             </div>
             <div className={cn(TABLE_SUBLABEL, "truncate")}>

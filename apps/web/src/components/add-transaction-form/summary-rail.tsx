@@ -2,6 +2,7 @@
 
 import { BrokerageIcon } from "@/components/brokerage-icon";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
+import { useLocale } from "next-intl";
 import { computeTxTotal, formatMoney, totalLabelKey } from "./totals";
 
 /**
@@ -34,6 +35,7 @@ export function SummaryRail({
   const total = computeTxTotal(type, quantity, price, fees, tax);
   const showBreakdown = total?.kind === "trade-buy" || total?.kind === "trade-sell";
   const sign = total?.kind === "trade-sell" ? "− " : "+ ";
+  const locale = useLocale();
 
   return (
     <aside className="sticky top-0 flex flex-col gap-3 self-start">
@@ -68,7 +70,7 @@ export function SummaryRail({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-2">{t("subtotal")}</span>
             <span className="text-body-sm font-semibold text-foreground">
-              {formatMoney(total.subtotal, currency)}
+              {formatMoney(total.subtotal, currency, locale)}
             </span>
           </div>
         )}
@@ -76,7 +78,7 @@ export function SummaryRail({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-2">{t("fees")}</span>
             <span className="text-body-sm font-semibold text-foreground">
-              {sign + formatMoney(total.fees, currency)}
+              {sign + formatMoney(total.fees, currency, locale)}
             </span>
           </div>
         )}
@@ -84,7 +86,7 @@ export function SummaryRail({
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-2">{t("tax")}</span>
             <span className="text-body-sm font-semibold text-foreground">
-              {sign + formatMoney(total.tax, currency)}
+              {sign + formatMoney(total.tax, currency, locale)}
             </span>
           </div>
         )}
@@ -94,7 +96,7 @@ export function SummaryRail({
             {t(total ? totalLabelKey(total.kind) : "totalEstimated")}
           </span>
           <span className="text-lg font-bold text-foreground">
-            {total ? formatMoney(total.total, currency) : "—"}
+            {total ? formatMoney(total.total, currency, locale) : "—"}
           </span>
         </div>
       </div>

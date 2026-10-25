@@ -1,5 +1,5 @@
 import { deltaToneOf } from "@/lib/tone";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import {
@@ -16,7 +16,7 @@ import { IncomeCalendar } from "@/components/income/income-calendar";
 import { IncomeCalendarEmpty } from "@/components/income/income-calendar-empty";
 import type { IncomeEventRow } from "@/components/income/income-events-table";
 import { incomeStatsOnce } from "@/components/income/income-data";
-import { formatMoney, formatPercent, cn } from "@/lib/utils";
+import { formatMoney, formatPercent, formatPercentPoints, cn } from "@/lib/utils";
 
 /*
  * One async server component per Income section. The page resolves `incomeStatsOnce()`
@@ -26,6 +26,19 @@ import { formatMoney, formatPercent, cn } from "@/lib/utils";
  */
 
 type SectionProps = { locale: string };
+
+/**
+ * The active locale for a section that isn't handed one. `getLocale()` resolves inside a
+ * request; where there is no request context at all, fall back to the default locale
+ * instead of letting the browser's locale decide (a mixed-convention number).
+ */
+async function activeLocale(): Promise<string> {
+  try {
+    return await getLocale();
+  } catch {
+    return "en";
+  }
+}
 
 async function load() {
   const result = await incomeStatsOnce();
@@ -269,7 +282,7 @@ export async function IncomeAllocationSection() {
 }
 
 export async function IncomeCurrencySection() {
-  const [t, s] = await Promise.all([getTranslations("Income"), load()]);
+  const [t, s, locale] = await Promise.all([getTranslations("Income"), load(), activeLocale()]);
   if (!s || s.byCurrency.length <= 1) return null;
   return (
     <Card className="@container px-6 py-5">
@@ -288,7 +301,11 @@ export async function IncomeCurrencySection() {
             <span className="min-w-0 flex-1 truncate text-body-sm font-semibold">{c.currency}</span>
             <span className="tabular shrink-0 text-body-sm font-bold text-text-2">
               {Number(s.lifetimeTotal) > 0
-                ? `${((Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100).toFixed(1)}%`
+                ? formatPercentPoints(
+                    (Number(c.totalNormalized) / Number(s.lifetimeTotal)) * 100,
+                    locale,
+                    1,
+                  )
                 : "—"}
             </span>
           </div>

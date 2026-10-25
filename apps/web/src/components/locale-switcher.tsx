@@ -33,7 +33,7 @@ export function LocaleSwitcher() {
               : "bg-background font-semibold text-foreground",
           )}
         >
-          {t(`languageOptions.${l}`)}
+          {t.has(`languageOptions.${l}`) ? t(`languageOptions.${l}`) : t("language")}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

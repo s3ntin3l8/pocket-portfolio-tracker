@@ -3,7 +3,7 @@
 import { signToneClass } from "@/lib/tone";
 import { useState, useMemo, Fragment } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { formatMoney, cn } from "@/lib/utils";
+import { formatMoney, formatPercentPoints, cn } from "@/lib/utils";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
@@ -164,7 +164,11 @@ export function IncomeEventsTable({
               [
                 e.growthApplied !== undefined
                   ? t("growthHint", {
-                      pct: `${e.growthApplied >= 1 ? "+" : ""}${((e.growthApplied - 1) * 100).toFixed(1)}%`,
+                      pct: `${e.growthApplied >= 1 ? "+" : ""}${formatPercentPoints(
+                        (e.growthApplied - 1) * 100,
+                        locale,
+                        1,
+                      )}`,
                     })
                   : null,
                 e.assumesContributions ? t("contributionsHint") : null,

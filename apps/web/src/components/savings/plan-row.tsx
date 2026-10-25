@@ -3,7 +3,7 @@
 import type { DetectedPlan, DriftRow } from "@portfolio/api-client";
 import type { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatPercentPoints } from "@/lib/utils";
 import { monogram, softTintFor } from "@/lib/brokerages";
 import { StepHint } from "./step-hint";
 import { DriftBadge } from "./drift-badge";
@@ -63,7 +63,7 @@ export function PlanRow({
         <p className="tabular text-body-sm font-bold">{amount}</p>
         {driftRow ? (
           <p className="tabular mt-0.5 text-micro font-semibold text-text-2">
-            {t("nowPct", { pct: driftRow.actualPct.toFixed(0) })}
+            {t("nowPct", { pct: formatPercentPoints(driftRow.actualPct, locale, 0) })}
           </p>
         ) : (
           plan.status === "stopped" && (

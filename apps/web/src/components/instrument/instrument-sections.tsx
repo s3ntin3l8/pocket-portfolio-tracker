@@ -19,7 +19,7 @@ import {
   selectedPortfolioIdOnce,
   type InstrumentTxFilters,
 } from "@/components/instrument/instrument-data";
-import { formatMoney, formatPercent, rowAnomalyCounts } from "@/lib/utils";
+import { formatMoney, formatPercent, formatPercentPoints, rowAnomalyCounts } from "@/lib/utils";
 import { effectiveRateForDate } from "@/lib/bond-rate";
 import { lastPriceInfo } from "@/lib/instrument-price";
 
@@ -323,7 +323,11 @@ export async function InstrumentPositionSection({ id, locale }: SectionProps) {
             />
             <StatCard
               label={t("portfolioWeightLabel")}
-              value={portfolioWeight !== null ? `${(portfolioWeight * 100).toFixed(1)}%` : "—"}
+              value={
+                portfolioWeight !== null
+                  ? formatPercentPoints(portfolioWeight * 100, locale, 1)
+                  : "—"
+              }
             />
           </div>
         ) : (

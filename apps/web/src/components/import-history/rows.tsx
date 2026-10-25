@@ -10,7 +10,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import type { ImportRecord } from "@portfolio/api-client";
 import { cn } from "@/lib/utils";
 import { onActivateKey } from "@/lib/a11y";
-import { sourceMeta, statusLabelKey } from "./utils";
+import { sourceMeta, statusLabelKey, type SourceTranslator } from "./utils";
 import { STATUS_VARIANT } from "./types";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -194,7 +194,7 @@ export function DesktopRow({
   selected: Set<string>;
   selectionMode: boolean;
   t: (key: string, params?: Record<string, string | number | Date>) => string;
-  ts: (key: string) => string;
+  ts: SourceTranslator;
   df: Intl.DateTimeFormat;
   onToggleOne: (id: string) => void;
   actions: React.ReactNode;
@@ -262,7 +262,7 @@ export function MobileRow({
   selected: Set<string>;
   selectionMode: boolean;
   t: (key: string, params?: Record<string, string | number | Date>) => string;
-  ts: (key: string) => string;
+  ts: SourceTranslator;
   shortDf: Intl.DateTimeFormat;
   onToggleOne: (id: string) => void;
   longPressHandlers: (id: string) => Record<string, (e: React.PointerEvent) => void>;

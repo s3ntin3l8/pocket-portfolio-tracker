@@ -230,7 +230,7 @@ export function ImportHistory({
                   Timestamp
                 </SortableTableHead>
                 <TableCell className="h-10 px-3 text-left align-middle text-xs font-medium text-muted-foreground">
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">{t("actions")}</span>
                 </TableCell>
               </TableRow>
             </TableHeader>

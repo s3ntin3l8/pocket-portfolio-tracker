@@ -8,7 +8,7 @@ import messages from "../messages/en.json";
 function renderCard(trend: ConcentrationPoint[]) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <ConcentrationTrendCard trend={trend} />
+      <ConcentrationTrendCard trend={trend} locale="en" />
     </NextIntlClientProvider>,
   );
 }

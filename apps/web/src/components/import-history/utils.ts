@@ -11,14 +11,18 @@ export function statusLabelKey(imp: ImportRecord): string {
   return `status.${imp.status}`;
 }
 
-export function sourceMeta(imp: ImportRecord, ts: (key: string) => string) {
+/**
+ * The `Transactions`-namespace translator. `has` is part of next-intl's translator, but the
+ * prop type has to say so explicitly — a dynamic key that isn't in the catalogue would
+ * otherwise throw instead of falling back to a real label (R4-F7).
+ */
+export type SourceTranslator = ((key: string) => string) & { has: (key: string) => boolean };
+
+export function sourceMeta(imp: ImportRecord, ts: SourceTranslator) {
   const sourceType = parserToSourceType(imp.parser);
   const style = SRC_STYLE[sourceType] ?? DEFAULT_SRC;
-  let sourceLabel = sourceType;
-  try {
-    sourceLabel = ts(`sources.${sourceType}`);
-  } catch {
-    /* unknown source type — keep the raw value */
-  }
+  const sourceLabel = ts.has(`sources.${sourceType}`)
+    ? ts(`sources.${sourceType}`)
+    : ts("sourcesOther");
   return { style, sourceLabel, label: imp.originalFilename ?? sourceLabel };
 }

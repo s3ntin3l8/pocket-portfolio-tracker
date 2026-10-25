@@ -85,7 +85,7 @@ export function ImportFlow(props: UseImportFlowProps = {}) {
               {i + 1}
             </span>
             <span className={cn(i <= activeIndex ? "text-foreground" : "text-muted-foreground")}>
-              {t(`steps.${s}`)}
+              {t.has(`steps.${s}`) ? t(`steps.${s}`) : t("stepsOther")}
             </span>
             {i < STEPS.length - 1 && <span className="mx-1 h-px flex-1 bg-border" />}
           </li>

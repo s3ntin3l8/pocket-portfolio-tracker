@@ -130,7 +130,29 @@ function reconciliationValues(
   return values;
 }
 
-export type AnomalyTranslator = (key: string, values?: Record<string, string>) => string;
+/**
+ * The `Anomalies` translator, narrowed to what `anomalyLabel` needs. `has` is next-intl's
+ * "does this key exist" check — optional, so a plain function (a test double, a caller
+ * outside the web tier) still satisfies the type.
+ */
+export type AnomalyTranslator = ((key: string, values?: Record<string, string>) => string) & {
+  has?: (key: string) => boolean;
+};
+
+/**
+ * The localized message for an anomaly code. The code is dynamic, so next-intl can't verify
+ * it at build time — and an unknown code (the API can grow one) would render the key path.
+ * A code that isn't in the catalogue falls back to `codes.unknown`.
+ */
+function anomalyCodeLabel(
+  ta: AnomalyTranslator,
+  code: string,
+  values?: Record<string, string>,
+): string {
+  const key = `codes.${code}`;
+  if (ta.has && !ta.has(key)) return ta("codes.unknown");
+  return ta(key, values);
+}
 
 /**
  * Localized label/tooltip for a transaction-scoped anomaly. For `negative_cash` it folds the
@@ -146,22 +168,26 @@ export function anomalyLabel(
 ): string {
   if (anomaly.code === "negative_cash" && anomaly.meta) {
     const currency = String(anomaly.meta.currency ?? "");
-    return ta("codes.negative_cash", {
+    return anomalyCodeLabel(ta, anomaly.code, {
       currency,
       balance: formatMoney(Number(anomaly.meta.balance), currency, locale),
     });
   }
   if (anomaly.meta && RECONCILIATION_CODES.has(anomaly.code)) {
-    return ta(`codes.${anomaly.code}`, reconciliationValues(anomaly.code, anomaly.meta, locale));
+    return anomalyCodeLabel(
+      ta,
+      anomaly.code,
+      reconciliationValues(anomaly.code, anomaly.meta, locale),
+    );
   }
   if (anomaly.meta) {
     const values: Record<string, string> = {};
     for (const [key, value] of Object.entries(anomaly.meta)) {
       values[key] = String(value);
     }
-    return ta(`codes.${anomaly.code}`, values);
+    return anomalyCodeLabel(ta, anomaly.code, values);
   }
-  return ta(`codes.${anomaly.code}`);
+  return anomalyCodeLabel(ta, anomaly.code);
 }
 
 /**
@@ -261,13 +287,59 @@ export function formatPercentUnsigned(value: number, locale = "en") {
  * Locale-formatted percentage from a value already expressed in percent points
  * (`12.5` -> "12.5%" / "12,5 %"). Use instead of `x.toFixed(1) + "%"`, which hard-codes
  * the decimal separator and the sign/space convention.
+ *
+ * `unit` overrides the percent sign for a magnitude measured in another unit: a drift is
+ * measured in percentage POINTS ("pp"), not in percent of a whole, so it renders as
+ * "+1.5 pp" through the SAME helper instead of a second, hand-rolled formatter.
  */
-export function formatPercentPoints(pct: number, locale = "en", digits = 1) {
+export function formatPercentPoints(pct: number, locale = "en", digits = 1, unit = "%") {
+  if (unit !== "%") {
+    return `${new Intl.NumberFormat(locale, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      signDisplay: "exceptZero",
+    }).format(pct)} ${unit}`;
+  }
   return new Intl.NumberFormat(locale, {
     style: "percent",
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(pct / 100);
+}
+
+/**
+ * Locale-formatted calendar date from a date-only string ("2024-03-01" -> "1 Mar 2024").
+ * Pinned to UTC so a date-only value never shifts a day in a negative-offset timezone.
+ * An unparseable value is returned unchanged rather than crashing the surface.
+ */
+export function formatDate(date: string, locale = "en"): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return date;
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(d);
+}
+
+/**
+ * Locale-formatted month from a "YYYY-MM" string ("2024-03" -> "Mar 2024"). Pinned to UTC
+ * like {@link formatDate}.
+ */
+export function formatMonth(month: string, locale = "en"): string {
+  const d = new Date(`${month}-01T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return month;
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(d);
+}
+
+/**
+ * Locale-formatted date of an ISO instant ("2024-03-01T10:00:00Z"). An instant, so it
+ * renders in the reader's own timezone — unlike the calendar dates above.
+ */
+export function formatDateTime(instant: string, locale = "en"): string {
+  const d = new Date(instant);
+  if (Number.isNaN(d.getTime())) return instant;
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(d);
 }
 
 /** Locale-formatted plain number with a fixed number of decimals (percentage-point gaps, …). */

@@ -3,7 +3,7 @@
 import { flatToneClass } from "@/lib/tone";
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { useChartTooltip } from "@/components/ui/use-chart-tooltip";
 import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-tooltip-panel";
@@ -28,6 +28,7 @@ import { ChartTooltipPanel, type ChartTooltipRow } from "@/components/ui/chart-t
  */
 export function HoldingSparkline({ values, className }: { values: number[]; className?: string }) {
   const t = useTranslations("Holdings");
+  const locale = useLocale();
   const tip = useChartTooltip<{ rows: ChartTooltipRow[]; label: string }>();
   const { rows, rangeLabel } = useMemo(() => {
     if (values.length < 2) return { rows: [] as ChartTooltipRow[], rangeLabel: "" };
@@ -35,7 +36,7 @@ export function HoldingSparkline({ values, className }: { values: number[]; clas
     const max = Math.max(...values);
     // Numeric-only; the component is currency-agnostic by design. Callers that
     // want currency formatting can wrap this in their own component.
-    const fmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
+    const fmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 4 });
     const minStr = fmt.format(min);
     const maxStr = fmt.format(max);
     const range = min === max ? minStr : `${minStr} – ${maxStr}`;
@@ -48,7 +49,7 @@ export function HoldingSparkline({ values, className }: { values: number[]; clas
       rows: [{ label: t("sparklineRange"), value: range }] as ChartTooltipRow[],
       rangeLabel: t("sparklineRangeAria", { range }),
     };
-  }, [values, t]);
+  }, [values, t, locale]);
 
   if (values.length < 2) return null;
 
