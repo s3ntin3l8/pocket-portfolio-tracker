@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import messages from "../messages/en.json";
 import idMessages from "../messages/id.json";
 import { COMMAND_PAGES, MAIN_NAV, navActiveKey } from "../src/components/nav-items";
+import { PageHeaderProvider, usePageHeader } from "../src/components/page-header";
 
 /*
  * One name per concept (audit R4-G1/R4-G2): a route is called the same thing in the nav,
@@ -155,6 +156,14 @@ describe("message catalogues", () => {
 /** The `Referer` the instrument page sees (its back target follows it). */
 const referer = vi.hoisted(() => ({ value: null as string | null }));
 
+/** What `instrumentOnce` answers — the page branches on it (ok / not_found / error). */
+const instrumentResult = vi.hoisted(() => ({
+  value: { status: "not_found" } as unknown,
+}));
+
+/** The `backHref` the page handed to `InstrumentHeader` (the hero chevron). */
+const headerProps = vi.hoisted(() => ({ backHref: null as string | null }));
+
 vi.mock("next/headers", () => ({
   headers: async () => new Headers(referer.value ? { referer: referer.value } : {}),
 }));
@@ -175,12 +184,17 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/components/instrument/instrument-data", () => ({
-  instrumentOnce: async () => ({ status: "not_found" }),
+  instrumentOnce: async () => instrumentResult.value,
   meOnce: async () => ({ isAdmin: false }),
   startInstrumentLoads: vi.fn(),
 }));
 vi.mock("@/components/instrument/instrument-header", () => ({
-  InstrumentHeader: () => null,
+  // Records the props the page hands it — the hero chevron's href is one of the two
+  // places the back target is published.
+  InstrumentHeader: (props: { backHref?: string }) => {
+    headerProps.backHref = props.backHref ?? null;
+    return null;
+  },
 }));
 vi.mock("@/components/instrument/instrument-sections", () => ({
   InstrumentPriceSection: () => null,
@@ -219,6 +233,12 @@ vi.mock("@/components/reports/reports-cards", () => ({
 import InstrumentPage from "../src/app/[locale]/(app)/instruments/[id]/page";
 import ReportsPage from "../src/app/[locale]/(app)/reports/page";
 
+/** Reads what the page published to the desktop topbar (the shell's back chevron). */
+function TopbarBackProbe() {
+  const { backHref } = usePageHeader();
+  return <span data-testid="topbar-back">{backHref ?? ""}</span>;
+}
+
 describe("/reports hub", () => {
   it("states no scope of its own — its cards follow the selected scope", async () => {
     // Audit R4-G4 was filed as "the hub's cards are aggregate while its neighbours are
@@ -235,6 +255,8 @@ describe("/reports hub", () => {
 describe("/instruments/:id back target", () => {
   beforeEach(() => {
     referer.value = null;
+    instrumentResult.value = { status: "not_found" };
+    headerProps.backHref = null;
   });
 
   async function renderInstrument() {
@@ -282,5 +304,37 @@ describe("/instruments/:id back target", () => {
     const href = backLinkHref() ?? "";
     expect(href.startsWith("/")).toBe(true);
     expect(href.startsWith("//")).toBe(false);
+  });
+
+  it("publishes the referring route to the hero and the topbar when the instrument loads", async () => {
+    // The success path is the one that matters: the two error branches build their own
+    // `BackLink`, so only here do the page's two propagation points run.
+    instrumentResult.value = {
+      status: "ok",
+      data: {
+        instrument: { id: "inst-1", symbol: "AAPL", name: "Apple", displayName: "Apple Inc." },
+        history: [],
+        corporateActions: [],
+      },
+    };
+    referer.value = "http://localhost:3005/en/trades";
+
+    const ui = await InstrumentPage({
+      params: Promise.resolve({ locale: "en", id: "inst-1" }),
+      searchParams: Promise.resolve({}),
+    });
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <PageHeaderProvider>
+          <TopbarBackProbe />
+          {ui}
+        </PageHeaderProvider>
+      </NextIntlClientProvider>,
+    );
+
+    // The hero chevron.
+    expect(headerProps.backHref).toBe("/trades");
+    // The desktop topbar (`PageHeaderSetter` → the shell's header).
+    expect(screen.getByTestId("topbar-back").textContent).toBe("/trades");
   });
 });
