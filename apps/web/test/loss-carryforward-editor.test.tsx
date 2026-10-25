@@ -149,4 +149,56 @@ describe("LossCarryforwardEditor", () => {
     const [stockInput] = screen.getAllByRole("textbox") as HTMLInputElement[];
     expect(stockInput).toHaveValue("42");
   });
+
+  // R4-A1 — revisiting a year must not inherit the previous verdict for it. The
+  // request key for 2026 is the same on the way back as it was on the way out, so a
+  // stale "loaded" would make the blanked fields saveable — and saving an empty set
+  // clears every pot for that year.
+  it("does not make a revisited year saveable while its reload is still in flight", async () => {
+    getLossCarryforward.mockResolvedValueOnce({
+      taxYear: 2026,
+      entries: [{ pot: "stock", amount: "1000" }],
+    });
+    renderEditor(2026);
+    await waitForLoaded();
+
+    const yearSelect = screen.getByRole("combobox");
+    // 2026 → 2025 → back to 2026, with BOTH refetches still pending. The request key
+    // for 2026 is then the same as it was on the first load, so a stale "loaded"
+    // verdict would make the blanked fields saveable — and saving an empty set
+    // clears every pot for that year.
+    getLossCarryforward.mockImplementationOnce(() => new Promise(() => {}));
+    fireEvent.change(yearSelect, { target: { value: "2025" } });
+    await waitFor(() => expect(getLossCarryforward).toHaveBeenCalledTimes(2));
+
+    getLossCarryforward.mockImplementationOnce(() => new Promise(() => {}));
+    fireEvent.change(yearSelect, { target: { value: "2026" } });
+    await waitFor(() => expect(getLossCarryforward).toHaveBeenCalledTimes(3));
+
+    // The amounts on screen are unknown: Save must be off and nothing may be sent.
+    expect(screen.getByRole("button", { name: m.save })).toBeDisabled();
+    const [stockInput] = screen.getAllByRole("textbox") as HTMLInputElement[];
+    expect(stockInput).toHaveValue("");
+    expect(stockInput).toHaveAttribute("readonly");
+
+    fireEvent.click(screen.getByRole("button", { name: m.save }));
+    expect(setLossCarryforward).not.toHaveBeenCalled();
+  });
+
+  it("drops the minus-sign hint when the amounts are cleared for another year", async () => {
+    getLossCarryforward.mockResolvedValueOnce({
+      taxYear: 2026,
+      entries: [{ pot: "stock", amount: "1000" }],
+    });
+    renderEditor(2026);
+    await waitForLoaded();
+
+    const [stockInput] = screen.getAllByRole("textbox") as HTMLInputElement[];
+    fireEvent.change(stockInput, { target: { value: "-500" } });
+    expect(screen.getByText(m.negativeIgnored)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "2025" } });
+
+    await waitFor(() => expect(screen.queryByText(m.negativeIgnored)).not.toBeInTheDocument());
+  });
 });

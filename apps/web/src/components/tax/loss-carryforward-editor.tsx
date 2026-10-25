@@ -61,6 +61,14 @@ export function LossCarryforwardEditor({
       clearedKeyRef.current = key;
       setStock("");
       setGeneral("");
+      // The previous verdict belongs to the previous request. It must be dropped, not
+      // carried over: revisiting a year (2026 → 2025 → 2026) makes the *new* key equal
+      // the old one again, and a stale "loaded" would otherwise make the blanked
+      // fields saveable — saving an empty set clears every pot for that year.
+      setLoad({ key: "", status: "loading" });
+      // The "a minus sign was dropped" hint described the amounts that were just
+      // cleared; it must not survive into the new request.
+      setNegativeIgnored({ stock: false, general: false });
     }
     api
       .getLossCarryforward(holderId, year)
@@ -106,10 +114,6 @@ export function LossCarryforwardEditor({
         taxYear: year,
         entries,
       });
-      // A successful save clears a stale failure state.
-      setLoad((prev) =>
-        prev.key === loadKey && prev.status !== "loaded" ? { ...prev, status: "loaded" } : prev,
-      );
       toast.success(t("lossCarryforward.success"));
       // Refresh server-rendered tax figures (estimated tax, allowance usage, harvest
       // suggestions) that depend on carry-forward data. A single post-save refresh is
@@ -196,10 +200,13 @@ export function LossCarryforwardEditor({
               inputMode="decimal"
               value={stock}
               readOnly={status !== "loaded"}
+              aria-busy={status === "loading"}
               onChange={(e) => handleAmountChange("stock", e.target.value)}
             />
             <p className="mt-1 text-micro text-muted-foreground">
-              {t("lossCarryforward.stockHint")}
+              {status === "loading"
+                ? t("lossCarryforward.loading")
+                : t("lossCarryforward.stockHint")}
             </p>
             {negativeIgnored.stock && (
               <p role="status" className="text-micro text-muted-foreground">
@@ -215,10 +222,13 @@ export function LossCarryforwardEditor({
               inputMode="decimal"
               value={general}
               readOnly={status !== "loaded"}
+              aria-busy={status === "loading"}
               onChange={(e) => handleAmountChange("general", e.target.value)}
             />
             <p className="mt-1 text-micro text-muted-foreground">
-              {t("lossCarryforward.generalHint")}
+              {status === "loading"
+                ? t("lossCarryforward.loading")
+                : t("lossCarryforward.generalHint")}
             </p>
             {negativeIgnored.general && (
               <p role="status" className="text-micro text-muted-foreground">
