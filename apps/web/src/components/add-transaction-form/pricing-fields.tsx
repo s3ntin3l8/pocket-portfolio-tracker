@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form-field";
 import { NumberField } from "./number-field";
 import { computeTxTotal, formatMoney, totalLabelKey } from "./totals";
+import { cn } from "@/lib/utils";
 
 const CURRENCIES = ["IDR", "USD", "EUR", "SGD"];
 
@@ -112,30 +113,41 @@ export function PricingFields({
         )}
       </div>
 
-      {showExtrasFields && (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {showFees && (
-            <FormField label={t(feesLabelKey)} id="tx-fees">
-              <NumberField id="tx-fees" value={fees} onValueChange={setFees} />
-            </FormField>
-          )}
-          {showTax && (
-            <FormField label={t("tax")} id="tx-tax-extra">
-              <NumberField id="tx-tax-extra" value={tax} onValueChange={setTax} placeholder="0" />
-            </FormField>
-          )}
-        </div>
-      )}
-      {showExtrasBtn && (
+      {/* The disclosure stays mounted while the panel is open, so its open/closed state is
+          perceivable (the chevron rotates) — and the panel keeps its node (and its id)
+          either way, so `aria-controls` always points at an element that exists. */}
+      {(showExtrasBtn || showExtrasFields) && (
         <button
           type="button"
           onClick={onOpenExtras}
+          aria-expanded={showExtrasFields}
+          aria-controls="tx-extras-panel"
           className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-primary"
         >
-          <ChevronRight className="size-3.5 rotate-90" strokeWidth={2.2} />
+          <ChevronRight
+            className={cn("size-3.5 transition-transform", showExtrasFields && "rotate-90")}
+            strokeWidth={2.2}
+          />
           {t(extrasLabelKey)}
         </button>
       )}
+
+      <div id="tx-extras-panel">
+        {showExtrasFields && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {showFees && (
+              <FormField label={t(feesLabelKey)} id="tx-fees">
+                <NumberField id="tx-fees" value={fees} onValueChange={setFees} />
+              </FormField>
+            )}
+            {showTax && (
+              <FormField label={t("tax")} id="tx-tax-extra">
+                <NumberField id="tx-tax-extra" value={tax} onValueChange={setTax} placeholder="0" />
+              </FormField>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Live estimated-total line — suppressed on desktop, where the Summary rail
           (`summary-rail.tsx`) shows the same figure alongside the rest of the form. */}
