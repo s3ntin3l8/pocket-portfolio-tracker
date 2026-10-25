@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { DataState } from "@/components/data-state";
 import { retryAfterOf } from "@/lib/data-status";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 import { Layers, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
@@ -27,6 +28,7 @@ import {
   loadAnomalies,
   loadNetworthAnomalies,
 } from "@/lib/server-api";
+import { getScopeSelection, legacyScopeValue } from "@/lib/server-api/_shared";
 import { PageHeader } from "@/components/page-header";
 import { PageWithRail } from "@/components/page-with-rail";
 
@@ -48,16 +50,37 @@ export default async function HoldingsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ portfolio?: string; filter?: string; range?: string }>;
+  searchParams: Promise<{ portfolio?: string; scope?: string; filter?: string; range?: string }>;
 }) {
   // eslint-disable-next-line react-hooks/purity
   const t0 = TIMING ? performance.now() : 0;
   const { locale } = await params;
-  const { portfolio: portfolioParam, filter: filterParam, range: rangeParam } = await searchParams;
+  const sp = await searchParams;
+  const { portfolio: portfolioParam, filter: filterParam, range: rangeParam } = sp;
   setRequestLocale(locale);
   const t = await getTranslations("Holdings");
   const te = await getTranslations("Empty");
   const tf = await getTranslations("PortfolioForm");
+
+  // `?portfolio=<id>` was the Holdings page's own drill-in parameter. It overrode ONLY the
+  // positions table while the hero chart, the allocation donut and the sidebar net worth
+  // followed `?scope=` — two different scopes on one screen, with nothing saying so (audit
+  // R4-C2). `?scope=p:<id>` is the documented encoding, so a legacy deep link is translated
+  // to it (a redirect) instead of being read as a second, parallel scope.
+  const legacyScope = legacyScopeValue({ scope: sp.scope, portfolio: portfolioParam });
+  if (legacyScope) {
+    const query: Record<string, string> = {};
+    for (const [key, value] of Object.entries(sp)) {
+      if (value && key !== "portfolio" && key !== "scope") query[key] = value;
+    }
+    query.scope = legacyScope;
+    redirect({ href: { pathname: "/holdings", query }, locale });
+  }
+
+  // The page's scope — the `?scope=` the proxy surfaced, or the `pf` cookie fallback. Every
+  // part of this page (positions, hero, allocation, sidebar) follows it.
+  const scope = await getScopeSelection();
+  const portfolioId = scope.kind === "portfolio" ? scope.portfolioId : undefined;
 
   // Blocking path: only what decides WHICH page this is (error / empty / table) plus the
   // net-worth payload — loadHoldings and loadNetWorth share one cached API call. Everything
@@ -70,12 +93,12 @@ export default async function HoldingsPage({
   // promise prop, the anomalies via their request-`cache()`d loaders (the section's own
   // call returns the same in-flight promise).
   const heroData = startHoldingsHeroData(rangeParam);
-  void (portfolioParam ? loadAnomalies(portfolioParam) : loadNetworthAnomalies());
+  void (portfolioId ? loadAnomalies(portfolioId) : loadNetworthAnomalies());
   const prefs = await loadPreferences();
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
   const [result, netWorthResult] = await Promise.all([
-    loadHoldings(costBasis, portfolioParam),
+    loadHoldings(costBasis),
     loadNetWorth(costBasis),
   ]);
 
@@ -244,7 +267,7 @@ export default async function HoldingsPage({
           <HoldingsHeroSection
             summary={summary}
             data={heroData}
-            portfolioParam={portfolioParam}
+            portfolioParam={portfolioId}
             benchmarkSymbol={prefs?.benchmarkSymbols?.[0]?.symbol ?? "^GSPC"}
           />
         </Suspense>
@@ -254,7 +277,7 @@ export default async function HoldingsPage({
         {/* ── Main column: anomaly banners + tabs + table ── */}
         <div className="space-y-5">
           <Suspense fallback={null}>
-            <HoldingsAnomalySection portfolioParam={portfolioParam} locale={locale} />
+            <HoldingsAnomalySection portfolioParam={portfolioId} locale={locale} />
           </Suspense>
 
           <PositionsPanel
